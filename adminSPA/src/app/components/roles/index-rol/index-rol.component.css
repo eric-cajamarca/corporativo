@@ -1,0 +1,54 @@
+/* Estilos para el contenedor del listado de roles */
+.container{
+    margin-top: 20px;
+    padding-top: 20px;
+}
+
+
+.roles-list-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+
+/* Estilos para cada elemento de la lista de roles */
+.role-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+/* Estilos para el nombre del rol */
+.role-name {
+    font-weight: bold;
+    color: green;
+}
+
+/* Estilos para la descripción del rol */
+.role-description {
+    color: #888;
+}
+
+/* Estilos para el botón de editar */
+.edit-button {
+    background-color: #007bff;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* Estilos para el botón de eliminar */
+.delete-button {
+    background-color: #dc3545;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+

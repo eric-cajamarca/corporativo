@@ -1,0 +1,158 @@
+<div class="ventas-container">
+    <!-- HEADER ACTIONS -->
+    <div class="header-actions">
+        <button class="btn btn-primary" [routerLink]="['/ventas/create']" routerLinkActive="active">
+            <i class="bi bi-plus-circle"></i> Crear Nueva Venta
+        </button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="content-wrapper">
+        <!-- FILTERS CARD -->
+        <div class="filters-card card mb-4">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-funnel"></i> Filtros de Búsqueda</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label">Rango de Fechas</label>
+                        <div class="input-group">
+                            <select class="form-select" id="date-filter-type">
+                                <option value="all">Todos</option>
+                                <option value="today">Hoy</option>
+                                <option value="month">Este Mes</option>
+                                <option value="range">Rango Personalizado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3 date-range-container" id="date-range-container" style="display: none;">
+                        <label class="form-label">Fechas</label>
+                        <div class="input-group">
+                            <input type="date" class="form-control" id="date-start">
+                            <input type="date" class="form-control" id="date-end">
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label">Empresa (RUC)</label>
+                        <input type="text" class="form-control" id="ruc-filter" placeholder="20123456789">
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label">Razón Social</label>
+                        <input type="text" class="form-control" id="razon-filter" placeholder="Mi Empresa S.A.C.">
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label">N° Comprobante</label>
+                        <input type="text" class="form-control" id="voucher-number-filter" placeholder="V001-0001">
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label">Tipo Comprobante</label>
+                        <select class="form-select" id="voucher-type-filter">
+                            <option value="">Todos</option>
+                            <option value="Boleta">Boleta</option>
+                            <option value="Factura">Factura</option>
+                            <option value="Nota de Crédito">Nota de Crédito</option>
+                            <option value="Nota de Débito">Nota de Débito</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="filter-actions mt-4">
+                    <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                        <i class="bi bi-x-circle"></i> Limpiar
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="applyFilters()">
+                        <i class="bi bi-search"></i> Buscar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SALES TABLE -->
+        <div class="table-card card">
+            <div class="card-header bg-gradient-success text-white">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Listado de Ventas</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped" id="sales-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID Venta</th>
+                                <th>Fecha y Hora</th>
+                                <th>Cliente</th>
+                                <th>RUC</th>
+                                <th>Comprobante</th>
+                                <th>Total</th>
+                                <th>Estado Pago</th>
+                                <th>Estado SUNAT</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        
+                        <tbody id="sales-table-body">
+                           <tr>
+                            <td>12</td>
+                            <td>2024-06-15 14:30</td>
+                            <td>Juan Pérez</td>
+                            <td>20123456789</td>
+                            <td>Factura V001-0001</td>
+                            <td>S/ 150.00</td>
+                            <td><span class="badge bg-success">Pagado</span></td>
+                            <td><span class="badge bg-info">Aceptado</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#pdfModal">
+                                    <i class="bi bi-file-pdf"></i> PDF
+                                </button>
+                                <!-- <button class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-eye"></i> Ver   
+                                </button> -->
+                                <button class="btn btn-sm btn-outline-secondary">
+                                    <a href="">XML</a> 
+
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary">
+                                    <a href="">CDR</a>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary">
+                                    <a href="">Enviar</a>
+                                </button>
+                            </td>
+
+                           </tr>
+                        </tbody>
+                        <tfoot class="table-light" id="sales-table-footer">
+                            <!-- Summary will be inserted here -->
+
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF MODAL -->
+    <div class="modal fade" id="pdfModal" tabindex="-1" aria-labelledby="pdfModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="pdfModalLabel">
+                        <i class="bi bi-file-pdf"></i> Generar Comprobante PDF
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Seleccione el formato para el comprobante:</p>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary" onclick="generatePdf('ticket')">
+                            <i class="bi bi-receipt"></i> Formato Ticket
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="generatePdf('a4')">
+                            <i class="bi bi-file-earmark-pdf"></i> Formato A4
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

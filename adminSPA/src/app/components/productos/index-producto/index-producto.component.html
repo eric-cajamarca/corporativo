@@ -1,0 +1,189 @@
+<app-topnav></app-topnav>
+<div class="container" style="background-color: white; margin-top: 20px; margin-bottom: 20px;">
+    <div class="card">
+      <div class="card-header">
+  
+        <!-- Title -->
+        <h4 class="card-header-title">
+          Mostrando todos tus productos
+        </h4>
+  
+        <!-- <button class="btn btn-primary" [routerLink]="['/compras/create']" routerLinkActive="active"
+                    style="text-align: right; margin-bottom: 20px;">crear nueva compra</button> -->
+      </div>
+  
+      <ng-container *ngIf="productos.length === 0">
+        <div class="row">
+          <div class="col-12">
+            <div class="alert alert-danger" role="alert">
+              <div class="alert-text">
+                <p>No tienes productos registrados</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="productos.length > 0">
+        <div class="card-body">
+          <div class="input-group input-group-merge">
+            <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
+              [(ngModel)]="filtro">
+            <div class="input-group-append">
+              <button class="btn btn-primary" (click)="filtrar()">
+                Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive" style="height:500px;">
+          <table class="table table-striped table-hover">
+            <thead class="table-dark" style="position: sticky; top: 0; z-index: 100;">
+              <tr>
+                <th>Codigo</th>
+                <th>Categoría</th>
+                <th>Descripción</th>
+                <th>presentación</th>
+                <th>CUnitario</th>
+                <th>FProduccion</th>
+                <th>FVencimiento</th>
+                <th>Acción</th>
+    
+              </tr>
+            </thead>
+            <tbody class="font-size-base">
+              <tr *ngFor="let item of productos | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+                <td>
+    
+                  <span>
+                    {{item.Codigo}}
+                  </span>
+                </td>
+                <td>
+                  <span>{{item.idCategoria}} </span>
+                </td>
+                <td>
+                  <span>{{item.descripcion}}</span>
+                </td>
+                <td>
+                  <span>{{item.idPresentacion}} </span>
+                </td>
+                <td>
+                  <span> {{item.cUnitario | number:'1.2-2'}}</span>
+                  <br>
+                  <!-- <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">Activo</span>
+                  <span class="badge bg-danger" *ngIf="item.condicion != 'ACTIVO'">No Activo</span> -->
+                </td>
+                <td>
+                  <span>{{item.fProduccion}}</span>
+                  <span class="badge bg-success" *ngIf="item.descripcion === 'Pagado'"> Pagado</span>
+                  <span class="badge bg-warning" *ngIf="item.descripcion === 'Pendiente'"> Pendiente</span>
+    
+                </td>
+                <td style="width: 60px; text-align: right;">
+                  <span>{{item.fVencimiento}}</span>
+                </td>
+               
+                <td>
+    
+    
+                  <!-- Example single danger button -->
+                  <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                      Opciones
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+                      
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" data-bs-toggle="modal"
+                        [attr.data-bs-target]="'#consulta-'+item.idProducto"   (click)="consultaidProducto(item.idProducto)">
+                        <i></i> &nbsp; Ver detalles
+                      </a>
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto"  [routerLink]="['/productos',item.idProducto]">
+                        <i></i> &nbsp; Editar
+                      </a>
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" data-bs-toggle="modal"
+                        [attr.data-bs-target]="'#delete-'+item.idProducto">
+                        <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Eliminar
+                      </a>
+                      <!-- <a class="dropdown-item" [routerLink]="['/colaborador',item.compCompra]">
+                        <i class="icon-1x text-dark-50 flaticon-edit"></i> &nbsp; Editar
+                      </a> -->
+                    </ul>
+                  </div>
+    
+                  <div class="modal fade modal-fullscreen" id="consulta-{{item.idProducto}}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-xl" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="exampleModalLabel">Detalles del producto: {{item.descripcion}} </h5>
+                                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                    <i aria-hidden="true" class="ki ki-close"></i>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Aqui se muestra los detalles del producto.</p>
+    
+                                
+                                        
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
+                                
+                            </div>
+                        </div>
+                    </div>
+                  </div>
+    
+                  <div class="modal fade" id="delete-{{item.idProducto}}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="exampleModalLabel">Ventana de eliminación: {{item.descripcion}} </h5>
+                                
+                            </div>
+                            <div class="modal-body">
+                                <p>Está seguro que desea este producto?.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
+                                <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold" (click)="set_eliminar(item.idProducto)">Sí, Eliminar</button>
+                
+                                <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    Eliminando...
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                  </div>
+    
+    
+                </td>
+              </tr>
+    
+            </tbody>
+          </table>
+    
+        </div>
+      </ng-container>
+  
+      
+  
+    </div>
+    <ngb-pagination 
+          *ngIf="productos.length > 0"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="productos.length"
+          [maxSize]="maxSize"
+          [rotate]="rotate"
+          [boundaryLinks]="boundaryLinks"
+          (pageChange)="onPageChange($event)"
+          aria-label="Paginación de productos"
+          class="d-flex justify-content-center my-4">
+        </ngb-pagination>
+    <!-- <ngb-pagination *ngIf="productos.length >= 1" [(page)]="page" [pageSize]="pageSize" [maxSize]="10" [rotate]="true"
+      [boundaryLinks]="true" [collectionSize]="productos.length">
+    </ngb-pagination> -->
+  
+  </div>

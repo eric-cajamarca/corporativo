@@ -1,0 +1,164 @@
+
+
+/* aqui ponemos el css para la tabla de compras */
+
+/* styles-tabla-compras.css */
+.table-responsive {
+  overflow-y: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Estructura compacta de la tabla */
+.table {
+  width: 100%;
+  padding: 15px;
+  margin-bottom: 0;
+  font-size: 0.875rem; /* Tamaño de fuente más pequeño */
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Cabecera compacta */
+.table thead th {
+  position: sticky;
+  top: 0;
+  padding: 2px 2px;
+  vertical-align: middle;
+  border-bottom: 1px solid #dee2e6;
+  background-color: #0d6efd !important; /* Color primario consistente */
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+/* Celdas compactas */
+.table td {
+  padding: 2px 2px;
+  vertical-align: middle;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Efecto hover más sutil */
+.table-hover tbody tr:hover {
+  background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Estilo para filas alternadas */
+.table tbody tr:nth-child(odd) {
+  background-color: #fafafa;
+}
+
+/* Badges más compactos */
+.badge {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  border-radius: 0.25rem;
+}
+
+.badge-condicion {
+  width: fit-content;
+}
+
+/* Alineación de texto */
+.text-end {
+  padding-right: 1rem;
+}
+
+/* Dropdown más compacto */
+.dropdown-menu {
+  min-width: 10rem;
+  padding: 0.25rem 0;
+  font-size: 0.8125rem;
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 0.375rem 1rem;
+}
+
+/* Iconos más pequeños */
+.bi {
+  font-size: 0.875rem;
+}
+
+/* Botón de opciones compacto */
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Efecto visual para estado */
+/* .bg-success {
+  background-color: #198754 !important;
+}
+
+.bg-warning {
+  background-color: #ffc107 !important;
+  color: #212529;
+}
+
+.bg-secondary {
+  background-color: #6c757d !important;
+} */
+
+/* Scrollbar personalizado (opcional) */
+.table-responsive::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+/* Estilo para el campo de proveedor */
+.d-flex.flex-column {
+  line-height: 1.0;
+}
+
+/* Ajuste para números */
+.fw-bold {
+  font-weight: 600 !important;
+}
+
+/* Borde inferior para la última fila */
+.table tbody tr:last-child td {
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* Columnas específicas */
+.table-responsive th:nth-child(1),
+.table-responsive td:nth-child(1) { /* Código */
+  width: 90px;
+}
+
+.table-responsive th:nth-child(2),
+.table-responsive td:nth-child(2) { /* Categoría */
+  width: 90px;
+}
+
+.table-responsive th:nth-child(3),
+.table-responsive td:nth-child(3) { /* Descripción */
+  width: 380px;
+  white-space: normal !important;
+}
+
+.table-responsive th:nth-child(4),
+.table-responsive td:nth-child(4) { /* marca */
+  width: 80px;
+}
+
+.table-responsive th:nth-child(5),
+.table-responsive td:nth-child(5) { /* presentacion */
+  width: 80px;
+}
+
+.table-responsive th:nth-child(6),
+.table-responsive td:nth-child(6) { /* Cantidad */
+  width: 80px;
+}
+

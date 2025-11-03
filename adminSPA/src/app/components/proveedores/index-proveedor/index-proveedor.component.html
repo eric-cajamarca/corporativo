@@ -1,0 +1,164 @@
+<app-topnav></app-topnav>
+
+<div class="container" style="background-color: white;">
+  <div class="row">
+    <div class="col-md-12">
+      <h3> Ventana de proveedores y proveedores</h3>
+        <hr>
+      <div class="col-md-6" style="margin-bottom: 20px;">
+        <a class="btn btn-primary" [routerLink]="['/proveedores/create']" routerLinkActive="active">Nuevo Cliente</a>
+      </div>
+
+      <ng-container *ngIf="proveedores.length === 0">
+        <div class="row">
+          <div class="col-12">
+            <div class="alert alert-danger" role="alert">
+              <div class="alert-text">
+                <p>No tienes proveedores registrados</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="proveedores.length > 0">
+        
+        <div class="row">
+          
+          <div class="input-group input-group-merge">
+            <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
+              [(ngModel)]="filtro">
+            <div class="input-group-append">
+              <button class="btn btn-primary" (click)="filtrar()">
+                Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Ruc/Dni</th>
+              <th>Razón Social</th>
+              <th>Condición</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="font-size-base">
+            <tr *ngFor="let item of proveedores | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+              <td>{{item.ruc}}</td>
+              <td>{{item.rSocial}}</td>
+              <td>
+                <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">Habido</span>
+                <span class="badge bg-danger" *ngIf="item.condicion === 'INACTIVO'">No habido</span>
+              </td>
+              <td>
+                <span class="badge bg-success" *ngIf="item.estado === true">Activo</span>
+                <span class="badge bg-danger" *ngIf="item.estado === false">Inactivo</span>
+              </td>
+              <td>
+                <!-- <a class="btn btn-outline-primary btn-sm" routerLink="/proveedores/editar">Editar</a>
+                            <a class="btn btn-outline-danger btn-sm" style="margin-left: 10px;">Eliminar</a> -->
+
+                <div class="btn-group">
+                  <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown"
+                    aria-expanded="false">
+                    Opciones
+                  </button>
+                  <ul class="dropdown-menu">
+                    <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.estado === true"
+                      data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idProveedor">
+                      <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Desactivar
+                    </a>
+                    <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.estado === false"
+                      data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idProveedor">
+                      <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Activar
+                    </a>
+                    <a class="dropdown-item" [routerLink]="['/proveedores/',item.idProveedor]">
+                      <i class="icon-1x text-dark-50 flaticon-edit"></i> &nbsp; Editar
+                    </a>
+                    <a style="cursor: pointer;" class="dropdown-item" data-bs-toggle="modal"
+                      [attr.data-bs-target]="'#delete-'+item.idProveedor">
+                      <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Eliminar
+                    </a>
+                  </ul>
+                </div>
+
+                <div class="modal fade" id="update-{{item.idProveedor}}" tabindex="-1" role="dialog"
+                  aria-labelledby="exampleModalLabel">
+                  <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                      <div class="modal-header bg-primary">
+                        <h5 class="modal-title" id="exampleModalLabel">Cambio de estado del registro: {{item.rSocial}}
+                        </h5>
+                        
+                      </div>
+                      <div class="modal-body">
+                        <p>Está seguro que desea cambiar el estado del registro?.</p>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-warning font-weight-bold"
+                          data-bs-dismiss="modal">Cerrar</button>
+                        <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold"
+                          (click)="set_state(item.idProveedor,item.estado)" data-bs-dismiss="modal">Sí, Cambiar</button>
+
+                        <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          Cambiando...
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- modal eliminar -->
+                <div class="modal fade" id="delete-{{item.idProveedor}}" tabindex="-1" role="dialog"
+                  aria-labelledby="exampleModalLabel" aria-hidden="true">
+                  <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                      <div class="modal-header bg-danger">
+                        <h5 class="modal-title" id="exampleModalLabel">Eliminar registro: {{item.rSocial}} </h5>
+                        
+                      </div>
+                      <div class="modal-body">
+                        <p>Está seguro que desea eliminar el registro?.</p>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-warning font-weight-bold"
+                          data-bs-dismiss="modal">Cerrar</button>
+                        <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold"
+                          (click)="eliminar(item.idProveedor)">Sí, Eliminar</button>
+
+                        <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          Eliminando...
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+            </tr>
+          </tbody>
+
+        </table>
+      </ng-container>
+
+
+    </div>
+    <ngb-pagination 
+          *ngIf="proveedores.length > 0"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="proveedores.length"
+          [maxSize]="maxSize"
+          [rotate]="rotate"
+          [boundaryLinks]="boundaryLinks"
+          (pageChange)="onPageChange($event)"
+          aria-label="Paginación de proveedores"
+          class="d-flex justify-content-center my-4">
+        </ngb-pagination>
+  </div>
+</div>

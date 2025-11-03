@@ -1,0 +1,100 @@
+<div class="controls">
+  <button (click)="addStem()">🍃 Agregar Tallo</button>
+  <button (click)="addFlower()">➕ Agregar Flor</button>
+  <button (click)="addLeaf()">🍃 Agregar Hoja</button>
+  <input type="color" [(ngModel)]="selectedColor" />
+</div>
+
+<svg width="600" height="600" viewBox="0 0 600 600">
+  <!-- Fondo -->
+  <rect width="100%" height="100%" fill="#f5f5f5" />
+
+  <!-- Jarrón (base del arreglo) -->
+  <path d="M200,550 L400,550 L380,450 L220,450 Z" fill="#e6e6fa" stroke="#333" />
+
+  <!-- Tallos -->
+  <g *ngFor="let stem of stems()" (click)="selectStem(stem)">
+    <path 
+      [attr.d]="stem.path" 
+      stroke="#2e8b57" 
+      [attr.stroke-width]="stem.width" 
+      fill="none" 
+      [class.selected]="stem === selectedStem" />
+  </g>
+
+  <!-- Flores -->
+  <g *ngFor="let flower of flowers()" (click)="selectElement(flower)">
+    <path [attr.d]="flower.path" [attr.fill]="flower.color" />
+    <circle *ngIf="flower.center" 
+            [attr.cx]="flower.center.x" 
+            [attr.cy]="flower.center.y" 
+            [attr.r]="flower.center.radius" 
+            fill="#FFD700" />
+  </g>
+
+  <!-- Hojas -->
+  <path *ngFor="let leaf of leaves()" 
+        [attr.d]="leaf.path" 
+        [attr.fill]="leaf.color" 
+        (click)="selectElement(leaf)" />
+</svg>
+<!-- <nav class="navbar navbar-dark bg-dark fixed-top">
+  <div class="container-fluid">
+    <div class="container">
+      <a class="navbar-brand" href="#">
+        <img src="assets/img/bsc.jpg" alt="img" width="30" height="24">
+      </a>
+    </div>
+  
+    <a class="navbar-brand" href="#">Offcanvas dark navbar</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasDarkNavbar" aria-controls="offcanvasDarkNavbar" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+   
+    <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="offcanvasDarkNavbar" aria-labelledby="offcanvasDarkNavbarLabel">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasDarkNavbarLabel">Dark offcanvas</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="#">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">Link</a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              Dropdown
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="#">Action</a></li>
+              <li><a class="dropdown-item" href="#">Another action</a></li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li><a class="dropdown-item" href="#">Something else here</a></li>
+            </ul>
+          </li>
+        </ul>
+        <form class="d-flex mt-3" role="search">
+          <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+          <button class="btn btn-success" type="submit">Search</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</nav> -->
+
+<!-- <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasWithBothOptions" aria-controls="offcanvasWithBothOptions">Enable both scrolling & backdrop</button>
+
+<div class="offcanvas offcanvas-start" data-bs-scroll="true" tabindex="-1" id="offcanvasWithBothOptions" aria-labelledby="offcanvasWithBothOptionsLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="offcanvasWithBothOptionsLabel">Backdrop with scrolling</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <p>Try scrolling the rest of the page to see this option in action.</p>
+  </div>
+</div> -->

@@ -1,0 +1,156 @@
+<app-topnav></app-topnav>
+
+<div class="main-content">
+  <div class="container-fluid" >
+    <div class="row justify-content-center" >
+      <div class="col-12 col-lg-11 col-xl-11"  style="background-color: white; margin-top: 20px;">
+
+        <h3>Bien venido al módulo de despachos</h3>
+        <p>Aquí se lista el comprobante de compra mas la descripcion de la mercaderia que el cliente a retirado.</p>
+
+
+        <div class="card-body">
+
+          <!-- lista desplegable -->
+          <label for="select">Seleccione una empresa</label><br>
+          <select class="select-empresa" aria-label="Default select example" [(ngModel)]="empresaSeleccionada"
+            (change)="onEmpresaSeleccionada()">
+            <option selected disabled>Selecionar</option>
+            <option *ngFor="let empresa of empresa" [ngValue]="empresa">{{ empresa.Alias }}</option>
+            <!-- <option *ngFor="let empresa of empresa" [value]="empresa.id">{{ empresa.Alias }}</option> -->
+          </select>
+
+
+          <div class="input-group input-group-merge" style="width: 40%;">
+            <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
+              [(ngModel)]="filtro" >
+            <div class="input-group-append">
+              <button class="btn btn-primary" (click)="filtrar()">
+                Buscar
+              </button>
+            </div>
+
+
+          </div>
+
+
+        </div>
+
+        <h5>Comprobante de compra</h5>
+
+        <div class="card">
+          <div class="card-header">
+            Comprobante: {{compVenta.Serie_Numero}} <br>
+            Cliente: {{compVenta.Razon_Social}}
+          </div>
+          <div class="card-body">
+            <h6 class="card-title">Detalle del comprobante</h6>
+
+            <div class="table-responsive">
+              <table class="table table-dark">
+                <thead class="table-dark">
+                  <tr>
+                    <th>Cantidad</th>
+                    <th>Codigo</th>
+                    <th>Descripción</th>
+                    <th>Presentación</th>
+                    <th>Precio</th>
+                    <th>CEntregado</th>
+                    
+
+                  </tr>
+                </thead>
+                <tbody class="table-active">
+                  <tr *ngFor="let item of detalleVenta">
+
+                    <td style="width: 70px;">
+                      <span>{{item.Cantidad}}</span>
+                    </td>
+                    <td>
+                      <span>{{item.Codigo}} </span>
+                    </td>
+                    <td>
+                      <span>{{item.Descripcion}} </span>
+                    </td>
+                    <td style="width: 60px; text-align: center;">
+                      <span>{{item.Presentacion}} </span>
+                    </td>
+                    <td style="width: 60px; text-align: right;">
+                      <span>{{item.PVenta | number:'1.2-2'}} </span>
+                    </td>
+                    <td style="width: 60px; text-align: center;">
+                      <span>{{item.CantEntregado}} </span>
+                    </td>
+                    
+                  </tr>
+
+                </tbody>
+              </table>
+
+            </div>
+
+            <!-- <a [routerLink]="['/despachos/registrar']" [queryParams]="{ idempresa: idempresa, Serie_Numero: compVenta.Serie_Numero }" class="btn btn-primary">Crear nuevo despacho</a> -->
+            <a class="btn btn-primary" [routerLink]="['/despachos/registrar', idempresa, compVenta.Serie_Numero]">Crear
+              nuevo despacho</a>
+            <!-- <a  class="btn btn-primary" [routerLink]="['/despachos/registrar']" >Crear nuevo despacho</a> -->
+          </div>
+        </div>
+
+        <h5>Comprobantes de despachos</h5>
+
+
+        <div class="accordion" id="accordionExample">
+          <div *ngFor="let compEnvioItem of compEnvio" class="accordion-item">
+            <h2 class="accordion-header" id="heading{{compEnvioItem.CompEnvio}}">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                [attr.data-bs-target]="'#collapse' + compEnvioItem.CompEnvio" aria-expanded="true"
+                [attr.aria-controls]="'collapse' + compEnvioItem.CompEnvio">
+                Comprobante: {{compEnvioItem.CompEnvio}} <br>
+                Fecha: {{compEnvioItem.FEnvio}}
+              </button>
+            </h2>
+            <div [id]="'collapse' + compEnvioItem.CompEnvio" class="accordion-collapse collapse"
+              [attr.aria-labelledby]="'heading' + compEnvioItem.CompEnvio" data-bs-parent="#accordionExample">
+              <div class="accordion-body">
+                <div class="table-responsive">
+                  <table class="table table-dark">
+                    <thead class="table-dark">
+                      <tr>
+                        <!-- <th>Comprobante</th>
+                                    <th>FEnvio</th> -->
+                        <th>Descripción</th>
+                        <th>Presentación</th>
+                        <th>Cantidad</th>
+                      </tr>
+                    </thead>
+                    <tbody class="table-active">
+                      <tr *ngFor="let item of henvio">
+                        <!-- <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
+                                      <span>{{item.CompEnvio}}</span>
+                                    </td>
+                                    <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
+                                      <span>{{item.FEnvio}} </span>
+                                    </td> -->
+                        <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
+                          <span>{{item.Descripcion}} </span>
+                        </td>
+                        <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
+                          <span>{{item.Presentacion}} </span>
+                        </td>
+                        <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
+                          <span>{{item.Cantidad}} </span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,16 @@
+.main-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+}
+
+.card-form {
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 2rem;
+  width: 100%;
+  max-width: 900px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}

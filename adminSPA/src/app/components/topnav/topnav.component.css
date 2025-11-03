@@ -1,0 +1,135 @@
+/* Color principal y navbar */
+.bg-dark {
+    /* background: linear-gradient(135deg, #e3672e 0%, #d9601a 100%) !important; 
+    background: linear-gradient(135deg, #2962FF 0%, #0039CB 100%) !important;
+    background: linear-gradient(135deg, #00B0FF 0%, #0081CB 100%) !important; */
+
+    background: linear-gradient(135deg, #2196F3 0%, #1565C0 100%) !important;
+    box-shadow: 0 2px 10px rgba(24, 30, 105, 0.329);
+}
+
+.navbar {
+    padding: 0.5rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.navbar > .container-fluid {
+    padding: 0;
+}
+
+/* Items del navbar */
+.nav-link {
+    color: white !important;
+    font-weight: 500;
+    padding: 0.8rem 1.2rem !important;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    margin: 0 2px;
+    display: flex;
+    align-items: center;
+}
+
+.nav-link:hover, .nav-link:focus {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    transform: translateY(-2px);
+}
+
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.25) !important;
+    font-weight: 600;
+}
+
+/* Dropdowns */
+.dropdown-toggle::after {
+    margin-left: 0.5em;
+    vertical-align: middle;
+}
+
+.dropdown-menu {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    padding: 0.5rem 0;
+    margin-top: 0.5rem;
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dropdown-item {
+    padding: 0.5rem 1.5rem;
+    color: #333;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: #f8f9fa;
+    color: #1565C0;
+    transform: translateX(5px);
+}
+
+.dropdown-item.active {
+    background-color: #f0f0f0;
+    color: #1565C0;
+    font-weight: 600;
+}
+
+/* Efecto hover para los dropdowns principales */
+.nav-item.dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+/* Ícono de cerrar sesión */
+.nav-link[href="#"] {
+    color: #fff !important;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-link[href="#"]:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .navbar-collapse {
+        padding: 1rem 0;
+    }
+    
+    .nav-link {
+        padding: 0.75rem 1rem !important;
+        margin: 2px 0;
+    }
+    
+    .dropdown-menu {
+        margin-top: 0;
+        box-shadow: none;
+        border-radius: 0;
+        border: none;
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .dropdown-item {
+        color: white;
+        padding-left: 2rem;
+    }
+    
+    .dropdown-item:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        transform: none;
+    }
+
+}
+
+/* Agrega esto a tu CSS para proteger los estilos del dropdown */
+.dropdown-menu {
+  border: 1px solid rgba(0,0,0,.15) !important;
+  box-shadow: 0 0.5rem 1rem rgba(0,0,0,.175) !important;
+}
+
+.dropdown-item {
+  transition: all 0.2s ease;
+}
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #00B0FF;
+}

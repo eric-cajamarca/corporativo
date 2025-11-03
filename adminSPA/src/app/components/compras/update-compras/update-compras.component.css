@@ -1,0 +1,225 @@
+/* Estilos generales para el contenedor principal */
+.container {
+  width: 95%;
+  max-width: 95%;
+  padding: 0;
+  margin: 10px;
+}
+
+/* Estilos para todos los cards */
+.cabecera-compra .card,
+.tabla-busqueda .card,
+.nuevo-producto .card,
+.tabla-detalle .card,
+.totales .card {
+  width: 100% !important;
+  margin: 0 0 10px 0;
+  border-radius: 5px;
+}
+
+/* Eliminar márgenes internos no deseados */
+.card-body {
+  padding: 1.25rem;
+}
+
+/* Cabecera principal */
+.cabecera-compra .card > h2 {
+  padding: 15px 20px;
+  margin: 0;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+/* Formularios dentro de cards */
+.row.form-group {
+  margin-left: -8px;
+  margin-right: -8px;
+}
+
+.row.form-group > div {
+  padding-left: 8px;
+  padding-right: 8px;
+  margin-bottom: 15px;
+}
+
+/* Tablas responsivas */
+.table-responsive {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Ajustes específicos para la tabla de detalle */
+.tabla-detalle .table-responsive {
+  height: 300px;
+}
+
+/* Eliminar márgenes en inputs y selects */
+.form-control {
+  margin: 0;
+}
+
+/* Botones alineados correctamente */
+.btn {
+  margin: 0 5px 0 0;
+}
+
+.tabla-busqueda table{
+  table-layout: fixed;
+  width: 100%;
+  font-size: 12px;
+}
+
+.tabla-busqueda th,
+.tabla-busqueda td{
+    padding: 2px 2px !important;
+}
+
+/* Columnas específicas */
+.tabla-busqueda th:nth-child(1),
+.tabla-busqueda td:nth-child(1) { /* Código */
+  width: 100px;
+}
+
+.tabla-busqueda th:nth-child(2),
+.tabla-busqueda td:nth-child(2) { /* Categoría */
+  width: 80px;
+}
+
+.tabla-busqueda th:nth-child(3),
+.tabla-busqueda td:nth-child(3) { /* Descripción */
+  width: 350px;
+  white-space: normal !important;
+}
+
+.tabla-busqueda th:nth-child(4),
+.tabla-busqueda td:nth-child(4) { /* marca */
+  width: 80px;
+}
+
+.tabla-busqueda th:nth-child(5),
+.tabla-busqueda td:nth-child(5) { /* presentacion */
+  width: 100px;
+}
+
+.tabla-busqueda th:nth-child(6),
+.tabla-busqueda td:nth-child(6) { /* Cantidad */
+  width: 100px;
+}
+
+.tabla-busqueda th:nth-child(7),
+.tabla-busqueda td:nth-child(7) { /* C.unitario */
+  width: 100px;
+}
+
+.tabla-busqueda th:nth-child(8),
+.tabla-busqueda td:nth-child(8) { /* F.Prod */
+  width: 90px;
+}
+
+.tabla-busqueda th:nth-child(9),
+.tabla-busqueda td:nth-child(9) { /* FVrnc */
+  width: 90px;
+}
+
+
+.tabla-busqueda th:nth-child(10),
+.tabla-busqueda td:nth-child(10) { /* sucursal */
+  width: 80px;
+}
+
+
+/* Ajustes para las columnas de la tabla */
+.tabla-detalle table {
+  table-layout: fixed;
+  width: 100%;
+  font-size: 12px;
+}
+
+.tabla-detalle th, 
+.tabla-detalle td {
+  padding: 2px 2px !important;
+}
+
+/* Columnas específicas */
+/* Columnas específicas */
+.tabla-detalle th:nth-child(1),
+.tabla-detalle td:nth-child(1) { /* Código */
+  width: 100px;
+}
+
+.tabla-detalle th:nth-child(2),
+.tabla-detalle td:nth-child(2) { /* Categoría */
+  width: 80px;
+}
+
+.tabla-detalle th:nth-child(3),
+.tabla-detalle td:nth-child(3) { /* Descripción */
+  width: 300px;
+  white-space: normal !important;
+}
+
+.tabla-detalle th:nth-child(4),
+.tabla-detalle td:nth-child(4) { /* marca */
+  width: 80px;
+}
+
+.tabla-detalle th:nth-child(5),
+.tabla-detalle td:nth-child(5) { /* presentacion */
+  width: 100px;
+}
+
+.tabla-detalle th:nth-child(6),
+.tabla-detalle td:nth-child(6) { /* Cantidad */
+  width: 80px;
+}
+
+.tabla-detalle th:nth-child(7),
+.tabla-detalle td:nth-child(7) { /* C.unitario */
+  width: 80px;
+}
+
+.tabla-detalle th:nth-child(8),
+.tabla-detalle td:nth-child(8) { /* F.Prod */
+  width: 90px;
+}
+
+.tabla-detalle th:nth-child(9),
+.tabla-detalle td:nth-child(9) { /* FVrnc */
+  width: 90px;
+}
+
+
+.tabla-detalle th:nth-child(10),
+.tabla-detalle td:nth-child(10) { /* sucursal */
+  width: 90px;
+}
+
+/* ... (continuar con los demás nth-child según necesites) */
+
+/* Responsive para pantallas pequeñas */
+@media (max-width: 768px) {
+  .row.form-group > div {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .tabla-detalle th, 
+  .tabla-detalle td {
+    padding: 6px 8px !important;
+    font-size: 0.7rem;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

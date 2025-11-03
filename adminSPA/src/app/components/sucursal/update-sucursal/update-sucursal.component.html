@@ -1,0 +1,44 @@
+<app-topnav></app-topnav>
+
+
+<div class="container">
+    <div class="card">
+        <div class="card-header"> 
+            <h1>Editar sucursal</h1>
+        </div>
+        <div class="card-body">
+            <form #updateForm="ngForm" (ngSubmit)="actualizar(updateForm)">
+                <div class="mb-3">
+                    <label for="nombre" class="form-label">Nombre de la sucursal</label>
+                    <input class="form-control" name="descripcion" [(ngModel)]="sucursal.nombre" type="text" maxlength="20" appFormatSentence>
+
+                </div>
+
+                <div class="mb-3">
+                    <label for="direccion" class="form-label">Dirección</label>
+                    <input class="form-control" name="direccion" [(ngModel)]="sucursal.direccion" type="text" maxlength="200" appFormatSentence>
+                </div>
+
+                <div class="mb-3">
+                    <label for="fregistro" class="date">Fecha de registro</label>
+                    <input  class="form-control" name="fregistro" [(ngModel)]="sucursal.fregistro" type="text" disabled>
+                </div>
+
+
+                <button *ngIf="!load_data" type="submit" class="btn btn-primary">Actualizar</button>
+                <button *ngIf="load_data" type="button" class="btn btn-success" disabled>
+                    <span class="spinner-border spinner-border-sm" role="status"
+                        aria-hidden="true"></span>
+                    Actualizando...
+                </button>
+                
+                <a href="/sucursal" class="btn btn-warning" style="margin-left: 20px;">Regresar</a>
+            </form>
+        </div>   
+         
+        
+    </div>
+
+</div>
+
+

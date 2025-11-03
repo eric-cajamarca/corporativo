@@ -1,0 +1,82 @@
+
+<app-topnav></app-topnav>
+<div class="main-wrapper">
+            <div class="card-form">
+                <div class="card-header pb-2">
+                    <h3 class="text-dark mb-0">Nuevo colaborador</h3>
+                </div>
+
+                <div class="card-body">
+                    <form #registroForm="ngForm" (ngSubmit)="registrar(registroForm)">
+                        <div class="mb-4">
+                            <h5 class="text-muted">Datos personales</h5>
+                        </div>
+
+                        <!-- Nombres -->
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label">Nombres (*)</label>
+                            <div class="col-sm-9">
+                                <input required name="nombres" [(ngModel)]="colaborador.nombres" type="text"
+                                    class="form-control" placeholder="Nombres" />
+                            </div>
+                        </div>
+
+                        <!-- Apellidos -->
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label">Apellidos (*)</label>
+                            <div class="col-sm-9">
+                                <input required name="apellidos" [(ngModel)]="colaborador.apellidos" type="text"
+                                    class="form-control" placeholder="Apellidos" />
+                            </div>
+                        </div>
+
+                        <!-- Correo -->
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label">Correo electrónico (*)</label>
+                            <div class="col-sm-9">
+                                <input required name="email" [(ngModel)]="colaborador.email" type="email"
+                                    class="form-control" placeholder="ejemplo@gmail.com" />
+                            </div>
+                        </div>
+
+                        <!-- Contraseña -->
+                        <div class="mb-3 row">
+                            <label class="col-sm-3 col-form-label">Contraseña (*)</label>
+                            <div class="col-sm-9">
+                                <input required name="password" [(ngModel)]="colaborador.password" type="password"
+                                    class="form-control" placeholder="********" />
+                                <small class="text-muted">Ingrese como mínimo 8 caracteres</small>
+                            </div>
+                        </div>
+
+                        <!-- Cargo -->
+                        <div class="mb-4 row">
+                            <label class="col-sm-3 col-form-label">Cargo</label>
+                            <div class="col-sm-9">
+                                <select required name="idRol" [(ngModel)]="colaborador.idRol" class="form-select">
+                                    <option value="" disabled selected>Seleccionar cargo...</option>
+                                    <option *ngFor="let rol of roles" [value]="rol.idRol">{{ rol.descripcion }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Acciones -->
+                        <div class="d-flex justify-content-between mt-4 border-top pt-3">
+                            <a class="btn btn-warning" [routerLink]="['/colaborador']">Regresar</a>
+
+                            <ng-container *ngIf="!btn_registrar; else registrando">
+                                <button type="submit" class="btn btn-success">Registrar</button>
+                            </ng-container>
+                            <ng-template #registrando>
+                                <button type="button" class="btn btn-success" disabled>
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"
+                                        aria-hidden="true"></span>
+                                    Registrando...
+                                </button>
+                            </ng-template>
+                        </div>
+                    </form>
+                </div>
+            </div>
+</div>
+

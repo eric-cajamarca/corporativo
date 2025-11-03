@@ -1,0 +1,180 @@
+<app-topnav></app-topnav>
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+
+      
+      <!-- Title -->
+      <h4 class="card-header-title">
+        Mostrando todos los registros
+      </h4>
+
+      <button class="btn btn-primary" [routerLink]="['/marcas/create']" routerLinkActive="active"
+        style="text-align: right; margin-bottom: 20px;">Crear nueva marca</button>
+
+    </div>
+
+    <ng-container *ngIf="marcas.length === 0">
+      <div class="row">
+        <div class="col-12">
+          <div class="alert alert-danger" role="alert">
+            <div class="alert-text">
+              <p>No tienes marcas registradas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-container *ngIf="marcas.length > 0">
+      <div class="card">
+        <div class="card-body">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th scope="col">Nombre</th>
+                <th scope="col">Descripción</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let marca of marcas |  slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+                <td>{{ marca.nombre }}</td>
+                <td>{{ marca.descripcion }}</td>
+                <td>
+                  <span class="badge bg-success" *ngIf="marca.estado">Activo</span>
+                  <span class="badge bg-danger" *ngIf="!marca.estado">Desactivado</span>
+                <td>
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown"
+                      aria-expanded="false">
+                      Opciones
+                    </button>
+                    <ul class="dropdown-menu">
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="marca.estado" data-bs-toggle="modal"
+                        [attr.data-bs-target]="'#delete-'+marca.idMarca">
+                        <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Desactivar
+                      </a>
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="!marca.estado" data-bs-toggle="modal"
+                        [attr.data-bs-target]="'#delete-'+marca.idMarca">
+                        <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Activar
+                      </a>
+                      <a style="cursor: pointer;" class="dropdown-item" (click)="seleccionar(marca.idMarca)"
+                        data-bs-toggle="modal" [attr.data-bs-target]="'#editar-'+marca.idMarca">
+                        <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Editar
+                      </a>
+                    </ul>
+                  </div>
+
+                  <div class="modal fade" id="delete-{{marca.idMarca}}" tabindex="-1" role="dialog"
+                    aria-labelledby="exampleModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title" id="exampleModalLabel">Ventana de cambio de estado de la marca:
+                            {{marca.nombre}}
+                          </h5>
+
+                        </div>
+                        <div class="modal-body">
+                          <p>Está seguro que desea cambiar el estado de la marca?.</p>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-warning font-weight-bold"
+                            data-bs-dismiss="modal">Cerrar</button>
+                          <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold"
+                            (click)="cambiarEstado(marca?.idMarca, marca?.estado)" data-bs-dismiss="modal">Sí,
+                            cambiar</button>
+
+                          <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Cambiando...
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal fade" id="editar-{{marca.idMarca}}" tabindex="-1" role="dialog"
+                    aria-labelledby="exampleModalLabel" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title" id="exampleModalLabel">Ventana para editar la marca:
+                            {{marca.nombre}}
+                          </h5>
+
+                        </div>
+                        <div class="modal-body">
+                          <p>Está seguro que desea editar la marca?.</p>
+                          <div>
+                            <div class="col-12">
+                              <div>
+                                <label for="nombre">Nombre</label>
+                                <input type="text" class="form-control" name="nombre"
+                                  [(ngModel)]="prod_Modificar.nombre">
+                              </div>
+
+                              <div>
+                                <label for="descripcion">Descripción</label>
+                                <input type="text" class="form-control" name="descripcion"
+                                  [(ngModel)]="prod_Modificar.descripcion">
+                              </div>
+                            </div>
+
+                            <div class="col-12">
+                              <div>
+                                <label for="contacto">Contato</label>
+                                <input type="text" class="form-control" name="contacto"
+                                  [(ngModel)]="prod_Modificar.contacto">
+                              </div>
+
+                              <div>
+                                <label for="paginaWeb">Pagina Web</label>
+                                <input type="text" class="form-control" name="paginaWeb"
+                                  [(ngModel)]="prod_Modificar.paginaWeb">
+                              </div>
+                            </div>
+                          </div>
+
+
+                        </div>
+
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-warning font-weight-bold"
+                            data-bs-dismiss="modal">Cerrar</button>
+                          <button *ngIf="!load_estado" type="button" class="btn btn-primary font-weight-bold"
+                            (click)="editarMarca(prod_Modificar.idMarca)" data-bs-dismiss="modal">Sí, guardar
+                            cambios</button>
+
+                          <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Modificando...
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+      </div>
+
+    </ng-container>
+    <ngb-pagination 
+          *ngIf="marcas.length > 0"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="marcas.length"
+          [maxSize]="maxSize"
+          [rotate]="rotate"
+          [boundaryLinks]="boundaryLinks"
+          (pageChange)="onPageChange($event)"
+          aria-label="Paginación de marcas"
+          class="d-flex justify-content-center my-4">
+        </ngb-pagination>
+  </div>
+</div>

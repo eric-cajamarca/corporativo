@@ -1,0 +1,62 @@
+<app-topnav></app-topnav>
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+
+
+            <!-- Title -->
+            <h4 class="card-header-title">
+                Crear nueva marca.
+            </h4>
+
+
+        </div>
+
+        <div class="card-body">
+            <form class="form" id="kt_form" #registroForm="ngForm" (ngSubmit)="registrar(registroForm)">
+                <div class="form-group">
+
+                    <label for="nombre">Nombre</label>
+                    <input type="text" class="form-control" id="nombre" name="nombre" [(ngModel)]="marca.nombre"
+                        required appFormatSentence>
+                </div>
+                <div class="form-group">
+                    <label for="descripcion">Descripción</label>
+                    <textarea class="form-control" id="descripcion" name="descripcion" [(ngModel)]="marca.descripcion"
+                        required appFormatSentence></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="contacto">Contacto</label>
+                    <input type="text" class="form-control" id="contacto" name="contacto" [(ngModel)]="marca.contacto"
+                        required appFormatSentence>
+                </div>
+                <div class="form-group">
+                    <label for="paginaWeb">Pagina Web</label>
+                    <input type="text" class="form-control" id="paginaWeb" name="paginaWeb"
+                        [(ngModel)]="marca.paginaWeb" >
+                </div>
+
+                <div class="form-group" style="margin-top: 20px;">
+                    <div>
+
+                        <button type="button" class="btn btn-warning" style="margin-right: 15px;">Regresar</button>
+
+                        <button *ngIf="!btn_registrar" type="submit" class="btn btn-success">Registrar</button>
+
+                        <button *ngIf="btn_registrar" type="button" class="btn btn-success font-weight-bolder px-9 py-4"
+                            disabled>
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            Registrando...
+                        </button>
+
+
+                    </div>
+
+
+                </div>
+
+
+            </form>
+        </div>
+    </div>
+</div>

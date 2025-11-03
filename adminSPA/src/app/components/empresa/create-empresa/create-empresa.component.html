@@ -1,0 +1,89 @@
+<app-topnav></app-topnav>
+<div class="container-fluid">
+    <div class="card">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-12 p-5">
+            @if (load_create) {
+              <div class="alert alert-success" role="alert">
+                <h4 class="alert-heading">Empresa creada correctamente</h4>
+                <p>
+                  Verifique su correo <strong>{{ empresas.correo }}</strong> para recibir la conformidad y activación de su cuenta.
+                </p>
+                <hr />
+                <p class="mb-0">Este proceso podría tardar de 12 a 24 horas.</p>
+              </div>
+            } @else {
+              <div class="form-signin0">
+                <main class="form-signin">
+                  <form #loginForm="ngForm" style="text-align: center !important;">
+                    <h1 class="h3 mb-3 fw-normal">Formulario de registro</h1>
+  
+                    <div class="form-floating">
+                      <div class="input-group">
+                        <input
+                          type="text"
+                          class="form-control"
+                          name="ruc"
+                          [(ngModel)]="empresa.ruc"
+                          placeholder="Ingrese el RUC"
+                          required
+                        />
+                        @if (!encontrado) {
+                          <button class="btn btn-primary" (click)="buscar(empresa.ruc)">Verificar</button>
+                        } @else {
+                          <button class="btn btn-success">Verificado</button>
+                        }
+                      </div>
+                    </div>
+  
+                    <div class="form-floating">
+                      <input
+                        type="email"
+                        class="form-control"
+                        name="email"
+                        [(ngModel)]="empresa.email"
+                        placeholder="Correo electrónico"
+                        appValidateEmail
+                        required
+                      />
+                      <label for="floatingInput">Correo electrónico</label>
+                    </div>
+  
+                    <div class="form-floating">
+                      <input
+                        type="password"
+                        class="form-control"
+                        name="password"
+                        [(ngModel)]="empresa.password"
+                        placeholder="Tu contraseña"
+                        required
+                      />
+                      <label for="floatingPassword">Contraseña</label>
+                    </div>
+  
+                    <div class="form-floating">
+                      <input
+                        type="password"
+                        class="form-control"
+                        name="repitPassword"
+                        [(ngModel)]="empresa.repitPassword"
+                        placeholder="Confirmar contraseña"
+                        required
+                      />
+                      <label for="floatingPassword">Confirmar contraseña</label>
+                    </div>
+  
+                    @if (encontrado) {
+                      <button class="w-100 btn btn-lg btn-primary" (click)="registrar()">Registrarme</button>
+                    }
+                  </form>
+                </main>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  

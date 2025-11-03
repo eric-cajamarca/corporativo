@@ -1,0 +1,157 @@
+<app-topnav></app-topnav>
+
+<div class="main-wrapper">
+    <div class="card-form">
+        <div class="card-header pb-2">
+
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-10 col-xl-10 bg-white mt-3 rounded-2 p-4 shadow-sm">
+
+                    @if (load_data) {
+                    <div class="card card-custom card-shadowless rounded-top-0">
+                        <div class="row">
+                            <div class="col-12 text-center">
+                                <!-- Custom size border spinner -->
+                                <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
+                                    <span class="visually-hidden"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    } @else {
+                    @if (data) {
+                    <div class="card card-custom card-shadowless rounded-top-0">
+                        <!--begin::Body-->
+                        <div class="card-header border-0 pt-5">
+                            <h2 class="card-title align-items-start flex-column text-center">
+                                <span class="card-label font-weight-bolder text-dark">Editar un colaborador</span>
+                                <span class="text-muted mt-3 font-weight-bold font-size-sm">{{colaborador.name}}</span>
+                            </h2>
+                        </div>
+                        <hr>
+                        <div class="card-body p-0">
+
+                            <!--begin::Wizard Form-->
+                            <form class="form" id="kt_form" #updateForm="ngForm" (ngSubmit)="actualizar(updateForm)">
+                                <div class="row justify-content-center">
+                                    <div class="col-xl-9">
+                                        <!--begin::Wizard Step 1-->
+                                        <div class="my-5 step" data-wizard-type="step-content"
+                                            data-wizard-state="current">
+                                            <h5 class="text-dark font-weight-bold mb-10">Datos personales:</h5>
+
+                                            <!--begin::Group-->
+                                            <div class="form-group row">
+                                                <label class="col-xl-3 col-lg-3 col-form-label">Nombres</label>
+                                                <div class="col-lg-9 col-xl-9">
+                                                    <input class="form-control form-control-solid" required
+                                                        name="nombres" [(ngModel)]="colaborador.nombres" type="text"
+                                                        placeholder="Nombres" />
+                                                </div>
+                                            </div>
+                                            <!--end::Group-->
+
+                                            <!--begin::Group-->
+                                            <div class="form-group row">
+                                                <label class="col-xl-3 col-lg-3 col-form-label">Apellidos</label>
+                                                <div class="col-lg-9 col-xl-9">
+                                                    <input class="form-control form-control-solid form-control-lg"
+                                                        required name="apellidos" [(ngModel)]="colaborador.apellidos"
+                                                        type="text" placeholder="Apellidos" />
+                                                </div>
+                                            </div>
+
+                                            <div class="form-group row">
+                                                <label class="col-xl-3 col-lg-3 col-form-label">Correo
+                                                    electrónico</label>
+                                                <div class="col-lg-9 col-xl-9">
+                                                    <input class="form-control form-control-solid form-control-lg"
+                                                        required name="email" [(ngModel)]="colaborador.email"
+                                                        type="email" placeholder="Correo electrónico" disabled />
+                                                </div>
+                                            </div>
+                                            <!--end::Group-->
+
+                                            <!--begin::Group-->
+                                            <div class="form-group row">
+                                                <label class="col-xl-3 col-lg-3 col-form-label">Contraseña</label>
+                                                <div class="col-lg-9 col-xl-9">
+                                                    <input type="text"
+                                                        class="form-control form-control-solid form-control-lg"
+                                                        name="password" [(ngModel)]="colaborador.password"
+                                                        placeholder="Puede ingresar una nueva contraseña si desea" />
+                                                </div>
+                                            </div>
+                                            <!--end::Group-->
+                                            <div class="form-group row">
+                                                <label class="col-xl-3 col-lg-3 col-form-label">Cargo</label>
+                                                <div class="col-lg-9 col-xl-9">
+                                                    <select required name="idRol" [(ngModel)]="colaborador.idRol"
+                                                        class="form-control">
+                                                        <option [ngValue]="null" selected disabled>Seleccionar cargo...
+                                                        </option>
+                                                        @for (rol of roles; track rol.idRol) {
+                                                        <option [ngValue]="rol.idRol">{{ rol.descripcion }}</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <!--begin::Group-->
+                                            <!-- <div class="form-group row">
+                                                        <label class="col-xl-3 col-lg-3 col-form-label">Cargo</label>
+                                                        <div class="col-lg-9 col-xl-9">
+                                                            <select required name="idRol" [(ngModel)]="colaborador.idRol"
+                                                                class="form-control">
+                                                                <option value="" selected disabled>Seleccionar cargo...</option>
+                                                                @for (rol of roles; track rol.idRol) {
+                                                                    <option [value]="rol.idRol">{{ rol.descripcion }}</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                    </div> -->
+                                            <!--end::Group-->
+                                        </div>
+                                        <!--end::Wizard Step 1-->
+
+                                        <!--begin::Wizard Actions-->
+                                        <div class="d-flex justify-content-between border-top pt-10 mt-15">
+                                            <div class="mr-2">
+                                                <a class="btn btn-warning" [routerLink]="['/colaborador']"
+                                                    data-wizard-type="action-prev">Regresar</a>
+                                            </div>
+                                            <div>
+                                                @if (!btn_actualizar) {
+                                                <button type="submit" class="btn btn-success">Actualizar</button>
+                                                } @else {
+                                                <button type="button" class="btn btn-success" disabled>
+                                                    <span class="spinner-border spinner-border-sm" role="status"
+                                                        aria-hidden="true"></span>
+                                                    Actualizando...
+                                                </button>
+                                                }
+                                            </div>
+                                        </div>
+                                        <!--end::Wizard Actions-->
+                                    </div>
+                                </div>
+                            </form>
+                            <!--end::Wizard Form-->
+                        </div>
+                        <!--end::Body-->
+                    </div>
+                    } @else {
+                    <div class="card card-custom card-shadowless rounded-top-0 text-center">
+                        <h3 class="text-center">No se encontró el registro</h3>
+                        <div class="row justify-content-center">
+                            <div class="col-6">
+                                <h5 class="text-danger">Error fatal</h5>
+                            </div>
+                        </div>
+                    </div>
+                    }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

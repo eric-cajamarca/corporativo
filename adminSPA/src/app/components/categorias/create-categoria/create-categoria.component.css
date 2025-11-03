@@ -1,0 +1,19 @@
+.card-header {
+    background-color: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/*quiero que el card este centrado en la pantalla y que su ancho maximo sea de 400px*/
+.card {
+    margin: 0 auto;
+    float: none;
+    max-width: 400px;
+}
+
+.card {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.14);
+}

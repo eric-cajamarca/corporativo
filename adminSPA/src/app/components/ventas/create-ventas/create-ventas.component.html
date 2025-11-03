@@ -1,0 +1,318 @@
+<app-topnav></app-topnav>
+
+<div class="app-container">
+  <main class="app-main">
+    <div class="container-fluid h-100">
+      <div class="row h-100">
+
+        <!-- COLUMNA IZQUIERDA: Productos y Carrito -->
+        <div class="col-lg-8 col-md-12 left-column">
+
+          <!-- CARD: Detalle de Venta -->
+          <section class="cart-section card">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
+
+              <!-- BOTÓN VERDE QUE ABRE EL MODAL -->
+              <button class="btn btn-success btn-lg"
+                      data-bs-toggle="modal"
+                      data-bs-target="#buscadorModal">
+                <i class="bi bi-search"></i> Buscar productos
+              </button>
+            </div>
+
+            <div class="card-body">
+
+              <!-- Mensaje carrito vacío -->
+              <div *ngIf="carrito.length === 0" class="text-center py-4">
+                <i class="bi bi-cart-x fs-1"></i>
+                <p class="mb-0">El carrito está vacío</p>
+              </div>
+
+              <!-- Tabla de detalle -->
+              <div *ngIf="carrito.length > 0"
+                   class="table-responsive mx-auto"
+                   style="max-height:300px; overflow-y:auto;">
+                <table class="table table-hover align-middle mb-0">
+                  <thead style="background-color:#20c997; color:white;">
+                    <tr>
+                      <th>Código</th>
+                      <th>Producto</th>
+                      <th>U.Medida</th>
+                      <th>Cantidad</th>
+                      <th>P. Unit.</th>
+                      <th>Subtotal</th>
+                      <th>Sucursal</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let item of carrito; let i = index">
+                      <td>{{ item.producto.Codigo }}</td>
+                      <td>{{ item.producto.descripcion }}</td>
+                      <td>{{ item.presentacion.codigo }}</td>
+
+                      <!-- Cantidad editable -->
+                      <td contenteditable="true"
+                          class="editable"
+                          (blur)="actualizaCantidad(item, $event)">
+                        {{ item.cantidad }}
+                      </td>
+
+                      <!-- Precio editable -->
+                      <td contenteditable="true"
+                          class="editable"
+                          (blur)="actualizaPrecio(item, $event)">
+                        S/ {{ item.producto.cUnitario | number:'1.2-2' }}
+                      </td>
+
+                      <td>S/ {{ (item.cantidad * item.producto.cUnitario) | number:'1.2-2' }}</td>
+                      <td>{{ item.sucursal.nombre }}</td>
+                      <td>
+                        <i class="bi bi-trash text-danger"
+                           style="cursor:pointer;"
+                           (click)="eliminarDelCarrito(i)"></i>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Resumen -->
+              <div class="cart-summary mt-3">
+                <div class="row g-2">
+                  <div class="col-6"><div class="summary-item"><span>Subtotal:</span><span>S/ 0.00</span></div></div>
+                  <div class="col-6"><div class="summary-item"><span>IGV (18%):</span><span>S/ 0.00</span></div></div>
+                  <div class="col-12"><div class="summary-item total"><span>Total:</span><span>S/ 0.00</span></div></div>
+                </div>
+              </div>
+
+            </div>
+          </section>
+        </div>
+
+        <!-- COLUMNA DERECHA: Comprobante -->
+        <div class="col-lg-4 col-md-12 right-column">
+            <aside class="receipt-panel card h-100">
+                <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Datos del Comprobante</h5>
+                </div>
+                <div class="card-body">
+                <!-- (radios, inputs, botón cobrar...) -->
+                    <div class="btn-group w-100 mb-3" role="group" (change)="cargarDatosComprobante($event)">
+                        <input type="radio" class="btn-check" name="receipt" id="boleta" value="boleta">
+                        <label class="btn btn-outline-primary" for="boleta">Boleta</label>
+
+                        <input type="radio" class="btn-check" name="receipt" id="factura" value="factura">
+                        <label class="btn btn-outline-primary" for="factura">Factura</label>
+
+                        <input type="radio" class="btn-check" name="receipt" id="nota" value="nota">
+                        <label class="btn btn-outline-primary" for="nota">Nota de Pedido</label>
+
+                        <input type="radio" class="btn-check" name="receipt" id="cotizacion" value="cotizacion">
+                        <label class="btn btn-outline-primary" for="cotizacion">Cótizacion</label>
+                    </div>
+                    <div class="info-comprobante row g-3">
+
+                        <!-- Fila 1: Serie + Número -->
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">Serie</label>
+                        <input type="text" class="form-control" name="serie" [(ngModel)]="ventas.serie" placeholder="F001">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">Número</label>
+                        <input type="text" class="form-control" name="numero" [(ngModel)]="ventas.numero"
+                                placeholder="00000001" >
+                                <!-- (change)="onInputChangesCompventas()" -->
+                        </div>
+
+                        <!-- Fila 2: Fechas -->
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">F. Emisión (*)</label>
+                        <input type="date" class="form-control" name="fEmision" [(ngModel)]="ventas.fEmision">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">F. Vencimiento (*)</label>
+                        <input type="date" class="form-control" name="fVencimiento" [(ngModel)]="ventas.fVencimiento">
+                        </div>
+
+                        <!-- Fila 3: Moneda + Estado pago -->
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">Moneda (*)</label>
+                        <select class="form-select" name="idMoneda" [(ngModel)]="ventas.idMoneda">
+                            <option value="" disabled selected>Seleccionar...</option>
+                            <option *ngFor="let m of moneda" [value]="m.idMoneda">{{ m.descripcion }}</option>
+                        </select>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">Estado de pago (*)</label>
+                        <select class="form-select" name="idEstadoPago" [(ngModel)]="ventas.idEstadoPago">
+                            <option value="" disabled selected>Seleccionar...</option>
+                            <option *ngFor="let e of estadoPago" [value]="e.idEstadoPago">{{ e.descripcion }}</option>
+                        </select>
+                        </div>
+
+                        <!-- Fila 4: Medio de pago + Comp. Relacionado -->
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">Medio de pago (*)</label>
+                        <select class="form-select" name="idMediosPago" [(ngModel)]="ventas.idMediosPago">
+                            <option value="" disabled selected>Seleccionar...</option>
+                            <option *ngFor="let m of mediosPago" [value]="m.idMediosPago">{{ m.descripcion }}</option>
+                        </select>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                        <label class="form-label">Comp. Relacionado</label>
+                        <input type="text" class="form-control" name="compRelacionado"
+                                [(ngModel)]="ventas.compRelacionado" placeholder="Ingrese el comprobante relacionado">
+                        </div>
+
+                    </div>
+                    <!-- CARD: Información del Cliente -->
+                   
+
+                </div>
+                 <!-- CARD: Información del Cliente -->
+                <div class="card border-secondary mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0"><i class="bi bi-person-lines-fill"></i> Información del Cliente</h6>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- Tipo + RUC + Botón -->
+                            <div class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label">Tipo</label>
+                                <select class="form-select" [(ngModel)]="ventas.idDocumento">
+                                <option value="" selected disabled>Seleccionar documento...</option>
+                                <option *ngFor="let item of documento" [value]="item.idDocumento">{{ item.nombre }}
+                                </select>
+                            </div>
+
+                            <div class="col-md-5">
+                                <label class="form-label">Número</label>
+                                <input
+                                  type="text"
+                                  class="form-control"
+                                  [(ngModel)]="cliente.ruc"
+                                  [placeholder]="cliente.tipoDoc === 'ruc' ? '20123456789' : '12345678'"
+                                  (input)="onInputNumero()">
+                            
+                                  </div>
+
+                            <div class="col-md-4 d-grid">
+                                <!-- Botón que abre el modal (SIN TS) -->
+                                <button class="btn btn-secundary" style="border-color: grey;"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#clientesModal">
+                                <i class="bi bi-search"></i> Buscar
+                                </button>
+                            </div>
+                            </div>
+
+                            <!-- Razón Social -->
+                            <div class="mt-3">
+                                <label class="form-label">Razón Social</label>
+                                <input type="text" class="form-control" [(ngModel)]="cliente.rSocial" readonly>
+                            </div>
+
+                        </div>
+                        
+                    <!-- Botón cobrar -->
+                    <button class="btn btn-secundary btn-lg w-100" [disabled]="!cliente.razonSocial">
+                    <i class="bi bi-currency-dollar"></i> Cobrar y Emitir
+                    </button>
+                  </div>
+                
+            </aside>
+
+          <!-- Modal: lista de clientes -->
+            <div class="modal fade" id="clientesModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Seleccionar cliente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <!-- Aquí Angular 19 renderiza el componente -->
+                        <app-index-clientes (clienteElegido)="clienteSeleccionado($event)">
+                        </app-index-clientes>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- MODAL (fuera del card, al final del template) -->
+<!-- ------------------------------------------------------------------ -->
+<div class="modal fade" id="buscadorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">Buscar productos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Buscador -->
+        <div class="row mb-3">
+          <div class="col-md-8">
+            <input type="search"
+                   class="form-control"
+                   placeholder="Nombre o código..."
+                   [(ngModel)]="searchTerm"
+                   (input)="buscarProductos()">
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-outline-success w-100" (click)="buscarProductos()">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla de resultados -->
+        <div class="table-responsive" style="max-height:300px;">
+          <table class="table table-hover align-middle">
+            <thead style="background-color:#20c997; color:white;">
+              <tr>
+                <th>Código</th>
+                <th>Categoría</th>
+                <th>Producto</th>
+                <th>U.Medida</th>
+                <th>Precio</th>
+                <th>Sucursal</th>
+                <th>Stock</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of productos_filtrados">
+                <td>{{ p.producto.Codigo }}</td>
+                <td>{{ p.categoria.nombre }}</td>
+                <td>{{ p.producto.descripcion }}</td>
+                <td>{{ p.presentacion.codigo }}</td>
+                <td>S/ {{ p.producto.cUnitario | number:'1.2-2' }}</td>
+                <td>{{ p.sucursal.nombre }}</td>
+                <td>{{ p.cantidad }}</td>
+                <td>
+                  <i class="bi bi-plus-circle-fill text-success"
+                     style="font-size:1.5rem; cursor:pointer;"
+                     (click)="agregarAlCarrito(p)"
+                     data-bs-dismiss="modal"></i>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>

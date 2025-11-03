@@ -1,0 +1,79 @@
+<app-topnav></app-topnav>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="row justify-content-center min-vh-100 align-items-center py-4" style="background-color: #f8f9fa;">
+            <div class="col-12 col-md-10 col-lg-8 col-xl-6">
+                <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+                    <!-- Card Header -->
+                    <div class="card-header bg-white border-0 py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2 class="h5 mb-0 fw-semibold text-primary">
+                                <i class="bi bi-people-fill me-2"></i> Listado de Roles
+                            </h2>
+                            <button class="btn btn-sm btn-primary" (click)="redirigirCrearRol()" type="button">
+                                <i class="bi bi-plus-circle me-1"></i> Nuevo
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Card Body -->
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4 py-2 text-uppercase fw-semibold small">Nombre del Rol</th>
+                                        <th class="text-end pe-4 py-2 text-uppercase fw-semibold small" style="width: 120px;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr *ngFor="let item of roles | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+                                        <td class="ps-4 py-2">
+                                            <span class="d-flex align-items-center">
+                                                <i class="bi bi-person-badge me-2 text-muted"></i>
+                                                <span class="fw-medium">{{ item!.descripcion }}</span>
+                                            </span>
+                                        </td>
+                                        <td class="text-end pe-4 py-2">
+                                            <button class="btn btn-sm btn-outline-primary" [routerLink]="['/rol',item.idRol]">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr *ngIf="roles.length === 0">
+                                        <td colspan="2" class="text-center py-4 text-muted small">
+                                            No se encontraron roles registrados
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Card Footer -->
+                    <div class="card-footer bg-white border-0 py-2">
+                        <div class="text-end">
+                            <span class="text-muted small">
+                                Mostrando {{roles.length}} {{roles.length === 1 ? 'registro' : 'registros'}}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <ngb-pagination 
+                    *ngIf="roles.length > 0"
+                    [(page)]="page"
+                    [pageSize]="pageSize"
+                    [collectionSize]="roles.length"
+                    [maxSize]="maxSize"
+                    [rotate]="rotate"
+                    [boundaryLinks]="boundaryLinks"
+                    (pageChange)="onPageChange($event)"
+                    aria-label="Paginación de roles"
+                    class="d-flex justify-content-center my-4">
+                </ngb-pagination>
+            </div>
+        </div>
+    </div>
+</div>
+

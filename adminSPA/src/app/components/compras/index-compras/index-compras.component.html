@@ -1,0 +1,244 @@
+<app-topnav></app-topnav>
+
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h4 class="mb-0 fw-semibold">
+        <i class="bi bi-receipt me-2"></i>Mostrando todas tus compras
+      </h4>
+      
+      <button class="btn btn-sm btn-primary" 
+              [routerLink]="['/compras/create']" 
+              routerLinkActive="active">
+        <i class="bi bi-plus-circle me-2"></i>Crear nueva compra
+      </button>
+    </div>
+
+    <!-- Mensaje cuando no hay compras -->
+    <ng-container *ngIf="compras.length === 0">
+      <div class="card-body">
+        <div class="alert alert-warning d-flex align-items-center mb-0">
+          <i class="bi bi-exclamation-triangle-fill me-3 fs-5"></i>
+          <div>
+            <p class="mb-0 fw-medium">No tienes compras realizadas</p>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Contenido cuando hay compras -->
+    <ng-container *ngIf="compras.length > 0">
+      <div class="card-body border-bottom">
+        <button class="btn btn-sm btn-info" (click)="generarListaCompras()">
+          <i class="bi bi-file-pdf"></i> Lista de Compras
+        </button>
+        <div class="row">
+          <div class="col-md-8 offset-md-2">
+            <div class="input-group mb-3">
+              <input type="text" 
+                     class="form-control" 
+                     placeholder="Buscar compras..." 
+                     name="filtro"
+                     [(ngModel)]="filtro">
+              <button class="btn btn-primary" 
+                      type="button" 
+                      (click)="filtrar()">
+                <i class="bi bi-search me-2"></i>Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive" style="max-height:500px;">
+        <table class="table table-hover mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th class="bg-primary text-white">Comprobante</th>
+              <th class="bg-primary text-white">F. Emisión</th>
+              <th class="bg-primary text-white">Proveedor</th>
+              <th class="bg-primary text-white">Estado</th>
+              <th class="bg-primary text-white text-end">Total</th>
+              <th class="bg-primary text-white text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of compras | slice: (page-1) * pageSize : page * pageSize">
+              <td class="fw-medium">{{item.compCompra}}</td>
+              <td>{{item.fEmision}}</td>
+              <td>
+                <div class="d-flex flex-column">
+                  <span>{{item.rSocial}}</span>
+                  <span class="badge mt-1 badge-condicion" 
+                         [ngClass]="item.condicion === 'ACTIVO' ? 'bg-success' : 'bg-secondary'" >
+                    {{item.condicion === 'ACTIVO' ? 'Activo' : 'No Activo'}}
+                  </span>
+                </div>
+              </td>
+              <td>
+                <span class="badge" 
+                      [ngClass]="{'bg-success': item.descripcion === 'Pagado', 
+                                 'bg-warning': item.descripcion === 'Pendiente'}">
+                  {{item.descripcion}}
+                </span>
+              </td>
+              <td class="text-end fw-bold">{{item.total | number:'1.2-2'}}</td>
+              <td class="text-end">
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-primary dropdown-toggle" 
+                          type="button" 
+                          data-bs-toggle="dropdown"
+                          aria-expanded="false">
+                    <i class="bi bi-gear"></i> Opciones
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li *ngIf="item.compCompra">
+                      <a class="dropdown-item d-flex align-items-center" 
+                         data-bs-toggle="modal"
+                         [attr.data-bs-target]="'#consulta-'+item.compCompra" 
+                         (click)="consultaCompCompra(item.idcompra)">
+                        <i class="bi bi-eye me-2"></i>Ver detalles
+                      </a>
+                    </li>
+                    <li *ngIf="item.compCompra">
+                      <a class="dropdown-item d-flex align-items-center" 
+                         [routerLink]="['/compras',item.idcompra]">
+                        <i class="bi bi-pencil me-2"></i>Editar
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item d-flex align-items-center" (click)="descargarPDF(item, detalleCompras)">
+                        <i class="bi bi-eye me-2"></i>Ver PDF
+                      </a>
+                    </li>
+                    <li *ngIf="item.idcompra">
+                      <a class="dropdown-item d-flex align-items-center text-danger" 
+                         data-bs-toggle="modal"
+                         [attr.data-bs-target]="'#delete-'+item.idcompra">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal de Detalles -->
+      <div  class="tabla-detalle">
+        <div *ngFor="let item of compras">
+          <div class="modal fade" [id]="'consulta-'+item.compCompra" tabindex="-1">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                  <h5 class="modal-title">
+                    Detalles de la factura: {{item.compCompra}} - {{item.rSocial}}
+                  </h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="mb-3">Lista de productos de la compra:</p>
+                  
+                  <div *ngIf="loadDetalleCompras" class="text-center py-5">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                      <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3">Cargando detalles...</p>
+                  </div>
+                  
+                  <div *ngIf="!loadDetalleCompras" class="table-responsive">
+                    <table class="table table-sm table-hover">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Código</th>
+                          <th>Categoría</th>
+                          <th>Producto</th>
+                          <th>Marca</th>
+                          <th class="text-center">Present.</th>
+                          <th class="text-end">Cantidad</th>
+                          <th class="text-end">P.Unitario</th>
+                          <th class="text-end">Sub Total</th>
+                          <th class="text-center">F.Producción</th>
+                          <th class="text-center">F.Vencimiento</th>
+                          <th class="text-center">Sucursal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let detalle of detalleCompras">
+                          <td>{{detalle.codigo}}</td>
+                          <td>{{detalle.categoria.nombre}}</td>
+                          <td>{{detalle.descripcion}}</td>
+                          <td>{{detalle.marca.nombre}}</td>
+                          <td class="text-center">{{detalle.presentacion.Descripcion}}</td>
+                          <td class="text-end">{{detalle.cantidad}}</td>
+                          <td class="text-end">{{detalle.cUnitario | number:'1.2-2'}}</td>
+                          <td class="text-end">{{detalle.subtotal | number:'1.2-2'}}</td>
+                          <td class="text-center">{{detalle.fProduccion}}</td>
+                          <td class="text-center">{{detalle.fVencimiento}}</td>
+                          <td class="text-center">{{detalle.sucursal.nombre}}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Modal de Eliminación -->
+      <div *ngFor="let item of compras">
+        <div class="modal fade" [id]="'delete-'+item.idcompra" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Eliminar compra: {{item.idcompra}}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <p>¿Está seguro que desea eliminar esta compra?</p>
+                <p class="fw-bold">Esta acción no se puede deshacer.</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  Cancelar
+                </button>
+                <button type="button" 
+                        class="btn btn-danger"
+                        (click)="set_eliminar(item.idcompra)"
+                        [disabled]="load_estado">
+                  <span *ngIf="!load_estado">Sí, Eliminar</span>
+                  <span *ngIf="load_estado">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Procesando...
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Paginación -->
+    <div class="card-footer bg-white" *ngIf="compras.length > 0">
+      <ngb-pagination [(page)]="page"
+                      [pageSize]="pageSize"
+                      [collectionSize]="compras.length"
+                      [maxSize]="maxSize"
+                      [rotate]="true"
+                      [boundaryLinks]="true"
+                      (pageChange)="onPageChange($event)"
+                      aria-label="Paginación de compras"
+                      class="d-flex justify-content-center mb-0">
+      </ngb-pagination>
+    </div>
+  </div>
+</div>

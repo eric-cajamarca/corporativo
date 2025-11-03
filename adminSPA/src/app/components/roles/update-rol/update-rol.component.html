@@ -1,0 +1,44 @@
+<app-topnav></app-topnav>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="row justify-content-center min-vh-100 align-items-center" style="background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);">
+            <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+                <div class="card border-0 shadow-lg rounded-3 overflow-hidden">
+                    <!-- Card Header with Gradient Background -->
+                    <div class="card-header bg-primary text-white py-4">
+                        <h2 class="h4 mb-0 text-center">
+                            <i class="bi bi-person-plus me-2"></i> Editar Rol
+                        </h2>
+                    </div>
+                    <!-- Card Body -->
+                    <div class="card-body p-4 p-md-5">    
+                        <form #updateForm="ngForm" (ngSubmit)="actualizar(updateForm)" class="needs-validation" novalidate>
+                            <div class="mb-4">
+                                <label for="rolName" class="form-label fw-bold">Nombre del rol</label>
+                                <input class="form-control form-control-lg" 
+                                       id="rolName"
+                                       name="descripcion"  
+                                       [(ngModel)]="rol.descripcion" 
+                                       type="text"
+                                       required>
+                                <div class="invalid-feedback">
+                                    Por favor ingresa el nombre del rol
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-3 d-md-flex justify-content-md-end mt-4">
+                                <a routerLink="/rol" class="btn btn-outline-secondary me-md-2">
+                                    <i class="bi bi-arrow-left me-2"></i>Regresar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle me-2"></i>Actualizar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

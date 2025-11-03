@@ -1,0 +1,55 @@
+<app-topnav></app-topnav>
+
+<!-- Contenido del listado de envíos -->
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h2 class="text-center mb-4">Listado de Envíos</h2>
+
+            <!-- Filtros para envíos de hoy y pendientes -->
+            <div class="mb-3">
+                <label for="filtroEnvios" class="form-label">Filtrar Envíos</label>
+                <select class="form-select" id="filtroEnvios">
+
+
+                    <option value="hoy">Envíos de Hoy</option>
+                    <option value="pendientes">Envíos Pendientes</option>
+                </select>
+            </div>
+
+
+
+
+            <!-- Tabla para mostrar los envíos -->
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+
+
+                        <th>Dirección de Envío</th>
+                        <th>Detalles del Envío</th>
+                        <th>Fecha de Entrega</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Ejemplo de fila de envío -->
+                    <tr>
+                        <td>1</td>
+                        <td>Cliente 1</td>
+
+
+                        <td>Dirección 123, Ciudad</td>
+                        <td>Detalles del envío</td>
+                        <td>2023-12-15</td>
+                        <td>Pendiente</td>
+
+                    </tr>
+                    <!-- Puedes repetir esta fila para más envíos -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

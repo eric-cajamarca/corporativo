@@ -1,0 +1,32 @@
+.container {
+    margin: 0 auto;
+    float: none;
+    min-width: 600px;
+
+}
+
+.card {
+    margin: 0 auto;
+    float: none;
+    max-width: 600px;
+}
+
+.card {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.14);
+}
+
+.btn-primary{
+    background-color: #e3672e;
+    color: white;
+    border:  #94847c 1px solid;
+}
+.btn-primary:hover{
+    background-color: #9c9b9a;
+    color: white;
+    border:  #e3672e 1px solid;
+}
+

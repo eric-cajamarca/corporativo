@@ -1,0 +1,168 @@
+<app-topnav></app-topnav>
+
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-11 col-xl-11"
+        style="background:white; border-radius: 1.5%; margin-top: 10px; margin-bottom: 10px;">
+
+        <!-- Header -->
+        <div class="header mt-md-5">
+          <div class="header-body">
+            <div class="row align-items-center">
+              <div class="col">
+
+                <!-- Title -->
+                <h1 class="header-title">
+                  Colaboradores
+                </h1><br>
+
+                <button class="btn btn-primary" [routerLink]="['/colaborador/create']" routerLinkActive="active"
+                  style="text-align: right; margin-bottom: 20px;">crear nuevo colaborador</button>
+              </div>
+            </div> <!-- / .row -->
+
+          </div>
+        </div>
+
+        <!-- Alert -->
+
+
+        <!-- Card -->
+        <div class="card">
+          <div class="card-header">
+
+            <!-- Title -->
+            <h4 class="card-header-title">
+              Mostrando todos tus colaboradores de la pagina web
+            </h4>
+
+          </div>
+
+          <div class="card-body">
+            <div class="input-group input-group-merge">
+              <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
+                [(ngModel)]="filtro">
+              <div class="input-group-append">
+                <button class="btn btn-primary" (click)="filtrar()">
+                  Buscar
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-nowrap card-table">
+              <thead class="table-dark">
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Correo</th>
+                  <!-- <th>Telefono</th> -->
+                  <th>Estado</th>
+                  <th>Rol</th>
+                  <th></th>
+
+                </tr>
+              </thead>
+              <tbody class="font-size-base">
+                <tr *ngFor="let item of colaboradores | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+                  <td>
+
+                    <span>
+                      {{item.nombres}} {{item.apellidos}}
+                    </span>
+                  </td>
+
+                  <td>
+                    <span>{{item.email}}</span>
+
+                    <!-- <td>
+                        <span *ngIf="item.telefono">{{item.telefono}}</span>
+                        <span *ngIf="!item.telefono">No registrado</span>
+                      </td> -->
+                  <td>
+                    <span class="badge bg-success" *ngIf="item.estado">Activo</span>
+                    <span class="badge bg-danger" *ngIf="!item.estado">Desactivado</span>
+                  </td>
+                  <td>
+                    <span>{{item.descripcion}}</span>
+
+                  </td>
+                  <td>
+
+
+                    <!-- Example single danger button -->
+                    <div class="btn-group">
+                      <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown"
+                        aria-expanded="false">
+                        Opciones
+                      </button>
+                      <ul class="dropdown-menu">
+                        <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.estado" data-bs-toggle="modal"
+                          [attr.data-bs-target]="'#delete-'+item.idUsuario">
+                          <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Desactivar
+                        </a>
+                        <a style="cursor: pointer;" class="dropdown-item" *ngIf="!item.estado" data-bs-toggle="modal"
+                          [attr.data-bs-target]="'#delete-'+item.idUsuario">
+                          <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Activar
+                        </a>
+                        <a class="dropdown-item" [routerLink]="['/colaborador',item.idUsuario]">
+                          <i class="icon-1x text-dark-50 flaticon-edit"></i> &nbsp; Editar
+                        </a>
+                      </ul>
+                    </div>
+
+
+                    <!-- modal eliminar -->
+                    <div class="modal fade" id="delete-{{item.idUsuario}}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                      <div class="modal-dialog" role="document">
+                          <div class="modal-content">
+                              <div class="modal-header bg-warning text-white">
+                                  <h5 class="modal-title" id="exampleModalLabel">Cambio de estado del colaborador: {{item.nombres}} {{item.apellidos}} </h5>
+                                  
+                              </div>
+                              <div class="modal-body">
+                                  <p>Está seguro que desea cambiar el estado del colaborador?.</p>
+                              </div>
+                              <div class="modal-footer">
+                                  <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
+                                  <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold" (click)="set_state(item.idUsuario,item.estado)">Sí, Cambiar</button>
+                  
+                                  <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                                      <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                      Cambiando...
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                    </div>
+
+
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
+
+          </div>
+
+        </div>
+        
+        <ngb-pagination 
+          *ngIf="colaboradores.length > 0"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="colaboradores.length"
+          [maxSize]="maxSize"
+          [rotate]="rotate"
+          [boundaryLinks]="boundaryLinks"
+          (pageChange)="onPageChange($event)"
+          aria-label="Paginación de colaboradores"
+          class="d-flex justify-content-center my-4">
+        </ngb-pagination>
+
+        <br>
+
+      </div>
+    </div>
+  </div>
+</div>

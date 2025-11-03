@@ -1,0 +1,226 @@
+
+<app-topnav></app-topnav>
+<!-- <app-top-nav></app-top-nav> -->
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+
+
+      <!-- Title -->
+      <h4 class="card-header-title">
+        Mostrando todos los registros
+      </h4>
+
+      <button class="btn btn-primary" [routerLink]="['/crear-empresa']" routerLinkActive="active"
+        style="text-align: right; margin-bottom: 20px;">Crear nueva empresa</button>
+
+    </div>
+    @if(empresas.length === 0) {
+      
+        <ng-container>
+        <div class="row">
+            <div class="col-12">
+            <div class="alert alert-danger" role="alert">
+                <div class="alert-text">
+                <p>No tienes empresas registradas</p>
+                </div>
+            </div>
+            </div>
+        </div>
+        </ng-container>
+    } @else {
+        <ng-container> 
+            <div class="card">
+              <div class="card-body">
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th scope="col">Ruc</th>
+                      <th scope="col">Nombre</th>
+                      <th scope="col">Celular</th>
+                      <th scope="col">Est.Sunat</th>
+                      <th scope="col">Estado </th>
+                      <th scope="col">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (empresa of empresas | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize; track empresa.idEmpresa) {
+                        <tr>
+                          <td>{{ empresa.ruc }}</td>
+                          <td>{{ empresa.razon_Social }}</td>
+                          <td>{{ empresa.celular }}</td>
+                          <td>
+                            @switch (empresa.estSunat) {
+                              @case ('ACTIVO') {
+                                <span class="badge bg-success">Activo</span>
+                              }
+                              @case ('BAJA DE OFICIO') {
+                                <span class="badge bg-warning">Baja de oficio</span>
+                              }
+                              @case ('BAJA PROVISIONAL') {
+                                <span class="badge bg-warning">Baja provisional</span>
+                              }
+                              @case ('BAJA DEFINITIVA') {
+                                <span class="badge bg-warning">Baja definitiva</span>
+                              }
+                              @case ('SUSPENSION TEMPORAL') {
+                                <span class="badge bg-warning">Suspensión temporal</span>
+                              }
+                              @default {
+                                <span class="badge bg-danger">Sin Estado</span>
+                              }
+                            }
+                          </td>
+                          <td>
+                            @if (empresa.estado) {
+                              <span class="badge bg-success">Activo</span>
+                            } @else {
+                              <span class="badge bg-danger">Desactivado</span>
+                            }
+                          </td>
+                          <td>
+                           
+                            <div class="btn-group">
+                              <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                Opciones
+                              </button>  
+                              <ul class="dropdown-menu">
+                                @if (empresa.estado) {
+                                  <li>
+                                    <a class="dropdown-item" data-bs-toggle="modal" [attr.data-bs-target]="'#delete-'+empresa.idEmpresa">
+                                      <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Desactivar
+                                    </a>
+                                  </li>
+                                } @else {
+                                  <li>
+                                    <a class="dropdown-item" data-bs-toggle="modal" [attr.data-bs-target]="'#delete-'+empresa.idEmpresa">
+                                      <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Activar
+                                    </a>
+                                  </li>
+                                }
+                              </ul>
+                            </div>
+                            
+                            
+                            <div class="modal fade" id="delete-{{empresa.idEmpresa}}" tabindex="-1" role="dialog"
+                              aria-labelledby="exampleModalLabel" aria-hidden="true">
+                              <div class="modal-dialog" role="document">
+                                <div class="modal-content">
+                                  <div class="modal-header">
+                                    <h5 class="modal-title" id="exampleModalLabel">
+                                      Ventana de cambio de estado de la empresa: {{empresa.nombre}}
+                                    </h5>
+                                  </div>
+                                  <div class="modal-body">
+                                    <p>¿Está seguro que desea cambiar el estado de la empresa?</p>
+                                  </div>
+                                  <div class="modal-footer">
+                                    <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
+                                    
+                                    @if (!load_estado) {
+                                      <button type="button" class="btn btn-danger font-weight-bold"
+                                        (click)="cambiarEstado(empresa.idEmpresa, empresa.estado)" data-bs-dismiss="modal">
+                                        Sí, cambiar
+                                      </button>
+                                    } @else {
+                                      <button class="btn btn-danger" type="button" disabled>
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        Cambiando...
+                                      </button>
+                                    }
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+
+                    <!-- <tr *ngFor="let empresas of empresas">
+                      <td>{{empresas.ruc}} </td>
+                      <td>{{ empresas.razon_Social }}</td>
+                      <td>{{ empresas.celular }}</td>
+                      <td>
+                          <span class="badge bg-success" *ngIf="empresas.estSunat === 'ACTIVO'">Activo </span>
+                          <span class="badge bg-warning" *ngIf="empresas.estSunat === 'BAJA DE OFICIO'">Baja de oficio</span>
+                          <span class="badge bg-warning" *ngIf="empresas.estSunat === 'BAJA PROVISIONAL'">Baja provisional</span>
+                          <span class="badge bg-warning" *ngIf="empresas.estSunat === 'BAJA DEFINITIVA'">Baja definitiva</span>
+                          <span class="badge bg-warning" *ngIf="empresas.estSunat === 'SUSPENSION TEMPORAL'">Suspensión temporal</span>
+                          
+                          <span class="badge bg-danger" *ngIf="empresas.estSunat === null">Sin Estado</span>
+                      </td>
+                      <td>
+                        <span class="badge bg-success" *ngIf="empresas.estado">Activo</span>
+                        <span class="badge bg-danger" *ngIf="!empresas.estado">Desactivado</span>
+                      </td>
+                      <td>
+                        <div class="btn-group">
+                          <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                            Opciones
+                          </button>
+                          <ul class="dropdown-menu">
+                            <a style="cursor: pointer;" class="dropdown-item" *ngIf="empresas.estado" data-bs-toggle="modal"
+                              [attr.data-bs-target]="'#delete-'+empresas.idEmpresa">
+                              <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Desactivar
+                            </a>
+                            <a style="cursor: pointer;" class="dropdown-item" *ngIf="!empresas.estado" data-bs-toggle="modal"
+                              [attr.data-bs-target]="'#delete-'+empresas.idEmpresa">
+                              <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Activar
+                            </a>
+                            
+                          </ul>
+                        </div>
+      
+                        <div class="modal fade" id="delete-{{empresas.idEmpresa}}" tabindex="-1" role="dialog"
+                          aria-labelledby="exampleModalLabel" aria-hidden="true">
+                          <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title" id="exampleModalLabel">Ventana de cambio de estado de la empresas:
+                                  {{empresas.nombre}}
+                                </h5>
+      
+                              </div>
+                              <div class="modal-body">
+                                <p>Está seguro que desea cambiar el estado de la empresas?.</p>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-warning font-weight-bold"
+                                  data-bs-dismiss="modal">Cerrar</button>
+                                <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold"
+                                  (click)="cambiarEstado(empresas?.idEmpresa, empresas?.estado)" data-bs-dismiss="modal">Sí,
+                                  cambiar</button>
+      
+                                <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                                  <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                  Cambiando...
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                       
+                      </td>
+                    </tr> -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </ng-container>
+          <ngb-pagination 
+          *ngIf="empresas.length > 0"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="empresas.length"
+          [maxSize]="maxSize"
+          [rotate]="rotate"
+          [boundaryLinks]="boundaryLinks"
+          (pageChange)="onPageChange($event)"
+          aria-label="Paginación de empresas"
+          class="d-flex justify-content-center my-4">
+        </ngb-pagination>
+    }
+   
+  </div>
+</div>
