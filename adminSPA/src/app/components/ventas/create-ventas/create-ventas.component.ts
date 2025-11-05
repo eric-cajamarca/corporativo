@@ -35,6 +35,7 @@ export class CreateVentasComponent {
   public marcas: any = [];
   public stockSucursales: any = [];
   stockSucursales_const: any = [];
+  private TASA_IGV: number = 0.18;
   public sucursales: any = [];
   public carrito: any[] = [];
   private buscadorModal: any;
@@ -50,9 +51,9 @@ export class CreateVentasComponent {
 
   };
   public ventas: any = {
-    compVenta: '',
-    idComprobante: '',
-    serie: '',
+    compVenta: '0000-00000000',
+    idComprobante: '0',
+    serie: '0000',
     numero: 0,
     idSucursal: '',
     idcliente: '',
@@ -364,11 +365,11 @@ export class CreateVentasComponent {
 
     if (comp) {
       // Asignar de forma segura y normalizando tipos
-      this.ventas.serie = comp.serie ?? '';
-      this.ventas.numero = comp.numero != null ? Number(comp.numero) : 0;
+      // this.ventas.serie = comp.serie ?? '';
+      // this.ventas.numero = comp.numero != null ? Number(comp.numero) : 0;
       this.ventas.idComprobante = comp.idComprobante ?? comp.id ?? '';
-      this.ventas.compVenta = comp.serie + '-' + (comp.numero != null ? String(comp.numero).padStart(8, '0') : '00000000');
-      console.log('Datos del comprobante cargados en ventas:', this.ventas);
+      // this.ventas.compVenta = comp.serie + '-' + (comp.numero != null ? String(comp.numero).padStart(8, '0') : '00000000');
+      // console.log('Datos del comprobante cargados en ventas:', this.ventas);
     } else {
       // No se encontró: limpia o conserva según prefieras — aquí limpiamos para evitar datos inconsistentes
       console.warn('No se encontró comprobante para el valor:', valor);
@@ -389,8 +390,33 @@ export class CreateVentasComponent {
         ...producto,
         cantidad: 1
       });
+      
       console.log('Producto agregado al carrito:', this.carrito);
     }
+    this.actualizaTotales();
+  }
+
+  actualizaTotales(): void {
+    //quiero recorrer el carrito y sumar el subtotal, igv y total
+    console.log('Calculando totales para el carrito:', this.carrito);
+
+    this.ventas.subTotal = 0;
+    this.ventas.igv = 0;
+    this.ventas.total = 0;
+
+    this.carrito.forEach(item => {
+      const subtotalItem = item.producto.cUnitario * item.cantidad;
+      this.ventas.subTotal += subtotalItem;
+      console.log(`Subtotal para ${item.producto.descripcion}: ${subtotalItem}`);
+    });
+
+    this.ventas.igv = this.ventas.subTotal * this.TASA_IGV;
+    this.ventas.total = this.ventas.subTotal + this.ventas.igv;
+    console.log('Totales actualizados:', {
+      subTotal: this.ventas.subTotal,
+      igv: this.ventas.igv,
+      total: this.ventas.total
+    });
   }
 
   eliminarDelCarrito(index: number): void {
