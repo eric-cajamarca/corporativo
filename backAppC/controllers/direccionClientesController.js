@@ -97,10 +97,9 @@ const listarDireccionClientes = async function (req, res) {
 
 //2. crea el metodo listarDireccionClientes segun los datos de la tabla
 const listarDireccionesClientes_idCliente = async function (req, res) {
-    const idCliente = req.params.id;
+       const idCliente = req.params.id;
 
-    console.log('listarDireccionesClientes_idCliente idCliente', idCliente);
-
+    
     if (req.user) {
         if (req.user.rol == 'Administrador') {
             //aqui permito que todas las empresas puedan ver las direcciones de los clientes
@@ -112,6 +111,7 @@ const listarDireccionesClientes_idCliente = async function (req, res) {
                     .input('idCliente', sql.Int, idCliente)
                     .query('select * from DireccionClientes where idCliente = @idCliente');
 
+                
                 res.status(200).send({ message: 'Lista de DireccionClientes', data: listaDireccionClientes.recordset });
             } catch (error) {
                 console.log('listarDireccionesClientes_idCliente error', error);

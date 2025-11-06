@@ -236,7 +236,7 @@
     }
     
     .cart-section {
-        max-height: 300px;
+        max-height: 500px;
     }
     
     .summary-item {
@@ -273,3 +273,53 @@
   outline: 2px solid #20c997;
 }
 
+/* ---------- TABLA DETALLE – ANCHOS FIJOS ---------- */
+.th-w-item   { width: 50px  !important; }
+.th-w-cod    { width: 90px  !important; }
+.th-w-prod   { width: 280px !important; }
+.th-w-um     { width: 80px  !important; }
+.th-w-cant   { width: 85px  !important; }
+.th-w-punit  { width: 100px !important; }
+.th-w-subt   { width: 100px !important; }
+.th-w-suc    { width: 130px !important; }
+.th-w-acc    { width: 40px  !important; }
+
+/* ---------- ELIMINAR PADDING/MÁRGENES INTERNOS ---------- */
+.table-detalle tbody tr td,
+.table-detalle tbody tr th {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  margin: 0 !important;
+  line-height: 1.2;
+}
+
+/* ---------- MODALES – ESTILO ELEGANTE ---------- */
+.modal-content.shadow-xl {
+  border-radius: 1rem;
+  box-shadow: 0 15px 35px rgba(0,0,0,.15);
+}
+
+.modal-header.bg-gradient-info {
+  background: linear-gradient(135deg, #17a2b8, #117a8b);
+}
+
+.modal-header.bg-gradient-secondary {
+  background: linear-gradient(135deg, #6c757d, #495057);
+}
+
+.btn-rounded-pill {
+  border-radius: 50rem;
+}
+
+/* Bordes redondeados del modal */
+.rounded-10 { border-radius: 1rem !important; }
+
+/* Sombra elegante */
+.shadow-xl  { box-shadow: 0 20px 40px rgba(0,0,0,.18) !important; }
+
+/* Inputs más compactos */
+.modal-body .form-control,
+.modal-body .form-select {
+  padding: .45rem .75rem;
+  font-size: .95rem;
+}

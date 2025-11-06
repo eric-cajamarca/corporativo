@@ -17,6 +17,14 @@ import { DocumentoService } from '../../../services/documento.service';
 declare var bootstrap: any;
 declare var iziToast: any;
 
+interface FormaPago {
+  idMediosPago: string;
+  condicion: string;
+  recibido: number;
+  vuelto: number;
+  referencia: string;
+}
+
 @Component({
   selector: 'app-create-ventas',
   standalone: true,
@@ -73,6 +81,8 @@ export class CreateVentasComponent {
     subTotal: 0,
     descuentos: 0,
   };
+
+  public direccionCliente: any;
 
   constructor(
     private _productoService: ProductoService,
@@ -379,6 +389,16 @@ export class CreateVentasComponent {
     }
   }
 
+  seleccionaProducto(prod: any): void {
+    // 1.  Agrega al carrito
+    this.agregarAlCarrito(prod);
+
+    // 2.  Cierra el modal (por JS)
+    const buscador = bootstrap.Modal.getInstance(
+      document.getElementById('buscadorModal')!
+    );
+    buscador?.hide();
+  }
 
   agregarAlCarrito(producto: any): void {
     console.log('Agregando al carrito:', producto);
@@ -421,6 +441,7 @@ export class CreateVentasComponent {
 
   eliminarDelCarrito(index: number): void {
     this.carrito.splice(index, 1);
+    this.actualizaTotales();
   }
 
   actualizaPrecio(item: any, el: any) {
@@ -428,6 +449,7 @@ export class CreateVentasComponent {
     if (!isNaN(nuevo)) {
       item.producto.cUnitario = nuevo;
     }
+    this.actualizaTotales();
   }
 
   actualizaCantidad(item: any, el: any) {
@@ -435,6 +457,7 @@ export class CreateVentasComponent {
     if (!isNaN(nuevo)) {
       item.cantidad = nuevo;
     }
+    this.actualizaTotales();
   }
 
   abrirBuscadorModal(): void {
@@ -468,7 +491,16 @@ export class CreateVentasComponent {
         console.log('response cliente por ruc', response.data);
         if (response.data != undefined && response.data.length > 0) {
           this.cliente = response.data[0];
+
           console.log('this.cliente', this.cliente);
+          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe(
+            (response) => {
+                this.direccionCliente = response.data[0];
+                this.cliente.direccion = this.direccionCliente.direccion
+                console.log("direcciones", response)
+            }
+            
+          )
         }else{
            iziToast.show({
             title: 'ERROR',
@@ -484,6 +516,7 @@ export class CreateVentasComponent {
         console.log(error);
       }
     );
+
   }
 
   clienteSeleccionado(event: any) {
@@ -495,5 +528,30 @@ export class CreateVentasComponent {
   const modalInst = bootstrap.Modal.getInstance(modalEl);
   modalInst.hide();
   this.buscarRuc()
+  }
+
+
+
+  // Interfaz (opcional)
+  
+
+  // Propiedad
+  forma: FormaPago = {
+    idMediosPago: '5',   // efectivo por defecto
+    condicion: 'contado',
+    recibido: 0,
+    vuelto: 0,
+    referencia: ''
+  };
+
+  // Métodos
+  calculaVuelto(): void {
+    this.forma.vuelto = Math.max(0, this.forma.recibido - this.ventas.total);
+  }
+
+  resetCalculos(): void {
+    this.forma.recibido = 0;
+    this.forma.vuelto   = 0;
+    this.forma.referencia = '';
   }
 }

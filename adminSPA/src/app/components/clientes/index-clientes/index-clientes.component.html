@@ -43,7 +43,8 @@
               <th>Razón Social</th>
               <th>Condición</th>
               <th>Estado</th>
-              <th>Acciones</th>
+
+              <th *ngIf="!modoSelector">Acciones</th>
             </tr>
           </thead>
           <tbody class="font-size-base">
@@ -59,7 +60,7 @@
                 <span class="badge bg-success" *ngIf="item.estado === true">Activo</span>
                 <span class="badge bg-danger" *ngIf="item.estado === false">Inactivo</span>
               </td>
-              <td (click)="$event.stopPropagation()">
+              <td (click)="$event.stopPropagation()" *ngIf="!modoSelector">
                 <!-- <a class="btn btn-outline-primary btn-sm" routerLink="/clientes/editar">Editar</a>
                             <a class="btn btn-outline-danger btn-sm" style="margin-left: 10px;">Eliminar</a> -->
 
@@ -87,7 +88,7 @@
                   </ul>
                 </div> -->
                 
-                <div class="btn-group">
+                <div class="btn-group" >
                   <button type="button" class="btn btn-primary btn-sm dropdown-toggle"
                           data-bs-toggle="dropdown" (click)="$event.stopPropagation()">
                     Opciones

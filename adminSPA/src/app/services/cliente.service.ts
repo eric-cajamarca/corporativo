@@ -96,6 +96,7 @@ export class ClienteService {
 
   //metodo para obtener direccionCliente idCLiente
   obtener_direccionesCliente_idCliente(id:any):Observable<any>{
+    console.log(id)
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'direccionesClientes/'+id,{
       headers: headers,

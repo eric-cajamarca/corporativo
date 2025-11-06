@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { FormsModule } from '@angular/forms';
@@ -16,6 +16,7 @@ declare var iziToast: any;
   styleUrl: './index-clientes.component.css'
 })
 export class IndexClientesComponent {
+  @Input() modoSelector = false;   // true  → dentro de modal
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
   
   public clientes: Array<any> = [];
