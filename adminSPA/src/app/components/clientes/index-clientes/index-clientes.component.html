@@ -9,7 +9,7 @@
         <a class="btn btn-primary" [routerLink]="['/cliente/create']" routerLinkActive="active" target="_blank">Nuevo Cliente</a>
       </div>
 
-      <ng-container *ngIf="clientes.length === 0">
+      <ng-container *ngIf="clientes_const.length === 0">
         <div class="row">
           <div class="col-12">
             <div class="alert alert-danger" role="alert">
@@ -21,13 +21,13 @@
         </div>
       </ng-container>
 
-      <ng-container *ngIf="clientes.length > 0">
+      <ng-container *ngIf="clientes_const.length > 0">
         
         <div class="row">
           
           <div class="input-group input-group-merge">
             <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
-              [(ngModel)]="filtro">
+              [(ngModel)]="filtro" (input)="filtrar()">
             <div class="input-group-append">
               <button class="btn btn-primary" (click)="filtrar()">
                 Buscar

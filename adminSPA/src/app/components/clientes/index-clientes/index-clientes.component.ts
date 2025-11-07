@@ -20,6 +20,7 @@ export class IndexClientesComponent {
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
   
   public clientes: Array<any> = [];
+  public clienteSearch: Array<any> = [];
   public clientes_const: Array<any> = [];
   public token: any = "";
 
@@ -56,7 +57,8 @@ export class IndexClientesComponent {
     this._clientesService.obtener_clientes().subscribe(
       response => {
         console.log('response.data');
-        console.log(response.data);
+        console.log(response);
+
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -71,6 +73,7 @@ export class IndexClientesComponent {
           this.clientes = response.data;
           this.clientes_const = response.data;
           this.load_estado = false;
+          console.log(this.clientes)
         }
       },
       error => {
@@ -85,8 +88,9 @@ export class IndexClientesComponent {
       //
       var term = new RegExp(this.filtro, 'i');
       this.clientes = this.clientes_const.filter(item => term.test(item.rSocial) || term.test(item.apellidos) || term.test(item.correo) || term.test(item.ruc));
+      
     } else {
-      this.clientes = this.clientes_const;
+      this.clienteSearch = this.clientes_const;
     }
   }
 

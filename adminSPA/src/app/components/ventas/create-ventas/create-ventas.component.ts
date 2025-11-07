@@ -37,7 +37,9 @@ export class CreateVentasComponent {
   public productos: any[] = [];
   productos_const: any[] = [];
   productos_filtrados: any[] = [];
+  private productoEncontrado: any = null;
   searchTerm: string = '';
+  public searchCodigo = '';
   public categoria: any = [];
   public presentacion: any = [];
   public marcas: any = [];
@@ -416,6 +418,64 @@ export class CreateVentasComponent {
     this.actualizaTotales();
   }
 
+  
+  buscarCodigoProd(): void {
+      // normalizar input
+      const raw = (this.searchCodigo ?? '').toString().trim();
+      if (!raw) {
+        iziToast.show({ title: 'ERROR', titleColor: '#FF0000', message: 'Ingrese un código', position: 'topRight' });
+        return;
+      }
+
+      // opcional: exigir mínimo de caracteres para evitar búsquedas insignificantes
+      if (raw.length < 5) {
+        // iziToast.show({ title: 'INFO', titleColor: '#007bff', message: 'Ingrese al menos 3 caracteres', position: 'topRight' });
+        return;
+      }
+
+      const term = raw.toLowerCase();
+
+      // 1) Buscar coincidencia exacta en producto.Codigo
+      let encontrado = this.stockSucursales_const.find((item: any) => {
+        const codigo = (item.producto?.Codigo ?? '').toString().toLowerCase();
+        return codigo === term;
+      });
+
+      // 2) Si no hay exacta, buscar por inclusión (parcial)
+      if (!encontrado) {
+        encontrado = this.stockSucursales_const.find((item: any) => {
+          const codigo = (item.producto?.Codigo ?? '').toString().toLowerCase();
+          return codigo.includes(term);
+        });
+      }
+
+      // 3) (Opcional) buscar por idProducto si la entrada es numérica y no se encontró por código
+      if (!encontrado && /^\d+$/.test(term)) {
+        encontrado = this.stockSucursales_const.find((item: any) => String(item.idProducto) === term || String(item.producto?.idProducto) === term);
+      }
+
+      this.productoEncontrado = encontrado ?? null;
+      console.log('Producto encontrado por código:', this.productoEncontrado);
+
+      if (this.productoEncontrado) {
+        // Agregar al carrito usando la función existente
+        this.agregarAlCarrito(this.productoEncontrado);
+        this.searchCodigo = ''; // limpiar campo de búsqueda
+        // iziToast.show({ title: 'OK', titleColor: '#1DC74C', message: 'Producto agregado al carrito', position: 'topRight' });
+      } else {
+        iziToast.show({
+          title: 'ERROR',
+          titleColor: '#FF0000',
+          color: '#f39999ff',
+          class: 'text-danger',
+          position: 'topRight',
+          message: 'El código no existe.'
+        });
+      }
+  }
+
+
+
   actualizaTotales(): void {
     //quiero recorrer el carrito y sumar el subtotal, igv y total
     console.log('Calculando totales para el carrito:', this.carrito);
@@ -459,6 +519,8 @@ export class CreateVentasComponent {
     }
     this.actualizaTotales();
   }
+
+  
 
   abrirBuscadorModal(): void {
     

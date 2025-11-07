@@ -5,22 +5,31 @@
     <div class="container-fluid h-100">
       <div class="row h-100">
         <!-- BOTONES QUE ABREN LOS MODALES -->
-      <div class="d-flex justify-content-between align-items-center mt-3">
+      <div class="d-flex justify-content-between align-items-center mt-3" style="margin-bottom: 10px;">
+
         <button class="btn btn-outline-primary rounded-pill"
                 data-bs-toggle="modal" data-bs-target="#modalComprobante">
           <i class="bi bi-receipt me-2"></i>Datos del Comprobante
         </button>
 
-        <button class="btn btn-outline-secondary rounded-pill"
+        @if(ventas?.idComprobante != '0'){
+           <button class="btn btn-outline-secondary rounded-pill"
                 data-bs-toggle="modal" data-bs-target="#modalCliente">
-          <i class="bi bi-person-lines-fill me-2"></i>Información del Cliente
-        </button>
-
-        <button class="btn btn-outline-warning rounded-pill"
+              <i class="bi bi-person-lines-fill me-2"></i>Información del Cliente
+            </button>
+            
+            @if(cliente?.idCliente){
+              <button class="btn btn-outline-warning rounded-pill"
                 data-bs-toggle="modal"
                 data-bs-target="#modalPago">
-          <i class="bi bi-credit-card me-2"></i>Forma de pago
-        </button>
+                <i class="bi bi-credit-card me-2"></i>Forma de pago
+              </button>
+            }
+
+            
+        }
+
+        
       </div>
 
         <!-- COLUMNA IZQUIERDA: Productos y Carrito -->
@@ -31,10 +40,18 @@
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
               <h5 class="mb-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
 
-              <!-- BOTÓN VERDE QUE ABRE EL MODAL -->
-              <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#buscadorModal">
-                <i class="bi bi-search"></i> Buscar productos
-              </button>
+              <div class="align-items-center" style="display: inline-flex; ">
+                
+                <input type="text" class="form-control" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()" style="width: 150px; height: 40px;" 
+                placeholder="Buscar Código">
+
+                <!-- BOTÓN VERDE QUE ABRE EL MODAL -->
+                <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#buscadorModal">
+                  <i class="bi bi-search"></i> Buscar
+                </button>
+              </div>
+
+              
             </div>
 
             <div class="card-body" style="height: 80%; overflow-y:auto;">
@@ -66,7 +83,7 @@
                     <tr *ngFor="let item of carrito; let i = index">
                       <td> {{i + 1}} </td>
                       <td>{{ item.producto.Codigo }}</td>
-                      <td>{{ item.producto.descripcion }}</td>
+                      <td >{{ item.producto.descripcion }}</td>
                       <td>{{ item.presentacion.codigo }}</td>
 
                       <!-- Cantidad editable -->
@@ -83,6 +100,7 @@
                       <td>{{ item.sucursal.nombre }}</td>
                       <td>
                         <i class="bi bi-trash text-danger" style="cursor:pointer;" (click)="eliminarDelCarrito(i)"></i>
+                        <i class="bi bi-eye text-secundary" style="cursor:pointer;"></i>
                       </td>
                     </tr>
                   </tbody>
@@ -175,11 +193,11 @@
                 class="table-row-hover"
                 (click)="seleccionaProducto(p)">
                 <td>{{ p.producto.Codigo }}</td>
-                <td>{{ p.categoria.nombre }}</td>
+                <td>{{ p.categoria?.nombre }}</td>
                 <td>{{ p.producto.descripcion }}</td>
-                <td>{{ p.presentacion.codigo }}</td>
+                <td>{{ p.presentacion?.codigo }}</td>
                 <td>S/ {{ p.producto.cUnitario | number:'1.2-2' }}</td>
-                <td>{{ p.sucursal.nombre }}</td>
+                <td>{{ p.sucursal?.nombre }}</td>
                 <td>{{ p.cantidad }}</td>
                 <!-- <td>
                   <i class="bi bi-plus-circle-fill text-success" style="font-size:1.5rem; cursor:pointer;"
