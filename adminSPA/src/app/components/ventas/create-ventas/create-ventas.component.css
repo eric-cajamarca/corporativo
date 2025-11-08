@@ -19,7 +19,7 @@
 }
 
 .card-body {
-    padding: 1rem 1.25rem;
+    /* padding: 1rem 1.25rem; */
     
 }
 
@@ -272,17 +272,6 @@
   background-color: #d4f5e0;
   outline: 2px solid #20c997;
 }
-
-/* ---------- TABLA DETALLE – ANCHOS FIJOS ---------- */
-.th-w-item   { width: 50px  !important; }
-.th-w-cod    { width: 90px  !important; }
-.th-w-prod   { width: 280px !important; }
-.th-w-um     { width: 80px  !important; }
-.th-w-cant   { width: 85px  !important; }
-.th-w-punit  { width: 100px !important; }
-.th-w-subt   { width: 100px !important; }
-.th-w-suc    { width: 130px !important; }
-.th-w-acc    { width: 40px  !important; }
 
 /* ---------- ELIMINAR PADDING/MÁRGENES INTERNOS ---------- */
 .table-detalle tbody tr td,

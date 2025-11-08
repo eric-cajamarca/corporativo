@@ -54,7 +54,7 @@
               
             </div>
 
-            <div class="card-body" style="height: 80%; overflow-y:auto;">
+            <div class="card-body" style="height: 70%; overflow-y:auto;">
 
               <!-- Mensaje carrito vacío -->
               <div *ngIf="carrito.length === 0" class="text-center py-4">
@@ -64,40 +64,42 @@
 
               <!-- Tabla de detalle -->
               <div *ngIf="carrito.length > 0" class="table-responsive mx-auto"
-                style="max-height:80%; overflow-y:auto;">
+                style="max-height:80%;">
                 <table class="table table-hover align-middle mb-0 table-detalle" style="max-height: 60%;">
                   <thead >
                     <tr>
-                      <th class="th-w-item">Item</th>
-                      <th class="th-w-cod">Código</th>
-                      <th class="th-w-prod">Producto</th>
-                      <th class="th-w-um">U.Medida</th>
-                      <th class="th-w-cant">Cantidad</th>
-                      <th class="th-w-punit">P. Unit.</th>
-                      <th class="th-w-subt">Subtotal</th>
-                      <th class="th-w-suc">Sucursal</th>
-                      <th class="th-w-acc"></th>
+                      <th>Item</th>
+                      <th>Código</th>
+                      <th>Producto</th>
+                      <th>U.Medida</th>
+                      <th>Cantidad</th>
+                      <th>P. Unit.</th>
+                      <th>Subtotal</th>
+                      <th>Sucursal</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr *ngFor="let item of carrito; let i = index">
-                      <td> {{i + 1}} </td>
-                      <td>{{ item.producto.Codigo }}</td>
-                      <td >{{ item.producto.descripcion }}</td>
-                      <td>{{ item.presentacion.codigo }}</td>
+                      <td style="width: 10px; text-align: left;"> {{i + 1}} </td>
+                      <td>{{ item.producto?.Codigo }}</td>
+                      <td style="width: 400px; text-align: left; " contenteditable="true" class="editable" 
+                      (blur)="actualizaDescripcion(item, $event)">{{ item?.producto.descripcion }}
+                      </td>
+                      <td style="width: 60px; text-align: center;">{{ item.presentacion.codigo }}</td>
 
                       <!-- Cantidad editable -->
-                      <td contenteditable="true" class="editable" (blur)="actualizaCantidad(item, $event)">
-                        {{ item.cantidad }}
+                      <td style="width: 60px; text-align: left;" contenteditable="true" class="editable" (blur)="actualizaCantidad(item, $event)">
+                        {{ item?.cantidad }}
                       </td>
 
                       <!-- Precio editable -->
-                      <td contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">
-                        S/ {{ item.producto.cUnitario | number:'1.2-2' }}
+                      <td style="width: 80px; text-align: right;" contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">
+                        S/ {{ item.producto?.cUnitario | number:'1.2-2' }}
                       </td>
 
-                      <td>S/ {{ (item.cantidad * item.producto.cUnitario) | number:'1.2-2' }}</td>
-                      <td>{{ item.sucursal.nombre }}</td>
+                      <td style="width: 80px; text-align: right;" >S/ {{ (item.cantidad * item.producto.cUnitario) | number:'1.2-2' }}</td>
+                      <td>{{ item.sucursal?.nombre }}</td>
                       <td>
                         <i class="bi bi-trash text-danger" style="cursor:pointer;" (click)="eliminarDelCarrito(i)"></i>
                         <i class="bi bi-eye text-secundary" style="cursor:pointer;"></i>
@@ -121,6 +123,14 @@
                         <span>Subtotal:</span>
                         <span>S/ {{ ventas.subTotal | number:'1.2-2' }}</span>
                       </div>
+                      <div class="d-flex justify-content-between mb-2">
+                        <span>Descuento:</span>
+                        <span>S/ {{ ventas.descuentos | number:'1.2-2' }}</span>
+                      </div>
+                      <div class="d-flex justify-content-between mb-2">
+                        <span>Exonerado:</span>
+                        <span>S/ {{ ventas.exonerado | number:'1.2-2' }}</span>
+                      </div>
 
                       <div class="d-flex justify-content-between mb-1">
                         <span>IGV (18%):</span>
@@ -131,7 +141,7 @@
 
                       <div class="d-flex justify-content-between align-items-center">
                         <span class="fw-bold">Total:</span>
-                        <span class="fw-bold">S/ {{ ventas.total | number:'1.2-2' }}</span>
+                        <span class="fw-bold">S/ {{ ventas.total}}</span>
                       </div>
                     </div>
                   </div>
@@ -381,10 +391,143 @@
 <!--  MODAL 3: FORMA DE PAGO                                 -->
 <!-- ========================================================= -->
 <div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content shadow-xl rounded-10">
+
+      <!-- Header -->
+      <div class="modal-header bg-gradient-info text-white">
+        <h5 class="modal-title fw-600">
+          <i class="bi bi-cash-stack me-2"></i>Forma de pago
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        
+        <!-- === RESUMEN SUPERIOR === -->
+        <div class="row g-3 justify-content-center mb-4">
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Deuda Total</label>
+            <input type="text" class="form-control text-center bg-light fw-bold" 
+                   [(ngModel)]="ventas.total" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Paga Con</label>
+            <input type="number" class="form-control text-center fw-bold" 
+                   [(ngModel)]="pagaCon" (input)="calcularVuelto()" 
+                   placeholder="0.00">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">Vuelto</label>
+            <input type="text" class="form-control text-center fw-bold bg-light" 
+                   [class.text-success]="vuelto >= 0"
+                   [class.text-danger]="vuelto < 0"
+                   [value]="vuelto | number:'1.2-2'" readonly>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <!-- === DETALLE DE PAGO === -->
+        <h6 class="fw-bold text-primary mb-3">
+          <i class="bi bi-list-check me-2"></i>Detalle de pago
+        </h6>
+
+        <!-- Fila de inputs -->
+        <div class="row g-2 mb-4 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small">Forma de pago</label>
+            <select class="form-select form-select-sm" [(ngModel)]="detailForm.formaPago">
+              @for (opcion of formaPagoOptions; track opcion) {
+                <option [value]="opcion">{{ opcion }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Monto</label>
+            <input type="number" class="form-control form-control-sm" 
+                   [(ngModel)]="detailForm.monto" 
+                   placeholder="0.00" step="0.01">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">Referencia</label>
+            <input type="text" class="form-control form-control-sm" 
+                   [(ngModel)]="detailForm.referencia" 
+                   placeholder="N° operación">
+          </div>
+          <div class="col-md-1 d-flex align-items-end">
+            
+            <i class="bi bi-plus-circle-fill text-success"  (click)="agregarDetalle()"></i>
+          </div>
+        </div>
+
+        <!-- Tabla de detalles -->
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered ">
+            <thead class="table-light">
+              <tr>
+                <th class="text-center" style="width: 5%">Item</th>
+                <th style="width: 25%">FormaPago</th>
+                <th style="width: 20%">Monto</th>
+                <th style="width: 35%">Referencias</th>
+                <th class="text-center" style="width: 15%">Opciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (detalle of detallePago; track detalle.item) {
+                <tr>
+                  <td class="text-center">{{ detalle.item }}</td>
+                  <td>{{ detalle.descripcion }}</td>
+                  <td class="text-end">{{ detalle.monto | number:'1.2-2' }}</td>
+                  <td>{{ detalle.referencia }}</td>
+                  <td class="text-center">
+                    <button class="btn btn-outline-danger btn-sm" (click)="eliminarDetalle($index)">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              }
+              @if (detallePago.length === 0) {
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">
+                    No se han agregado formas de pago
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot class="table-info">
+              <tr>
+                <td colspan="2" class="fw-bold text-end">TOTAL</td>
+                <td class="fw-bold text-end">
+                  {{ calcularTotalTabla() | number:'1.2-2' }}
+                </td>
+                <td colspan="2" class="fw-bold">
+                  SALDO: {{ (ventas.total - calcularTotalTabla()) | number:'1.2-2' }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-2"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-info" (click)="guardarPago()">
+          <i class="bi bi-check-circle me-2"></i>Guardar pago
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- <div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-md modal-dialog-centered">
     <div class="modal-content shadow-xl rounded-10">
 
-      <!-- Header dinámico -->
+      
       <div class="modal-header bg-gradient-info text-white">
         <h5 class="modal-title fw-600">
           <i class="bi me-2"
@@ -399,7 +542,7 @@
       <div class="modal-body p-4">
         <div class="row g-3">
 
-          <!-- Medio de pago -->
+          
           <div class="col-12">
             <label class="form-label">Medio de pago</label>
             <select class="form-select" [(ngModel)]="forma.idMediosPago"
@@ -410,7 +553,7 @@
             </select>
           </div>
 
-          <!-- Condición de pago -->
+          
           <div class="col-12">
             <label class="form-label">Condición</label>
             <select class="form-select" [(ngModel)]="forma.condicion">
@@ -420,7 +563,7 @@
             </select>
           </div>
 
-          <!-- === EFECTIVO === -->
+        
           <ng-container *ngIf="forma.idMediosPago === '5'">
             <div class="col-6">
               <label class="form-label">Recibo</label>
@@ -436,7 +579,7 @@
             </div>
           </ng-container>
 
-          <!-- === TARJETA / DEPÓSITO === -->
+        
           <ng-container *ngIf="forma.idMediosPago !== '5'">
             <div class="col-12">
               <label class="form-label">Referencia / Operación</label>
@@ -456,4 +599,4 @@
       </div>
     </div>
   </div>
-</div>
+</div> -->

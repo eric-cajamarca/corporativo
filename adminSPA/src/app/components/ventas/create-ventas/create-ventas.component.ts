@@ -50,7 +50,14 @@ export class CreateVentasComponent {
   public carrito: any[] = [];
   private buscadorModal: any;
   public moneda: any = [];
-  public mediosPago: any = [];
+  public mediosPago:any=[];
+  public formaPago: any = {
+    idFPago:1,
+    descripcion:'',
+    monto:0,
+    referencia:''
+  };
+  public detallePago: any =[];
   public estadoPago: any = [];
   public documento: any = [];
   public comprobantes: any = [];
@@ -520,6 +527,19 @@ export class CreateVentasComponent {
     this.actualizaTotales();
   }
 
+  actualizaDescripcion(item: any, el: any) {
+    // Obtener el texto editado y normalizar
+    const texto = ((el.target as HTMLElement)?.innerText ?? '').trim();
+
+    // Asignar la descripción al objeto correcto:
+    // si el item tiene la propiedad 'producto', actualizar producto.descripcion,
+    // si no, guardar en item.descripcion (por compatibilidad).
+    if (item.producto) {
+      item.producto.descripcion = texto;
+    } else {
+      item.descripcion = texto;
+    }
+  }
   
 
   abrirBuscadorModal(): void {
@@ -538,46 +558,55 @@ export class CreateVentasComponent {
 
   onInputNumero(): void {
     const long = this.cliente.ruc.length;
-    if (
-      long === 8 || long === 11
-    ) {
-      console.log('Longitud válida para búsqueda:', long);
+    console.log(long);
+    console.log(this.documento.idDocumento);
+    if(long === 8 && String(this.documento.idDocumento).trim() === '1') {
+      console.log('buscando dni');
       this.buscarRuc();
+    }
+
+    if(long === 11 && String(this.documento.idDocumento).trim() === '6'){
+        console.log('buscando ruc');
+        this.buscarRuc();
     }
   }
 
   buscarRuc() {
     console.log('Buscando RUC:', this.cliente.ruc);
-    this._clienteService.obtener_cliente_ruc(this.cliente.ruc).subscribe(
-      (response) => {
-        console.log('response cliente por ruc', response.data);
-        if (response.data != undefined && response.data.length > 0) {
-          this.cliente = response.data[0];
+   
+      this._clienteService.obtener_cliente_ruc(this.cliente.ruc).subscribe(
+        (response) => {
+          console.log('response cliente por ruc', response.data);
+          if (response.data != undefined && response.data.length > 0) {
+            this.cliente = response.data[0];
 
-          console.log('this.cliente', this.cliente);
-          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe(
-            (response) => {
-                this.direccionCliente = response.data[0];
-                this.cliente.direccion = this.direccionCliente.direccion
-                console.log("direcciones", response)
-            }
-            
-          )
-        }else{
-           iziToast.show({
-            title: 'ERROR',
-            titleColor: '#FF0000',
-            color: '#f39999ff',
-            class: 'text-danger',
-            position: 'topRight',
-            message: 'El cliente no existe.',
-          });
+            console.log('this.cliente', this.cliente);
+            this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe(
+              (response) => {
+                  this.direccionCliente = response.data[0];
+                  this.cliente.direccion = this.direccionCliente.direccion
+                  console.log("direcciones", response)
+              }
+              
+            )
+          }else{
+            iziToast.show({
+              title: 'ERROR',
+              titleColor: '#FF0000',
+              color: '#f39999ff',
+              class: 'text-danger',
+              position: 'topRight',
+              message: 'El cliente no existe.',
+            });
+          }
+        },
+        (error) => {
+          console.log(error);
         }
-      },
-      (error) => {
-        console.log(error);
-      }
-    );
+      );
+    
+
+    
 
   }
 
@@ -616,4 +645,67 @@ export class CreateVentasComponent {
     this.forma.vuelto   = 0;
     this.forma.referencia = '';
   }
+
+  //pago
+  deudaTotal: number = this.ventas.total; // Asigna con tu valor real
+  pagaCon: number = 0;
+  vuelto: number = 0;
+
+  // Formulario de detalle
+  detailForm = {
+    formaPago: 'Efectivo',
+    monto: 0,
+    referencia: ''
+  };
+
+  
+
+  // Opciones del select
+  formaPagoOptions = [
+    'Efectivo', 'Cheque', 'Dep. Cta. Cte', 'Tarjeta Visa',
+    'Tarjeta Mastercard', 'Pago en oficina', 'Yape', 'Plin'
+  ];
+
+  // Calcular vuelto cuando cambia "Paga Con"
+  calcularVuelto(): void {
+    this.vuelto = this.pagaCon - this.ventas.total;
+  }
+
+  // Calcular total de la tabla
+  calcularTotalTabla(): number {
+    return this.detallePago.reduce((sum: any, item: { monto: any; }) => sum + item.monto, 0);
+  }
+
+  // Agregar detalle
+  agregarDetalle(): void {
+    if (this.detailForm.monto > 0) {
+      this.detallePago.push({
+        item: this.detallePago.length + 1,
+        descripcion: this.detailForm.formaPago,
+        monto: this.detailForm.monto,
+        referencia: this.detailForm.referencia || 'N/A'
+      });
+      // Resetear formulario
+      this.detailForm = { formaPago: 'Efectivo', monto: 0, referencia: '' };
+    }
+  }
+
+  // Eliminar detalle
+  eliminarDetalle(index: number): void {
+    this.detallePago.splice(index, 1);
+    // Reenumerar items
+    this.detallePago.forEach((item: { item: any; }, idx: number) => item.item = idx + 1);
+  }
+
+  // Guardar pago
+  guardarPago() {
+    // console.log('Detalles guardados:', this.detallePago);
+    // const modal = bootstrap.Modal.getInstance(document.getElementById('modalPago'));
+    // modal?.hide();
+  }
 }
+
+
+
+
+
