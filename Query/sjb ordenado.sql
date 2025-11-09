@@ -596,8 +596,22 @@ insert into MediosPago values	('009','CONTADO');
 insert into MediosPago values	('009','CREDITO');
 
 go
+create table FormaPago
+(
+	idFPago int identity primary key not null,
+	descripcion varchar(50) not nulL
+)
+go
+insert into FormaPago values('EFECTIVO');
+insert into FormaPago values('TARJETA');
+insert into FormaPago values('TRANSFERENCIA');
+insert into FormaPago values('YAPE');
+insert into FormaPago values('PLIN');
+
 
 go
+
+select * from FormaPago
 
 CREATE TABLE Moneda(
 	idMoneda int identity(1,1) primary key not null,
@@ -624,6 +638,8 @@ go
 insert into EstadoPago values	('Pendiente');
 insert into EstadoPago values	('Pagado');
 go
+
+select * from Comprobantes
 
 --truncate table compras
 --drop table Compras

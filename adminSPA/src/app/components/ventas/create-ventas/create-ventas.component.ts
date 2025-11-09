@@ -1,4 +1,6 @@
 import { Component } from '@angular/core';
+import { forkJoin } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +25,47 @@ interface FormaPago {
   recibido: number;
   vuelto: number;
   referencia: string;
+}
+
+interface ApiResponse<T> {
+  data: T[];
+  message?: string;
+  success?: boolean;
+}
+
+interface Producto {
+  idProducto: number;
+  idCategoria?: number;
+  idPresentacion?: number;
+  idMarca?: number;
+  // ... otros campos
+}
+
+interface Marca {
+  idMarca: number;
+  nombre: string;
+}
+
+interface Categoria {
+  idCategoria: number;
+}
+
+interface Presentacion {
+  idPresentacion: number;
+}
+
+interface Sucursal {
+  idSucursal: number;
+}
+
+interface StockSucursal {
+  idProducto: number;
+  idSucursal: number;
+  producto?: Producto;
+  sucursal?: Sucursal;
+  categoria?: Categoria;
+  presentacion?: Presentacion;
+  marca?: Marca;
 }
 
 @Component({
@@ -52,10 +95,7 @@ export class CreateVentasComponent {
   public moneda: any = [];
   public mediosPago:any=[];
   public formaPago: any = {
-    idFPago:1,
-    descripcion:'',
-    monto:0,
-    referencia:''
+    idFPago:1
   };
   public detallePago: any =[];
   public estadoPago: any = [];
@@ -169,8 +209,14 @@ export class CreateVentasComponent {
       }
     );
 
+    this._documentosService.getFormasPago().subscribe(
+      (response)=>{
+        this.formaPago = response.data;
+        console.log('formaspago',this.formaPago);
+      },
+    );
 
-     this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
+    this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
       (response) => {
         this.stockSucursales = response.data;
         if (response.data != undefined) {
@@ -292,6 +338,13 @@ export class CreateVentasComponent {
     );
 
   }
+
+
+
+
+
+
+
 
   // Función para buscar productos por código o descripción
   buscarProductos(): void {
@@ -421,6 +474,7 @@ export class CreateVentasComponent {
       });
       
       console.log('Producto agregado al carrito:', this.carrito);
+      console.log('ventas', this.ventas)
     }
     this.actualizaTotales();
   }
@@ -708,4 +762,8 @@ export class CreateVentasComponent {
 
 
 
+
+function captureError(arg0: () => never[]): import("rxjs").OperatorFunction<any, unknown> {
+  throw new Error('Function not implemented.');
+}
 

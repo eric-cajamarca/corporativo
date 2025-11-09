@@ -112,10 +112,36 @@ async function eliminarDocumento(req,res){
     }
 }
 
+// create table FormaPago
+// (
+// 	idFPago int identity primary key not null,
+// 	descripcion varchar(50) not nulL
+// )
+
+const listarFormasPago = async function (req,res) {
+    if(req.user){
+
+        try{
+            let pool = await sql.connect(dbConfig);
+            let formasPago = await pool.request()
+                .query('select * from FormaPago');
+            res.status(200).send({data: formasPago.recordset});
+        
+        }catch(error){
+            console.log(error);
+            res.status(500).send({ message: error.message, data: undefined });
+        }
+    }else{
+        res.status(500).send({ message: 'No Access' });
+
+    }
+}
 
 module.exports = {
     listarDocumentos,
     crearDocumento,
     actualizarDocumento,
-    eliminarDocumento
+    eliminarDocumento,
+
+    listarFormasPago
 }

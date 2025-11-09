@@ -438,9 +438,11 @@
           <div class="col-md-4">
             <label class="form-label small">Forma de pago</label>
             <select class="form-select form-select-sm" [(ngModel)]="detailForm.formaPago">
-              @for (opcion of formaPagoOptions; track opcion) {
+              <option *ngFor="let f of formaPago" [value]="f.idFPago">{{ f.descripcion }}</option>
+              <!-- @for (opcion of formaPagoOptions; track opcion) {
+                
                 <option [value]="opcion">{{ opcion }}</option>
-              }
+              } -->
             </select>
           </div>
           <div class="col-md-3">

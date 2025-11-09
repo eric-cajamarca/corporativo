@@ -9,4 +9,6 @@ api.post('/documentos',auth.auth, documentoController.crearDocumento);
 api.put('/documentos/:idDocumento',auth.auth, documentoController.actualizarDocumento);
 api.delete('/documentos/:idDocumento',auth.auth, documentoController.eliminarDocumento);
 
+api.get('/formaPago',auth.auth,documentoController.listarFormasPago)
+
 module.exports = api;

@@ -48,4 +48,10 @@ export class DocumentoService {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':token});
     return this._http.delete(this.url+'documentos/'+id,{headers:headers});
   }
+
+  //aqui consulto comprobantes
+  getFormasPago():Observable<any>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'formaPago',{withCredentials:true,headers:headers}); 
+  }
 }
