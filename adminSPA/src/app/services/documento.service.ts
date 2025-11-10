@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
 import { Observable } from 'rxjs';
+import { FormaPago } from '../interfaces/formasPago-interface.js';
 
 @Injectable({
   providedIn: 'root'
@@ -50,8 +51,19 @@ export class DocumentoService {
   }
 
   //aqui consulto comprobantes
-  getFormasPago():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'formaPago',{withCredentials:true,headers:headers}); 
-  }
+  // getFormasPago():Observable<any>{
+  //   let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+  //   return this._http.get(this.url+'formaPago',{withCredentials:true,headers:headers}); 
+  // }
+
+  getFormasPago(): Observable<{ data: FormaPago[] }> { // ✅ Tipa la respuesta
+  let headers = new HttpHeaders({
+    'Content-Type': 'application/json',
+    'Authorization': ''
+  });
+  return this._http.get<{ data: FormaPago[] }>(
+    this.url + 'formaPago',
+    { withCredentials: true, headers }
+  );
+}
 }

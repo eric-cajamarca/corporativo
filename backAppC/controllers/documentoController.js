@@ -124,7 +124,7 @@ const listarFormasPago = async function (req,res) {
         try{
             let pool = await sql.connect(dbConfig);
             let formasPago = await pool.request()
-                .query('select * from FormaPago');
+                .query('select * from formasPago');
             res.status(200).send({data: formasPago.recordset});
         
         }catch(error){

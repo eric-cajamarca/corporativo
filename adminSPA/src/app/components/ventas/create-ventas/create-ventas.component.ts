@@ -15,58 +15,10 @@ import { ClienteService } from '../../../services/cliente.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { DocumentoService } from '../../../services/documento.service';
+import { FormaPago } from '../../../interfaces/formasPago-interface';
 
 declare var bootstrap: any;
 declare var iziToast: any;
-
-interface FormaPago {
-  idMediosPago: string;
-  condicion: string;
-  recibido: number;
-  vuelto: number;
-  referencia: string;
-}
-
-interface ApiResponse<T> {
-  data: T[];
-  message?: string;
-  success?: boolean;
-}
-
-interface Producto {
-  idProducto: number;
-  idCategoria?: number;
-  idPresentacion?: number;
-  idMarca?: number;
-  // ... otros campos
-}
-
-interface Marca {
-  idMarca: number;
-  nombre: string;
-}
-
-interface Categoria {
-  idCategoria: number;
-}
-
-interface Presentacion {
-  idPresentacion: number;
-}
-
-interface Sucursal {
-  idSucursal: number;
-}
-
-interface StockSucursal {
-  idProducto: number;
-  idSucursal: number;
-  producto?: Producto;
-  sucursal?: Sucursal;
-  categoria?: Categoria;
-  presentacion?: Presentacion;
-  marca?: Marca;
-}
 
 @Component({
   selector: 'app-create-ventas',
@@ -78,29 +30,40 @@ interface StockSucursal {
 export class CreateVentasComponent {
 
   public productos: any[] = [];
-  productos_const: any[] = [];
-  productos_filtrados: any[] = [];
-  private productoEncontrado: any = null;
-  searchTerm: string = '';
+  private productos_const: any[] = [];
+  public productos_filtrados: any[] = [];
+  public productoEncontrado: any = null;
+  public searchTerm: string = '';
   public searchCodigo = '';
   public categoria: any = [];
   public presentacion: any = [];
   public marcas: any = [];
   public stockSucursales: any = [];
-  stockSucursales_const: any = [];
+  private stockSucursales_const: any = [];
   private TASA_IGV: number = 0.18;
   public sucursales: any = [];
   public carrito: any[] = [];
-  private buscadorModal: any;
+  public buscadorModal: any;
   public moneda: any = [];
   public mediosPago:any=[];
-  public formaPago: any = {
-    idFPago:1
-  };
+  public formasPago: FormaPago[] = [];
+  public formaPagoSeleccionada: FormaPago = {
+  idFormaPago: 0,
+  descripcion: '',
+  tipo: 0,
+  requiereReferencia: 0,
+  activo: 0,
+  recibido: 0,
+  vuelto: 0,
+  referencia: ''
+};
   public detallePago: any =[];
   public estadoPago: any = [];
   public documento: any = [];
   public comprobantes: any = [];
+  public cajaMovimientos:{} ={
+    idFormaPago:0,
+  };
   public cliente : any = {
     tipoDocumento: '1',
     razonsocial: '',
@@ -109,7 +72,7 @@ export class CreateVentasComponent {
   };
   public ventas: any = {
     compVenta: '0000-00000000',
-    idComprobante: '0',
+    idComprobante: '',
     serie: '0000',
     numero: 0,
     idSucursal: '',
@@ -209,14 +172,18 @@ export class CreateVentasComponent {
       }
     );
 
-    this._documentosService.getFormasPago().subscribe(
-      (response)=>{
-        this.formaPago = response.data;
-        console.log('formaspago',this.formaPago);
-      },
-    );
+  this._documentosService.getFormasPago().subscribe({
+    next: (response) => {
+      this.formasPago = response.data || [];
+      console.log('formaspago', this.formasPago);
+    },
+    error: (err) => {
+      console.error('Error:', err);
+      this.formasPago = [];
+    }
+  });
 
-    this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
+  this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
       (response) => {
         this.stockSucursales = response.data;
         if (response.data != undefined) {
@@ -676,22 +643,30 @@ export class CreateVentasComponent {
   }
 
 
-
-  // Interfaz (opcional)
-  
-
+//  idFormaPago: number;
+//   descripcion:string,
+//   tipo:number,
+//   reqRef:number,
+//   recibido: number;
+//   vuelto: number;
+//   referencia: string;
+ 
   // Propiedad
   forma: FormaPago = {
-    idMediosPago: '5',   // efectivo por defecto
-    condicion: 'contado',
-    recibido: 0,
+    idFormaPago: 1,
+    descripcion:'',
+    tipo:0,
+    requiereReferencia:0,   // efectivo por defecto
+    recibido:0,
+    activo: 0,
     vuelto: 0,
     referencia: ''
   };
 
+
   // Métodos
   calculaVuelto(): void {
-    this.forma.vuelto = Math.max(0, this.forma.recibido - this.ventas.total);
+    this.forma.vuelto = Math.max(0, this.forma.recibido ?? 0 - this.ventas.total);
   }
 
   resetCalculos(): void {
@@ -711,14 +686,6 @@ export class CreateVentasComponent {
     monto: 0,
     referencia: ''
   };
-
-  
-
-  // Opciones del select
-  formaPagoOptions = [
-    'Efectivo', 'Cheque', 'Dep. Cta. Cte', 'Tarjeta Visa',
-    'Tarjeta Mastercard', 'Pago en oficina', 'Yape', 'Plin'
-  ];
 
   // Calcular vuelto cuando cambia "Paga Con"
   calcularVuelto(): void {
