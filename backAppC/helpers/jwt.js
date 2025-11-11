@@ -1,3 +1,4 @@
+// jwt.js
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
 const secret = 'erik@./Eog';

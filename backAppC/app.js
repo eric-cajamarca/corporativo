@@ -4,6 +4,7 @@ const { connectDB } = require('./dbConnection');
 const xss = require('xss'); // Solo si vas a usarlo
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { querySafeMiddleware } = require('./middlewares/tenant-query');
 // Importación de rutas
 const detalleVentasRoutes = require('./routes/detalleventas');
 const adminRoutes = require('./routes/admin');
@@ -45,6 +46,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+
 // Middleware CORS
 app.use(cors({
   origin: ['http://localhost:4200'],
@@ -77,6 +79,7 @@ app.get('/database', async (req, res) => {
   }
 });
 
+app.use('/api',querySafeMiddleware); // Agrega req.querySafe
 // Middleware XSS (opcional, descomentar si lo necesitas)
 /*
 app.use((req, res, next) => {
