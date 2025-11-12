@@ -4,6 +4,7 @@ import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
 import { Observable } from 'rxjs';
 import { FormaPago } from '../interfaces/formasPago-interface.js';
 import { Documento } from '../interfaces/documento-interface.js';
+import { ApiResponse } from '../interfaces/ApiResponse-interface.js';
 
 
 @Injectable({
@@ -28,9 +29,9 @@ export class DocumentoService {
     return this._http.get(this.url+'documentos',{withCredentials:true,headers:headers});  
   }
 
-   obtener_documento1():Observable<Documento[]>{
+   obtener_documento1():Observable<ApiResponse<Documento[]>>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get<Documento[]>(this.url+'documentos',{withCredentials:true,headers:headers});  
+    return this._http.get<ApiResponse<Documento[]>>(this.url+'documentos',{withCredentials:true,headers:headers});  
   }
 
   //Metodo para obtener un documento por id

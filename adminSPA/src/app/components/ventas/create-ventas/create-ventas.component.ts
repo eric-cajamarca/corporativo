@@ -119,7 +119,7 @@ export class CreateVentasComponent {
  ngOnInit(): void {
      this._documentosService.obtener_documento1().subscribe({
       next: (response) => {
-        this.documento = response; // ✅ Asigna directo el array
+        this.documento = response.data; // ✅ Asigna directo el array
         console.log('Documentos:', this.documento);
       },
       error: (error) => console.error(error)
