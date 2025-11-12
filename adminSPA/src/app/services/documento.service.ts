@@ -3,6 +3,8 @@ import { Injectable } from '@angular/core';
 import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
 import { Observable } from 'rxjs';
 import { FormaPago } from '../interfaces/formasPago-interface.js';
+import { Documento } from '../interfaces/documento-interface.js';
+
 
 @Injectable({
   providedIn: 'root'
@@ -24,6 +26,11 @@ export class DocumentoService {
   obtener_documento():Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'documentos',{withCredentials:true,headers:headers});  
+  }
+
+   obtener_documento1():Observable<Documento[]>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<Documento[]>(this.url+'documentos',{withCredentials:true,headers:headers});  
   }
 
   //Metodo para obtener un documento por id

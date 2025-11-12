@@ -16,9 +16,15 @@ import { ComprobanteService } from '../../../services/comprobante.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
+import { Documento } from '../../../interfaces/documento-interface';
 
 declare var bootstrap: any;
 declare var iziToast: any;
+
+interface DocumentoResponse {
+  message: string;
+  data: Documento[];
+}
 
 @Component({
   selector: 'app-create-ventas',
@@ -59,7 +65,8 @@ export class CreateVentasComponent {
 };
   public detallePago: any =[];
   public estadoPago: any = [];
-  public documento: any = [];
+  public documento: Documento[] = [];
+  
   public comprobantes: any = [];
   public cajaMovimientos:{} ={
     idFormaPago:0,
@@ -110,6 +117,14 @@ export class CreateVentasComponent {
   ) { }
 
  ngOnInit(): void {
+     this._documentosService.obtener_documento1().subscribe({
+      next: (response) => {
+        this.documento = response; // ✅ Asigna directo el array
+        console.log('Documentos:', this.documento);
+      },
+      error: (error) => console.error(error)
+    });
+
     this.cargarDatos();
   }
   // Función para cargar todos los productos
@@ -235,7 +250,7 @@ export class CreateVentasComponent {
               );
               element.marca = selectedObjectMarca;
 
-              console.log('selectedObjectMarca', selectedObjectMarca);
+              // console.log('selectedObjectMarca', selectedObjectMarca);
             });
 
             console.log('this.stockSucursales', this.stockSucursales);
@@ -294,15 +309,21 @@ export class CreateVentasComponent {
       }
     );
 
-     this._documentosService.obtener_documento().subscribe(
-      response => {
-        this.documento = response.data;
-        console.log('this.documento', this.documento);
-      },
-      error => {
-        console.log(error);
-      }
-    );
+
+   
+      
+  
+
+    console.log('documento', this.documento);
+    // this._documentosService.obtener_documento().subscribe(
+    //   response => {
+    //     this.documento = response.data;
+    //     console.log('this.documento', this.documento);
+    //   },
+    //   error => {
+    //     console.log(error);
+    //   }
+    // );
 
   }
 
@@ -379,20 +400,21 @@ export class CreateVentasComponent {
     if(valor === 'nota'){
       valor = 'nota de pedido';
     }
-    
+        
+    // switch (valor) {
+    //   case 'factura':
+    //     this.documento.idDocumento = '6';
+    //     break;
+    //   case 'boleta':
+    //   case 'cotizacion':
+    //   case 'nota de pedido':
+    //     this.documento.idDocumento = '1';
+    //     break;
+    //   default:
+    //     console.warn('Valor no reconocido:', valor);
+    // }
 
-    if(valor === 'factura'){
-      this.documento.idDocumento = '6';
-      
-    }if(valor === 'boleta'){
-      this.documento.idDocumento = '1';
-    }if(valor === 'cotizacion'){
-      this.documento.idDocumento = '1';
-    }if(valor === 'nota de pedido'){
-      this.documento.idDocumento = '1';
-    }
-
-    this.ventas.idDocumento = this.documento.idDocumento;
+    //this.ventas.idDocumento = this.documento.idDocumento;
 
     // 1) Buscar por nombre (insensible a mayúsculas/espacios)
     const compByName = this.comprobantes.find((c: any) =>
@@ -579,17 +601,23 @@ export class CreateVentasComponent {
 
   onInputNumero(): void {
     const long = this.cliente.ruc.length;
-    console.log(long);
-    console.log(this.documento.idDocumento);
-    if(long === 8 && String(this.documento.idDocumento).trim() === '1') {
-      console.log('buscando dni');
-      this.buscarRuc();
-    }
+    if (!this.documento) {
+    console.error('Documento no cargado');
+    return;
+  }
 
-    if(long === 11 && String(this.documento.idDocumento).trim() === '6'){
-        console.log('buscando ruc');
-        this.buscarRuc();
-    }
+  const id = this.documento[0].idDocumento;
+//  const long = id.length;
+
+  if (long === 8 && id === '1') {
+    console.log('buscando dni');
+    this.buscarRuc();
+  }
+
+  if (long === 11 && id === '6') {
+    console.log('buscando ruc');
+    this.buscarRuc();
+  }
   }
 
   buscarRuc() {

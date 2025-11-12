@@ -3,7 +3,7 @@ export interface FormaPago {
   descripcion: string;
   tipo: number;
   requiereReferencia: number;
-  activo: number;   // efectivo por defecto
+  activo?: number;   // efectivo por defecto
   recibido?: number;
   vuelto?: number;
   referencia?: string;

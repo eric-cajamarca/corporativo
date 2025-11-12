@@ -43,6 +43,7 @@ async function listarDocumentos(req,res){
             try {
                 let pool = await sql.connect(dbConfig);
                 let documentos = await pool.request().query('select * from Documentos');
+                console.log('documentos', documentos.recordset)
                 res.status(200).send({ message: 'Lista de documentos', data: documentos.recordset });
             } catch (error) {
                 res.status(500).send({ message: error.message, data: undefined });
