@@ -17,7 +17,7 @@ const obtener_Presentaciones = async (req, res) => {
     if(req.user){
         try {
             let pool = await sql.connect(dbConfig);
-            let presentaciones = await pool.request().query("select * from Presentacion");
+            let presentaciones = await pool.request().query("select idPresentacion,codigo,Descripcion from Presentacion");
             res.status(200).send({data: presentaciones.recordset});
         } catch (error) {
             console.log('error obtener_Presentaciones',error)

@@ -2,6 +2,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs';
+import { Comprobante } from '../interfaces/comprobante-interface';
+import { ApiResponse } from '../interfaces/ApiResponse-interface';
 
 @Injectable({
   providedIn: 'root'
@@ -27,6 +29,14 @@ export class PresentacionService {
   obtener_presentaciones():Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'presentaciones',{
+      headers:headers,
+      withCredentials: true
+    });
+  }
+
+  obtener_presentaciones1():Observable<ApiResponse<Comprobante[]>>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<ApiResponse<Comprobante[]>>(this.url+'presentaciones',{
       headers:headers,
       withCredentials: true
     });

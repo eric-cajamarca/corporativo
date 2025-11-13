@@ -220,7 +220,7 @@ go
 create table Presentacion
 (
 idPresentacion int identity(1,1) primary key not null,
-idEmpresa  UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
+--idEmpresa  UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
 codigo varchar(3) not null,
 Descripcion varchar(50) null,
 Multiplicador int null,
@@ -329,7 +329,7 @@ go
 --TRUNCATE TABLE CORRELATIVO
 create table Correlativos
 (
-idCorrelativo int identity (1,1) primary key not null,
+idCorrelativo int identity (1,1000) primary key not null,
 idEmpresa UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE not null,
 numero int not null,
 )
@@ -507,18 +507,15 @@ direccion varchar(200) null,
 fregistro datetime not null,
 estado bit not null
 )
-go
-
 
 go
 select * from empresas
 select * from DireccionEmpresa
 select * from Sucursal
-select * from UsuarioWeb
+select * from Presentacion
 go
 
 --truncate table stockSucursal
---drop table StockSucursal
 create table StockSucursal
 (
 idStockSucursal int identity(1,1) primary key not null,

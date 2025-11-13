@@ -21,14 +21,14 @@ const obtener_sucursal_idempresa = async function (req, res) {
         if (req.user.rol == 'Administrador') {
             try {
                 let pool = await sql.connect(dbConfig);
-                let sucursal = await pool.request().query("SELECT * FROM Sucursal WHERE idEmpresa = '" + idEmpresa + "'");
+                let sucursal = await pool.request().query("SELECT idsucursal,nombre,fregistro FROM Sucursal WHERE idEmpresa = '" + idEmpresa + "'");
 
                 //quiero recorrer sucursal y cambiar el formato de la fecha de fregistro
                 sucursal.recordset.forEach(element => {
                     element.fregistro = element.fregistro.toISOString().split('T')[0];
                 });           
 
-                res.status(200).send({ data: sucursal.recordset });
+                res.status(200).send({ message: 'succes', data: sucursal.recordset });
             } catch (error) {
                 console.log('obterner sucursal error: ' + error);
                 res.status(500).send({ message: 'Error al obtener los sucursal', data: undefined });

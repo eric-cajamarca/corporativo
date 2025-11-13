@@ -17,6 +17,8 @@ import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { Documento } from '../../../interfaces/documento-interface';
+import { Sucursal } from '../../../interfaces/sucursal-interface';
+import { Presentacion } from '../../../interfaces/presentacion-interface';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -42,12 +44,12 @@ export class CreateVentasComponent {
   public searchTerm: string = '';
   public searchCodigo = '';
   public categoria: any = [];
-  public presentacion: any = [];
+  public presentacion: Presentacion[] = [];
   public marcas: any = [];
   public stockSucursales: any = [];
   private stockSucursales_const: any = [];
   private TASA_IGV: number = 0.18;
-  public sucursales: any = [];
+  public sucursales: Sucursal[] = [];
   public carrito: any[] = [];
   public buscadorModal: any;
   public moneda: any = [];
@@ -117,7 +119,9 @@ export class CreateVentasComponent {
   ) { }
 
  ngOnInit(): void {
-     this._documentosService.obtener_documento1().subscribe({
+
+
+    this._documentosService.obtener_documento1().subscribe({
       next: (response) => {
         this.documento = response.data; // ✅ Asigna directo el array
         console.log('Documentos:', this.documento);
@@ -167,25 +171,24 @@ export class CreateVentasComponent {
       }
     );
 
-    this._presentacionService.obtener_presentaciones().subscribe(
-      (response) => {
+    this._presentacionService.obtener_presentaciones().subscribe({
+      next: (response) => {
         this.presentacion = response.data;
         console.log('this.presentacion', this.presentacion);
       },
-      (error) => {
-        console.log(error);
-      }
-    );
+      error: (error) => console.log(error)
+      
+    });
 
-    this._sucursalService.obtener_sucursal_idempresa().subscribe(
-      (response) => {
+    this._sucursalService.obtener_sucursal_idempresa1().subscribe({
+      next: (response) => {
         this.sucursales = response.data;
-        console.log('this.sucursales', this.sucursales);
+        console.log('sucursales', this.sucursales);
       },
-      (error) => {
-        console.log(error);
-      }
-    );
+      error: (error)=> console.error(error),
+      
+    });
+    
 
   this._documentosService.getFormasPago().subscribe({
     next: (response) => {

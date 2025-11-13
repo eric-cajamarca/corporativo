@@ -1,5 +1,7 @@
 export interface Sucursal {
   idSucursal: string;
   nombre:string;
-  direccion:string;
+  direccion?:string;
+  fechaRegistro?:string;
 }
+

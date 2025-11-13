@@ -2,6 +2,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
+import { ApiResponse } from '../interfaces/ApiResponse-interface';
+import { Sucursal } from '../interfaces/sucursal-interface';
 
 @Injectable({
   providedIn: 'root'
@@ -38,6 +40,14 @@ export class SucursalService {
   obtener_sucursal_idempresa():Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'sucursalempresa',{
+      headers:headers,
+      withCredentials: true
+    });
+  }
+
+  obtener_sucursal_idempresa1():Observable<ApiResponse<Sucursal[]>>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<ApiResponse<Sucursal[]>>(this.url+'sucursalempresa',{
       headers:headers,
       withCredentials: true
     });
