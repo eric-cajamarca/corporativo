@@ -1,110 +1,38 @@
 const sql = require('mssql');
+const ventasService = require('../services/ventas.service');
+const detalleVentaService = require('../services/detalle-ventas.service');
+const stockService = require('../services/stock.service');
 const dbConfig = require('../dbconfig');
 
-// CREATE TABLE [dbo].[Ventas](
-//     [idVenta] [int] IDENTITY(1,1) NOT NULL,
-//     [idEmpresa] [UNIQUEIDENTIFIER] NOT NULL,
-//     [idSucursal] [UNIQUEIDENTIFIER] NOT NULL,
-//     [serie] [varchar](4) NOT NULL,
-//     [numero] [varchar](8) NOT NULL,
-// 	[compVenta][varchar](13) not null,
-//     [idComprobante] [int] NOT NULL, -- '01':Factura, '03':Boleta, etc.
-//     [fEmision] [datetime] NOT NULL,
-// 	[fVencimiento] [datetime] NOT NULL,
-//     [idCliente] [int] NOT NULL,
-//     [idMoneda] [int] NOT NULL,
-//     [tCambio] [decimal](10,4) NOT NULL,
-// 	[subtotal] [decimal](18,2) NOT NULL,
-//     [igv] [decimal](18,2) NOT NULL,
-// 	[exonerado][decimal](18,2) NOT NULL,
-// 	[gratuito][decimal](18,2) NOT NULL,
-// 	[otrosCargos][decimal](18,2) NOT NULL,
-// 	[descuentos][decimal](18,2) NOT NULL,
-//     [total] [decimal](18,2) NOT NULL,
-//     [idMediosPago] [varchar](20) NOT NULL, -- 'PENDIENTE', 'PAGADO', 'ANULADO'
-// 	[idEstadoSunat][int]not null,
-// 	[compRelacionado][varchar](30) NULL,
-//     [idUsuario] [UNIQUEIDENTIFIER] NOT NULL,
-//     [fechaAnulacion] [datetime] NOT NULL DEFAULT GETDATE(),
-//     [idUsuarioAnulacion] [int] NULL,
-//     [motivo_anulacion] [varchar](255) NULL,
-//     CONSTRAINT [PK_Ventas] PRIMARY KEY CLUSTERED([idVenta] ASC),
-//     CONSTRAINT [FK_Ventas_Empresas] FOREIGN KEY ([idempresa]) 
-//         REFERENCES [dbo].[Empresas] ([idEmpresa]),
-//     CONSTRAINT [FK_Ventas_Sucursal] FOREIGN KEY ([idSucursal]) 
-//         REFERENCES [dbo].[Sucursal] ([idSucursal]),
-//     CONSTRAINT [FK_Ventas_Clientes] FOREIGN KEY ([idCliente]) 
-//         REFERENCES [dbo].[Clientes] ([idCliente]),
-// 	CONSTRAINT [FK_Ventas_Usuario] FOREIGN KEY ([idUsuario])
-// 		REFERENCES [dbo].[usuarioweb]([idUsuario]),
-//     CONSTRAINT [UQ_Ventas_SerieNumero] UNIQUE ([idEmpresa], [serie], [numero]),
-	
-// ) ON [PRIMARY]
+
 
 const crearVenta = async function (req, res) {
-    const {
-        idEmpresa,
-        idSucursal,
-        serie,
-        numero,
-        compVenta,
-        idComprobante,
-        fEmision,
-        fVencimiento,
-        idCliente,
-        idMoneda,
-        tCambio,
-        subtotal,
-        igv,
-        exonerado,
-        gratuito,
-        otrosCargos,
-        descuentos,
-        total,
-        idMediosPago,
-        idEstadoSunat,
-        compRelacionado,
-        idUsuario
-    } = req.body;
-    if (req.user) {
-        try {
-            let pool = await sql.connect(dbConfig);
-            let result = await pool
-                .request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('serie', sql.VarChar(4), serie)
-                .input('numero', sql.VarChar(8), numero)
-                .input('compVenta', sql.VarChar(13), compVenta)
-                .input('idComprobante', sql.Int, idComprobante)
-                .input('fEmision', sql.DateTime, fEmision)
-                .input('fVencimiento', sql.DateTime, fVencimiento)
-                .input('idCliente', sql.Int, idCliente)
-                .input('idMoneda', sql.Int, idMoneda)
-                .input('tCambio', sql.Decimal(10, 4), tCambio)
-                .input('subtotal', sql.Decimal(18, 2), subtotal)
-                .input('igv', sql.Decimal(18, 2), igv)
-                .input('exonerado', sql.Decimal(18, 2), exonerado)
-                .input('gratuito', sql.Decimal(18, 2), gratuito)
-                .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
-                .input('descuentos', sql.Decimal(18, 2), descuentos)
-                .input('total', sql.Decimal(18, 2), total)
-                .input('idMediosPago', sql.VarChar(20), idMediosPago)
-                .input('idEstadoSunat', sql.Int, idEstadoSunat)
-                .input('compRelacionado', sql.VarChar(30), compRelacionado)
-                .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                .query(`INSERT INTO Ventas 
-                (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoSunat, compRelacionado, idUsuario) 
-                VALUES 
-                (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoSunat, @compRelacionado, @idUsuario)`);
-            res.status(201).json({ message: 'Venta creada correctamente' });
-        } catch (error) {
-            console.error('Error al crear la venta:', error);
-            res.status(500).send('Error al crear la venta');
-        }
-    } else {
-        res.status(500).send({ message: 'No Access' });
-    }
+    const datosVenta = req.body;
+    const idUsuario = req.sub;
+  
+  if (!req.user) {
+    return res.status(401).send({ message: 'No Access' });
+  }
+
+  const pool = await sql.connect();
+  
+  try {
+    //Inicia transacción (CONTROLADOR = ORQUESTADOR)
+    await pool.request().query('BEGIN TRANSACTION');
+
+    //Llama al SERVICIO (solo lógica de negocio)
+    await ventasService.crearVenta(pool, datosVenta, req.user.empresa, idUsuario);
+    
+    //Commit (si todo OK)
+    await pool.request().query('COMMIT');
+    res.status(201).json({ message: 'Venta creada correctamente' });
+
+  } catch (error) {
+    // Rollback automático (si ALGÚN servicio falla)
+    await pool.request().query('ROLLBACK');
+    console.error('Error al crear la venta:', error);
+    res.status(500).send('Error al crear la venta');
+  }
 };
 
 const obtenerVentaPorId = async function (req, res) {
@@ -181,100 +109,82 @@ const actualizarVenta = async function (req, res) {
     }
 };
 
-// CREATE TABLE [dbo].[DetalleVenta](
-//     [idDetalle] [int] IDENTITY(1,1) NOT NULL,
-//     [idVenta] [int] NOT NULL,
-//     [idProducto] [UNIQUEIDENTIFIER] NOT NULL,
-//     [cantidad] [decimal](18,3) NOT NULL,
-//     [pVenta] [decimal](18,5) NOT NULL,
-//     [descuento] [decimal](18,2) NULL DEFAULT 0,
-//     [subtotal] [decimal](18,2) NOT NULL,
-// 	[igv] [bit] NOT NULL DEFAULT 0,
-// 	[isc] [bit] NOT NULL DEFAULT 0,
-//     [total] [decimal](18,2) NOT NULL,
-// 	[hVenta][datetime]  not null DEFAULT getdate(),
-// 	[cantEntregada][decimal](18,3) NOT NULL,
-// 	[cantPendiente]  AS (cantidad - cantEntregada) PERSISTED,
-// 	[fUltEntrega] [datetime2] NULL, -- última fecha que se entregó
-// 	[idEstadoPedido] [int] NOT NULL
-	   
-//     CONSTRAINT [PK_DetalleVenta] PRIMARY KEY CLUSTERED ([idDetalle] ASC),
-//     CONSTRAINT [FK_DetalleVenta_Ventas] FOREIGN KEY ([idVenta]) 
-//         REFERENCES [dbo].[Ventas] ([idVenta]),
-//     CONSTRAINT [FK_DetalleVenta_Productos] FOREIGN KEY ([idProducto]) 
-//         REFERENCES [dbo].[Productos] ([idProducto]),
-// 	CONSTRAINT [FK_DetalleVenta_EstadoPedido] FOREIGN KEY ([idEstadoPedido]) 
-//         REFERENCES [dbo].[EstadosPedidos] ([idEstadoPedido])
 
-// ) ON [PRIMARY]
 
-const crearDetalleVenta = async function (req, res) {
-  const {
-    idVenta,
-    idProducto,
-    cantidad,
-    pVenta,
-    descuento,
-    subtotal,
-    igv,
-    isc,
-    total,
-    hVenta,
-    cantEntregada,
-    idEstadoPedido
-  } = req.body;
-    if (req.user) {
-     try {
-        let pool = await sql.connect(dbConfig);
-        let result = await pool
-          .request()
-          .input('idVenta', sql.Int, idVenta)
-            .input('idProducto', sql.UniqueIdentifier, idProducto)
-            .input('cantidad', sql.Decimal(18, 3), cantidad)
-            .input('pVenta', sql.Decimal(18, 5), pVenta)
-            .input('descuento', sql.Decimal(18, 2), descuento)
-            .input('subtotal', sql.Decimal(18, 2), subtotal)
-            .input('igv', sql.Bit, igv)
-            .input('isc', sql.Bit, isc)
-            .input('total', sql.Decimal(18, 2), total)
-            .input('hVenta', sql.DateTime, hVenta)
-            .input('cantEntregada', sql.Decimal(18, 3), cantEntregada)
-            .input('idEstadoPedido', sql.Int, idEstadoPedido)
-          .query(`INSERT INTO DetalleVenta 
-          (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, hVenta, cantEntregada, idEstadoPedido)
-            VALUES
-            (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @hVenta, @cantEntregada, @idEstadoPedido)`); 
-        res.status(201).json({ message: 'Detalle de venta creado correctamente' });
-        } catch (error) {
-        console.error('Error al crear el detalle de venta:', error);
-        res.status(500).send('Error al crear el detalle de venta');
-        }
-    } else {
-        res.status(500).send({ message: 'No Access' });
+// const crearDetalleVenta = async function (req, res) {
+//   const {
+//     idVenta,
+//     idProducto,
+//     cantidad,
+//     pVenta,
+//     descuento,
+//     subtotal,
+//     igv,
+//     isc,
+//     total,
+//     hVenta,
+//     cantEntregada,
+//     idEstadoPedido
+//   } = req.body;
+//     if (req.user) {
+//      try {
+//         let pool = await sql.connect(dbConfig);
+//         let result = await pool
+//           .request()
+//           .input('idVenta', sql.Int, idVenta)
+//             .input('idProducto', sql.UniqueIdentifier, idProducto)
+//             .input('cantidad', sql.Decimal(18, 3), cantidad)
+//             .input('pVenta', sql.Decimal(18, 5), pVenta)
+//             .input('descuento', sql.Decimal(18, 2), descuento)
+//             .input('subtotal', sql.Decimal(18, 2), subtotal)
+//             .input('igv', sql.Bit, igv)
+//             .input('isc', sql.Bit, isc)
+//             .input('total', sql.Decimal(18, 2), total)
+//             .input('hVenta', sql.DateTime, hVenta)
+//             .input('cantEntregada', sql.Decimal(18, 3), cantEntregada)
+//             .input('idEstadoPedido', sql.Int, idEstadoPedido)
+//           .query(`INSERT INTO DetalleVenta 
+//           (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, hVenta, cantEntregada, idEstadoPedido)
+//             VALUES
+//             (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @hVenta, @cantEntregada, @idEstadoPedido)`); 
+//         res.status(201).json({ message: 'Detalle de venta creado correctamente' });
+//         } catch (error) {
+//         console.error('Error al crear el detalle de venta:', error);
+//         res.status(500).send('Error al crear el detalle de venta');
+//         }
+//     } else {
+//         res.status(500).send({ message: 'No Access' });
+//     }
+// };
+
+// controllers/ventas.controller.js
+
+
+
+const crearVentaCompleta = async (req, res) => {
+  const { venta, detalles } = req.body; // venta = {}, detalles = []
+  const pool = await sql.connect();
+
+  try {
+    await pool.request().query('BEGIN TRANSACTION');
+    
+    // ✅ Servicio 1: Crea venta
+    const ventaResult = await ventasService.crearVenta(pool, venta, req.user.empresa);
+    const idVenta = ventaResult.recordset[0].idVenta;
+
+    // ✅ Servicio 2: Crea múltiples detalles
+    for (const det of detalles) {
+      await detalleVentaService.crearDetalle(pool, { ...det, idVenta }, req.user.empresa);
     }
+    
+    await pool.request().query('COMMIT');
+    res.json({ success: true, idVenta });
+
+  } catch (error) {
+    await pool.request().query('ROLLBACK');
+    res.status(500).json({ error: error.message });
+  }
 };
-
-//quiero crear detalle de venta y actualizar stock al mismo tiempo utilizando el procedimiento almacenado
-// CREATE OR ALTER PROC dbo.sp_DescontarStock
-//     @idEmpresa  UNIQUEIDENTIFIER,
-//     @idSucursal UNIQUEIDENTIFIER,
-//     @idProducto UNIQUEIDENTIFIER,
-//     @cantidad   DECIMAL(18,2)
-// AS
-// BEGIN
-//     SET NOCOUNT ON;
-
-//     UPDATE dbo.StockSucursal
-//     SET    cantidad = cantidad - @cantidad
-//     OUTPUT DELETED.cantidad AS stockAntes, INSERTED.cantidad AS stockDespues
-//     WHERE  idEmpresa  = @idEmpresa
-//       AND  idSucursal = @idSucursal
-//       AND  idProducto = @idProducto
-//       AND  cantidad  >= @cantidad;          -- evita negativos
-
-//     IF @@ROWCOUNT = 0
-//         THROW 51000, 'Stock insuficiente o producto no existe', 1;
-// END
 
 const crearDetalleVenta_DescontarStock = async function (req, res) {
     const {
