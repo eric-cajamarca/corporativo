@@ -6,12 +6,12 @@ const secret = 'erik@./Eog';
 exports.createToken = function(user){
     //console.log('helpers jwt', user);
     var payload = {
-        empresa: user.idEmpresa[0],
+        empresa: user.idEmpresa,
         sub: user.idUsuario,
         nombres: user.nombres,
         apellidos: user.apellidos,
         email: user.email,
-        rol: user.descripcion,
+        rol: user.rol,
         iat: moment().unix(),
         exp: moment().add(1,'day').unix()
     

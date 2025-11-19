@@ -43,12 +43,15 @@ export class AuthService {
 
   verifyToken() {
     return this.http.get<any>( this.url + 'getEmpresa_login', {withCredentials: true }).pipe(
+      
       tap(response => this.handleAuthResponse(response)),
+      
       catchError(error => {
         this.handleAuthError();
         return EMPTY;
       })
     );
+
   }
 
 //   getEmpresa_login(): Observable<any> {
@@ -65,7 +68,7 @@ export class AuthService {
       this._userData.set({
         razonSocial: response.data.razonSocial,
         nombres: response.data.nombres,
-        rol: response.data.roles,
+        rol: response.data.rol,
         lastVerified: Date.now()
       });
       console.log('Usuario conectado:','en handleAuthResponse');

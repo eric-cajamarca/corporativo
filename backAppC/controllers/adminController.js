@@ -4,40 +4,115 @@ const bcrypt = require('bcryptjs');
 const moment = require('moment');
 const jwt = require('../helpers/jwt');
 const { v4: uuidv4 } = require('uuid');
-
+//const usuarioService = require('../services/usuario.service');
+const empresaService = require('../services/empresa.service');
+const loginService = require('../services/login.service');
+const authService = require('../services/auth.service');
 
 const getAdmin = async function (req, res) {
+  // 1. Validación de autenticación
+  if (!req.user) {
+    return res.status(401).send({ message: 'No Access', data: undefined });
+  }
 
-    if (req.user) {
+  // 2. Validación de rol
+  if (req.user.rol !== 'Administrador') {
+    return res.status(403).send({ message: 'No tiene permisos', data: undefined });
+  }
 
-        if (req.user.rol == 'Administrador') {
+  try {
+    // 3. Conectar BD (Controller gestiona el lifecycle de la conexión)
+    const pool = await sql.connect();
 
-            //  if(req.user.rol=='Administrador'){
-            console.log('req.user.rol', req.user.rol);
-            try {
-                const pool = await sql.connect(dbConfig);
-                const result = await pool
-                    .request()
-                    .input('empresa', sql.UniqueIdentifier, req.user.empresa)
-                    .query('SELECT * FROM UsuarioWeb UW INNER JOIN Rol R ON UW.idRol = R.idRol WHERE UW.idEmpresa = @empresa')
-                //.query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol where UsuarioWeb.estado = 1 and idEmpresa = @empresa');
-                // res.json(result.recordset);
-                // console.log('result.recordset');
-                // console.log(result.recordset);
-                res.status(200).send({ data: result.recordset });
-            } catch (error) {
-                console.error('Error al obtener los usuarios:', error);
-                res.status(200).send({ data: undefined });
-            }
+    // 4. Llamar al Service
+    const usuarios = await usuarioService.getAdmin(pool, req.user.empresa);
 
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
-    }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
-    }
+    // 5. Responder HTTP
+    res.status(200).send({ data: usuarios });
+
+  } catch (error) {
+    console.error('Error al obtener usuarios:', error);
+    res.status(500).send({ data: undefined });
+  }
 };
+
+// const getAdmin = async function (req, res) {
+
+//     if (req.user) {
+
+//         if (req.user.rol == 'Administrador') {
+
+//             //  if(req.user.rol=='Administrador'){
+//             console.log('req.user.rol', req.user.rol);
+//             try {
+//                 const pool = await sql.connect(dbConfig);
+//                 const result = await pool
+//                     .request()
+//                     .input('empresa', sql.UniqueIdentifier, req.user.empresa)
+//                     .query('SELECT * FROM UsuarioWeb UW INNER JOIN Rol R ON UW.idRol = R.idRol WHERE UW.idEmpresa = @empresa')
+//                 //.query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol where UsuarioWeb.estado = 1 and idEmpresa = @empresa');
+//                 // res.json(result.recordset);
+//                 // console.log('result.recordset');
+//                 // console.log(result.recordset);
+//                 res.status(200).send({ data: result.recordset });
+//             } catch (error) {
+//                 console.error('Error al obtener los usuarios:', error);
+//                 res.status(200).send({ data: undefined });
+//             }
+
+//         } else {
+//             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+//         }
+//     }
+//     else {
+//         res.status(500).send({ message: 'No Access', data: undefined });
+//     }
+// };
+
+
+// const getEmpresa_login = async function (req, res) {
+//   const { ruc, email, password } = req.body;
+
+//   // 1. Validación de entrada
+//   if (!ruc || !email || !password) {
+//     return res.status(400).send({ message: 'Faltan datos: ruc, email y password requeridos' });
+//   }
+
+//   try {
+//     // 2. Conectar BD
+//     const pool = await sql.connect(dbConfig);
+
+//     // 3. Llamar al Service (toda la lógica de negocio)
+//     const datosUsuario = await loginService.autenticar(pool, ruc, email, password);
+
+//     // 4. Generar token JWT
+//     const token = jwt.sign(datosUsuario, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+//     // 5. Responder con éxito
+//     res.status(200).send({ 
+//       message: 'Login exitoso', 
+//       data: { 
+//         token, 
+//         usuario: datosUsuario 
+//       } 
+//     });
+
+//   } catch (error) {
+//     console.error('Error en login:', error);
+    
+//     // Manejar errores específicos del Service
+//     if (error.message === 'RUC no existe' || 
+//         error.message === 'Usuario no existe' || 
+//         error.message === 'Usuario no pertenece a esta empresa' || 
+//         error.message === 'Contraseña incorrecta') {
+//       return res.status(401).send({ message: 'Credenciales inválidas', data: undefined });
+//     }
+    
+//     res.status(500).send({ message: 'Error interno del servidor', data: undefined });
+//   }
+// };
+
+
 
 const getEmpresa_login = async function (req, res) {
     console.log('getEmpresa_login req.user: ', req.user);
@@ -200,17 +275,6 @@ const updateAdmin = async (req, res) => {
 
 };
 
-// if (req.user) {
-// if (req.user.rol == 'Administrador') {
-
-// } else {
-//    res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-// }
-// }
-// else {
-//     res.status(500).send({ message: 'No Access' });
-// }
-
 const obtener_datos_colaborador_admin = async (req, res) => {
     const { id } = req.params;
     let data;
@@ -315,254 +379,126 @@ const cambiar_estado_colaborador_admin = async function (req, res) {
     }
 }
 
-
-// const admin_login = async (req, res) => {
-//     const { email, password, ruc } = req.body;
-//     const estado = true;
-//     // const data = req.body;
-//     // console.log('entro a login admin')
-//     // console.log(data);
-
-//     console.log('aqui valido si es el ruc correcto', ruc);
-//     //primero quiero validar si el ruc es correcto en la tabla de Empresas
-//     try {
-//         const pool = await sql.connect(dbConfig);
-
-//         //validar ruc
-//         const checkEmailQuery = await pool
-//             .request()
-//             .input('ruc', sql.VarChar, ruc)
-//             .query('SELECT * FROM Empresas where ruc = @ruc ');
-//         //console.log('checkEmailQuery', checkEmailQuery);
-//         // const bdRuc = checkEmailQuery.recordset[0].ruc;
-//         // const bdidEmpresa = checkEmailQuery.recordset[0].idEmpresa;
-//         // console.log('checkEmailQuery.recordset[0].ruc', checkEmailQuery.recordset[0].ruc)
-
-//         if (checkEmailQuery.recordset.length > 0) {
-            
-            
-//             //const bdidEmpresa = checkEmailQuery.recordset[0].idEmpresa;
-//             console.log('el ruc existe');
-//             console.log('aqui valido si el email es correcto', email, 'estado :', estado);
-
-//             const pool = await sql.connect(dbConfig);
-//             const checkEmailQuery = await pool
-//                 .request()
-//                 .input('idEmpresa', sql.UniqueIdentifier, bdidEmpresa)
-//                 .input('email', sql.VarChar, email)
-//                 .input('estado', sql.Bit, estado)
-//                 .query('SELECT * FROM usuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol WHERE UsuarioWeb.email = @email and UsuarioWeb.estado=@estado and usuarioWeb.idEmpresa = @idEmpresa');
-
-//             //.query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol');
-//             //.query('SELECT * FROM usuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol WHERE email = @email and estado=@estado');
-
-
-//             console.log('checkEmailQuery', checkEmailQuery);
-//             console.log(checkEmailQuery.recordset.length)
-
-//             if (checkEmailQuery.recordset.length > 0) {
-//                 const bdEmail = checkEmailQuery.recordset[0].email;
-//                 const bdPassword = checkEmailQuery.recordset[0].password;
-//                 let user = checkEmailQuery.recordset[0];
-//                 console.log('user respuesta de la bd', user);
-
-//                 //aqui quiero comparar si el ruc es igual al bdRuc, si el email es igual al bdEmail y si el estado es igual a true
-//                 if (bdRuc == ruc && bdEmail == email && estado == true) {
-                   
-
-//                     console.log('bdRuc == ruc && bdEmail == email && estado == true');
-//                     bcrypt.compare(password, bdPassword, (err, result) => {
-//                         if (err) {
-//                             console.error('Error al comparar contraseñas:', err);
-//                             res.status(500).send('Error al comparar contraseñas');
-//                         } else if (result) {
-//                             // Las contraseñas coinciden, inicia sesión
-//                             res.status(200).send({
-//                                 data: user,
-//                                 token: jwt.createToken(user)
-//                             });
-//                             console.log('las contraseñas coinciden');
-//                         } else {
-//                             // Las contraseñas no coinciden, devuelve un mensaje de error
-//                             res.status(200).send({ message: 'La contraseña es incorrecta', data: undefined });
-//                         }
-//                     });
-
-//                 } else {
-//                     console.log('el ruc no coincide con el email o el estado no es true');
-//                     res.status(200).send({ message: 'El ruc no coincide con el email o el estado no es true', data: undefined });
-//                 }
-
-
-//             } else {
-//                 // return res.status(400).json({ message: 'El email no existe. Por favor elija otro.' });
-//                 res.status(200).send({ message: 'El email no existe o usted no tiene permisos para acceder' });
-//             }
-
-//         } else {
-//             console.log('el ruc no existe');
-//             res.status(200).send({ message: 'El ruc no existe', data: undefined });
-//         }
-//     } catch (error) {
-//         console.error('Error al obtener los usurios:', error);
-//         res.status(200).send({ data: undefined });
-//     }
-
-
-// };
-
-
-
-// const admin_login = async (req, res) => {
-//     const { email, password, ruc } = req.body;
-//     const estado = true;
-//     const data = req.body;
-//     console.log('entro a login admin')
-//     console.log(data);
-
-//     console.log('aqui valido si es el ruc correcto', ruc);
-//     //primero quiero validar si el ruc es correcto en la tabla de Empresas
-//     try {
-//         const pool = await sql.connect(dbConfig);
-//         const checkEmailQuery = await pool
-//             .request()
-//             .input('ruc', sql.VarChar, ruc)
-//             .query('SELECT * FROM Empresas where ruc = @ruc ');
-//         console.log('checkEmailQuery', checkEmailQuery);
-
-//         if (checkEmailQuery.recordset.length > 0) {
-//             console.log('el ruc existe');
-//             console.log('aqui valido si el email es correcto', email,'estado :', estado);
-
-//             const pool = await sql.connect(dbConfig);
-//             const checkEmailQuery = await pool
-//                 .request()
-//                 .input('email', sql.VarChar, email)
-//                 .input('estado', sql.Bit, estado)
-//                 //.query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol');
-//                 .query('SELECT * FROM usuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol WHERE email = @email and estado=@estado');
-
-
-//             console.log('checkEmailQuery', checkEmailQuery);
-//             console.log(checkEmailQuery.recordset.length)
-
-//             if (checkEmailQuery.recordset.length > 0) {
-//                 const bdPassword = checkEmailQuery.recordset[0].password;
-//                 let user = checkEmailQuery.recordset[0];
-//                 console.log('user respuesta de la bd', user);
-
-
-//                 console.log('bdpassword', bdPassword);
-//                 bcrypt.compare(password, bdPassword, (err, result) => {
-//                     if (err) {
-//                         console.error('Error al comparar contraseñas:', err);
-//                         res.status(500).send('Error al comparar contraseñas');
-//                     } else if (result) {
-//                         // Las contraseñas coinciden, inicia sesión
-//                         res.status(200).send({
-//                             data: user,
-//                             token: jwt.createToken(user)
-//                         });
-//                         console.log('las contraseñas coinciden');
-//                     } else {
-//                         // Las contraseñas no coinciden, devuelve un mensaje de error
-//                         res.status(200).send({ message: 'La contraseña es incorrecta', data: undefined });
-//                     }
-//                 });
-//             } else {
-//                 // return res.status(400).json({ message: 'El email no existe. Por favor elija otro.' });
-//                 res.status(200).send({ message: 'El email no existe o usted no tiene permisos para acceder' });
-//             }
-
-//         } else {
-//             console.log('el ruc no existe');
-//             res.status(200).send({ message: 'El ruc no existe', data: undefined });
-//         }
-//     } catch (error) {
-//         console.error('Error al obtener los usuriosa:', error);
-//         res.status(200).send({ data: undefined });
-//     }
-
-
-// };
-
 const admin_login = async (req, res) => {
-    const { email, password, ruc } = req.body;
-    const estado = true;
+  const { email, password, ruc } = req.body;
 
-    try {
-        const pool = await sql.connect(dbConfig);
+  // 1. Validación de entrada
+  if (!email || !password || !ruc) {
+    return res.status(400).send({ message: 'Faltan datos requeridos', data: undefined });
+  }
 
-        // Validar RUC
-        const empresaQuery = await pool
-            .request()
-            .input('ruc', sql.VarChar, ruc)
-            .query('SELECT * FROM Empresas WHERE ruc = @ruc');
+  try {
+    // 2. Conectar BD
+    const pool = await sql.connect(dbConfig);
 
-        if (empresaQuery.recordset.length === 0) {
-            return res.status(404).send({ message: 'El RUC no existe', data: undefined });
-        }
+    // 3. Llamar al Service (toda la lógica de negocio)
+    const datosUsuario = await authService.adminLogin(pool, email, password, ruc);
+    console
+    // 4. Crear token
+    const token = jwt.createToken(datosUsuario);
 
-        const empresa = empresaQuery.recordset[0];
+    // 5. Establecer cookie HttpOnly (estás seguro porque ya validaste credenciales)
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 24 * 60 * 60 * 1000 // 1 día
+    });
 
-        // Validar email y estado
-        const userQuery = await pool
-            .request()
-            .input('idEmpresa', sql.UniqueIdentifier, empresa.idEmpresa)
-            .input('email', sql.VarChar, email)
-            .input('estado', sql.Bit, estado)
-            .query(`
-                SELECT * 
-                FROM usuarioWeb 
-                INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol 
-                WHERE UsuarioWeb.email = @email 
-                  AND UsuarioWeb.estado = @estado 
-                  AND UsuarioWeb.idEmpresa = @idEmpresa
-            `);
+    // 6. Responder éxito (NO enviar token en JSON)
+    res.status(200).send({ message: 'Login exitoso', data: {} });
 
-        if (userQuery.recordset.length === 0) {
-            return res.status(401).send({ message: 'El email no existe o usted no tiene permisos para acceder', data: undefined });
-        }
-
-        const user = userQuery.recordset[0];
-
-        // Verificar contraseña
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (!isMatch) {
-            return res.status(401).send({ message: 'La contraseña es incorrecta', data: undefined });
-        }
-
-        // Crear token y establecer cookie segura
-        const token = jwt.createToken(user);
-
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: true, //Solo por HTTPS (en producción)
-            sameSite: 'Strict',
-            maxAge: 24 * 60 * 60 * 1000 // 1 día
-        });
-
-        res.status(200).send({
-            message: 'Login exitoso',
-            data: {}
-        });
-        // //No enviar token por JSON
-        // res.status(200).send({
-        //     message: 'Login exitoso',
-        //     data: {
-        //         nombres: user.nombres,
-        //         apellidos: user.apellidos,
-        //         email: user.email,
-        //         rol: user.descripcion
-        //     }
-        // });
-
-    } catch (error) {
-        console.error('Error en login:', error);
-        res.status(500).send({ message: 'Error interno del servidor', data: undefined });
+  } catch (error) {
+    console.error('Error en login:', error);
+    
+    // Manejar errores específicos del Service
+    if (error.message === 'RUC no existe' || 
+        error.message === 'El email no existe o no tiene permisos para acceder' ||
+        error.message === 'La contraseña es incorrecta') {
+      return res.status(401).send({ message: error.message, data: undefined });
     }
+    
+    res.status(500).send({ message: 'Error interno del servidor', data: undefined });
+  }
 };
+
+// const admin_login = async (req, res) => {
+//     const { email, password, ruc } = req.body;
+//     const estado = true;
+
+//     try {
+//         const pool = await sql.connect(dbConfig);
+
+//         // Validar RUC
+//         const empresaQuery = await pool
+//             .request()
+//             .input('ruc', sql.VarChar, ruc)
+//             .query('SELECT * FROM Empresas WHERE ruc = @ruc');
+
+//         if (empresaQuery.recordset.length === 0) {
+//             return res.status(404).send({ message: 'El RUC no existe', data: undefined });
+//         }
+
+//         const empresa = empresaQuery.recordset[0];
+
+//         // Validar email y estado
+//         const userQuery = await pool
+//             .request()
+//             .input('idEmpresa', sql.UniqueIdentifier, empresa.idEmpresa)
+//             .input('email', sql.VarChar, email)
+//             .input('estado', sql.Bit, estado)
+//             .query(`
+//                 SELECT * 
+//                 FROM usuarioWeb 
+//                 INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol 
+//                 WHERE UsuarioWeb.email = @email 
+//                   AND UsuarioWeb.estado = @estado 
+//                   AND UsuarioWeb.idEmpresa = @idEmpresa
+//             `);
+
+//         if (userQuery.recordset.length === 0) {
+//             return res.status(401).send({ message: 'El email no existe o usted no tiene permisos para acceder', data: undefined });
+//         }
+
+//         const user = userQuery.recordset[0];
+
+//         // Verificar contraseña
+//         const isMatch = await bcrypt.compare(password, user.password);
+
+//         if (!isMatch) {
+//             return res.status(401).send({ message: 'La contraseña es incorrecta', data: undefined });
+//         }
+
+//         // Crear token y establecer cookie segura
+//         const token = jwt.createToken(user);
+
+//         res.cookie('token', token, {
+//             httpOnly: true,
+//             secure: true, //Solo por HTTPS (en producción)
+//             sameSite: 'Strict',
+//             maxAge: 24 * 60 * 60 * 1000 // 1 día
+//         });
+
+//         res.status(200).send({
+//             message: 'Login exitoso',
+//             data: {}
+//         });
+//         // //No enviar token por JSON
+//         // res.status(200).send({
+//         //     message: 'Login exitoso',
+//         //     data: {
+//         //         nombres: user.nombres,
+//         //         apellidos: user.apellidos,
+//         //         email: user.email,
+//         //         rol: user.descripcion
+//         //     }
+//         // });
+
+//     } catch (error) {
+//         console.error('Error en login:', error);
+//         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
+//     }
+// };
 
 
 const deleteAdmin = async (req, res) => {
