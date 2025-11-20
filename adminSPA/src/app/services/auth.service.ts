@@ -36,9 +36,9 @@ export class AuthService {
   }
 
   private setupTokenVerification() {
-    setInterval(() => {
-      this.verifyToken().subscribe();
-    }, this.verificationInterval);
+    // setInterval(() => {
+    //   this.verifyToken().subscribe();
+    // }, this.verificationInterval);
   }
 
   verifyToken() {
@@ -68,10 +68,10 @@ export class AuthService {
       this._userData.set({
         razonSocial: response.data.razonSocial,
         nombres: response.data.nombres,
-        rol: response.data.rol,
+        rol: response.data.roles,
         lastVerified: Date.now()
       });
-      console.log('Usuario conectado:','en handleAuthResponse');
+      console.log('Usuario conectado:', this._userData());
     } else {
       this._userData.set(null);
       this.router.navigate(['/login-empresa']);

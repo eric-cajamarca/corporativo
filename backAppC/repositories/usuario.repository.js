@@ -36,3 +36,4 @@ exports.buscarPorEmailYRuc = async (pool, email, idEmpresa) => {
   
   return result.recordset.length > 0 ? result.recordset[0] : null;
 };
+

@@ -3,7 +3,7 @@ const empresaRepository = require('../repositories/empresa.repository');
 
 exports.getDatosEmpresaLogin = async (pool, userData) => {
   // Obtiene datos de empresa desde el repository
-  const empresa = await empresaRepository.obtenerRazonSocial(pool, userData.empresa);
+  const empresa = await empresaRepository.obtenerRazonSocial(pool, userData);
   
   // Construye objeto de respuesta
   const data = {
@@ -12,6 +12,7 @@ exports.getDatosEmpresaLogin = async (pool, userData) => {
     roles: userData.rol
   };
   
+  console.log('Datos en servicio getDatosEmpresaLogin:', data);
   // Valida que haya al menos un dato
   if (!data.razonSocial && !data.nombres) {
     throw new Error('No se encontraron datos para el usuario/empresa');

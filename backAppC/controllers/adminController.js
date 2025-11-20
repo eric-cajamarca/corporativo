@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const moment = require('moment');
 const jwt = require('../helpers/jwt');
 const { v4: uuidv4 } = require('uuid');
-//const usuarioService = require('../services/usuario.service');
+const usuarioService = require('../services/usuario.service');
 const empresaService = require('../services/empresa.service');
 const loginService = require('../services/login.service');
 const authService = require('../services/auth.service');
@@ -121,29 +121,18 @@ const getEmpresa_login = async function (req, res) {
     }
 
     console.log('Obteniendo datos para usuario:', req.user);
-    const data = {};
+    
 
     try {
         const pool = await sql.connect(dbConfig);
-        
-        // Obtener datos de la empresa
-        const empresaResult = await pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-            .query('SELECT razon_Social FROM Empresas WHERE idEmpresa = @idEmpresa');
-        
-        if (empresaResult.recordset.length > 0) {
-            data.razonSocial = empresaResult.recordset[0].razon_Social;
-            data.nombres = req.user.nombres + ' ' + req.user.apellidos;
-            data.roles = req.user.rol;
-        }
-        
-        console.log('Datos obtenidos en getempresa_login:', data);
-        // Verificar si obtuvimos al menos algún dato
-        if (!data.razonSocial && !data.nombres) {
-            return res.status(404).send({ message: 'No se encontraron datos para el usuario/empresa',data: undefined });
-        }
 
-        return res.status(200).send({ data });
+        const empresaResult = await empresaService.getDatosEmpresaLogin(pool, req.user);
+        
+        
+        console.log('Datos obtenidos en getempresa_login:', empresaResult);
+        // Verificar si obtuvimos al menos algún dato
+        
+        return res.status(200).send({ data: empresaResult, message: 'Datos obtenidos correctamente' });
         
     } catch (error) {
         console.error('Error al obtener datos:', error);
@@ -333,51 +322,91 @@ const obtener_datos_colaborador_admin = async (req, res) => {
     }
 };
 
-const cambiar_estado_colaborador_admin = async function (req, res) {
+const cambiar_estado_colaborador_admin = async (req, res) => {
+  console.log('cambiar_estado_colaborador_admin:', req.params);
 
-    console.log('cambiar_estado_colaborador_admin: ', req.params);
-    if (req.user) {
+  // Validación básica de autenticación
+  if (!req.user) {
+    return res.status(403).json({ data: undefined, message: 'NoToken' });
+  }
 
-        //quiero validar si el rol del usuario es administrador
-        if (req.user.rol == 'Administrador') {
+  try {
+    const id = req.params.id;
+    const data = req.body;
 
-            let id = req.params['id'];
-            let data = req.body;
-            let estado = data.estado;
+    // Llamada al service
+    const resultado = await colaboradorService.cambiarEstado(id, data, req.user ,req.user.empresa);
 
-            let nuevo_estado;
+    // Respuesta exitosa
+    res.status(200).json({
+      message: resultado.message,
+      data: { nuevoEstado: resultado.nuevoEstado }
+    });
 
-            // console.log('cambiar_estado_colaborador_admin: ', data);
-            // console.log('id: ', id);
+  } catch (error) {
+    console.error('Error en controller:', error.message);
 
-
-            if (data.estado) {
-                nuevo_estado = false;
-            } else if (!data.estado) {
-                nuevo_estado = true;
-            }
-
-            console.log('nuevo estado: ', nuevo_estado);
-
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idUsuario', sql.UniqueIdentifier, id)
-                .input('estado', sql.Bit, nuevo_estado)
-                .query('UPDATE usuarioWeb SET estado = @estado WHERE idUsuario = @idUsuario');
-            console.log(result.recordset);
-            res.status(200).send({ data: result.recordset });
-        } else {
-            console.log('no es administrador');
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
-
-
-
-    } else {
-        res.status(403).send({ data: undefined, message: 'NoToken' });
+    // Manejo específico de errores
+    if (error.message === 'PERMISO_DENEGADO') {
+      return res.status(403).json({ 
+        message: 'No tiene permisos para realizar esta acción', 
+        data: undefined 
+      });
     }
-}
+
+    // Error genérico
+    res.status(500).json({ 
+      message: 'Error interno del servidor', 
+      data: undefined 
+    });
+  }
+};
+
+// const cambiar_estado_colaborador_admin = async function (req, res) {
+
+//     console.log('cambiar_estado_colaborador_admin: ', req.params);
+//     if (req.user) {
+
+//         //quiero validar si el rol del usuario es administrador
+//         if (req.user.rol == 'Administrador') {
+
+//             let id = req.params['id'];
+//             let data = req.body;
+//             let estado = data.estado;
+
+//             let nuevo_estado;
+
+//             // console.log('cambiar_estado_colaborador_admin: ', data);
+//             // console.log('id: ', id);
+
+
+//             if (data.estado) {
+//                 nuevo_estado = false;
+//             } else if (!data.estado) {
+//                 nuevo_estado = true;
+//             }
+
+//             console.log('nuevo estado: ', nuevo_estado);
+
+//             const pool = await sql.connect(dbConfig);
+//             const result = await pool
+//                 .request()
+//                 .input('idUsuario', sql.UniqueIdentifier, id)
+//                 .input('estado', sql.Bit, nuevo_estado)
+//                 .query('UPDATE usuarioWeb SET estado = @estado WHERE idUsuario = @idUsuario');
+//             console.log(result.recordset);
+//             res.status(200).send({ data: result.recordset });
+//         } else {
+//             console.log('no es administrador');
+//             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+//         }
+
+
+
+//     } else {
+//         res.status(403).send({ data: undefined, message: 'NoToken' });
+//     }
+// }
 
 const admin_login = async (req, res) => {
   const { email, password, ruc } = req.body;
@@ -528,17 +557,17 @@ const logout = async (req, res) => {
     return res.status(200).json({ success:true ,message: 'Sesión cerrada exitosamente' });
 };
   
-const consulCookie= async (req, res) => {
-    const token = req.cookies.token;
-    if (!token) return res.status(401).send({ message: 'No autenticado' });
+// const consulCookie= async (req, res) => {
+//     const token = req.cookies.token;
+//     if (!token) return res.status(401).send({ message: 'No autenticado' });
   
-    try {
-      //const decoded = jwt.verify(token, 'secreto');
-      res.send({ nombre: decoded.nombre, idUsuario: decoded.idUsuario });
-    } catch {
-      res.status(401).send({ message: 'Token inválido' });
-    }
-  };
+//     try {
+//       //const decoded = jwt.verify(token, 'secreto');
+//       res.send({ nombre: decoded.nombre, idUsuario: decoded.idUsuario });
+//     } catch {
+//       res.status(401).send({ message: 'Token inválido' });
+//     }
+//   };
   
 
 
