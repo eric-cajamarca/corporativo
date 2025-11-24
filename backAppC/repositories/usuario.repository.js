@@ -1,6 +1,51 @@
 // repositories/usuario.repository.js
 const sql = require('mssql');
 
+/**
+ * Verifica si un email ya existe en la BD
+ */
+exports.checkEmailExists = async (pool, email, Empresa) =>{
+      
+   console.log('checkEmailExists Empresa', Empresa, email);
+    const result = await pool
+      .request()
+      .input('email', sql.VarChar, email)
+      .input('idEmpresa', sql.UniqueIdentifier, Empresa)
+      .query('SELECT idUsuario FROM usuarioWeb WHERE email = @email and idEmpresa = @idEmpresa');
+     console.log('checkEmailExists', result.recordset.length);
+    return result.recordset.length > 0;
+  
+}
+
+/**
+ * Crea un nuevo usuario en la BD
+ */
+exports.createUsuario = async (pool, usuarioData) => {
+  console.log('createUsurio en repositoy', usuarioData);
+  
+    const result = await pool
+      .request()
+      .input('idUsuario', sql.UniqueIdentifier, usuarioData.idUsuario)
+      .input('idEmpresa', sql.UniqueIdentifier, usuarioData.idEmpresa)
+      .input('nombres', sql.VarChar, usuarioData.nombres)
+      .input('apellidos', sql.VarChar, usuarioData.apellidos)
+      .input('email', sql.VarChar, usuarioData.email)
+      .input('password', sql.Text, usuarioData.password)
+      .input('idRol', sql.UniqueIdentifier, usuarioData.idRol)
+      .input('estado', sql.Bit, 0)
+      .input('fregistro', sql.Date, usuarioData.fregistro)
+      .query(`
+        INSERT INTO usuarioWeb 
+        (idUsuario, idEmpresa, nombres, apellidos, email, password, idRol, estado, fregistro) 
+        VALUES (@idUsuario, @idEmpresa, @nombres, @apellidos, @email, @password, @idRol, @estado, @fregistro)
+      `);
+
+    
+    return result.rowsAffected;
+  
+}
+
+
 exports.obtenerUsuariosAdmin = async (pool, idEmpresa) => {
   const result = await pool
     .request()
@@ -37,3 +82,53 @@ exports.buscarPorEmailYRuc = async (pool, email, idEmpresa) => {
   return result.recordset.length > 0 ? result.recordset[0] : null;
 };
 
+// Agrega estas funciones al archivo existente
+
+/**
+ * Actualiza usuario SIN password
+ */
+exports.updateUsuarioSinPassword = async (pool, idUsuario, datos) => {
+  try {
+    
+    const result = await pool
+      .request()
+      .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+      .input('nombres', sql.VarChar, datos.nombres)
+      .input('apellidos', sql.VarChar, datos.apellidos)
+      .input('idRol', sql.UniqueIdentifier, datos.idRol)
+      .input('idEmpresa', sql.UniqueIdentifier, datos.idEmpresa)
+      .query(`
+        UPDATE usuarioWeb 
+        SET nombres = @nombres, apellidos = @apellidos, idRol = @idRol 
+        WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa
+      `);
+    
+    return result.rowsAffected;
+  } catch (error) {
+    throw new Error(`DB Error updateSinPass: ${error.message}`);
+  }
+}
+
+/**
+ * Actualiza usuario CON password
+ */
+exports.updateUsuarioConPassword = async (pool, idUsuario, datos) => {
+  try {
+    const result = await pool
+      .request()
+      .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+      .input('nombres', sql.VarChar, datos.nombres)
+      .input('apellidos', sql.VarChar, datos.apellidos)
+      .input('password', sql.Text, datos.password)
+      .input('idRol', sql.UniqueIdentifier, datos.idRol)
+      .query(`
+        UPDATE usuarioWeb 
+        SET nombres = @nombres, apellidos = @apellidos, password = @password, idRol = @idRol 
+        WHERE idUsuario = @idUsuario
+      `);
+    
+    return result.rowsAffected;
+  } catch (error) {
+    throw new Error(`DB Error updateConPass: ${error.message}`);
+  }
+}

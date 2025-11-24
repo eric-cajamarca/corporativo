@@ -157,6 +157,9 @@ export class UpdateColaboradorComponent {
               this._router.navigate(['/colaborador']);
             }
   
+          },
+          error =>{
+            this.btn_actualizar = false;
           }
         
         )

@@ -1,9 +1,8 @@
 const sql = require('mssql');
 
 
-exports.updateEstado = async (id, estado, idEmpresa) =>{
+exports.updateEstado = async (pool, id, estado, idEmpresa) =>{
     try {
-      const pool = await sql.connect(dbConfig);
       const result = await pool
         .request()
         .input('idUsuario', sql.UniqueIdentifier, id)

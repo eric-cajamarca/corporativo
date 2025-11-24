@@ -105,7 +105,13 @@ export class CreateColaboradorComponent {
           this._router.navigate(['/colaborador']);
           }
           
+        },
+        Error => {
+        this.btn_registrar=false;
+
         }
+        
+        
       )
       
     }else{
@@ -117,6 +123,9 @@ export class CreateColaboradorComponent {
         position: 'topRight',
         message: 'Complete correctamente el formulario'
     });
+
+      this.btn_registrar=false;
+
     }
   }
 
