@@ -217,53 +217,53 @@ const obtener_rol_id = async function (req, res) {
 
 //crea la funcion actualizar_rol para actualizar un rol por id
 // UPDATE
+
+
 const actualizar_rol = async function (req, res) {
-    const { id } = req.params;
-    const { descripcion } = req.body;
+  const { id } = req.params;
+  const { descripcion } = req.body;
 
-    if (req.user) {
-
-        if (req.user.rol == 'Administrador') {
-
-            //antes de actualizar el rol, verificar que no exista
-            try {
-                let pool = await sql.connect(dbConfig);
-                let rol = await pool
-                    .request()
-                    .input('descripcion', sql.VarChar, descripcion)
-                    .query("SELECT * FROM Rol WHERE descripcion = @descripcion");
-                if (rol.recordset.length > 0) {
-                    res.status(200).send({ message: 'El rol ya existe', data: undefined });
-                } else {
-                    try {
-                        let pool = await sql.connect(dbConfig);
-                        let rol = await pool
-                            .request()
-                            .input('idRol', sql.UniqueIdentifier, id)
-                            .input('descripcion', sql.VarChar, descripcion)
-                            .query("UPDATE Rol SET descripcion = @descripcion WHERE idRol = @idRol");
-
-                        res.status(200).send({message: 'Rol actualizado correctamente', data: rol.rowsAffected});
-                    } catch (error) {
-                        res.status(200).send({ message: 'Error al actualizar el rol', data: undefined });
-                        //res.send(error.message);
-                    }
-                }
-            } catch (error) {
-                res.status(200).send({ message: 'Error al actualizar el rol', data: undefined });
-                //res.send(error.message);
-            }
-
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
-    }
-    else {
-        res.status(500).send({ message: 'No Access' });
+  try {
+    // Validación básica de token
+    if (!req.user) {
+      return res.status(403).json({ message: 'No Access', data: undefined });
     }
 
-}
+    const pool = await sql.connect(dbConfig);
+    // Llamar al service
+    const resultado = await rolService.actualizarRol(pool, id, descripcion, req.user);
 
+    // Respuesta exitosa
+    res.status(200).json({
+      message: resultado.message,
+      data: resultado.rowsAffected
+    });
+
+  } catch (error) {
+    console.error('Error en actualizar_rol:', error.message);
+
+    // Manejo de errores específicos
+    if (error.message === 'PERMISO_DENEGADO') {
+      return res.status(403).json({
+        message: 'No tiene permisos para realizar esta acción',
+        data: undefined
+      });
+    }
+
+    if (error.message === 'ROL_DUPLICADO') {
+      return res.status(200).json({
+        message: 'El rol ya existe',
+        data: undefined
+      });
+    }
+
+    // Error genérico
+    res.status(500).json({
+      message: 'Error al actualizar el rol',
+      data: undefined
+    });
+  }
+};
 
 
 //crea la funcion eliminar_rol para eliminar un rol por id
