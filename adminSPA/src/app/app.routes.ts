@@ -38,6 +38,7 @@ import { IndexProveedorComponent } from './components/proveedores/index-proveedo
 import { CreateProveedorComponent } from './components/proveedores/create-proveedor/create-proveedor.component';
 import { UpdateProveedorComponent } from './components/proveedores/update-proveedor/update-proveedor.component';
 import { PrincipalInventarioComponent } from './components/inventarios/principal-inventario/principal-inventario.component';
+import { CreatePreciosComponent } from './components/preciosV/create-precios/create-precios.component';
 
 export const routes: Routes = [
     {
@@ -153,7 +154,7 @@ export const routes: Routes = [
      { path: 'proveedores/create', component: CreateProveedorComponent,canActivate: [AuthGuard], title: 'Crear Proveedor' },
      { path: 'proveedores/:id', component: UpdateProveedorComponent,canActivate: [AuthGuard], title: 'Actualizar Proveedor' },
 
-     
+     {path: 'precios', component: CreatePreciosComponent, canActivate: [AuthGuard], title: 'Crear Precio Venta' },
      
      
 

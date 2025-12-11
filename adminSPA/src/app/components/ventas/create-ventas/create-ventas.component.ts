@@ -138,7 +138,8 @@ export class CreateVentasComponent {
         console.log('response productos', response.data);
         if (response.data != undefined) {
           this.productos = response.data;
-          this.productos_const = this.productos;
+          this.productos_const = this.productos;  
+          this.stockSucursales_const = this.productos;
           //this.productos_filtrados = this.productos; // Inicializar con todos los productos
           console.log('this.productos', this.productos);
         }
@@ -148,46 +149,46 @@ export class CreateVentasComponent {
       }
     );
 
-    this._marcaService.obtenerMarcas().subscribe(
-      (response) => {
-        this.marcas = response.data;
-        this.marcas.sort((a: { nombre: string }, b: { nombre: any }) =>
-          a.nombre.localeCompare(b.nombre)
-        );
-        console.log('this.marcas', this.marcas);
-      },
-      (error) => {
-        console.log(error);
-      }
-    );
+    // this._marcaService.obtenerMarcas().subscribe(
+    //   (response) => {
+    //     this.marcas = response.data;
+    //     this.marcas.sort((a: { nombre: string }, b: { nombre: any }) =>
+    //       a.nombre.localeCompare(b.nombre)
+    //     );
+    //     console.log('this.marcas', this.marcas);
+    //   },
+    //   (error) => {
+    //     console.log(error);
+    //   }
+    // );
 
-    this._categoriaService.obtener_categorias().subscribe(
-      (response) => {
-        this.categoria = response.data;
-        console.log('this.categoria', this.categoria);
-      },
-      (error) => {
-        console.log(error);
-      }
-    );
+    // this._categoriaService.obtener_categorias().subscribe(
+    //   (response) => {
+    //     this.categoria = response.data;
+    //     console.log('this.categoria', this.categoria);
+    //   },
+    //   (error) => {
+    //     console.log(error);
+    //   }
+    // );
 
-    this._presentacionService.obtener_presentaciones().subscribe({
-      next: (response) => {
-        this.presentacion = response.data;
-        console.log('this.presentacion', this.presentacion);
-      },
-      error: (error) => console.log(error)
+    // this._presentacionService.obtener_presentaciones().subscribe({
+    //   next: (response) => {
+    //     this.presentacion = response.data;
+    //     console.log('this.presentacion', this.presentacion);
+    //   },
+    //   error: (error) => console.log(error)
       
-    });
+    // });
 
-    this._sucursalService.obtener_sucursal_idempresa1().subscribe({
-      next: (response) => {
-        this.sucursales = response.data;
-        console.log('sucursales', this.sucursales);
-      },
-      error: (error)=> console.error(error),
+    // this._sucursalService.obtener_sucursal_idempresa1().subscribe({
+    //   next: (response) => {
+    //     this.sucursales = response.data;
+    //     console.log('sucursales', this.sucursales);
+    //   },
+    //   error: (error)=> console.error(error),
       
-    });
+    // });
     
 
   this._documentosService.getFormasPago().subscribe({
@@ -201,76 +202,76 @@ export class CreateVentasComponent {
     }
   });
 
-  this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
-      (response) => {
-        this.stockSucursales = response.data;
-        if (response.data != undefined) {
-          if (
-            this.productos &&
-            this.sucursales &&
-            this.categoria &&
-            this.presentacion &&
-            this.stockSucursales
-          ) {
-            // Realizar operaciones con los arrays
-            console.log('this.productos', this.productos);
-            console.log('this.sucursales', this.sucursales);
-            console.log('this.categoria', this.categoria);
-            console.log('this.presentacion', this.presentacion);
-            console.log('this.stockSucursales', this.stockSucursales);
+  // this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
+  //     (response) => {
+  //       this.stockSucursales = response.data;
+  //       if (response.data != undefined) {
+  //         if (
+  //           this.productos &&
+  //           this.sucursales &&
+  //           this.categoria &&
+  //           this.presentacion &&
+  //           this.stockSucursales
+  //         ) {
+  //           // Realizar operaciones con los arrays
+  //           console.log('this.productos', this.productos);
+  //           console.log('this.sucursales', this.sucursales);
+  //           console.log('this.categoria', this.categoria);
+  //           console.log('this.presentacion', this.presentacion);
+  //           console.log('this.stockSucursales', this.stockSucursales);
 
-            //quiero buscar en response.data el idProducto y traer todo el objeto del idProducto y agregarlo a this.stockSucursales
+  //           //quiero buscar en response.data el idProducto y traer todo el objeto del idProducto y agregarlo a this.stockSucursales
 
-            this.stockSucursales.forEach((element: any) => {
-              //buscar en this.productos el codigo y traer todo el objeto del codigo
-              const selectedObject = this.productos.find(
-                (item: any) => item.idProducto == element.idProducto
-              );
-              element.producto = selectedObject;
-              // Ahora, selectedObject contiene toda la información del elemento seleccionado
-              //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
-              const selectedObjectSucursal = this.sucursales.find(
-                (item: any) => item.idSucursal == element.idSucursal
-              );
-              element.sucursal = selectedObjectSucursal;
+  //           this.stockSucursales.forEach((element: any) => {
+  //             //buscar en this.productos el codigo y traer todo el objeto del codigo
+  //             const selectedObject = this.productos.find(
+  //               (item: any) => item.idProducto == element.idProducto
+  //             );
+  //             element.producto = selectedObject;
+  //             // Ahora, selectedObject contiene toda la información del elemento seleccionado
+  //             //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
+  //             const selectedObjectSucursal = this.sucursales.find(
+  //               (item: any) => item.idSucursal == element.idSucursal
+  //             );
+  //             element.sucursal = selectedObjectSucursal;
 
-              //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
-              const selectedObjectCategoria = this.categoria.find(
-                (item: any) => item.idCategoria == element.producto.idCategoria
-              );
-              element.categoria = selectedObjectCategoria;
+  //             //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
+  //             const selectedObjectCategoria = this.categoria.find(
+  //               (item: any) => item.idCategoria == element.producto.idCategoria
+  //             );
+  //             element.categoria = selectedObjectCategoria;
 
-              //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
-              const selectedObjectPresentacion = this.presentacion.find(
-                (item: any) =>
-                  item.idPresentacion == element.producto.idPresentacion
-              );
-              element.presentacion = selectedObjectPresentacion;
+  //             //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
+  //             const selectedObjectPresentacion = this.presentacion.find(
+  //               (item: any) =>
+  //                 item.idPresentacion == element.producto.idPresentacion
+  //             );
+  //             element.presentacion = selectedObjectPresentacion;
 
-              //buscar en this.marcas el idMarca y traer todo el objeto del idMarca
-              const selectedObjectMarca = this.marcas.find(
-                (item: any) => item.idMarca == element.producto.idMarca
-              );
-              element.marca = selectedObjectMarca;
+  //             //buscar en this.marcas el idMarca y traer todo el objeto del idMarca
+  //             const selectedObjectMarca = this.marcas.find(
+  //               (item: any) => item.idMarca == element.producto.idMarca
+  //             );
+  //             element.marca = selectedObjectMarca;
 
-              // console.log('selectedObjectMarca', selectedObjectMarca);
-            });
+  //             // console.log('selectedObjectMarca', selectedObjectMarca);
+  //           });
 
-            console.log('this.stockSucursales', this.stockSucursales);
-          } else {
-            console.error('Uno de los arrays es undefined o está vacío.');
-          }
+  //           console.log('this.stockSucursales', this.stockSucursales);
+  //         } else {
+  //           console.error('Uno de los arrays es undefined o está vacío.');
+  //         }
 
-          this.stockSucursales_const = this.stockSucursales;
-          console.log('this.stockSucursales', this.stockSucursales);
-        } else {
-          this.stockSucursales = [];
-        }
-      },
-      (error) => {
-        console.log(error);
-      }
-    );
+  //         this.stockSucursales_const = this.stockSucursales;
+  //         console.log('this.stockSucursales', this.stockSucursales);
+  //       } else {
+  //         this.stockSucursales = [];
+  //       }
+  //     },
+  //     (error) => {
+  //       console.log(error);
+  //     }
+  //   );
 
     this._comprobanteService.obtener_comprobantes().subscribe(
       (response) => {
@@ -350,9 +351,9 @@ export class CreateVentasComponent {
       // Filtrar por código o descripción (uso includes en lugar de test)
       this.productos_filtrados = this.stockSucursales_const.filter(
         (item: any) => {
-          const descripcion = (item.producto?.descripcion ?? '').toString().toLowerCase();
-          const codigo = (item.producto?.Codigo ?? '').toString().toLowerCase();
-          const marca = (item.marca?.nombre ?? '').toString().toLowerCase();
+          const descripcion = (item.descripcion ?? '').toString().toLowerCase();
+          const codigo = (item.codigo ?? '').toString().toLowerCase();
+          const marca = (item.nombre ?? '').toString().toLowerCase();
           return (
             descripcion.includes(term) ||
             codigo.includes(term) ||
@@ -368,7 +369,7 @@ export class CreateVentasComponent {
   // Función para limpiar la búsqueda
   limpiarBusqueda(): void {
     this.searchTerm = '';
-    this.productos_filtrados = this.productos_const;
+    this.productos_filtrados = this.stockSucursales_const;
   }
 
 //   cargarDatosComprobante(evt: Event): void {
@@ -444,6 +445,7 @@ export class CreateVentasComponent {
   }
 
   seleccionaProducto(prod: any): void {
+    console.log('Producto seleccionado:', prod);
     // 1.  Agrega al carrito
     this.agregarAlCarrito(prod);
 
@@ -456,7 +458,7 @@ export class CreateVentasComponent {
 
   agregarAlCarrito(producto: any): void {
     console.log('Agregando al carrito:', producto);
-    const existe = this.carrito.find(p => p.producto.idProducto === producto.idProducto);
+    const existe = this.carrito.find(p => p.idProducto === producto.idProducto);
     if (existe) {
       existe.cantidad += 1;
     } else {
@@ -490,21 +492,21 @@ export class CreateVentasComponent {
 
       // 1) Buscar coincidencia exacta en producto.Codigo
       let encontrado = this.stockSucursales_const.find((item: any) => {
-        const codigo = (item.producto?.Codigo ?? '').toString().toLowerCase();
+        const codigo = (item.codigo ?? '').toString().toLowerCase();
         return codigo === term;
       });
 
       // 2) Si no hay exacta, buscar por inclusión (parcial)
       if (!encontrado) {
         encontrado = this.stockSucursales_const.find((item: any) => {
-          const codigo = (item.producto?.Codigo ?? '').toString().toLowerCase();
+          const codigo = (item.codigo ?? '').toString().toLowerCase();
           return codigo.includes(term);
         });
       }
 
       // 3) (Opcional) buscar por idProducto si la entrada es numérica y no se encontró por código
       if (!encontrado && /^\d+$/.test(term)) {
-        encontrado = this.stockSucursales_const.find((item: any) => String(item.idProducto) === term || String(item.producto?.idProducto) === term);
+        encontrado = this.stockSucursales_const.find((item: any) => String(item.idProducto) === term || String(item.idProducto) === term);
       }
 
       this.productoEncontrado = encontrado ?? null;
@@ -538,9 +540,9 @@ export class CreateVentasComponent {
     this.ventas.total = 0;
 
     this.carrito.forEach(item => {
-      const subtotalItem = item.producto.cUnitario * item.cantidad;
+      const subtotalItem = item.cUnitario * item.cantidad;
       this.ventas.subTotal += subtotalItem;
-      console.log(`Subtotal para ${item.producto.descripcion}: ${subtotalItem}`);
+      console.log(`Subtotal para ${item.descripcion}: ${subtotalItem}`);
     });
 
     this.ventas.igv = this.ventas.subTotal * this.TASA_IGV;

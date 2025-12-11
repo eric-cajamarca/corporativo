@@ -1,0 +1,224 @@
+<p>create-precios works!</p>
+
+
+    <div class="container-fluid py-4">
+        
+        <!-- ENCABEZADO Y CONTROLES DE LISTA -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row align-items-center g-3">
+                    
+                    <!-- Título -->
+                    <div class="col-md-3">
+                        <h4 class="mb-0 text-primary"><i class="bi bi-tag-fill"></i> Gestor de Precios</h4>
+                    </div>
+
+                    <!-- Selector de Lista (Tabla: ListasPrecio) -->
+                    <div class="col-md-5">
+                        <label class="form-label small text-muted mb-1">Seleccionar Lista de Precios</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-list-ul"></i></span>
+                            <select class="form-select" id="listaSelector">
+                                <!-- Estos valores vendrían de SELECT * FROM ListasPrecio WHERE activo = 1 -->
+                                <option value="1" data-moneda="PEN" data-igv="1">Lista Normal (S/.) - Con IGV</option>
+                                <option value="2" data-moneda="USD" data-igv="0">Lista Mayorista ($) - Sin IGV</option>
+                                <option value="3" data-moneda="PEN" data-igv="1">Cyber 2025 (S/.) - Con IGV</option>
+                            </select>
+                            <button class="btn btn-outline-secondary" type="button" title="Editar Lista Actual">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Botones de Acción -->
+                    <div class="col-md-4 text-end">
+                        <!-- Abre Modal para INSERT en ListasPrecio -->
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevaLista">
+                            <i class="bi bi-plus-circle"></i> Nueva Lista
+                        </button>
+                        <!-- Botón para guardar cambios en PreciosProducto -->
+                        <button class="btn btn-primary ms-2">
+                            <i class="bi bi-save"></i> Guardar Precios
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Detalles visuales de la lista seleccionada -->
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <span class="badge bg-info text-dark me-2"><i class="bi bi-shop"></i> Sucursal: Global</span>
+                        <span class="badge bg-secondary me-2"><i class="bi bi-calendar-event"></i> Vigencia: 01/01/2025 - Indefinido</span>
+                        <span class="badge bg-warning text-dark" id="badgeImpuesto">Incluye IGV</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLA DE PRODUCTOS (Tabla: PreciosProducto) -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white py-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="mb-0">Listado de Productos</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" class="form-control form-control-sm" placeholder="Buscar producto por nombre o SKU...">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light bg-light-header">
+                        <tr>
+                            <th scope="col">SKU / Código</th>
+                            <th scope="col">Producto</th>
+                            <th scope="col" class="text-end">Costo Ref.</th>
+                            <th scope="col" class="text-end">Precio Actual</th>
+                            <th scope="col" class="text-center">Nuevo Precio <span id="symbolHeader">(S/.)</span></th>
+                            <th scope="col" class="text-center">Última Act.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Ejemplo Fila 1 -->
+                        <tr>
+                            <td>PROD-001</td>
+                            <td>
+                                <div class="fw-bold">Monitor LED 24"</div>
+                                <small class="text-muted">Electrónica</small>
+                            </td>
+                            <td class="text-end text-muted">S/. 400.00</td> <!-- Solo referencia visual -->
+                            <td class="text-end">S/. 550.00</td>
+                            
+                            <!-- INPUT PARA INSERT/UPDATE EN PreciosProducto -->
+                            <td class="text-center">
+                                <div class="input-group input-group-sm justify-content-end">
+                                    <span class="input-group-text symbol-span">S/.</span>
+                                    <input type="number" 
+                                        class="form-control price-input" 
+                                        step="0.01" 
+                                        value="550.00"
+                                        name="precio_PROD001"> 
+                                </div>
+                            </td>
+                            
+                            <td class="text-center small text-muted">07/12/2025</td>
+                        </tr>
+
+                        <!-- Ejemplo Fila 2 -->
+                        <tr>
+                            <td>PROD-002</td>
+                            <td>
+                                <div class="fw-bold">Teclado Mecánico RGB</div>
+                                <small class="text-muted">Periféricos</small>
+                            </td>
+                            <td class="text-end text-muted">S/. 120.00</td>
+                            <td class="text-end">S/. 180.00</td>
+                            
+                            <!-- INPUT PARA INSERT/UPDATE EN PreciosProducto -->
+                            <td class="text-center">
+                                <div class="input-group input-group-sm justify-content-end">
+                                    <span class="input-group-text symbol-span">S/.</span>
+                                    <input type="number" 
+                                        class="form-control price-input" 
+                                        step="0.01" 
+                                        value="180.00"
+                                        name="precio_PROD002">
+                                </div>
+                            </td>
+                            
+                            <td class="text-center small text-muted">06/12/2025</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer text-muted small">
+                Mostrando 2 de 500 productos
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: NUEVA LISTA DE PRECIOS (Insertar en ListasPrecio) -->
+    <div class="modal fade" id="modalNuevaLista" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Crear Nueva Lista de Precios</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formNuevaLista">
+                        <div class="row g-3">
+                            <!-- Campo: nombre -->
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre de la Lista <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" placeholder="Ej. Cyber Wow 2025" required>
+                            </div>
+
+                            <!-- Campo: idSucursal (Si es null es global) -->
+                            <div class="col-md-6">
+                                <label class="form-label">Sucursal</label>
+                                <select class="form-select">
+                                    <option value="">Global (Todas las sucursales)</option>
+                                    <option value="SUC-001">Lima Centro</option>
+                                    <option value="SUC-002">Arequipa Norte</option>
+                                </select>
+                            </div>
+
+                            <!-- Campo: idMoneda -->
+                            <div class="col-md-4">
+                                <label class="form-label">Moneda <span class="text-danger">*</span></label>
+                                <select class="form-select">
+                                    <option value="1">Soles (PEN)</option>
+                                    <option value="2">Dólares (USD)</option>
+                                </select>
+                            </div>
+
+                            <!-- Campo: fecha_inicio -->
+                            <div class="col-md-4">
+                                <label class="form-label">Fecha Inicio <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" required>
+                            </div>
+
+                            <!-- Campo: fecha_fin -->
+                            <div class="col-md-4">
+                                <label class="form-label">Fecha Fin (Opcional)</label>
+                                <input type="date" class="form-control">
+                                <div class="form-text">Dejar vacío si es indefinido.</div>
+                            </div>
+
+                            <!-- Switches booleanos -->
+                            <div class="col-md-12 mt-4">
+                                <div class="form-check form-switch mb-2">
+                                    <!-- Campo: principal -->
+                                    <input class="form-check-input" type="checkbox" id="checkPrincipal">
+                                    <label class="form-check-label" for="checkPrincipal">
+                                        <strong>Lista Principal (Por Defecto)</strong>
+                                        <small class="d-block text-muted">Si se activa, reemplazará a la actual lista por defecto.</small>
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check form-switch mb-2">
+                                    <!-- Campo: conIgv -->
+                                    <input class="form-check-input" type="checkbox" id="checkIgv" checked>
+                                    <label class="form-check-label" for="checkIgv">
+                                        <strong>Precios Incluyen IGV</strong>
+                                    </label>
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    <!-- Campo: activo -->
+                                    <input class="form-check-input" type="checkbox" id="checkActivo" checked>
+                                    <label class="form-check-label" for="checkActivo">Activo</label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary">Guardar Lista</button>
+                </div>
+            </div>
+        </div>
+    </div>

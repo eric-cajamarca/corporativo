@@ -82,11 +82,11 @@
                   <tbody>
                     <tr *ngFor="let item of carrito; let i = index">
                       <td style="width: 10px; text-align: left;"> {{i + 1}} </td>
-                      <td>{{ item.producto?.Codigo }}</td>
+                      <td>{{ item.codigo }}</td>
                       <td style="width: 400px; text-align: left; " contenteditable="true" class="editable" 
-                      (blur)="actualizaDescripcion(item, $event)">{{ item?.producto.descripcion }}
+                      (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}
                       </td>
-                      <td style="width: 60px; text-align: center;">{{ item.presentacion.codigo }}</td>
+                      <td style="width: 60px; text-align: center;">{{ item.codigoPresentacion }}</td>
 
                       <!-- Cantidad editable -->
                       <td style="width: 60px; text-align: left;" contenteditable="true" class="editable" (blur)="actualizaCantidad(item, $event)">
@@ -95,11 +95,11 @@
 
                       <!-- Precio editable -->
                       <td style="width: 80px; text-align: right;" contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">
-                        S/ {{ item.producto?.cUnitario | number:'1.2-2' }}
+                        S/ {{ item.cUnitario | number:'1.2-2' }}
                       </td>
 
-                      <td style="width: 80px; text-align: right;" >S/ {{ (item.cantidad * item.producto.cUnitario) | number:'1.2-2' }}</td>
-                      <td>{{ item.sucursal?.nombre }}</td>
+                      <td style="width: 80px; text-align: right;" >S/ {{ (item.cantidad * item.cUnitario) | number:'1.2-2' }}</td>
+                      <td>{{ item.sucursal }}</td>
                       <td>
                         <i class="bi bi-trash text-danger" style="cursor:pointer;" (click)="eliminarDelCarrito(i)"></i>
                         <i class="bi bi-eye text-secundary" style="cursor:pointer;"></i>
@@ -202,12 +202,12 @@
               <tr *ngFor="let p of productos_filtrados" role="button"
                 class="table-row-hover"
                 (click)="seleccionaProducto(p)">
-                <td>{{ p.producto.Codigo }}</td>
-                <td>{{ p.categoria?.nombre }}</td>
-                <td>{{ p.producto.descripcion }}</td>
-                <td>{{ p.presentacion?.codigo }}</td>
-                <td>S/ {{ p.producto.cUnitario | number:'1.2-2' }}</td>
-                <td>{{ p.sucursal?.nombre }}</td>
+                <td>{{ p.codigo }}</td>
+                <td>{{ p.categoria }}</td>
+                <td>{{ p.descripcion }}</td>
+                <td>{{ p.codigoPresentacion }}</td>
+                <td>S/ {{ p.cUnitario | number:'1.2-2' }}</td>
+                <td>{{ p.sucursal }}</td>
                 <td>{{ p.cantidad }}</td>
                 <!-- <td>
                   <i class="bi bi-plus-circle-fill text-success" style="font-size:1.5rem; cursor:pointer;"

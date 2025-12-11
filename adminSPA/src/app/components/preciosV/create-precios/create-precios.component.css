@@ -1,0 +1,13 @@
+ .price-input {
+            max-width: 150px;
+            text-align: right;
+        }
+        .table-responsive {
+            max-height: 70vh; /* Scroll vertical si hay muchos productos */
+        }
+        .bg-light-header {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+        }

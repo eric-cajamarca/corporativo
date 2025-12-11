@@ -1,54 +1,69 @@
-const sql = require("mssql");
-const dbConfig = require("../dbconfig");
-const { v4: uuidv4 } = require("uuid");
+const dbConfig = require('../dbconfig');
+const { v4: uuidv4 } = require('uuid');
+const sql = require('mssql');
+const {obtenerProductosTodosService} = require('../services/productos.service');
 
-// crea un crud para la tabla productos de la base de datos
+
+
+// const obtener_productos_todos = async (req, res) => {
+//   if (req.user) {
+//     if (req.user.rol == "Administrador") {
+//       try {
+//         let pool = await sql.connect(dbConfig);
+//         let productos = await pool.request().query("SELECT * FROM Productos");
+
+      
+
+//         res.status(200).send({ data: productos.recordset });
+//       } catch (error) {
+//         console.log("obterner productos error: " + error);
+//         res
+//           .status(500)
+//           .send({ message: "Error al obtener los productos", data: undefined });
+//       }
+//     } else {
+//       res
+//         .status(200)
+//         .send({
+//           message: "No tiene permisos para realizar esta acción",
+//           data: undefined,
+//         });
+//     }
+//   } else {
+//     res.status(500).send({ message: "No Access", data: undefined });
+//   }
+// };
+
+
 const obtener_productos_todos = async (req, res) => {
-  if (req.user) {
-    if (req.user.rol == "Administrador") {
-      try {
-        let pool = await sql.connect(dbConfig);
-        let productos = await pool.request().query("SELECT * FROM Productos");
+  try {
 
-        //quiero traer todos los productos con sus tablas relacionadas (idCategoria, idPresentacion) de la base de datos usando inner join
-        //let productos = await pool.request().query("SELECT * FROM Productos INNER JOIN Categorias ON Productos.idCategoria = Categorias.idCategoria INNER JOIN Presentacion ON Productos.idPresentacion = Presentacion.idPresentacion");
+    const pool = await sql.connect(dbConfig);
+    console.log('req.user in controller:', req.user);
 
-        //quiero recorrer el array de productos.recordset y formatear la fecha de produccion y vencimiento por cada producto
-        // productos.recordset.forEach(element => {
-        //     let fProduccion = element.fProduccion;
-        //     // Ejemplo de uso
-        //     let fechaFormateada = convertirFormato(fProduccion);
-        //     element.fProduccion = fechaFormateada;
+    const productos = await obtenerProductosTodosService(pool, req.user);
 
-        //     let fVencimiento = element.fVencimiento;
-        //     // Ejemplo de uso
-        //     let fechaFormateada2 = convertirFormato(fVencimiento);
-        //     element.fVencimiento = fechaFormateada2;
-        // });
-
-        //let data = productos.recordset;
-
-        //console.log('productos ', productos.recordset);
-
-        res.status(200).send({ data: productos.recordset });
-      } catch (error) {
-        console.log("obterner productos error: " + error);
-        res
-          .status(500)
-          .send({ message: "Error al obtener los productos", data: undefined });
-      }
-    } else {
-      res
-        .status(200)
-        .send({
-          message: "No tiene permisos para realizar esta acción",
-          data: undefined,
-        });
+    res.status(200).send({ data: productos });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(500).send({ message: "No Access", data: undefined });
     }
-  } else {
-    res.status(500).send({ message: "No Access", data: undefined });
+
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(200).send({
+        message: "No tiene permisos para realizar esta acción",
+        data: undefined,
+      });
+    }
+
+    console.log("Error obtener productos:", error);
+    res.status(500).send({
+      message: "Error al obtener los productos",
+      data: undefined,
+    });
   }
 };
+
 
 const obtener_productos_id = async (req, res) => {
   const { idProducto } = req.params.id;
