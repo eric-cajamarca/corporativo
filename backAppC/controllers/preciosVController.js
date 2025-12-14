@@ -1,6 +1,6 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-
+const precioProductoService = require('../services/preciosV.service');
 
 // create table PreciosV
 // (
@@ -237,88 +237,249 @@ const eliminar_lista_precio = async function (req, res) {
 // );
 
 const crear_precio_producto = async function (req, res) {
-    const { idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
-    if (req.user) {
-        try {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idLista', sql.Int, idLista)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)  
-                .input('precio', sql.Decimal(18, 4), precio)
-                .input('idMoneda', sql.Int, idMoneda)
-                .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                .query(`INSERT INTO PreciosProducto (idLista, idProducto, precio, idMoneda, idUsuario) VALUES (@idLista, @idProducto, @precio, @idMoneda, @idUsuario)`);
-            res.status(200).send({ data: result });
-        } catch (error) {
-            console.error('Error al crear el precio del producto:', error);
-            res.status(500).send({ data: undefined });
-        }   
-    } else {
-        res.status(401).send({ message: 'No Access', data: undefined });
+    
+    
+    try {
+        // Obtener datos del request
+        const { idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
+        
+        // Crear conexión a la base de datos
+        const pool = await sql.connect(dbConfig);
+        
+        // Llamar al service pasando el pool y datos necesarios
+        const resultado = await precioProductoService.crearPrecioProducto(
+            pool,
+            { idLista, idProducto, precio, idMoneda, idUsuario },
+            req.user  // usuario autenticado
+        );
+        
+        // Enviar respuesta exitosa
+        res.status(200).send({ 
+            data: resultado.data,
+            message: resultado.message
+        });
+        
+    } catch (error) {
+        console.error('Error al crear el precio del producto:', error);
+        
+        // Manejar diferentes tipos de errores
+        switch (error.message) {
+            case 'NO_ACCESO':
+                res.status(401).send({ 
+                    message: 'No Access', 
+                    data: undefined 
+                });
+                break;
+            case 'CAMPOS_REQUERIDOS':
+                res.status(400).send({ 
+                    message: 'Faltan campos requeridos', 
+                    data: undefined 
+                });
+                break;
+            case 'PRECIO_INVALIDO':
+            case 'PRECIO_NEGATIVO':
+                res.status(400).send({ 
+                    message: 'El precio proporcionado no es válido', 
+                    data: undefined 
+                });
+                break;
+            default:
+                res.status(500).send({ 
+                    message: 'Error interno del servidor', 
+                    data: undefined 
+                });
+        }
+    } finally {
+        // Cerrar la conexión si existe
+        if (pool) {
+            try {
+                await pool.close();
+            } catch (closeError) {
+                console.error('Error al cerrar la conexión:', closeError);
+            }
+        }
     }
-}
+};
 
-// const editar_precio_producto = async function (req, res) {
-//     const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
-//     if (req.user) {
-//         try {
-//             const pool = await sql.connect(dbConfig);
-//             const result = await pool
-//                 .request()
-//                 .input('idPrecio', sql.Int, idPrecio)
-//                 .input('idLista', sql.Int, idLista)
-//                 .input('idProducto', sql.UniqueIdentifier, idProducto)  
-//                 .input('precio', sql.Decimal(18, 4), precio)
-//                 .input('idMoneda', sql.Int, idMoneda)
-//                 .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-//                 .query(`UPDATE PreciosProducto SET idLista = @idLista, idProducto = @idProducto, precio = @precio, idMoneda = @idMoneda, idUsuario = @idUsuario, fActualizacion = SYSDATETIME() WHERE idPrecio = @idPrecio`);
-//             res.status(200).send({ data: result });
-//         } catch (error) {
-//             console.error('Error al actualizar el precio del producto:', error);
-//             res.status(500).send({ data: undefined });
+
+
+// const crear_precio_producto = async function (req, res) {
+//     let pool;
+    
+//     try {
+//         // Obtener datos del request
+//         const { idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
+        
+//         // Crear conexión a la base de datos
+//         pool = await sql.connect(dbConfig);
+        
+//         // Llamar al service pasando el pool y datos necesarios
+//         const resultado = await precioProductoService.crearPrecioProducto(
+//             pool,
+//             { idLista, idProducto, precio, idMoneda, idUsuario },
+//             req.user  // usuario autenticado
+//         );
+        
+//         // Enviar respuesta exitosa
+//         res.status(200).send({ 
+//             data: resultado.data,
+//             message: resultado.message
+//         });
+        
+//     } catch (error) {
+//         console.error('Error al crear el precio del producto:', error);
+        
+//         // Manejar diferentes tipos de errores
+//         switch (error.message) {
+//             case 'NO_ACCESO':
+//                 res.status(401).send({ 
+//                     message: 'No Access', 
+//                     data: undefined 
+//                 });
+//                 break;
+//             case 'CAMPOS_REQUERIDOS':
+//                 res.status(400).send({ 
+//                     message: 'Faltan campos requeridos', 
+//                     data: undefined 
+//                 });
+//                 break;
+//             case 'PRECIO_INVALIDO':
+//             case 'PRECIO_NEGATIVO':
+//                 res.status(400).send({ 
+//                     message: 'El precio proporcionado no es válido', 
+//                     data: undefined 
+//                 });
+//                 break;
+//             default:
+//                 res.status(500).send({ 
+//                     message: 'Error interno del servidor', 
+//                     data: undefined 
+//                 });
 //         }
-//     } else {
-//         res.status(401).send({ message: 'No Access', data: undefined });
+//     } finally {
+//         // Cerrar la conexión si existe
+//         if (pool) {
+//             try {
+//                 await pool.close();
+//             } catch (closeError) {
+//                 console.error('Error al cerrar la conexión:', closeError);
+//             }
+//         }
 //     }
-// }
+// };
 
 const editar_precio_producto = async function (req, res) {
-  const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
-  
-  if (!req.user) {
-    return res.status(401).send({ message: 'No Access', data: undefined });
-  }
+    try {
+        // Verificar autenticación
+        if (!req.user) {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
 
-  try {
-    
-    const result = await req.querySafe(
-      `UPDATE PreciosProducto 
-       SET idLista = @idLista, 
-           idProducto = @idProducto, 
-           precio = @precio, 
-           idMoneda = @idMoneda, 
-           idUsuario = @idUsuario, 
-           fActualizacion = SYSDATETIME() 
-       WHERE idPrecio = @idPrecio`,
-      [
-        { name: 'idPrecio', type: sql.Int, value: idPrecio },
-        { name: 'idLista', type: sql.Int, value: idLista },
-        { name: 'idProducto', type: sql.UniqueIdentifier, value: idProducto },
-        { name: 'precio', type: sql.Decimal(18, 4), value: precio },
-        { name: 'idMoneda', type: sql.Int, value: idMoneda },
-        { name: 'idUsuario', type: sql.UniqueIdentifier, value: idUsuario }
-        // ✅ req.querySafe agrega automáticamente:
-        // { name: 'idEmpresa', type: sql.Int, value: req.user.empresa }
-      ]
-    );
+        // Obtener datos del request
+        const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
 
-    res.status(200).send({ data: result });
-  } catch (error) {
-    console.error('Error al actualizar:', error);
-    res.status(500).send({ data: undefined });
-  }
+        // Llamar al service pasando req.querySafe (el middleware)
+        const pool = await sql.connect(dbConfig);
+        const resultado = await precioProductoService.editarPrecioProducto(
+            pool,  // Pasamos el método seguro con empresa
+            { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario },
+            req.user  // usuario autenticado
+        );
+
+        // Enviar respuesta exitosa
+        res.status(200).send({ 
+            data: resultado.data,
+            message: resultado.message,
+            cambios: resultado.cambios
+        });
+
+    } catch (error) {
+        console.error('Error al actualizar precio del producto:', error);
+
+        // Manejar diferentes tipos de errores
+        switch (error.message) {
+            case 'NO_ACCESO':
+                return res.status(401).send({ 
+                    message: 'No Access', 
+                    data: undefined 
+                });
+            case 'CAMPOS_REQUERIDOS':
+                return res.status(400).send({ 
+                    message: 'Faltan campos requeridos', 
+                    data: undefined 
+                });
+            case 'PRECIO_NO_ENCONTRADO':
+                return res.status(404).send({ 
+                    message: 'Precio no encontrado', 
+                    data: undefined 
+                });
+            case 'ID_PRECIO_INVALIDO':
+            case 'PRECIO_INVALIDO':
+            case 'PRECIO_NEGATIVO':
+            case 'MONEDA_INVALIDA':
+                return res.status(400).send({ 
+                    message: 'Datos de entrada no válidos', 
+                    data: undefined 
+                });
+            case 'PERMISO_DENEGADO':
+                return res.status(403).send({ 
+                    message: 'No tiene permisos para editar este precio', 
+                    data: undefined 
+                });
+            case 'NO_SE_ACTUALIZO':
+                return res.status(404).send({ 
+                    message: 'No se pudo actualizar el precio', 
+                    data: undefined 
+                });
+            default:
+                return res.status(500).send({ 
+                    message: 'Error interno del servidor', 
+                    data: undefined 
+                });
+        }
+    }
 };
+
+
+// const editar_precio_producto = async function (req, res) {
+//   const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
+  
+//   if (!req.user) {
+//     return res.status(401).send({ message: 'No Access', data: undefined });
+//   }
+
+//   try {
+    
+//     const result = await req.querySafe(
+//       `UPDATE PreciosProducto 
+//        SET idLista = @idLista, 
+//            idProducto = @idProducto, 
+//            precio = @precio, 
+//            idMoneda = @idMoneda, 
+//            idUsuario = @idUsuario, 
+//            fActualizacion = SYSDATETIME() 
+//        WHERE idPrecio = @idPrecio`,
+//       [
+//         { name: 'idPrecio', type: sql.Int, value: idPrecio },
+//         { name: 'idLista', type: sql.Int, value: idLista },
+//         { name: 'idProducto', type: sql.UniqueIdentifier, value: idProducto },
+//         { name: 'precio', type: sql.Decimal(18, 4), value: precio },
+//         { name: 'idMoneda', type: sql.Int, value: idMoneda },
+//         { name: 'idUsuario', type: sql.UniqueIdentifier, value: idUsuario }
+//         // ✅ req.querySafe agrega automáticamente:
+//         // { name: 'idEmpresa', type: sql.Int, value: req.user.empresa }
+//       ]
+//     );
+
+//     res.status(200).send({ data: result });
+//   } catch (error) {
+//     console.error('Error al actualizar:', error);
+//     res.status(500).send({ data: undefined });
+//   }
+// };
 
 const obtener_precios_producto = async function (req, res) {
     if (req.user) {
