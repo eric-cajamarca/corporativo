@@ -125,98 +125,408 @@ const actualizarPrecioV = async function (req, res) {
 
 // );
 
+
 const crear_lista_precio = async function (req, res) {
-    const { idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fecha_inicio, fecha_fin, activo } = req.body;
-    if (req.user) {
-        try {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('nombre', sql.VarChar(100), nombre)
-                .input('idMoneda', sql.Int, idMoneda)
-                .input('principal', sql.Bit, principal)
-                .input('conIgv', sql.Bit, conIgv)
-                .input('fecha_inicio', sql.Date, fecha_inicio)
-                .input('fecha_fin', sql.Date, fecha_fin)
-                .input('activo', sql.Bit, activo)
-                .query(`INSERT INTO ListasPrecio (idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fecha_inicio, fecha_fin, activo) VALUES (@idEmpresa, @idSucursal, @nombre, @idMoneda, @principal, @conIgv, @fecha_inicio, @fecha_fin, @activo)`);
-            res.status(200).send({ data: result });
-        } catch (error) {
-            console.error('Error al crear la lista de precios:', error);
-            res.status(500).send({ data: undefined });
-        }  
-    } else {
-        res.status(401).send({ message: 'No Access', data: undefined });
-    }
-}
+    
+    try {
+        // Verificar autenticación
+        if (!req.user) {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
+
+        // Obtener datos del request
+        const { 
+            idEmpresa, 
+            idSucursal, 
+            nombre, 
+            idMoneda, 
+            principal, 
+            conIgv, 
+            fecha_inicio, 
+            fecha_fin, 
+            activo 
+        } = req.body;
+
+        // Validación básica en el controller
+        if (!req.user.idEmpresa || !idSucursal || !nombre || !idMoneda) {
+            return res.status(400).send({ 
+                message: 'Faltan campos requeridos', 
+                data: undefined 
+            });
+        }
+
+        // Crear conexión a la base de datos
+        pool = await sql.connect(dbConfig);
+
+        // Llamar al service
+        const resultado = await precioProductoService.crearListaPrecio(
+            pool,
+            { 
+                idEmpresa, 
+                idSucursal, 
+                nombre, 
+                idMoneda, 
+                principal: principal || false, 
+                conIgv: conIgv || false, 
+                fecha_inicio, 
+                fecha_fin, 
+                activo: activo !== undefined ? activo : true 
+            },
+            req.user
+        );
+
+        // Enviar respuesta exitosa
+        res.status(200).send({ 
+            data: resultado.data,
+            message: resultado.message,
+            idGenerado: resultado.idGenerado
+        });
+
+    } catch (error) {
+        console.error('Error al crear la lista de precios:', error);
+
+        // Manejar diferentes tipos de errores
+        switch (error.message) {
+            case 'NO_ACCESO':
+                return res.status(401).send({ 
+                    message: 'No Access', 
+                    data: undefined 
+                });
+            case 'CAMPOS_REQUERIDOS':
+                return res.status(400).send({ 
+                    message: 'Faltan campos requeridos', 
+                    data: undefined 
+                });
+            case 'NOMBRE_DUPLICADO':
+                return res.status(409).send({ 
+                    message: 'Ya existe una lista de precios con ese nombre', 
+                    data: undefined 
+                });
+            case 'YA_EXISTE_PRINCIPAL':
+                return res.status(409).send({ 
+                    message: 'Ya existe una lista de precios principal activa', 
+                    data: undefined 
+                });
+            case 'FECHA_FIN_MENOR':
+                return res.status(400).send({ 
+                    message: 'La fecha de fin no puede ser menor a la fecha de inicio', 
+                    data: undefined 
+                });
+            case 'NOMBRE_LONGITUD_INVALIDA':
+                return res.status(400).send({ 
+                    message: 'El nombre debe tener entre 3 y 100 caracteres', 
+                    data: undefined 
+                });
+            case 'MONEDA_INVALIDA':
+            case 'PRINCIPAL_INVALIDO':
+            case 'CON_IGV_INVALIDO':
+            case 'ACTIVO_INVALIDO':
+                return res.status(400).send({ 
+                    message: 'Datos de entrada no válidos', 
+                    data: undefined 
+                });
+            default:
+                return res.status(500).send({ 
+                    message: 'Error interno del servidor', 
+                    data: undefined 
+                });
+        }
+    } 
+};
+
 
 const editar_lista_precio = async function (req, res) {
-    const { idLista, idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fecha_inicio, fecha_fin, activo } = req.body;  
-    if (req.user) {
-        try {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idLista', sql.Int, idLista)
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('nombre', sql.VarChar(100), nombre)
-                .input('idMoneda', sql.Int, idMoneda)
-                .input('principal', sql.Bit, principal)
-                .input('conIgv', sql.Bit, conIgv)
-                .input('fecha_inicio', sql.Date, fecha_inicio)
-                .input('fecha_fin', sql.Date, fecha_fin)    
-                .input('activo', sql.Bit, activo)
-                .query(`UPDATE ListasPrecio SET idEmpresa = @idEmpresa, idSucursal = @idSucursal, nombre = @nombre, idMoneda = @idMoneda, principal = @principal, conIgv = @conIgv, fecha_inicio = @fecha_inicio, fecha_fin = @fecha_fin, activo = @activo WHERE idLista = @idLista`);
-            res.status(200).send({ data: result });
-        } catch (error) {
-            console.error('Error al actualizar la lista de precios:', error);
-            res.status(500).send({ data: undefined });
+    
+    
+    try {
+        if (!req.user) {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
         }
-    } else {
-        res.status(401).send({ message: 'No Access', data: undefined });
-    }
-}
 
-const obtener_listas_precio = async function (req, res) {
-    if (req.user) {
-        try {   
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .query(`SELECT * FROM ListasPrecio`);
-            res.status(200).send({ data: result.recordset });
+        const { 
+            idLista, 
+            idEmpresa, 
+            idSucursal, 
+            nombre, 
+            idMoneda, 
+            principal, 
+            conIgv, 
+            fecha_inicio, 
+            fecha_fin, 
+            activo 
+        } = req.body;
+
+        if (!idLista || !idEmpresa || !idSucursal || !nombre || !idMoneda) {
+            return res.status(400).send({ 
+                message: 'Faltan campos requeridos', 
+                data: undefined 
+            });
         }
-        catch (error) {
-            console.error('Error al obtener las listas de precios:', error);
-            res.status(500).send({ data: undefined });
+
+        const pool = await sql.connect(dbConfig);
+
+        const resultado = await precioProductoService.editarListaPrecio(
+            pool,
+            { 
+                idLista, 
+                idEmpresa, 
+                idSucursal, 
+                nombre, 
+                idMoneda, 
+                principal: principal || false, 
+                conIgv: conIgv || false, 
+                fecha_inicio, 
+                fecha_fin, 
+                activo: activo !== undefined ? activo : true 
+            },
+            req.user
+        );
+
+        res.status(200).send({ 
+            data: resultado.data,
+            message: resultado.message
+        });
+
+    } catch (error) {
+        console.error('Error al actualizar la lista de precios:', error);
+
+        switch (error.message) {
+            case 'NO_ACCESO':
+                return res.status(401).send({ 
+                    message: 'No Access', 
+                    data: undefined 
+                });
+            case 'CAMPOS_REQUERIDOS':
+                return res.status(400).send({ 
+                    message: 'Faltan campos requeridos', 
+                    data: undefined 
+                });
+            case 'LISTA_NO_ENCONTRADA':
+                return res.status(404).send({ 
+                    message: 'Lista de precios no encontrada', 
+                    data: undefined 
+                });
+            case 'ID_LISTA_INVALIDO':
+            case 'NOMBRE_LONGITUD_INVALIDA':
+            case 'MONEDA_INVALIDA':
+            case 'PRINCIPAL_INVALIDO':
+            case 'CON_IGV_INVALIDO':
+            case 'ACTIVO_INVALIDO':
+            case 'FECHA_FIN_MENOR':
+                return res.status(400).send({ 
+                    message: 'Datos de entrada no válidos', 
+                    data: undefined 
+                });
+            case 'NO_SE_ACTUALIZO':
+                return res.status(404).send({ 
+                    message: 'No se pudo actualizar la lista de precios', 
+                    data: undefined 
+                });
+            default:
+                return res.status(500).send({ 
+                    message: 'Error interno del servidor', 
+                    data: undefined 
+                });
         }
-    } else {
-        res.status(401).send({ message: 'No Access', data: undefined });
-    }
-}
+    } 
+};
 
 
-const eliminar_lista_precio = async function (req, res) {
-    const idLista = req.params.id;
-    if (req.user) {
-        try {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idLista', sql.Int, idLista)
-                .query(`DELETE FROM ListasPrecio WHERE idLista = @idLista`);
-            res.status(200).send({ data: result });
-        } catch (error) {
-            console.error('Error al eliminar la lista de precios:', error);
-            res.status(500).send({ data: undefined });
+const obtener_listas_precio_producto = async function (req, res) {
+        
+    try {
+        if (!req.user) {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
         }
-    } else {
-        res.status(401).send({ message: 'No Access', data: undefined });
+
+        const { idProducto } = req.params;
+        
+        if (!idProducto) {
+            return res.status(400).send({ 
+                message: 'Producto no válido', 
+                data: undefined 
+            });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        
+        const listas = await precioProductoService.obtenerListasPrecioPorProducto(
+            pool, 
+            idProducto, 
+            req.user
+        );
+        
+        res.status(200).send({ data: listas });
+
+    } catch (error) {
+        console.error('Error al obtener listas por producto:', error);
+        
+        if (error.message === 'NO_ACCESO') {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
+        
+        if (error.message === 'EMPRESA_NO_ASIGNADA') {
+            return res.status(400).send({ 
+                message: 'Usuario no tiene empresa asignada', 
+                data: undefined 
+            });
+        }
+        
+        if (error.message === 'PRODUCTO_NO_VALIDO') {
+            return res.status(400).send({ 
+                message: 'Producto no válido', 
+                data: undefined 
+            });
+        }
+        
+        res.status(500).send({ 
+            message: 'Error interno del servidor', 
+            data: undefined 
+        });
+        
+    } 
+};
+
+const obtener_listas_precio_empresa = async function (req, res) {
+    let pool;
+    
+    try {
+        if (!req.user) {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
+
+        pool = await sql.connect(dbConfig);
+        
+        const listas = await precioProductoService.obtenerListasPrecioEmpresa(pool, req.user);
+        
+        res.status(200).send({ data: listas });
+
+    } catch (error) {
+        console.error('Error al obtener listas de empresa:', error);
+        
+        if (error.message === 'NO_ACCESO') {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
+        
+        if (error.message === 'EMPRESA_NO_ASIGNADA') {
+            return res.status(400).send({ 
+                message: 'Usuario no tiene empresa asignada', 
+                data: undefined 
+            });
+        }
+        
+        res.status(500).send({ 
+            message: 'Error interno del servidor', 
+            data: undefined 
+        });
+        
+    } 
+};
+
+const desactivar_lista_precio = async function (req, res) {
+    let pool;
+    
+    try {
+        if (!req.user) {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
+
+        const idLista = req.params.id;
+        
+        if (!idLista) {
+            return res.status(400).send({ 
+                message: 'ID de lista no válido', 
+                data: undefined 
+            });
+        }
+
+        pool = await sql.connect(dbConfig);
+        
+        const resultado = await precioProductoService.desactivarListaPrecio(
+            pool, 
+            idLista, 
+            req.user
+        );
+        
+        res.status(200).send({ 
+            data: resultado.data,
+            message: resultado.message
+        });
+
+    } catch (error) {
+        console.error('Error al eliminar/desactivar la lista de precios:', error);
+        
+        if (error.message === 'NO_ACCESO') {
+            return res.status(401).send({ 
+                message: 'No Access', 
+                data: undefined 
+            });
+        }
+        
+        if (error.message === 'ID_LISTA_INVALIDO') {
+            return res.status(400).send({ 
+                message: 'ID de lista no válido', 
+                data: undefined 
+            });
+        }
+        
+        if (error.message === 'LISTA_NO_ENCONTRADA') {
+            return res.status(404).send({ 
+                message: 'Lista de precios no encontrada', 
+                data: undefined 
+            });
+        }
+        
+        res.status(500).send({ 
+            message: 'Error interno del servidor', 
+            data: undefined 
+        });
+        
     }
-}
+};
+
+
+
+
+// const desactivar_lista_precio = async function (req, res) {
+//     const idLista = req.params.id;
+//     if (req.user) {
+//         try {
+//             const pool = await sql.connect(dbConfig);
+//             const result = await pool
+//                 .request()
+//                 .input('idLista', sql.Int, idLista)
+//                 .query(`DELETE FROM ListasPrecio WHERE idLista = @idLista`);
+//             res.status(200).send({ data: result });
+//         } catch (error) {
+//             console.error('Error al eliminar la lista de precios:', error);
+//             res.status(500).send({ data: undefined });
+//         }
+//     } else {
+//         res.status(401).send({ message: 'No Access', data: undefined });
+//     }
+// }
 
 
 // CREATE TABLE dbo.PreciosProducto
@@ -301,73 +611,6 @@ const crear_precio_producto = async function (req, res) {
     }
 };
 
-
-
-// const crear_precio_producto = async function (req, res) {
-//     let pool;
-    
-//     try {
-//         // Obtener datos del request
-//         const { idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
-        
-//         // Crear conexión a la base de datos
-//         pool = await sql.connect(dbConfig);
-        
-//         // Llamar al service pasando el pool y datos necesarios
-//         const resultado = await precioProductoService.crearPrecioProducto(
-//             pool,
-//             { idLista, idProducto, precio, idMoneda, idUsuario },
-//             req.user  // usuario autenticado
-//         );
-        
-//         // Enviar respuesta exitosa
-//         res.status(200).send({ 
-//             data: resultado.data,
-//             message: resultado.message
-//         });
-        
-//     } catch (error) {
-//         console.error('Error al crear el precio del producto:', error);
-        
-//         // Manejar diferentes tipos de errores
-//         switch (error.message) {
-//             case 'NO_ACCESO':
-//                 res.status(401).send({ 
-//                     message: 'No Access', 
-//                     data: undefined 
-//                 });
-//                 break;
-//             case 'CAMPOS_REQUERIDOS':
-//                 res.status(400).send({ 
-//                     message: 'Faltan campos requeridos', 
-//                     data: undefined 
-//                 });
-//                 break;
-//             case 'PRECIO_INVALIDO':
-//             case 'PRECIO_NEGATIVO':
-//                 res.status(400).send({ 
-//                     message: 'El precio proporcionado no es válido', 
-//                     data: undefined 
-//                 });
-//                 break;
-//             default:
-//                 res.status(500).send({ 
-//                     message: 'Error interno del servidor', 
-//                     data: undefined 
-//                 });
-//         }
-//     } finally {
-//         // Cerrar la conexión si existe
-//         if (pool) {
-//             try {
-//                 await pool.close();
-//             } catch (closeError) {
-//                 console.error('Error al cerrar la conexión:', closeError);
-//             }
-//         }
-//     }
-// };
-
 const editar_precio_producto = async function (req, res) {
     try {
         // Verificar autenticación
@@ -443,51 +686,11 @@ const editar_precio_producto = async function (req, res) {
     }
 };
 
-
-// const editar_precio_producto = async function (req, res) {
-//   const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
-  
-//   if (!req.user) {
-//     return res.status(401).send({ message: 'No Access', data: undefined });
-//   }
-
-//   try {
-    
-//     const result = await req.querySafe(
-//       `UPDATE PreciosProducto 
-//        SET idLista = @idLista, 
-//            idProducto = @idProducto, 
-//            precio = @precio, 
-//            idMoneda = @idMoneda, 
-//            idUsuario = @idUsuario, 
-//            fActualizacion = SYSDATETIME() 
-//        WHERE idPrecio = @idPrecio`,
-//       [
-//         { name: 'idPrecio', type: sql.Int, value: idPrecio },
-//         { name: 'idLista', type: sql.Int, value: idLista },
-//         { name: 'idProducto', type: sql.UniqueIdentifier, value: idProducto },
-//         { name: 'precio', type: sql.Decimal(18, 4), value: precio },
-//         { name: 'idMoneda', type: sql.Int, value: idMoneda },
-//         { name: 'idUsuario', type: sql.UniqueIdentifier, value: idUsuario }
-//         // ✅ req.querySafe agrega automáticamente:
-//         // { name: 'idEmpresa', type: sql.Int, value: req.user.empresa }
-//       ]
-//     );
-
-//     res.status(200).send({ data: result });
-//   } catch (error) {
-//     console.error('Error al actualizar:', error);
-//     res.status(500).send({ data: undefined });
-//   }
-// };
-
 const obtener_precios_producto = async function (req, res) {
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .query(`SELECT * FROM PreciosProducto`);
+            const result = precioProductoService.obtenerPrecioPorId(pool, req.params.idPrecio);
             res.status(200).send({ data: result.recordset });
         } catch (error) {
             console.error('Error al obtener los precios de los productos:', error);
@@ -503,10 +706,11 @@ const eliminar_precio_producto = async function (req, res) {
     if (req.user) {
         try {   
             const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idPrecio', sql.Int, idPrecio)
-                .query(`DELETE FROM PreciosProducto WHERE idPrecio = @idPrecio`);
+            const result = await precioProductoService.eliminarPrecioProducto(
+                pool,
+                idPrecio,
+                req.user  // usuario autenticado
+            );
             res.status(200).send({ data: result });
         } catch (error) {
             console.error('Error al eliminar el precio del producto:', error);
@@ -524,8 +728,8 @@ module.exports = {
     actualizarPrecioV,
     crear_lista_precio,
     editar_lista_precio,
-    obtener_listas_precio,
-    eliminar_lista_precio,
+    obtener_listas_precio_producto,
+    desactivar_lista_precio,
     crear_precio_producto,
     editar_precio_producto,
     obtener_precios_producto,

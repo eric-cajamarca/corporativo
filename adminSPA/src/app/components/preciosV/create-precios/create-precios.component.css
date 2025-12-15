@@ -1,13 +1,119 @@
- .price-input {
-            max-width: 150px;
-            text-align: right;
-        }
-        .table-responsive {
-            max-height: 70vh; /* Scroll vertical si hay muchos productos */
-        }
-        .bg-light-header {
-            background-color: #f8f9fa;
-            position: sticky;
-            top: 0;
-            z-index: 1020;
-        }
+
+
+
+/* Estilos Personalizados */
+.card {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 1rem 0.75rem;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.02);
+}
+
+.table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+/* Input de precios */
+.price-input:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+.input-group-sm .input-group-text {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Badges personalizados */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+    border-radius: 6px;
+}
+
+/* Cards header */
+.bg-light-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Modal */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+}
+
+.modal-header {
+    border-bottom: 1px solid #e9ecef;
+    background-color: #f8f9fa;
+    border-radius: 12px 12px 0 0;
+}
+
+/* Formulario */
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* Estado deshabilitado */
+.btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Input de búsqueda */
+.input-group-text {
+    transition: all 0.2s ease;
+}
+
+.input-group:focus-within .input-group-text {
+    background-color: #e7f1ff;
+    border-color: #86b7fe;
+}
+
+/* Estado vacío */
+.display-1 {
+    opacity: 0.3;
+}
