@@ -35,12 +35,19 @@ export class PreciosService {
     return this._http.get(this.url+'lista_precios',{withCredentials:true,headers:headers});
   }
 
+  //api.get('/lista_precios_empresa',auth.auth, preciosVController.obtener_listas_precio_empresa);
+  listar_listas_precios_empresa():Observable<any>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'lista_precios_empresa',{withCredentials:true,headers:headers});
+  }
+
   listar_precios_producto(productoId:any):Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'precio_producto/'+productoId,{withCredentials:true,headers:headers});
   }
 
   crear_lista_precios(data:any):Observable<any>{
+    console.log('Datos enviados al servicio crear_lista_precios:', data);
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'lista_precios',data,{withCredentials:true,headers:headers});
   }

@@ -104,10 +104,12 @@ exports.crearListaPrecio = async (pool, listaData) => {
             activo 
         } = listaData;
 
+        console.log('Creating listaData in repository:', listaData);
         const result = await pool
+
             .request()
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal || null)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
             .input('nombre', sql.VarChar(100), nombre)
             .input('idMoneda', sql.Int, idMoneda)
             .input('principal', sql.Bit, principal)
@@ -184,7 +186,7 @@ exports.actualizarListaPrecio = async (pool, listaData) => {
             .request()
             .input('idLista', sql.Int, idLista)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal || null)
             .input('nombre', sql.VarChar(100), nombre)
             .input('idMoneda', sql.Int, idMoneda)
             .input('principal', sql.Bit, principal)
@@ -259,11 +261,14 @@ exports.obtenerListasPrecioEmpresa = async (pool, idEmpresa) => {
             .request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query(`
-                SELECT * 
-                FROM ListasPrecio 
-                WHERE idEmpresa = @idEmpresa 
-                AND activo = 1
-                ORDER BY principal DESC, nombre ASC
+                SELECT 
+                    lp.*,
+                    s.nombre as nombreSucursal
+                FROM ListasPrecio lp
+                LEFT JOIN Sucursal s ON lp.idSucursal = s.idSucursal
+                WHERE lp.idEmpresa = @idEmpresa 
+                AND lp.activo = 1
+                ORDER BY lp.principal DESC, lp.nombre ASC
             `);
         
         return result.recordset;

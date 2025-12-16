@@ -266,7 +266,7 @@ function validarDatosListaPrecio(listaData) {
     } = listaData;
     
     // Validar campos requeridos
-    if (!idEmpresa || !idSucursal || !nombre || !idMoneda) {
+    if (!idEmpresa || !nombre || !idMoneda) {
         throw new Error('CAMPOS_REQUERIDOS');
     }
     
@@ -367,13 +367,13 @@ exports.obtenerListasPrecioEmpresa = async (pool, usuarioAutenticado) => {
             throw new Error('NO_ACCESO');
         }
 
-        if (!usuarioAutenticado.idEmpresa) {
+        if (!usuarioAutenticado.empresa) {
             throw new Error('EMPRESA_NO_ASIGNADA');
         }
 
         const listas = await precioProductoRepository.obtenerListasPrecioEmpresa(
             pool,
-            usuarioAutenticado.idEmpresa
+            usuarioAutenticado.empresa
         );
 
         return listas;

@@ -39,7 +39,6 @@ const obtener_productos_todos = async (req, res) => {
   try {
 
     const pool = await sql.connect(dbConfig);
-    console.log('req.user in controller:', req.user);
 
     const productos = await obtenerProductosTodosService(pool, req.user);
 

@@ -6,6 +6,7 @@ import { PreciosService } from '../../../services/precios.service';
 import { StockSucursal } from '../../../interfaces/stockSucursal-interface';
 import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
+import { TablasSunatService } from '../../../services/tablas-sunat.service';
 
 declare var bootstrap: any;
 
@@ -23,6 +24,7 @@ export class CreatePreciosComponent implements OnInit {
   // Datos
   listasPrecio: any[] = [];
   productos: any[] = [];
+  monedas: any = {};
   productosFiltrados: any[] = [];
   sucursales: any[] = [];
   
@@ -42,11 +44,12 @@ export class CreatePreciosComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private preciosService: PreciosService,
-    private _productosService : ProductoService
+    private _productosService : ProductoService,
+    private _sucursalService: SucursalService,
+    private _tablasSunatService: TablasSunatService
   ) {
     this.formListaPrecio = this.fb.group({
       idLista: [null],
-      idEmpresa: [null, Validators.required],
       idSucursal: [null],
       nombre: ['', [Validators.required, Validators.minLength(3)]],
       idMoneda: ['', Validators.required],
@@ -62,6 +65,7 @@ export class CreatePreciosComponent implements OnInit {
     this.cargarListasPrecio();
     this.cargarProductos();
     this.cargarSucursales();
+    this.cargarMonedas();
   }
 
   ngAfterViewInit(): void {
@@ -72,9 +76,10 @@ export class CreatePreciosComponent implements OnInit {
 
   // Carga de datos
   cargarListasPrecio(): void {
-    this.preciosService.listar_listas_precios_producto().subscribe({
+    this.preciosService.listar_listas_precios_empresa().subscribe({
       next: (response) => {
         this.listasPrecio = response.data || [];
+        console.log('Listas de precios cargadas:', this.listasPrecio);
       },
       error: (error) => {
         console.error('Error al cargar listas de precios:', error);
@@ -100,10 +105,27 @@ export class CreatePreciosComponent implements OnInit {
 
   cargarSucursales(): void {
     // Implementar servicio para obtener sucursales
-    this.sucursales = [
-      { idSucursal: 'SUC-001', nombre: 'Lima Centro' },
-      { idSucursal: 'SUC-002', nombre: 'Arequipa Norte' }
-    ];
+    this._sucursalService.obtener_sucursal_idempresa().subscribe({
+      next: (response) => {
+        this.sucursales = response.data || [];
+        console.log('Sucursales cargadas:', response.data);
+      },
+      error: (error) => {
+        console.error('Error al cargar sucursales:', error);
+      }
+    });
+  }
+
+  cargarMonedas(): void {
+    this._tablasSunatService.obtener_moneda().subscribe({
+      next: (response) => {
+        this.monedas = response.data;
+        console.log('Monedas cargadas:', response.data);
+      },
+      error: (error) => {
+        console.error('Error al cargar monedas:', error);
+      }
+    });
   }
 
   // Eventos
@@ -170,12 +192,15 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   guardarListaPrecio(): void {
+    console.log('Guardando lista de precios...', this.formListaPrecio.value);
     if (this.formListaPrecio.invalid) return;
     
     const formData = this.formListaPrecio.value;
+    console.log('Datos del formulario:', formData);
     
     if (formData.idLista) {
       // Editar
+      console.log('Editando lista de precios...');
       this.preciosService.editar_lista_precios(formData.idLista, formData).subscribe({
         next: (response) => {
           this.modal.hide();
@@ -189,6 +214,7 @@ export class CreatePreciosComponent implements OnInit {
       });
     } else {
       // Crear
+      console.log('Creando nueva lista de precios...');
       this.preciosService.crear_lista_precios(formData).subscribe({
         next: (response) => {
           this.modal.hide();

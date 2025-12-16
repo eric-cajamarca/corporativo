@@ -127,7 +127,7 @@ const actualizarPrecioV = async function (req, res) {
 
 
 const crear_lista_precio = async function (req, res) {
-    
+    console.log('idEmpresa from req.user:', req.body);
     try {
         // Verificar autenticación
         if (!req.user) {
@@ -139,8 +139,6 @@ const crear_lista_precio = async function (req, res) {
 
         // Obtener datos del request
         const { 
-            idEmpresa, 
-            idSucursal, 
             nombre, 
             idMoneda, 
             principal, 
@@ -150,8 +148,11 @@ const crear_lista_precio = async function (req, res) {
             activo 
         } = req.body;
 
+        const idSucursal = req.body.idSucursal || null;
+        console.log('idEmpresa from req.user:', req.user);
+        
         // Validación básica en el controller
-        if (!req.user.idEmpresa || !idSucursal || !nombre || !idMoneda) {
+        if (!req.user.empresa || !nombre || !idMoneda) {
             return res.status(400).send({ 
                 message: 'Faltan campos requeridos', 
                 data: undefined 
@@ -160,12 +161,13 @@ const crear_lista_precio = async function (req, res) {
 
         // Crear conexión a la base de datos
         pool = await sql.connect(dbConfig);
-
+        let idEmpresa = req.user.empresa;
+        console.log('Datos recibidos para crear lista de precios:', req.body);
         // Llamar al service
         const resultado = await precioProductoService.crearListaPrecio(
             pool,
             { 
-                idEmpresa, 
+                idEmpresa , 
                 idSucursal, 
                 nombre, 
                 idMoneda, 
@@ -239,8 +241,8 @@ const crear_lista_precio = async function (req, res) {
 
 
 const editar_lista_precio = async function (req, res) {
-    
-    
+
+    console.log('idEmpresa from req.user:', req.body);
     try {
         if (!req.user) {
             return res.status(401).send({ 
@@ -248,10 +250,10 @@ const editar_lista_precio = async function (req, res) {
                 data: undefined 
             });
         }
-
+        
+        
         const { 
             idLista, 
-            idEmpresa, 
             idSucursal, 
             nombre, 
             idMoneda, 
@@ -261,8 +263,8 @@ const editar_lista_precio = async function (req, res) {
             fecha_fin, 
             activo 
         } = req.body;
-
-        if (!idLista || !idEmpresa || !idSucursal || !nombre || !idMoneda) {
+        
+        if (!idLista || !idSucursal || !nombre || !idMoneda) {
             return res.status(400).send({ 
                 message: 'Faltan campos requeridos', 
                 data: undefined 
@@ -270,7 +272,7 @@ const editar_lista_precio = async function (req, res) {
         }
 
         const pool = await sql.connect(dbConfig);
-
+        let idEmpresa = req.user.empresa;
         const resultado = await precioProductoService.editarListaPrecio(
             pool,
             { 
@@ -400,8 +402,7 @@ const obtener_listas_precio_producto = async function (req, res) {
 };
 
 const obtener_listas_precio_empresa = async function (req, res) {
-    let pool;
-    
+      
     try {
         if (!req.user) {
             return res.status(401).send({ 
@@ -410,7 +411,7 @@ const obtener_listas_precio_empresa = async function (req, res) {
             });
         }
 
-        pool = await sql.connect(dbConfig);
+        const pool = await sql.connect(dbConfig);
         
         const listas = await precioProductoService.obtenerListasPrecioEmpresa(pool, req.user);
         
@@ -729,6 +730,7 @@ module.exports = {
     crear_lista_precio,
     editar_lista_precio,
     obtener_listas_precio_producto,
+    obtener_listas_precio_empresa,
     desactivar_lista_precio,
     crear_precio_producto,
     editar_precio_producto,

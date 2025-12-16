@@ -54,7 +54,7 @@
             <div class="row mt-3" *ngIf="listaSeleccionada">
                 <div class="col-12">
                     <span class="badge bg-info text-dark me-2">
-                        <i class="bi bi-shop me-1"></i> Sucursal: {{listaSeleccionada.idSucursal || 'Global'}}
+                        <i class="bi bi-shop me-1"></i> Sucursal: {{listaSeleccionada.nombreSucursal || 'Global'}}
                     </span>
                     <span class="badge bg-secondary me-2">
                         <i class="bi bi-calendar-event me-1"></i> 
@@ -201,7 +201,7 @@
                             <label class="form-label">Sucursal</label>
                             <select class="form-select" formControlName="idSucursal">
                                 <option [value]="null">Global (Todas las sucursales)</option>
-                                <option *ngFor="let sucursal of sucursales" [value]="sucursal.idSucursal">
+                                <option *ngFor="let sucursal of sucursales" [value]="sucursal.idsucursal">
                                     {{sucursal.nombre}}
                                 </option>
                             </select>
@@ -210,15 +210,15 @@
                         <!-- Moneda -->
                         <div class="col-md-4">
                             <label class="form-label">Moneda <span class="text-danger">*</span></label>
-                            <select class="form-select" formControlName="idMoneda" 
-                                    [class.is-invalid]="formListaPrecio.get('idMoneda')?.invalid && formListaPrecio.get('idMoneda')?.touched">
-                                <option value="">Seleccionar...</option>
-                                <option value="1">Soles (PEN)</option>
-                                <option value="2">Dólares (USD)</option>
+                            <select class="form-select" formControlName="idMoneda">
+                                <option [value]="null">Seleccionar...</option>
+                                <option *ngFor="let moneda of monedas" [value]="moneda.idMoneda">
+                                    {{moneda.descripcion}} ({{moneda.simbolo}})
+                                </option>
                             </select>
-                            <div class="invalid-feedback" *ngIf="formListaPrecio.get('idMoneda')?.invalid && formListaPrecio.get('idMoneda')?.touched">
+                            <!-- <div class="invalid-feedback" *ngIf="formListaPrecio.get('idMoneda')?.invalid && formListaPrecio.get('idMoneda')?.touched">
                                 Selecciona una moneda
-                            </div>
+                            </div> -->
                         </div>
 
                         <!-- Fecha Inicio -->
@@ -271,7 +271,7 @@
 
                     <div class="modal-footer mt-4">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" [disabled]="formListaPrecio.invalid">
+                        <button type="submit" class="btn btn-primary" >
                             <i class="bi bi-save me-1"></i>
                             {{listaEditar ? 'Actualizar' : 'Guardar'}} Lista
                         </button>
