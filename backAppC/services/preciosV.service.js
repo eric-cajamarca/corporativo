@@ -1,41 +1,215 @@
+const { forEach } = require('jszip');
 const precioProductoRepository = require('../repositories/preciosV.repository');
 
-exports.crearPrecioProducto = async (pool, precioData, usuarioAutenticado) => {
+// exports.crearPrecioProducto = async (pool, Data, usuarioAutenticado) => {
+//     try {
+//         // Validar permisos del usuario
+//         if (!usuarioAutenticado) {
+//             throw new Error('NO_ACCESO');
+//         }
+
+//         console.log('Datos recibidos en el service para crear precio producto:', Data);
+//         //aqui quiero recorrer el objeto Data
+//         //         Datos recibidos para crear precio de producto: [
+//         //   {
+//         //     idLista: '3',
+//         //     idProducto: 'FB6D30D5-3A1B-49DB-A094-7EA20117607C',
+//         //     precio: 50,
+//         //     idMoneda: 1,
+//         //     idUsuario: 'USUARIO_ACTUAL'
+//         //   },
+//         //   {
+//         //     idLista: '3',
+//         //     idProducto: 'B74CCDA2-B15D-4A5B-9F2E-195150B04077',
+//         //     precio: 30,
+//         //     idMoneda: 1,
+//         //     idUsuario: 'USUARIO_ACTUAL'
+//         //   },
+//         //   {
+//         //     idLista: '3',
+//         //     idProducto: 'AD5E6683-E965-4D44-B5A3-2CEAFC9FB4F7',
+//         //     precio: 120,
+//         //     idMoneda: 1,
+//         //     idUsuario: 'USUARIO_ACTUAL'
+//         //   }
+//         // ]
+//                 const precioData = forEach(Data, (item) => {
+//                     return {
+//                         idLista: item.idLista,
+//                         idProducto: item.idProducto,
+//                         precio: item.precio,
+//                         idMoneda: item.idMoneda,
+//                         idUsuario: usuarioAutenticado.idUsuario
+//                     };
+
+//                     // Validaciones de negocio
+//                     validarDatosPrecio(precioData);
+
+
+//                 });
+
+       
+
+        
+//         // Lógica adicional (si necesitas verificar algo más antes de crear)
+//         // Ejemplo: Verificar si el producto existe, si la moneda es válida, etc.
+        
+//         // Llamar al repository
+//         const result = await precioProductoRepository.crearPrecioProducto(
+//             pool, 
+//             precioData
+//         );
+        
+//         return { 
+//             success: true, 
+//             data: result,
+//             message: 'Precio del producto creado exitosamente'
+//         };
+//     } catch (error) {
+//         console.error('Error en service al crear precio producto:', error);
+//         throw error;
+//     }
+// };
+
+
+exports.crearPrecioProducto = async (pool, Data, usuarioAutenticado) => {
     try {
         // Validar permisos del usuario
         if (!usuarioAutenticado) {
             throw new Error('NO_ACCESO');
         }
 
-        // Validaciones de negocio
-        validarDatosPrecio(precioData);
+        console.log('Datos recibidos en el service para crear precio producto:', Data);
         
-        // Lógica adicional (si necesitas verificar algo más antes de crear)
-        // Ejemplo: Verificar si el producto existe, si la moneda es válida, etc.
-        
-        // Llamar al repository
-        const result = await precioProductoRepository.crearPrecioProducto(
-            pool, 
-            precioData
-        );
-        
+        // Validar que Data sea un array
+        if (!Array.isArray(Data)) {
+            throw new Error('LOS_DATOS_DEBEN_SER_UN_ARRAY');
+        }
+
+        const resultados = [];
+        const errores = [];
+
+        // Recorrer cada precio en el array
+        for (const item of Data) {
+            try {
+                // Crear objeto de precio
+                const precioData = {
+                    idLista: item.idLista,
+                    idProducto: item.idProducto,
+                    precio: item.precio,
+                    idMoneda: item.idMoneda,
+                    idUsuario: usuarioAutenticado.sub
+                };
+
+                // Validar datos del precio
+                validarDatosPrecio(precioData);
+
+                // Verificar si el precio ya existe
+                const precioExistente = await precioProductoRepository.verificarPrecioExistente(
+                    pool,
+                    precioData.idLista,
+                    precioData.idProducto
+                );
+
+                let result;
+                let mensaje;
+
+                if (precioExistente) {
+                    // Actualizar precio existente
+                    result = await precioProductoRepository.actualizarPrecioProducto(
+                        pool,
+                        precioData
+                    );
+                    mensaje = 'Precio actualizado';
+                } else {
+                    // Crear nuevo precio
+                    result = await precioProductoRepository.crearPrecioProducto(
+                        pool,
+                        precioData
+                    );
+                    mensaje = 'Precio creado';
+                }
+
+                resultados.push({
+                    success: true,
+                    data: result,
+                    message: mensaje,
+                    idProducto: precioData.idProducto,
+                    precio: precioData.precio,
+                    accion: precioExistente ? 'actualizado' : 'creado'
+                });
+
+            } catch (error) {
+                errores.push({
+                    idProducto: item.idProducto,
+                    precio: item.precio,
+                    error: error.message
+                });
+            }
+        }
+
+        // Si hay errores, informar pero no fallar completamente
+        if (errores.length > 0) {
+            console.warn(`Se encontraron ${errores.length} errores:`, errores);
+        }
+
         return { 
-            success: true, 
-            data: result,
-            message: 'Precio del producto creado exitosamente'
+            success: resultados.length > 0,
+            data: resultados,
+            errores: errores,
+            message: `Procesados ${resultados.length} precios (${errores.length} con error)`,
+            resumen: {
+                total: Data.length,
+                exitosos: resultados.length,
+                fallidos: errores.length,
+                actualizados: resultados.filter(r => r.accion === 'actualizado').length,
+                creados: resultados.filter(r => r.accion === 'creado').length
+            }
         };
+        
     } catch (error) {
         console.error('Error en service al crear precio producto:', error);
         throw error;
     }
 };
 
+// Función de validación
+// function validarDatosPrecio(precioData) {
+//     const { idLista, idProducto, precio, idMoneda } = precioData;
+    
+//     // Validar campos requeridos
+//     if (!idLista || !idProducto || precio === undefined || !idMoneda) {
+//         throw new Error('CAMPOS_REQUERIDOS');
+//     }
+    
+//     // Validar tipos de datos
+//     if (typeof precio !== 'number' || isNaN(precio)) {
+//         throw new Error('PRECIO_INVALIDO');
+//     }
+    
+//     if (precio < 0) {
+//         throw new Error('PRECIO_NEGATIVO');
+//     }
+    
+//     // Validar que idLista sea número
+//     if (isNaN(parseInt(idLista))) {
+//         throw new Error('ID_LISTA_INVALIDO');
+//     }
+    
+//     // Validar que idMoneda sea número positivo
+//     if (isNaN(parseInt(idMoneda)) || parseInt(idMoneda) <= 0) {
+//         throw new Error('ID_MONEDA_INVALIDO');
+//     }
+// }
+
+
+
 // Función de validación interna
 function validarDatosPrecio(precioData) {
     const { idLista, idProducto, precio, idMoneda, idUsuario } = precioData;
     
     // Validar campos requeridos
-    if (!idLista || !idProducto || precio === undefined || !idMoneda || !idUsuario) {
+    if (!idLista || !idProducto || precio === undefined || !idMoneda) {
         throw new Error('CAMPOS_REQUERIDOS');
     }
     

@@ -250,9 +250,20 @@ export class CreatePreciosComponent implements OnInit {
       return;
     }
     
+    console.log('Precios a guardar:', preciosAGuardar);
     // Guardar cada precio
-    preciosAGuardar.forEach(precio => {
-      this.preciosService.creaer_precio_producto(precio).subscribe({
+    // preciosAGuardar.forEach(precio => {
+    //   this.preciosService.creaer_precio_producto(precio).subscribe({
+    //     next: (response) => {
+    //       console.log('Precio guardado:', response);
+    //     },
+    //     error: (error) => {
+    //       console.error('Error al guardar precio:', error);
+    //     }
+    //   });
+    // });
+
+    this.preciosService.creaer_precio_producto(preciosAGuardar).subscribe({
         next: (response) => {
           console.log('Precio guardado:', response);
         },
@@ -260,10 +271,9 @@ export class CreatePreciosComponent implements OnInit {
           console.error('Error al guardar precio:', error);
         }
       });
-    });
     
     alert(`${preciosAGuardar.length} precios guardados correctamente`);
-    this.cargarPreciosProductos();
+    //this.cargarPreciosProductos();
   }
 
   // Funciones auxiliares

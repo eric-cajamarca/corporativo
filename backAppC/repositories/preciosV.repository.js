@@ -65,17 +65,35 @@ exports.actualizarPrecioProducto = async (pool, precioData) => {
     }
 };
 
-exports.obtenerPrecioPorId = async (pool, idPrecio) => {
+exports.verificarPrecioExistente = async (pool, idLista, idProducto) => {
     try {
         const result = await pool
             .request()
-            .input('idPrecio', sql.UniqueIdentifier, idPrecio)
-            .query('SELECT * FROM PreciosProducto WHERE idPrecio = @idPrecio');
-        return result;
+            .input('idLista', sql.Int, idLista)
+            .input('idProducto', sql.UniqueIdentifier, idProducto)
+            .query(`
+                SELECT COUNT(*) as cantidad 
+                FROM PreciosProducto 
+                WHERE idLista = @idLista 
+                AND idProducto = @idProducto
+            `);
+        
+        return result.recordset[0].cantidad > 0;
     } catch (error) {
         throw new Error(`Repository Error: ${error.message}`);
     }
 };
+// exports.obtenerPrecioPorId = async (pool, idPrecio) => {
+//     try {
+//         const result = await pool
+//             .request()
+//             .input('idPrecio', sql.UniqueIdentifier, idPrecio)
+//             .query('SELECT * FROM PreciosProducto WHERE idPrecio = @idPrecio');
+//         return result;
+//     } catch (error) {
+//         throw new Error(`Repository Error: ${error.message}`);
+//     }
+// };
 
 exports.eliminarPrecioProducto = async (pool, idPrecio) => {
     try {

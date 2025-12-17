@@ -548,67 +548,37 @@ const desactivar_lista_precio = async function (req, res) {
 // );
 
 const crear_precio_producto = async function (req, res) {
+    console.log('Datos recibidos para crear precio de producto:', req.body);
+    console.log('Usuario autenticado:', req.user);
     
+    if (req.user.rol) {
     
-    try {
-        // Obtener datos del request
-        const { idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
+         // Obtener datos del request
+            console.log('entro al trycahs');
+            const precioData = req.body;
+            
+            // Crear conexión a la base de datos
+            const pool = await sql.connect(dbConfig);
+            
+            // Llamar al service pasando el pool y datos necesarios
+            const resultado = await precioProductoService.crearPrecioProducto(
+                pool,
+                precioData,
+                req.user  // usuario autenticado
+            );
+            
+            // Enviar respuesta exitosa
+            res.status(200).send({ 
+                data: resultado.data,
+                message: resultado.message
+            });
+            
         
-        // Crear conexión a la base de datos
-        const pool = await sql.connect(dbConfig);
-        
-        // Llamar al service pasando el pool y datos necesarios
-        const resultado = await precioProductoService.crearPrecioProducto(
-            pool,
-            { idLista, idProducto, precio, idMoneda, idUsuario },
-            req.user  // usuario autenticado
-        );
-        
-        // Enviar respuesta exitosa
-        res.status(200).send({ 
-            data: resultado.data,
-            message: resultado.message
+    } else {
+        res.status(401).send({ 
+            message: 'No Access', 
+            data: undefined 
         });
-        
-    } catch (error) {
-        console.error('Error al crear el precio del producto:', error);
-        
-        // Manejar diferentes tipos de errores
-        switch (error.message) {
-            case 'NO_ACCESO':
-                res.status(401).send({ 
-                    message: 'No Access', 
-                    data: undefined 
-                });
-                break;
-            case 'CAMPOS_REQUERIDOS':
-                res.status(400).send({ 
-                    message: 'Faltan campos requeridos', 
-                    data: undefined 
-                });
-                break;
-            case 'PRECIO_INVALIDO':
-            case 'PRECIO_NEGATIVO':
-                res.status(400).send({ 
-                    message: 'El precio proporcionado no es válido', 
-                    data: undefined 
-                });
-                break;
-            default:
-                res.status(500).send({ 
-                    message: 'Error interno del servidor', 
-                    data: undefined 
-                });
-        }
-    } finally {
-        // Cerrar la conexión si existe
-        if (pool) {
-            try {
-                await pool.close();
-            } catch (closeError) {
-                console.error('Error al cerrar la conexión:', closeError);
-            }
-        }
     }
 };
 
