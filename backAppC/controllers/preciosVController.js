@@ -583,6 +583,7 @@ const crear_precio_producto = async function (req, res) {
 };
 
 const editar_precio_producto = async function (req, res) {
+    console.log('Datos recibidos para editar precio de producto:', req.body);
     try {
         // Verificar autenticación
         if (!req.user) {

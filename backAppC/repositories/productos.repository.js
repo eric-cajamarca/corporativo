@@ -79,9 +79,11 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
             pp.idLista,
             pp.precio,
             pp.idPrecio,
+            pp.fActualizacion,
             lp.nombre as nombreLista,
             lp.principal,
             m.simbolo as simboloMoneda
+            
         FROM PreciosProducto pp
         INNER JOIN ListasPrecio lp ON pp.idLista = lp.idLista
         INNER JOIN Moneda m ON lp.idMoneda = m.idMoneda
@@ -101,7 +103,9 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
         idPrecio: precio.idPrecio,
         nombreLista: precio.nombreLista,
         principal: precio.principal,
-        simboloMoneda: precio.simboloMoneda
+        simboloMoneda: precio.simboloMoneda,
+        fActualizacion: precio.fActualizacion
+
       };
     });
 

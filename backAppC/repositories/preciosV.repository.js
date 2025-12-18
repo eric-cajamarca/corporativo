@@ -39,26 +39,29 @@ exports.obtenerPrecioPorId = async (pool, id) => {
 
 
 exports.actualizarPrecioProducto = async (pool, precioData) => {
+    console.log('Actualizar precio con datos:', precioData);
     const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = precioData;
     
     try {
         const result = await pool
             .request()
-            .input('idPrecio', sql.UniqueIdentifier, idPrecio)
+            .input('idPrecio', sql.Int, idPrecio)
             .input('idLista', sql.Int, idLista)
             .input('idProducto', sql.UniqueIdentifier, idProducto)
             .input('precio', sql.Decimal(18, 4), precio)
             .input('idMoneda', sql.Int, idMoneda)
+            .input('fActualizacion', sql.DateTime2, new Date())
             .input('idUsuario', sql.UniqueIdentifier, idUsuario)
             .query(` update PreciosProducto 
                      set idLista = @idLista,
                          idProducto = @idProducto,
                          precio = @precio,
                          idMoneda = @idMoneda,
+                         fActualizacion = @fActualizacion,
                          idUsuario = @idUsuario
                      where idPrecio = @idPrecio`);
 
-
+        console.log('Resultado de la actualización del precio:', result);
         return result;
     } catch (error) {
         throw new Error(`Repository Error: ${error.message}`);
@@ -285,7 +288,6 @@ exports.obtenerListasPrecioEmpresa = async (pool, idEmpresa) => {
                 FROM ListasPrecio lp
                 LEFT JOIN Sucursal s ON lp.idSucursal = s.idSucursal
                 WHERE lp.idEmpresa = @idEmpresa 
-                AND lp.activo = 1
                 ORDER BY lp.principal DESC, lp.nombre ASC
             `);
         
@@ -331,6 +333,19 @@ exports.desactivarListaPrecio = async (pool, idLista) => {
             .request()
             .input('idLista', sql.Int, idLista)
             .query(`UPDATE ListasPrecio SET activo = 0 WHERE idLista = @idLista`);
+        
+        return result;
+    } catch (error) {
+        throw new Error(`Repository Error: ${error.message}`);
+    }
+};
+
+exports.activarListaPrecio = async (pool, idLista) => {
+    try {
+        const result = await pool
+            .request()
+            .input('idLista', sql.Int, idLista)
+            .query(`UPDATE ListasPrecio SET activo = 1 WHERE idLista = @idLista`);
         
         return result;
     } catch (error) {

@@ -96,6 +96,7 @@ exports.crearPrecioProducto = async (pool, Data, usuarioAutenticado) => {
                 const precioData = {
                     idLista: item.idLista,
                     idProducto: item.idProducto,
+                    idPrecio: item.idPrecio, // Puede ser null para nuevos precios
                     precio: item.precio,
                     idMoneda: item.idMoneda,
                     idUsuario: usuarioAutenticado.sub
@@ -116,13 +117,16 @@ exports.crearPrecioProducto = async (pool, Data, usuarioAutenticado) => {
 
                 if (precioExistente) {
                     // Actualizar precio existente
+                    console.log(`El precio para el producto ${precioData.idProducto} ya existe. Actualizando...`);
                     result = await precioProductoRepository.actualizarPrecioProducto(
                         pool,
                         precioData
                     );
                     mensaje = 'Precio actualizado';
+                    console.log('Resultado de la actualización del precio en el servicio:', result);
                 } else {
                     // Crear nuevo precio
+                    console.log(`El precio para el producto ${precioData.idProducto} no existe. Creando nuevo precio...`);
                     result = await precioProductoRepository.crearPrecioProducto(
                         pool,
                         precioData
@@ -573,29 +577,90 @@ exports.desactivarListaPrecio = async (pool, idLista, usuarioAutenticado) => {
         if (!lista) {
             throw new Error('LISTA_NO_ENCONTRADA');
         }
+        // Verificar si la lista esta activa o desactivada
+        if (!lista.activo) {
+            console.log('La lista está activa o desactivada:', lista.activo);
+            if (cantidadUso > 0) {
+                result = await precioProductoRepository.activarListaPrecio(pool, idLista);
+                mensaje = 'Lista de precios activada (contiene productos)';
+            }
+            
+            return {
+            success: true,
+            data: result,
+            message: mensaje,
+            Activada: cantidadUso === 0
+            };
 
-        const cantidadUso = await precioProductoRepository.verificarUsoListaPrecio(pool, idLista);
+        }else{
+             console.log('La lista está activa, procediendo a desactivarla o eliminarla según su uso.');
+            const cantidadUso = await precioProductoRepository.verificarUsoListaPrecio(pool, idLista);
         
-        let result;
-        let mensaje;
 
-        if (cantidadUso > 0) {
-            result = await precioProductoRepository.desactivarListaPrecio(pool, idLista);
-            mensaje = 'Lista de precios desactivada (contiene productos)';
-        } else {
-            result = await precioProductoRepository.eliminarListaPrecio(pool, idLista);
-            mensaje = 'Lista de precios eliminada (no tiene productos)';
-        }
+            let result;
+            let mensaje;
 
-        return {
+            if (cantidadUso > 0) {
+                result = await precioProductoRepository.desactivarListaPrecio(pool, idLista);
+                mensaje = 'Lista de precios desactivada (contiene productos)';
+            } else {
+                result = await precioProductoRepository.eliminarListaPrecio(pool, idLista);
+                mensaje = 'Lista de precios eliminada (no tiene productos)';
+            }
+
+            return {
             success: true,
             data: result,
             message: mensaje,
             eliminada: cantidadUso === 0
-        };
+            };
+        }
+
+        
+       
 
     } catch (error) {
         console.error('Error en service al desactivar/eliminar lista de precios:', error);
         throw error;
     }
 };
+
+
+// exports.activarListaPrecio = async (pool, idLista, usuarioAutenticado) => {
+//     try {
+//         if (!usuarioAutenticado) {
+//             throw new Error('NO_ACCESO');
+//         }
+
+//         if (!idLista) {
+//             throw new Error('ID_LISTA_INVALIDO');
+//         }
+
+//         const lista = await precioProductoRepository.obtenerListaPorIdSimple(pool, idLista);
+        
+//         if (!lista) {
+//             throw new Error('LISTA_NO_ENCONTRADA');
+//         }
+
+//         const cantidadUso = await precioProductoRepository.verificarUsoListaPrecio(pool, idLista);
+        
+//         let result;
+//         let mensaje;
+
+//         if (cantidadUso > 0) {
+//             result = await precioProductoRepository.desactivarListaPrecio(pool, idLista);
+//             mensaje = 'Lista de precios activada (contiene productos)';
+//         }
+
+//         return {
+//             success: true,
+//             data: result,
+//             message: mensaje,
+//             eliminada: cantidadUso === 0
+//         };
+
+//     } catch (error) {
+//         console.error('Error en service al desactivar/eliminar lista de precios:', error);
+//         throw error;
+//     }
+// };
