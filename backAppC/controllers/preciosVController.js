@@ -2,17 +2,7 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const precioProductoService = require('../services/preciosV.service');
 
-// create table PreciosV
-// (
-// idPreciosV int identity (1,1) not null,
-// idProducto UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Productos (idProducto) not null,
-// cUnitario decimal(18,4) null,
-// mayorista decimal(18,4) null,
-// cliente decimal(18,4) null,
-// transeunte decimal(18,4) null,
 
-// )
-// go
 
 //crear un registro en PreciosV
 const crearPrecioV = async function (detalle) {
