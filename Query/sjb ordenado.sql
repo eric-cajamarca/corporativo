@@ -415,6 +415,40 @@ CREATE TABLE ProductosCompuestos (
 
 go
 
+
+-- Tabla para atributos (Talla, Color, etc.)
+CREATE TABLE AtributosProducto (
+    idAtributo INT IDENTITY PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL, -- 'Talla', 'Color', 'Material'
+    idEmpresa UNIQUEIDENTIFIER
+);
+
+-- Tabla para valores de atributos
+CREATE TABLE ValoresAtributo (
+    idValor INT IDENTITY PRIMARY KEY,
+    idAtributo INT,
+    valor VARCHAR(50) NOT NULL, -- 'M', 'L', 'Rojo', 'Azul'
+    FOREIGN KEY (idAtributo) REFERENCES AtributosProducto(idAtributo)
+);
+
+-- Tabla para variantes del producto
+CREATE TABLE VariantesProducto (
+    idVariante UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    idProductoBase UNIQUEIDENTIFIER, -- Producto principal
+    sku VARCHAR(50) UNIQUE, -- SKU específico de la variante
+    precio DECIMAL(18,5), -- Precio específico (opcional)
+    stock INT,
+    FOREIGN KEY (idProductoBase) REFERENCES Productos(idProducto)
+);
+
+-- Tabla para asociar valores a variantes
+CREATE TABLE VarianteAtributos (
+    idVariante UNIQUEIDENTIFIER,
+    idValor INT,
+    FOREIGN KEY (idVariante) REFERENCES VariantesProducto(idVariante),
+    FOREIGN KEY (idValor) REFERENCES ValoresAtributo(idValor)
+);
+
 --truncate table preciosV
 --drop table PreciosV
 --create table PreciosV
@@ -508,11 +542,6 @@ fregistro datetime not null,
 estado bit not null
 )
 
-go
-select * from empresas
-select * from DireccionEmpresa
-select * from Sucursal
-select * from Presentacion
 go
 
 --truncate table stockSucursal

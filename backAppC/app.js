@@ -29,6 +29,9 @@ const unidporcajaRoutes = require('./routes/unidporcaja');
 const preciosVRoutes = require('./routes/preciosV');
 const proveedoresRoutes = require('./routes/proveedores');
 const factilizaRoutes = require('./routes/factiliza');
+const productoCompuestoRoutes = require('./routes/productoCompuesto');
+const productoVarianteRoutes = require('./routes/productoVariante');
+const tranferenciaRoutes = require('./routes/transferencia');
 
 
 const app = express();
@@ -116,6 +119,9 @@ app.use('/api', unidporcajaRoutes);
 app.use('/api', preciosVRoutes);
 app.use('/api', proveedoresRoutes);
 app.use('/api', factilizaRoutes);
+app.use('/api', productoCompuestoRoutes);
+app.use('/api', productoVarianteRoutes);
+app.use('/api', tranferenciaRoutes);
 
 // Iniciar servidor
 app.listen(PORT, () => {
