@@ -105,9 +105,35 @@
                         [attr.data-bs-target]="'#delete-'+item.idProducto">
                         <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Eliminar
                       </a>
-                      <!-- <a class="dropdown-item" [routerLink]="['/colaborador',item.compCompra]">
-                        <i class="icon-1x text-dark-50 flaticon-edit"></i> &nbsp; Editar
-                      </a> -->
+                      <!-- En el dropdown "Opciones", AGREGAR después de las opciones existentes: -->
+                      <div class="dropdown-divider"></div>
+
+                      <!-- Opción para convertir a COMPUESTO -->
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" data-bs-toggle="modal"
+                        (click)="abrirModalConvertirCompuesto(item)">
+                        <i class="bi bi-box-seam me-1"></i> Convertir a Kit/Compuesto
+                      </a>
+                                      <!-- *ngIf="item.tipoProducto === 'S'" -->
+                        <!-- Opción para gestionar VARIANTES -->
+                        <a style="cursor: pointer;" class="dropdown-item" 
+                          (click)="abrirModalGestionarVariantes(item)">
+                          <i class="bi bi-palette me-1"></i> Gestionar Variantes
+                        </a>
+                                        <!-- *ngIf="item.tipoProducto === 'S'" -->
+
+                        <!-- Si ya es COMPUESTO -->
+                        <a style="cursor: pointer;" class="dropdown-item" 
+                          *ngIf="item.tipoProducto === 'C'"
+                          (click)="verComponentesKit(item)">
+                          <i class="bi bi-box-seam-fill me-1"></i> Ver Componentes del Kit
+                        </a>
+
+                        <!-- Si tiene VARIANTES -->
+                        <a style="cursor: pointer;" class="dropdown-item" 
+                          *ngIf="item.tieneVariantes"
+                          (click)="verVariantesProducto(item)">
+                          <i class="bi bi-palette-fill me-1"></i> Ver Variantes
+                        </a>
                     </ul>
                   </div>
     
@@ -157,7 +183,267 @@
                     </div>
                   </div>
     
-    
+                  <!-- MODAL CONVERTIR A PRODUCTO COMPUESTO -->
+                  <div class="modal fade" id="modalConvertirCompuesto" tabindex="-1" aria-hidden="true" #modalConvertirCompuesto>
+                    <div class="modal-dialog modal-lg">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title">
+                            <i class="bi bi-box-seam me-2"></i>
+                            Convertir a Producto Compuesto (Kit)
+                          </h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                          <!-- Producto Base -->
+                          <div class="card mb-3">
+                            <div class="card-body">
+                              <h6 class="card-subtitle mb-2 text-muted">Producto Base</h6>
+                              <p class="mb-1"><strong>{{productoSeleccionado?.descripcion}}</strong></p>
+                              <small class="text-muted">Código: {{productoSeleccionado?.codigo}}</small>
+                            </div>
+                          </div>
+
+                          <!-- Componentes del Kit -->
+                          <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                              <h6 class="mb-0">Componentes del Kit</h6>
+                              <button class="btn btn-sm btn-primary" (click)="agregarComponente()">
+                                <i class="bi bi-plus-circle"></i> Agregar Componente
+                              </button>
+                            </div>
+
+                            <!-- Lista de Componentes -->
+                            <div class="table-responsive">
+                              <table class="table table-sm table-hover">
+                                <thead>
+                                  <tr>
+                                    <th width="40%">Producto</th>
+                                    <th width="30%">Cantidad</th>
+                                    <th width="20%">Stock</th>
+                                    <th width="10%"></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr *ngFor="let componente of componentesKit; let i = index">
+                                    <td>
+                                      <select class="form-select form-select-sm" 
+                                              [(ngModel)]="componente.idProductoHijo"
+                                              (change)="onProductoComponenteChange(componente, i)">
+                                        <option value="">Seleccionar producto</option>
+                                        <option *ngFor="let prod of productosDisponibles" 
+                                                [value]="prod.idProducto"
+                                                [disabled]="esProductoPadre(prod.idProducto)">
+                                          {{prod.descripcion}} ({{prod.codigo}})
+                                        </option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <input type="number" class="form-control form-control-sm"
+                                            [(ngModel)]="componente.cantidad"
+                                            min="1" step="1" placeholder="Cantidad">
+                                    </td>
+                                    <td>
+                                      <span class="badge" 
+                                            [class.bg-success]="componente.stockDisponible >= componente.cantidad"
+                                            [class.bg-warning]="componente.stockDisponible < componente.cantidad">
+                                        {{componente.stockDisponible || 0}}
+                                      </span>
+                                    </td>
+                                    <td class="text-center">
+                                      <button class="btn btn-sm btn-outline-danger" 
+                                              (click)="eliminarComponente(i)">
+                                        <i class="bi bi-trash"></i>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                  <tr *ngIf="componentesKit.length === 0">
+                                    <td colspan="4" class="text-center text-muted py-3">
+                                      <i class="bi bi-inbox display-6"></i>
+                                      <p class="mt-2">No hay componentes agregados</p>
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          <!-- Stock Calculado -->
+                          <div class="alert alert-info" *ngIf="stockKitCalculado !== null">
+                            <div class="d-flex justify-content-between align-items-center">
+                              <div>
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Stock disponible del kit:</strong> {{stockKitCalculado}} unidades
+                              </div>
+                              <button class="btn btn-sm btn-outline-info" (click)="calcularStockKit()">
+                                <i class="bi bi-calculator"></i> Recalcular
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                          <button type="button" class="btn btn-primary" 
+                                  [disabled]="!puedeConvertirACompuesto()"
+                                  (click)="confirmarConversionCompuesto()">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Convertir a Kit
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- MODAL GESTIONAR VARIANTES -->
+                  <div class="modal fade" id="modalGestionarVariantes" tabindex="-1" aria-hidden="true" #modalGestionarVariantes>
+                    <div class="modal-dialog modal-xl">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title">
+                            <i class="bi bi-palette me-2"></i>
+                            Gestionar Variantes de Producto
+                          </h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                          <!-- Paso 1: Definir Atributos -->
+                          <div class="card mb-4">
+                            <div class="card-header">
+                              <h6 class="mb-0">Paso 1: Definir Atributos (Talla, Color, etc.)</h6>
+                            </div>
+                            <div class="card-body">
+                              <div class="row">
+                                <div class="col-md-6">
+                                  <div class="mb-3">
+                                    <label class="form-label">Agregar Atributo</label>
+                                    <div class="input-group">
+                                      <input type="text" class="form-control" 
+                                            [(ngModel)]="nuevoAtributo.nombre"
+                                            placeholder="Ej: Talla, Color, Material">
+                                      <button class="btn btn-outline-primary" 
+                                              (click)="agregarAtributo()"
+                                              [disabled]="!nuevoAtributo.nombre">
+                                        <i class="bi bi-plus"></i> Agregar
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div class="col-md-6">
+                                  <div class="mb-3">
+                                    <label class="form-label">Atributos Definidos</label>
+                                    <div class="list-group">
+                                      <div class="list-group-item d-flex justify-content-between align-items-center"
+                                          *ngFor="let atributo of atributosProducto">
+                                        <div>
+                                          <strong>{{atributo.nombre}}</strong>
+                                          <small class="d-block text-muted">
+                                            Valores: {{atributo.valores.join(', ')}}
+                                          </small>
+                                        </div>
+                                        <div>
+                                          <button class="btn btn-sm btn-outline-info me-1"
+                                                  (click)="agregarValorAtributo(atributo)">
+                                            <i class="bi bi-plus"></i>
+                                          </button>
+                                          <button class="btn btn-sm btn-outline-danger"
+                                                  (click)="eliminarAtributo(atributo)">
+                                            <i class="bi bi-trash"></i>
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div *ngIf="atributosProducto.length === 0" 
+                                          class="list-group-item text-center text-muted">
+                                        No hay atributos definidos
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <!-- Paso 2: Crear Variantes -->
+                          <div class="card" *ngIf="atributosProducto.length > 0">
+                            <div class="card-header">
+                              <h6 class="mb-0">Paso 2: Crear Variantes</h6>
+                              <small class="text-muted">{{combinacionesGeneradas.length}} combinaciones posibles</small>
+                            </div>
+                            <div class="card-body">
+                              <!-- Generar Combinaciones -->
+                              <div class="mb-3">
+                                <button class="btn btn-primary me-2" (click)="generarCombinaciones()">
+                                  <i class="bi bi-magic"></i> Generar Combinaciones
+                                </button>
+                                <button class="btn btn-outline-secondary" (click)="limpiarCombinaciones()">
+                                  <i class="bi bi-eraser"></i> Limpiar
+                                </button>
+                              </div>
+
+                              <!-- Tabla de Variantes -->
+                              <div class="table-responsive" *ngIf="combinacionesGeneradas.length > 0">
+                                <table class="table table-sm table-hover">
+                                  <thead>
+                                    <tr>
+                                      <th>SKU</th>
+                                      <th *ngFor="let atributo of atributosProducto">
+                                        {{atributo.nombre}}
+                                      </th>
+                                      <th>Precio</th>
+                                      <th>Stock Inicial</th>
+                                      <th></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr *ngFor="let variante of variantesCreadas; let i = index">
+                                      <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                              [(ngModel)]="variante.sku"
+                                              placeholder="SKU único">
+                                      </td>
+                                      <td *ngFor="let atributo of atributosProducto">
+                                        <select class="form-select form-select-sm"
+                                                [(ngModel)]="variante.atributos[atributo.nombre]">
+                                          <option *ngFor="let valor of atributo.valores" [value]="valor">
+                                            {{valor}}
+                                          </option>
+                                        </select>
+                                      </td>
+                                      <td>
+                                        <input type="number" class="form-control form-control-sm"
+                                              [(ngModel)]="variante.precio"
+                                              min="0" step="0.01" placeholder="0.00">
+                                      </td>
+                                      <td>
+                                        <input type="number" class="form-control form-control-sm"
+                                              [(ngModel)]="variante.stockInicial"
+                                              min="0" step="1" placeholder="0">
+                                      </td>
+                                      <td>
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                (click)="eliminarVariante(i)">
+                                          <i class="bi bi-trash"></i>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                          <button type="button" class="btn btn-primary" 
+                                  [disabled]="!puedeCrearVariantes()"
+                                  (click)="crearVariantes()">
+                            <i class="bi bi-save me-1"></i>
+                            Guardar Variantes
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                 </td>
               </tr>
     
