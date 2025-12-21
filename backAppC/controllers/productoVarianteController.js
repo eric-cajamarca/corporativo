@@ -19,8 +19,9 @@ const crear_variante = async function (req, res) {
             atributos // Array: [{idAtributo, idValor}, ...]
         } = req.body;
 
+        console.log('Crear variante - atributos recibidos:', req.body);
         // Validaciones básicas
-        if (!idProductoBase || !sku) {
+        if (!idProductoBase ) {
             return res.status(400).send({ 
                 message: 'SKU y Producto Base son requeridos', 
                 data: undefined 
@@ -36,8 +37,8 @@ const crear_variante = async function (req, res) {
                 sku,
                 precio: precio || null,
                 atributos: atributos || [],
-                idEmpresa: req.user.empresa,
-                idUsuario: req.user.idUsuario
+                // idEmpresa: req.user.empresa,
+                // idUsuario: req.user.idUsuario
             },
             req.user
         );
@@ -65,9 +66,7 @@ const crear_variante = async function (req, res) {
             default:
                 return res.status(500).send({ message: 'Error interno del servidor', data: undefined });
         }
-    } finally {
-        if (pool) await pool.close();
-    }
+    } 
 };
 
 const obtener_variantes_producto = async function (req, res) {
@@ -88,7 +87,6 @@ const obtener_variantes_producto = async function (req, res) {
         const resultado = await productoVarianteService.obtenerVariantesProducto(
             pool,
             idProductoBase,
-            req.user.empresa,
             req.user
         );
 
@@ -132,7 +130,6 @@ const obtener_variante_por_id = async function (req, res) {
         const resultado = await productoVarianteService.obtenerVariantePorId(
             pool,
             idVariante,
-            req.user.empresa,
             req.user
         );
 
@@ -172,8 +169,7 @@ const actualizar_variante = async function (req, res) {
                 sku,
                 precio,
                 atributos,
-                idEmpresa: req.user.empresa,
-                idUsuario: req.user.idUsuario
+            
             },
             req.user
         );
@@ -209,7 +205,6 @@ const eliminar_variante = async function (req, res) {
         const resultado = await productoVarianteService.eliminarVariante(
             pool,
             idVariante,
-            req.user.empresa,
             req.user
         );
 
@@ -245,9 +240,7 @@ const crear_atributo = async function (req, res) {
             pool,
             {
                 nombre,
-                tipo: tipo || 'text',
-                idEmpresa: req.user.empresa,
-                idUsuario: req.user.idUsuario
+                tipo: tipo || 'text'
             },
             req.user
         );
@@ -286,9 +279,7 @@ const agregar_valor_atributo = async function (req, res) {
             pool,
             {
                 idAtributo,
-                valor,
-                idEmpresa: req.user.empresa,
-                idUsuario: req.user.idUsuario
+                valor
             },
             req.user
         );
@@ -318,7 +309,6 @@ const obtener_atributos_empresa = async function (req, res) {
         
         const resultado = await productoVarianteService.obtenerAtributosEmpresa(
             pool,
-            req.user.empresa,
             req.user
         );
 

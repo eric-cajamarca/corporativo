@@ -58,6 +58,7 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
             s.nombre as sucursal,
             p.cUnitario,
             ss.cantidad as stock,
+            p.tipoProducto,
             p.fProduccion,
             p.fVencimiento
         FROM StockSucursal ss
@@ -122,6 +123,7 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
       sucursal: producto.sucursal,
       cUnitario: producto.cUnitario,
       stock: producto.stock,
+      tipoProducto: producto.tipoProducto,
       fProduccion: producto.fProduccion,
       fVencimiento: producto.fVencimiento,
       precios: preciosMap[producto.idProducto] || {}

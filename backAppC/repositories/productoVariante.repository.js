@@ -1,75 +1,75 @@
 const sql = require('mssql');
 
 // Crear tablas necesarias (ejecutar una sola vez)
-exports.crearTablasVariantes = async (pool) => {
-    try {
-        // Tabla de atributos (Talla, Color, etc.)
-        await pool.request().query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AtributosProducto' AND xtype='U')
-            CREATE TABLE AtributosProducto (
-                idAtributo INT IDENTITY(1,1) PRIMARY KEY,
-                nombre VARCHAR(50) NOT NULL,
-                tipo VARCHAR(20) DEFAULT 'text',
-                idEmpresa UNIQUEIDENTIFIER NOT NULL,
-                idUsuario UNIQUEIDENTIFIER,
-                fCreacion DATETIME DEFAULT GETDATE(),
-                estado BIT DEFAULT 1,
-                FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa),
-                FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
-            )
-        `);
+// exports.crearTablasVariantes = async (pool) => {
+//     try {
+//         // Tabla de atributos (Talla, Color, etc.)
+//         await pool.request().query(`
+//             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AtributosProducto' AND xtype='U')
+//             CREATE TABLE AtributosProducto (
+//                 idAtributo INT IDENTITY(1,1) PRIMARY KEY,
+//                 nombre VARCHAR(50) NOT NULL,
+//                 tipo VARCHAR(20) DEFAULT 'text',
+//                 idEmpresa UNIQUEIDENTIFIER NOT NULL,
+//                 idUsuario UNIQUEIDENTIFIER,
+//                 fCreacion DATETIME DEFAULT GETDATE(),
+//                 estado BIT DEFAULT 1,
+//                 FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa),
+//                 FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
+//             )
+//         `);
 
-        // Tabla de valores de atributos
-        await pool.request().query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ValoresAtributo' AND xtype='U')
-            CREATE TABLE ValoresAtributo (
-                idValor INT IDENTITY(1,1) PRIMARY KEY,
-                idAtributo INT NOT NULL,
-                valor VARCHAR(50) NOT NULL,
-                idUsuario UNIQUEIDENTIFIER,
-                fCreacion DATETIME DEFAULT GETDATE(),
-                estado BIT DEFAULT 1,
-                FOREIGN KEY (idAtributo) REFERENCES AtributosProducto(idAtributo),
-                FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
-            )
-        `);
+//         // Tabla de valores de atributos
+//         await pool.request().query(`
+//             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ValoresAtributo' AND xtype='U')
+//             CREATE TABLE ValoresAtributo (
+//                 idValor INT IDENTITY(1,1) PRIMARY KEY,
+//                 idAtributo INT NOT NULL,
+//                 valor VARCHAR(50) NOT NULL,
+//                 idUsuario UNIQUEIDENTIFIER,
+//                 fCreacion DATETIME DEFAULT GETDATE(),
+//                 estado BIT DEFAULT 1,
+//                 FOREIGN KEY (idAtributo) REFERENCES AtributosProducto(idAtributo),
+//                 FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
+//             )
+//         `);
 
-        // Tabla de variantes
-        await pool.request().query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='VariantesProducto' AND xtype='U')
-            CREATE TABLE VariantesProducto (
-                idVariante UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-                idProductoBase UNIQUEIDENTIFIER NOT NULL,
-                sku VARCHAR(50) NOT NULL UNIQUE,
-                precio DECIMAL(18,5) NULL,
-                idUsuario UNIQUEIDENTIFIER,
-                fCreacion DATETIME DEFAULT GETDATE(),
-                estado BIT DEFAULT 1,
-                FOREIGN KEY (idProductoBase) REFERENCES Productos(idProducto),
-                FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
-            )
-        `);
+//         // Tabla de variantes
+//         await pool.request().query(`
+//             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='VariantesProducto' AND xtype='U')
+//             CREATE TABLE VariantesProducto (
+//                 idVariante UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+//                 idProductoBase UNIQUEIDENTIFIER NOT NULL,
+//                 sku VARCHAR(50) NOT NULL UNIQUE,
+//                 precio DECIMAL(18,5) NULL,
+//                 idUsuario UNIQUEIDENTIFIER,
+//                 fCreacion DATETIME DEFAULT GETDATE(),
+//                 estado BIT DEFAULT 1,
+//                 FOREIGN KEY (idProductoBase) REFERENCES Productos(idProducto),
+//                 FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
+//             )
+//         `);
 
-        // Tabla para asociar atributos a variantes
-        await pool.request().query(`
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='VarianteAtributos' AND xtype='U')
-            CREATE TABLE VarianteAtributos (
-                idVarianteAtributo INT IDENTITY(1,1) PRIMARY KEY,
-                idVariante UNIQUEIDENTIFIER NOT NULL,
-                idAtributo INT NOT NULL,
-                idValor INT NOT NULL,
-                FOREIGN KEY (idVariante) REFERENCES VariantesProducto(idVariante),
-                FOREIGN KEY (idAtributo) REFERENCES AtributosProducto(idAtributo),
-                FOREIGN KEY (idValor) REFERENCES ValoresAtributo(idValor),
-                CONSTRAINT UQ_VarianteAtributo UNIQUE (idVariante, idAtributo)
-            )
-        `);
+//         // Tabla para asociar atributos a variantes
+//         await pool.request().query(`
+//             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='VarianteAtributos' AND xtype='U')
+//             CREATE TABLE VarianteAtributos (
+//                 idVarianteAtributo INT IDENTITY(1,1) PRIMARY KEY,
+//                 idVariante UNIQUEIDENTIFIER NOT NULL,
+//                 idAtributo INT NOT NULL,
+//                 idValor INT NOT NULL,
+//                 FOREIGN KEY (idVariante) REFERENCES VariantesProducto(idVariante),
+//                 FOREIGN KEY (idAtributo) REFERENCES AtributosProducto(idAtributo),
+//                 FOREIGN KEY (idValor) REFERENCES ValoresAtributo(idValor),
+//                 CONSTRAINT UQ_VarianteAtributo UNIQUE (idVariante, idAtributo)
+//             )
+//         `);
 
-        return { success: true, message: 'Tablas de variantes creadas' };
-    } catch (error) {
-        throw new Error(`Repository Error: ${error.message}`);
-    }
-};
+//         return { success: true, message: 'Tablas de variantes creadas' };
+//     } catch (error) {
+//         throw new Error(`Repository Error: ${error.message}`);
+//     }
+// };
 
 exports.crearVariante = async (pool, datos) => {
     try {
@@ -80,11 +80,10 @@ exports.crearVariante = async (pool, datos) => {
             .input('idProductoBase', sql.UniqueIdentifier, idProductoBase)
             .input('sku', sql.VarChar(50), sku)
             .input('precio', sql.Decimal(18,5), precio)
-            .input('idUsuario', sql.UniqueIdentifier, idUsuario)
             .query(`
-                INSERT INTO VariantesProducto (idProductoBase, sku, precio, idUsuario)
+                INSERT INTO VariantesProducto (idProductoBase, sku, precio)
                 OUTPUT INSERTED.idVariante
-                VALUES (@idProductoBase, @sku, @precio, @idUsuario)
+                VALUES (@idProductoBase, @sku, @precio)
             `);
         
         return result;
@@ -104,14 +103,14 @@ exports.obtenerVariantesProducto = async (pool, idProductoBase, idEmpresa) => {
                     v.idVariante,
                     v.sku,
                     v.precio,
-                    v.estado,
+                    p.estado,
                     p.codigo as codigoBase,
                     p.descripcion as productoBase
                 FROM VariantesProducto v
                 INNER JOIN Productos p ON v.idProductoBase = p.idProducto
                 WHERE v.idProductoBase = @idProductoBase
                 AND p.idEmpresa = @idEmpresa
-                AND v.estado = 1
+                AND p.estado = 1
                 ORDER BY v.sku
             `);
         
@@ -134,8 +133,7 @@ exports.obtenerVariantePorId = async (pool, idVariante, idEmpresa) => {
                     v.precio,
                     v.idProductoBase,
                     p.codigo as codigoBase,
-                    p.descripcion as productoBase,
-                    v.estado
+                    p.descripcion as productoBase
                 FROM VariantesProducto v
                 INNER JOIN Productos p ON v.idProductoBase = p.idProducto
                 WHERE v.idVariante = @idVariante
@@ -223,8 +221,6 @@ exports.obtenerAtributosVariante = async (pool, idVariante) => {
                 INNER JOIN AtributosProducto a ON va.idAtributo = a.idAtributo
                 INNER JOIN ValoresAtributo v ON va.idValor = v.idValor
                 WHERE va.idVariante = @idVariante
-                AND a.estado = 1
-                AND v.estado = 1
             `);
         
         return result.recordset;
@@ -243,19 +239,17 @@ exports.obtenerAtributosProducto = async (pool, idProductoBase, idEmpresa) => {
                 SELECT DISTINCT
                     a.idAtributo,
                     a.nombre,
-                    a.tipo,
+                    a.idEmpresa,
                     (
                         SELECT va.idValor, va.valor
                         FROM ValoresAtributo va
                         WHERE va.idAtributo = a.idAtributo
-                        AND va.estado = 1
                         FOR JSON PATH
                     ) as valores
                 FROM AtributosProducto a
                 LEFT JOIN VarianteAtributos va ON a.idAtributo = va.idAtributo
                 LEFT JOIN VariantesProducto v ON va.idVariante = v.idVariante
                 WHERE a.idEmpresa = @idEmpresa
-                AND a.estado = 1
                 AND (v.idProductoBase = @idProductoBase OR v.idProductoBase IS NULL)
                 ORDER BY a.nombre
             `);
@@ -286,8 +280,7 @@ exports.verificarAtributoValor = async (pool, idAtributo, idValor, idEmpresa) =>
                 WHERE v.idValor = @idValor
                 AND v.idAtributo = @idAtributo
                 AND a.idEmpresa = @idEmpresa
-                AND v.estado = 1
-                AND a.estado = 1
+
             `);
         
         return result.recordset[0].existe > 0;
@@ -467,18 +460,15 @@ exports.obtenerAtributosEmpresa = async (pool, idEmpresa) => {
                     a.idAtributo,
                     a.nombre,
                     a.tipo,
-                    a.estado,
                     (
-                        SELECT v.idValor, v.valor, v.estado
+                        SELECT v.idValor, v.valor
                         FROM ValoresAtributo v
                         WHERE v.idAtributo = a.idAtributo
-                        AND v.estado = 1
                         ORDER BY v.valor
                         FOR JSON PATH
                     ) as valores
                 FROM AtributosProducto a
                 WHERE a.idEmpresa = @idEmpresa
-                AND a.estado = 1
                 ORDER BY a.nombre
             `);
         
@@ -505,7 +495,7 @@ exports.verificarAtributoExistente = async (pool, nombre, idEmpresa) => {
                 FROM AtributosProducto 
                 WHERE nombre = @nombre
                 AND idEmpresa = @idEmpresa
-                AND estado = 1
+            
             `);
         
         return result.recordset[0].existe > 0;
@@ -525,11 +515,10 @@ exports.obtenerAtributoPorId = async (pool, idAtributo, idEmpresa) => {
                     a.idAtributo,
                     a.nombre,
                     a.tipo,
-                    a.estado
                 FROM AtributosProducto a
                 WHERE a.idAtributo = @idAtributo
                 AND a.idEmpresa = @idEmpresa
-                AND a.estado = 1
+            
             `);
         
         return result.recordset[0] || null;
@@ -549,7 +538,7 @@ exports.verificarValorAtributoExistente = async (pool, idAtributo, valor) => {
                 FROM ValoresAtributo 
                 WHERE idAtributo = @idAtributo
                 AND valor = @valor
-                AND estado = 1
+            
             `);
         
         return result.recordset[0].existe > 0;

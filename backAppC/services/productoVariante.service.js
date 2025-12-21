@@ -6,7 +6,10 @@ exports.crearVariante = async (pool, datos, usuarioAutenticado) => {
             throw new Error('NO_ACCESO');
         }
 
-        validarDatosVariante(datos);
+        datos.idEmpresa = usuarioAutenticado.empresa;
+        datos.idUsuario = usuarioAutenticado.sub;
+
+        // validarDatosVariante(datos);
 
         // Verificar que el producto base exista
         const productoBase = await productoVarianteRepository.obtenerProductoPorId(
@@ -86,11 +89,13 @@ exports.crearVariante = async (pool, datos, usuarioAutenticado) => {
     }
 };
 
-exports.obtenerVariantesProducto = async (pool, idProductoBase, idEmpresa, usuarioAutenticado) => {
+exports.obtenerVariantesProducto = async (pool, idProductoBase, usuarioAutenticado) => {
     try {
         if (!usuarioAutenticado) {
             throw new Error('NO_ACCESO');
         }
+
+        idEmpresa = usuarioAutenticado.empresa;
 
         const variantes = await productoVarianteRepository.obtenerVariantesProducto(
             pool,
@@ -136,11 +141,13 @@ exports.obtenerVariantesProducto = async (pool, idProductoBase, idEmpresa, usuar
     }
 };
 
-exports.obtenerVariantePorId = async (pool, idVariante, idEmpresa, usuarioAutenticado) => {
+exports.obtenerVariantePorId = async (pool, idVariante, usuarioAutenticado) => {
     try {
         if (!usuarioAutenticado) {
             throw new Error('NO_ACCESO');
         }
+
+        idEmpresa = usuarioAutenticado.empresa;
 
         const variante = await productoVarianteRepository.obtenerVariantePorId(
             pool,
@@ -190,7 +197,8 @@ exports.actualizarVariante = async (pool, datos, usuarioAutenticado) => {
         if (!datos.idVariante) {
             throw new Error('CAMPOS_REQUERIDOS');
         }
-
+        datos.idEmpresa = usuarioAutenticado.empresa;
+        datos.idUsuario = usuarioAutenticado.sub;
         // Verificar que la variante exista
         const varianteExistente = await productoVarianteRepository.obtenerVariantePorId(
             pool,
@@ -259,12 +267,13 @@ exports.actualizarVariante = async (pool, datos, usuarioAutenticado) => {
     }
 };
 
-exports.eliminarVariante = async (pool, idVariante, idEmpresa, usuarioAutenticado) => {
+exports.eliminarVariante = async (pool, idVariante, usuarioAutenticado) => {
     try {
         if (!usuarioAutenticado) {
             throw new Error('NO_ACCESO');
         }
 
+        const idEmpresa = usuarioAutenticado.empresa;
         // Verificar que no haya stock en ninguna sucursal
         const stock = await productoVarianteRepository.verificarStockVariante(
             pool,
@@ -304,6 +313,8 @@ exports.crearAtributo = async (pool, datos, usuarioAutenticado) => {
             throw new Error('CAMPOS_REQUERIDOS');
         }
 
+        datos.idEmpresa = usuarioAutenticado.empresa;
+        datos.idUsuario = usuarioAutenticado.sub;
         // Verificar que no exista atributo con mismo nombre
         const atributoExistente = await productoVarianteRepository.verificarAtributoExistente(
             pool,
@@ -350,6 +361,8 @@ exports.agregarValorAtributo = async (pool, datos, usuarioAutenticado) => {
             throw new Error('CAMPOS_REQUERIDOS');
         }
 
+        datos.idEmpresa = usuarioAutenticado.empresa;
+        datos.idUsuario = usuarioAutenticado.sub;
         // Verificar que el atributo exista
         const atributoExistente = await productoVarianteRepository.obtenerAtributoPorId(
             pool,
@@ -396,11 +409,14 @@ exports.agregarValorAtributo = async (pool, datos, usuarioAutenticado) => {
     }
 };
 
-exports.obtenerAtributosEmpresa = async (pool, idEmpresa, usuarioAutenticado) => {
+exports.obtenerAtributosEmpresa = async (pool, usuarioAutenticado) => {
     try {
         if (!usuarioAutenticado) {
             throw new Error('NO_ACCESO');
         }
+
+        idEmpresa = usuarioAutenticado.empresa;
+
 
         const atributos = await productoVarianteRepository.obtenerAtributosEmpresa(
             pool,
@@ -423,6 +439,7 @@ exports.obtenerAtributosEmpresa = async (pool, idEmpresa, usuarioAutenticado) =>
 function validarDatosVariante(datos) {
     const { idProductoBase, sku } = datos;
     
+    console.log('Validando datos de variante:', datos);
     if (!idProductoBase || !sku) {
         throw new Error('CAMPOS_REQUERIDOS');
     }

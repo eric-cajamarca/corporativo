@@ -109,13 +109,15 @@
                       <div class="dropdown-divider"></div>
 
                       <!-- Opción para convertir a COMPUESTO -->
-                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" data-bs-toggle="modal"
-                        (click)="abrirModalConvertirCompuesto(item)">
+                      <a style="cursor: pointer;" class="dropdown-item" 
+                           *ngIf="item.tipoProducto === 'S'"
+                           (click)="abrirModalConvertirCompuesto(item)">
                         <i class="bi bi-box-seam me-1"></i> Convertir a Kit/Compuesto
                       </a>
                                       <!-- *ngIf="item.tipoProducto === 'S'" -->
                         <!-- Opción para gestionar VARIANTES -->
                         <a style="cursor: pointer;" class="dropdown-item" 
+                          *ngIf="item.tipoProducto === 'S'"
                           (click)="abrirModalGestionarVariantes(item)">
                           <i class="bi bi-palette me-1"></i> Gestionar Variantes
                         </a>
@@ -187,7 +189,7 @@
                   <div class="modal fade" id="modalConvertirCompuesto" tabindex="-1" aria-hidden="true" #modalConvertirCompuesto>
                     <div class="modal-dialog modal-lg">
                       <div class="modal-content">
-                        <div class="modal-header">
+                        <div class="modal-header bg-success text-white">
                           <h5 class="modal-title">
                             <i class="bi bi-box-seam me-2"></i>
                             Convertir a Producto Compuesto (Kit)
@@ -298,7 +300,7 @@
                   <div class="modal fade" id="modalGestionarVariantes" tabindex="-1" aria-hidden="true" #modalGestionarVariantes>
                     <div class="modal-dialog modal-xl">
                       <div class="modal-content">
-                        <div class="modal-header">
+                        <div class="modal-header bg-success text-white">
                           <h5 class="modal-title">
                             <i class="bi bi-palette me-2"></i>
                             Gestionar Variantes de Producto

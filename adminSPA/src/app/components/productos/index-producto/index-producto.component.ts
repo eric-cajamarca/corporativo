@@ -350,6 +350,8 @@ export class IndexProductoComponent {
   }
   
   agregarAtributo(): void {
+
+
     if (!this.nuevoAtributo.nombre.trim()) return;
     
     // Verificar que no exista ya
@@ -364,6 +366,8 @@ export class IndexProductoComponent {
       });
       this.nuevoAtributo.nombre = '';
     }
+
+    console.log(this.atributosProducto);
   }
   
   eliminarAtributo(atributo: any): void {
@@ -387,7 +391,8 @@ export class IndexProductoComponent {
   }
   
   generarCombinaciones(): void {
-    if (this.atributosProducto.length === 0) return;
+    console.log('generando cominaciones',this.atributosProducto)
+    if (this.atributosProducto.length < 0) return;
     
     // Generar todas las combinaciones posibles
     let combinaciones: Array<any> = [{}];
