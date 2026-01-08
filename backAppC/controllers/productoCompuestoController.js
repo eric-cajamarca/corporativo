@@ -3,6 +3,7 @@ const dbConfig = require('../dbconfig');
 const productoCompuestoService = require('../services/productoCompuesto.service');
 
 const crear_producto_compuesto = async function (req, res) {
+    console.log('Crear producto compuesto - req.user:', req.body);
     let pool;
     try {
         if (!req.user) {
@@ -17,6 +18,11 @@ const crear_producto_compuesto = async function (req, res) {
             componentes  // Array: [{idProductoHijo, cantidad}, ...]
         } = req.body;
 
+        const datos = {
+            idProductoPadre,
+            componentes
+        };
+
         // Validaciones básicas
         if (!idProductoPadre || !componentes || !Array.isArray(componentes) || componentes.length === 0) {
             return res.status(400).send({ 
@@ -29,12 +35,7 @@ const crear_producto_compuesto = async function (req, res) {
         
         const resultado = await productoCompuestoService.crearProductoCompuesto(
             pool,
-            {
-                idProductoPadre,
-                componentes,
-                idEmpresa: req.user.empresa,
-                idUsuario: req.user.idUsuario
-            },
+            datos,
             req.user
         );
 

@@ -6,29 +6,33 @@ exports.crearProductoCompuesto = async (pool, datos, usuarioAutenticado) => {
             throw new Error('NO_ACCESO');
         }
 
-        validarDatosCompuesto(datos);
+        // validarDatosCompuesto(datos);
 
+        const idEmpresa = usuarioAutenticado.empresa;
+        const idUsuario = usuarioAutenticado.sub;
         // Verificar que el producto padre exista y sea de tipo compuesto
         const productoPadre = await productoCompuestoRepository.obtenerProductoPorId(
             pool,
             datos.idProductoPadre,
-            datos.idEmpresa
+            idEmpresa
         );
 
         if (!productoPadre) {
             throw new Error('PRODUCTO_PADRE_NO_EXISTE');
         }
 
-        if (productoPadre.tipoProducto !== 'C') {
-            throw new Error('PRODUCTO_NO_ES_COMPUESTO');
-        }
+        console.log('Producto padre encontrado:', productoPadre);
+        
+        // if (productoPadre.tipoProducto !== 'C') {
+        //     throw new Error('PRODUCTO_NO_ES_COMPUESTO');
+        // }
 
         // Verificar que todos los componentes existan y sean simples
         for (const componente of datos.componentes) {
             const productoHijo = await productoCompuestoRepository.obtenerProductoPorId(
                 pool,
                 componente.idProductoHijo,
-                datos.idEmpresa
+                idEmpresa
             );
 
             if (!productoHijo) {
@@ -60,7 +64,7 @@ exports.crearProductoCompuesto = async (pool, datos, usuarioAutenticado) => {
                     idProductoPadre: datos.idProductoPadre,
                     idProductoHijo: componente.idProductoHijo,
                     cantidad: componente.cantidad,
-                    idUsuario: datos.idUsuario
+                    idUsuario: idUsuario
                 }
             );
             resultados.push(resultado);

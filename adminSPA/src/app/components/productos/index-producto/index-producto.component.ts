@@ -40,6 +40,9 @@ export class IndexProductoComponent {
  
   productoSeleccionado: any = null;
   
+  // Propiedades
+  modoEdicion: boolean = false;
+
   // Variables para Producto Compuesto
   componentesKit: Array<any> = [];
   productosDisponibles: Array<any> = [];
@@ -304,6 +307,7 @@ export class IndexProductoComponent {
       c.idProductoHijo && c.cantidad > 0
     );
     
+    console.log('Componentes para kit:', componentesValidos);
     // Llamar al servicio para convertir a compuesto
     this._productoCompuestoService.crear_producto_compuesto({
       idProductoPadre: this.productoSeleccionado.idProducto,
@@ -476,8 +480,88 @@ export class IndexProductoComponent {
   }
   
   verComponentesKit(_item: any){
+    console.log('verComponentesKit',_item);
+    this._productoCompuestoService.obtener_componentes(_item.idProducto).subscribe(
+      response => {
+        console.log('response.data');
+        console.log(response.data);
+        if (response.data == undefined) {
+          iziToast.show({
+            title: 'ERROR',
+            titleColor: '#FF0000',
+            color: '#FFF',
+            class: 'text-danger',
+            position: 'topRight',
+            message: 'Usted no tiene acceso a compras'
+          });
+          this._router.navigate(['/']);
+        }
+        else { {
 
+          this.componentesKit = response.data.componentes;
+          this.productosDisponibles = response.data.infoStock;
+
+          // Asumiendo que response.data.infoStock es el objeto que mostraste
+          const infoStock = response.data.infoStock;
+
+          let mensaje = `Sucursales con stock:\n\n`;
+          infoStock.sucursales.forEach((suc: any) => {
+            if (suc.stockDisponible > 0) {
+              mensaje += `- ${suc.sucursal} (Stock: ${suc.stockDisponible})\n`;
+            }
+          });
+
+          alert(mensaje);
+
+          this.abrirModalVerEditarCompuesto(_item);
+        }
+      }
+      },
+      error => {
+        console.log(error);
+      }
+    );
+    
+
+    
   }
+
+
+  // Abrir modal
+abrirModalVerEditarCompuesto(producto: any): void {
+  this.inicializarModalCompuesto();
+  this.productoSeleccionado = producto;
+  this.modoEdicion = true;
+  this.cargarComponentesDeKit(producto.idProducto);
+  // Abrir modal con Bootstrap
+}
+
+// Cargar componentes existentes
+cargarComponentesDeKit(idProductoPadre: string): void {
+  this._productoCompuestoService.obtener_componentes(idProductoPadre).subscribe({
+    next: (response) => {
+      this.componentesKit = response.data.componentes;
+      this.calcularStockKit();
+    }
+  });
+}
+
+
+// Guardar cambios
+guardarComponentesKit(): void {
+  const data = {
+    idProductoPadre: this.productoSeleccionado.idProducto,
+    componentes: this.componentesKit
+  };
+  
+  // this.servicio.actualizarComponentesKit(data).subscribe({
+  //   next: () => {
+  //     this.toastr.success('Kit actualizado correctamente');
+  //     this.modoEdicion = false;
+  //   }
+  // });
+}
+
  
 }
 

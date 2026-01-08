@@ -405,6 +405,9 @@ FOREIGN KEY (idMarca) REFERENCES Marcas (idMarca),
 )
 
 go
+ALTER TABLE Productos 
+ADD tipoProducto CHAR(1) DEFAULT 'S' 
+CONSTRAINT CHK_tipoProducto CHECK (tipoProducto IN ('S', 'C'));
 
 CREATE TABLE ProductosCompuestos (
     idProductoCompuesto INT PRIMARY KEY IDENTITY,
