@@ -19,6 +19,9 @@ import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { Documento } from '../../../interfaces/documento-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
+import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { ModalService } from '../../../services/modal.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -114,7 +117,8 @@ export class CreateVentasComponent {
     private _clienteService: ClienteService,
     private _comprobanteService: ComprobanteService,
     private _tablasSunatService: TablasSunatService,
-    private _documentosService: DocumentoService
+    private _documentosService: DocumentoService,
+    private modalService: ModalService
 
   ) { }
 
@@ -333,11 +337,6 @@ export class CreateVentasComponent {
 
 
 
-
-
-
-
-
   // Función para buscar productos por código o descripción
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
@@ -514,6 +513,7 @@ export class CreateVentasComponent {
 
       if (this.productoEncontrado) {
         // Agregar al carrito usando la función existente
+        //this.productoEncontrado.pVenta = this.obtenerPrecioPrincipal(this.productoEncontrado);
         this.agregarAlCarrito(this.productoEncontrado);
         this.searchCodigo = ''; // limpiar campo de búsqueda
         // iziToast.show({ title: 'OK', titleColor: '#1DC74C', message: 'Producto agregado al carrito', position: 'topRight' });
@@ -534,16 +534,19 @@ export class CreateVentasComponent {
   actualizaTotales(): void {
     //quiero recorrer el carrito y sumar el subtotal, igv y total
     console.log('Calculando totales para el carrito:', this.carrito);
+    console.log('Estado actual de ventas antes de totales:', this.searchCodigo);
 
     this.ventas.subTotal = 0;
     this.ventas.igv = 0;
     this.ventas.total = 0;
+    console.log('aqui muetro el carrito para ver si pventa se modifico', this.carrito);
 
     this.carrito.forEach(item => {
-      const subtotalItem = item.cUnitario * item.cantidad;
+      const subtotalItem = item.pVenta * item.cantidad;
       this.ventas.subTotal += subtotalItem;
       console.log(`Subtotal para ${item.descripcion}: ${subtotalItem}`);
     });
+    console.log('Subtotal calculado:', this.ventas.subTotal);
 
     this.ventas.igv = this.ventas.subTotal * this.TASA_IGV;
     this.ventas.total = this.ventas.subTotal + this.ventas.igv;
@@ -560,12 +563,65 @@ export class CreateVentasComponent {
   }
 
   actualizaPrecio(item: any, el: any) {
-    const nuevo = parseFloat(el.target.innerText.replace('S/', '').trim());
+    console.log('Elemento editado para el:', el);
+    console.log('Elemento editado para Item:', item);
+    //const nuevo = parseFloat(el.target.innerText.replace('S/', '').trim(),10);
+    const nuevo = parseInt(el.target.innerText.trim(), 10);
     if (!isNaN(nuevo)) {
-      item.producto.cUnitario = nuevo;
+      item.pVenta = nuevo;
     }
+    console.log('Nuevo precio establecido:', item.producto);
     this.actualizaTotales();
   }
+
+ obtenerPrecioPrincipal(item: any): number {
+  if (!item.precios || typeof item.precios !== 'object') {
+    return item.precio || 0;
+  }
+
+  const listaPrincipal = Object.values(item.precios).find(
+    (p: any) => p.principal === true
+  );
+
+  //return listaPrincipal ? listaPrincipal.precio : item.precio || 0;
+  return listaPrincipal ? (listaPrincipal as any).precio : item.pVenta || 0;
+}
+
+/**
+ * Abre el modal de selección de precios
+ */
+abrirModalPrecios(item: any) {
+    const opcionesPrecios = Object.values(item.precios || {}).map((precio: any) => ({
+      ...precio,
+      idProducto: item.idProducto
+    }));
+
+    this.modalService.open(ModalPreciosComponent, {
+      size: 'sm',
+      centered: true,
+      backdrop: 'static'
+    }, {
+      precios: opcionesPrecios,
+      precioActual: this.obtenerPrecioPrincipal(item)
+      
+    }).subscribe({
+      next: (precioSeleccionado: any) => {
+        if (precioSeleccionado) {
+          item.pVenta = precioSeleccionado.precio;
+          this.actualizaTotales(); // Recalcula totales si aplica
+          console.log('Precio seleccionado desde el modal:', precioSeleccionado);
+          console.log('Item actualizado con nuevo precio:', item);
+        }
+      },
+      error: () => {
+        // Modal cerrado sin selección
+      }
+    });
+
+  }
+
+
+
 
   actualizaCantidad(item: any, el: any) {
     const nuevo = parseInt(el.target.innerText.trim(), 10);

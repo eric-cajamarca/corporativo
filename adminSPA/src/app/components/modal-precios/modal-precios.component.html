@@ -1,0 +1,26 @@
+<div class="modal-header bg-primary text-white">
+  <h5 class="modal-title">Seleccionar Precio</h5>
+  <button type="button" class="btn-close" (click)="cancelar()"></button>
+</div>
+<div class="modal-body">
+  <div class="list-group">
+    <button *ngFor="let precio of precios" 
+            type="button" 
+            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+            [class.active]="precio.precio === precioActual"
+            (click)="seleccionarPrecio(precio)">
+      <div>
+        <div class="fw-bold">{{ precio.nombreLista }}</div>
+        <small class="text-muted">
+          {{ precio.simboloMoneda }} {{ precio.precio | number:'1.2-2' }}
+        </small>
+      </div>
+      <i *ngIf="precio.precio === precioActual" class="bi bi-check-circle-fill text-primary"></i>
+    </button>
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancelar()">
+    Cancelar
+  </button>
+</div>

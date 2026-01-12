@@ -1,0 +1,6 @@
+/* src/app/components/modal-precios/modal-precios.component.scss */
+.list-group-item.active {
+  background-color: #e7f3ff;
+  border-color: #b3d9ff;
+  color: #0c63e4;
+}

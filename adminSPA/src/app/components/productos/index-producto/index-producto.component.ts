@@ -530,6 +530,9 @@ export class IndexProductoComponent {
   // Abrir modal
 abrirModalVerEditarCompuesto(producto: any): void {
   this.inicializarModalCompuesto();
+
+
+  
   this.productoSeleccionado = producto;
   this.modoEdicion = true;
   this.cargarComponentesDeKit(producto.idProducto);

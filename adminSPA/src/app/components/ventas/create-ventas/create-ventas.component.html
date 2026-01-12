@@ -94,11 +94,29 @@
                       </td>
 
                       <!-- Precio editable -->
-                      <td style="width: 80px; text-align: right;" contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">
-                        S/ {{ item.cUnitario | number:'1.2-2' }}
+                      
+                      <td style="width: 100px; text-align: right;">
+                        <div class="d-flex align-items-center justify-content-end gap-1">
+                          <!-- Precio principal -->
+                          <span contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">
+                            {{ item.pVenta | number:'1.2-2' }}
+                          </span>
+                          
+                          <!-- Botón para abrir modal -->
+                          <button type="button" class="btn btn-sm btn-link p-0 text-primary" 
+                                  (click)="abrirModalPrecios(item)" 
+                                  title="Ver otros precios">
+                            <i class="bi bi-chevron-down"></i>
+                          </button>
+                        </div>
                       </td>
 
-                      <td style="width: 80px; text-align: right;" >S/ {{ (item.cantidad * item.cUnitario) | number:'1.2-2' }}</td>
+
+
+
+
+
+                      <td style="width: 80px; text-align: right;" >S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</td>
                       <td>{{ item.sucursal }}</td>
                       <td>
                         <i class="bi bi-trash text-danger" style="cursor:pointer;" (click)="eliminarDelCarrito(i)"></i>
@@ -206,9 +224,9 @@
                 <td>{{ p.categoria }}</td>
                 <td>{{ p.descripcion }}</td>
                 <td>{{ p.codigoPresentacion }}</td>
-                <td>S/ {{ p.cUnitario | number:'1.2-2' }}</td>
+                <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                 <td>{{ p.sucursal }}</td>
-                <td>{{ p.cantidad }}</td>
+                <td>{{ p.stock }}</td>
                 <!-- <td>
                   <i class="bi bi-plus-circle-fill text-success" style="font-size:1.5rem; cursor:pointer;"
                     (click)="agregarAlCarrito(p)" data-bs-dismiss="modal"></i>

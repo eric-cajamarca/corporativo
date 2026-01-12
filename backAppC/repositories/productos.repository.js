@@ -108,26 +108,59 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
         fActualizacion: precio.fActualizacion
 
       };
+      
     });
 
+     // Combinar productos con precios
+    const productos = result.recordset.map((producto) => {
+      // Obtener precios del producto actual
+      const preciosProducto = preciosMap[producto.idProducto] || {};
+      
+      // Buscar el precio principal (donde principal = true)
+      const precioPrincipal = Object.values(preciosProducto).find(
+        (p) => p.principal === true
+      );
+
+      return {
+        idProducto: producto.idProducto,
+        codigo: producto.codigo,
+        categoria: producto.categoria,
+        descripcion: producto.descripcion,
+        marca: producto.marca,
+        codigoPresentacion: producto.codigoPresentacion,
+        descripcionPres: producto.descripcionPres,
+        idSucursal: producto.idSucursal,
+        sucursal: producto.sucursal,
+        cUnitario: producto.cUnitario,
+        pVenta: precioPrincipal ? precioPrincipal.precio:0, // ← AQUÍ ESTÁ LA CORRECCIÓN
+        stock: producto.stock,
+        tipoProducto: producto.tipoProducto,
+        fProduccion: producto.fProduccion,
+        fVencimiento: producto.fVencimiento,
+        precios: preciosProducto,
+      };
+    });   // Encontrar el precio principal (normal)
+   
+
     // Combinar productos con precios
-    const productos = result.recordset.map((producto) => ({
-      idProducto: producto.idProducto,
-      codigo: producto.codigo,
-      categoria: producto.categoria,
-      descripcion: producto.descripcion,
-      marca: producto.marca,
-      codigoPresentacion: producto.codigoPresentacion,
-      descripcionPres: producto.descripcionPres,
-      idSucursal: producto.idSucursal,
-      sucursal: producto.sucursal,
-      cUnitario: producto.cUnitario,
-      stock: producto.stock,
-      tipoProducto: producto.tipoProducto,
-      fProduccion: producto.fProduccion,
-      fVencimiento: producto.fVencimiento,
-      precios: preciosMap[producto.idProducto] || {}
-    }));
+    // const productos = result.recordset.map((producto) => ({
+    //   idProducto: producto.idProducto,
+    //   codigo: producto.codigo,
+    //   categoria: producto.categoria,
+    //   descripcion: producto.descripcion,
+    //   marca: producto.marca,
+    //   codigoPresentacion: producto.codigoPresentacion,
+    //   descripcionPres: producto.descripcionPres,
+    //   idSucursal: producto.idSucursal,
+    //   sucursal: producto.sucursal,
+    //   cUnitario: producto.cUnitario,
+    //   pVenta: precioNormal ? precioNormal.precio : null,
+    //   stock: producto.stock,
+    //   tipoProducto: producto.tipoProducto,
+    //   fProduccion: producto.fProduccion,
+    //   fVencimiento: producto.fVencimiento,
+    //   precios: preciosMap[producto.idProducto] || {}
+    // }));
 
     console.log('Productos obtenidos en repo:', productos.length);
 
