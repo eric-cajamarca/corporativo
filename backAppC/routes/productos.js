@@ -5,6 +5,7 @@ var auth  = require('../middlewares/autenticate');
 
 // Rutas para el CRUD de clientes
 api.get('/productos',auth.auth, productosController.obtener_productos_todos);
+api.get('/productos/compras',auth.auth, productosController.obtener_productos_compras);
 api.get('/productos/:id',auth.auth, productosController.obtener_productos_id);
 api.post('/productos', auth.auth, productosController.crear_producto);
 api.put('/productos/:id',auth.auth, productosController.actualizar_producto);

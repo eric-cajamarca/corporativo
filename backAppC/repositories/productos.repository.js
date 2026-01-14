@@ -251,3 +251,119 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
 //     throw new Error(`Repository Error: ${error.message}`);
 //   }
 // };
+
+exports.obtenerProductosCompras = async (pool, idEmpresa) => {
+  try {
+    // Primero, obtener productos básicos
+    const result = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT 
+            ss.idProducto,
+            p.codigo,
+            c.nombre as categoria,
+            p.idCategoria,            
+            p.descripcion,
+            p.idMarca,
+            m.nombre as marca,
+            p.idPresentacion,
+            pr.codigo as codigoPresentacion,
+            pr.descripcion as descripcionPres,
+            ss.idSucursal,
+            s.nombre as sucursal,
+            p.cUnitario,
+            ss.cantidad as stock,
+            p.tipoProducto,
+            p.fProduccion,
+            p.fVencimiento
+        FROM StockSucursal ss
+        INNER JOIN Productos p ON ss.idProducto = p.idProducto
+        INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
+        INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+        INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal
+        INNER JOIN Marcas m ON p.idMarca = m.idMarca
+        WHERE ss.idEmpresa = @idEmpresa
+      `);
+
+    // Obtener precios por separado
+    const preciosResult = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT 
+            pp.idProducto,
+            pp.idLista,
+            pp.precio,
+            pp.idPrecio,
+            pp.fActualizacion,
+            lp.nombre as nombreLista,
+            lp.principal,
+            m.simbolo as simboloMoneda
+            
+        FROM PreciosProducto pp
+        INNER JOIN ListasPrecio lp ON pp.idLista = lp.idLista
+        INNER JOIN Moneda m ON lp.idMoneda = m.idMoneda
+        INNER JOIN Productos p ON pp.idProducto = p.idProducto
+        WHERE p.idEmpresa = @idEmpresa
+        AND lp.activo = 1
+      `);
+
+    // Crear mapa de precios
+    const preciosMap = {};
+    preciosResult.recordset.forEach(precio => {
+      if (!preciosMap[precio.idProducto]) {
+        preciosMap[precio.idProducto] = {};
+      }
+      preciosMap[precio.idProducto][precio.idLista] = {
+        precio: precio.precio,
+        idPrecio: precio.idPrecio,
+        nombreLista: precio.nombreLista,
+        principal: precio.principal,
+        simboloMoneda: precio.simboloMoneda,
+        fActualizacion: precio.fActualizacion
+
+      };
+      
+    });
+
+     // Combinar productos con precios
+    const productos = result.recordset.map((producto) => {
+      // Obtener precios del producto actual
+      const preciosProducto = preciosMap[producto.idProducto] || {};
+      
+      // Buscar el precio principal (donde principal = true)
+      const precioPrincipal = Object.values(preciosProducto).find(
+        (p) => p.principal === true
+      );
+
+      return {
+        idProducto: producto.idProducto,
+        codigo: producto.codigo,
+        idCategoria: producto.idCategoria,
+        categoria: producto.categoria,
+        descripcion: producto.descripcion,
+        idMarca: producto.idMarca,
+        marca: producto.marca,
+        idPresentacion: producto.idPresentacion,
+        codigoPresentacion: producto.codigoPresentacion,
+        descripcionPres: producto.descripcionPres,
+        idSucursal: producto.idSucursal,
+        sucursal: producto.sucursal,
+        cUnitario: producto.cUnitario,
+        pVenta: precioPrincipal ? precioPrincipal.precio:0, // ← AQUÍ ESTÁ LA CORRECCIÓN
+        stock: producto.stock,
+        tipoProducto: producto.tipoProducto,
+        fProduccion: producto.fProduccion,
+        fVencimiento: producto.fVencimiento,
+        // precios: preciosProducto,
+      };
+    });   // Encontrar el precio principal (normal)
+   
+    console.log('Productos obtenidos en repo:', productos.length);
+
+    return productos;
+  } catch (error) {
+    throw new Error(`Repository Error: ${error.message}`);
+  }
+};

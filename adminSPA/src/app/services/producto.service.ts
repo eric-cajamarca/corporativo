@@ -26,6 +26,15 @@ export class ProductoService {
     });
   }
 
+  //api.get('/productos/compras',auth.auth, productosController.obtener_productos_compras);
+  obtener_productos_compras():Observable<any>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'productos/compras',{
+      headers:headers,
+      withCredentials: true
+    });
+  }
+
   obtener_productos_id(id:any):Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'productos/'+id,{

@@ -25,8 +25,8 @@
                                 <button class="btn btn-primary" (click)="buscar()" style="margin-left: 10px;">
                                     Buscar
                                 </button>
-                                <button class="btn btn-primary" [routerLink]="['/proveedores/create']"
-                                    routerLinkActive="active" style="margin-left: 10px;">
+                                <button class="btn btn-primary" (click)="agregarNuevoProveedor()">
+                                      
                                     Nuevo
                                 </button>
 
@@ -193,7 +193,7 @@
                             <div class="modal fade" id="nuevoProductoModal" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog">
                                     <div class="modal-content" style="color: #858585;">
-                                        <div class="modal-header">
+                                        <div class="modal-header bg-success text-white">
                                             <h5 class="modal-title" id="nuevoProductoModalLabel">Nuevo Producto</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
                                                 aria-label="Close"></button>
@@ -419,21 +419,20 @@
                                 <tbody>
                                     <!-- Add table rows here -->
 
-                                    <tr *ngFor="let item of stockSucursales; let idx = index">
-                                        <th scope="row">{{item.producto.Codigo}}</th>
-                                        <td>{{item.categoria.nombre}} </td>
-                                        <td>{{item.producto.descripcion}} </td>
-                                        <td>{{item.marca.nombre}} </td>
-                                        <td style="width: 60px; text-align: center;">{{item.presentacion.Descripcion}}
+                                    <tr *ngFor="let item of productos; let idx = index">
+                                        <th scope="row">{{item.codigo}}</th>
+                                        <td>{{item.categoria}} </td>
+                                        <td>{{item.descripcion}} </td>
+                                        <td>{{item.marca}} </td>
+                                        <td style="width: 60px; text-align: center;">{{item.codigoPresentacion}}
                                         </td>
-                                        <td style="width: 60px; text-align: right;">{{item.cantidad}}</td>
-                                        <td style="width: 60px; text-align: right;">{{item.producto.cUnitario |
-                                            number:'1.2-2'}} </td>
-                                        <td style="width: 60px; text-align: center;">{{item.producto.fProduccion}} </td>
-                                        <td style="width: 60px; text-align: center;">{{item.producto.fVencimiento}}
+                                        <td style="width: 60px; text-align: right;">{{item.stock}}</td>
+                                        <td style="width: 60px; text-align: right;">{{item.cUnitario | number:'1.2-2'}} </td>
+                                        <td style="width: 60px; text-align: center;">{{item.fProduccion}} </td>
+                                        <td style="width: 60px; text-align: center;">{{item.fVencimiento}}
                                         </td>
 
-                                        <td style="width: 60px; text-align: center;">{{item.sucursal.nombre}} </td>
+                                        <td style="width: 60px; text-align: center;">{{item.sucursal}} </td>
                                         <td>
                                             <a style="cursor: pointer;" class="text-success" (click)="seleccionar(idx)"
                                                 data-bs-toggle="modal" data-bs-target="#addProducto">

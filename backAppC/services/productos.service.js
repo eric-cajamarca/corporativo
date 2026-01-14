@@ -13,3 +13,16 @@ exports.obtenerProductosTodosService = async (pool, user) => {
   const productos = await obtenerProductosTodosRepo(pool, user.empresa);
   return productos;
 };
+
+exports.obtenerProductosComprasService = async (pool, user) => {
+  if (!user) {
+    throw new Error("NO_ACCESS");
+  }
+
+  if (user.rol !== "Administrador") {
+    throw new Error("NO_PERMISSIONS");
+  }
+  
+  const productos = await obtenerProductosCompras(pool, user.empresa);
+  return productos;
+};

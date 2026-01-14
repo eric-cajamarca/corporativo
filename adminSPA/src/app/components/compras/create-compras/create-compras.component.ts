@@ -1347,6 +1347,11 @@ export class CreateComprasComponent {
     window.open('/marcas/create', '_blank');
   }
 
+  agregarNuevoProveedor() {
+    
+    window.open('/proveedores/create', '_blank');
+  }
+
   agregarNuevaSucursal() {
     console.log('agregarNuevaSucursal', this.sucursales);
     window.open('/sucursal/create', '_blank');

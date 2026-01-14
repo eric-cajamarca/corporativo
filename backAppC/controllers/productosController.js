@@ -63,6 +63,34 @@ const obtener_productos_todos = async (req, res) => {
   }
 };
 
+const obtener_productos_compras = async (req, res) => {
+  try {
+
+    const pool = await sql.connect(dbConfig);
+
+    const productos = await obtenerProductosComprasService(pool, req.user);
+
+    res.status(200).send({ data: productos });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(500).send({ message: "No Access", data: undefined });
+    }
+
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(200).send({
+        message: "No tiene permisos para realizar esta acción",
+        data: undefined,
+      });
+    }
+
+    console.log("Error obtener productos:", error);
+    res.status(500).send({
+      message: "Error al obtener los productos",
+      data: undefined,
+    });
+  }
+};
+
 
 const obtener_productos_id = async (req, res) => {
   const { idProducto } = req.params.id;
@@ -636,11 +664,34 @@ function formatearFecha(date) {
   return `${year}-${month}-${day}`;
 }
 
+
+// const obtener_Stock_id = async function (req, res){
+//   const { id } = req.params;
+//   let pool = await sql.connect(dbConfig);
+//   const stock = await obtenerProductosTodosService.getStock(id, pool);
+//   res.status(200).send({ data: stock });
+  
+// };
+
+// export const updateStock = async function (req, res){
+//   const { id } = req.params;
+//   const { quantity, reason } = req.body;
+
+//   let pool = await sql.connect(dbConfig);
+
+//   await obtenerProductosTodosService.updateStock(id, catidad, reason);
+//   res.sendStatus(204);
+// };
+
+
 module.exports = {
   obtener_productos_todos,
+  obtener_productos_compras,
   obtener_productos_id,
   crear_producto,
   gestionProductos_Compras,
   actualizar_producto,
   eliminar_producto,
+
+ 
 };
