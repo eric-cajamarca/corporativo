@@ -1,7 +1,7 @@
 const dbConfig = require('../dbconfig');
 const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
-const {obtenerProductosTodosService} = require('../services/productos.service');
+const ProductosServices = require('../services/productos.service');
 
 
 
@@ -40,7 +40,7 @@ const obtener_productos_todos = async (req, res) => {
 
     const pool = await sql.connect(dbConfig);
 
-    const productos = await obtenerProductosTodosService(pool, req.user);
+    const productos = await ProductosServices.obtenerProductosTodosService(pool, req.user);
 
     res.status(200).send({ data: productos });
   } catch (error) {
@@ -68,7 +68,7 @@ const obtener_productos_compras = async (req, res) => {
 
     const pool = await sql.connect(dbConfig);
 
-    const productos = await obtenerProductosComprasService(pool, req.user);
+    const productos = await ProductosServices.obtenerProductosComprasService(pool, req.user);
 
     res.status(200).send({ data: productos });
   } catch (error) {

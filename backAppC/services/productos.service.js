@@ -1,5 +1,5 @@
 // src/services/productos.service.js
-const {obtenerProductosTodosRepo} = require('../repositories/productos.repository');
+const ProductosRepository = require('../repositories/productos.repository');
 
 exports.obtenerProductosTodosService = async (pool, user) => {
   if (!user) {
@@ -10,7 +10,7 @@ exports.obtenerProductosTodosService = async (pool, user) => {
     throw new Error("NO_PERMISSIONS");
   }
   
-  const productos = await obtenerProductosTodosRepo(pool, user.empresa);
+  const productos = await ProductosRepository.obtenerProductosTodosRepo(pool, user.empresa);
   return productos;
 };
 
@@ -23,6 +23,6 @@ exports.obtenerProductosComprasService = async (pool, user) => {
     throw new Error("NO_PERMISSIONS");
   }
   
-  const productos = await obtenerProductosCompras(pool, user.empresa);
+  const productos = await ProductosRepository.obtenerProductosCompras(pool, user.empresa);
   return productos;
 };

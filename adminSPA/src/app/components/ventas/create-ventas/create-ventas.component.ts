@@ -153,48 +153,7 @@ export class CreateVentasComponent {
       }
     );
 
-    // this._marcaService.obtenerMarcas().subscribe(
-    //   (response) => {
-    //     this.marcas = response.data;
-    //     this.marcas.sort((a: { nombre: string }, b: { nombre: any }) =>
-    //       a.nombre.localeCompare(b.nombre)
-    //     );
-    //     console.log('this.marcas', this.marcas);
-    //   },
-    //   (error) => {
-    //     console.log(error);
-    //   }
-    // );
-
-    // this._categoriaService.obtener_categorias().subscribe(
-    //   (response) => {
-    //     this.categoria = response.data;
-    //     console.log('this.categoria', this.categoria);
-    //   },
-    //   (error) => {
-    //     console.log(error);
-    //   }
-    // );
-
-    // this._presentacionService.obtener_presentaciones().subscribe({
-    //   next: (response) => {
-    //     this.presentacion = response.data;
-    //     console.log('this.presentacion', this.presentacion);
-    //   },
-    //   error: (error) => console.log(error)
-      
-    // });
-
-    // this._sucursalService.obtener_sucursal_idempresa1().subscribe({
-    //   next: (response) => {
-    //     this.sucursales = response.data;
-    //     console.log('sucursales', this.sucursales);
-    //   },
-    //   error: (error)=> console.error(error),
-      
-    // });
-    
-
+   
   this._documentosService.getFormasPago().subscribe({
     next: (response) => {
       this.formasPago = response.data || [];
@@ -206,77 +165,7 @@ export class CreateVentasComponent {
     }
   });
 
-  // this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
-  //     (response) => {
-  //       this.stockSucursales = response.data;
-  //       if (response.data != undefined) {
-  //         if (
-  //           this.productos &&
-  //           this.sucursales &&
-  //           this.categoria &&
-  //           this.presentacion &&
-  //           this.stockSucursales
-  //         ) {
-  //           // Realizar operaciones con los arrays
-  //           console.log('this.productos', this.productos);
-  //           console.log('this.sucursales', this.sucursales);
-  //           console.log('this.categoria', this.categoria);
-  //           console.log('this.presentacion', this.presentacion);
-  //           console.log('this.stockSucursales', this.stockSucursales);
-
-  //           //quiero buscar en response.data el idProducto y traer todo el objeto del idProducto y agregarlo a this.stockSucursales
-
-  //           this.stockSucursales.forEach((element: any) => {
-  //             //buscar en this.productos el codigo y traer todo el objeto del codigo
-  //             const selectedObject = this.productos.find(
-  //               (item: any) => item.idProducto == element.idProducto
-  //             );
-  //             element.producto = selectedObject;
-  //             // Ahora, selectedObject contiene toda la información del elemento seleccionado
-  //             //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
-  //             const selectedObjectSucursal = this.sucursales.find(
-  //               (item: any) => item.idSucursal == element.idSucursal
-  //             );
-  //             element.sucursal = selectedObjectSucursal;
-
-  //             //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
-  //             const selectedObjectCategoria = this.categoria.find(
-  //               (item: any) => item.idCategoria == element.producto.idCategoria
-  //             );
-  //             element.categoria = selectedObjectCategoria;
-
-  //             //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
-  //             const selectedObjectPresentacion = this.presentacion.find(
-  //               (item: any) =>
-  //                 item.idPresentacion == element.producto.idPresentacion
-  //             );
-  //             element.presentacion = selectedObjectPresentacion;
-
-  //             //buscar en this.marcas el idMarca y traer todo el objeto del idMarca
-  //             const selectedObjectMarca = this.marcas.find(
-  //               (item: any) => item.idMarca == element.producto.idMarca
-  //             );
-  //             element.marca = selectedObjectMarca;
-
-  //             // console.log('selectedObjectMarca', selectedObjectMarca);
-  //           });
-
-  //           console.log('this.stockSucursales', this.stockSucursales);
-  //         } else {
-  //           console.error('Uno de los arrays es undefined o está vacío.');
-  //         }
-
-  //         this.stockSucursales_const = this.stockSucursales;
-  //         console.log('this.stockSucursales', this.stockSucursales);
-  //       } else {
-  //         this.stockSucursales = [];
-  //       }
-  //     },
-  //     (error) => {
-  //       console.log(error);
-  //     }
-  //   );
-
+  
     this._comprobanteService.obtener_comprobantes().subscribe(
       (response) => {
         this.comprobantes = response.data;
@@ -619,9 +508,6 @@ abrirModalPrecios(item: any) {
     });
 
   }
-
-
-
 
   actualizaCantidad(item: any, el: any) {
     const nuevo = parseInt(el.target.innerText.trim(), 10);

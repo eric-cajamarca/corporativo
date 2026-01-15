@@ -25,7 +25,7 @@ import { catchError, finalize, mergeMap, tap } from 'rxjs/operators';
 import { ProveedoresService } from '../../../services/proveedores.service';
 
 declare var iziToast: any;
-declare var boostrap: any;
+declare var bootstrap: any;
 const FORMATO_FECHA = 'dd/MM/yyyy';
 
 @Component({
@@ -74,6 +74,10 @@ export class CreateComprasComponent {
   public productos: any = {};
   public prodSelecionado: any = {};
   public productos_const: any = {};
+  public productos_filtrados: any[] = [];
+  public productoEncontrado: any = null;
+  public searchTerm: string = '';
+  public buscadorModal: any;
   public sucursales: any = [];
   public stockSucursales: any = [];
   public stockSucursales_const: any = [];
@@ -504,7 +508,7 @@ export class CreateComprasComponent {
       }
     );
 
-    this._productoService.obtener_productos_todos().subscribe(
+    this._productoService.obtener_productos_compras().subscribe(
       (response) => {
         console.log('response productos', response.data);
         if (response.data != undefined) {
@@ -532,76 +536,76 @@ export class CreateComprasComponent {
       }
     );
 
-    this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
-      (response) => {
-        this.stockSucursales = response.data;
-        if (response.data != undefined) {
-          if (
-            this.productos &&
-            this.sucursales &&
-            this.categoria &&
-            this.presentacion &&
-            this.stockSucursales
-          ) {
-            // Realizar operaciones con los arrays
-            console.log('this.productos', this.productos);
-            console.log('this.sucursales', this.sucursales);
-            console.log('this.categoria', this.categoria);
-            console.log('this.presentacion', this.presentacion);
-            console.log('this.stockSucursales', this.stockSucursales);
+    // this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
+    //   (response) => {
+    //     this.stockSucursales = response.data;
+    //     if (response.data != undefined) {
+    //       if (
+    //         this.productos &&
+    //         this.sucursales &&
+    //         this.categoria &&
+    //         this.presentacion &&
+    //         this.stockSucursales
+    //       ) {
+    //         // Realizar operaciones con los arrays
+    //         console.log('this.productos', this.productos);
+    //         console.log('this.sucursales', this.sucursales);
+    //         console.log('this.categoria', this.categoria);
+    //         console.log('this.presentacion', this.presentacion);
+    //         console.log('this.stockSucursales', this.stockSucursales);
 
-            //quiero buscar en response.data el idProducto y traer todo el objeto del idProducto y agregarlo a this.stockSucursales
+    //         //quiero buscar en response.data el idProducto y traer todo el objeto del idProducto y agregarlo a this.stockSucursales
 
-            this.stockSucursales.forEach((element: any) => {
-              //buscar en this.productos el codigo y traer todo el objeto del codigo
-              const selectedObject = this.productos.find(
-                (item: any) => item.idProducto == element.idProducto
-              );
-              element.producto = selectedObject;
-              // Ahora, selectedObject contiene toda la información del elemento seleccionado
-              //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
-              const selectedObjectSucursal = this.sucursales.find(
-                (item: any) => item.idSucursal == element.idSucursal
-              );
-              element.sucursal = selectedObjectSucursal;
+    //         this.stockSucursales.forEach((element: any) => {
+    //           //buscar en this.productos el codigo y traer todo el objeto del codigo
+    //           const selectedObject = this.productos.find(
+    //             (item: any) => item.idProducto == element.idProducto
+    //           );
+    //           element.producto = selectedObject;
+    //           // Ahora, selectedObject contiene toda la información del elemento seleccionado
+    //           //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
+    //           const selectedObjectSucursal = this.sucursales.find(
+    //             (item: any) => item.idSucursal == element.idSucursal
+    //           );
+    //           element.sucursal = selectedObjectSucursal;
 
-              //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
-              const selectedObjectCategoria = this.categoria.find(
-                (item: any) => item.idCategoria == element.producto.idCategoria
-              );
-              element.categoria = selectedObjectCategoria;
+    //           //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
+    //           const selectedObjectCategoria = this.categoria.find(
+    //             (item: any) => item.idCategoria == element.producto.idCategoria
+    //           );
+    //           element.categoria = selectedObjectCategoria;
 
-              //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
-              const selectedObjectPresentacion = this.presentacion.find(
-                (item: any) =>
-                  item.idPresentacion == element.producto.idPresentacion
-              );
-              element.presentacion = selectedObjectPresentacion;
+    //           //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
+    //           const selectedObjectPresentacion = this.presentacion.find(
+    //             (item: any) =>
+    //               item.idPresentacion == element.producto.idPresentacion
+    //           );
+    //           element.presentacion = selectedObjectPresentacion;
 
-              //buscar en this.marcas el idMarca y traer todo el objeto del idMarca
-              const selectedObjectMarca = this.marcas.find(
-                (item: any) => item.idMarca == element.producto.idMarca
-              );
-              element.marca = selectedObjectMarca;
+    //           //buscar en this.marcas el idMarca y traer todo el objeto del idMarca
+    //           const selectedObjectMarca = this.marcas.find(
+    //             (item: any) => item.idMarca == element.producto.idMarca
+    //           );
+    //           element.marca = selectedObjectMarca;
 
-              console.log('selectedObjectMarca', selectedObjectMarca);
-            });
+    //           console.log('selectedObjectMarca', selectedObjectMarca);
+    //         });
 
-            console.log('this.stockSucursales', this.stockSucursales);
-          } else {
-            console.error('Uno de los arrays es undefined o está vacío.');
-          }
+    //         console.log('this.stockSucursales', this.stockSucursales);
+    //       } else {
+    //         console.error('Uno de los arrays es undefined o está vacío.');
+    //       }
 
-          this.stockSucursales_const = this.stockSucursales;
-          console.log('this.stockSucursales', this.stockSucursales);
-        } else {
-          this.stockSucursales = [];
-        }
-      },
-      (error) => {
-        console.log(error);
-      }
-    );
+    //       this.stockSucursales_const = this.stockSucursales;
+    //       console.log('this.stockSucursales', this.stockSucursales);
+    //     } else {
+    //       this.stockSucursales = [];
+    //     }
+    //   },
+    //   (error) => {
+    //     console.log(error);
+    //   }
+    // );
   }
 
   cargarSucursales() {
@@ -1407,243 +1411,68 @@ export class CreateComprasComponent {
     );
   }
 
-  //desde aqui registro las compras de manera optimizada
-  //   registrarCompras(): void{
-  //     // 1. Validación mejorada
-  //     if (!this.validarCamposObligatorios()) {
-  //         return;
-  //     }
+  buscarProductos(): void {
+    const term = this.searchTerm.toLowerCase().trim();
+    console.log('Término de búsqueda:', term);
+    
+    if (term === '') {
+      // Si no hay término de búsqueda, mostrar todos los productos
+      this.productos_filtrados = this.productos_const;
+      console.log('No se ingresó término de búsqueda. Mostrando todos los productos.');
+    } else {
+      // Filtrar por código o descripción (uso includes en lugar de test)
+      this.productos_filtrados = this.productos_const.filter(
+        (item: any) => {
+          const descripcion = (item.descripcion ?? '').toString().toLowerCase();
+          const codigo = (item.codigo ?? '').toString().toLowerCase();
+          const marca = (item.nombre ?? '').toString().toLowerCase();
+          return (
+            descripcion.includes(term) ||
+            codigo.includes(term) ||
+            marca.includes(term)
+          );
+        }
+      );
+    }
+    
+    console.log('Productos filtrados:', this.productos_filtrados);
+  }
 
-  //     this.compras.compCompra = `${this.compras.serie}-${this.compras.numero}`;
-  //     this.loadButton = true;
+   agregarDetallesCompra(producto: any): void {
+    console.log('Agregando al carrito:', producto);
+    const existe = this.detalleCompras.find((p: { idProducto: any; }) => p.idProducto === producto.idProducto);
+    if (existe) {
+      existe.cantidad += 1;
+    } else {
+      this.detalleCompras.push({
+        ...producto,
+        cantidad: 1
+      });
+      
+      console.log('Producto agregado al carrito:', this.detalleCompras);
+      
+    }
+    this.actualizarSubtotalNuevoProducto
+  }
 
-  //     // 2. Estructura plana con forkJoin para operaciones paralelas
-  //     this.subscriptions.add(
-  //         this._comprasService.crear_compra(this.compras).pipe(
-  //             finalize(() => this.loadButton = false)
-  //         ).subscribe({
-  //             next: (response) => this.procesarRespuestaCompra(response),
-  //             error: (error) => this.mostrarError('Error al registrar compra', error)
-  //         })
-  //     );
-  // }
+  seleccionaProducto(prod: any): void {
+    console.log('Producto seleccionado:', prod);
+    // 1.  Agrega al carrito
+    this.agregarDetallesCompra(prod);
 
-  // private validarCamposObligatorios(): boolean {
-  //     const camposRequeridos = [
-  //         this.compras.fEmision,
-  //         this.compras.idMoneda,
-  //         this.compras.idEstadoPago,
-  //         this.compras.idMediosPago,
-  //         this.compras.total,
-  //         this.detalleCompras.length > 0,
-  //     ];
 
-  //     if (camposRequeridos.some(campo => !campo)) {
-  //         this.mostrarErrorValidacion();
-  //         return false;
-  //     }
-  //     return true;
-  // }
+    // 2.  Cierra el modal (por JS)
+    const buscador = bootstrap.Modal.getInstance(
+      document.getElementById('buscadorModal')!
+    );
+    buscador?.hide();
+  }
 
-  // private mostrarErrorValidacion(): void {
-  //     iziToast.show({
-  //         title: 'ERROR',
-  //         titleColor: '#FF0000',
-  //         color: '#FFF',
-  //         class: 'text-danger',
-  //         position: 'topRight',
-  //         message: 'Debe llenar todos los campos obligatorios (*).'
-  //     });
-  // }
-
-  // private procesarRespuestaCompra(response: any): void {
-  //     if (!response?.data) {
-  //         this.mostrarError('No se recibió ID de compra');
-  //         return;
-  //     }
-
-  //     this.idCompra = response.data;
-  //     this.procesarDetallesCompra();
-  //     this.actualizarCorrelativo();
-  // }
-
-  // private procesarDetallesCompra(): void {
-  //     const operaciones = this.detalleCompras.map((element: any) => {
-  //         const { nuevoProducto, nuevoDetalleCompra } = this.prepararDatosProducto(element);
-
-  //         if (element.idProducto == undefined) {
-  //             console.log('El producto es nuevo', nuevoProducto);
-  //             return this.crearNuevoProducto(nuevoProducto, nuevoDetalleCompra);
-  //         } else {
-  //             console.log('El producto ya existe, actualizando', element.idProducto);
-  //             return this.actualizarProductoExistente(element.idProducto, nuevoProducto);
-  //         }
-  //     });
-
-  //     // Ejecutar todas las operaciones en paralelo
-  //     this.subscriptions.add(
-  //         forkJoin(operaciones).subscribe({
-  //             next: () => this._router.navigate(['/compras']),
-  //             error: (error) => this.mostrarError('Error al procesar detalles', error)
-  //         })
-  //     );
-  // }
-
-  // private prepararDatosProducto(element: any): { nuevoProducto: any, nuevoDetalleCompra: any } {
-  //     const nuevoProducto = {
-  //         idProducto: element.idProducto,
-  //         Codigo: element.codigo,
-  //         idCategoria: element.idCategoria,
-  //         descripcion: element.descripcion,
-  //         idPresentacion: element.idPresentacion,
-  //         cUnitario: element.cUnitario,
-  //         fProduccion: element.fProduccion,
-  //         fVencimiento: element.fVencimiento,
-  //         cantidad: element.cantidad,
-  //         cantidadAnterior: element.cantidadAnterior,
-  //         facturar: 'SI',
-  //         idStockSucursal: element.idStockSucursal,
-  //         idEmpresa: element.idEmpresa,
-  //         idMarca: element.idMarca,
-  //         idSucursal: element.idSucursal,
-  //         ubicacion: element.ubicacion,
-  //     };
-
-  //     const nuevoDetalleCompra = {
-  //         idEmpresa: element.idEmpresa,
-  //         idSucursal: element.idSucursal,
-  //         idCompra: this.idCompra,
-  //         cantidad: element.cantidad,
-  //         idPresentacion: element.idPresentacion,
-  //         pUnitario: parseFloat(element.cUnitario),
-  //         total: element.subtotal,
-  //         idProducto: null,
-  //     };
-
-  //     return { nuevoProducto, nuevoDetalleCompra };
-  // }
-
-  // // private crearNuevoProducto(nuevoProducto: any, nuevoDetalleCompra: any): Observable<any> {
-  // //     return this._productoService.crear_producto(nuevoProducto).pipe(
-  // //         mergeMap(productoResponse => {
-  // //             if (!productoResponse?.data) {
-  // //                 throw new Error('No se recibió ID de producto');
-  // //             }
-
-  // //             console.log('Producto creado:', productoResponse.data);
-
-  // //             nuevoDetalleCompra.idProducto = productoResponse.data;
-  // //             nuevoProducto.idProducto = productoResponse.data;
-
-  // //             return forkJoin([
-  // //                 console.log('Registrando stock para el nuevo producto:', nuevoProducto),
-  // //                 console.log('Registrando detalle de compra:', nuevoDetalleCompra),
-  // //                 this._sucursalService.crear_stock_sucursal_idEmpresa(nuevoProducto),
-  // //                 this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra)
-  // //             ]);
-  // //         }),
-  // //         tap(() => {
-  // //             this.mostrarExito('Producto, stock y detalle registrados correctamente');
-  // //         }),
-  // //         catchError(error => {
-  // //             this.mostrarError('Error al crear producto', error);
-  // //             return throwError(error);
-  // //         })
-  // //     );
-  // // }
-
-  // private crearNuevoProducto(nuevoProducto: any, nuevoDetalleCompra: any): Observable<any> {
-  //     return this._productoService.crear_producto(nuevoProducto).pipe(
-  //         mergeMap(productoResponse => {
-  //             if (!productoResponse?.data) {
-  //                 throw new Error('No se recibió ID de producto');
-  //             }
-
-  //             console.log('Producto creado:', productoResponse.data);
-
-  //             // Asignar IDs
-  //             nuevoDetalleCompra.idProducto = productoResponse.data;
-  //             nuevoProducto.idProducto = productoResponse.data;
-
-  //             // Mover los console.log fuera del forkJoin
-  //             console.log('Registrando stock para el nuevo producto:', nuevoProducto);
-  //             console.log('Registrando detalle de compra:', nuevoDetalleCompra);
-
-  //             // Retornar forkJoin con observables válidos
-  //             return forkJoin([
-  //                 this._sucursalService.crear_stock_sucursal_idEmpresa(nuevoProducto),
-  //                 this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra)
-  //             ]);
-  //         }),
-  //         tap(([stockResult, detalleResult]) => {
-  //             // Aquí tienes ambos resultados
-  //             console.log('Stock creado:', stockResult);
-  //             console.log('Detalle de compra creado:', detalleResult);
-  //             this.mostrarExito('Producto, stock y detalle registrados correctamente');
-  //         }),
-  //         catchError(error => {
-  //             this.mostrarError('Error al crear producto', error);
-  //             return throwError(error);
-  //         })
-  //     );
-  // }
-
-  // private actualizarProductoExistente(idProducto: number, nuevoProducto: any): Observable<any> {
-  //   console.log('Actualizando producto existente:', idProducto, nuevoProducto);
-  //   return forkJoin([
-  //         this._productoService.actualizar_producto(idProducto, nuevoProducto),
-  //         this._sucursalService.editar_stock_sucursal(idProducto, nuevoProducto),
-  //         this._comprasService.crear_detalle_compras_idcompra(detalleCompra),
-  //     ]).pipe(
-  //         tap(([productResult, stockResult]) => {
-  //             console.log('Producto actualizado:', productResult);
-  //             console.log('Stock actualizado:', stockResult);
-  //             this.mostrarExito('Producto y stock actualizados correctamente');
-  //         }),
-  //         catchError(error => {
-  //             this.mostrarError('Error al actualizar producto', error);
-  //             return throwError(error);
-  //         })
-  //     );
-  // }
-
-  // private actualizarCorrelativo(): void {
-  //     this.subscriptions.add(
-  //         this._comprasService.editar_correlativos_empresa(
-  //             this.correlativo.idCorrelativo,
-  //             this.correlativo
-  //         ).subscribe({
-  //             next: () => this.mostrarExito('Correlativo actualizado correctamente'),
-  //             error: (error) => this.mostrarError('Error al actualizar correlativo', error)
-  //         })
-  //     );
-  // }
-
-  // private mostrarExito(mensaje: string): void {
-  //     iziToast.show({
-  //         title: 'SUCCESS',
-  //         titleColor: '#1DC74C',
-  //         color: '#FFF',
-  //         class: 'text-success',
-  //         position: 'topRight',
-  //         message: mensaje,
-  //     });
-  // }
-
-  // private mostrarError(titulo: string, error?: any): void {
-  //     console.error(titulo, error);
-  //     iziToast.show({
-  //         title: 'ERROR',
-  //         titleColor: '#FF0000',
-  //         color: '#FFF',
-  //         class: 'text-danger',
-  //         position: 'topRight',
-  //         message: titulo,
-  //     });
-  // }
-
-  // // En ngOnDestroy():
-  // ngOnDestroy() {
-  //     this.subscriptions.unsubscribe();
-  // }
+  abrirBuscadorModal(): void {
+    
+    this.searchTerm = '';
+    this.productos_filtrados = [];          // o cárgalos todos
+    const modal = new bootstrap.Modal(this.buscadorModal.nativeElement);
+    modal.show();
+  }
 }

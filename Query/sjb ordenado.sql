@@ -886,7 +886,7 @@ CREATE TABLE [dbo].[MovimientosInventario](
     [idMovimiento] [int] IDENTITY(1,1) NOT NULL,
     [idEmpresa] [UNIQUEIDENTIFIER] NOT NULL,
     [idSucursal] [UNIQUEIDENTIFIER] NOT NULL,
-    [idProducto] [int] NOT NULL,
+    [idProducto] [UNIQUEIDENTIFIER] NOT NULL,
     [tipoMovimiento] [varchar](2) NOT NULL, -- 'EN':Entrada, 'SA':Salida, 'TR':Transferencia
     [cantidad] [decimal](18,3) NOT NULL,
     [fMovimiento] [datetime] NOT NULL DEFAULT GETDATE(),
