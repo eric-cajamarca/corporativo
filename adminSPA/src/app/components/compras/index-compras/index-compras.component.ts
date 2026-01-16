@@ -99,6 +99,7 @@ export class IndexComprasComponent {
   public filtro = '';
   public compras: Array<any> = [];
   public compras_const: Array<any> = [];
+  public load_compras = true;
   public detCompras: Array<any> = [];
   public marcas: any = [];
 
@@ -222,13 +223,16 @@ export class IndexComprasComponent {
   }
 
   filtrar() {
+    
     if (this.filtro) {
-      //
+      // this.load_compras = false;
       var term = new RegExp(this.filtro, 'i');
       this.compras = this.compras_const.filter(item => term.test(item.compCompra) || term.test(item.rSocial) || term.test(item.total) || term.test(item.fEmision) || term.test(item.descripcion));
       console.log('this.compras', this.compras);
+      // this.load_compras = true;
     } else {
       this.compras = this.compras_const;
+      // this.load_compras = true;
     }
   }
 
