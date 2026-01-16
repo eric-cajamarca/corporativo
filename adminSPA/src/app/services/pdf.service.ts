@@ -54,7 +54,7 @@ export interface DatosPdf {
   providedIn: 'root'
 })
 export class PdfService {
-  private readonly baseUrl = 'http://localhost:3002'; // backend Puppeteer
+  private readonly baseUrl = 'http://localhost:3002/api/reports'; // backend Puppeteer
 
   constructor(private http: HttpClient) {}
 

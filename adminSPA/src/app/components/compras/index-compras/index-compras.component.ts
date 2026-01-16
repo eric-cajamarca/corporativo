@@ -505,16 +505,7 @@ export class IndexComprasComponent {
       logo: 'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png'
     };
 
-    //  const header: HeaderPdf = {
-    //   logo: '',
-    //   titulo: 'Reporte de Compras',
-    //   colIzq: ``,
-    //   colDer: ``
-    // };
-    // logo: 'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png',
-    //   titulo: 'Reporte de Compras',
-    //   colIzq: `<div><strong>${empresa.nombre}</strong><br>RUC: ${empresa.ruc}</div>`,
-    //   colDer: `<div>Fecha: ${new Date().toLocaleDateString('es-PE')}<br>Página: </div>`
+    
 
     // 1. Construir filas de la tabla (solo datos visibles)
     const filas = this.compras.map((c, index) => `
