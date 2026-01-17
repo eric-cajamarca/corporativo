@@ -1,21 +1,67 @@
 import { Injectable } from '@angular/core';
 import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Empresa } from '../models/empresa.model.js';
 
 @Injectable({
   providedIn: 'root'
 })
 export class EmpresaService {
+
+  private empresaSubject = new BehaviorSubject<Empresa>(new Empresa());
+
   public url: any;
   private _router: any;
   public idUser:any;
+  private empresa = new Empresa(
+    'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png',
+    'Mi Empresa S.A.C.',
+    '00000000000',
+    'Av. Principal 123, Lima',
+    '(01) 456-7890'
+  );
 
-  constructor(
+    constructor(
     private _http: HttpClient,
+    
   ) {
     this.url = global.url;
+    this.cargarEmpresa();
   }
+  // Obtén la instancia (referencia compartida)
+//  private cargarEmpresa(): void {
+//     this.getEmpresas_id().subscribe(response => {
+//       if (response.data?.[0]) {
+//         this.empresaSubject.next(response.data[0]);
+//         console.log('Empresa cargada en el servicio:', response.data[0]);
+//       }
+//     });
+//   }
+  private cargarEmpresa(): void {
+  this.getEmpresas_id().subscribe(response => {
+    if (response.data?.[0]) {
+      const empresaData = response.data[0];
+      console.log('Datos de la empresa obtenidos en servicio:', empresaData);
+      // Construye URL completa del logo usando el nombre del archivo
+      empresaData.logo = `http://localhost:3000/api/obtener_logo/${empresaData.logo}`;
+      this.empresaSubject.next(empresaData);
+      console.log('Empresa cargada en el servicio:', empresaData);
+    }
+  });
+}
+
+  // El componente se suscribe
+  getEmpresa$(): Observable<Empresa> {
+    return this.empresaSubject.asObservable();
+  }
+
+  // Para obtener valor actual síncrono
+  getEmpresaActual(): Empresa {
+    return this.empresaSubject.value;
+  }
+
+ 
 
   getEmpresas():Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -31,7 +77,7 @@ export class EmpresaService {
   getEmpresas_id():Observable<any>{
     
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'empresaid',{
+    return this._http.get(this.url+'empresas_id',{
       headers: headers,
       withCredentials: true
     });

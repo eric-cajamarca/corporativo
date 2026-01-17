@@ -13,6 +13,10 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { PdfService } from '../../../services/pdf.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
+import { ExcelService } from '../../../services/excel.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { Empresa } from '../../../models/empresa.model';
+
 
 
 
@@ -22,13 +26,13 @@ import { numeroALetras } from '../../../utils/numeroALetras';
 declare var iziToast: any;
 declare var bootstrap: any;
 
-export interface Empresa {
-  logo: string;
-  nombre: string;
-  ruc: string;
-  direccion: string;
-  telefono: string;
-}
+// export interface Empresa {
+//   logo: string;
+//   nombre: string;
+//   ruc: string;
+//   direccion: string;
+//   telefono: string;
+// }
 
 export interface Cliente {
   razonSocial: string;
@@ -84,6 +88,9 @@ export interface DatosPdf {
   styleUrl: './index-compras.component.css'
 })
 export class IndexComprasComponent {
+  
+  empresa!: Empresa;
+
   public clientes: Array<any> = [];
   public clientes_const: Array<any> = [];
   public token: any = "";
@@ -125,11 +132,18 @@ export class IndexComprasComponent {
     private _presentacionService: PresentacionService,
     private _marcaService: variosService,
     private pdfService: PdfService,
-  ) {
-    //this.token = this._cookieService.get('token');
-  }
+    private excelService: ExcelService,
+    private empresaService: EmpresaService
+  ) { }
 
   ngOnInit(): void {
+
+    this.empresaService.getEmpresa$().subscribe(emp => {
+      this.empresa = emp;
+      
+      console.log('Empresa en IndexComprasComponent:', this.empresa);
+    });
+        
 
     this._categoriaService.obtener_categorias().subscribe(
       response => {
@@ -309,66 +323,7 @@ export class IndexComprasComponent {
 
   }
 
-  //aqui obtengo el detalle de compra por idCompra
-  // this._comprasService.obtener_detalle_compras_idcompra(this.idCompra, this.token).subscribe(
-  //   response => {
-  //     console.log('response detalle compras', response);
-  //     if (response.data != undefined) {
-
-  //       response.data.forEach((element: any) => {
-  //         //buscar en this.productos el codigo y traer todo el objeto del codigo
-  //         const selectedObject = this.productos.find((item: any) => item.idProducto == element.idProducto);
-  //         element.producto = selectedObject;
-
-  //         //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
-  //         const selectedObjectSucursal = this.sucursales.find((item: any) => item.idSucursal == element.idSucursal);
-  //         element.sucursal = selectedObjectSucursal;
-
-  //         //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
-  //         const selectedObjectCategoria = this.categoria.find((item: any) => item.idCategoria == element.producto.idCategoria);
-  //         element.categoria = selectedObjectCategoria;
-
-  //         //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
-
-  //         const selectedObjectPresentacion = this.presentacion.find((item: any) => item.idPresentacion == element.producto.idPresentacion);
-  //         element.presentacion = selectedObjectPresentacion;
-
-
-
-  //       }
-  //       );
-  //       this.detalleCompras = response.data;
-  //       this.detalleCompras_const = this.detalleCompras;
-
-
-  //       //quiero recorrer detallecompras y modificar algunos campos
-  //       this.detalleCompras.forEach((element: any) => {
-  //         element.idPresentacion = element.producto.idPresentacion;
-  //         element.idCategoria = element.producto.idCategoria;
-  //         element.idSucursal = element.sucursal.idSucursal;
-  //         element.cUnitario = element.pUnitario;
-  //         element.subtotal = element.total;
-  //         element.descripcion = element.producto.descripcion;
-  //         element.codigo = element.producto.Codigo;
-  //         element.fProduccion = element.producto.fProduccion;
-  //         element.fVencimiento = element.producto.fVencimiento;
-  //       });
-
-
-
-
-  //       this.loadDetalleCompras = false;
-  //       console.log('this.detalleCompras', this.detalleCompras);
-  //     }
-  //   },
-  //   error => {
-  //     console.log(error);
-  //   }
-  // );
-  // });
-
-
-
+  
   set_eliminar(id: any) {
     console.log('aqui set_eliminar', id);
     this._comprasService.eliminar_idcompra_empresa(id).subscribe(
@@ -423,20 +378,20 @@ export class IndexComprasComponent {
     // cargar más datos cuando cambia la página
   }
 
-
+  //detalle compras
   descargarPDF(item: any, detalleCompras: any[]): void {
     const cantidadALetras = numeroALetras(item.total);
     console.log('Cantidad en letras:', cantidadALetras);
-    const empresa: Empresa = {
-      nombre: 'Mi Empresa S.A.C.',
-      ruc: '20123456789',
-      direccion: 'Av. Principal 123, Lima',
-      telefono: '(01) 456-7890',
-      logo: 'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png'
-    };
-
+    // const empresa: Empresa = {
+    //   nombre: 'Mi Empresa S.A.C.',
+    //   ruc: '20123456789',
+    //   direccion: 'Av. Principal 123, Lima',
+    //   telefono: '(01) 456-7890',
+    //   logo: 'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png'
+    // };
+    //this.empresa.logo = 'http://localhost:3000/api/obtener_logo/' + this.empresa.logo
    
-
+    console.log('Empresa para PDF:', this.empresa);
     
 
     const cliente: Cliente = {
@@ -449,7 +404,7 @@ export class IndexComprasComponent {
 
     const datos: DatosPdf = {
       comprobante: item.compCompra,
-      emp: empresa,
+      emp: this.empresa,
       cli: cliente,
       items: detalleCompras.map(d => ({
         cant: d.cantidad,
@@ -480,110 +435,83 @@ export class IndexComprasComponent {
 
 
     
-    // this.pdfService.generarFactura(datos, 9).subscribe({
-    //   next: blob =>
-    //     this.pdfService.descargar(blob, `factura-${item.compCompra}.pdf`),
-    //   error: err => console.error('Error al generar PDF', err)
-    // });
-
-    this.pdfService.generarFactura(datos, 9).subscribe({
-      next: blob => {
-        // En lugar de descargar, abre vista previa
-        this.pdfService.previsualizar(blob);
-      },
-      error: err => console.error('Error al generar PDF', err)
+    this.pdfService.generarPdfDinamico(datos, 'factura', 9).subscribe({
+      next: blob => this.pdfService.previsualizar(blob),
+      error: err => console.error('Error PDF', err)
     });
+
   }
 
 
-  generarListaCompras(): void {
-    const empresa: Empresa = {
-      nombre: 'Mi Empresa S.A.C.',
-      ruc: '20123456789',
-      direccion: 'Av. Principal 123, Lima http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png',
-      telefono: '(01) 456-7890',
-      logo: 'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png'
+
+
+
+
+  // ===== EXPORTAR PDF DINÁMICO =====
+  exportarPDF(): void {
+    const datos = {
+      empresa: this.empresa,
+      titulo: 'Lista de Compras',
+      columnas: ['#', 'N° Factura', 'Proveedor', 'F. Emisión', 'Total', 'Estado'],
+      filas: this.compras.map((c, i) => [
+        i + 1,
+        c.compCompra,
+        c.rSocial,
+        c.fEmision,
+        `S/ ${Number(c.total).toFixed(2)}`,
+        c.descripcion
+      ])
     };
 
-    
-
-    // 1. Construir filas de la tabla (solo datos visibles)
-    const filas = this.compras.map((c, index) => `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${c.compCompra}</td>
-        <td>${c.rSocial}</td>
-        <td>${c.fEmision}</td>
-        <td style="text-align:right">S/ ${Number(c.total).toFixed(2)}</td>
-        <td>${c.descripcion}</td>
-      </tr>
-    `).join('');
-
-    // 2. HTML completo
-    const html = `
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Lista de Compras</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; }
-        .header { border-bottom: 5px solid #0056b3; padding-bottom: 5px; margin-bottom: 5px; }
-        .logo { max-width: 100px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 6px; }
-        th { background-color: #f2f2f2; text-align: center; }
-        .text-end { text-align: right; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <table style="width: 100%; border: none;">
-          <tr>
-            <td style="border: none; width: 30%;"><img src="${empresa.logo}" alt="Logo" class="logo"></td>
-            <td style="border: none; width: 70%; color:black; padding-left: 10px;">
-              <h3>${empresa.nombre}</h3>
-              <p>RUC: ${empresa.ruc}<br>${empresa.direccion}<br>Tel: ${empresa.telefono}</p>
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <h2>Lista de Compras</h2>
-      <p>Fecha de reporte: ${new Date().toLocaleDateString('es-PE')}</p>
-
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>N° Factura</th>
-            <th>Proveedor</th>
-            <th>F. Emisión</th>
-            <th>Total</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filas}
-        </tbody>
-      </table>
-    </body>
-    </html>`;
-
-
-    // const html = this.armarHtmlListaCompras(...); // tu HTML de tabla
-
-    // this.pdfService.generarPdfConHeader(html, 9, header).subscribe({
-    //   next: blob => this.pdfService.previsualizar(blob),
-    //   error: err => console.error(err)
-    // });
-
-    // 3. Generar y previsualizar
-    this.pdfService.generarPdf(html, 9).subscribe({
+    this.pdfService.generarPdfDinamico(datos, 'lista-compras', 9).subscribe({
       next: blob => this.pdfService.previsualizar(blob),
-      error: err => console.error('Error al generar reporte', err)
+      error: err => console.error('Error PDF', err)
     });
   }
 
+  // ===== EXPORTAR EXCEL DINÁMICO =====
+  exportarExcel(): void {
+    const datosExcel = {
+      title: 'Lista de Compras',
+      filename: `compras_${new Date().getTime()}`,
+      worksheetName: 'Compras',
+      columns: ['#', 'N° Factura', 'Proveedor', 'F. Emisión', 'Total', 'Estado'],
+      rows: this.compras.map((c, i) => [
+        i + 1,
+        c.compCompra,
+        c.rSocial,
+        c.fEmision,
+        Number(c.total), // Número para formato correcto en Excel
+        c.descripcion
+      ])
+    };
+
+    this.excelService.generarExcel(datosExcel).subscribe({
+      next: blob => this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`),
+      error: err => console.error('Error Excel', err)
+    });
+  }
+
+  // ===== MÉTODO GENÉRICO PARA CUALQUIER TABLA =====
+  exportarDataExcel(
+    titulo: string,
+    columnas: string[],
+    data: any[],
+    mapper: (item: any, index: number) => any[]
+  ): void {
+    const datosExcel = {
+      title: titulo,
+      filename: `${titulo.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`,
+      worksheetName: titulo,
+      columns: columnas,
+      rows: data.map(mapper)
+    };
+
+    this.excelService.generarExcel(datosExcel).subscribe({
+      next: blob => this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`),
+      error: err => console.error('Error Excel', err)
+    });
+  }
 
 }
 
