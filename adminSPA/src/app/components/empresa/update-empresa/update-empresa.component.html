@@ -14,13 +14,12 @@
                     </div>
                     <div>
                         @if (!imgSelect) {
-                        <label for="logoPreview" class="form-label">Vista previa del logo actual</label>
+                        <!-- <label for="logoPreview" class="form-label">Vista previa del logo actual</label> -->
                         <hr>
-                        <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 100%"
-                            onerror="this.src='assets/01.jpg'">
+                        <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 100%" class="img-fluid">
                         }
                         @if (imgSelect) {
-                        <label for="newLogoPreview" class="form-label">Vista previa del nuevo logo</label>
+                        <!-- <label for="newLogoPreview" class="form-label">Vista previa del nuevo logo</label> -->
                         <hr>
                         <img [src]="imgSelect" class="img-fluid" style="width: 100%;">
                         }

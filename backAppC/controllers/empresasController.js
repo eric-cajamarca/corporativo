@@ -104,7 +104,13 @@ const getEmpresa_id = async function (req, res) {
                 let result = await pool
                     .request()
                     .input('idEmpresa', sql.UniqueIdentifier, id)
-                    .query('SELECT logo, razon_Social as nombre, ruc,rubro,correo,celular as telefono FROM Empresas WHERE idEmpresa = @idEmpresa');
+                    .query(
+                        'SELECT e.logo, e.razon_Social AS nombre, e.ruc, e.rubro, e.correo, e.celular AS telefono, de.direccion ' +
+                        'FROM Empresas e ' +
+                        'LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1 ' +
+                        'WHERE e.idEmpresa = @idEmpresa'
+                    );
+
 
                 console.log('result:', result.recordset);
                 //res.json(result.recordset);
@@ -323,6 +329,7 @@ const obtener_logo = async function (req, res) {
         const img = req.params.img || 'default.jpg';
         const logoPath = path.join(__dirname, '../uploads/configuraciones/', img);
         
+        console.log('Ruta del logo:', logoPath);
         // Verificar si existe el archivo
         try {
             await fs.access(logoPath);

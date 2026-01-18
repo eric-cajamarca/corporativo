@@ -15,20 +15,42 @@
     box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.14);
 
 } */
-
+/* 
 .card {
     margin-top: 20px;
     margin-bottom: 20px;
     border: 1px solid #e0e0e0;
     border-radius: 5px;
     box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.14);
+} */
+
+/* Elimina el fondo y borde del contenedor modal */
+.sin-fondo {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
+/* Aplica fondo solo al contenido interno para efecto tarjeta flotante */
+.contenido-tarjeta {
+  background: white;
+  border-left: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+}
 
-/* .card .cabecera-logo {
-    margin-top: 20px;
-    margin-bottom: 20px; 
-    border: 1px solid #e0e0e0;
-    border-radius: 5px;
-    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.14);
-} */
+.modal-header {
+  border-top-left-radius: 1rem !important;
+  border-top-right-radius: 1rem !important;
+  border-bottom: none !important;
+}
+
+.modal-footer {
+  border-bottom-left-radius: 1rem !important;
+  border-bottom-right-radius: 1rem !important;
+  border-top: none !important;
+}
+
+/* Elimina el backdrop oscuro */
+.modal-backdrop {
+  display: none !important;
+}

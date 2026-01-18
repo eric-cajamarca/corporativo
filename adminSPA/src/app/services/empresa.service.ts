@@ -31,7 +31,7 @@ export class EmpresaService {
   }
   // Obtén la instancia (referencia compartida)
 //  private cargarEmpresa(): void {
-//     this.getEmpresas_id().subscribe(response => {
+//     this.getEmpresasPdf().subscribe(response => {
 //       if (response.data?.[0]) {
 //         this.empresaSubject.next(response.data[0]);
 //         console.log('Empresa cargada en el servicio:', response.data[0]);
@@ -39,7 +39,7 @@ export class EmpresaService {
 //     });
 //   }
   private cargarEmpresa(): void {
-  this.getEmpresas_id().subscribe(response => {
+  this.getEmpresasPdf().subscribe(response => {
     if (response.data?.[0]) {
       const empresaData = response.data[0];
       console.log('Datos de la empresa obtenidos en servicio:', empresaData);
@@ -49,7 +49,7 @@ export class EmpresaService {
       console.log('Empresa cargada en el servicio:', empresaData);
     }
   });
-}
+  }
 
   // El componente se suscribe
   getEmpresa$(): Observable<Empresa> {
@@ -74,10 +74,19 @@ export class EmpresaService {
     });
   }
 
-  getEmpresas_id():Observable<any>{
+  getEmpresasPdf():Observable<any>{
     
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'empresas_id',{
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
+  getEmpresas_id():Observable<any>{
+    
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'empresaid',{
       headers: headers,
       withCredentials: true
     });

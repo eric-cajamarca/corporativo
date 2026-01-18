@@ -135,6 +135,7 @@ class HtmlBuilderService {
           <div class="datos-empresa">
             <h3>${empresa?.nombre || ''}</h3>
             <p>
+              ${empresa?.rubro ? `${empresa.rubro}<br>` : ''}
               ${empresa?.ruc ? `RUC: ${empresa.ruc}<br>` : ''}
               ${empresa?.direccion ? `${empresa.direccion}<br>` : ''}
               ${empresa?.telefono ? `Tel: ${empresa.telefono}` : ''}
