@@ -1,0 +1,21 @@
+export interface Lote {
+  idLote?: string; // UUID generado por SQL Server
+  idEmpresa: string;
+  idProducto: string;
+  idSucursal: string;
+  costoUnitario: number;
+  cantidadIngresada: number;
+  cantidadDisponible: number;
+  fechaIngreso?: Date;
+  // Propiedades extendidas para UI
+  nombreProducto?: string;
+  nombreSucursal?: string;
+  ubicaciones?: any[];
+}
+
+export interface LoteCreate {
+  idProducto: string;
+  idSucursal: string;
+  costoUnitario: number;
+  cantidadIngresada: number;
+}

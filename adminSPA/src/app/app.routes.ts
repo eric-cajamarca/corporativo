@@ -39,6 +39,12 @@ import { CreateProveedorComponent } from './components/proveedores/create-provee
 import { UpdateProveedorComponent } from './components/proveedores/update-proveedor/update-proveedor.component';
 import { PrincipalInventarioComponent } from './components/inventarios/principal-inventario/principal-inventario.component';
 import { CreatePreciosComponent } from './components/preciosV/create-precios/create-precios.component';
+import { LoteListComponent } from './components/inventario/lote-list/lote-list.component';
+import { LoteFormComponent } from './components/inventario/lote-form/lote-form.component';
+import { UbicacionPrioridadListComponent } from './components/inventario/ubicacion-prioridad-list/ubicacion-prioridad-list.component';
+import { MovimientoUbicacionComponent } from './components/inventario/movimiento-ubicacion/movimiento-ubicacion.component';
+import { VentaPorPrioridadComponent } from './components/inventario/venta-por-prioridad/venta-por-prioridad.component';
+import { AsignarStockUbicacionComponent } from './components/inventario/asignar-stock-ubicacion/asignar-stock-ubicacion.component';
 
 export const routes: Routes = [
     {
@@ -155,7 +161,12 @@ export const routes: Routes = [
      { path: 'proveedores/:id', component: UpdateProveedorComponent,canActivate: [AuthGuard], title: 'Actualizar Proveedor' },
 
      {path: 'precios', component: CreatePreciosComponent, canActivate: [AuthGuard], title: 'Crear Precio Venta' },
-     
-     
 
+     { path: 'inventario/lotes', component: LoteListComponent, canActivate: [AuthGuard], title: 'Lotes de Inventario' },
+     { path: 'inventario/lotes/nuevo', component: LoteFormComponent, canActivate: [AuthGuard], title: 'Nuevo Lote de Inventario' },
+     { path: 'inventario/lotes/editar/:id', component: LoteFormComponent, canActivate: [AuthGuard], title: 'Editar Lote de Inventario' },
+     { path: 'inventario/ubicaciones', component: UbicacionPrioridadListComponent, canActivate: [AuthGuard], title: 'Ubicaciones con Prioridad' },
+     { path: 'inventario/movimientos', component: MovimientoUbicacionComponent, canActivate: [AuthGuard], title: 'Movimiento entre Ubicaciones' },
+     { path: 'inventario/venta-rapida', component: VentaPorPrioridadComponent, canActivate: [AuthGuard], title: 'Venta por Prioridad' },
+     { path: 'inventario/asignaciones', component: AsignarStockUbicacionComponent, canActivate: [AuthGuard], title: 'Asignaciones de Stock' },
 ];

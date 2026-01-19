@@ -1,0 +1,84 @@
+<p>lote-list works!</p>
+<app-topnav></app-topnav>
+<div class="container-fluid mt-4">
+  <!-- Título y botón de acción -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📦 Listado de Lotes</h2>
+    <button class="btn btn-primary" (click)="crearLote()">
+      <i class="bi bi-plus-circle"></i> Nuevo Lote
+    </button>
+  </div>
+
+  <!-- Spinner de carga -->
+  <div *ngIf="isLoading" class="text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando...</span>
+    </div>
+  </div>
+
+  <!-- Mensaje de error -->
+  <div *ngIf="errorMessage" class="alert alert-danger">
+    {{ errorMessage }}
+  </div>
+
+  <!-- Tabla de lotes -->
+  <div class="table-responsive" *ngIf="!isLoading && !errorMessage">
+    <table class="table table-striped table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>ID Lote</th>
+          <th>Producto</th>
+          <th>Sucursal</th>
+          <th>Costo Unitario</th>
+          <th>Cant. Disponible</th>
+          <th>Fecha Ingreso</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let lote of lotes">
+          <!-- ID corto para mejor visualización -->
+          <td>{{ lote.idLote | slice:0:8 }}...</td>
+          
+          <!-- Nombre del producto (si viene del backend) -->
+          <td>{{ lote.nombreProducto || 'N/D' }}</td>
+          
+          <!-- Nombre de sucursal (si viene del backend) -->
+          <td>{{ lote.nombreSucursal || 'N/D' }}</td>
+          
+          <!-- Costo formateado a 2 decimales -->
+          <td>S/ {{ lote.costoUnitario | number:'1.2-2' }}</td>
+          
+          <!-- Cantidad con badge de color según stock -->
+          <td>
+            <span class="badge" [ngClass]="{
+              'bg-success': lote.cantidadDisponible > 50,
+              'bg-warning': lote.cantidadDisponible <= 50 && lote.cantidadDisponible > 10,
+              'bg-danger': lote.cantidadDisponible <= 10
+            }">
+              {{ lote.cantidadDisponible }}
+            </span>
+          </td>
+          
+          <!-- Fecha formateada -->
+          <td>{{ lote.fechaIngreso | date:'dd/MM/yyyy' }}</td>
+          
+          <!-- Botones de acción -->
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-2" (click)="editarLote(lote.idLote!)">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" (click)="eliminarLote(lote.idLote!)">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mensaje cuando no hay datos -->
+  <div *ngIf="!isLoading && lotes.length === 0" class="alert alert-info">
+    No hay lotes registrados. <a routerLink="/inventario/lotes/nuevo">Crea uno nuevo</a>.
+  </div>
+</div>

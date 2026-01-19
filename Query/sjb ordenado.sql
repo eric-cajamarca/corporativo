@@ -515,15 +515,15 @@ CREATE INDEX IX_ListasPrecio_EmpresaSucursalActivo
 ON dbo.ListasPrecio (idEmpresa, idSucursal, activo, fecha_inicio, fecha_fin);
 
 
-CREATE TABLE UndPorCaja (
-    idUndPorCaja INT PRIMARY KEY IDENTITY(1,1),
-    idProducto UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Productos (idProducto) ON DELETE CASCADE not null,
-    unidadesxCaja int not null,
-    pesoUnidad DECIMAL(10,2) NOT NULL, -- Peso por unidad del producto
-    pesoCaja DECIMAL(10,2) NOT NULL, -- Peso total por caja o bulto
+--CREATE TABLE UndPorCaja (
+--    idUndPorCaja INT PRIMARY KEY IDENTITY(1,1),
+--    idProducto UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Productos (idProducto) ON DELETE CASCADE not null,
+--    unidadesxCaja int not null,
+--    pesoUnidad DECIMAL(10,2) NOT NULL, -- Peso por unidad del producto
+--    pesoCaja DECIMAL(10,2) NOT NULL, -- Peso total por caja o bulto
     
     
-);
+--);
 
 
 go
@@ -565,19 +565,35 @@ go
 
 --alter table StockSucursal add ubicacion varchar(50) null
 
--- Eliminar columna 'ubicacion' que ahora estará en la tabla UbicacionesStock
---ALTER TABLE StockSucursal DROP COLUMN IF EXISTS ubicacion;
+CREATE TABLE Lotes (
+    idLote UNIQUEIDENTIFIER PRIMARY KEY,
+	idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    idProducto UNIQUEIDENTIFIER,
+    idSucursal UNIQUEIDENTIFIER,
+    costoUnitario DECIMAL(18,6),
+    cantidadIngresada INT,
+    cantidadDisponible INT, -- STOCK REAL
+    fechaIngreso DATETIME
+	FOREIGN KEY (idEmpresa, idProducto) REFERENCES Productos(idEmpresa, idProducto),
+    FOREIGN KEY (idEmpresa, idSucursal) REFERENCES Sucursal(idEmpresa, idSucursal)
+)
 
-CREATE TABLE UbicacionesStock (
-    idUbicacionStock INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
-    idStockSucursal INT FOREIGN KEY REFERENCES StockSucursal(idStockSucursal) ON DELETE CASCADE NOT NULL,
-    codigoUbicacion VARCHAR(20) NOT NULL, -- Ej: "ANDAMIO-1", "BODEGA-2"
-    cantidad DECIMAL(18,2) NOT NULL,
-    fechaUltimaActualizacion DATETIME DEFAULT GETDATE(),
-    idUsuario UNIQUEIDENTIFIER FOREIGN KEY REFERENCES UsuarioWeb(idUsuario) NOT NULL,
-    
-    CONSTRAINT UQ_UbicacionStock UNIQUE (idStockSucursal, codigoUbicacion) -- Evita duplicados
-);
+CREATE TABLE UbicacionesPrioridad (
+    idUbicacion INT IDENTITY(1,1) PRIMARY KEY,
+    idSucursal UNIQUEIDENTIFIER,
+    codigoUbicacion VARCHAR(20), -- 'MOSTRADOR', 'ANDAMIO-5'
+    prioridad INT, -- 1=Primero, 2=Segundo
+    UNIQUE(idSucursal, codigoUbicacion)
+)
+
+CREATE TABLE LotesUbicacion (
+    idLote UNIQUEIDENTIFIER,
+    idUbicacion INT,
+    cantidad INT, -- Cantidad física en esa ubicación
+    PRIMARY KEY(idLote, idUbicacion)
+)
+
+
 
 
 -- 1. Actualizar StockSucursal (total)
@@ -882,6 +898,19 @@ ON dbo.DetalleVentaEntrega (idVenta);
 -- =============================================
 -- TABLA DE MOVIMIENTOS DE INVENTARIO
 -- =============================================
+
+
+--CREATE TABLE MovimientosInventario (
+--    idMovimiento INT IDENTITY PRIMARY KEY,
+--    idProducto INT,
+--    idLote UNIQUEIDENTIFIER,
+--    tipo VARCHAR(20), -- ENTRADA, SALIDA
+--    cantidad INT,
+--    fecha DATETIME DEFAULT GETDATE()
+--)
+
+
+
 CREATE TABLE [dbo].[MovimientosInventario](
     [idMovimiento] [int] IDENTITY(1,1) NOT NULL,
     [idEmpresa] [UNIQUEIDENTIFIER] NOT NULL,

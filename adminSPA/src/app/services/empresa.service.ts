@@ -27,7 +27,7 @@ export class EmpresaService {
     
   ) {
     this.url = global.url;
-    this.cargarEmpresa();
+    // this.cargarEmpresa();
   }
   // Obtén la instancia (referencia compartida)
 //  private cargarEmpresa(): void {

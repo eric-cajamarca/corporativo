@@ -1,0 +1,58 @@
+<div class="container mt-4">
+  <div class="card">
+    <div class="card-header bg-success text-white">
+      <h3>💰 Venta con Descuento Automático</h3>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="ventaForm" (ngSubmit)="procesarVenta()">
+        
+        <!-- Sucursal -->
+        <div class="mb-3">
+          <label for="sucursal" class="form-label">Sucursal *</label>
+          <select id="sucursal" formControlName="idSucursal" class="form-control">
+            <option value="" disabled>Seleccione sucursal</option>
+            <option value="UUID_SUCURSAL_1">Sucursal Principal</option>
+          </select>
+        </div>
+
+        <!-- Productos a vender -->
+        <div class="mb-3">
+          <h5>Productos</h5>
+          <div formArrayName="productosVendidos">
+            <div *ngFor="let producto of productosVendidos.controls; let i=index" [formGroupName]="i">
+              <div class="row">
+                <div class="col-md-7">
+                  <select formControlName="idProducto" class="form-control">
+                    <option value="" disabled>Producto</option>
+                    <option *ngFor="let p of productos" [value]="p.id">{{ p.nombre }}</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <input type="number" formControlName="cantidad" class="form-control" placeholder="Cantidad">
+                </div>
+                <div class="col-md-2">
+                  <button class="btn btn-sm btn-danger" (click)="eliminarProductoVenta(i)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary mt-2" (click)="agregarProductoVenta()">
+            + Agregar Producto
+          </button>
+        </div>
+
+        <!-- Botón procesar -->
+        <button type="submit" class="btn btn-success btn-lg" [disabled]="ventaForm.invalid">
+          <i class="bi bi-cart-check"></i> Procesar Venta
+        </button>
+
+        <!-- Nota explicativa -->
+        <div class="alert alert-info mt-3">
+          <strong>Nota:</strong> El sistema aplicará el descuento automáticamente según la prioridad de ubicaciones.
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -32,6 +32,9 @@ const factilizaRoutes = require('./routes/factiliza');
 const productoCompuestoRoutes = require('./routes/productoCompuesto');
 const productoVarianteRoutes = require('./routes/productoVariante');
 const tranferenciaRoutes = require('./routes/transferencia');
+const lotesRoutes = require('./routes/lotes');
+const lotesUbicacionRoutes = require('./routes/lotesUbicacion');
+const ubicacionesPrioridadRoutes = require('./routes/ubicacionesPrioridad');
 
 
 const app = express();
@@ -122,6 +125,9 @@ app.use('/api', factilizaRoutes);
 app.use('/api', productoCompuestoRoutes);
 app.use('/api', productoVarianteRoutes);
 app.use('/api', tranferenciaRoutes);
+app.use('/api', lotesRoutes);
+app.use('/api', lotesUbicacionRoutes);
+app.use('/api', ubicacionesPrioridadRoutes);
 
 // Iniciar servidor
 app.listen(PORT, () => {

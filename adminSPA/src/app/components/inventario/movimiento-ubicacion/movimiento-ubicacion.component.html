@@ -1,0 +1,66 @@
+<div class="container mt-4">
+  <div class="card">
+    <div class="card-header bg-warning text-dark">
+      <h3>🔄 Traslado entre Ubicaciones</h3>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="movimientoForm" (ngSubmit)="ejecutarMovimiento()">
+        
+        <!-- Selección de Lote -->
+        <div class="mb-3">
+          <label for="lote" class="form-label">Lote *</label>
+          <select 
+            id="lote" 
+            formControlName="idLote" 
+            class="form-control"
+            (change)="onLoteSeleccionado()"
+          >
+            <option value="" disabled>Seleccione un lote</option>
+            <option *ngFor="let lote of lotes" [value]="lote.idLote">
+              {{ lote.idLote | slice:0:8 }}... ({{ lote.cantidadDisponible }} unid.)
+            </option>
+          </select>
+        </div>
+
+        <!-- Ubicación Origen -->
+        <div class="mb-3">
+          <label for="origen" class="form-label">Desde Ubicación *</label>
+          <select id="origen" formControlName="idUbicacionOrigen" class="form-control">
+            <option value="" disabled>Seleccione origen</option>
+            <option *ngFor="let u of ubicacionesOrigen" [value]="u.idUbicacion">
+              {{ u.codigoUbicacion }} ({{ u.cantidad }} unid.)
+            </option>
+          </select>
+        </div>
+
+        <!-- Ubicación Destino -->
+        <div class="mb-3">
+          <label for="destino" class="form-label">Hacia Ubicación *</label>
+          <select id="destino" formControlName="idUbicacionDestino" class="form-control">
+            <option value="" disabled>Seleccione destino</option>
+            <option *ngFor="let u of ubicacionesDestino" [value]="u.idUbicacion">
+              {{ u.codigoUbicacion }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Cantidad -->
+        <div class="mb-3">
+          <label for="cantidad" class="form-label">Cantidad a Mover *</label>
+          <input 
+            type="number" 
+            id="cantidad" 
+            formControlName="cantidad" 
+            class="form-control"
+            min="1"
+          >
+        </div>
+
+        <!-- Botones -->
+        <button type="submit" class="btn btn-warning" [disabled]="movimientoForm.invalid">
+          <i class="bi bi-arrow-left-right"></i> Ejecutar Movimiento
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

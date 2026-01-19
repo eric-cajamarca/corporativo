@@ -1,0 +1,43 @@
+<app-topnav></app-topnav>
+<div class="modal-header">
+  <h4 class="modal-title">📍 Asignar Stock a Ubicaciones</h4>
+  <button type="button" class="btn-close" (click)="activeModal.dismiss()"></button>
+</div>
+<div class="modal-body">
+  <p>Total a asignar: <strong>{{ cantidadTotal }}</strong> unidades</p>
+  <p class="text-danger">Restante: {{ cantidadRestante }}</p>
+
+  <div *ngIf="ubicaciones.length === 0" class="alert alert-warning">
+    No hay ubicaciones configuradas para esta sucursal
+  </div>
+
+  <table class="table table-sm" *ngIf="ubicaciones.length > 0">
+    <thead>
+      <tr>
+        <th>Ubicación</th>
+        <th>Cantidad a asignar</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let asignacion of asignaciones">
+        <td>{{ asignacion.codigoUbicacion }}</td>
+        <td>
+          <input 
+            type="number" 
+            class="form-control form-control-sm" 
+            [(ngModel)]="asignacion.cantidad"
+            (input)="calcularRestante()"
+            min="0"
+            [max]="cantidadRestante + asignacion.cantidad"
+          >
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<div class="modal-footer">
+  <button class="btn btn-secondary" (click)="activeModal.dismiss()">Cancelar</button>
+  <button class="btn btn-success" (click)="guardarAsignacion()" [disabled]="cantidadRestante !== 0">
+    Guardar Asignación
+  </button>
+</div>
