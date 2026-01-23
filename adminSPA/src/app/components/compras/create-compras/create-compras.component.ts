@@ -508,7 +508,7 @@ export class CreateComprasComponent {
       }
     );
 
-    this._productoService.obtener_productos_compras().subscribe(
+    this._productoService.obtenerProductosCompras().subscribe(
       (response) => {
         console.log('response productos', response.data);
         if (response.data != undefined) {
@@ -1117,7 +1117,7 @@ export class CreateComprasComponent {
             // Identifico si el producto no existe, entonces lo creo, y si existe, solo actualizo el stock
             if (element.idProducto == undefined) {
               console.log('El producto es nuevo', this.nuevoProducto);
-              this._productoService.crear_producto(nuevoProducto).subscribe(
+              this._productoService.crearProducto(nuevoProducto).subscribe(
                 (productoResponse) => {
                   if (productoResponse.data != undefined) {
                     iziToast.show({
@@ -1242,7 +1242,7 @@ export class CreateComprasComponent {
   private actualizarProducto(element: any, nuevoProducto: any) {
     console.log('actualizarProducto', element, nuevoProducto);
 
-    this._productoService.actualizar_producto(element, nuevoProducto).subscribe(
+    this._productoService.actualizarProducto(element, nuevoProducto).subscribe(
       (response) => {
         if (response.data != undefined) {
           iziToast.show({

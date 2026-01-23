@@ -768,7 +768,7 @@ export class UpdateComprasComponent {
   crearNuevoProductoModal() {
 
     console.log('this.nuevoProducto', this.nuevoProducto);
-    this._productoService.crear_producto(this.nuevoProducto).subscribe(
+    this._productoService.crearProducto(this.nuevoProducto).subscribe(
       response => {
         console.log('response', response);
         if (response.data) {
@@ -1243,7 +1243,7 @@ export class UpdateComprasComponent {
     this.detalleCompras[idx].subtotal = parseFloat((this.detalleCompras[idx].cantidad * this.detalleCompras[idx].pUnitario).toFixed(2));
     this.sumarDetalleCompras();
     this.sumarFooterFactura();
-    console.log('this.detalleCompras', this.detalleCompras);
+    //console.log('this.detalleCompras', this.detalleCompras);
 
     this.idEliminado();
     console.log('this.detalleCompras_const', this.detalleCompras_const);
@@ -1257,7 +1257,7 @@ export class UpdateComprasComponent {
 
   onSelectPUnitario(selectedValue: any) {
     this.nuevoProducto.subtotal = parseFloat((Number(this.nuevoProducto.cantidad) * this.nuevoProducto.pUnitario).toFixed(2));
-    console.log('actualizarSubtotalNuevoProducto this.nuevoProducto', this.nuevoProducto);
+    //console.log('actualizarSubtotalNuevoProducto this.nuevoProducto', this.nuevoProducto);
   }
 
 }
