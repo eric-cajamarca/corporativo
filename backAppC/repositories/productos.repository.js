@@ -359,10 +359,54 @@ exports.obtenerProductosCompras = async (pool, idEmpresa) => {
         // precios: preciosProducto,
       };
     });   // Encontrar el precio principal (normal)
-   
+
     console.log('Productos obtenidos en repo:', productos.length);
 
     return productos;
+  } catch (error) {
+    throw new Error(`Repository Error: ${error.message}`);
+  }
+};
+
+exports.obtenerProductoPorIdRepo = async (pool, idProducto, idEmpresa) => {
+  try {
+    // SIEMPRE usa sql.UniqueIdentifier para UUIDs (regla 1.4)
+    const result = await pool
+      .request()
+      .input("idProducto", sql.UniqueIdentifier, idProducto)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT
+          p.idProducto,
+          p.Codigo,
+          p.descripcion,
+          p.cUnitario,
+          p.fProduccion,
+          p.fVencimiento,
+          c.nombre as categoria,
+          m.nombre as marca,
+          pr.descripcion as presentacion,
+          p.estado,
+          p.alertaMinimo,
+          p.alertaMaximo,
+          CONVERT(VARCHAR(19), p.FIngreso, 120) as fechaIngreso,
+          CONVERT(VARCHAR(19), p.fProduccion, 120) as fechaProduccion,
+          CONVERT(VARCHAR(19), p.fVencimiento, 120) as fechaVencimiento
+        FROM Productos p
+        INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
+        INNER JOIN Marcas m ON p.idMarca = m.idMarca
+        INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+        WHERE p.idProducto = @idProducto
+        AND p.idEmpresa = @idEmpresa
+      `);
+
+    // NUNCA retornes fechas sin formatear (regla 1.4)
+    if (result.recordset.length > 0) {
+      const producto = result.recordset[0];
+      return producto;
+    }
+
+    return null;
   } catch (error) {
     throw new Error(`Repository Error: ${error.message}`);
   }

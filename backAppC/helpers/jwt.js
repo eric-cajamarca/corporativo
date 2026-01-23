@@ -1,7 +1,7 @@
 // jwt.js
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
-const secret = 'erik@./Eog';
+const secret = process.env.JWT_SECRET || 'erik@./Eog_DEV_CHANGE_IN_PRODUCTION';
 
 exports.createToken = function(user){
     //console.log('helpers jwt', user);

@@ -39,21 +39,15 @@ const getAdmin = async function (req, res) {
 };
 
 const getEmpresa_login = async function (req, res) {
-    console.log('getEmpresa_login req.user: ', req.user);
     if (!req.user) {
         return res.status(401).send({ message: 'No autenticado' });
     }
-
-    console.log('Obteniendo datos para usuario:', req.user);
     
 
     try {
         const pool = await sql.connect(dbConfig);
 
         const empresaResult = await empresaService.getDatosEmpresaLogin(pool, req.user);
-        
-        
-        console.log('Datos obtenidos en getempresa_login:', empresaResult);
         // Verificar si obtuvimos al menos algún dato
         
         return res.status(200).send({ data: empresaResult, message: 'Datos obtenidos correctamente' });
@@ -234,25 +228,22 @@ const obtener_datos_colaborador_admin = async (req, res) => {
                     .request()
                     .input('idUsuario', sql.UniqueIdentifier, id)
                     
-                    .query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol where idUsuario = @idUsuario');
+                    .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+                    .query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol WHERE idUsuario = @idUsuario AND UsuarioWeb.idEmpresa = @idEmpresa');
                 //.query('SELECT * FROM UsuarioWeb where idUsuario = @idUsuario');
 
 
 
-                //despues del codigo anterior no puedo optener respuesta a la consulta
-                console.log('result.recordset: ', result.recordset);
-                console.log('result.recordset: ', result.recordset[0].idUsuario);
+                if (result.recordset.length === 0) {
+                    return res.status(404).send({ message: 'Usuario no encontrado', data: undefined });
+                }
 
-                //quiero convertir el result.recordset.fregistro a un formato de fecha mas amigable
-                let fecha = result.recordset[0].fregistro;
-                let fecha2 = moment(fecha).format('DD-MM-YYYY');
-                console.log('fecha2: ', fecha2);
-                result.recordset[0].fregistro = fecha2;
-                console.log('result.recordset[0].fregistro: ', result.recordset[0].fregistro);
-
+                // Formatear fecha (regla 1.4: NUNCA retornes fechas sin formatear)
+                if (result.recordset[0].fregistro) {
+                    result.recordset[0].fregistro = moment(result.recordset[0].fregistro).format('DD-MM-YYYY');
+                }
 
                 data = result.recordset;
-                console.log('data: ', data);
                 res.status(200).send({ data: data });
                 //res.json({ data });
 
@@ -335,7 +326,6 @@ const admin_login = async (req, res) => {
 
     // 3. Llamar al Service (toda la lógica de negocio)
     const datosUsuario = await authService.adminLogin(pool, email, password, ruc);
-    console
     // 4. Crear token
     const token = jwt.createToken(datosUsuario);
 
@@ -367,12 +357,24 @@ const admin_login = async (req, res) => {
 
 const deleteAdmin = async (req, res) => {
     const { id } = req.params;
+
+    // Validación crítica: SIEMPRE filtra por idEmpresa (regla 1.6)
+    if (!req.user || !req.user.empresa) {
+        return res.status(401).json({ message: 'No autorizado' });
+    }
+
     try {
         const pool = await sql.connect(dbConfig);
         const result = await pool
             .request()
             .input('id', sql.Int, id)
-            .query('DELETE FROM usuarioWeb WHERE id = @id');
+            .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+            .query('DELETE FROM usuarioWeb WHERE id = @id AND idEmpresa = @idEmpresa');
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
         res.json({ message: 'Usuario eliminado correctamente' });
     } catch (error) {
         console.error('Error al eliminar un Usuario:', error);
@@ -382,14 +384,12 @@ const deleteAdmin = async (req, res) => {
 
 // auth.controller.js
 const logout = async (req, res) => {
-    console.log('logout req.user: ', req.user);
     res.clearCookie('token', {
       httpOnly: true,
-      secure: false, // solo en HTTPS
-      sameSite: 'None' // o 'Lax' si no usas múltiples dominios
+      secure: process.env.NODE_ENV === 'production', // solo en HTTPS en producción
+      sameSite: process.env.NODE_ENV === 'production' ? 'Strict' : 'Lax'
     });
-    console.log('Sesión cerrada exitosamente',res.cookie('token'));
-    return res.status(200).json({ success:true ,message: 'Sesión cerrada exitosamente' });
+    return res.status(200).json({ success: true, message: 'Sesión cerrada exitosamente' });
 };
   
 // const consulCookie= async (req, res) => {

@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken'); // Cambiado a jsonwebtoken
 const moment = require('moment');
-const secret = 'erik@./Eog';
+const secret = process.env.JWT_SECRET || 'erik@./Eog_DEV_CHANGE_IN_PRODUCTION';
 
 exports.auth = function(req, res, next) {
     // if (!req.headers) {

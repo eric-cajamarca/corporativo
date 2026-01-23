@@ -87,10 +87,8 @@ export class IndexProductoComponent {
   }
 
   initData() {
-    this._productoService.obtener_productos_todos().subscribe(
-      response => {
-        console.log('response.data');
-        console.log(response.data);
+    this._productoService.obtenerProductosTodos().subscribe(
+      (response: any) => {
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -106,8 +104,8 @@ export class IndexProductoComponent {
           this.productos_const = response.data;
         }
       },
-      error => {
-        console.log(error);
+      (error: any) => {
+        console.error('Error al cargar productos:', error);
       }
     );
   }
@@ -131,12 +129,9 @@ export class IndexProductoComponent {
   }
 
 
-  set_eliminar(id: any) {
-    console.log('aqui set_eliminar', id);
-    this._productoService.eliminar_producto(id).subscribe(
-      response => {
-        console.log('response.data');
-        console.log(response.data);
+  setEliminar(id: string) {
+    this._productoService.eliminarProducto(id).subscribe(
+      (response: any) => {
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -161,10 +156,10 @@ export class IndexProductoComponent {
           // $('body').css('overflow-y', 'auto');
 
         }
-       
+
       },
-      error => {
-        console.log(error);
+      (error: any) => {
+        console.error('Error al eliminar producto:', error);
       }
     );
 

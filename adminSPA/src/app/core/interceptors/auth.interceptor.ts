@@ -23,7 +23,7 @@ export class AuthInterceptor implements HttpInterceptor {
       catchError(error => {
         if (error instanceof HttpErrorResponse) {
           if (error.status === 401) { // No autorizado
-            console.log('Token no válido, redirigiendo a login en interceptor');
+            console.error('Token no válido, redirigiendo a login en interceptor');
             this.authService.forceLogout();
           }
         }

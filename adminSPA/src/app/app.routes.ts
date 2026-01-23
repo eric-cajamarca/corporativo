@@ -33,7 +33,7 @@ import { CreateProgramacionComponent } from './components/programaciones/create-
 import { UpdateProgramacionComponent } from './components/programaciones/update-programacion/update-programacion.component';
 import { IndexVentasComponent } from './components/ventas/index-ventas/index-ventas.component';
 import { CreateVentasComponent } from './components/ventas/create-ventas/create-ventas.component';
-import { AuthGuard } from './guards/auth.guards';
+import { AuthGuard } from './guards/auth.guard';
 import { IndexProveedorComponent } from './components/proveedores/index-proveedor/index-proveedor.component';
 import { CreateProveedorComponent } from './components/proveedores/create-proveedor/create-proveedor.component';
 import { UpdateProveedorComponent } from './components/proveedores/update-proveedor/update-proveedor.component';

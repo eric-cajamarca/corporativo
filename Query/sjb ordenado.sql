@@ -574,18 +574,51 @@ CREATE TABLE Lotes (
     cantidadIngresada INT,
     cantidadDisponible INT, -- STOCK REAL
     fechaIngreso DATETIME
-	FOREIGN KEY (idEmpresa, idProducto) REFERENCES Productos(idEmpresa, idProducto),
-    FOREIGN KEY (idEmpresa, idSucursal) REFERENCES Sucursal(idEmpresa, idSucursal)
+	FOREIGN KEY (idProducto) REFERENCES Productos(idProducto),
+    FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa),
+	FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal)
 )
+go
 
+select * from Lotes
+
+INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaIngreso)
+VALUES 
+    -- Lote 1: Producto 1 en Sucursal 1
+    (NEWID(), '7E967BC0-AC0E-48F7-8A73-2C54A5C92A59', 'CD729340-73F6-4DCD-AA98-107A8B22BE3B', '7048502F-FAAF-4004-BE8F-62C88B058F6E', 125.50, 100, 100, GETDATE()),
+    
+    -- Lote 2: Producto 2 en Sucursal 1 (mismo producto, diferente costo)
+    (NEWID(), '7E967BC0-AC0E-48F7-8A73-2C54A5C92A59', '5F451B60-93FC-45CA-A2BE-130F70D041B7', '7048502F-FAAF-4004-BE8F-62C88B058F6E', 89.99, 200, 200, GETDATE()),
+    
+    -- Lote 3: Producto 1 en Sucursal 2
+    (NEWID(),  '7E967BC0-AC0E-48F7-8A73-2C54A5C92A59', '25724371-9488-408F-A0FD-14ACBA4CA930', '7048502F-FAAF-4004-BE8F-62C88B058F6E', 130.00, 50, 50, GETDATE());
+GO
+
+
+--select * from lotesUbicacion
 CREATE TABLE UbicacionesPrioridad (
     idUbicacion INT IDENTITY(1,1) PRIMARY KEY,
     idSucursal UNIQUEIDENTIFIER,
     codigoUbicacion VARCHAR(20), -- 'MOSTRADOR', 'ANDAMIO-5'
     prioridad INT, -- 1=Primero, 2=Segundo
-    UNIQUE(idSucursal, codigoUbicacion)
+    UNIQUE(codigoUbicacion)
 )
-
+SELECT * FROM UbicacionesPrioridad ORDER BY idSucursal, prioridad;
+--INSERT INTO UbicacionesPrioridad (idSucursal, codigoUbicacion, prioridad)
+--VALUES 
+--    -- Ubicaciones para Sucursal 1 (ej: Principal)
+--    ('7048502F-FAAF-4004-BE8F-62C88B058F6E', 'MOSTRADOR', 1),  -- Prioridad 1: se consume primero
+    
+--    ('7048502F-FAAF-4004-BE8F-62C88B058F6ETU_UUID_SUCURSAL_1', 'ANDAMIO-5', 2),  -- Prioridad 2: se consume segundo
+    
+--    ('7048502F-FAAF-4004-BE8F-62C88B058F6E', 'BODEGA-A', 3),   -- Prioridad 3: se consume último
+    
+--    -- Ubicaciones para Sucursal 2 (ej: Secundaria)
+--    ('663D91C6-26A2-4472-A494-2E37B437322A', 'MOSTRADOR-2', 1),  -- Prioridad 1 para sucursal 2
+    
+--    ('663D91C6-26A2-4472-A494-2E37B437322A', 'ANDAMIO-3', 2);
+--GO
+go
 CREATE TABLE LotesUbicacion (
     idLote UNIQUEIDENTIFIER,
     idUbicacion INT,
@@ -593,35 +626,7 @@ CREATE TABLE LotesUbicacion (
     PRIMARY KEY(idLote, idUbicacion)
 )
 
-
-
-
--- 1. Actualizar StockSucursal (total)
-INSERT INTO StockSucursal (idEmpresa, idSucursal, idProducto, cantidad, fIngreso, idUsuario)
-VALUES ('EMPRESA-GUID', 'SUCURSAL-GUID', 'PRODUCTO-GUID', 25, GETDATE(), 'USUARIO-GUID')
-ON DUPLICATE KEY UPDATE cantidad = cantidad + 25, fIngreso = GETDATE();
-
--- 2. Registrar ubicaciones específicas (15 en ANDAMIO-1 y 10 en ESTANTE-3)
-INSERT INTO UbicacionesStock (idStockSucursal, codigoUbicacion, cantidad, idUsuario)
-VALUES 
-(SCOPE_IDENTITY(), 'ANDAMIO-1', 15, 'USUARIO-GUID'),
-(SCOPE_IDENTITY(), 'ESTANTE-3', 10, 'USUARIO-GUID');
-
----Consultar stock con detalle de ubicaciones:
-SELECT 
-    p.nombre AS Producto,
-    ss.cantidad AS StockTotal,
-    us.codigoUbicacion AS Ubicacion,
-    us.cantidad AS EnUbicacion
-FROM 
-    StockSucursal ss
-    JOIN Productos p ON ss.idProducto = p.idProducto
-    LEFT JOIN UbicacionesStock us ON ss.idStockSucursal = us.idStockSucursal
-WHERE 
-    ss.idEmpresa = 'EMPRESA-GUID'
-    AND ss.idSucursal = 'SUCURSAL-GUID';
-
-
+insert into 
 --------------------------------------
 --compras
 ----------------------------------------

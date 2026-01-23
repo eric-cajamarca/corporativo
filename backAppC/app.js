@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { connectDB } = require('./dbConnection');
 const xss = require('xss'); // Solo si vas a usarlo
 const cookieParser = require('cookie-parser');
@@ -39,6 +40,20 @@ const ubicacionesPrioridadRoutes = require('./routes/ubicacionesPrioridad');
 
 const app = express();
 
+// Seguridad: Implementar headers de seguridad con helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
 // Servir archivos estáticos desde uploads
 app.use('/logos', express.static(path.join(__dirname, 'uploads/configuraciones')));
 
@@ -53,14 +68,31 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 
-// Middleware CORS
-app.use(cors({
-  origin: ['http://localhost:4200'],
+// Middleware CORS - Más restrictivo para producción
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (como mobile apps)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      'http://localhost:4200',  // Desarrollo
+      'http://127.0.0.1:4200',  // Desarrollo alternativo
+      process.env.FRONTEND_URL  // Variable de entorno para producción
+    ].filter(Boolean); // Remover valores undefined
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  allowedHeaders: ['Authorization', 'X-API-KEY', 'Origin', 'X-Requested-With', 'Content-Type', 'Access-Control-Allow-Request-Method'],
-  methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS'],
-  
-}));
+  allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  maxAge: 86400 // Cache preflight por 24 horas
+};
+
+app.use(cors(corsOptions));
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', 'http://localhost:4200');

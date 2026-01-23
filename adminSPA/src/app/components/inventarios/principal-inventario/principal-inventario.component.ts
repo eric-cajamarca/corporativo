@@ -268,20 +268,15 @@ export class PrincipalInventarioComponent {
       }
     );
 
-    this._productoService.obtener_productos_todos().subscribe(
-      (response) => {
-        console.log('response productos', response.data);
+    this._productoService.obtenerProductosTodos().subscribe(
+      (response: any) => {
         if (response.data != undefined) {
           this.productos = response.data;
-
-          // this.productos = response.data;
-          // console.log('this.productos como objeto',this.productos);
         }
         this.productos_const = this.productos;
-        console.log('this.productos', this.productos);
       },
-      (error) => {
-        console.log(error);
+      (error: any) => {
+        console.error('Error al cargar productos:', error);
       }
     );
 

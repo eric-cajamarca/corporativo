@@ -1,7 +1,8 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { global } from './global';
 import { Observable } from 'rxjs';
+import { Producto, ProductoCreate, ProductoResponse } from '../models/producto.models';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -15,56 +16,42 @@ export class ProductoService {
   constructor(
     private _http: HttpClient,
   ) {
-    this.url = global.url;
+    this.url = environment.API_URL;
   }
 
-  obtener_productos_todos():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'productos',{
-      headers:headers,
+  obtenerProductosTodos(): Observable<ProductoResponse> {
+    // SIEMPRE maneja errores en el subscribe (regla 2.2)
+    return this._http.get<ProductoResponse>(this.url + 'productos', {
       withCredentials: true
     });
   }
 
-  //api.get('/productos/compras',auth.auth, productosController.obtener_productos_compras);
-  obtener_productos_compras():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'productos/compras',{
-      headers:headers,
+  obtenerProductosCompras(): Observable<ProductoResponse> {
+    return this._http.get<ProductoResponse>(this.url + 'productos/compras', {
       withCredentials: true
     });
   }
 
-  obtener_productos_id(id:any):Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'productos/'+id,{
-      headers:headers,
+  obtenerProductoPorId(id: string): Observable<ProductoResponse> {
+    return this._http.get<ProductoResponse>(this.url + 'productos/' + id, {
       withCredentials: true
     });
   }
 
-  crear_producto(producto:any):Observable<any>{
-    console.log('producto',producto);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.post(this.url+'productos',producto,{
-      headers:headers,
+  crearProducto(producto: ProductoCreate): Observable<ProductoResponse> {
+    return this._http.post<ProductoResponse>(this.url + 'productos', producto, {
       withCredentials: true
     });
   }
 
-  actualizar_producto(id:any,producto:any):Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.put(this.url+'productos/'+id,producto,{
-      headers:headers,
+  actualizarProducto(id: string, producto: ProductoCreate): Observable<ProductoResponse> {
+    return this._http.put<ProductoResponse>(this.url + 'productos/' + id, producto, {
       withCredentials: true
     });
   }
 
-  //api.delete('/productos/:id',auth.auth, productosController.eliminar_producto);
-  eliminar_producto(id:any):Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.delete(this.url+'productos/'+id,{
-      headers:headers,
+  eliminarProducto(id: string): Observable<ProductoResponse> {
+    return this._http.delete<ProductoResponse>(this.url + 'productos/' + id, {
       withCredentials: true
     });
   }

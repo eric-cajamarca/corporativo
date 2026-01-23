@@ -93,34 +93,39 @@ const obtener_productos_compras = async (req, res) => {
 
 
 const obtener_productos_id = async (req, res) => {
-  const { idProducto } = req.params.id;
+  try {
+    const { idProducto } = req.params;
 
-  if (req.user) {
-    if (req.user.rol == "Administrador") {
-      try {
-        let pool = await sql.connect(dbConfig);
-        let productos = await pool
-          .request()
-          .query(
-            "SELECT * FROM Productos WHERE idProducto = '" + idProducto + "'"
-          );
-        res.status(200).send({ data: productos.recordset });
-      } catch (error) {
-        console.log("obterner productos error: " + error);
-        res
-          .status(500)
-          .send({ message: "Error al obtener los productos", data: undefined });
-      }
-    } else {
-      res
-        .status(200)
-        .send({
-          message: "No tiene permisos para realizar esta acción",
-          data: undefined,
-        });
+    const pool = await sql.connect(dbConfig);
+
+    // NUNCA pongas lógica de negocio en controllers, solo llamadas a services (regla 1.1)
+    const producto = await ProductosServices.obtenerProductoPorIdService(pool, idProducto, req.user);
+
+    res.status(200).json({ data: producto });
+  } catch (error) {
+    // SIEMPRE lanza throw new Error para errores de negocio (regla 1.3)
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).json({ message: "No autorizado" });
     }
-  } else {
-    res.status(500).send({ message: "No Access", data: undefined });
+
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).json({
+        message: "No tiene permisos para realizar esta acción",
+        data: undefined
+      });
+    }
+
+    if (error.message === "PRODUCTO_NO_ENCONTRADO") {
+      return res.status(404).json({ message: "Producto no encontrado", data: undefined });
+    }
+
+    if (error.message === "ID_PRODUCTO_INVALIDO") {
+      return res.status(400).json({ message: "ID de producto inválido", data: undefined });
+    }
+
+    // NUNCA uses console.log(). Usa console.error() (regla 1.3)
+    console.error("Error al obtener producto:", error);
+    res.status(500).json({ message: "Error interno del servidor", data: undefined });
   }
 };
 

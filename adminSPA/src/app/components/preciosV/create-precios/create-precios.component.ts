@@ -91,11 +91,10 @@ export class CreatePreciosComponent implements OnInit {
   cargarProductos(): void {
     // Aquí deberías implementar el servicio para obtener productos
     // Por ahora, datos de ejemplo
-    this._productosService.obtener_productos_todos().subscribe({
-      next: (response) => {
+    this._productosService.obtenerProductosTodos().subscribe({
+      next: (response: any) => {
         this.productos = response.data || [];
         this.productosFiltrados = [...this.productos];
-        console.log(this.productos);
       },
       error: (error) => {
         console.error('Error al cargar productos:', error);

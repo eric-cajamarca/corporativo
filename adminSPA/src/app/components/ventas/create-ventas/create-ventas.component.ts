@@ -137,19 +137,16 @@ export class CreateVentasComponent {
   }
   // Función para cargar todos los productos
   cargarDatos(){
-    this._productoService.obtener_productos_todos().subscribe(
-      (response) => {
-        console.log('response productos', response.data);
+    this._productoService.obtenerProductosTodos().subscribe(
+      (response: any) => {
         if (response.data != undefined) {
           this.productos = response.data;
-          this.productos_const = this.productos;  
+          this.productos_const = this.productos;
           this.stockSucursales_const = this.productos;
-          //this.productos_filtrados = this.productos; // Inicializar con todos los productos
-          console.log('this.productos', this.productos);
         }
       },
-      (error) => {
-        console.log(error);
+      (error: any) => {
+        console.error('Error al cargar productos:', error);
       }
     );
 
