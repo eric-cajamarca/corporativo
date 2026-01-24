@@ -1,0 +1,453 @@
+<!-- Navbar principal -->
+<app-topnav></app-topnav>
+
+<!-- Layout principal con sidebar -->
+<div class="dashboard-layout">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <i class="fas fa-building text-primary me-2"></i>
+        <span class="fw-bold">CRM</span>
+      </div>
+      <button class="sidebar-close d-lg-none" type="button" id="sidebarClose">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+      <!-- Usuario info -->
+      <div class="user-info">
+        <div class="user-avatar">
+          <i class="fas fa-user-circle"></i>
+        </div>
+        <div class="user-details">
+          <div class="user-name fw-semibold">Administrador</div>
+          <div class="user-role text-muted small">Administrador</div>
+        </div>
+      </div>
+
+      <!-- Navegación principal -->
+      <ul class="sidebar-nav">
+        <!-- Dashboard -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('dashboard'); $event.preventDefault()">
+            <i class="nav-icon fas fa-tachometer-alt"></i>
+            <span class="nav-text">Dashboard</span>
+          </a>
+        </li>
+
+        <!-- Módulo Caja -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('caja'); $event.preventDefault()">
+            <i class="nav-icon fas fa-cash-register"></i>
+            <span class="nav-text">Caja</span>
+          </a>
+        </li>
+
+        <!-- Módulo Créditos -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('creditos'); $event.preventDefault()">
+            <i class="nav-icon fas fa-hand-holding-usd"></i>
+            <span class="nav-text">Créditos</span>
+          </a>
+        </li>
+
+        <!-- Módulo Análisis -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('analisis'); $event.preventDefault()">
+            <i class="nav-icon fas fa-chart-line"></i>
+            <span class="nav-text">Análisis</span>
+          </a>
+        </li>
+
+        <!-- Separador -->
+        <li class="nav-divider"></li>
+
+        <!-- Módulo Ventas -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('ventas'); $event.preventDefault()">
+            <i class="nav-icon fas fa-shopping-cart"></i>
+            <span class="nav-text">Ventas</span>
+          </a>
+        </li>
+
+        <!-- Módulo Compras -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('compras'); $event.preventDefault()">
+            <i class="nav-icon fas fa-shopping-bag"></i>
+            <span class="nav-text">Compras</span>
+          </a>
+        </li>
+
+        <!-- Módulo Inventario -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('inventario'); $event.preventDefault()">
+            <i class="nav-icon fas fa-boxes"></i>
+            <span class="nav-text">Inventario</span>
+          </a>
+        </li>
+
+        <!-- Módulo Clientes -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('clientes'); $event.preventDefault()">
+            <i class="nav-icon fas fa-users"></i>
+            <span class="nav-text">Clientes</span>
+          </a>
+        </li>
+
+        <!-- Separador -->
+        <li class="nav-divider"></li>
+
+        <!-- Configuración -->
+        <li class="nav-item">
+          <a href="#" class="nav-link active" (click)="navigateTo('configuracion'); $event.preventDefault()">
+            <i class="nav-icon fas fa-cog"></i>
+            <span class="nav-text">Configuración</span>
+          </a>
+        </li>
+
+        <!-- Reportes -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('reportes'); $event.preventDefault()">
+            <i class="nav-icon fas fa-file-alt"></i>
+            <span class="nav-text">Reportes</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Overlay para móviles -->
+  <div class="sidebar-overlay d-lg-none" id="sidebarOverlay"></div>
+
+  <!-- Contenido principal -->
+  <main class="main-content">
+    <!-- Header del contenido -->
+    <div class="content-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h1 class="content-title mb-1">Configuración del Sistema</h1>
+          <p class="content-subtitle text-muted mb-0">Administra la configuración general del sistema</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" (click)="exportarConfiguracion()">
+            <i class="fas fa-download me-1"></i>
+            Exportar
+          </button>
+          <button class="btn btn-outline-primary" (click)="importarConfiguracion()">
+            <i class="fas fa-upload me-1"></i>
+            Importar
+          </button>
+          <button class="btn btn-outline-danger" (click)="restaurarConfiguracion()">
+            <i class="fas fa-undo me-1"></i>
+            Restaurar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configuración por pestañas -->
+    <div class="config-container">
+      <nav>
+        <div class="nav nav-tabs" id="nav-tab" role="tablist">
+          <button class="nav-link active" id="nav-general-tab" data-bs-toggle="tab" data-bs-target="#nav-general" type="button" role="tab" aria-controls="nav-general" aria-selected="true">
+            <i class="fas fa-building me-2"></i>General
+          </button>
+          <button class="nav-link" id="nav-facturacion-tab" data-bs-toggle="tab" data-bs-target="#nav-facturacion" type="button" role="tab" aria-controls="nav-facturacion" aria-selected="false">
+            <i class="fas fa-file-invoice-dollar me-2"></i>Facturación
+          </button>
+          <button class="nav-link" id="nav-inventario-tab" data-bs-toggle="tab" data-bs-target="#nav-inventario" type="button" role="tab" aria-controls="nav-inventario" aria-selected="false">
+            <i class="fas fa-boxes me-2"></i>Inventario
+          </button>
+          <button class="nav-link" id="nav-ventas-tab" data-bs-toggle="tab" data-bs-target="#nav-ventas" type="button" role="tab" aria-controls="nav-ventas" aria-selected="false">
+            <i class="fas fa-shopping-cart me-2"></i>Ventas
+          </button>
+          <button class="nav-link" id="nav-sistema-tab" data-bs-toggle="tab" data-bs-target="#nav-sistema" type="button" role="tab" aria-controls="nav-sistema" aria-selected="false">
+            <i class="fas fa-cog me-2"></i>Sistema
+          </button>
+        </div>
+      </nav>
+
+      <div class="tab-content" id="nav-tabContent">
+        <!-- Configuración General -->
+        <div class="tab-pane fade show active" id="nav-general" role="tabpanel" aria-labelledby="nav-general-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Información de la Empresa</h5>
+            </div>
+            <div class="card-body">
+              <form>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label for="nombreEmpresa" class="form-label">Nombre de la Empresa</label>
+                    <input type="text" class="form-control" id="nombreEmpresa" [(ngModel)]="configuracion.nombreEmpresa" name="nombreEmpresa">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="ruc" class="form-label">RUC</label>
+                    <input type="text" class="form-control" id="ruc" [(ngModel)]="configuracion.ruc" name="ruc">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="telefono" class="form-label">Teléfono</label>
+                    <input type="text" class="form-control" id="telefono" [(ngModel)]="configuracion.telefono" name="telefono">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" [(ngModel)]="configuracion.email" name="email">
+                  </div>
+                  <div class="col-12">
+                    <label for="direccion" class="form-label">Dirección</label>
+                    <textarea class="form-control" id="direccion" rows="3" [(ngModel)]="configuracion.direccion" name="direccion"></textarea>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="moneda" class="form-label">Moneda</label>
+                    <select class="form-select" id="moneda" [(ngModel)]="configuracion.moneda" name="moneda">
+                      <option value="PEN">Soles (PEN)</option>
+                      <option value="USD">Dólares (USD)</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="idioma" class="form-label">Idioma</label>
+                    <select class="form-select" id="idioma" [(ngModel)]="configuracion.idioma" name="idioma">
+                      <option value="es">Español</option>
+                      <option value="en">English</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionGeneral()">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración de Facturación -->
+        <div class="tab-pane fade" id="nav-facturacion" role="tabpanel" aria-labelledby="nav-facturacion-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Configuración de Facturación Electrónica</h5>
+            </div>
+            <div class="card-body">
+              <form>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label for="serieFactura" class="form-label">Serie de Facturas</label>
+                    <input type="text" class="form-control" id="serieFactura" [(ngModel)]="facturacion.serieFactura" name="serieFactura">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="serieBoleta" class="form-label">Serie de Boletas</label>
+                    <input type="text" class="form-control" id="serieBoleta" [(ngModel)]="facturacion.serieBoleta" name="serieBoleta">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="igv" class="form-label">IGV (%)</label>
+                    <input type="number" class="form-control" id="igv" [(ngModel)]="facturacion.igv" name="igv" min="0" max="100">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="serieNotaCredito" class="form-label">Serie Nota de Crédito</label>
+                    <input type="text" class="form-control" id="serieNotaCredito" [(ngModel)]="facturacion.serieNotaCredito" name="serieNotaCredito">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="serieNotaDebito" class="form-label">Serie Nota de Débito</label>
+                    <input type="text" class="form-control" id="serieNotaDebito" [(ngModel)]="facturacion.serieNotaDebito" name="serieNotaDebito">
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="autoNumeracion" [(ngModel)]="facturacion.autoNumeracion" name="autoNumeracion">
+                      <label class="form-check-label" for="autoNumeracion">
+                        Numeración automática
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="enviarSunat" [(ngModel)]="facturacion.enviarSunat" name="enviarSunat">
+                      <label class="form-check-label" for="enviarSunat">
+                        Enviar automáticamente a SUNAT
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionFacturacion()">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración de Inventario -->
+        <div class="tab-pane fade" id="nav-inventario" role="tabpanel" aria-labelledby="nav-inventario-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Configuración de Inventario</h5>
+            </div>
+            <div class="card-body">
+              <form>
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label for="alertaStockMinimo" class="form-label">Alerta Stock Mínimo</label>
+                    <input type="number" class="form-control" id="alertaStockMinimo" [(ngModel)]="inventario.alertaStockMinimo" name="alertaStockMinimo">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="alertaStockMaximo" class="form-label">Alerta Stock Máximo</label>
+                    <input type="number" class="form-control" id="alertaStockMaximo" [(ngModel)]="inventario.alertaStockMaximo" name="alertaStockMaximo">
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="permitirVentasNegativas" [(ngModel)]="inventario.permitirVentasNegativas" name="permitirVentasNegativas">
+                      <label class="form-check-label" for="permitirVentasNegativas">
+                        Permitir ventas con stock negativo
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="controlLotes" [(ngModel)]="inventario.controlLotes" name="controlLotes">
+                      <label class="form-check-label" for="controlLotes">
+                        Control de lotes
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="controlVencimiento" [(ngModel)]="inventario.controlVencimiento" name="controlVencimiento">
+                      <label class="form-check-label" for="controlVencimiento">
+                        Control de vencimiento
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="ubicaciones" [(ngModel)]="inventario.ubicaciones" name="ubicaciones">
+                      <label class="form-check-label" for="ubicaciones">
+                        Control de ubicaciones
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionInventario()">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración de Ventas -->
+        <div class="tab-pane fade" id="nav-ventas" role="tabpanel" aria-labelledby="nav-ventas-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Configuración de Ventas</h5>
+            </div>
+            <div class="card-body">
+              <form>
+                <div class="row g-3">
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="permitirCreditos" [(ngModel)]="ventas.permitirCreditos" name="permitirCreditos">
+                      <label class="form-check-label" for="permitirCreditos">
+                        Permitir ventas a crédito
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="diasCreditoMaximo" class="form-label">Días de crédito máximo</label>
+                    <input type="number" class="form-control" id="diasCreditoMaximo" [(ngModel)]="ventas.diasCreditoMaximo" name="diasCreditoMaximo">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="interesMoratorio" class="form-label">Interés moratorio (%)</label>
+                    <input type="number" class="form-control" id="interesMoratorio" [(ngModel)]="ventas.interesMoratorio" name="interesMoratorio" step="0.1">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="descuentoMaximo" class="form-label">Descuento máximo (%)</label>
+                    <input type="number" class="form-control" id="descuentoMaximo" [(ngModel)]="ventas.descuentoMaximo" name="descuentoMaximo">
+                  </div>
+                  <div class="col-md-6">
+                    <label for="comisionVendedor" class="form-label">Comisión vendedor (%)</label>
+                    <input type="number" class="form-control" id="comisionVendedor" [(ngModel)]="ventas.comisionVendedor" name="comisionVendedor" step="0.1">
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionVentas()">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Configuración del Sistema -->
+        <div class="tab-pane fade" id="nav-sistema" role="tabpanel" aria-labelledby="nav-sistema-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Configuración del Sistema</h5>
+            </div>
+            <div class="card-body">
+              <form>
+                <div class="row g-3">
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="backupAutomatico" [(ngModel)]="sistema.backupAutomatico" name="backupAutomatico">
+                      <label class="form-check-label" for="backupAutomatico">
+                        Backup automático
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="frecuenciaBackup" class="form-label">Frecuencia de backup</label>
+                    <select class="form-select" id="frecuenciaBackup" [(ngModel)]="sistema.frecuenciaBackup" name="frecuenciaBackup">
+                      <option value="diario">Diario</option>
+                      <option value="semanal">Semanal</option>
+                      <option value="mensual">Mensual</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="retencionLogs" class="form-label">Retención de logs (días)</label>
+                    <input type="number" class="form-control" id="retencionLogs" [(ngModel)]="sistema.retencionLogs" name="retencionLogs">
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="notificacionesEmail" [(ngModel)]="sistema.notificacionesEmail" name="notificacionesEmail">
+                      <label class="form-check-label" for="notificacionesEmail">
+                        Notificaciones por email
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="notificacionesWhatsApp" [(ngModel)]="sistema.notificacionesWhatsApp" name="notificacionesWhatsApp">
+                      <label class="form-check-label" for="notificacionesWhatsApp">
+                        Notificaciones por WhatsApp
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modoMantenimiento" [(ngModel)]="sistema.modoMantenimiento" name="modoMantenimiento">
+                      <label class="form-check-label" for="modoMantenimiento">
+                        Modo mantenimiento
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionSistema()">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

@@ -6,12 +6,13 @@ import { CreditosService } from '../../../services/creditos.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfaces/creditos-interface';
 import { Cliente } from '../../../interfaces/cliente-interface';
+import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-index-creditos',
-  imports: [FormsModule, RouterModule, CommonModule],
+  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
   templateUrl: './index-creditos.component.html',
   styleUrl: './index-creditos.component.css'
 })

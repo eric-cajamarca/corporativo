@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
 import { Caja, MovimientoCaja, TipoMovimientoCaja } from '../../../interfaces/caja-interface';
+import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-index-caja',
-  imports: [FormsModule, RouterModule, CommonModule],
+  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
   templateUrl: './index-caja.component.html',
   styleUrl: './index-caja.component.css'
 })

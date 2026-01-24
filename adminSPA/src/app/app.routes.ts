@@ -48,6 +48,8 @@ import { AsignarStockUbicacionComponent } from './components/inventario/asignar-
 import { IndexCajaComponent } from './components/caja/index-caja/index-caja.component';
 import { IndexCreditosComponent } from './components/creditos/index-creditos/index-creditos.component';
 import { DashboardAnalisisComponent } from './components/analisis/dashboard-analisis/dashboard-analisis.component';
+import { IndexConfiguracionComponent } from './components/configuracion/index-configuracion/index-configuracion.component';
+import { IndexReportesComponent } from './components/reportes/index-reportes/index-reportes.component';
 
 export const routes: Routes = [
     {
@@ -145,19 +147,19 @@ export const routes: Routes = [
      { path: 'detalle-compras', component: DetalleComprasComponent,canActivate: [AuthGuard], title: 'Detalle Compra' },
      { path: 'inventario', component: PrincipalInventarioComponent, canActivate: [AuthGuard], title: 'Inventario'},
 
-     { path: 'clientes', component: IndexClientesComponent, title: 'Clientes'},
-     { path: 'cliente/create', component: CreateClientesComponent, title: 'Crear Cliente'},
-     { path: 'cliente/:id', component: UpdateClientesComponent, title: 'Actualizar Cliente'},
+     { path: 'clientes', component: IndexClientesComponent, canActivate: [AuthGuard], title: 'Clientes'},
+     { path: 'cliente/create', component: CreateClientesComponent, canActivate: [AuthGuard], title: 'Crear Cliente'},
+     { path: 'cliente/:id', component: UpdateClientesComponent, canActivate: [AuthGuard], title: 'Actualizar Cliente'},
 
-     { path: 'despachos', component: IndexDespachosComponent, title: 'Despachos'},
-     { path: 'despachos/create', component: CreateDespachosComponent, title: 'Crear Despacho'},
+     { path: 'despachos', component: IndexDespachosComponent, canActivate: [AuthGuard], title: 'Despachos'},
+     { path: 'despachos/create', component: CreateDespachosComponent, canActivate: [AuthGuard], title: 'Crear Despacho'},
 
-     { path: 'programaciones', component: IndexProgramacionComponent, title: 'Programaciones' },
-     { path: 'programacion/create',component: CreateProgramacionComponent, title: 'Crear Programacion'},
-     { path: 'programacion/:id', component: UpdateProgramacionComponent, title: 'Actualizar Programacion'},
+     { path: 'programaciones', component: IndexProgramacionComponent, canActivate: [AuthGuard], title: 'Programaciones' },
+     { path: 'programacion/create',component: CreateProgramacionComponent, canActivate: [AuthGuard], title: 'Crear Programacion'},
+     { path: 'programacion/:id', component: UpdateProgramacionComponent, canActivate: [AuthGuard], title: 'Actualizar Programacion'},
 
-     { path: 'ventas', component: IndexVentasComponent, title: 'Resumen de ventas'},
-     { path: 'ventas/create', component: CreateVentasComponent, title: 'Crear nueva venta'},
+     { path: 'ventas', component: IndexVentasComponent, canActivate: [AuthGuard], title: 'Resumen de ventas'},
+     { path: 'ventas/create', component: CreateVentasComponent, canActivate: [AuthGuard], title: 'Crear nueva venta'},
 
      { path: 'proveedores',component: IndexProveedorComponent,canActivate: [AuthGuard], title: 'Proveedores' },
      { path: 'proveedores/create', component: CreateProveedorComponent,canActivate: [AuthGuard], title: 'Crear Proveedor' },
@@ -177,4 +179,6 @@ export const routes: Routes = [
      { path: 'caja', component: IndexCajaComponent, canActivate: [AuthGuard], title: 'Gestión de Caja' },
      { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard], title: 'Créditos y Cuotas' },
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
+     { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },
+     { path: 'reportes', component: IndexReportesComponent, canActivate: [AuthGuard], title: 'Reportes y Análisis' },
 ];

@@ -10,12 +10,13 @@ import {
   RatiosFinancieros,
   DiagnosticoFinanciero
 } from '../../../interfaces/analisis-interface';
+import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-dashboard-analisis',
-  imports: [FormsModule, RouterModule, CommonModule],
+  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
   templateUrl: './dashboard-analisis.component.html',
   styleUrl: './dashboard-analisis.component.css'
 })

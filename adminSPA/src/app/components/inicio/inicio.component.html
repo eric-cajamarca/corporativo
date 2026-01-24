@@ -1,108 +1,345 @@
+<!-- Navbar principal -->
 <app-topnav></app-topnav>
 
-<div class="container-fluid">
-  <div class="row">
-    <div class="col-12 p-3">
-      <!-- Aquí va el contenido principal de la página -->
-      <!-- <div class="accordion" id="accordionExample">
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingOne">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-              Accordion Item #1
-            </button>
-          </h2>
-          <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#accordionExample">
-            <div class="accordion-body">
-              <strong>This is the first item's accordion body.</strong> It is shown by default, until the collapse plugin adds the appropriate classes that we use to style each element. These classes control the overall appearance, as well as the showing and hiding via CSS transitions. You can modify any of this with custom CSS or overriding our default variables. It's also worth noting that just about any HTML can go within the <code>.accordion-body</code>, though the transition does limit overflow.
-            </div>
-          </div>
+<!-- Layout principal con sidebar -->
+<div class="dashboard-layout">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <i class="fas fa-building text-primary me-2"></i>
+        <span class="fw-bold">CRM</span>
+      </div>
+      <button class="sidebar-close d-lg-none" type="button" id="sidebarClose">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+      <!-- Usuario info -->
+      <div class="user-info">
+        <div class="user-avatar">
+          <i class="fas fa-user-circle"></i>
         </div>
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingTwo">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
-              Accordion Item #2
-            </button>
-          </h2>
-          <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionExample">
-            <div class="accordion-body">
-              <strong>This is the second item's accordion body.</strong> It is hidden by default, until the collapse plugin adds the appropriate classes that we use to style each element. These classes control the overall appearance, as well as the showing and hiding via CSS transitions. You can modify any of this with custom CSS or overriding our default variables. It's also worth noting that just about any HTML can go within the <code>.accordion-body</code>, though the transition does limit overflow.
-            </div>
-          </div>
-        </div>
-        <div class="accordion-item">
-          <h2 class="accordion-header" id="headingThree">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
-              Accordion Item #3
-            </button>
-          </h2>
-          <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#accordionExample">
-            <div class="accordion-body">
-              <strong>This is the third item's accordion body.</strong> It is hidden by default, until the collapse plugin adds the appropriate classes that we use to style each element. These classes control the overall appearance, as well as the showing and hiding via CSS transitions. You can modify any of this with custom CSS or overriding our default variables. It's also worth noting that just about any HTML can go within the <code>.accordion-body</code>, though the transition does limit overflow.
-            </div>
-          </div>
-        </div>
-      </div> -->
-
-      <!-- Barra de navegación -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-          <a class="navbar-brand" href="#">Panel de Administrador</a>
-        </div>
-      </nav>
-
-      <!-- Contenido del panel -->
-      <div class="container mt-4">
-        <div class="row">
-          <!-- Gráfico de Ventas -->
-          <div class="col-md-6 mb-4">
-            <div class="card">
-              <div class="card-header">
-                Ventas Mensuales
-              </div>
-              <div class="card-body">
-                <canvas id="ventasChart" width="400" height="200"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <!-- Gráfico de Compras -->
-          <div class="col-md-6 mb-4">
-            <div class="card">
-              <div class="card-header">
-                Compras Mensuales
-              </div>
-              <div class="card-body">
-                <canvas id="comprasChart" width="400" height="200"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <!-- Gráfico de Compras -->
-          <div class="col-md-6 mb-4">
-            <div class="card">
-              <div class="card-header">
-                Compras Envios
-              </div>
-              <div class="card-body">
-                <canvas id="comprasChart" width="400" height="200"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <!-- Otros gráficos similares para productos más vendidos, envíos, y productos con stock insuficiente -->
+        <div class="user-details">
+          <div class="user-name fw-semibold">{{userName}}</div>
+          <div class="user-role text-muted small">{{userRole}}</div>
         </div>
       </div>
 
-      <!-- Pie de página -->
-      <footer class="bg-dark text-light mt-4">
-        <div class="container py-3">
-          <p class="text-center">&copy; 2024 Rocket tech. Todos los derechos reservados.</p>
-        </div>
-      </footer>
+      <!-- Navegación principal -->
+      <ul class="sidebar-nav">
+        <!-- Dashboard -->
+        <li class="nav-item">
+          <a href="#" class="nav-link active" (click)="navigateTo('dashboard'); $event.preventDefault()">
+            <i class="nav-icon fas fa-tachometer-alt"></i>
+            <span class="nav-text">Dashboard</span>
+          </a>
+        </li>
 
-      <!-- Script para inicializar los gráficos -->
-    
+        <!-- Módulo Caja -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('caja'); $event.preventDefault()">
+            <i class="nav-icon fas fa-cash-register"></i>
+            <span class="nav-text">Caja</span>
+          </a>
+        </li>
 
+        <!-- Módulo Créditos -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('creditos'); $event.preventDefault()">
+            <i class="nav-icon fas fa-hand-holding-usd"></i>
+            <span class="nav-text">Créditos</span>
+          </a>
+        </li>
+
+        <!-- Módulo Análisis -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('analisis'); $event.preventDefault()">
+            <i class="nav-icon fas fa-chart-line"></i>
+            <span class="nav-text">Análisis</span>
+          </a>
+        </li>
+
+        <!-- Separador -->
+        <li class="nav-divider"></li>
+
+        <!-- Módulo Ventas -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('ventas'); $event.preventDefault()">
+            <i class="nav-icon fas fa-shopping-cart"></i>
+            <span class="nav-text">Ventas</span>
+          </a>
+        </li>
+
+        <!-- Módulo Compras -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('compras'); $event.preventDefault()">
+            <i class="nav-icon fas fa-shopping-bag"></i>
+            <span class="nav-text">Compras</span>
+          </a>
+        </li>
+
+        <!-- Módulo Inventario -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('inventario'); $event.preventDefault()">
+            <i class="nav-icon fas fa-boxes"></i>
+            <span class="nav-text">Inventario</span>
+          </a>
+        </li>
+
+        <!-- Módulo Clientes -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('clientes'); $event.preventDefault()">
+            <i class="nav-icon fas fa-users"></i>
+            <span class="nav-text">Clientes</span>
+          </a>
+        </li>
+
+        <!-- Separador -->
+        <li class="nav-divider"></li>
+
+        <!-- Configuración -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('configuracion'); $event.preventDefault()">
+            <i class="nav-icon fas fa-cog"></i>
+            <span class="nav-text">Configuración</span>
+          </a>
+        </li>
+
+        <!-- Reportes -->
+        <li class="nav-item">
+          <a href="#" class="nav-link" (click)="navigateTo('reportes'); $event.preventDefault()">
+            <i class="nav-icon fas fa-file-alt"></i>
+            <span class="nav-text">Reportes</span>
+          </a>
+        </li>
+      </ul>
     </div>
-  </div>
+  </nav>
+
+  <!-- Overlay para móviles -->
+  <div class="sidebar-overlay d-lg-none" id="sidebarOverlay"></div>
+
+  <!-- Contenido principal -->
+  <main class="main-content">
+    <!-- Header del contenido -->
+    <div class="content-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h1 class="content-title mb-1">Dashboard Ejecutivo</h1>
+          <p class="content-subtitle text-muted mb-0">Resumen general del negocio</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" (click)="refreshData()">
+            <i class="fas fa-sync-alt me-1"></i>
+            Actualizar
+          </button>
+          <div class="dropdown">
+            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-calendar me-1"></i>
+              {{periodoSeleccionado}}
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Hoy'); $event.preventDefault()">Hoy</a></li>
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Esta Semana'); $event.preventDefault()">Esta Semana</a></li>
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Mes'); $event.preventDefault()">Este Mes</a></li>
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Año'); $event.preventDefault()">Este Año</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs principales -->
+    <div class="row g-3 mb-4">
+      <!-- Ventas Totales -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card sales-card">
+          <div class="kpi-icon">
+            <i class="fas fa-chart-line"></i>
+          </div>
+          <div class="kpi-content">
+            <div class="kpi-value">{{ventasTotales | currency:'PEN':'symbol':'1.0-0'}}</div>
+            <div class="kpi-label">Ventas Totales</div>
+            <div class="kpi-change positive">
+              <i class="fas fa-arrow-up"></i>
+              +12.5%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Utilidad Neta -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card profit-card">
+          <div class="kpi-icon">
+            <i class="fas fa-coins"></i>
+          </div>
+          <div class="kpi-content">
+            <div class="kpi-value">{{utilidadNeta | currency:'PEN':'symbol':'1.0-0'}}</div>
+            <div class="kpi-label">Utilidad Neta</div>
+            <div class="kpi-change positive">
+              <i class="fas fa-arrow-up"></i>
+              +8.2%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Clientes Activos -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card clients-card">
+          <div class="kpi-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="kpi-content">
+            <div class="kpi-value">{{clientesActivos}}</div>
+            <div class="kpi-label">Clientes Activos</div>
+            <div class="kpi-change positive">
+              <i class="fas fa-arrow-up"></i>
+              +5.1%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROI -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card roi-card">
+          <div class="kpi-icon">
+            <i class="fas fa-percentage"></i>
+          </div>
+          <div class="kpi-content">
+            <div class="kpi-value">{{roi}}%</div>
+            <div class="kpi-label">ROI</div>
+            <div class="kpi-change" [class]="roi >= 15 ? 'positive' : 'negative'">
+              <i class="fas" [class]="roi >= 15 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+              {{roi >= 15 ? 'Excelente' : 'Regular'}}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráficos y métricas -->
+    <div class="row g-3 mb-4">
+      <!-- Gráfico de ventas -->
+      <div class="col-xl-8">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+              <i class="fas fa-chart-bar me-2"></i>
+              Tendencia de Ventas
+            </h5>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                6 meses
+              </button>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#">3 meses</a></li>
+                <li><a class="dropdown-item" href="#">6 meses</a></li>
+                <li><a class="dropdown-item" href="#">1 año</a></li>
+              </ul>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas id="ventasChart" height="300"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen financiero -->
+      <div class="col-xl-4">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="fas fa-balance-scale me-2"></i>
+              Resumen Financiero
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="financial-summary">
+              <div class="summary-item">
+                <div class="summary-label">Ingresos</div>
+                <div class="summary-value text-success">{{ingresos | currency:'PEN':'symbol':'1.0-0'}}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Costos</div>
+                <div class="summary-value text-danger">{{costos | currency:'PEN':'symbol':'1.0-0'}}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Utilidad Bruta</div>
+                <div class="summary-value text-info">{{utilidadBruta | currency:'PEN':'symbol':'1.0-0'}}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Gastos Operativos</div>
+                <div class="summary-value text-warning">{{gastosOperativos | currency:'PEN':'symbol':'1.0-0'}}</div>
+              </div>
+              <hr>
+              <div class="summary-item total">
+                <div class="summary-label fw-bold">Utilidad Neta</div>
+                <div class="summary-value fw-bold text-primary">{{utilidadNeta | currency:'PEN':'symbol':'1.0-0'}}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Métricas adicionales -->
+    <div class="row g-3">
+      <!-- Productos más vendidos -->
+      <div class="col-xl-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="fas fa-star me-2"></i>
+              Productos Más Vendidos
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="product-list">
+              <div class="product-item" *ngFor="let producto of productosMasVendidos">
+                <div class="product-info">
+                  <div class="product-name">{{producto.nombre}}</div>
+                  <div class="product-category text-muted small">{{producto.categoria}}</div>
+                </div>
+                <div class="product-sales">
+                  <div class="sales-count">{{producto.ventas}} ventas</div>
+                  <div class="sales-amount text-success fw-semibold">{{producto.monto | currency:'PEN':'symbol':'1.0-0'}}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alertas y notificaciones -->
+      <div class="col-xl-6">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title mb-0">
+              <i class="fas fa-bell me-2"></i>
+              Alertas y Notificaciones
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="alerts-list">
+              <div class="alert-item warning" *ngFor="let alerta of alertas">
+                <div class="alert-icon">
+                  <i class="fas" [class]="alerta.icono"></i>
+                </div>
+                <div class="alert-content">
+                  <div class="alert-title">{{alerta.titulo}}</div>
+                  <div class="alert-message text-muted small">{{alerta.mensaje}}</div>
+                </div>
+                <div class="alert-time text-muted small">{{alerta.tiempo}}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
