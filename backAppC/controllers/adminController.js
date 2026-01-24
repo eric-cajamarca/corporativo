@@ -326,7 +326,8 @@ const admin_login = async (req, res) => {
 
     // 3. Llamar al Service (toda la lógica de negocio)
     const datosUsuario = await authService.adminLogin(pool, email, password, ruc);
-    // 4. Crear token
+
+    // 4. Crear token con datos del usuario
     const token = jwt.createToken(datosUsuario);
 
     // 5. Establecer cookie HttpOnly (estás seguro porque ya validaste credenciales)
@@ -337,8 +338,20 @@ const admin_login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 1 día
     });
 
-    // 6. Responder éxito (NO enviar token en JSON)
-    res.status(200).send({ message: 'Login exitoso', data: {} });
+    // 6. Responder éxito con datos del usuario (sin el token)
+    const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
+    res.status(200).send({
+      message: 'Login exitoso',
+      data: {
+        idUsuario,
+        idEmpresa,
+        razonSocial,
+        nombres,
+        apellidos,
+        email: userEmail,
+        rol
+      }
+    });
 
   } catch (error) {
     console.error('Error en login:', error);

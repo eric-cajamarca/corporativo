@@ -36,6 +36,12 @@ const tranferenciaRoutes = require('./routes/transferencia');
 const lotesRoutes = require('./routes/lotes');
 const lotesUbicacionRoutes = require('./routes/lotesUbicacion');
 const ubicacionesPrioridadRoutes = require('./routes/ubicacionesPrioridad');
+const cajaRoutes = require('./routes/caja');
+const creditosRoutes = require('./routes/creditos');
+const despachosRoutes = require('./routes/despachos');
+const enviosRoutes = require('./routes/envios');
+const facturacionRoutes = require('./routes/facturacion');
+const analisisRoutes = require('./routes/analisis');
 
 
 const app = express();
@@ -160,6 +166,12 @@ app.use('/api', tranferenciaRoutes);
 app.use('/api', lotesRoutes);
 app.use('/api', lotesUbicacionRoutes);
 app.use('/api', ubicacionesPrioridadRoutes);
+app.use('/api/caja', cajaRoutes);
+app.use('/api/creditos', creditosRoutes);
+app.use('/api/despachos', despachosRoutes);
+app.use('/api/envios', enviosRoutes);
+app.use('/api/facturacion', facturacionRoutes);
+app.use('/api/analisis', analisisRoutes);
 
 // Iniciar servidor
 app.listen(PORT, () => {

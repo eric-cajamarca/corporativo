@@ -1,0 +1,427 @@
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-hand-holding-usd me-2"></i>
+            Gestión de Créditos
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Resumen de Créditos -->
+          <div class="row mb-4" *ngIf="resumenCreditos">
+            <div class="col-12">
+              <h6 class="text-muted mb-3">
+                <i class="fas fa-chart-bar me-2"></i>
+                Resumen General
+              </h6>
+              <div class="row">
+                <div class="col-md-3 mb-3">
+                  <div class="card border-primary">
+                    <div class="card-body text-center">
+                      <div class="text-primary mb-2">
+                        <i class="fas fa-credit-card fa-2x"></i>
+                      </div>
+                      <h4 class="mb-1">{{resumenCreditos.totalCreditos}}</h4>
+                      <small class="text-muted">Total Créditos</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <div class="card border-success">
+                    <div class="card-body text-center">
+                      <div class="text-success mb-2">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                      </div>
+                      <h4 class="mb-1">S/ {{resumenCreditos.totalMontoOtorgado | number:'1.2-2'}}</h4>
+                      <small class="text-muted">Monto Otorgado</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <div class="card border-warning">
+                    <div class="card-body text-center">
+                      <div class="text-warning mb-2">
+                        <i class="fas fa-clock fa-2x"></i>
+                      </div>
+                      <h4 class="mb-1">S/ {{resumenCreditos.totalSaldoPendiente | number:'1.2-2'}}</h4>
+                      <small class="text-muted">Saldo Pendiente</small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                  <div class="card border-info">
+                    <div class="card-body text-center">
+                      <div class="text-info mb-2">
+                        <i class="fas fa-percentage fa-2x"></i>
+                      </div>
+                      <h4 class="mb-1">{{resumenCreditos.tasaCobro | number:'1.1-1'}}%</h4>
+                      <small class="text-muted">Tasa de Cobro</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filtros y Acciones -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="text-muted mb-0">
+                  <i class="fas fa-filter me-2"></i>
+                  Créditos
+                </h6>
+                <button class="btn btn-primary btn-sm" (click)="abrirModalNuevoCredito()">
+                  <i class="fas fa-plus me-1"></i>
+                  Nuevo Crédito
+                </button>
+              </div>
+
+              <div class="card">
+                <div class="card-body">
+                  <div class="row">
+                    <div class="col-md-3">
+                      <label class="form-label">Cliente</label>
+                      <select class="form-select form-select-sm"
+                              [(ngModel)]="filtros.idCliente"
+                              (change)="filtrarCreditos()">
+                        <option value="">Todos los clientes</option>
+                        <option *ngFor="let cliente of clientes"
+                                [value]="cliente.idCliente">
+                          {{cliente.rSocial || (cliente.nombre + ' ' + (cliente.apellido || ''))}}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Estado</label>
+                      <select class="form-select form-select-sm"
+                              [(ngModel)]="filtros.estado"
+                              (change)="filtrarCreditos()">
+                        <option value="">Todos</option>
+                        <option value="ACTIVO">Activo</option>
+                        <option value="COMPLETADO">Completado</option>
+                        <option value="CANCELADO">Cancelado</option>
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Desde</label>
+                      <input type="date" class="form-control form-control-sm"
+                             [(ngModel)]="filtros.fechaDesde"
+                             (change)="filtrarCreditos()">
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Hasta</label>
+                      <input type="date" class="form-control form-control-sm"
+                             [(ngModel)]="filtros.fechaHasta"
+                             (change)="filtrarCreditos()">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label">&nbsp;</label>
+                      <div class="d-flex gap-1">
+                        <button class="btn btn-outline-secondary btn-sm"
+                                (click)="limpiarFiltros()">
+                          <i class="fas fa-eraser"></i>
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm"
+                                (click)="filtrarCreditos()">
+                          <i class="fas fa-search"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lista de Créditos -->
+          <div class="row">
+            <div class="col-12">
+              <div class="table-responsive" *ngIf="creditos.length > 0; else noCreditos">
+                <table class="table table-hover">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Fecha</th>
+                      <th>Monto Total</th>
+                      <th>Cuotas</th>
+                      <th>Saldo Pendiente</th>
+                      <th>Estado</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let credito of creditos">
+                      <td>{{getClienteNombre(credito.idCliente)}}</td>
+                      <td>{{credito.fechaCredito | date:'dd/MM/yyyy'}}</td>
+                      <td class="text-end">S/ {{credito.montoTotal | number:'1.2-2'}}</td>
+                      <td class="text-center">{{credito.numeroCuotas}}</td>
+                      <td class="text-end">S/ {{credito.saldoPendiente | number:'1.2-2'}}</td>
+                      <td>
+                        <span class="badge" [ngClass]="getEstadoBadgeClass(credito.estado)">
+                          {{credito.estado}}
+                        </span>
+                      </td>
+                      <td>
+                        <button class="btn btn-sm btn-outline-primary me-1"
+                                (click)="verCuotas(credito)"
+                                title="Ver Cuotas">
+                          <i class="fas fa-eye"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <ng-template #noCreditos>
+                <div class="text-center py-5">
+                  <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                  <h6 class="text-muted">No hay créditos registrados</h6>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+
+          <!-- Cuotas del Crédito Seleccionado -->
+          <div class="row mt-4" *ngIf="mostrarCuotas && creditoSeleccionado">
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header bg-light">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                      <i class="fas fa-list me-2"></i>
+                      Cuotas - Crédito de {{getClienteNombre(creditoSeleccionado.idCliente)}}
+                    </h6>
+                    <button class="btn btn-sm btn-secondary" (click)="cerrarModales()">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive" *ngIf="cuotas.length > 0; else noCuotas">
+                    <table class="table table-hover">
+                      <thead class="table-light">
+                        <tr>
+                          <th>N°</th>
+                          <th>Vencimiento</th>
+                          <th>Monto</th>
+                          <th>Interés</th>
+                          <th>Saldo Pendiente</th>
+                          <th>Estado</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let cuota of cuotas">
+                          <td class="text-center">{{cuota.numeroCuota}}</td>
+                          <td>{{cuota.fechaVencimiento | date:'dd/MM/yyyy'}}</td>
+                          <td class="text-end">S/ {{cuota.montoCuota | number:'1.2-2'}}</td>
+                          <td class="text-end">S/ {{cuota.interes | number:'1.2-2'}}</td>
+                          <td class="text-end">S/ {{cuota.saldoPendiente | number:'1.2-2'}}</td>
+                          <td>
+                            <span class="badge" [ngClass]="getEstadoCuotaBadgeClass(cuota.estado)">
+                              {{cuota.estado}}
+                            </span>
+                          </td>
+                          <td>
+                            <button class="btn btn-sm btn-success"
+                                    *ngIf="cuota.estado !== 'PAGADO'"
+                                    (click)="abrirModalPagarCuota(cuota)"
+                                    title="Pagar Cuota">
+                              <i class="fas fa-money-bill-wave"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <ng-template #noCuotas>
+                    <div class="text-center py-3">
+                      <p class="text-muted mb-0">No hay cuotas registradas</p>
+                    </div>
+                  </ng-template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo Crédito -->
+<div class="modal fade" [class.show]="mostrarModalNuevoCredito" [style.display]="mostrarModalNuevoCredito ? 'block' : 'none'"
+     tabindex="-1" aria-labelledby="modalNuevoCreditoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalNuevoCreditoLabel">
+          <i class="fas fa-plus me-2"></i>
+          Nuevo Crédito
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModales()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="cliente" class="form-label">Cliente *</label>
+                <select class="form-select" id="cliente"
+                        [(ngModel)]="nuevoCredito.idCliente" name="idCliente" required>
+                  <option value="">Seleccionar cliente</option>
+                  <option *ngFor="let cliente of clientes"
+                          [value]="cliente.idCliente">
+                    {{cliente.rSocial || (cliente.nombre + ' ' + (cliente.apellido || ''))}}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="venta" class="form-label">Venta Asociada</label>
+                <input type="text" class="form-control" id="venta"
+                       [(ngModel)]="nuevoCredito.idVenta" name="idVenta"
+                       placeholder="ID de la venta (opcional)">
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="montoTotal" class="form-label">Monto Total *</label>
+                <div class="input-group">
+                  <span class="input-group-text">S/</span>
+                  <input type="number" class="form-control" id="montoTotal"
+                         [(ngModel)]="nuevoCredito.montoTotal" name="montoTotal"
+                         placeholder="0.00" step="0.01" min="0" required>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="interes" class="form-label">Interés (%)</label>
+                <div class="input-group">
+                  <input type="number" class="form-control" id="interes"
+                         [(ngModel)]="nuevoCredito.interes" name="interes"
+                         placeholder="0.00" step="0.01" min="0">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="numeroCuotas" class="form-label">Número de Cuotas *</label>
+                <input type="number" class="form-control" id="numeroCuotas"
+                       [(ngModel)]="nuevoCredito.numeroCuotas" name="numeroCuotas"
+                       placeholder="1" min="1" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="cuotaInicial" class="form-label">Cuota Inicial</label>
+                <div class="input-group">
+                  <span class="input-group-text">S/</span>
+                  <input type="number" class="form-control" id="cuotaInicial"
+                         [(ngModel)]="nuevoCredito.cuotaInicial" name="cuotaInicial"
+                         placeholder="0.00" step="0.01" min="0">
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label">Monto por Cuota</label>
+                <div class="input-group">
+                  <span class="input-group-text">S/</span>
+                  <input type="text" class="form-control" readonly
+                         [value]="calcularMontoCuota() | number:'1.2-2'">
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="crearCredito()" [disabled]="loading">
+          <i class="fas fa-save me-1"></i>
+          {{loading ? 'Creando...' : 'Crear Crédito'}}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Pagar Cuota -->
+<div class="modal fade" [class.show]="mostrarModalPagarCuota" [style.display]="mostrarModalPagarCuota ? 'block' : 'none'"
+     tabindex="-1" aria-labelledby="modalPagarCuotaLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="modalPagarCuotaLabel">
+          <i class="fas fa-money-bill-wave me-2"></i>
+          Pagar Cuota
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModales()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="mb-3">
+            <label for="montoPagado" class="form-label">Monto a Pagar *</label>
+            <div class="input-group">
+              <span class="input-group-text">S/</span>
+              <input type="number" class="form-control" id="montoPagado"
+                     [(ngModel)]="pagoCuota.montoPagado" name="montoPagado"
+                     placeholder="0.00" step="0.01" min="0" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="formaPago" class="form-label">Forma de Pago *</label>
+            <select class="form-select" id="formaPago"
+                    [(ngModel)]="pagoCuota.formaPago" name="formaPago" required>
+              <option value="">Seleccionar forma de pago</option>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="CHEQUE">Cheque</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="referencia" class="form-label">Referencia</label>
+            <input type="text" class="form-control" id="referencia"
+                   [(ngModel)]="pagoCuota.referencia" name="referencia"
+                   placeholder="Número de operación, voucher, etc.">
+          </div>
+
+          <div class="mb-3">
+            <label for="observaciones" class="form-label">Observaciones</label>
+            <textarea class="form-control" id="observaciones" rows="2"
+                      [(ngModel)]="pagoCuota.observaciones" name="observaciones"
+                      placeholder="Observaciones adicionales"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn btn-success" (click)="pagarCuota()" [disabled]="loading">
+          <i class="fas fa-money-bill-wave me-1"></i>
+          {{loading ? 'Procesando...' : 'Registrar Pago'}}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backdrop para modales -->
+<div class="modal-backdrop fade show" *ngIf="mostrarModalNuevoCredito || mostrarModalPagarCuota"></div>

@@ -1,7 +1,12 @@
 const sql = require('mssql');
 
 // Tablas globales que NO necesitan filtro de empresa
-const TABLAS_GLOBALES = ['documentoidentidad', 'moneda', 'paises', 'departamentos', 'municipios'];
+const TABLAS_GLOBALES = [
+  'documentoidentidad', 'moneda', 'paises', 'departamentos', 'municipios',
+  'mediospago', 'presentacion', 'documentos', 'estadopago', 'estadospedidos',
+  'tiposmovimientocaja', 'tiposdespacho', 'tiposenvio', 'estadosenvio',
+  'estadosunat', 'transportistas'
+];
 
 // Middleware que agrega req.querySafe
 exports.querySafeMiddleware = (req, res, next) => {

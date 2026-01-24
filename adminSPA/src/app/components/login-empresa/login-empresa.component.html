@@ -2,56 +2,164 @@
   <div class="login-wrapper">
     <div class="login-card">
       <form #loginForm="ngForm" (ngSubmit)="login(loginForm)" class="login-form">
-        <div class="logo-container">
-          <img class="logo" src="logos/login.png" alt="Logo de la empresa">
+        <!-- Header con logo y título -->
+        <div class="login-header">
+          <div class="logo-container">
+            <img class="logo" src="logos/login.png" alt="Logo de la empresa">
+          </div>
+          <h1 class="login-title">CRM Empresarial</h1>
+          <p class="login-subtitle">Acceso seguro al panel de administración</p>
         </div>
-        
-        <h1 class="login-title">Busines Soft Company</h1>
-        <p class="login-subtitle">Ingrese sus credenciales para acceder al sistema</p>
-        
-        <div class="form-group">
-          <input type="text"
-                 class="form-input"
-                 name="ruc"
-                 [(ngModel)]="user.ruc"
-                 placeholder=" "
-                 required />
-          <label class="form-label">RUC empresa</label>
-          <span class="input-border"></span>
+
+        <!-- Indicador de progreso -->
+        <div class="login-steps">
+          <div class="step active">
+            <div class="step-icon">
+              <i class="fas fa-building"></i>
+            </div>
+            <span class="step-label">Empresa</span>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step">
+            <div class="step-icon">
+              <i class="fas fa-user"></i>
+            </div>
+            <span class="step-label">Usuario</span>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step">
+            <div class="step-icon">
+              <i class="fas fa-check"></i>
+            </div>
+            <span class="step-label">Acceso</span>
+          </div>
         </div>
-        
-        <div class="form-group">
-          <input type="email"
-                 class="form-input"
-                 name="email"
-                 [(ngModel)]="user.email"
-                 placeholder=" "
-                 required />
-          <label class="form-label">Correo electrónico</label>
-          <span class="input-border"></span>
+
+        <!-- Campos del formulario -->
+        <div class="form-fields">
+          <!-- Campo RUC con validación -->
+          <div class="form-group" [class.has-error]="rucInvalid">
+            <div class="input-container">
+              <div class="input-icon">
+                <i class="fas fa-id-card"></i>
+              </div>
+              <input type="text"
+                     class="form-input"
+                     id="ruc"
+                     name="ruc"
+                     [(ngModel)]="user.ruc"
+                     placeholder="Ingrese RUC de 11 dígitos"
+                     (input)="validateRuc()"
+                     (blur)="validateRuc()"
+                     maxlength="11"
+                     required />
+              <label class="form-label">RUC de la Empresa</label>
+              <span class="input-border"></span>
+            </div>
+            <small class="field-hint" [class.error]="rucInvalid">
+              <i class="fas" [class]="rucInvalid ? 'fa-exclamation-circle' : 'fa-info-circle'"></i>
+              {{rucInvalid ? 'RUC inválido' : 'Número de RUC registrado en SUNAT'}}
+            </small>
+          </div>
+
+          <!-- Campo Email con validación -->
+          <div class="form-group" [class.has-error]="emailInvalid">
+            <div class="input-container">
+              <div class="input-icon">
+                <i class="fas fa-envelope"></i>
+              </div>
+              <input type="email"
+                     class="form-input"
+                     id="email"
+                     name="email"
+                     [(ngModel)]="user.email"
+                     placeholder="usuario@empresa.com"
+                     (input)="validateEmail()"
+                     (blur)="validateEmail()"
+                     required />
+              <label class="form-label">Correo Electrónico</label>
+              <span class="input-border"></span>
+            </div>
+            <small class="field-hint" [class.error]="emailInvalid">
+              <i class="fas" [class]="emailInvalid ? 'fa-exclamation-circle' : 'fa-info-circle'"></i>
+              {{emailInvalid ? 'Correo inválido' : 'Email del administrador de la empresa'}}
+            </small>
+          </div>
+
+          <!-- Campo Password con toggle -->
+          <div class="form-group">
+            <div class="input-container">
+              <div class="input-icon">
+                <i class="fas fa-lock"></i>
+              </div>
+              <input [type]="showPassword ? 'text' : 'password'"
+                     class="form-input"
+                     id="password"
+                     name="password"
+                     [(ngModel)]="user.password"
+                     placeholder="Contraseña segura"
+                     required />
+              <button type="button" class="password-toggle" (click)="togglePasswordVisibility()">
+                <i class="fas" [class]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+              </button>
+              <label class="form-label">Contraseña</label>
+              <span class="input-border"></span>
+            </div>
+            <small class="field-hint">
+              <i class="fas fa-shield-alt"></i>
+              Mínimo 6 caracteres con números y letras
+            </small>
+          </div>
         </div>
-        
-        <div class="form-group">
-          <input type="password"
-                 class="form-input"
-                 name="password"
-                 [(ngModel)]="user.password"
-                 placeholder=" "
-                 required />
-          <label class="form-label">Contraseña</label>
-          <span class="input-border"></span>
+
+        <!-- Opciones adicionales -->
+        <div class="login-options">
+          <div class="remember-container">
+            <input type="checkbox" id="remember" class="remember-checkbox" (change)="onRememberChange($event)">
+            <label for="remember" class="remember-label">
+              <span class="checkmark"></span>
+              Recordar empresa
+            </label>
+          </div>
+          <a href="#" class="forgot-password" (click)="recuperarPassword($event)">
+            <i class="fas fa-key"></i>
+            Recuperar contraseña
+          </a>
         </div>
-        
-        <button class="login-button" type="submit">
-          <span>Ingresar</span>
-          <svg width="34" height="34" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+        <!-- Botón de login -->
+        <button class="login-button" type="submit" [disabled]="loginForm.invalid || loading">
+          <span *ngIf="!loading">Acceder al Sistema</span>
+          <span *ngIf="loading">Verificando credenciales...</span>
+          <div class="button-spinner" *ngIf="loading">
+            <div class="spinner"></div>
+          </div>
+          <svg *ngIf="!loading" width="20" height="20" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="37" cy="37" r="35.5" stroke="white" stroke-width="3"></circle>
             <path d="M25 35.5C24.1716 35.5 23.5 36.1716 23.5 37C23.5 37.8284 24.1716 38.5 25 38.5V35.5ZM49.0607 38.0607C49.6464 37.4749 49.6464 36.5251 49.0607 35.9393L39.5147 26.3934C38.9289 25.8076 37.9792 25.8076 37.3934 26.3934C36.8076 26.9792 36.8076 27.9289 37.3934 28.5147L45.8787 37L37.3934 45.4853C36.8076 46.0711 36.8076 47.0208 37.3934 47.6066C37.9792 48.1924 38.9289 48.1924 39.5147 47.6066L49.0607 38.0607ZM25 38.5L48 38.5V35.5L25 35.5V38.5Z" fill="white"></path>
           </svg>
         </button>
-        
+
+        <!-- Información adicional -->
+        <div class="login-info">
+          <div class="info-card">
+            <i class="fas fa-shield-alt"></i>
+            <div>
+              <strong>Acceso Seguro</strong>
+              <p>Conexión encriptada y autenticación multi-factor</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
         <div class="login-footer">
-          <a href="#" class="forgot-password">¿Olvidó su contraseña?</a>
+          <p class="footer-text">
+            ¿No tienes una cuenta?
+            <a href="#" class="register-link" (click)="contactarSoporte($event)">
+              Contactar soporte
+            </a>
+          </p>
+          <p class="version">v2.1.0 - Sistema CRM Multiempresa</p>
         </div>
       </form>
     </div>

@@ -170,6 +170,27 @@
           </ul>
         </li>
 
+        <!-- Módulo Caja -->
+        <li class="nav-item">
+          <a class="nav-link" [routerLink]="['/caja']" routerLinkActive="active">
+            <i class="fas fa-cash-register me-2"></i> Caja
+          </a>
+        </li>
+
+        <!-- Módulo Créditos -->
+        <li class="nav-item">
+          <a class="nav-link" [routerLink]="['/creditos']" routerLinkActive="active">
+            <i class="fas fa-hand-holding-usd me-2"></i> Créditos
+          </a>
+        </li>
+
+        <!-- Módulo Análisis Financiero -->
+        <li class="nav-item">
+          <a class="nav-link" [routerLink]="['/analisis']" routerLinkActive="active">
+            <i class="fas fa-chart-line me-2"></i> Análisis
+          </a>
+        </li>
+
         <li class="nav-item">
           <a class="nav-link" href="#" (click)="authService.forceLogout(); $event.preventDefault()"> <i
               class="bi-box-arrow-right me-2"></i> Cerrar sesión</a>

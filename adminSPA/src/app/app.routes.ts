@@ -45,6 +45,9 @@ import { UbicacionPrioridadListComponent } from './components/inventario/ubicaci
 import { MovimientoUbicacionComponent } from './components/inventario/movimiento-ubicacion/movimiento-ubicacion.component';
 import { VentaPorPrioridadComponent } from './components/inventario/venta-por-prioridad/venta-por-prioridad.component';
 import { AsignarStockUbicacionComponent } from './components/inventario/asignar-stock-ubicacion/asignar-stock-ubicacion.component';
+import { IndexCajaComponent } from './components/caja/index-caja/index-caja.component';
+import { IndexCreditosComponent } from './components/creditos/index-creditos/index-creditos.component';
+import { DashboardAnalisisComponent } from './components/analisis/dashboard-analisis/dashboard-analisis.component';
 
 export const routes: Routes = [
     {
@@ -169,4 +172,9 @@ export const routes: Routes = [
      { path: 'inventario/movimientos', component: MovimientoUbicacionComponent, canActivate: [AuthGuard], title: 'Movimiento entre Ubicaciones' },
      { path: 'inventario/venta-rapida', component: VentaPorPrioridadComponent, canActivate: [AuthGuard], title: 'Venta por Prioridad' },
      { path: 'inventario/asignaciones', component: AsignarStockUbicacionComponent, canActivate: [AuthGuard], title: 'Asignaciones de Stock' },
+
+     // Nuevos módulos
+     { path: 'caja', component: IndexCajaComponent, canActivate: [AuthGuard], title: 'Gestión de Caja' },
+     { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard], title: 'Créditos y Cuotas' },
+     { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
 ];

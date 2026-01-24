@@ -82,6 +82,28 @@ exports.buscarPorEmailYRuc = async (pool, email, idEmpresa) => {
   return result.recordset.length > 0 ? result.recordset[0] : null;
 };
 
+/**
+ * Busca el primer usuario administrador de una empresa
+ */
+exports.buscarUsuarioAdminPorEmpresa = async (pool, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1
+        UW.*,
+        R.descripcion as rol
+      FROM usuarioWeb UW
+      INNER JOIN Rol R ON UW.idRol = R.idRol
+      WHERE UW.idEmpresa = @idEmpresa
+        AND R.descripcion = 'Administrador'
+        AND UW.estado = 1
+      ORDER BY UW.fRegistro ASC
+    `);
+
+  return result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
 // Agrega estas funciones al archivo existente
 
 /**

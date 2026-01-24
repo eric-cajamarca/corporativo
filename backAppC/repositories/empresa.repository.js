@@ -15,7 +15,7 @@ exports.buscarPorRuc = async (pool, ruc) => {
     .request()
     .input('ruc', sql.VarChar(20), ruc)
     .input('estado', sql.Bit, 1)
-    .query('SELECT idEmpresa, razon_Social FROM Empresas WHERE ruc = @ruc and estado= @estado');
-  
+    .query('SELECT idEmpresa, razon_Social, correo, password FROM Empresas WHERE ruc = @ruc AND estado = @estado');
+
   return result.recordset.length > 0 ? result.recordset[0] : null;
 };

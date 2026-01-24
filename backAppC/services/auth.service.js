@@ -6,39 +6,57 @@ const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 
 exports.adminLogin = async (pool, email, password, ruc) => {
-  // 1. Validar RUC
+  // 1. Validar RUC y obtener empresa
   const empresa = await empresaRepository.buscarPorRuc(pool, ruc);
   if (!empresa) {
-    throw new Error('RUC no existe');
+    throw new Error('RUC no existe o empresa inactiva');
   }
 
   console.log('Empresa encontrada:', empresa);
-  // 2. Validar email y obtener usuario con rol
-  const usuario = await usuarioRepository.buscarPorEmailYRuc(pool, email, empresa.idEmpresa);
-  if (!usuario) {
-    throw new Error('El email no existe o no tiene permisos para acceder');
+
+  // 2. Verificar que el email coincida con el email de la empresa
+  if (empresa.correo !== email) {
+    throw new Error('El email no corresponde a la empresa registrada');
   }
 
-  console.log('Usuario encontrado:', usuario);
-  // 3. Verificar contraseña
-  const isMatch = await bcrypt.compare(password, usuario.password);
-  if (!isMatch) {
+  // 3. Verificar contraseña de la empresa
+  const isEmpresaPasswordValid = await bcrypt.compare(password, empresa.password);
+  if (!isEmpresaPasswordValid) {
     throw new Error('La contraseña es incorrecta');
   }
 
-  // 4. Verificar estado activo
-  if (!usuario.estado) {
-    throw new Error('Usuario inactivo');
+  console.log('Empresa autenticada correctamente');
+
+  // 4. Buscar usuario administrador de la empresa (opcional para completar datos)
+  try {
+    const usuario = await usuarioRepository.buscarUsuarioAdminPorEmpresa(pool, empresa.idEmpresa);
+    if (usuario) {
+      console.log('Usuario administrador encontrado:', usuario.nombres);
+
+      // 5. Retornar datos combinados para token
+      return {
+        idUsuario: usuario.idUsuario,
+        idEmpresa: empresa.idEmpresa,
+        razonSocial: empresa.razon_Social,
+        nombres: usuario.nombres,
+        apellidos: usuario.apellidos,
+        email: usuario.email,
+        rol: usuario.rol || 'Administrador'
+      };
+    }
+  } catch (error) {
+    console.log('No se encontró usuario administrador, continuando con datos de empresa');
   }
 
-  // 5. Retornar datos del usuario para token
+  // 6. Si no hay usuario administrador, retornar datos básicos de empresa
   return {
-    idUsuario: usuario.idUsuario,
-    idEmpresa: usuario.idEmpresa,
-    nombres: usuario.nombres,
-    apellidos: usuario.apellidos,
-    email: usuario.email,
-    rol: usuario.rol
+    idUsuario: empresa.idEmpresa, // Usar ID de empresa como ID de usuario temporal
+    idEmpresa: empresa.idEmpresa,
+    razonSocial: empresa.razon_Social,
+    nombres: 'Administrador',
+    apellidos: 'Sistema',
+    email: empresa.correo,
+    rol: 'Administrador'
   };
 
 };
