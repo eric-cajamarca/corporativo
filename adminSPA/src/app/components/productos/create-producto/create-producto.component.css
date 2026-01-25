@@ -41,8 +41,18 @@
   margin: 0;
 }
 
-.content-subtitle {
-  font-size: 0.9rem;
+.breadcrumb {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.breadcrumb-item a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+  text-decoration: underline;
 }
 
 /* =============================================
@@ -58,102 +68,75 @@
 .card-header {
   background: #fff;
   border-bottom: 1px solid #f1f3f4;
-  padding: 16px 20px;
+  padding: 0;
 }
 
 .card-body {
-  padding: 20px;
+  padding: 24px;
+}
+
+.card-footer {
+  background: #fff;
+  border-top: 1px solid #f1f3f4;
+  padding: 16px 24px;
 }
 
 /* =============================================
-   TABLA
+   TABS
    ============================================= */
-
-.table {
-  margin-bottom: 0;
-}
-
-.table th {
-  font-weight: 600;
-  color: #6c757d;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-top: none;
-  padding: 12px 16px;
-}
-
-.table td {
-  vertical-align: middle;
-  padding: 16px;
-  border-color: #f1f3f4;
-}
-
-.table tbody tr:hover {
-  background-color: #f8f9fa;
-}
-
-.fw-medium {
-  font-weight: 500;
-}
-
-/* =============================================
-   BADGES
-   ============================================= */
-
-.badge {
-  font-weight: 500;
-  padding: 6px 10px;
-  font-size: 0.75rem;
-}
-
-/* =============================================
-   MODAL
-   ============================================= */
-
-.modal-lg .modal-dialog {
-  max-width: 700px;
-}
 
 .nav-tabs {
   border-bottom: none;
-  gap: 4px;
+  padding: 0 16px;
 }
 
 .nav-tabs .nav-link {
   border: none;
-  border-radius: 8px 8px 0 0;
-  padding: 12px 20px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 16px 20px;
   color: #6c757d;
   font-weight: 500;
+  transition: all 0.2s;
 }
 
 .nav-tabs .nav-link.active {
-  background: #fff;
   color: #667eea;
-  border-bottom: 2px solid #667eea;
+  border-bottom-color: #667eea;
+  background: transparent;
 }
 
 .nav-tabs .nav-link:hover:not(.active) {
-  background: #f8f9fa;
+  color: #1a1f2e;
+  border-bottom-color: #e9ecef;
 }
 
 /* =============================================
-   LIST GROUP
+   FORM
    ============================================= */
 
-.list-group-item {
-  border-radius: 8px !important;
-  margin-bottom: 8px;
-  border: 1px solid #e9ecef;
+.form-label {
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.5rem;
 }
 
-.list-group-item:last-child {
-  margin-bottom: 0;
+.form-control,
+.form-select {
+  border-radius: 8px;
+  padding: 10px 14px;
+  border-color: #e9ecef;
 }
 
-.list-group-item h6 {
-  color: #1a1f2e;
+.form-control:focus,
+.form-select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input-group-text {
+  background: #f8f9fa;
+  border-color: #e9ecef;
 }
 
 /* =============================================
@@ -169,7 +152,8 @@
     font-size: 1.25rem;
   }
 
-  .table-responsive {
+  .nav-tabs .nav-link {
+    padding: 12px 16px;
     font-size: 0.9rem;
   }
 }

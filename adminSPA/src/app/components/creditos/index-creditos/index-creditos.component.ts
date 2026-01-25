@@ -12,7 +12,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-index-creditos',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './index-creditos.component.html',
   styleUrl: './index-creditos.component.css'
 })

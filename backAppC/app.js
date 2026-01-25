@@ -42,6 +42,9 @@ const despachosRoutes = require('./routes/despachos');
 const enviosRoutes = require('./routes/envios');
 const facturacionRoutes = require('./routes/facturacion');
 const analisisRoutes = require('./routes/analisis');
+const permisosRoutes = require('./routes/permisos');
+const gestoresRoutes = require('./routes/gestores');
+const usuarioSucursalRoutes = require('./routes/usuarioSucursal');
 
 
 const app = express();
@@ -172,6 +175,9 @@ app.use('/api/despachos', despachosRoutes);
 app.use('/api/envios', enviosRoutes);
 app.use('/api/facturacion', facturacionRoutes);
 app.use('/api/analisis', analisisRoutes);
+app.use('/api/permisos', permisosRoutes);
+app.use('/api/gestores', gestoresRoutes);
+app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
 
 // Iniciar servidor
 app.listen(PORT, () => {

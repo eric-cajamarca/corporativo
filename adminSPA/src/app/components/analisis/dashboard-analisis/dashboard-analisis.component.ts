@@ -16,7 +16,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-dashboard-analisis',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './dashboard-analisis.component.html',
   styleUrl: './dashboard-analisis.component.css'
 })

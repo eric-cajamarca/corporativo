@@ -1,0 +1,322 @@
+// NUNCA pongas lógica de negocio en controllers (regla 1.1)
+const sql = require('mssql');
+const dbConfig = require('../dbconfig');
+const gestoresService = require('../services/gestores.service');
+
+/**
+ * Obtiene las empresas gestionadas
+ */
+const obtener_empresas_gestionadas = async function (req, res) {
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.obtenerEmpresasGestionadas(pool, req.user);
+
+        res.status(200).json({
+            message: 'Empresas gestionadas obtenidas correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en obtener_empresas_gestionadas:', error.message);
+
+        if (error.message === 'PERMISO_DENEGADO') {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
+                data: undefined
+            });
+        }
+
+        res.status(500).json({
+            message: 'Error al obtener empresas gestionadas',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Obtiene todos los gestores
+ */
+const obtener_todos_gestores = async function (req, res) {
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.obtenerTodosGestores(pool, req.user);
+
+        res.status(200).json({
+            message: 'Gestores obtenidos correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en obtener_todos_gestores:', error.message);
+        res.status(500).json({
+            message: 'Error al obtener gestores',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Busca una empresa por RUC
+ */
+const buscar_empresa_ruc = async function (req, res) {
+    const { ruc } = req.params;
+
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.buscarEmpresaPorRuc(pool, ruc, req.user);
+
+        res.status(200).json({
+            message: 'Empresa encontrada',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en buscar_empresa_ruc:', error.message);
+
+        if (error.message === 'RUC_INVALIDO') {
+            return res.status(400).json({
+                message: 'El RUC debe tener 11 dígitos',
+                data: undefined
+            });
+        }
+
+        if (error.message === 'EMPRESA_NO_ENCONTRADA') {
+            return res.status(404).json({
+                message: 'No se encontró una empresa con ese RUC',
+                data: undefined
+            });
+        }
+
+        if (error.message === 'NO_PUEDE_GESTIONARSE_A_SI_MISMO') {
+            return res.status(400).json({
+                message: 'No puede asignarse a sí mismo como empresa gestionada',
+                data: undefined
+            });
+        }
+
+        res.status(500).json({
+            message: 'Error al buscar empresa',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Asigna una empresa como gestionada
+ */
+const asignar_empresa_gestionada = async function (req, res) {
+    const { idEmpresaDestino } = req.body;
+
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.asignarEmpresaGestionada(pool, idEmpresaDestino, req.user);
+
+        res.status(200).json({
+            message: 'Empresa asignada correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en asignar_empresa_gestionada:', error.message);
+
+        if (error.message === 'EMPRESA_DESTINO_REQUERIDA') {
+            return res.status(400).json({
+                message: 'Debe especificar la empresa a gestionar',
+                data: undefined
+            });
+        }
+
+        if (error.message === 'NO_PUEDE_GESTIONARSE_A_SI_MISMO') {
+            return res.status(400).json({
+                message: 'No puede asignarse a sí mismo como empresa gestionada',
+                data: undefined
+            });
+        }
+
+        if (error.message === 'RELACION_YA_EXISTE') {
+            return res.status(400).json({
+                message: 'Esta empresa ya está asignada como gestionada',
+                data: undefined
+            });
+        }
+
+        res.status(500).json({
+            message: 'Error al asignar empresa',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Remueve una empresa gestionada
+ */
+const remover_empresa_gestionada = async function (req, res) {
+    const { idGestor } = req.params;
+
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.removerEmpresaGestionada(pool, idGestor, req.user);
+
+        res.status(200).json({
+            message: 'Empresa removida correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en remover_empresa_gestionada:', error.message);
+        res.status(500).json({
+            message: 'Error al remover empresa',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Activa una empresa gestionada
+ */
+const activar_empresa_gestionada = async function (req, res) {
+    const { idGestor } = req.params;
+
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.activarEmpresaGestionada(pool, idGestor, req.user);
+
+        res.status(200).json({
+            message: 'Empresa activada correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en activar_empresa_gestionada:', error.message);
+        res.status(500).json({
+            message: 'Error al activar empresa',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Elimina permanentemente una empresa gestionada
+ */
+const eliminar_empresa_gestionada = async function (req, res) {
+    const { idGestor } = req.params;
+
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.eliminarEmpresaGestionada(pool, idGestor, req.user);
+
+        res.status(200).json({
+            message: 'Empresa eliminada permanentemente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en eliminar_empresa_gestionada:', error.message);
+        res.status(500).json({
+            message: 'Error al eliminar empresa',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Obtiene la configuración de la empresa
+ */
+const obtener_configuracion = async function (req, res) {
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.obtenerConfiguracion(pool, req.user);
+
+        res.status(200).json({
+            message: 'Configuración obtenida correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en obtener_configuracion:', error.message);
+        res.status(500).json({
+            message: 'Error al obtener configuración',
+            data: undefined
+        });
+    }
+};
+
+/**
+ * Guarda la configuración de la empresa
+ */
+const guardar_configuracion = async function (req, res) {
+    const { configuraciones } = req.body;
+
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const pool = await sql.connect(dbConfig);
+        const resultado = await gestoresService.guardarConfiguracion(pool, configuraciones, req.user);
+
+        res.status(200).json({
+            message: 'Configuración guardada correctamente',
+            data: resultado
+        });
+
+    } catch (error) {
+        console.error('Error en guardar_configuracion:', error.message);
+
+        if (error.message === 'CONFIGURACIONES_INVALIDAS') {
+            return res.status(400).json({
+                message: 'Las configuraciones deben ser un array',
+                data: undefined
+            });
+        }
+
+        res.status(500).json({
+            message: 'Error al guardar configuración',
+            data: undefined
+        });
+    }
+};
+
+module.exports = {
+    obtener_empresas_gestionadas,
+    obtener_todos_gestores,
+    buscar_empresa_ruc,
+    asignar_empresa_gestionada,
+    remover_empresa_gestionada,
+    activar_empresa_gestionada,
+    eliminar_empresa_gestionada,
+    obtener_configuracion,
+    guardar_configuracion
+};

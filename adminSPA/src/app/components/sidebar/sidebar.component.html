@@ -1,100 +1,138 @@
-<div class="controls">
-  <button (click)="addStem()">🍃 Agregar Tallo</button>
-  <button (click)="addFlower()">➕ Agregar Flor</button>
-  <button (click)="addLeaf()">🍃 Agregar Hoja</button>
-  <input type="color" [(ngModel)]="selectedColor" />
+<!-- Botón toggle para móvil -->
+<button 
+  class="sidebar-mobile-toggle d-lg-none" 
+  (click)="toggleMobileSidebar()"
+  [class.active]="isMobileOpen()">
+  <i class="fas" [class.fa-bars]="!isMobileOpen()" [class.fa-times]="isMobileOpen()"></i>
+</button>
+
+<!-- Overlay para móvil -->
+<div 
+  class="sidebar-overlay d-lg-none" 
+  [class.show]="isMobileOpen()" 
+  (click)="closeMobileSidebar()">
 </div>
 
-<svg width="600" height="600" viewBox="0 0 600 600">
-  <!-- Fondo -->
-  <rect width="100%" height="100%" fill="#f5f5f5" />
-
-  <!-- Jarrón (base del arreglo) -->
-  <path d="M200,550 L400,550 L380,450 L220,450 Z" fill="#e6e6fa" stroke="#333" />
-
-  <!-- Tallos -->
-  <g *ngFor="let stem of stems()" (click)="selectStem(stem)">
-    <path 
-      [attr.d]="stem.path" 
-      stroke="#2e8b57" 
-      [attr.stroke-width]="stem.width" 
-      fill="none" 
-      [class.selected]="stem === selectedStem" />
-  </g>
-
-  <!-- Flores -->
-  <g *ngFor="let flower of flowers()" (click)="selectElement(flower)">
-    <path [attr.d]="flower.path" [attr.fill]="flower.color" />
-    <circle *ngIf="flower.center" 
-            [attr.cx]="flower.center.x" 
-            [attr.cy]="flower.center.y" 
-            [attr.r]="flower.center.radius" 
-            fill="#FFD700" />
-  </g>
-
-  <!-- Hojas -->
-  <path *ngFor="let leaf of leaves()" 
-        [attr.d]="leaf.path" 
-        [attr.fill]="leaf.color" 
-        (click)="selectElement(leaf)" />
-</svg>
-<!-- <nav class="navbar navbar-dark bg-dark fixed-top">
-  <div class="container-fluid">
-    <div class="container">
-      <a class="navbar-brand" href="#">
-        <img src="assets/img/bsc.jpg" alt="img" width="30" height="24">
-      </a>
-    </div>
+<!-- Sidebar principal -->
+<aside 
+  class="sidebar" 
+  [class.collapsed]="isCollapsed()" 
+  [class.mobile-open]="isMobileOpen()">
   
-    <a class="navbar-brand" href="#">Offcanvas dark navbar</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasDarkNavbar" aria-controls="offcanvasDarkNavbar" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
+  <!-- Header del sidebar -->
+  <div class="sidebar-header">
+    <div class="sidebar-brand" *ngIf="!isCollapsed()">
+      <i class="fas fa-building text-primary me-2"></i>
+      <span class="brand-text">{{empresaNombre() || 'Sistema'}}</span>
+    </div>
+    <div class="sidebar-brand-collapsed" *ngIf="isCollapsed()">
+      <i class="fas fa-building text-primary"></i>
+    </div>
+    
+    <!-- Botón toggle desktop -->
+    <button 
+      class="sidebar-toggle-btn d-none d-lg-flex" 
+      (click)="toggleSidebar()" 
+      [title]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'">
+      <i class="fas" [class.fa-chevron-left]="!isCollapsed()" [class.fa-chevron-right]="isCollapsed()"></i>
     </button>
-   
-    <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="offcanvasDarkNavbar" aria-labelledby="offcanvasDarkNavbarLabel">
-      <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="offcanvasDarkNavbarLabel">Dark offcanvas</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-      </div>
-      <div class="offcanvas-body">
-        <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
-          <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="#">Home</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#">Link</a>
-          </li>
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Dropdown
-            </a>
-            <ul class="dropdown-menu dropdown-menu-dark">
-              <li><a class="dropdown-item" href="#">Action</a></li>
-              <li><a class="dropdown-item" href="#">Another action</a></li>
-              <li>
-                <hr class="dropdown-divider">
-              </li>
-              <li><a class="dropdown-item" href="#">Something else here</a></li>
-            </ul>
-          </li>
-        </ul>
-        <form class="d-flex mt-3" role="search">
-          <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
-          <button class="btn btn-success" type="submit">Search</button>
-        </form>
-      </div>
+    
+    <!-- Botón cerrar móvil -->
+    <button 
+      class="sidebar-close-btn d-lg-none" 
+      (click)="closeMobileSidebar()">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+
+  <!-- Información del usuario -->
+  <div class="sidebar-user" [class.collapsed]="isCollapsed()">
+    <div class="user-avatar">
+      <span class="avatar-initials">{{getUserInitials()}}</span>
+    </div>
+    <div class="user-info" *ngIf="!isCollapsed()">
+      <div class="user-name">{{userName()}}</div>
+      <div class="user-role">{{userRole()}}</div>
     </div>
   </div>
-</nav> -->
 
-<!-- <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasWithBothOptions" aria-controls="offcanvasWithBothOptions">Enable both scrolling & backdrop</button>
+  <!-- Navegación -->
+  <nav class="sidebar-nav">
+    <ul class="nav-list">
+      <ng-container *ngFor="let item of menuItems()">
+        <!-- Separador -->
+        <li *ngIf="item.tipo === 'separador'" class="nav-separator">
+          <hr *ngIf="!isCollapsed()">
+        </li>
 
-<div class="offcanvas offcanvas-start" data-bs-scroll="true" tabindex="-1" id="offcanvasWithBothOptions" aria-labelledby="offcanvasWithBothOptionsLabel">
-  <div class="offcanvas-header">
-    <h5 class="offcanvas-title" id="offcanvasWithBothOptionsLabel">Backdrop with scrolling</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <!-- Item sin submenú -->
+        <li 
+          *ngIf="!item.tipo && !item.submenu && item.visible !== false" 
+          class="nav-item"
+          [class.active]="isRouteActive(item.ruta || null)">
+          <a 
+            class="nav-link" 
+            (click)="navigateTo(item.ruta || null); $event.preventDefault()"
+            [title]="isCollapsed() ? item.nombre : ''">
+            <i class="nav-icon" [class]="item.icono"></i>
+            <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
+          </a>
+        </li>
+
+        <!-- Item con submenú -->
+        <li 
+          *ngIf="!item.tipo && item.submenu && item.submenu.length > 0 && item.visible !== false" 
+          class="nav-item has-submenu"
+          [class.open]="isSubmenuOpen(item.modulo || '')"
+          [class.active]="isSubmenuOpen(item.modulo || '')">
+          <a 
+            class="nav-link" 
+            (click)="toggleSubmenu(item.modulo || ''); $event.preventDefault()"
+            [title]="isCollapsed() ? item.nombre : ''">
+            <i class="nav-icon" [class]="item.icono"></i>
+            <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
+            <i class="submenu-arrow fas fa-chevron-down" *ngIf="!isCollapsed()"></i>
+          </a>
+          
+          <!-- Submenú -->
+          <ul class="submenu" [class.show]="isSubmenuOpen(item.modulo || '') && !isCollapsed()">
+            <li 
+              *ngFor="let subItem of item.submenu" 
+              class="submenu-item"
+              [class.active]="isRouteActive(subItem.ruta)">
+              <a 
+                class="submenu-link" 
+                (click)="navigateTo(subItem.ruta); $event.preventDefault()">
+                <i class="fas fa-circle submenu-dot"></i>
+                <span>{{subItem.nombre}}</span>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Tooltip con submenú cuando está colapsado -->
+          <div class="submenu-tooltip" *ngIf="isCollapsed()">
+            <div class="tooltip-header">{{item.nombre}}</div>
+            <ul class="tooltip-menu">
+              <li *ngFor="let subItem of item.submenu">
+                <a (click)="navigateTo(subItem.ruta); $event.preventDefault()">
+                  {{subItem.nombre}}
+                </a>
+              </li>
+            </ul>
+          </div>
+        </li>
+      </ng-container>
+    </ul>
+  </nav>
+
+  <!-- Footer del sidebar -->
+  <div class="sidebar-footer">
+    <button 
+      class="logout-btn" 
+      (click)="logout()"
+      [title]="isCollapsed() ? 'Cerrar sesión' : ''">
+      <i class="fas fa-sign-out-alt"></i>
+      <span *ngIf="!isCollapsed()">Cerrar sesión</span>
+    </button>
   </div>
-  <div class="offcanvas-body">
-    <p>Try scrolling the rest of the page to see this option in action.</p>
-  </div>
-</div> -->
+</aside>

@@ -1,135 +1,515 @@
-/* Color principal y navbar */
-.bg-dark {
-    /* background: linear-gradient(135deg, #e3672e 0%, #d9601a 100%) !important; 
-    background: linear-gradient(135deg, #2962FF 0%, #0039CB 100%) !important;
-    background: linear-gradient(135deg, #00B0FF 0%, #0081CB 100%) !important; */
+/* =============================================
+   TOPNAV - Estilos principales
+   ============================================= */
 
-    background: linear-gradient(135deg, #2196F3 0%, #1565C0 100%) !important;
-    box-shadow: 0 2px 10px rgba(24, 30, 105, 0.329);
+.topnav {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 260px; /* Ancho del sidebar */
+  height: 64px;
+  background: #fff;
+  border-bottom: 1px solid #e9ecef;
+  z-index: 999;
+  transition: left 0.3s ease;
 }
 
-.navbar {
-    padding: 0.5rem 1rem;
-    transition: all 0.3s ease;
+.topnav-guest {
+  left: 0;
 }
 
-.navbar > .container-fluid {
-    padding: 0;
+:host-context(.sidebar-collapsed) .topnav {
+  left: 70px;
 }
 
-/* Items del navbar */
-.nav-link {
-    color: white !important;
-    font-weight: 500;
-    padding: 0.8rem 1.2rem !important;
-    transition: all 0.2s ease;
-    border-radius: 4px;
-    margin: 0 2px;
-    display: flex;
-    align-items: center;
+@media (max-width: 991.98px) {
+  .topnav {
+    left: 0;
+  }
 }
 
-.nav-link:hover, .nav-link:focus {
-    background-color: rgba(255, 255, 255, 0.15) !important;
-    transform: translateY(-2px);
+.topnav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 20px;
+  max-width: 100%;
 }
 
-.nav-link.active {
-    background-color: rgba(255, 255, 255, 0.25) !important;
-    font-weight: 600;
+/* =============================================
+   LADO IZQUIERDO
+   ============================================= */
+
+.topnav-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-/* Dropdowns */
-.dropdown-toggle::after {
-    margin-left: 0.5em;
-    vertical-align: middle;
-}
-
-.dropdown-menu {
-    border: none;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    padding: 0.5rem 0;
-    margin-top: 0.5rem;
-    background-color: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.dropdown-item {
-    padding: 0.5rem 1.5rem;
-    color: #333;
-    transition: all 0.2s;
-    font-weight: 500;
-}
-
-.dropdown-item:hover, .dropdown-item:focus {
-    background-color: #f8f9fa;
-    color: #1565C0;
-    transform: translateX(5px);
-}
-
-.dropdown-item.active {
-    background-color: #f0f0f0;
-    color: #1565C0;
-    font-weight: 600;
-}
-
-/* Efecto hover para los dropdowns principales */
-.nav-item.dropdown:hover .dropdown-menu {
-    display: block;
-}
-
-/* Ícono de cerrar sesión */
-.nav-link[href="#"] {
-    color: #fff !important;
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-.nav-link[href="#"]:hover {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-/* Responsive adjustments */
-@media (max-width: 992px) {
-    .navbar-collapse {
-        padding: 1rem 0;
-    }
-    
-    .nav-link {
-        padding: 0.75rem 1rem !important;
-        margin: 2px 0;
-    }
-    
-    .dropdown-menu {
-        margin-top: 0;
-        box-shadow: none;
-        border-radius: 0;
-        border: none;
-        background-color: rgba(255, 255, 255, 0.05);
-    }
-    
-    .dropdown-item {
-        color: white;
-        padding-left: 2rem;
-    }
-    
-    .dropdown-item:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        transform: none;
-    }
-
-}
-
-/* Agrega esto a tu CSS para proteger los estilos del dropdown */
-.dropdown-menu {
-  border: 1px solid rgba(0,0,0,.15) !important;
-  box-shadow: 0 0.5rem 1rem rgba(0,0,0,.175) !important;
-}
-
-.dropdown-item {
+.topnav-toggle {
+  background: none;
+  border: none;
+  color: #495057;
+  font-size: 1.2rem;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 8px;
   transition: all 0.2s ease;
 }
-.dropdown-item:hover {
-  background-color: #f8f9fa;
-  color: #00B0FF;
+
+.topnav-toggle:hover {
+  background: #f8f9fa;
+  color: #212529;
+}
+
+.topnav-title {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.topnav-brand {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #212529;
+}
+
+/* =============================================
+   CENTRO - BÚSQUEDA
+   ============================================= */
+
+.topnav-center {
+  flex: 1;
+  max-width: 500px;
+  margin: 0 24px;
+}
+
+.search-container {
+  position: relative;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #adb5bd;
+  font-size: 0.9rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 40px 10px 44px;
+  border: 1px solid #e9ecef;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  background: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-input::placeholder {
+  color: #adb5bd;
+}
+
+.search-clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #adb5bd;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.search-clear:hover {
+  color: #6c757d;
+}
+
+/* =============================================
+   LADO DERECHO
+   ============================================= */
+
+.topnav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topnav-btn {
+  position: relative;
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 1.1rem;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.topnav-btn:hover {
+  background: #f8f9fa;
+  color: #212529;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  background: #dc3545;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topnav-divider {
+  width: 1px;
+  height: 32px;
+  background: #e9ecef;
+  margin: 0 8px;
+}
+
+/* =============================================
+   DROPDOWN DE USUARIO
+   ============================================= */
+
+.user-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.user-dropdown-btn:hover {
+  background: #f8f9fa;
+}
+
+.user-avatar-sm {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.user-info-sm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.user-name-sm {
+  font-weight: 600;
+  color: #212529;
+  font-size: 0.85rem;
+}
+
+.user-role-sm {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.user-dropdown-btn .fa-chevron-down {
+  font-size: 0.7rem;
+  color: #adb5bd;
+}
+
+/* Dropdown de usuario */
+.user-dropdown {
+  min-width: 280px;
+  padding: 0;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.user-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.user-avatar-lg {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.user-info-lg {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name-lg {
+  font-weight: 600;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-role-lg {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.user-empresa-lg {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-dropdown .dropdown-item {
+  padding: 10px 16px;
+  font-size: 0.9rem;
+}
+
+.user-dropdown .dropdown-item:hover {
+  background: #f8f9fa;
+}
+
+.user-dropdown .dropdown-item i {
+  width: 20px;
+}
+
+/* =============================================
+   DROPDOWN DE NOTIFICACIONES
+   ============================================= */
+
+.notifications-dropdown {
+  width: 360px;
+  padding: 0;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.notifications-dropdown .dropdown-header {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.notifications-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f3f4;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.notification-item:hover {
+  background: #f8f9fa;
+}
+
+.notification-item.unread {
+  background: #f0f4ff;
+}
+
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  background: #f1f3f4;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #212529;
+}
+
+.notification-message {
+  font-size: 0.8rem;
+  color: #6c757d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notification-time {
+  font-size: 0.7rem;
+  color: #adb5bd;
+  margin-top: 4px;
+}
+
+.notification-empty {
+  padding: 32px;
+  text-align: center;
+  color: #adb5bd;
+}
+
+.notification-empty i {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.notification-empty p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.notifications-dropdown .dropdown-footer {
+  padding: 12px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.notifications-dropdown .dropdown-footer a {
+  color: #667eea;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.notifications-dropdown .dropdown-footer a:hover {
+  text-decoration: underline;
+}
+
+/* =============================================
+   DROPDOWN DE ACCESOS RÁPIDOS
+   ============================================= */
+
+.quick-access-dropdown {
+  width: 280px;
+  padding: 8px;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+}
+
+.quick-access-dropdown .dropdown-header {
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.quick-access-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.quick-access-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #495057;
+  transition: all 0.2s ease;
+}
+
+.quick-access-item:hover {
+  background: #f8f9fa;
+  color: #212529;
+}
+
+.quick-access-item i {
+  font-size: 1.3rem;
+}
+
+.quick-access-item span {
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+
+@media (max-width: 767.98px) {
+  .topnav-container {
+    padding: 0 12px;
+  }
+
+  .notifications-dropdown {
+    width: calc(100vw - 24px);
+    right: -60px !important;
+  }
+
+  .user-dropdown {
+    width: calc(100vw - 24px);
+    right: -10px !important;
+  }
+}
+
+/* =============================================
+   SCROLLBAR PERSONALIZADO
+   ============================================= */
+
+.notifications-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notifications-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notifications-list::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 3px;
+}
+
+.notifications-list::-webkit-scrollbar-thumb:hover {
+  background: #ccc;
 }

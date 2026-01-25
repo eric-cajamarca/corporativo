@@ -3,13 +3,14 @@ import { AdminService } from '../../services/admin.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
+import { CommonModule } from '@angular/common';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-login-empresa',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, CommonModule],
   templateUrl: './login-empresa.component.html',
   styleUrl: './login-empresa.component.css'
 })

@@ -1,345 +1,299 @@
-<!-- Navbar principal -->
-<app-topnav></app-topnav>
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
 
-<!-- Layout principal con sidebar -->
-<div class="dashboard-layout">
-  <!-- Sidebar -->
-  <nav class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <i class="fas fa-building text-primary me-2"></i>
-        <span class="fw-bold">CRM</span>
-      </div>
-      <button class="sidebar-close d-lg-none" type="button" id="sidebarClose">
-        <i class="fas fa-times"></i>
-      </button>
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<!-- Contenido principal -->
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" *ngIf="cargandoDatos()">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando...</span>
     </div>
+    <p class="mt-2 text-muted">Cargando dashboard...</p>
+  </div>
 
-    <div class="sidebar-body">
-      <!-- Usuario info -->
-      <div class="user-info">
-        <div class="user-avatar">
-          <i class="fas fa-user-circle"></i>
-        </div>
-        <div class="user-details">
-          <div class="user-name fw-semibold">{{userName}}</div>
-          <div class="user-role text-muted small">{{userRole}}</div>
-        </div>
+  <!-- Header del contenido -->
+  <div class="content-header">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+      <div>
+        <h1 class="content-title mb-1">Dashboard Ejecutivo</h1>
+        <p class="content-subtitle text-muted mb-0">
+          Bienvenido, {{userName}} - Resumen general del negocio
+        </p>
       </div>
-
-      <!-- Navegación principal -->
-      <ul class="sidebar-nav">
-        <!-- Dashboard -->
-        <li class="nav-item">
-          <a href="#" class="nav-link active" (click)="navigateTo('dashboard'); $event.preventDefault()">
-            <i class="nav-icon fas fa-tachometer-alt"></i>
-            <span class="nav-text">Dashboard</span>
-          </a>
-        </li>
-
-        <!-- Módulo Caja -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('caja'); $event.preventDefault()">
-            <i class="nav-icon fas fa-cash-register"></i>
-            <span class="nav-text">Caja</span>
-          </a>
-        </li>
-
-        <!-- Módulo Créditos -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('creditos'); $event.preventDefault()">
-            <i class="nav-icon fas fa-hand-holding-usd"></i>
-            <span class="nav-text">Créditos</span>
-          </a>
-        </li>
-
-        <!-- Módulo Análisis -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('analisis'); $event.preventDefault()">
-            <i class="nav-icon fas fa-chart-line"></i>
-            <span class="nav-text">Análisis</span>
-          </a>
-        </li>
-
-        <!-- Separador -->
-        <li class="nav-divider"></li>
-
-        <!-- Módulo Ventas -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('ventas'); $event.preventDefault()">
-            <i class="nav-icon fas fa-shopping-cart"></i>
-            <span class="nav-text">Ventas</span>
-          </a>
-        </li>
-
-        <!-- Módulo Compras -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('compras'); $event.preventDefault()">
-            <i class="nav-icon fas fa-shopping-bag"></i>
-            <span class="nav-text">Compras</span>
-          </a>
-        </li>
-
-        <!-- Módulo Inventario -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('inventario'); $event.preventDefault()">
-            <i class="nav-icon fas fa-boxes"></i>
-            <span class="nav-text">Inventario</span>
-          </a>
-        </li>
-
-        <!-- Módulo Clientes -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('clientes'); $event.preventDefault()">
-            <i class="nav-icon fas fa-users"></i>
-            <span class="nav-text">Clientes</span>
-          </a>
-        </li>
-
-        <!-- Separador -->
-        <li class="nav-divider"></li>
-
-        <!-- Configuración -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('configuracion'); $event.preventDefault()">
-            <i class="nav-icon fas fa-cog"></i>
-            <span class="nav-text">Configuración</span>
-          </a>
-        </li>
-
-        <!-- Reportes -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('reportes'); $event.preventDefault()">
-            <i class="nav-icon fas fa-file-alt"></i>
-            <span class="nav-text">Reportes</span>
-          </a>
-        </li>
-      </ul>
-    </div>
-  </nav>
-
-  <!-- Overlay para móviles -->
-  <div class="sidebar-overlay d-lg-none" id="sidebarOverlay"></div>
-
-  <!-- Contenido principal -->
-  <main class="main-content">
-    <!-- Header del contenido -->
-    <div class="content-header">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <h1 class="content-title mb-1">Dashboard Ejecutivo</h1>
-          <p class="content-subtitle text-muted mb-0">Resumen general del negocio</p>
-        </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-secondary" (click)="refreshData()">
-            <i class="fas fa-sync-alt me-1"></i>
-            Actualizar
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-secondary btn-sm" (click)="refreshData()">
+          <i class="fas fa-sync-alt me-1"></i>
+          Actualizar
+        </button>
+        <div class="dropdown">
+          <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <i class="fas fa-calendar me-1"></i>
+            {{periodoSeleccionado}}
           </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Hoy'); $event.preventDefault()">Hoy</a></li>
+            <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Esta Semana'); $event.preventDefault()">Esta Semana</a></li>
+            <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Mes'); $event.preventDefault()">Este Mes</a></li>
+            <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Año'); $event.preventDefault()">Este Año</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accesos rápidos -->
+  <div class="quick-actions mb-4">
+    <button class="quick-action-btn" (click)="navigateTo('ventas-create')">
+      <i class="fas fa-plus-circle"></i>
+      <span>Nueva Venta</span>
+    </button>
+    <button class="quick-action-btn" (click)="navigateTo('compras-create')">
+      <i class="fas fa-shopping-cart"></i>
+      <span>Nueva Compra</span>
+    </button>
+    <button class="quick-action-btn" (click)="navigateTo('clientes')">
+      <i class="fas fa-users"></i>
+      <span>Clientes</span>
+    </button>
+    <button class="quick-action-btn" (click)="navigateTo('productos')">
+      <i class="fas fa-box"></i>
+      <span>Productos</span>
+    </button>
+    <button class="quick-action-btn" (click)="navigateTo('caja')">
+      <i class="fas fa-cash-register"></i>
+      <span>Caja</span>
+    </button>
+    <button class="quick-action-btn" (click)="navigateTo('reportes')">
+      <i class="fas fa-chart-bar"></i>
+      <span>Reportes</span>
+    </button>
+  </div>
+
+  <!-- KPIs principales -->
+  <div class="row g-3 mb-4">
+    <!-- Ventas Totales -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="kpi-icon sales-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-value">{{ventasTotales | currency:'PEN':'S/ ':'1.0-0'}}</div>
+          <div class="kpi-label">Ventas Totales</div>
+          <div class="kpi-change" [class.positive]="ventasVariacion >= 0" [class.negative]="ventasVariacion < 0">
+            <i class="fas" [class.fa-arrow-up]="ventasVariacion >= 0" [class.fa-arrow-down]="ventasVariacion < 0"></i>
+            {{ventasVariacion >= 0 ? '+' : ''}}{{ventasVariacion}}%
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Utilidad Neta -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="kpi-icon profit-icon">
+          <i class="fas fa-coins"></i>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-value">{{utilidadNeta | currency:'PEN':'S/ ':'1.0-0'}}</div>
+          <div class="kpi-label">Utilidad Neta</div>
+          <div class="kpi-change" [class.positive]="utilidadVariacion >= 0" [class.negative]="utilidadVariacion < 0">
+            <i class="fas" [class.fa-arrow-up]="utilidadVariacion >= 0" [class.fa-arrow-down]="utilidadVariacion < 0"></i>
+            {{utilidadVariacion >= 0 ? '+' : ''}}{{utilidadVariacion}}%
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clientes Activos -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="kpi-icon clients-icon">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-value">{{clientesActivos}}</div>
+          <div class="kpi-label">Clientes Activos</div>
+          <div class="kpi-change" [class.positive]="clientesVariacion >= 0" [class.negative]="clientesVariacion < 0">
+            <i class="fas" [class.fa-arrow-up]="clientesVariacion >= 0" [class.fa-arrow-down]="clientesVariacion < 0"></i>
+            {{clientesVariacion >= 0 ? '+' : ''}}{{clientesVariacion}}%
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROI -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="kpi-icon roi-icon">
+          <i class="fas fa-percentage"></i>
+        </div>
+        <div class="kpi-content">
+          <div class="kpi-value">{{roi}}%</div>
+          <div class="kpi-label">ROI</div>
+          <div class="kpi-change" [class.positive]="roi >= 15" [class.negative]="roi < 15">
+            <i class="fas" [class.fa-arrow-up]="roi >= 15" [class.fa-arrow-down]="roi < 15"></i>
+            {{roi >= 15 ? 'Excelente' : 'Regular'}}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráficos y métricas -->
+  <div class="row g-3 mb-4">
+    <!-- Gráfico de ventas -->
+    <div class="col-xl-8">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-chart-bar me-2 text-primary"></i>
+            Tendencia de Ventas
+          </h5>
           <div class="dropdown">
-            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              <i class="fas fa-calendar me-1"></i>
-              {{periodoSeleccionado}}
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              12 meses
             </button>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Hoy'); $event.preventDefault()">Hoy</a></li>
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Esta Semana'); $event.preventDefault()">Esta Semana</a></li>
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Mes'); $event.preventDefault()">Este Mes</a></li>
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Año'); $event.preventDefault()">Este Año</a></li>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="#">3 meses</a></li>
+              <li><a class="dropdown-item" href="#">6 meses</a></li>
+              <li><a class="dropdown-item" href="#">12 meses</a></li>
             </ul>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- KPIs principales -->
-    <div class="row g-3 mb-4">
-      <!-- Ventas Totales -->
-      <div class="col-xl-3 col-md-6">
-        <div class="kpi-card sales-card">
-          <div class="kpi-icon">
-            <i class="fas fa-chart-line"></i>
-          </div>
-          <div class="kpi-content">
-            <div class="kpi-value">{{ventasTotales | currency:'PEN':'symbol':'1.0-0'}}</div>
-            <div class="kpi-label">Ventas Totales</div>
-            <div class="kpi-change positive">
-              <i class="fas fa-arrow-up"></i>
-              +12.5%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Utilidad Neta -->
-      <div class="col-xl-3 col-md-6">
-        <div class="kpi-card profit-card">
-          <div class="kpi-icon">
-            <i class="fas fa-coins"></i>
-          </div>
-          <div class="kpi-content">
-            <div class="kpi-value">{{utilidadNeta | currency:'PEN':'symbol':'1.0-0'}}</div>
-            <div class="kpi-label">Utilidad Neta</div>
-            <div class="kpi-change positive">
-              <i class="fas fa-arrow-up"></i>
-              +8.2%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Clientes Activos -->
-      <div class="col-xl-3 col-md-6">
-        <div class="kpi-card clients-card">
-          <div class="kpi-icon">
-            <i class="fas fa-users"></i>
-          </div>
-          <div class="kpi-content">
-            <div class="kpi-value">{{clientesActivos}}</div>
-            <div class="kpi-label">Clientes Activos</div>
-            <div class="kpi-change positive">
-              <i class="fas fa-arrow-up"></i>
-              +5.1%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ROI -->
-      <div class="col-xl-3 col-md-6">
-        <div class="kpi-card roi-card">
-          <div class="kpi-icon">
-            <i class="fas fa-percentage"></i>
-          </div>
-          <div class="kpi-content">
-            <div class="kpi-value">{{roi}}%</div>
-            <div class="kpi-label">ROI</div>
-            <div class="kpi-change" [class]="roi >= 15 ? 'positive' : 'negative'">
-              <i class="fas" [class]="roi >= 15 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
-              {{roi >= 15 ? 'Excelente' : 'Regular'}}
-            </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="ventasChart"></canvas>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Gráficos y métricas -->
-    <div class="row g-3 mb-4">
-      <!-- Gráfico de ventas -->
-      <div class="col-xl-8">
-        <div class="card h-100">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">
-              <i class="fas fa-chart-bar me-2"></i>
-              Tendencia de Ventas
-            </h5>
-            <div class="dropdown">
-              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                6 meses
-              </button>
-              <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="#">3 meses</a></li>
-                <li><a class="dropdown-item" href="#">6 meses</a></li>
-                <li><a class="dropdown-item" href="#">1 año</a></li>
-              </ul>
+    <!-- Resumen financiero -->
+    <div class="col-xl-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-balance-scale me-2 text-success"></i>
+            Resumen Financiero
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="financial-summary">
+            <div class="summary-item">
+              <div class="summary-label">
+                <i class="fas fa-arrow-up text-success me-2"></i>
+                Ingresos
+              </div>
+              <div class="summary-value text-success">{{ingresos | currency:'PEN':'S/ ':'1.0-0'}}</div>
             </div>
-          </div>
-          <div class="card-body">
-            <canvas id="ventasChart" height="300"></canvas>
+            <div class="summary-item">
+              <div class="summary-label">
+                <i class="fas fa-arrow-down text-danger me-2"></i>
+                Costos
+              </div>
+              <div class="summary-value text-danger">{{costos | currency:'PEN':'S/ ':'1.0-0'}}</div>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-item">
+              <div class="summary-label">
+                <i class="fas fa-calculator text-info me-2"></i>
+                Utilidad Bruta
+              </div>
+              <div class="summary-value text-info">{{utilidadBruta | currency:'PEN':'S/ ':'1.0-0'}}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">
+                <i class="fas fa-minus-circle text-warning me-2"></i>
+                Gastos Operativos
+              </div>
+              <div class="summary-value text-warning">{{gastosOperativos | currency:'PEN':'S/ ':'1.0-0'}}</div>
+            </div>
+            <div class="summary-divider"></div>
+            <div class="summary-item total">
+              <div class="summary-label fw-bold">
+                <i class="fas fa-money-bill-wave text-primary me-2"></i>
+                Utilidad Neta
+              </div>
+              <div class="summary-value fw-bold text-primary">{{utilidadNeta | currency:'PEN':'S/ ':'1.0-0'}}</div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Resumen financiero -->
-      <div class="col-xl-4">
-        <div class="card h-100">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <i class="fas fa-balance-scale me-2"></i>
-              Resumen Financiero
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="financial-summary">
-              <div class="summary-item">
-                <div class="summary-label">Ingresos</div>
-                <div class="summary-value text-success">{{ingresos | currency:'PEN':'symbol':'1.0-0'}}</div>
+  <!-- Métricas adicionales -->
+  <div class="row g-3">
+    <!-- Productos más vendidos -->
+    <div class="col-xl-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-star me-2 text-warning"></i>
+            Productos Más Vendidos
+          </h5>
+          <a href="#" class="btn btn-sm btn-link" (click)="navigateTo('productos'); $event.preventDefault()">
+            Ver todos
+          </a>
+        </div>
+        <div class="card-body p-0">
+          <div class="product-list">
+            <div class="product-item" *ngFor="let producto of productosMasVendidos; let i = index">
+              <div class="product-rank">{{i + 1}}</div>
+              <div class="product-info">
+                <div class="product-name">{{producto.nombre}}</div>
+                <div class="product-category">{{producto.categoria}}</div>
               </div>
-              <div class="summary-item">
-                <div class="summary-label">Costos</div>
-                <div class="summary-value text-danger">{{costos | currency:'PEN':'symbol':'1.0-0'}}</div>
+              <div class="product-stats">
+                <div class="sales-count">{{producto.ventas | number}} ventas</div>
+                <div class="sales-amount">{{producto.monto | currency:'PEN':'S/ ':'1.0-0'}}</div>
               </div>
-              <div class="summary-item">
-                <div class="summary-label">Utilidad Bruta</div>
-                <div class="summary-value text-info">{{utilidadBruta | currency:'PEN':'symbol':'1.0-0'}}</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Gastos Operativos</div>
-                <div class="summary-value text-warning">{{gastosOperativos | currency:'PEN':'symbol':'1.0-0'}}</div>
-              </div>
-              <hr>
-              <div class="summary-item total">
-                <div class="summary-label fw-bold">Utilidad Neta</div>
-                <div class="summary-value fw-bold text-primary">{{utilidadNeta | currency:'PEN':'symbol':'1.0-0'}}</div>
-              </div>
+            </div>
+            <div class="product-item empty" *ngIf="productosMasVendidos.length === 0">
+              <p class="text-muted mb-0">No hay datos disponibles</p>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Métricas adicionales -->
-    <div class="row g-3">
-      <!-- Productos más vendidos -->
-      <div class="col-xl-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <i class="fas fa-star me-2"></i>
-              Productos Más Vendidos
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="product-list">
-              <div class="product-item" *ngFor="let producto of productosMasVendidos">
-                <div class="product-info">
-                  <div class="product-name">{{producto.nombre}}</div>
-                  <div class="product-category text-muted small">{{producto.categoria}}</div>
-                </div>
-                <div class="product-sales">
-                  <div class="sales-count">{{producto.ventas}} ventas</div>
-                  <div class="sales-amount text-success fw-semibold">{{producto.monto | currency:'PEN':'symbol':'1.0-0'}}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <!-- Alertas y notificaciones -->
+    <div class="col-xl-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-bell me-2 text-danger"></i>
+            Alertas y Notificaciones
+          </h5>
+          <span class="badge bg-danger" *ngIf="alertas.length > 0">{{alertas.length}}</span>
         </div>
-      </div>
-
-      <!-- Alertas y notificaciones -->
-      <div class="col-xl-6">
-        <div class="card h-100">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <i class="fas fa-bell me-2"></i>
-              Alertas y Notificaciones
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="alerts-list">
-              <div class="alert-item warning" *ngFor="let alerta of alertas">
-                <div class="alert-icon">
-                  <i class="fas" [class]="alerta.icono"></i>
-                </div>
-                <div class="alert-content">
-                  <div class="alert-title">{{alerta.titulo}}</div>
-                  <div class="alert-message text-muted small">{{alerta.mensaje}}</div>
-                </div>
-                <div class="alert-time text-muted small">{{alerta.tiempo}}</div>
+        <div class="card-body p-0">
+          <div class="alerts-list">
+            <div 
+              class="alert-item" 
+              *ngFor="let alerta of alertas"
+              [ngClass]="getAlertClass(alerta.tipo)">
+              <div class="alert-icon" [ngClass]="getAlertIconColor(alerta.tipo)">
+                <i class="fas" [ngClass]="alerta.icono"></i>
               </div>
+              <div class="alert-content">
+                <div class="alert-title">{{alerta.titulo}}</div>
+                <div class="alert-message">{{alerta.mensaje}}</div>
+              </div>
+              <div class="alert-time">{{alerta.tiempo}}</div>
+            </div>
+            <div class="alert-item empty" *ngIf="alertas.length === 0">
+              <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+              <p class="text-muted mb-0">No hay alertas pendientes</p>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </main>
-</div>
+  </div>
+</main>

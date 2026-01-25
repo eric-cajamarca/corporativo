@@ -1,392 +1,546 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Router, RouterModule } from '@angular/router';
-import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 declare var iziToast: any;
-declare var $: any;
 
 @Component({
   selector: 'app-create-empresa',
   standalone: true,
-  imports: [FormsModule, RouterModule, TopnavComponent],
+  imports: [FormsModule, ReactiveFormsModule, RouterModule, CommonModule],
   templateUrl: './create-empresa.component.html',
   styleUrl: './create-empresa.component.css'
 })
-export class CreateEmpresaComponent {
-
-  public encontrado: any = false;
-  public empresas: any = {
-
-    idDocumento: '',
-    ruc: '',
-    razon_Social: '',
-    nombre_Comercial: '',
-    rubro: '',
-    celular: '',
-    correo: '',
-    password: '',
-    logo: '',
-    condicion: '',
-    estSunat: '',
-
-  };
-
-  public filtro: any = "";
-  public empresa: any = {
-    ruc: '',
-    email: '',
-    password: '',
-    repitPassword: '',
-  };
-
-  public clienteruc: any = [];
-  // public direccionEmpresas:any=[];
-  public documento: any = [];
-  public regiones: any = [];
-  public provincias: any = [];
-  public distritos: any = [];
-  public token: any = "";
-  public contBuscar = 0;
-  public btn_registrar = false;
-  public mostrarDireccion = false;
-
-  public str_pais = '';
-  public direccionEmpresas: any = {
-
-    ubigeo: '',
-    codpais: 'PEN',
-    region: '',
-    provincia: '',
-    distrito: '',
-    principal: false,
-    codLocal: '0',
-    urbanizacion: '',
-  };
-  public data: any = {};
-  public load_create = false;
+export class CreateEmpresaComponent implements OnInit {
+  // Estado del formulario
+  empresaForm!: FormGroup;
+  
+  // Estados de la UI
+  encontrado = signal<boolean>(false);
+  buscando = signal<boolean>(false);
+  registrando = signal<boolean>(false);
+  loadCreate = signal<boolean>(false);
+  showPassword = signal<boolean>(false);
+  showConfirmPassword = signal<boolean>(false);
+  currentStep = signal<number>(1);
+  
+  // Datos de la empresa encontrada
+  empresaEncontrada: any = null;
+  
+  // Datos de ubicación
+  regiones: any[] = [];
+  provincias: any[] = [];
+  distritos: any[] = [];
+  provinciasFiltradas: any[] = [];
+  distritosFiltrados: any[] = [];
+  
+  // Validación de contraseña
+  passwordStrength = signal<number>(0);
+  passwordRequirements = signal<{
+    length: boolean;
+    uppercase: boolean;
+    lowercase: boolean;
+    number: boolean;
+    special: boolean;
+  }>({
+    length: false,
+    uppercase: false,
+    lowercase: false,
+    number: false,
+    special: false
+  });
 
   constructor(
-    private _adminService: AdminService,
-    private _documentosService: DocumentoService,
-    private _apiperuService: ApiperuService,
-    private _empresasService: EmpresaService,
-    private _router: Router,
+    private fb: FormBuilder,
+    private adminService: AdminService,
+    private documentoService: DocumentoService,
+    private apiperuService: ApiperuService,
+    private empresaService: EmpresaService,
+    private router: Router,
+  ) {}
 
-  ) {
-    //this.token = this._cookieService.get('token');
+  ngOnInit(): void {
+    this.initForm();
+    this.cargarUbicaciones();
   }
 
-  ngOnInit() {
+  /**
+   * Inicializa el formulario reactivo
+   */
+  private initForm(): void {
+    this.empresaForm = this.fb.group({
+      // Paso 1: Verificación de RUC
+      ruc: ['', [Validators.required, Validators.minLength(11), Validators.maxLength(11), Validators.pattern(/^[0-9]{11}$/)]],
+      
+      // Paso 2: Datos de empresa (llenados automáticamente)
+      razonSocial: ['', Validators.required],
+      nombreComercial: [''],
+      condicion: [''],
+      estado: [''],
+      direccion: [''],
+      
+      // Ubicación
+      region: [''],
+      provincia: [''],
+      distrito: [''],
+      ubigeo: [''],
+      
+      // Paso 3: Credenciales
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [
+        Validators.required,
+        Validators.minLength(8),
+        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)
+      ]],
+      confirmPassword: ['', Validators.required],
+      
+      // Términos
+      acceptTerms: [false, Validators.requiredTrue]
+    }, {
+      validators: this.passwordMatchValidator
+    });
 
-    this._adminService.get_Regiones().subscribe(
-      response => {
-        this.regiones = response;
-        console.log('this.regiones', this.regiones);
-      }
-    );
+    // Observar cambios en la contraseña
+    this.empresaForm.get('password')?.valueChanges.subscribe(password => {
+      this.evaluatePasswordStrength(password);
+    });
 
-    this._adminService.get_Procincias().subscribe(
-      response => {
-        this.provincias = response;
-        console.log('this.provincias', this.provincias);
-      }
-    );
+    // Observar cambios en región para filtrar provincias
+    this.empresaForm.get('region')?.valueChanges.subscribe(regionId => {
+      this.filtrarProvincias(regionId);
+    });
 
-    this._adminService.get_Distritos().subscribe(
-      response => {
-        this.distritos = response;
-        console.log('this.distritos', this.distritos);
-
-      }
-    );
+    // Observar cambios en provincia para filtrar distritos
+    this.empresaForm.get('provincia')?.valueChanges.subscribe(provinciaId => {
+      this.filtrarDistritos(provinciaId);
+    });
   }
 
-  removeAccents(str: string) {
+  /**
+   * Validador personalizado para confirmar contraseña
+   */
+  private passwordMatchValidator(group: FormGroup): { [key: string]: boolean } | null {
+    const password = group.get('password')?.value;
+    const confirmPassword = group.get('confirmPassword')?.value;
+    return password === confirmPassword ? null : { passwordMismatch: true };
+  }
+
+  /**
+   * Carga las ubicaciones (regiones, provincias, distritos)
+   */
+  private cargarUbicaciones(): void {
+    this.adminService.get_Regiones().subscribe({
+      next: (response) => this.regiones = response,
+      error: (error) => console.error('Error cargando regiones:', error)
+    });
+
+    this.adminService.get_Procincias().subscribe({
+      next: (response) => this.provincias = response,
+      error: (error) => console.error('Error cargando provincias:', error)
+    });
+
+    this.adminService.get_Distritos().subscribe({
+      next: (response) => this.distritos = response,
+      error: (error) => console.error('Error cargando distritos:', error)
+    });
+  }
+
+  /**
+   * Filtra provincias por región
+   */
+  private filtrarProvincias(regionId: string): void {
+    if (regionId) {
+      this.provinciasFiltradas = this.provincias.filter(
+        (p: any) => p.department_id === regionId
+      );
+    } else {
+      this.provinciasFiltradas = [];
+    }
+    this.empresaForm.patchValue({ provincia: '', distrito: '' });
+    this.distritosFiltrados = [];
+  }
+
+  /**
+   * Filtra distritos por provincia
+   */
+  private filtrarDistritos(provinciaId: string): void {
+    if (provinciaId) {
+      this.distritosFiltrados = this.distritos.filter(
+        (d: any) => d.province_id === provinciaId
+      );
+    } else {
+      this.distritosFiltrados = [];
+    }
+    this.empresaForm.patchValue({ distrito: '' });
+  }
+
+  /**
+   * Evalúa la fortaleza de la contraseña
+   */
+  private evaluatePasswordStrength(password: string): void {
+    if (!password) {
+      this.passwordStrength.set(0);
+      this.passwordRequirements.set({
+        length: false,
+        uppercase: false,
+        lowercase: false,
+        number: false,
+        special: false
+      });
+      return;
+    }
+
+    const requirements = {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[@$!%*?&]/.test(password)
+    };
+
+    this.passwordRequirements.set(requirements);
+
+    const metRequirements = Object.values(requirements).filter(Boolean).length;
+    this.passwordStrength.set((metRequirements / 5) * 100);
+  }
+
+  /**
+   * Quita acentos de un string
+   */
+  private removeAccents(str: string): string {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
-  buscar(ruc: any) {
-    console.log('ingreso a buscar en la api', ruc);
-    // this.contBuscar = 1;
-    // console.log('veo que cod comprobante', this.empresa.idDocumento)
-
-    // console.log('filtro', this.empresa.ruc);
-    this.filtro = this.empresa.ruc;
-
-    try {
-
-      if (this.empresa.ruc.length === 11) {
-        this._apiperuService.getRucInfo(this.filtro).subscribe(
-          response => {
-            if (response.success == false) {
-              console.log('response', response);
-
-              iziToast.show({
-                title: 'ERROR',
-                titleColor: '#FF0000',
-                color: '#FFF',
-                class: 'text-danger',
-                position: 'topRight',
-                message: 'Error al realizar la validación'
-              });
-              this.encontrado = false;
-            } else {
-              this.clienteruc = response;
-              //divido los datos de la despuesta
-              this.empresa.rSocial = response.razonSocial;
-              this.empresa.condicion = response.estado
-              this.empresas.idDocumento = '6';
-
-
-              ///////////
-              this.direccionEmpresas.codpais = "PEN";
-              this.direccionEmpresas.ubigeo = response.ubigeo;
-              // this.direccionEmpresas.region = response.departamento;
-              // this.direccionEmpresas.provincia = response.provincia;
-              // this.direccionEmpresas.distrito = response.distrito;
-              this.direccionEmpresas.direccion = response.direccion;
-
-              try {
-                //encuentro el id de la region
-                const regionEncontrada = this.regiones.find((element: any) => this.removeAccents(element.name).toUpperCase() === response.departamento.toUpperCase());
-
-                if (regionEncontrada) {
-                  this.direccionEmpresas.region = regionEncontrada.id;
-                  console.log('this.direccionEmpresas.region', this.direccionEmpresas.region);
-                } else {
-                  console.log('No se encontró la región correspondiente para el departamento:', response.departamento);
-                }
-
-                //encuentro el id de la provincia
-                const provinciaEncontrada = this.provincias.find((element: any) => this.removeAccents(element.name).toUpperCase() === response.provincia.toUpperCase());
-
-                if (provinciaEncontrada) {
-                  this.direccionEmpresas.provincia = provinciaEncontrada.id;
-                  console.log('this.direccionEmpresas.provincia', this.direccionEmpresas.provincia);
-                } else {
-                  console.log('No se encontró la provincia correspondiente para el departamento:', response.provincia);
-                }
-
-                //encuentro el id del distrito
-                const distritoEncontrado = this.distritos.find((element: any) => this.removeAccents(element.name).toUpperCase() === response.distrito.toUpperCase());
-
-                if (distritoEncontrado) {
-                  this.direccionEmpresas.distrito = distritoEncontrado.id;
-                  console.log('this.direccionEmpresas.distrito', this.direccionEmpresas.distrito);
-                } else {
-                  console.log('No se encontró el distrito correspondiente para el departamento:', response.distrito);
-                }
-              } catch (error) {
-                console.error('Error al buscar la región, provincia y distrito:', error);
-              }
-
-
-
-              console.log('this.clienteruc: ', this.clienteruc);
-              this.encontrado = true;
-            }
-
-          },
-          error => {
-
-            iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#FFF',
-              class: 'text-danger',
-              position: 'topRight',
-              message: 'Error al realizar la validación'
-            });
-
-            this.encontrado = false;
-          }
-        );
-
-      }
-
-
-
-
-
-      if (this.empresa.ruc.length === 8) {
-        this._apiperuService.getDniInfo(this.filtro).subscribe(
-          response => {
-            if (response.success == false) {
-              iziToast.show({
-                title: 'ERROR',
-                titleColor: '#FF0000',
-                color: '#FFF',
-                class: 'text-danger',
-                position: 'topRight',
-                message: 'Error al realizar la validación'
-              });
-              this.encontrado = false;
-            } else {
-              this.clienteruc = response;
-              this.empresas.idDocumento = '1';
-              //divido los datos de la despuesta
-              this.empresa.rSocial = response.apellidoPaterno + ' ' + response.apellidoMaterno + ', ' + response.nombres;
-
-
-              console.log('this.clienteruc: ', this.clienteruc);
-              this.encontrado = true;
-            }
-
-          },
-          error => {
-
-            iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#FFF',
-              class: 'text-danger',
-              position: 'topRight',
-              message: 'Error al realizar la validación'
-            });
-
-            this.encontrado = false;
-          }
-        );
-
-
-
-
-      }
-    } catch (error) {
+  /**
+   * Busca empresa por RUC
+   */
+  buscarRuc(): void {
+    const ruc = this.empresaForm.get('ruc')?.value;
+    
+    if (!ruc || ruc.length !== 11) {
       iziToast.show({
-        title: 'ERROR',
-        titleColor: '#FF0000',
+        title: 'Advertencia',
+        titleColor: '#ffc107',
         color: '#FFF',
-        class: 'text-danger',
+        class: 'text-warning',
         position: 'topRight',
-        message: 'Ingrese un número de DNI o Ruc'
-      });
-    }
-
-
-  }
-
-
-  registrar() {
-
-    //quiero validar si el email es correcto
-    if (this.empresa.email == '') {
-      iziToast.show({
-        title: 'ERROR',
-        titleColor: '#FF0000',
-        color: '#FFF',
-        class: 'text-danger',
-        position: 'topRight',
-        message: 'Ingrese un email'
+        message: 'Ingrese un RUC válido de 11 dígitos'
       });
       return;
     }
 
-    //quiero comparar si el password y el repitPassword son iguales
-    if (this.empresa.password != this.empresa.repitPassword) {
-      iziToast.show({
-        title: 'ERROR',
-        titleColor: '#FF0000',
-        color: '#FFF',
-        class: 'text-danger',
-        position: 'topRight',
-        message: 'Las contraseñas no coinciden'
-      });
-      return;
-    }
-
-
-
-    this.empresas.ruc = this.empresa.ruc;
-    this.empresas.password = this.empresa.password;
-    this.empresas.correo = this.empresa.email;
-
-    this.empresas.razon_Social = this.empresa.rSocial;
-    this.empresas.nombre_Comercial = this.clienteruc.nombreComercial;
-    this.empresas.condicion = this.clienteruc.condicion;
-    this.empresas.estSunat = this.clienteruc.estado;
-
-
-
-
-    console.log('this.cliientes', this.empresa);
-    console.log('this.empresas', this.empresas);
-    console.log('this.direccionEmpresas', this.direccionEmpresas);
-
-    this.btn_registrar = true;
-    this.data = this.empresas;
-    console.log('this.data', this.data);
-
-
-    //  console.log('this.data como objeto', this.data);
-    this._empresasService.createEmpresa(this.data).subscribe(
-      response => {
-        if (response.data != undefined) {
-          console.log('response.data aqui recibo el id de la empresa creada', response.data);
-          this.direccionEmpresas.idEmpresa = response.data;
-          this._empresasService.createDireccionEmpresa(this.direccionEmpresas).subscribe(
-            response => {
-              if (response.data != undefined) {
-                iziToast.show({
-                  title: 'SUCCESS',
-                  titleColor: '#006064',
-                  color: '#FFF',
-                  class: 'text-success',
-                  position: 'topRight',
-                  message: 'Empresa creada correctamente'
-                });
-                this.btn_registrar = false;
-                this.load_create = true;
-                //quiero redirigir a la pagina de index-clientes
-                // this._router.navigate(['/empresa']);
-              }
-
-            },
-            error => {
-              console.log(<any>error);
-              console.error('Error al crear la Empresa:', error);
-              this.btn_registrar = false;
-            }
-          )
-        } else {
+    this.buscando.set(true);
+    
+    this.apiperuService.getRucInfo(ruc).subscribe({
+      next: (response) => {
+        this.buscando.set(false);
+        
+        if (response.success === false) {
           iziToast.show({
-            title: 'ERROR',
-            titleColor: '#FF0000',
+            title: 'Error',
+            titleColor: '#dc3545',
             color: '#FFF',
             class: 'text-danger',
             position: 'topRight',
-            message: response.message
+            message: 'No se encontró información para el RUC ingresado'
           });
+          this.encontrado.set(false);
           return;
         }
 
-        this.btn_registrar = false;
-      },
-      error => {
-        console.log(<any>error);
-        console.error('Error al crear la empresa:', error);
-        this.btn_registrar = false;
+        this.empresaEncontrada = response;
+        this.encontrado.set(true);
+        
+        // Llenar formulario con datos encontrados
+        this.empresaForm.patchValue({
+          razonSocial: response.razonSocial || '',
+          nombreComercial: response.nombreComercial || '',
+          condicion: response.condicion || '',
+          estado: response.estado || '',
+          direccion: response.direccion || '',
+          ubigeo: response.ubigeo || ''
+        });
 
+        // Buscar y seleccionar ubicación
+        this.seleccionarUbicacion(response);
+        
+        // Avanzar al siguiente paso
+        this.currentStep.set(2);
+        
         iziToast.show({
-          title: 'ERROR',
-          titleColor: '#FF0000',
+          title: 'Éxito',
+          titleColor: '#28a745',
+          color: '#FFF',
+          class: 'text-success',
+          position: 'topRight',
+          message: 'Empresa verificada correctamente'
+        });
+      },
+      error: (error) => {
+        this.buscando.set(false);
+        console.error('Error buscando RUC:', error);
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          color: '#FFF',
+          class: 'text-danger',
+          position: 'topRight',
+          message: 'Error al conectar con el servicio de validación'
+        });
+      }
+    });
+  }
+
+  /**
+   * Selecciona automáticamente la ubicación basada en la respuesta
+   */
+  private seleccionarUbicacion(response: any): void {
+    try {
+      // Encontrar región
+      const regionEncontrada = this.regiones.find(
+        (r: any) => this.removeAccents(r.name).toUpperCase() === response.departamento?.toUpperCase()
+      );
+      
+      if (regionEncontrada) {
+        this.empresaForm.patchValue({ region: regionEncontrada.id });
+        
+        // Filtrar provincias
+        setTimeout(() => {
+          const provinciaEncontrada = this.provincias.find(
+            (p: any) => this.removeAccents(p.name).toUpperCase() === response.provincia?.toUpperCase()
+          );
+          
+          if (provinciaEncontrada) {
+            this.empresaForm.patchValue({ provincia: provinciaEncontrada.id });
+            
+            // Filtrar distritos
+            setTimeout(() => {
+              const distritoEncontrado = this.distritos.find(
+                (d: any) => this.removeAccents(d.name).toUpperCase() === response.distrito?.toUpperCase()
+              );
+              
+              if (distritoEncontrado) {
+                this.empresaForm.patchValue({ distrito: distritoEncontrado.id });
+              }
+            }, 100);
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error seleccionando ubicación:', error);
+    }
+  }
+
+  /**
+   * Navega al paso anterior
+   */
+  previousStep(): void {
+    if (this.currentStep() > 1) {
+      this.currentStep.update(step => step - 1);
+    }
+  }
+
+  /**
+   * Navega al siguiente paso
+   */
+  nextStep(): void {
+    if (this.currentStep() < 3) {
+      // Validar paso actual antes de continuar
+      if (this.currentStep() === 1 && !this.encontrado()) {
+        iziToast.show({
+          title: 'Advertencia',
+          titleColor: '#ffc107',
+          color: '#FFF',
+          class: 'text-warning',
+          position: 'topRight',
+          message: 'Primero debe verificar el RUC'
+        });
+        return;
+      }
+      
+      this.currentStep.update(step => step + 1);
+    }
+  }
+
+  /**
+   * Alterna visibilidad de contraseña
+   */
+  togglePassword(): void {
+    this.showPassword.update(show => !show);
+  }
+
+  /**
+   * Alterna visibilidad de confirmar contraseña
+   */
+  toggleConfirmPassword(): void {
+    this.showConfirmPassword.update(show => !show);
+  }
+
+  /**
+   * Registra la empresa
+   */
+  registrar(): void {
+    if (this.empresaForm.invalid) {
+      // Marcar todos los campos como touched para mostrar errores
+      Object.keys(this.empresaForm.controls).forEach(key => {
+        this.empresaForm.get(key)?.markAsTouched();
+      });
+      
+      iziToast.show({
+        title: 'Error',
+        titleColor: '#dc3545',
+        color: '#FFF',
+        class: 'text-danger',
+        position: 'topRight',
+        message: 'Por favor complete todos los campos requeridos'
+      });
+      return;
+    }
+
+    if (!this.empresaForm.get('acceptTerms')?.value) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        color: '#FFF',
+        class: 'text-warning',
+        position: 'topRight',
+        message: 'Debe aceptar los términos y condiciones'
+      });
+      return;
+    }
+
+    this.registrando.set(true);
+
+    const formData = this.empresaForm.value;
+    
+    const empresaData = {
+      idDocumento: '6',
+      ruc: formData.ruc,
+      razon_Social: formData.razonSocial,
+      nombre_Comercial: formData.nombreComercial || '',
+      correo: formData.email,
+      password: formData.password,
+      condicion: formData.condicion || '',
+      estSunat: formData.estado || ''
+    };
+
+    this.empresaService.createEmpresa(empresaData).subscribe({
+      next: (response) => {
+        if (response.data) {
+          // Crear dirección
+          const direccionData = {
+            idEmpresa: response.data,
+            ubigeo: formData.ubigeo || '',
+            codpais: 'PEN',
+            region: formData.region || '',
+            provincia: formData.provincia || '',
+            distrito: formData.distrito || '',
+            direccion: formData.direccion || '',
+            principal: true,
+            codLocal: '0'
+          };
+
+          this.empresaService.createDireccionEmpresa(direccionData).subscribe({
+            next: () => {
+              this.registrando.set(false);
+              this.loadCreate.set(true);
+              
+              iziToast.show({
+                title: 'Éxito',
+                titleColor: '#28a745',
+                color: '#FFF',
+                class: 'text-success',
+                position: 'topRight',
+                message: 'Empresa registrada correctamente'
+              });
+            },
+            error: (error) => {
+              console.error('Error creando dirección:', error);
+              this.registrando.set(false);
+              // La empresa se creó pero falló la dirección
+              this.loadCreate.set(true);
+            }
+          });
+        } else {
+          this.registrando.set(false);
+          iziToast.show({
+            title: 'Error',
+            titleColor: '#dc3545',
+            color: '#FFF',
+            class: 'text-danger',
+            position: 'topRight',
+            message: response.message || 'Error al crear la empresa'
+          });
+        }
+      },
+      error: (error) => {
+        console.error('Error creando empresa:', error);
+        this.registrando.set(false);
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
           color: '#FFF',
           class: 'text-danger',
           position: 'topRight',
           message: 'Error al crear la empresa'
         });
-
       }
-
-    )
-
+    });
   }
 
+  /**
+   * Obtiene la clase CSS para la barra de fortaleza
+   */
+  getStrengthClass(): string {
+    const strength = this.passwordStrength();
+    if (strength < 40) return 'bg-danger';
+    if (strength < 80) return 'bg-warning';
+    return 'bg-success';
+  }
 
+  /**
+   * Obtiene el texto de la fortaleza
+   */
+  getStrengthText(): string {
+    const strength = this.passwordStrength();
+    if (strength < 40) return 'Débil';
+    if (strength < 80) return 'Media';
+    return 'Fuerte';
+  }
 
+  /**
+   * Verifica si un campo tiene error
+   */
+  hasError(field: string): boolean {
+    const control = this.empresaForm.get(field);
+    return !!(control?.invalid && control?.touched);
+  }
+
+  /**
+   * Obtiene el mensaje de error de un campo
+   */
+  getError(field: string): string {
+    const control = this.empresaForm.get(field);
+    if (!control?.errors) return '';
+
+    if (control.errors['required']) return 'Este campo es requerido';
+    if (control.errors['email']) return 'Ingrese un email válido';
+    if (control.errors['minlength']) return `Mínimo ${control.errors['minlength'].requiredLength} caracteres`;
+    if (control.errors['maxlength']) return `Máximo ${control.errors['maxlength'].requiredLength} caracteres`;
+    if (control.errors['pattern']) return 'Formato inválido';
+    
+    return 'Error de validación';
+  }
+
+  /**
+   * Navega a login
+   */
+  irALogin(): void {
+    this.router.navigate(['/login-empresa']);
+  }
 }

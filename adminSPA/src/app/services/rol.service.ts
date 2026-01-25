@@ -19,7 +19,7 @@ export class RolService {
   }
 
 
-  obtener_roles():Observable<any>{
+  obtenerRoles():Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'rol/',{
       headers: headers,
@@ -27,7 +27,7 @@ export class RolService {
     });
   }
 
-  obtener_rol_id(id:any):Observable<any>{
+  obtenerRolId(id:any):Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'rol/'+id,{
       headers: headers,
@@ -36,7 +36,7 @@ export class RolService {
   }
 
   //crea el sercicio actualizar_rol
-  actualizar_rol(id:any,data:any):Observable<any>{
+  actualizarRol(id:any,data:any):Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'rol/'+id,data,{
       headers: headers,
@@ -45,7 +45,7 @@ export class RolService {
   }
 
   //crea el servicio crear_rol
-  crear_rol(data:any):Observable<any>{
+  crearRol(data:any):Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'rol/',data,{
       headers: headers,

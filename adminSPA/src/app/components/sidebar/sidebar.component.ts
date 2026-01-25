@@ -1,118 +1,185 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-//import { NgxSvgModule } from 'ngx-svg';
+import { Component, OnInit, signal, effect, Output, EventEmitter, Input } from '@angular/core';
+import { Router, RouterModule } from '@angular/router';
+import { PermisosService } from '../../services/permisos.service';
+import { AuthService } from '../../services/auth.service';
+import { MenuItem } from '../../interfaces/permisos-interface';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [FormsModule, CommonModule],
+  imports: [CommonModule, RouterModule],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css'
 })
-export class SidebarComponent {
-   // Señales (Reactividad Angular 17+)
-  flowers = signal<Flower[]>([]);
-leaves = signal<Leaf[]>([]);
-stems = signal<Stem[]>([]);
-selectedColor = "#FF6B6B";
-selectedElement: Flower | Leaf | null = null;
-selectedStem: Stem | null = null; // Nuevo: Tallo seleccionado
+export class SidebarComponent implements OnInit {
+  // Estado del sidebar
+  isCollapsed = signal<boolean>(false);
+  isMobileOpen = signal<boolean>(false);
+  
+  // Navegación
+  menuItems = signal<MenuItem[]>([]);
+  openSubmenu = signal<string | null>(null);
+  
+  // Datos del usuario
+  userName = signal<string>('Usuario');
+  userRole = signal<string>('');
+  empresaNombre = signal<string>('');
 
-constructor() {
-  // Inicializar con un arreglo básico
-  this.addStem();
-}
+  // Eventos
+  @Output() sidebarToggle = new EventEmitter<boolean>();
+  @Input() forceCollapsed: boolean = false;
 
-// Generadores de formas
-private generateFlower(x: number, y: number): Flower {
-  const petals = `
-    M${x},${y - 15} 
-    C${x - 10},${y - 25} ${x - 20},${y - 15} ${x - 15},${y}
-    C${x - 25},${y + 5} ${x - 10},${y + 15} ${x},${y + 10}
-    C${x + 10},${y + 15} ${x + 25},${y + 5} ${x + 15},${y}
-    C${x + 20},${y - 15} ${x + 10},${y - 25} ${x},${y - 15}
-  `;
-  return {
-    path: petals,
-    color: this.selectedColor,
-    center: { x, y, radius: 3 }
-  };
-}
+  constructor(
+    private permisosService: PermisosService,
+    private authService: AuthService,
+    private router: Router
+  ) {
+    // Efecto para actualizar datos del usuario cuando cambien
+    effect(() => {
+      const userData = this.authService.userData();
+      if (userData) {
+        this.userName.set(userData.nombres || 'Usuario');
+        this.userRole.set(userData.rol || '');
+        this.empresaNombre.set(userData.razonSocial || '');
+      }
+    });
 
-private generateLeaf(x: number, y: number): Leaf {
-  return {
-    path: `
-      M${x},${y} 
-      C${x - 15},${y - 5} ${x - 20},${y + 10} ${x - 5},${y + 15}
-      C${x},${y + 20} ${x + 10},${y + 10} ${x + 5},${y}
-      Z
-    `,
-    color: "#2e8b57"
-  };
-}
-
-private generateStem(): Stem {
-  const startY = 450;
-  const endY = 250 + Math.random() * 100;
-  return {
-    path: `M300,${startY} C290,${startY - 50} 310,${endY + 50} 300,${endY}`,
-    width: 3
-  };
-}
-
-// Métodos de interacción
-addFlower() {
-  if (!this.selectedStem) {
-    console.warn("No hay un tallo seleccionado para agregar la flor.");
-    return;
+    // Efecto para actualizar navegación cuando se carguen los permisos
+    effect(() => {
+      const navegacion = this.permisosService.navegacion();
+      if (navegacion && navegacion.length > 0) {
+        this.menuItems.set(navegacion);
+      }
+    });
   }
-  // Posicionar la flor en el tallo seleccionado
-  const x = 300; // Coordenada X fija para el tallo
-  const y = 250 + Math.random() * 100; // Coordenada Y aleatoria dentro del rango del tallo
-  this.flowers.update(f => [...f, this.generateFlower(x, y)]);
-}
 
-addLeaf() {
-  if (!this.selectedStem) {
-    console.warn("No hay un tallo seleccionado para agregar la hoja.");
-    return;
+  ngOnInit(): void {
+    this.cargarNavegacion();
+    
+    // Verificar si hay preferencia guardada
+    const collapsed = localStorage.getItem('sidebarCollapsed');
+    if (collapsed === 'true') {
+      this.isCollapsed.set(true);
+    }
   }
-  // Posicionar la hoja en el tallo seleccionado
-  const x = 300 + (Math.random() * 40 - 20); // Coordenada X cerca del tallo
-  const y = 300 + Math.random() * 100; // Coordenada Y aleatoria dentro del rango del tallo
-  this.leaves.update(l => [...l, this.generateLeaf(x, y)]);
-}
 
-addStem() {
-  const newStem = this.generateStem();
-  this.stems.update(s => [...s, newStem]);
-  this.selectedStem = newStem; // Seleccionar automáticamente el nuevo tallo
-}
+  /**
+   * Carga la navegación desde el servicio de permisos
+   */
+  private cargarNavegacion(): void {
+    this.permisosService.cargarNavegacion().subscribe({
+      next: (response) => {
+        if (response.data) {
+          this.menuItems.set(response.data);
+        }
+      },
+      error: (error) => {
+        console.error('Error al cargar navegación:', error);
+        // Cargar navegación por defecto en caso de error
+        this.cargarNavegacionDefecto();
+      }
+    });
+  }
 
-selectElement(element: Flower | Leaf) {
-  this.selectedElement = element;
-  this.selectedColor = element.color;
-}
+  /**
+   * Navegación por defecto en caso de error
+   */
+  private cargarNavegacionDefecto(): void {
+    const navegacionDefecto: MenuItem[] = [
+      { nombre: 'Dashboard', icono: 'fas fa-tachometer-alt', ruta: '/home', visible: true },
+      { tipo: 'separador' },
+      { nombre: 'Ventas', icono: 'fas fa-shopping-cart', ruta: '/ventas', visible: true },
+      { nombre: 'Compras', icono: 'fas fa-shopping-bag', ruta: '/compras', visible: true },
+      { nombre: 'Inventario', icono: 'fas fa-boxes', ruta: '/inventario', visible: true },
+    ];
+    this.menuItems.set(navegacionDefecto);
+  }
 
-selectStem(stem: Stem) {
-  this.selectedStem = stem; // Seleccionar el tallo
-}
-}
+  /**
+   * Toggle del sidebar (colapsar/expandir)
+   */
+  toggleSidebar(): void {
+    const newState = !this.isCollapsed();
+    this.isCollapsed.set(newState);
+    localStorage.setItem('sidebarCollapsed', String(newState));
+    this.sidebarToggle.emit(newState);
+    
+    // Cerrar submenús cuando se colapsa
+    if (newState) {
+      this.openSubmenu.set(null);
+    }
+  }
 
-// Interfaces para tipado
-interface Flower {
-  path: string;
-  color: string;
-  center?: { x: number; y: number; radius: number };
-}
+  /**
+   * Toggle del sidebar en móvil
+   */
+  toggleMobileSidebar(): void {
+    this.isMobileOpen.set(!this.isMobileOpen());
+  }
 
-interface Leaf {
-  path: string;
-  color: string;
-}
+  /**
+   * Cierra el sidebar en móvil
+   */
+  closeMobileSidebar(): void {
+    this.isMobileOpen.set(false);
+  }
 
-interface Stem {
-  path: string;
-  width: number;
+  /**
+   * Toggle de submenú
+   */
+  toggleSubmenu(modulo: string): void {
+    if (this.openSubmenu() === modulo) {
+      this.openSubmenu.set(null);
+    } else {
+      this.openSubmenu.set(modulo);
+    }
+  }
+
+  /**
+   * Verifica si un submenú está abierto
+   */
+  isSubmenuOpen(modulo: string): boolean {
+    return this.openSubmenu() === modulo;
+  }
+
+  /**
+   * Navega a una ruta
+   */
+  navigateTo(ruta: string | null): void {
+    if (ruta) {
+      this.router.navigate([ruta]);
+      // Cerrar sidebar en móvil después de navegar
+      this.closeMobileSidebar();
+    }
+  }
+
+  /**
+   * Verifica si una ruta está activa
+   */
+  isRouteActive(ruta: string | null): boolean {
+    if (!ruta) return false;
+    return this.router.url === ruta || this.router.url.startsWith(ruta + '/');
+  }
+
+  /**
+   * Cierra sesión
+   */
+  logout(): void {
+    this.permisosService.limpiarPermisos();
+    this.authService.forceLogout();
+  }
+
+  /**
+   * Obtiene las iniciales del usuario
+   */
+  getUserInitials(): string {
+    const name = this.userName();
+    if (!name) return 'U';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
 }

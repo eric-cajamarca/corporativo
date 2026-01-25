@@ -1,0 +1,206 @@
+/* =============================================
+   LAYOUT PRINCIPAL
+   ============================================= */
+
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+/* =============================================
+   HEADER
+   ============================================= */
+
+.content-header {
+  margin-bottom: 24px;
+}
+
+.content-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin: 0;
+}
+
+.content-subtitle {
+  font-size: 0.9rem;
+}
+
+/* =============================================
+   CARD
+   ============================================= */
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+  background: #fff;
+  border-bottom: 1px solid #f1f3f4;
+  padding: 16px 20px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+.card-footer {
+  background: #fff;
+  border-top: 1px solid #f1f3f4;
+  padding: 16px 20px;
+}
+
+/* =============================================
+   TABLA
+   ============================================= */
+
+.table {
+  margin-bottom: 0;
+}
+
+.table th {
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: none;
+  padding: 12px 16px;
+  background: #f8f9fa;
+}
+
+.table td {
+  vertical-align: middle;
+  padding: 16px;
+  border-color: #f1f3f4;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* =============================================
+   AVATAR
+   ============================================= */
+
+.avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* =============================================
+   BADGES
+   ============================================= */
+
+.badge {
+  font-weight: 500;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+}
+
+/* =============================================
+   MODAL TABS
+   ============================================= */
+
+.nav-tabs {
+  border-bottom: none;
+  gap: 4px;
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  border-radius: 8px 8px 0 0;
+  padding: 12px 20px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.nav-tabs .nav-link.active {
+  background: #fff;
+  color: #667eea;
+  border-bottom: 2px solid #667eea;
+}
+
+.nav-tabs .nav-link:hover:not(.active) {
+  background: #f8f9fa;
+}
+
+/* =============================================
+   LIST GROUP
+   ============================================= */
+
+.list-group-item {
+  border-radius: 8px !important;
+  margin-bottom: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.list-group-item:last-child {
+  margin-bottom: 0;
+}
+
+/* =============================================
+   ACCORDION
+   ============================================= */
+
+.accordion-button:not(.collapsed) {
+  background-color: #f0f4ff;
+  color: #667eea;
+}
+
+.accordion-button:focus {
+  box-shadow: none;
+  border-color: #e9ecef;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+
+@media (max-width: 767.98px) {
+  .main-content {
+    padding: 16px;
+  }
+
+  .content-title {
+    font-size: 1.25rem;
+  }
+
+  .table-responsive {
+    font-size: 0.9rem;
+  }
+
+  .avatar-circle {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
+}

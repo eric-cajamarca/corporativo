@@ -10,7 +10,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-index-caja',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './index-caja.component.html',
   styleUrl: './index-caja.component.css'
 })
