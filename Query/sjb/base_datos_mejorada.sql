@@ -396,24 +396,24 @@ CREATE TABLE ProductosCompuestos (
 );
 GO
 
--- Tabla de stock por sucursal mejorada
-CREATE TABLE StockSucursal (
-    idStockSucursal INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
-    idEmpresa UNIQUEIDENTIFIER NOT NULL,
-    idSucursal UNIQUEIDENTIFIER NOT NULL,
-    idProducto UNIQUEIDENTIFIER NOT NULL,
-    cantidad DECIMAL(18,2) NOT NULL DEFAULT 0,
-    fIngreso DATETIME DEFAULT GETDATE(),
-    idUsuario UNIQUEIDENTIFIER NOT NULL,
-    ubicacion VARCHAR(50) NULL,
+---- Tabla de stock por sucursal mejorada
+--CREATE TABLE StockSucursal (
+--    idStockSucursal INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
+--    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+--    idSucursal UNIQUEIDENTIFIER NOT NULL,
+--    idProducto UNIQUEIDENTIFIER NOT NULL,
+--    cantidad DECIMAL(18,2) NOT NULL DEFAULT 0,
+--    fIngreso DATETIME DEFAULT GETDATE(),
+--    idUsuario UNIQUEIDENTIFIER NOT NULL,
+--    ubicacion VARCHAR(50) NULL,
 
-    FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE,
-    FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE CASCADE,
-    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
-    CONSTRAINT UQ_StockSucursal UNIQUE (idEmpresa, idSucursal, idProducto)
-);
-GO
+--    FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
+--    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE,
+--    FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE CASCADE,
+--    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
+--    CONSTRAINT UQ_StockSucursal UNIQUE (idEmpresa, idSucursal, idProducto)
+--);
+--GO
 
 -- Tabla de lotes mejorada
 CREATE TABLE Lotes (
@@ -433,6 +433,26 @@ CREATE TABLE Lotes (
     FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE
 );
 GO
+
+CREATE TABLE UbicacionesPrioridad (
+    idUbicacion INT IDENTITY(1,1) PRIMARY KEY,
+    idSucursal UNIQUEIDENTIFIER,
+    codigoUbicacion VARCHAR(20), -- 'MOSTRADOR', 'ANDAMIO-5'
+    prioridad INT, -- 1=Primero, 2=Segundo
+    UNIQUE(codigoUbicacion)
+)
+SELECT * FROM UbicacionesPrioridad ORDER BY idSucursal, prioridad;
+
+go
+CREATE TABLE LotesUbicacion (
+    idLote UNIQUEIDENTIFIER,
+    idUbicacion INT,
+    cantidad INT, -- Cantidad física en esa ubicación
+    PRIMARY KEY(idLote, idUbicacion)
+)
+
+
+
 
 -- =============================================
 -- TABLAS MULTIEMPRESA - PRECIOS Y LISTAS
@@ -1001,6 +1021,29 @@ CREATE TABLE MovimientosCaja (
     FOREIGN KEY (idMoneda) REFERENCES Moneda(idMoneda)
 );
 GO
+
+-- =========================================================
+-- 1. CAT�LOGO DE FORMAS DE PAGO (ampliado)
+-- =========================================================
+
+CREATE TABLE FormasPago (
+    idFormaPago INT IDENTITY(1,1) PRIMARY KEY,
+    descripcion VARCHAR(50) NOT NULL UNIQUE, -- Efectivo, Yape, Plin, Transferencia, Tarjeta Visa, etc.
+    tipo VARCHAR(20) NOT NULL, -- EFECTIVO, DIGITAL, BANCARIO, TARJETA
+    requiereReferencia BIT NOT NULL DEFAULT 0,
+    activo BIT NOT NULL DEFAULT 1
+);
+
+-- Valores iniciales
+INSERT INTO FormasPago (descripcion, tipo, requiereReferencia) VALUES
+('Efectivo', 'EFECTIVO', 0),
+('Yape', 'DIGITAL', 1),
+('Plin', 'DIGITAL', 1),
+('Transferencia', 'BANCARIO', 1),
+('Tarjeta Visa', 'TARJETA', 1),
+('Tarjeta Mastercard', 'TARJETA', 1),
+('Pago en Oficina', 'BANCARIO', 0),
+('Cheque', 'BANCARIO', 1);
 
 -- =============================================
 -- SISTEMA DE CUENTAS POR COBRAR

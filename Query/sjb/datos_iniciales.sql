@@ -250,10 +250,18 @@ INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo) VALU
 ('42099529-43C9-4B7F-921A-3D6FB946E93E', '03', 'Boleta', 'B001', 1, 1),
 ('42099529-43C9-4B7F-921A-3D6FB946E93E', '07', 'Nota de crédito', 'BC01', 1, 1),
 ('42099529-43C9-4B7F-921A-3D6FB946E93E', '08', 'Nota de débito', 'BD01', 1, 1),
+('42099529-43C9-4B7F-921A-3D6FB946E93E','07','Nota de credito','FC01',1),
+('42099529-43C9-4B7F-921A-3D6FB946E93E','08','Nota de dedito','FD01',1),
 ('42099529-43C9-4B7F-921A-3D6FB946E93E', 'RA', 'Comunicación de baja', '-', 1, 1),
+('42099529-43C9-4B7F-921A-3D6FB946E93E','RC','Resumen diario','-',1)
+('42099529-43C9-4B7F-921A-3D6FB946E93E','10','Guia Remitente','TG01',1)
+('42099529-43C9-4B7F-921A-3D6FB946E93E','11','Guia Transportista','RG01',1)
+('0CE8EED8-83C6-4694-B64F-9AD82B5E4023E','LT','Letra por cobrar','LT',1)
 ('42099529-43C9-4B7F-921A-3D6FB946E93E', 'TK', 'Ticket de despacho', 'TK01', 1, 1),
 ('42099529-43C9-4B7F-921A-3D6FB946E93E', 'NP', 'Nota de pedido', 'NP01', 1, 1),
-('42099529-43C9-4B7F-921A-3D6FB946E93E', 'CT', 'Cotización', 'CT01', 1, 1);
+('42099529-43C9-4B7F-921A-3D6FB946E93E', 'CT', 'Cotización', 'CT01', 1, 1),
+('42099529-43C9-4B7F-921A-3D6FB946E93E','NE','Nota de envio','NE01',1),
+('42099529-43C9-4B7F-921A-3D6FB946E93E','RP','Recibo de pago','RP01',1);
 GO
 
 -- Lista de precios principal
