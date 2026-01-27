@@ -163,7 +163,7 @@ const crear_permiso = async function (req, res) {
 const actualizar_permisos_rol = async function (req, res) {
     const { idRol } = req.params;
     const { permisos } = req.body;
-
+    console.log('controlador actualizar_permisos_rol',req.body, req.params );
     try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });

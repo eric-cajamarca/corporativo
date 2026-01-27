@@ -36,7 +36,7 @@ export class IndexRolComponent {
 
 
   ngOnInit(): void {
-    this._rolService.obtener_roles().subscribe(
+    this._rolService.obtenerRoles().subscribe(
       response=>{
         console.log('response: ',response.data);
         this.roles = response.data;

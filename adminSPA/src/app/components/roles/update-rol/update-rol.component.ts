@@ -34,7 +34,7 @@ export class UpdateRolComponent {
         this.id = params['id'];
         console.log('this.id: ', this.id);
 
-        this._rolService.obtener_rol_id(this.id).subscribe(
+        this._rolService.obtenerRolId(this.id).subscribe(
           response => {
             console.log('response: ', response);
             this.rol = response;
@@ -66,7 +66,7 @@ export class UpdateRolComponent {
     //validar si el formulario es valido
     if (updateForm.valid) {
       console.log('this.rol: ', this.rol);
-      this._rolService.actualizar_rol(this.id, this.rol).subscribe(
+      this._rolService.actualizarRol(this.id, this.rol).subscribe(
         response=>{
           if (response.data == undefined) {
             iziToast.show({

@@ -162,15 +162,33 @@ CREATE TABLE Permisos (
 GO
 
 -- Tabla de asociación rol-permisos
+--CREATE TABLE RolPermisos (
+--    idRol UNIQUEIDENTIFIER NOT NULL,
+--    idPermiso UNIQUEIDENTIFIER NOT NULL,
+--    PRIMARY KEY (idRol, idPermiso),
+
+--    FOREIGN KEY (idRol) REFERENCES Rol(idRol) ON DELETE CASCADE,
+--    FOREIGN KEY (idPermiso) REFERENCES Permisos(idPermiso) ON DELETE CASCADE
+--);
+--GO
+
 CREATE TABLE RolPermisos (
     idRol UNIQUEIDENTIFIER NOT NULL,
     idPermiso UNIQUEIDENTIFIER NOT NULL,
-    PRIMARY KEY (idRol, idPermiso),
+    CONSTRAINT PK_RolPermisos PRIMARY KEY (idRol, idPermiso),
 
-    FOREIGN KEY (idRol) REFERENCES Rol(idRol) ON DELETE CASCADE,
-    FOREIGN KEY (idPermiso) REFERENCES Permisos(idPermiso) ON DELETE CASCADE
+    CONSTRAINT FK_RolPermisos_Rol
+      FOREIGN KEY (idRol)
+      REFERENCES dbo.Rol(idRol)
+      ON DELETE CASCADE,
+
+    CONSTRAINT FK_RolPermisos_Permisos
+      FOREIGN KEY (idPermiso)
+      REFERENCES dbo.Permisos(idPermiso)
+      ON DELETE NO ACTION
 );
 GO
+select * from RolPermisos
 
 -- Tabla de usuarios mejorada
 CREATE TABLE UsuarioWeb (
@@ -343,15 +361,38 @@ CREATE TABLE Sucursal (
 GO
 
 -- Tabla de usuarios que pueden acceder a sucursales específicas
+--CREATE TABLE UsuarioSucursal (
+--    idUsuario UNIQUEIDENTIFIER NOT NULL,
+--    idSucursal UNIQUEIDENTIFIER NOT NULL,
+--    PRIMARY KEY (idUsuario, idSucursal),
+
+--    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario) ON DELETE CASCADE,
+--    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE NO ACTION,
+--);
+--GO
+
+--DROP TABLE UsuarioSucursal
+
 CREATE TABLE UsuarioSucursal (
+    idUsuarioSucursal UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
     idUsuario UNIQUEIDENTIFIER NOT NULL,
     idSucursal UNIQUEIDENTIFIER NOT NULL,
-    PRIMARY KEY (idUsuario, idSucursal),
+    estado BIT NOT NULL DEFAULT 1,
+    esDefault BIT NOT NULL DEFAULT 0,
+	fAsignacion DATETIME NOT NULL DEFAULT GETDATE(),
 
-    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario) ON DELETE CASCADE,
-    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE
+    CONSTRAINT PK_UsuarioSucursal PRIMARY KEY (idUsuarioSucursal),
+
+    CONSTRAINT FK_UsuarioSucursal_Usuario
+      FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario) ON DELETE CASCADE,
+
+    CONSTRAINT FK_UsuarioSucursal_Sucursal
+      FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE NO ACTION,
+
+    CONSTRAINT UQ_UsuarioSucursal UNIQUE (idUsuario, idSucursal)
 );
 GO
+
 
 -- Tabla de productos mejorada
 CREATE TABLE Productos (

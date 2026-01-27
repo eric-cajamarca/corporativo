@@ -35,8 +35,8 @@ export class CreateColaboradorComponent {
 
   ngOnInit(): void {
 
-    this._rolService.obtener_roles().subscribe(
-      response => {
+    this._rolService.obtenerRoles().subscribe(
+      (response: any) => {
         console.log('response.data', response.data);
         
         if (response.data == undefined) {
@@ -74,7 +74,7 @@ export class CreateColaboradorComponent {
       console.log('variable colaborador', this.colaborador);
 
       this._colaboradorService.registro_colaborador_admin(this.colaborador).subscribe(
-        response=>{
+        (response: any) =>{
           console.log('data:',response.data);
           if(response.data == undefined){
             iziToast.show({
@@ -106,7 +106,7 @@ export class CreateColaboradorComponent {
           }
           
         },
-        Error => {
+        (error:any) => {
         this.btn_registrar=false;
 
         }

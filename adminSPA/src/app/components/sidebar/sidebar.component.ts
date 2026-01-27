@@ -48,6 +48,7 @@ export class SidebarComponent implements OnInit {
     // Efecto para actualizar navegación cuando se carguen los permisos
     effect(() => {
       const navegacion = this.permisosService.navegacion();
+      console.log('navegacion', navegacion);
       if (navegacion && navegacion.length > 0) {
         this.menuItems.set(navegacion);
       }
@@ -70,6 +71,7 @@ export class SidebarComponent implements OnInit {
   private cargarNavegacion(): void {
     this.permisosService.cargarNavegacion().subscribe({
       next: (response) => {
+        console.log(response);
         if (response.data) {
           this.menuItems.set(response.data);
         }

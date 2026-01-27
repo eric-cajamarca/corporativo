@@ -31,8 +31,8 @@ export class CreateRolComponent {
     if(registroForm.valid){
        console.log('this.rol: ',this.rol);
 
-        //llamar al servicio crear_rol
-        this._rolService.crear_rol(this.rol).subscribe(
+        //llamar al servicio crearRol
+        this._rolService.crearRol(this.rol).subscribe(
           response=>{
             console.log('response: ',response);
             //valido que response no sea undefined

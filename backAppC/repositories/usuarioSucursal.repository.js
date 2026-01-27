@@ -5,6 +5,7 @@ const sql = require('mssql');
  * Obtiene las sucursales asignadas a un usuario
  */
 const obtenerSucursalesUsuario = async (pool, idUsuario, idEmpresa) => {
+    console.log('obtenerSucursaleUsuario repository', idUsuario, idEmpresa);
     const result = await pool.request()
         .input('idUsuario', sql.UniqueIdentifier, idUsuario)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -230,13 +231,13 @@ const actualizarAsignacionesMasivo = async (pool, idUsuario, sucursalesIds, idEm
  * Obtiene todas las sucursales de una empresa con info de asignación a un usuario
  */
 const obtenerSucursalesConAsignacion = async (pool, idUsuario, idEmpresa) => {
+    
     const result = await pool.request()
         .input('idUsuario', sql.UniqueIdentifier, idUsuario)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .query(`
             SELECT 
                 s.idSucursal,
-                s.codigo,
                 s.direccion,
                 s.telefono,
                 s.estado as estadoSucursal,
@@ -246,7 +247,7 @@ const obtenerSucursalesConAsignacion = async (pool, idUsuario, idEmpresa) => {
             FROM Sucursal s
             LEFT JOIN UsuarioSucursal us ON s.idSucursal = us.idSucursal AND us.idUsuario = @idUsuario
             WHERE s.idEmpresa = @idEmpresa
-            ORDER BY s.codigo
+            
         `);
     return result.recordset;
 };
