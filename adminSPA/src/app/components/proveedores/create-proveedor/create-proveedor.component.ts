@@ -541,7 +541,7 @@ private async handleDniSearch(): Promise<void> {
                           });
                           this.btn_registrar = false;
                           //quiero redirigir a la pagina de index-clientes
-                          this._router.navigate(['/cliente']);
+                          this._router.navigate(['/proveedores']);
                         }
                         
                       },

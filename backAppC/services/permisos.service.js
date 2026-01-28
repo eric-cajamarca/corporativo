@@ -7,13 +7,13 @@ const permisosRepository = require('../repositories/permisos.repository');
  */
 const obtenerPermisosUsuario = async (pool, user) => {
     // SIEMPRE filtra por idEmpresa en TODAS las consultas (regla 1.6)
-    if (!user || !user.empresa || !user.usuario) {
+    if (!user || !user.empresa || !user.sub) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
     const permisos = await permisosRepository.obtenerPermisosPorUsuario(
         pool, 
-        user.usuario, 
+        user.sub, 
         user.empresa
     );
 
@@ -131,7 +131,7 @@ const verificarPermisoUsuario = async (pool, nombrePermiso, user) => {
 
     return await permisosRepository.verificarPermiso(
         pool, 
-        user.usuario, 
+        user.sub, 
         user.empresa, 
         nombrePermiso
     );
@@ -167,12 +167,13 @@ const inicializarPermisos = async (pool, user) => {
  * Obtiene la estructura de navegación del sidebar basada en permisos
  */
 const obtenerNavegacionSidebar = async (pool, user) => {
-    if (!user || !user.empresa || !user.usuario) {
+    if (!user || !user.empresa || !user.sub) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
     // Obtener permisos del usuario
     const permisosData = await obtenerPermisosUsuario(pool, user);
+    console.log('estos permisos tiene el usuario', permisosData);
     const permisos = permisosData.listaPermisos;
 
     // Si es administrador, tiene acceso a todo

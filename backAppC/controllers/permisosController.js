@@ -7,6 +7,7 @@ const permisosService = require('../services/permisos.service');
  * Obtiene los permisos del usuario autenticado
  */
 const obtener_permisos_usuario = async function (req, res) {
+    console.log('req.user en obtener navegacion sidebar', req.user);
     try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
@@ -266,6 +267,8 @@ const inicializar_permisos = async function (req, res) {
  * Obtiene la navegación del sidebar basada en permisos
  */
 const obtener_navegacion_sidebar = async function (req, res) {
+    
+    console.log('req.user en obtener navegacion sidebar', req.user);
     try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });

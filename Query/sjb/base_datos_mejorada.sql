@@ -295,7 +295,7 @@ CREATE TABLE DireccionClientes (
     principal BIT DEFAULT 0,
 
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-    FOREIGN KEY (idCliente) REFERENCES Clientes(idCliente) ON DELETE CASCADE,
+    FOREIGN KEY (idCliente) REFERENCES Clientes(idCliente) ON DELETE NO ACTION,
 );
 GO
 
@@ -335,7 +335,7 @@ CREATE TABLE DireccionProveedor (
     principal BIT DEFAULT 0,
 
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-    FOREIGN KEY (idProveedor) REFERENCES Proveedores(idProveedor) ON DELETE CASCADE,
+    FOREIGN KEY (idProveedor) REFERENCES Proveedores(idProveedor) ON DELETE NO ACTION,
 );
 GO
 
@@ -438,23 +438,23 @@ CREATE TABLE ProductosCompuestos (
 GO
 
 ---- Tabla de stock por sucursal mejorada
---CREATE TABLE StockSucursal (
---    idStockSucursal INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
---    idEmpresa UNIQUEIDENTIFIER NOT NULL,
---    idSucursal UNIQUEIDENTIFIER NOT NULL,
---    idProducto UNIQUEIDENTIFIER NOT NULL,
---    cantidad DECIMAL(18,2) NOT NULL DEFAULT 0,
---    fIngreso DATETIME DEFAULT GETDATE(),
---    idUsuario UNIQUEIDENTIFIER NOT NULL,
---    ubicacion VARCHAR(50) NULL,
+CREATE TABLE StockSucursal (
+    idStockSucursal INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    idSucursal UNIQUEIDENTIFIER NOT NULL,
+    idProducto UNIQUEIDENTIFIER NOT NULL,
+    cantidad DECIMAL(18,2) NOT NULL DEFAULT 0,
+    fIngreso DATETIME DEFAULT GETDATE(),
+    idUsuario UNIQUEIDENTIFIER NOT NULL,
+    ubicacion VARCHAR(50) NULL,
 
---    FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
---    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE,
---    FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE CASCADE,
---    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
---    CONSTRAINT UQ_StockSucursal UNIQUE (idEmpresa, idSucursal, idProducto)
---);
---GO
+    FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
+    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE NO ACTION,
+    FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE NO ACTION,
+    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
+    CONSTRAINT UQ_StockSucursal UNIQUE (idEmpresa, idSucursal, idProducto)
+);
+GO
 
 -- Tabla de lotes mejorada
 CREATE TABLE Lotes (
@@ -533,7 +533,7 @@ CREATE TABLE PreciosProducto (
 
     CONSTRAINT PK_PreciosProducto PRIMARY KEY (idPrecio),
     CONSTRAINT FK_PreciosProducto_ListasPrecio FOREIGN KEY (idLista) REFERENCES ListasPrecio(idLista) ON DELETE CASCADE,
-    CONSTRAINT FK_PreciosProducto_Productos FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE CASCADE,
+    CONSTRAINT FK_PreciosProducto_Productos FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE NO ACTION,
     CONSTRAINT FK_PreciosProducto_Moneda FOREIGN KEY (idMoneda) REFERENCES Moneda(idMoneda),
     CONSTRAINT FK_PreciosProducto_Usuario FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
     CONSTRAINT UQ_PreciosProducto_ListaProducto UNIQUE (idLista, idProducto)
