@@ -27,6 +27,7 @@ api.post('/direccion_empresa', empresasController.createDireccionEmpresa);
 api.put('/direccion_empresa/:id',auth.auth, empresasController.updateDireccionEmpresa);
 api.put('/cambiar_principal/:id',auth.auth, empresasController.cambiar_principal_direccion);
 
-
+// Estado de configuración de la empresa
+api.get('/estado_configuracion',auth.auth, empresasController.getEstadoConfiguracion);
 
 module.exports = api;

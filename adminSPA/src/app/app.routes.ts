@@ -71,7 +71,6 @@ export const routes: Routes = [
      {
         path:'crear-empresa',
         component: CreateEmpresaComponent,
-        canActivate: [AuthGuard],
         title: 'Crear Empresa',
      },
      {

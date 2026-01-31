@@ -370,29 +370,44 @@
                 <!-- Requisitos de contraseña -->
                 <div class="password-requirements mt-2">
                   <small class="d-block" [class.text-success]="passwordRequirements().length" [class.text-muted]="!passwordRequirements().length">
-                    <i class="fas fa-check-circle me-1" *ngIf="passwordRequirements().length"></i>
-                    <i class="far fa-circle me-1" *ngIf="!passwordRequirements().length"></i>
+                    @if (passwordRequirements().length) {
+                      <i class="fas fa-check-circle me-1"></i>
+                    } @else {
+                      <i class="far fa-circle me-1"></i>
+                    }
                     Mínimo 8 caracteres
                   </small>
                   <small class="d-block" [class.text-success]="passwordRequirements().uppercase" [class.text-muted]="!passwordRequirements().uppercase">
-                    <i class="fas fa-check-circle me-1" *ngIf="passwordRequirements().uppercase"></i>
-                    <i class="far fa-circle me-1" *ngIf="!passwordRequirements().uppercase"></i>
+                    @if (passwordRequirements().uppercase) {
+                      <i class="fas fa-check-circle me-1"></i>
+                    } @else {
+                      <i class="far fa-circle me-1"></i>
+                    }
                     Al menos una mayúscula
                   </small>
                   <small class="d-block" [class.text-success]="passwordRequirements().lowercase" [class.text-muted]="!passwordRequirements().lowercase">
-                    <i class="fas fa-check-circle me-1" *ngIf="passwordRequirements().lowercase"></i>
-                    <i class="far fa-circle me-1" *ngIf="!passwordRequirements().lowercase"></i>
+                    @if (passwordRequirements().lowercase) {
+                      <i class="fas fa-check-circle me-1"></i>
+                    } @else {
+                      <i class="far fa-circle me-1"></i>
+                    }
                     Al menos una minúscula
                   </small>
                   <small class="d-block" [class.text-success]="passwordRequirements().number" [class.text-muted]="!passwordRequirements().number">
-                    <i class="fas fa-check-circle me-1" *ngIf="passwordRequirements().number"></i>
-                    <i class="far fa-circle me-1" *ngIf="!passwordRequirements().number"></i>
+                    @if (passwordRequirements().number) {
+                      <i class="fas fa-check-circle me-1"></i>
+                    } @else {
+                      <i class="far fa-circle me-1"></i>
+                    }
                     Al menos un número
                   </small>
                   <small class="d-block" [class.text-success]="passwordRequirements().special" [class.text-muted]="!passwordRequirements().special">
-                    <i class="fas fa-check-circle me-1" *ngIf="passwordRequirements().special"></i>
-                    <i class="far fa-circle me-1" *ngIf="!passwordRequirements().special"></i>
-                    Al menos un carácter especial (&#64;$!%*?&)
+                    @if (passwordRequirements().special) {
+                      <i class="fas fa-check-circle me-1"></i>
+                    } @else {
+                      <i class="far fa-circle me-1"></i>
+                    }
+                    Al menos un carácter especial (&#64;$!%*?&_-#.+=^)
                   </small>
                 </div>
               </div>
@@ -428,20 +443,34 @@
                     type="checkbox" 
                     id="acceptTerms"
                     class="form-check-input" 
-                    formControlName="acceptTerms">
+                    formControlName="acceptTerms"
+                    [class.is-invalid]="hasError('acceptTerms')">
                   <label for="acceptTerms" class="form-check-label">
                     Acepto los <a href="#" target="_blank">términos y condiciones</a> y la 
                     <a href="#" target="_blank">política de privacidad</a>
                   </label>
+                  @if (hasError('acceptTerms')) {
+                    <div class="invalid-feedback d-block">
+                      Debe aceptar los términos y condiciones para continuar
+                    </div>
+                  }
                 </div>
               </div>
               <!-- DEBUG: Estado del formulario -->
-              <div class="alert alert-danger mb-3" *ngIf="empresaForm.invalid">
-                <strong>Campos inválidos:</strong>
+              <div class="alert alert-info mb-3">
+                <strong>Estado del formulario:</strong>
                 <ul class="mb-0">
-                  <li *ngFor="let campo of ['ruc','razonSocial','email','password','confirmTerms','acceptTerms']">
-                    {{ campo }}: {{ empresaForm.get(campo)?.errors | json }}
-                  </li>
+                  <li><strong>Formulario válido:</strong> {{ empresaForm.valid }}</li>
+                  <li><strong>Formulario inválido:</strong> {{ empresaForm.invalid }}</li>
+                  @for (campo of ['ruc','razonSocial','email','password','confirmPassword','acceptTerms']; track campo) {
+                    <li>
+                      <strong>{{ campo }}:</strong>
+                      Valor: {{ empresaForm.get(campo)?.value | json }} |
+                      Válido: {{ empresaForm.get(campo)?.valid }} |
+                      Errores: {{ empresaForm.get(campo)?.errors | json }}
+                    </li>
+                  }
+                  <li><strong>Errores del formulario:</strong> {{ empresaForm.errors | json }}</li>
                 </ul>
               </div>
 

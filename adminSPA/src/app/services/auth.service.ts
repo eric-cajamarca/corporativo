@@ -2,7 +2,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { catchError, tap, EMPTY } from 'rxjs';
+import { catchError, tap, map, of } from 'rxjs';
 import { global } from './global';
 
 interface UserData {
@@ -19,6 +19,12 @@ export class AuthService {
   private _userData = signal<UserData | null>(null);
   private verificationInterval = 10 * 60 * 1000; // Verificar cada 15 minutos
 
+  // Rutas públicas que NO requieren autenticación
+  private readonly publicRoutes = [
+    '/login-empresa',
+    '/crear-empresa'
+  ];
+
   // Exponer datos reactivos
   userData = this._userData.asReadonly();
   isAuthenticated = computed(() => !!this._userData());
@@ -28,6 +34,14 @@ export class AuthService {
     private router: Router
   ) {
     this.url = global.url;
+  }
+
+  /**
+   * Verifica si la ruta actual es pública
+   */
+  private isPublicRoute(): boolean {
+    const currentUrl = this.router.url;
+    return this.publicRoutes.some(route => currentUrl.includes(route));
   }
 
   initialize() {
@@ -42,16 +56,30 @@ export class AuthService {
   }
 
   verifyToken() {
-    return this.http.get<any>( this.url + 'getEmpresa_login', {withCredentials: true }).pipe(
-      
+    return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
       tap(response => this.handleAuthResponse(response)),
-      
+      map(response => !!response?.data),
       catchError(error => {
+        console.error('verifyToken error:', error?.status, error?.message);
         this.handleAuthError();
-        return EMPTY;
+        return of(false);
       })
     );
+  }
 
+  /**
+   * Establece los datos del usuario desde la respuesta del login (sin llamar al backend).
+   * Usar después de login exitoso para evitar verificar token en el mismo tick (cookie puede no estar lista).
+   */
+  setUserDataFromLogin(data: { razonSocial?: string; nombres?: string; apellidos?: string; rol?: string }) {
+    if (!data) return;
+    this._userData.set({
+      razonSocial: data.razonSocial || '',
+      nombres: data.nombres || data.apellidos ? `${data.nombres || ''} ${data.apellidos || ''}`.trim() : 'Usuario',
+      rol: data.rol || '',
+      lastVerified: Date.now()
+    });
+    console.log('Usuario establecido desde login:', this._userData());
   }
 
 //   getEmpresa_login(): Observable<any> {
@@ -64,25 +92,37 @@ export class AuthService {
 
   private handleAuthResponse(response: any) {
     console.log('handleAuthResponse', response);
-    if (response.data) {
+    if (response?.data) {
+      const d = response.data;
       this._userData.set({
-        razonSocial: response.data.razonSocial,
-        nombres: response.data.nombres,
-        rol: response.data.roles,
+        razonSocial: d.razonSocial || '',
+        nombres: d.nombres || '',
+        rol: d.roles ?? d.rol ?? '',
         lastVerified: Date.now()
       });
       console.log('Usuario conectado:', this._userData());
     } else {
       this._userData.set(null);
-      this.router.navigate(['/login-empresa']);
-        console.log('No hay empresa conectada','en handleAuthResponse');
+      // Solo redirigir a login si NO estamos en una ruta pública
+      if (!this.isPublicRoute()) {
+        this.router.navigate(['/login-empresa']);
+        console.log('No hay empresa conectada, redirigiendo a login');
+      } else {
+        console.log('No hay empresa conectada pero estamos en ruta pública, no redirigir');
+      }
     }
   }
 
   private handleAuthError() {
-    console.log('Error al verificar el token, redirigiendo a login','en handleAuthError');
+    console.log('Error al verificar el token');
     this._userData.set(null);
-    this.router.navigate(['/login-empresa']);
+    // Solo redirigir a login si NO estamos en una ruta pública
+    if (!this.isPublicRoute()) {
+      console.log('Redirigiendo a login desde ruta privada');
+      this.router.navigate(['/login-empresa']);
+    } else {
+      console.log('Estamos en ruta pública, no redirigir a login');
+    }
   }
 
   forceLogout() {

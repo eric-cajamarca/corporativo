@@ -129,6 +129,8 @@ const getEmpresa_id = async function (req, res) {
     }
 };
 
+const empresaService = require('../services/empresa.service');
+
 const createEmpresa = async function (req, res) {
     console.log('entro a createEmpresa', req.body);
     const { idDocumento, ruc, razon_Social, nombre_Comercial, rubro, celular, logo, correo, password, alias, condicion, estSunat } = req.body;
@@ -178,7 +180,16 @@ const createEmpresa = async function (req, res) {
                 .query('INSERT INTO Empresas (idEmpresa, idDocumento, ruc, razon_Social, nombreComercial, rubro, celular, correo, password, logo, alias, condicion, estSunat, estado, fregistro) VALUES (@idEmpresa, @idDocumento, @ruc, @razon_Social, @nombreComercial, @rubro, @celular, @correo, @password, @logo, @alias, @condicion, @estSunat, @estado, @fregistro)');
 
 
-            console.log('valor de result:', idEmpresa);
+            console.log('✓ Empresa creada con ID:', idEmpresa);
+
+            // Crear roles predeterminados para la nueva empresa
+            try {
+                await empresaService.crearRolesPredeterminados(pool, idEmpresa);
+                console.log('✓ Roles predeterminados creados para la empresa');
+            } catch (errorRoles) {
+                console.error('⚠️ Error creando roles predeterminados:', errorRoles);
+                // No bloqueamos el registro si fallan los roles
+            }
 
             res.status(200).send({ data: idEmpresa });
         }
@@ -679,6 +690,25 @@ const cambiar_principal_direccion = async function (req, res) {
     }
 }
 
+const getEstadoConfiguracion = async function (req, res) {
+    console.log('getEstadoConfiguracion - Usuario:', req.user);
+    
+    if (!req.user || !req.user.empresa) {
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+
+    try {
+        const pool = await sql.connect(dbConfig);
+        const estado = await empresaService.obtenerEstadoConfiguracion(pool, req.user.empresa);
+        
+        console.log('Estado de configuración:', estado);
+        res.status(200).send({ data: estado });
+    } catch (error) {
+        console.error('Error obteniendo estado de configuración:', error);
+        res.status(500).send({ message: 'Error al obtener estado de configuración', data: undefined });
+    }
+};
+
 module.exports = {
     // getEmpresas,
     getEmpresas,
@@ -699,6 +729,9 @@ module.exports = {
     //logo,
     obtener_logo,
     getEmpresa_id,
+
+    // Estado de configuración
+    getEstadoConfiguracion,
 
     //direcciones de la empresa
 

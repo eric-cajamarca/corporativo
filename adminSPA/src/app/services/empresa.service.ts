@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
+import { global } from './global';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Empresa } from '../models/empresa.model.js';
+import { Empresa } from '../models/empresa.model';
 
 @Injectable({
   providedIn: 'root'
@@ -283,6 +283,15 @@ export class EmpresaService {
     console.log('id en el servicio',id);
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.delete(this.url+'direccion_empresa/'+id,{
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
+  // Obtener estado de configuración de la empresa
+  getEstadoConfiguracion():Observable<any>{
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'estado_configuracion',{
       headers: headers,
       withCredentials: true
     });

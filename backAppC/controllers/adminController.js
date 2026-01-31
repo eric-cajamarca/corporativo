@@ -39,10 +39,16 @@ const getAdmin = async function (req, res) {
 };
 
 const getEmpresa_login = async function (req, res) {
+    console.log('getEmpresa_login - Verificando token...');
+    console.log('Cookies recibidas:', req.cookies);
+    console.log('Token presente:', !!req.cookies.token);
+    
     if (!req.user) {
+        console.log('❌ No hay req.user - Token no válido o no presente');
         return res.status(401).send({ message: 'No autenticado' });
     }
     
+    console.log('✓ Usuario autenticado:', req.user.email, '- Empresa:', req.user.empresa);
 
     try {
         const pool = await sql.connect(dbConfig);
@@ -50,10 +56,11 @@ const getEmpresa_login = async function (req, res) {
         const empresaResult = await empresaService.getDatosEmpresaLogin(pool, req.user);
         // Verificar si obtuvimos al menos algún dato
         
+        console.log('✓ Datos de empresa obtenidos correctamente');
         return res.status(200).send({ data: empresaResult, message: 'Datos obtenidos correctamente' });
         
     } catch (error) {
-        console.error('Error al obtener datos:', error);
+        console.error('❌ Error al obtener datos:', error);
         return res.status(500).send({ message: 'Error interno del servidor' });
     }
 };
@@ -330,13 +337,16 @@ const admin_login = async (req, res) => {
     // 4. Crear token con datos del usuario
     const token = jwt.createToken(datosUsuario);
 
-    // 5. Establecer cookie HttpOnly (estás seguro porque ya validaste credenciales)
+    // 5. Establecer cookie HttpOnly (path: '/' para que se envíe en todas las peticiones al origen)
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'Strict' : 'Lax',
+      path: '/',
       maxAge: 24 * 60 * 60 * 1000 // 1 día
     });
+
+    console.log('✓ Cookie de sesión establecida para:', datosUsuario.email);
 
     // 6. Responder éxito con datos del usuario (sin el token)
     const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;

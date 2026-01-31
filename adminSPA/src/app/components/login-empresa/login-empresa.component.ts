@@ -192,11 +192,15 @@ export class LoginEmpresaComponent implements OnInit {
       localStorage.setItem('empresaRecordada', JSON.stringify(empresaRecordada));
     }
 
-    // Inicializar servicios de autenticación
-    this.authService.initialize();
+    // Establecer usuario en AuthService desde la respuesta del login (evita verificar token en el mismo tick)
+    this.authService.setUserDataFromLogin(userData);
 
-    // Redirigir al dashboard principal
-    this._router.navigate(['/home']);
+    // Navegar al dashboard; el AuthGuard verificará el token en la siguiente petición (cookie ya disponible)
+    setTimeout(() => {
+      this._router.navigate(['/home']).then(() => {
+        console.log('Navegación a /home completada');
+      });
+    }, 0);
   }
 
   // Método público para acceso desde template

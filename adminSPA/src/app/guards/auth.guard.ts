@@ -18,9 +18,18 @@ export class AuthGuard implements CanActivate {
     return this.authService.verifyToken().pipe(
       map(isValid => {
         const isLoginRoute = state.url.includes('/login-empresa');
+        const isPublicRoute = state.url.includes('/crear-empresa');
+
+        console.log('AuthGuard - Ruta:', state.url, 'Token válido:', isValid);
+
+        // Si es una ruta pública, siempre permitir
+        if (isPublicRoute) {
+          return true;
+        }
 
         // Si el token es válido y está en la página de login, redirigir a home
         if (isValid && isLoginRoute) {
+          console.log('Redirigiendo a home desde login');
           this.router.navigate(['/home']);
           return false;
         }

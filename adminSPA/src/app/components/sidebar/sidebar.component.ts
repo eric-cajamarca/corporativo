@@ -3,6 +3,7 @@ import { Component, OnInit, signal, effect, Output, EventEmitter, Input } from '
 import { Router, RouterModule } from '@angular/router';
 import { PermisosService } from '../../services/permisos.service';
 import { AuthService } from '../../services/auth.service';
+import { EmpresaService } from '../../services/empresa.service';
 import { MenuItem } from '../../interfaces/permisos-interface';
 
 @Component({
@@ -26,6 +27,9 @@ export class SidebarComponent implements OnInit {
   userRole = signal<string>('');
   empresaNombre = signal<string>('');
 
+  // Estado de configuración de la empresa
+  estadoConfiguracion = signal<any>(null);
+
   // Eventos
   @Output() sidebarToggle = new EventEmitter<boolean>();
   @Input() forceCollapsed: boolean = false;
@@ -33,6 +37,7 @@ export class SidebarComponent implements OnInit {
   constructor(
     private permisosService: PermisosService,
     private authService: AuthService,
+    private empresaService: EmpresaService,
     private router: Router
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
@@ -56,6 +61,7 @@ export class SidebarComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.cargarEstadoConfiguracion();
     this.cargarNavegacion();
     
     // Verificar si hay preferencia guardada
@@ -63,6 +69,65 @@ export class SidebarComponent implements OnInit {
     if (collapsed === 'true') {
       this.isCollapsed.set(true);
     }
+  }
+
+  /**
+   * Carga el estado de configuración de la empresa
+   */
+  private cargarEstadoConfiguracion(): void {
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (response) => {
+        console.log('Estado de configuración:', response.data);
+        this.estadoConfiguracion.set(response.data);
+        // Actualizar navegación según el estado
+        this.actualizarNavegacionSegunEstado(response.data);
+      },
+      error: (error) => {
+        console.error('Error al cargar estado de configuración:', error);
+      }
+    });
+  }
+
+  /**
+   * Actualiza la navegación basada en el estado de configuración
+   */
+  private actualizarNavegacionSegunEstado(estado: any): void {
+    if (!estado) return;
+
+    const navegacionBasica: MenuItem[] = [
+      { nombre: 'Dashboard', icono: 'fas fa-tachometer-alt', ruta: '/home', visible: true },
+      { tipo: 'separador' },
+      { nombre: 'Configuración Empresa', icono: 'fas fa-building', ruta: '/editar-empresa', visible: true },
+    ];
+
+    // Si no tiene colaboradores, solo mostrar colaboradores
+    if (!estado.tieneColaboradores) {
+      navegacionBasica.push({ 
+        nombre: 'Crear Primer Colaborador', 
+        icono: 'fas fa-user-plus', 
+        ruta: '/colaborador/create', 
+        visible: true 
+      });
+      this.menuItems.set(navegacionBasica);
+      return;
+    }
+
+    // Si ya tiene colaboradores, mostrar todas las opciones
+    const navegacionCompleta: MenuItem[] = [
+      ...navegacionBasica,
+      { tipo: 'separador' },
+      { nombre: 'Colaboradores', icono: 'fas fa-users', ruta: '/colaborador', visible: true },
+      { nombre: 'Ventas', icono: 'fas fa-shopping-cart', ruta: '/ventas', visible: true },
+      { nombre: 'Compras', icono: 'fas fa-shopping-bag', ruta: '/compras', visible: true },
+      { nombre: 'Inventario', icono: 'fas fa-boxes', ruta: '/inventario', visible: true },
+      { nombre: 'Productos', icono: 'fas fa-box', ruta: '/productos', visible: true },
+      { nombre: 'Clientes', icono: 'fas fa-users', ruta: '/clientes', visible: true },
+      { nombre: 'Proveedores', icono: 'fas fa-truck', ruta: '/proveedores', visible: true },
+      { tipo: 'separador' },
+      { nombre: 'Configuración', icono: 'fas fa-cog', ruta: '/configuracion', visible: true },
+    ];
+
+    this.menuItems.set(navegacionCompleta);
   }
 
   /**

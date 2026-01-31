@@ -95,8 +95,8 @@ export class CreateEmpresaComponent implements OnInit {
       password: ['', [
         Validators.required,
         Validators.minLength(8),
-        // Permite más caracteres especiales comunes
-        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,}$/)
+        // Permite caracteres especiales comunes: @$!%*?&_\-#.+=^
+        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#.+=^])[A-Za-z\d@$!%*?&_\-#.+=^]{8,}$/)
       ]],
       confirmPassword: ['', Validators.required],
       
@@ -219,7 +219,7 @@ export class CreateEmpresaComponent implements OnInit {
       uppercase: /[A-Z]/.test(password),
       lowercase: /[a-z]/.test(password),
       number: /[0-9]/.test(password),
-      special: /[@$!%*?&]/.test(password)
+      special: /[@$!%*?&_\-#.+=^]/.test(password)
     };
 
     this.passwordRequirements.set(requirements);
@@ -368,9 +368,12 @@ export class CreateEmpresaComponent implements OnInit {
    * Navega al siguiente paso
    */
   nextStep(): void {
-      console.log('this.empresaForm.valid',this.empresaForm)
+    console.log('nextStep - Paso actual:', this.currentStep());
+    console.log('nextStep - Estado del formulario:', this.empresaForm.value);
+    console.log('nextStep - Formulario válido:', this.empresaForm.valid);
+    
     if (this.currentStep() < 3) {
-      // Validar paso actual antes de continuar
+      // Validar paso 1: RUC verificado
       if (this.currentStep() === 1 && !this.encontrado()) {
         iziToast.show({
           title: 'Advertencia',
@@ -383,7 +386,24 @@ export class CreateEmpresaComponent implements OnInit {
         return;
       }
       
+      // Validar paso 2: Datos de empresa completados
+      if (this.currentStep() === 2) {
+        const razonSocial = this.empresaForm.get('razonSocial')?.value;
+        if (!razonSocial) {
+          iziToast.show({
+            title: 'Advertencia',
+            titleColor: '#ffc107',
+            color: '#FFF',
+            class: 'text-warning',
+            position: 'topRight',
+            message: 'La razón social es requerida'
+          });
+          return;
+        }
+      }
+      
       this.currentStep.update(step => step + 1);
+      console.log('nextStep - Nuevo paso:', this.currentStep());
     }
   }
 
@@ -405,12 +425,25 @@ export class CreateEmpresaComponent implements OnInit {
    * Registra la empresa
    */
   registrar(): void {
-    console.log('this.empresaForm.invalid')
+    console.log('=== INTENTANDO REGISTRAR EMPRESA ===');
+    console.log('Estado del formulario - invalid:', this.empresaForm.invalid);
+    console.log('Valores del formulario:', this.empresaForm.value);
+    console.log('Errores del formulario:', this.empresaForm.errors);
+    
+    const camposInvalidos = this.getCamposInvalidos();
+    console.log('Campos inválidos:', camposInvalidos);
+    
     if (this.empresaForm.invalid) {
       // Marcar todos los campos como touched para mostrar errores
       Object.keys(this.empresaForm.controls).forEach(key => {
-        this.empresaForm.get(key)?.markAsTouched();
+        const control = this.empresaForm.get(key);
+        control?.markAsTouched();
+        if (control?.invalid) {
+          console.error(`Campo ${key} inválido:`, control.errors, 'Valor:', control.value);
+        }
       });
+      
+      const mensajeError = `Complete todos los campos requeridos. Campos inválidos: ${camposInvalidos.join(', ')}`;
       
       iziToast.show({
         title: 'Error',
@@ -418,7 +451,7 @@ export class CreateEmpresaComponent implements OnInit {
         color: '#FFF',
         class: 'text-danger',
         position: 'topRight',
-        message: 'Por favor complete todos los campos requeridos'
+        message: mensajeError
       });
       return;
     }
@@ -550,12 +583,27 @@ export class CreateEmpresaComponent implements OnInit {
     if (!control?.errors) return '';
 
     if (control.errors['required']) return 'Este campo es requerido';
+    if (control.errors['requiredTrue']) return 'Debe aceptar este campo';
     if (control.errors['email']) return 'Ingrese un email válido';
     if (control.errors['minlength']) return `Mínimo ${control.errors['minlength'].requiredLength} caracteres`;
     if (control.errors['maxlength']) return `Máximo ${control.errors['maxlength'].requiredLength} caracteres`;
     if (control.errors['pattern']) return 'Formato inválido';
     
     return 'Error de validación';
+  }
+
+  /**
+   * Obtiene lista de campos inválidos
+   */
+  getCamposInvalidos(): string[] {
+    const invalidos: string[] = [];
+    Object.keys(this.empresaForm.controls).forEach(key => {
+      const control = this.empresaForm.get(key);
+      if (control?.invalid) {
+        invalidos.push(key);
+      }
+    });
+    return invalidos;
   }
 
   /**
