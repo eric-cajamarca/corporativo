@@ -95,7 +95,8 @@ export class CreateEmpresaComponent implements OnInit {
       password: ['', [
         Validators.required,
         Validators.minLength(8),
-        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)
+        // Permite más caracteres especiales comunes
+        Validators.pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_\-#])[A-Za-z\d@$!%*?&_\-#]{8,}$/)
       ]],
       confirmPassword: ['', Validators.required],
       
@@ -123,11 +124,29 @@ export class CreateEmpresaComponent implements OnInit {
 
   /**
    * Validador personalizado para confirmar contraseña
-   */
+   
   private passwordMatchValidator(group: FormGroup): { [key: string]: boolean } | null {
     const password = group.get('password')?.value;
     const confirmPassword = group.get('confirmPassword')?.value;
     return password === confirmPassword ? null : { passwordMismatch: true };
+  }
+    */
+  private passwordMatchValidator(group: FormGroup): { [key: string]: boolean } | null {
+    const password = group.get('password')?.value ?? '';
+    const confirmPassword = group.get('confirmPassword')?.value ?? '';
+    
+    if (password !== confirmPassword) {
+      group.get('confirmPassword')?.setErrors({ passwordMismatch: true });
+      return { passwordMismatch: true };
+    }
+    
+    // Limpiar error si coinciden
+    const confirmControl = group.get('confirmPassword');
+    if (confirmControl?.hasError('passwordMismatch')) {
+      confirmControl.setErrors(null);
+    }
+    
+    return null;
   }
 
   /**
@@ -349,6 +368,7 @@ export class CreateEmpresaComponent implements OnInit {
    * Navega al siguiente paso
    */
   nextStep(): void {
+      console.log('this.empresaForm.valid',this.empresaForm)
     if (this.currentStep() < 3) {
       // Validar paso actual antes de continuar
       if (this.currentStep() === 1 && !this.encontrado()) {
@@ -385,6 +405,7 @@ export class CreateEmpresaComponent implements OnInit {
    * Registra la empresa
    */
   registrar(): void {
+    console.log('this.empresaForm.invalid')
     if (this.empresaForm.invalid) {
       // Marcar todos los campos como touched para mostrar errores
       Object.keys(this.empresaForm.controls).forEach(key => {

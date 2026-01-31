@@ -9,7 +9,7 @@ GO
 -- =============================================
 -- DATOS PARA SISTEMA DE CAJA
 -- =============================================
-
+select  * from TiposMovimientoCaja
 -- Tipos de movimiento de caja
 INSERT INTO TiposMovimientoCaja (nombre, descripcion, tipo) VALUES
 ('VENTA_CONTADO', 'Ingreso por venta al contado', 'I'),
@@ -23,10 +23,11 @@ INSERT INTO TiposMovimientoCaja (nombre, descripcion, tipo) VALUES
 ('RETIRO_EFECTIVO', 'Egreso por retiro de efectivo', 'E');
 GO
 
+select  * from Sucursal
 -- Cajas por empresa
 INSERT INTO Cajas (idEmpresa, idSucursal, nombre, descripcion, estado) VALUES
-('42099529-43C9-4B7F-921A-3D6FB946E93E', '9D8B5A3C-1E2F-4G5H-6I7J-8K9L0M1N2O3P', 'CAJA PRINCIPAL', 'Caja principal de la sucursal', 1),
-('42099529-43C9-4B7F-921A-3D6FB946E93E', '9D8B5A3C-1E2F-4G5H-6I7J-8K9L0M1N2O3P', 'CAJA SECUNDARIA', 'Caja secundaria para entregas', 1);
+('42099529-43C9-4B7F-921A-3D6FB946E93E', '6AC6C2DB-4669-40AC-A2F0-2ED4192082D9', 'CAJA PRINCIPAL', 'Caja principal de la sucursal', 1),
+('42099529-43C9-4B7F-921A-3D6FB946E93E', '6AC6C2DB-4669-40AC-A2F0-2ED4192082D9', 'CAJA SECUNDARIA', 'Caja secundaria para entregas', 1);
 GO
 
 -- =============================================
@@ -109,14 +110,17 @@ GO
 -- =============================================
 -- DATOS DE EJEMPLO PARA PRUEBAS
 -- =============================================
+select * from UsuarioWeb
 
 -- Apertura de caja de ejemplo
 DECLARE @idAperturaEjemplo UNIQUEIDENTIFIER = NEWID();
+
+
 EXEC sp_AbrirCaja
     @idCaja = '12345678-1234-1234-1234-123456789012', -- Ajustar con ID real de caja
     @idEmpresa = '42099529-43C9-4B7F-921A-3D6FB946E93E',
-    @idSucursal = '9D8B5A3C-1E2F-4G5H-6I7J-8K9L0M1N2O3P',
-    @idUsuario = (SELECT idUsuario FROM UsuarioWeb WHERE email = 'ericortizguevara@gmail.com'),
+    @idSucursal = '6AC6C2DB-4669-40AC-A2F0-2ED4192082D9',
+    @idUsuario = '57E68697-8294-4FC1-A5C2-591FB44FA9DE',
     @montoInicial = 500.00,
     @observaciones = 'Apertura de caja del día',
     @idApertura = @idAperturaEjemplo OUTPUT;
