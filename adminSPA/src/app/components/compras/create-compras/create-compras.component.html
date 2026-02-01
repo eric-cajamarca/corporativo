@@ -148,6 +148,14 @@
 
 
                                 <div class="form-group">
+                                    <label for="idSucursal">Sucursal (*)</label>
+                                    <select required name="idSucursal" [(ngModel)]="compras.idSucursal" class="form-control">
+                                        <option value="" selected disabled>Seleccionar sucursal...</option>
+                                        <option *ngFor="let item of sucursales" [value]="item.idSucursal">{{ item.nombre }}</option>
+                                    </select>
+                                    <small class="form-text text-muted">Sucursal donde se registrará el stock de los productos.</small>
+                                </div>
+                                <div class="form-group">
                                     <label for="compRelacionado">CompRelacionado</label>
                                     <input type="text" class="form-control" name="compRelacionado"
                                         [(ngModel)]="compras.compRelacionado" placeholder="Ingrese el compRelacionado">

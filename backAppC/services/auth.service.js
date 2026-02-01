@@ -12,14 +12,42 @@ exports.adminLogin = async (pool, email, password, ruc) => {
     throw new Error('RUC no existe o empresa inactiva');
   }
 
-  console.log('Empresa encontrada:', empresa);
-
-  // 2. Verificar que el email coincida con el email de la empresa
-  if (empresa.correo !== email) {
-    throw new Error('El email no corresponde a la empresa registrada');
+  // 2. Intentar login como COLABORADOR (email + contraseña del usuario en UsuarioWeb)
+  const colaborador = await usuarioRepository.buscarPorEmailYRuc(pool, email, empresa.idEmpresa);
+  if (colaborador) {
+    // estado puede venir como 1, true (BIT) según el driver
+    const activo = colaborador.estado === 1 || colaborador.estado === true;
+    if (!activo) {
+      throw new Error('El usuario está deshabilitado. Contacte al administrador.');
+    }
+    // password puede venir con distinta capitalización desde SQL Server
+    const passwordHash = colaborador.password || colaborador.Password;
+    if (!passwordHash || typeof passwordHash !== 'string') {
+      console.error('Login colaborador: hash de contraseña no disponible para', email);
+      throw new Error('Error interno del servidor');
+    }
+    const isPasswordValid = await bcrypt.compare(password, passwordHash);
+    if (isPasswordValid) {
+      console.log('✓ Login como colaborador:', colaborador.email, 'Rol:', colaborador.rol);
+      return {
+        idUsuario: colaborador.idUsuario,
+        idEmpresa: empresa.idEmpresa,
+        razonSocial: empresa.razon_Social || empresa.razonSocial,
+        nombres: colaborador.nombres,
+        apellidos: colaborador.apellidos,
+        email: colaborador.email,
+        rol: colaborador.rol || 'Colaborador'
+      };
+    }
+    // Contraseña incorrecta para este colaborador
+    throw new Error('La contraseña es incorrecta');
   }
 
-  // 3. Verificar contraseña de la empresa
+  // 3. Si no es colaborador: login como EMPRESA (correo y contraseña de la empresa)
+  if (empresa.correo !== email) {
+    throw new Error('El email no existe o no tiene permisos para acceder');
+  }
+
   const isEmpresaPasswordValid = await bcrypt.compare(password, empresa.password);
   if (!isEmpresaPasswordValid) {
     throw new Error('La contraseña es incorrecta');
@@ -31,9 +59,6 @@ exports.adminLogin = async (pool, email, password, ruc) => {
   try {
     const usuario = await usuarioRepository.buscarUsuarioAdminPorEmpresa(pool, empresa.idEmpresa);
     if (usuario) {
-      console.log('Usuario administrador encontrado:', usuario.nombres);
-
-      // 5. Retornar datos combinados para token
       return {
         idUsuario: usuario.idUsuario,
         idEmpresa: empresa.idEmpresa,
@@ -45,12 +70,12 @@ exports.adminLogin = async (pool, email, password, ruc) => {
       };
     }
   } catch (error) {
-    console.log('No se encontró usuario administrador, continuando con datos de empresa');
+    console.error('Error al buscar admin por empresa:', error.message);
   }
 
-  // 6. Si no hay usuario administrador, retornar datos básicos de empresa
+  // 5. Sin usuario administrador: datos básicos de empresa
   return {
-    idUsuario: empresa.idEmpresa, // Usar ID de empresa como ID de usuario temporal
+    idUsuario: empresa.idEmpresa,
     idEmpresa: empresa.idEmpresa,
     razonSocial: empresa.razon_Social,
     nombres: 'Administrador',
@@ -58,7 +83,6 @@ exports.adminLogin = async (pool, email, password, ruc) => {
     email: empresa.correo,
     rol: 'Administrador'
   };
-
 };
 
 
@@ -86,7 +110,7 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
     throw new Error('EMAIL_EXISTE');
   }
 
-    console.log('despues chekar email');
+  console.log('despues chekar email');
 
   // 4. Hashear password
   const hashedPassword = await bcrypt.hash(password, 8);
@@ -110,9 +134,53 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
   // 7. Crear usuario
   const rowsAffected = await usuarioRepository.createUsuario(pool, usuarioData);
 
+  // 8. Asignar sucursal principal al usuario (si existe tabla UsuarioSucursal)
+  const sql = require('mssql');
+  let idSucursal = datos.idSucursal;
+  
+  if (!idSucursal) {
+    try {
+      const sucursalResult = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT TOP 1 idSucursal 
+          FROM Sucursal 
+          WHERE idEmpresa = @idEmpresa AND estado = 1 
+          ORDER BY fRegistro ASC
+        `);
+      
+      if (sucursalResult.recordset.length > 0) {
+        idSucursal = sucursalResult.recordset[0].idSucursal;
+      }
+    } catch (error) {
+      console.warn('⚠️ No se pudo obtener sucursal principal:', error.message);
+    }
+  }
+
+  // Asignar sucursal al usuario en UsuarioSucursal
+  if (idSucursal) {
+    try {
+      const idUsuarioSucursal = uuidv4();
+      await pool.request()
+        .input('idUsuarioSucursal', sql.UniqueIdentifier, idUsuarioSucursal)
+        .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+        .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+        .input('estado', sql.Bit, 1)
+        .input('esDefault', sql.Bit, 1)
+        .query(`
+          INSERT INTO UsuarioSucursal (idUsuarioSucursal, idUsuario, idSucursal, estado, esDefault, fAsignacion)
+          VALUES (@idUsuarioSucursal, @idUsuario, @idSucursal, @estado, @esDefault, GETDATE())
+        `);
+      console.log('✓ Sucursal principal asignada al usuario:', idSucursal);
+    } catch (error) {
+      console.warn('⚠️ No se pudo asignar sucursal al usuario:', error.message);
+    }
+  }
+
   return {
     message: 'Usuario creado correctamente',
-    rowsAffected
+    rowsAffected,
+    idSucursal
   };
 }
 

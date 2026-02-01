@@ -49,47 +49,106 @@ const obtener_detalle_compras_idcompra = async function (req, res) {
 
 const crear_detalle_compras_idcompra = async function (req, res) {
 
-    const { idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total } = req.body;
+    const { idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, fechaVencimiento, ubicacion } = req.body;
     console.log('crear_detalle_compras_idcompra: ', req.body);
 
-    const idUsuario = req.user.sub;
+    const idUsuario = req.user.sub || req.user.idUsuario;
     const idEmpresa = req.user.empresa;
 
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            try {
-                // Formatear pUnitario a dos decimales
-                const pUnitarioFormateado = parseFloat(pUnitario);
+    if (!req.user) {
+        return res.status(403).send({ message: 'No Access', data: undefined });
+    }
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
 
-                console.log('pUnitarioFormateado: ', pUnitarioFormateado);
+    const pUnitarioFormateado = parseFloat(pUnitario) || 0;
+    const cantidadVal = parseFloat(cantidad) || 0;
+    const totalVal = parseFloat(total) || 0;
+    const ubicacionVal = ubicacion || null;
+    const fechaVencimientoVal = fechaVencimiento || null;
 
-                let pool = await sql.connect(dbConfig);
-                let detalleCompra = await pool
-                    .request()
+    try {
+        const pool = await sql.connect(dbConfig);
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        try {
+            await transaction.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('idCompra', sql.UniqueIdentifier, idCompra)
+                .input('cantidad', sql.Decimal(18, 3), cantidadVal)
+                .input('idProducto', sql.UniqueIdentifier, idProducto)
+                .input('idPresentacion', sql.Int, idPresentacion)
+                .input('pUnitario', sql.Decimal(18, 6), pUnitarioFormateado)
+                .input('total', sql.Decimal(18, 2), totalVal)
+                .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+                .query(`
+                    INSERT INTO DetalleCompras (idEmpresa, idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario)
+                    VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)
+                `);
+
+            // Crear nuevo lote por cada línea de compra (según base_datos_mejorada)
+            await transaction.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idProducto', sql.UniqueIdentifier, idProducto)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('costoUnitario', sql.Decimal(18, 6), pUnitarioFormateado)
+                .input('cantidadIngresada', sql.Decimal(18, 2), cantidadVal)
+                .input('cantidadDisponible', sql.Decimal(18, 2), cantidadVal)
+                .input('fechaVencimiento', sql.DateTime, fechaVencimientoVal)
+                .query(`
+                    INSERT INTO Lotes (idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento)
+                    VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento)
+                `);
+
+            // Actualizar o insertar StockSucursal (stock agregado por sucursal)
+            const existeStock = await transaction.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('idProducto', sql.UniqueIdentifier, idProducto)
+                .query(`
+                    SELECT idStockSucursal, cantidad FROM StockSucursal
+                    WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal AND idProducto = @idProducto
+                `);
+
+            if (existeStock.recordset.length > 0) {
+                const idStockSucursal = existeStock.recordset[0].idStockSucursal;
+                const cantidadAnterior = parseFloat(existeStock.recordset[0].cantidad) || 0;
+                await transaction.request()
+                    .input('idStockSucursal', sql.Int, idStockSucursal)
+                    .input('cantidad', sql.Decimal(18, 2), cantidadAnterior + cantidadVal)
+                    .input('ubicacion', sql.VarChar(50), ubicacionVal)
+                    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+                    .query(`
+                        UPDATE StockSucursal SET cantidad = @cantidad, ubicacion = ISNULL(@ubicacion, ubicacion), fIngreso = GETDATE(), idUsuario = @idUsuario
+                        WHERE idStockSucursal = @idStockSucursal
+                    `);
+            } else {
+                await transaction.request()
                     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                    .input('idCompra', sql.UniqueIdentifier, idCompra)
-                    .input('cantidad', sql.Decimal(18, 3), cantidad)
                     .input('idProducto', sql.UniqueIdentifier, idProducto)
-                    .input('idPresentacion', sql.Int, idPresentacion)
-                    .input('pUnitario', sql.Decimal(18, 5), pUnitarioFormateado)
-                    .input('total', sql.Decimal(18, 2), total)
+                    .input('cantidad', sql.Decimal(18, 2), cantidadVal)
+                    .input('ubicacion', sql.VarChar(50), ubicacionVal)
                     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                    .query("INSERT INTO DetalleCompras (idEmpresa, idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario) VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)");
-
-                res.status(200).send({ data: detalleCompra.rowsAffected });
-                console.log('detalleCompra creado: ', detalleCompra.rowsAffected);
-
-            } catch (error) {
-                console.log('crear detallecompras error: ' + error);
-                res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
+                    .query(`
+                        INSERT INTO StockSucursal (idEmpresa, idSucursal, idProducto, cantidad, ubicacion, fIngreso, idUsuario)
+                        VALUES (@idEmpresa, @idSucursal, @idProducto, @cantidad, @ubicacion, GETDATE(), @idUsuario)
+                    `);
             }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+
+            await transaction.commit();
+            console.log('DetalleCompra, Lote y StockSucursal creados/actualizados correctamente');
+            res.status(200).send({ data: 1, message: 'Detalle de compra registrado. Lote y stock actualizados.' });
+        } catch (err) {
+            await transaction.rollback();
+            throw err;
         }
-    }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
+    } catch (error) {
+        console.error('crear_detalle_compras_idcompra error:', error);
+        res.status(500).send({ message: 'Error al crear detalle de compra', data: undefined });
     }
 }
 

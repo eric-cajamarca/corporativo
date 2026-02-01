@@ -20,8 +20,8 @@ import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { ConsultaXMLService } from '../../../services/consulta-xml.service';
 import { saveAs } from 'file-saver';
-import { forkJoin, Observable, Subscription, throwError } from 'rxjs';
-import { catchError, finalize, mergeMap, tap } from 'rxjs/operators';
+import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
+import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
 import { ProveedoresService } from '../../../services/proveedores.service';
 
 declare var iziToast: any;
@@ -1066,136 +1066,124 @@ export class CreateComprasComponent {
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
     this.loadButton = true;
 
-    // verifico si fechaEmision, fvencimiento, idMoneda, idEstadoPago, idMediosPago, total  son diferentes de vacio
     if (!this.validarCamposObligatorios()) {
       return;
-   }
+    }
 
-    console.log('this.compras', this.compras);
-    // Aquí preparo los datos que irán a crear una compra nueva
-    this._comprasService.crear_compra(this.compras).subscribe(
-      (response) => {
-        if (response.data != undefined) {
-          // Aquí agrego el idCompra de la compra recién creada a cada detalle de compra
-          this.idCompra = response.data;
-          console.log('this.idCompra', this.idCompra);
-
-          // Una vez registrada la compra, preparo para registrar los productos y el detalle de compras
-          this.detalleCompras.forEach((element: any) => {
-            // Creo una nueva instancia de nuevoProducto y nuevoDetalleCompra en cada iteración
-            const nuevoProducto = {
-              idProducto: element.idProducto,
-              Codigo: element.codigo,
-              idCategoria: element.idCategoria,
-              descripcion: element.descripcion,
-              idPresentacion: element.idPresentacion,
-              cUnitario: element.cUnitario,
-              fProduccion: element.fProduccion,
-              fVencimiento: element.fVencimiento,
-              cantidad: element.cantidad,
-              cantidadAnterior: element.cantidadAnterior,
-              facturar: 'SI',
-              idStockSucursal: element.idStockSucursal,
-              idEmpresa: element.idEmpresa,
-              idMarca: element.idMarca,
-              idSucursal: element.idSucursal,
-              ubicacion: element.ubicacion,
-            };
-            console.log('nuevoProducto para crear o actualizar', nuevoProducto);
-
-            const nuevoDetalleCompra = {
-              idEmpresa: element.idEmpresa,
-              idSucursal: element.idSucursal,
-              idCompra: this.idCompra,
-              cantidad: element.cantidad,
-              idPresentacion: element.idPresentacion,
-              pUnitario: parseFloat(element.cUnitario),
-              total: element.subtotal,
-              idProducto: element.idProducto || null, // Aún no conocemos el idProducto, se actualizará después de crearlo o encontrarlo
-            };
-            console.log('nuevoDetalleCompra para crear', nuevoDetalleCompra);
-            // Identifico si el producto no existe, entonces lo creo, y si existe, solo actualizo el stock
-            if (element.idProducto == undefined) {
-              console.log('El producto es nuevo', this.nuevoProducto);
-              this._productoService.crearProducto(nuevoProducto).subscribe(
-                (productoResponse) => {
-                  if (productoResponse.data != undefined) {
-                    iziToast.show({
-                      title: 'SUCCESS',
-                      titleColor: '#1DC74C',
-                      color: '#FFF',
-                      class: 'text-success',
-                      position: 'topRight',
-                      message: 'El producto se registró correctamente.',
-                    });
-
-                    // Actualizo el idProducto en nuevoDetalleCompra
-                    nuevoDetalleCompra.idProducto = productoResponse.data;
-                    nuevoProducto.idProducto = productoResponse.data;
-                    console.log('nuevoDetalleCompra con idProducto actualizado', nuevoDetalleCompra);
-                    console.log('nuevoProducto con idProducto actualizado', nuevoProducto);
-                    // Registro el stock del nuevo producto
-                    this.crearStockSucursal(nuevoProducto);
-                    this.crearDetalleCompra(nuevoDetalleCompra);
-                  }
-                },
-                (productoError) => {
-                  console.log(productoError);
-                }
-              );
-            } else {
-              // El código ya existe, entonces actualizo el producto y stock
-              console.log('El producto ya existe', this.nuevoProducto);
-              this.actualizarProducto(element.idProducto, nuevoProducto);
-              this.editarStockSucursal(element.idProducto, nuevoProducto);
-              this.crearDetalleCompra(nuevoDetalleCompra);
-            }
-          });
-
-          // Después de agregar todos los productos, actualizo el correlativo
-          this.editarCorrelativo();
-
-          this.loadButton = false;
-          this._router.navigate(['/compras']);
+    const idSucursalCompra = this.compras.idSucursal;
+    this._comprasService.crear_compra(this.compras).pipe(
+      switchMap((response) => {
+        if (response.data == null) {
+          return of(null);
         }
+        this.idCompra = response.data;
+        const observables: Observable<any>[] = [];
+        for (const element of this.detalleCompras) {
+          const idSucursalDetalle = element.sucursal?.idSucursal ?? element.idSucursal ?? idSucursalCompra;
+          const idPresentacionDetalle = element.presentacion?.idPresentacion ?? element.idPresentacion;
+          const subtotalDetalle = element.subtotal ?? (Number(element.cantidad) * Number(element.cUnitario ?? element.pUnitario ?? 0));
+
+          const nuevoProducto = {
+            idProducto: element.idProducto,
+            Codigo: element.codigo ?? element.Codigo,
+            idCategoria: element.idCategoria ?? element.categoria?.idCategoria,
+            descripcion: element.descripcion,
+            idPresentacion: idPresentacionDetalle,
+            cUnitario: element.cUnitario ?? element.pUnitario,
+            fProduccion: element.fProduccion ?? element.fproduccion,
+            fVencimiento: element.fVencimiento ?? element.fvencimiento,
+            cantidad: element.cantidad,
+            cantidadAnterior: element.cantidadAnterior,
+            facturar: 'SI',
+            idStockSucursal: element.idStockSucursal,
+            idEmpresa: element.idEmpresa,
+            idMarca: element.idMarca ?? element.marca?.idMarca,
+            idSucursal: idSucursalDetalle,
+            ubicacion: element.ubicacion ?? '',
+          };
+
+          const nuevoDetalleCompra = {
+            idSucursal: idSucursalDetalle,
+            idCompra: this.idCompra,
+            cantidad: Number(element.cantidad),
+            idPresentacion: Number(idPresentacionDetalle) || 1,
+            pUnitario: parseFloat(String(element.cUnitario ?? element.pUnitario ?? 0)),
+            total: subtotalDetalle,
+            idProducto: element.idProducto || null,
+            ubicacion: element.ubicacion ?? null,
+            fechaVencimiento: element.fVencimiento || element.fvencimiento || null,
+          };
+
+          if (element.idProducto == null || element.idProducto === undefined || element.idProducto === '') {
+            observables.push(
+              this._productoService.crearProducto(nuevoProducto).pipe(
+                switchMap((pr) => {
+                  if (pr?.data != null) {
+                    nuevoDetalleCompra.idProducto = pr.data;
+                    return this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra);
+                  }
+                  return of(null);
+                }),
+                catchError((err) => {
+                  console.error('Error creando producto:', err);
+                  iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', position: 'topRight', message: 'No se pudo crear el producto.' });
+                  return of(null);
+                })
+              )
+            );
+          } else {
+            this.actualizarProducto(element.idProducto, nuevoProducto);
+            observables.push(this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra));
+          }
+        }
+        if (observables.length === 0) {
+          return of(null);
+        }
+        return forkJoin(observables);
+      }),
+      finalize(() => {
+        this.loadButton = false;
+      })
+    ).subscribe({
+      next: () => {
+        this.editarCorrelativo();
+        iziToast.show({
+          title: 'SUCCESS',
+          titleColor: '#1DC74C',
+          color: '#FFF',
+          class: 'text-success',
+          position: 'topRight',
+          message: 'Compra registrada correctamente.',
+        });
+        this._router.navigate(['/compras']);
       },
-      (error) => {
-         iziToast.show({
+      error: (err) => {
+        iziToast.show({
           title: 'ERROR',
           titleColor: '#FF0000',
           color: '#FFF',
           class: 'text-danger',
           position: 'topRight',
-          message:error,
+          message: err?.error?.message || err?.message || 'Error al registrar la compra.',
         });
-        this.loadButton = false;
-      }
-    );
+      },
+    });
   }
 
   private validarCamposObligatorios(): boolean {
-    const fechaOk =
-      !!this.compras.fEmision &&
-      String(this.compras.fEmision).trim() !== '';
-      !!this.compras.fVencimiento &&
-      String(this.compras.fVencimiento).trim() !== '';
+    const fechaEmisionOk =
+      !!this.compras.fEmision && String(this.compras.fEmision).trim() !== '';
+    const fechaVencOk =
+      !!this.compras.fVencimiento && String(this.compras.fVencimiento).trim() !== '';
+    const idProveedorOk = !!this.compras.idProveedor && String(this.compras.idProveedor).trim() !== '';
+    const idSucursalOk = !!this.compras.idSucursal && String(this.compras.idSucursal).trim() !== '';
     const idMonedaOk = !!this.compras.idMoneda;
     const idEstadoPagoOk = !!this.compras.idEstadoPago;
     const idMediosPagoOk = !!this.compras.idMediosPago;
-    // exigir total > 0 (si quiere permitir total = 0 cambiar a >= 0)
     const totalOk = !isNaN(Number(this.compras.total)) && Number(this.compras.total) > 0;
     const detalleOk = Array.isArray(this.detalleCompras) && this.detalleCompras.length > 0;
 
-    console.log('validarCamposObligatorios', {
-      fechaOk,
-      idMonedaOk,
-      idEstadoPagoOk,
-      idMediosPagoOk,
-      totalOk,
-      detalleOk,
-    });
-
-    if (!fechaOk || !idMonedaOk || !idEstadoPagoOk || !idMediosPagoOk || !totalOk || !detalleOk) {
+    if (!fechaEmisionOk || !fechaVencOk || !idProveedorOk || !idSucursalOk || !idMonedaOk || !idEstadoPagoOk || !idMediosPagoOk || !totalOk || !detalleOk) {
       this.mostrarErrorValidacion();
       return false;
     }
@@ -1203,14 +1191,24 @@ export class CreateComprasComponent {
   }
 
   private mostrarErrorValidacion(): void {
+    const faltan: string[] = [];
+    if (!this.compras.fEmision?.trim()) faltan.push('Fecha emisión');
+    if (!this.compras.fVencimiento?.trim()) faltan.push('Fecha vencimiento');
+    if (!this.compras.idProveedor) faltan.push('Proveedor');
+    if (!this.compras.idSucursal) faltan.push('Sucursal');
+    if (!this.compras.idMoneda) faltan.push('Moneda');
+    if (!this.compras.idEstadoPago) faltan.push('Estado de pago');
+    if (!this.compras.idMediosPago) faltan.push('Medio de pago');
+    if (!this.compras.total || Number(this.compras.total) <= 0) faltan.push('Total mayor a 0');
+    if (!this.detalleCompras?.length) faltan.push('Al menos un producto en el detalle');
+    const msg = faltan.length ? `Faltan: ${faltan.join(', ')}.` : 'Debe llenar todos los campos obligatorios (*) y agregar al menos un producto.';
     iziToast.show({
       title: 'ERROR',
       titleColor: '#FF0000',
       color: '#FFF',
       class: 'text-danger',
       position: 'topRight',
-      message:
-        'Debe llenar todos los campos obligatorios (*) y agregar al menos un producto.',
+      message: msg,
     });
     this.loadButton = false;
   }
@@ -1438,21 +1436,30 @@ export class CreateComprasComponent {
     console.log('Productos filtrados:', this.productos_filtrados);
   }
 
-   agregarDetallesCompra(producto: any): void {
-    console.log('Agregando al carrito:', producto);
-    const existe = this.detalleCompras.find((p: { idProducto: any; }) => p.idProducto === producto.idProducto);
+  agregarDetallesCompra(producto: any): void {
+    const idSucursal = this.compras.idSucursal || (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
+    const idPresentacion = producto.idPresentacion ?? producto.presentacion?.idPresentacion;
+    const pUnitario = Number(producto.cUnitario ?? producto.pUnitario ?? 0);
+    const existe = this.detalleCompras.find((p: { idProducto: any }) => p.idProducto === producto.idProducto);
     if (existe) {
-      existe.cantidad += 1;
+      existe.cantidad = (existe.cantidad || 0) + 1;
+      existe.subtotal = (existe.cantidad || 0) * (Number(existe.cUnitario ?? existe.pUnitario ?? 0));
     } else {
+      const sucursalObj = this.sucursales?.find((s: any) => s.idSucursal === idSucursal) ?? null;
+      const presentacionObj = this.presentacion?.find((p: any) => p.idPresentacion === idPresentacion) ?? producto.presentacion ?? null;
       this.detalleCompras.push({
         ...producto,
-        cantidad: 1
+        idSucursal,
+        sucursal: sucursalObj,
+        idPresentacion: idPresentacion ?? presentacionObj?.idPresentacion,
+        presentacion: presentacionObj,
+        cantidad: 1,
+        cUnitario: pUnitario || producto.cUnitario,
+        pUnitario: pUnitario || producto.pUnitario,
+        subtotal: pUnitario,
       });
-      
-      console.log('Producto agregado al carrito:', this.detalleCompras);
-      
     }
-    this.actualizarSubtotalNuevoProducto
+    this.sumarFooterFactura();
   }
 
   seleccionaProducto(prod: any): void {
@@ -1469,10 +1476,12 @@ export class CreateComprasComponent {
   }
 
   abrirBuscadorModal(): void {
-    
     this.searchTerm = '';
-    this.productos_filtrados = [];          // o cárgalos todos
-    const modal = new bootstrap.Modal(this.buscadorModal.nativeElement);
-    modal.show();
+    this.productos_filtrados = this.productos_const ?? [];
+    const el = document.getElementById('buscadorModal');
+    if (el) {
+      const modal = new bootstrap.Modal(el);
+      modal.show();
+    }
   }
 }

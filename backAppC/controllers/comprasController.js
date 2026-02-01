@@ -13,7 +13,7 @@ const obtener_compras_todos = async (req, res) => {
                 let pool = await sql.connect(dbConfig);
                 let compras = await pool.request()
                     //quiero obtener todas las compras con las columnas con la informacion de las tablas relacionadas como idCliente y idEstadoPago
-                    .query("SELECT * FROM Compras INNER JOIN Proveedores ON Compras.idCliente = Proveedores.idProveedor INNER JOIN EstadoPago ON Compras.idEstadoPago = EstadoPago.idEstadoPago");
+                    .query("SELECT * FROM Compras INNER JOIN Proveedores ON Compras.idProveedor = Proveedores.idProveedor INNER JOIN EstadoPago ON Compras.idEstadoPago = EstadoPago.idEstadoPago");
                 // .query("SELECT * FROM Compras INNER JOIN Clientes ON Compras.idCliente = Clientes.idCliente");
                 // .query("SELECT * FROM Compras");
 
@@ -56,7 +56,7 @@ const obtener_compras_id = async function (req, res) {
                     .request()
                     .input('idCompra', sql.UniqueIdentifier, idCompra)
                     //quiero traer la compra con las columnas con la informacion de las tablas relacionadas como idCliente
-                    .query("SELECT * FROM Compras INNER JOIN Proveedores ON Compras.idCliente = Proveedores.idProveedor WHERE idCompra = @idCompra");
+                    .query("SELECT * FROM Compras INNER JOIN Proveedores ON Compras.idProveedor = Proveedores.idProveedor WHERE idCompra = @idCompra");
 
                 //.query("SELECT * FROM Compras WHERE idCompra = '" + idCompra + "'");
 
@@ -84,8 +84,8 @@ const obtener_compras_id = async function (req, res) {
 }
 
 const obtener_compras_idCompra_idEmpresa = async (req, res) => {
-    const { idCompra } = req.params.id;
-    const idEmpresa = req.user.idEmpresa;
+    const idCompra = req.params.id;
+    const idEmpresa = req.user.empresa;
 
     if (req.user) {
         if (req.user.rol == 'Administrador') {
@@ -115,10 +115,10 @@ const obtener_compras_idCompra_idEmpresa = async (req, res) => {
 
 const obtener_compras_todos_idEmpresa = async (req, res) => {
 
-    const idEmpresa = req.user.idEmpresa;
+    const idEmpresa = req.user.empresa;
 
     if (req.user) {
-        if (req.user.rol == 'Administrador') {
+        if (req.user.rol == 'Administrador' || req.user.rol == 'Almacenero') {
             try {
                 let pool = await sql.connect(dbConfig);
                 let compras = await pool
@@ -147,62 +147,63 @@ const crear_compra = async (req, res) => {
     console.log('crear_compra ', req.body);
 
     const idEmpresa = req.user.empresa;
-    const idUsuario = req.user.sub;
-    //generar el id de la compra
+    const idUsuario = req.user.sub || req.user.idUsuario;
 
+    if (!req.user) {
+        return res.status(403).send({ message: 'No Access', data: undefined });
+    }
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
 
     const idCompra = uuidv4();
+    const fVencimientoVal = fVencimiento || null;
+    const compRelacionadoVal = compRelacionado || null;
 
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            try {
-                let pool = await sql.connect(dbConfig);
-                let regCompra = await pool
-                    .request()
-                    .input("idCompra", sql.UniqueIdentifier, idCompra)
-                    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-                    .input("compCompra", sql.VarChar, compCompra)
-                    .input("idComprobante", sql.Int, idComprobante)
-                    .input("serie", sql.VarChar, serie)
-                    .input("numero", sql.VarChar, numero)
-                    .input("fEmision", sql.DateTime, fEmision)
-                    .input("fVencimiento", sql.DateTime, fVencimiento)
-                    .input("idCliente", sql.Int, idProveedor)
-                    .input("idMoneda", sql.Int, idMoneda)
-                    .input("idEstadoPago", sql.Int, idEstadoPago)
-                    .input("subTotal", sql.Decimal, subTotal)
-                    .input("igv", sql.Decimal, igv)
-                    .input("exonerado", sql.Decimal, exonerado)
-                    .input("gratuito", sql.Decimal, gratuito)
-                    .input("otrosCargos", sql.Decimal, otrosCargos)
-                    .input("descuentos", sql.Decimal, descuentos)
-                    .input("total", sql.Decimal, total)
-                    .input("idMediosPago", sql.VarChar, idMediosPago)
-                    .input("compRelacionado", sql.VarChar, compRelacionado)
-                    .input("idUsuario", sql.UniqueIdentifier, idUsuario)
-                    .query('INSERT INTO Compras VALUES (@idCompra,@idEmpresa, @compCompra, @idComprobante, @serie, @numero, @fEmision, @fVencimiento, @idCliente, @idMoneda, @idEstadoPago, @subTotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @compRelacionado, @idUsuario) SELECT SCOPE_IDENTITY() AS idCompra;');
+    try {
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('idCompra', sql.UniqueIdentifier, idCompra)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('compCompra', sql.VarChar(13), compCompra || '')
+            .input('idComprobante', sql.Int, idComprobante)
+            .input('serie', sql.VarChar(4), (serie || '').toString().substring(0, 4))
+            .input('numero', sql.VarChar(8), (numero || '').toString().substring(0, 8))
+            .input('fEmision', sql.DateTime, fEmision)
+            .input('fVencimiento', sql.DateTime, fVencimientoVal)
+            .input('idProveedor', sql.Int, idProveedor)
+            .input('idMoneda', sql.Int, idMoneda)
+            .input('idEstadoPago', sql.Int, idEstadoPago)
+            .input('subTotal', sql.Decimal(18, 2), subTotal || 0)
+            .input('igv', sql.Decimal(18, 2), igv || 0)
+            .input('exonerado', sql.Decimal(18, 2), exonerado || 0)
+            .input('gratuito', sql.Decimal(18, 2), gratuito || 0)
+            .input('otrosCargos', sql.Decimal(18, 2), otrosCargos || 0)
+            .input('descuentos', sql.Decimal(18, 2), descuentos || 0)
+            .input('total', sql.Decimal(18, 2), total || 0)
+            .input('idMediosPago', sql.Int, idMediosPago)
+            .input('compRelacionado', sql.VarChar(50), compRelacionadoVal)
+            .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+            .query(`
+                INSERT INTO Compras (idCompra, idEmpresa, compCompra, idComprobante, serie, numero, fEmision, fVencimiento, idProveedor, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario)
+                VALUES (@idCompra, @idEmpresa, @compCompra, @idComprobante, @serie, @numero, @fEmision, @fVencimiento, @idProveedor, @idMoneda, @idEstadoPago, @subTotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @compRelacionado, @idUsuario)
+            `);
 
-                if (regCompra.rowsAffected[0] == 1) {
-                    console.log('compra creada ', idCompra);
-                    res.status(200).send({ data: idCompra });
-                }
-
-            } catch (error) {
-                console.log('crear compras error: ' + error);
-                res.status(500).send({ message: 'Error al crear la compra', data: undefined });
-            }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+        console.log('Compra creada:', idCompra);
+        res.status(200).send({ data: idCompra });
+    } catch (error) {
+        console.error('crear_compra error:', error);
+        if (error.number === 2627) {
+            return res.status(400).send({ message: 'Ya existe una compra con la misma serie y número para esta empresa.', data: undefined });
         }
-    } else {
-        res.status(500).send({ message: 'No Access', data: undefined });
+        res.status(500).send({ message: 'Error al crear la compra', data: undefined });
     }
 }
 
 const editar_compra = async function (req, res) {
     console.log("editar_compra req.body", req.body);
     console.log("editar_compra req.params", req.params);
-    const { compCompra, serie, numero, idCliente, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario } = req.body;
+    const { compCompra, serie, numero, idProveedor, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario } = req.body;
     //quiero convertir fEmision y fVencimiento a formato de fecha DateTime
 
 
@@ -240,7 +241,7 @@ const editar_compra = async function (req, res) {
                     .input("numero", sql.VarChar, numero)
                     .input("fEmision", sql.DateTime, fEmision)
                     .input("fVencimiento", sql.DateTime, fVencimiento)
-                    .input("idCliente", sql.Int, idCliente)
+                    .input("idProveedor", sql.Int, idProveedor)
                     .input("idMoneda", sql.Int, idMoneda)
                     .input("idEstadoPago", sql.Int, idEstadoPago)
                     .input("subTotal", sql.Decimal, subTotal)
@@ -253,7 +254,7 @@ const editar_compra = async function (req, res) {
                     .input("idMediosPago", sql.Int, idMediosPago)
                     .input("compRelacionado", sql.VarChar, compRelacionado)
                     .input("idUsuario", sql.UniqueIdentifier, idUsuario)
-                    .query("UPDATE Compras SET compCompra=@compCompra,serie = @serie, numero = @numero, fEmision = @fEmision, fVencimiento = @fVencimiento, idCliente = @idCliente, idMoneda = @idMoneda, idEstadoPago = @idEstadoPago, subTotal = @subTotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total, idMediosPago = @idMediosPago, compRelacionado = @compRelacionado, idUsuario = @idUsuario WHERE idEmpresa = @idEmpresa AND idcompra = @idcompra");
+                    .query("UPDATE Compras SET compCompra=@compCompra, serie = @serie, numero = @numero, fEmision = @fEmision, fVencimiento = @fVencimiento, idProveedor = @idProveedor, idMoneda = @idMoneda, idEstadoPago = @idEstadoPago, subTotal = @subTotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total, idMediosPago = @idMediosPago, compRelacionado = @compRelacionado, idUsuario = @idUsuario WHERE idEmpresa = @idEmpresa AND idCompra = @idcompra");
 
                 res.status(200).send({ message: 'Compra editada correctamente', data: editarCompra.rowsAffected });
             } catch (error) {
@@ -301,20 +302,19 @@ const eliminar_idcompra_empresa = async function (req, res) {
 
 const buscar_comprobante_idCliente = async function (req, res) {
     const idProveedor = req.params.id;
-
     const idEmpresa = req.user.empresa;
 
     console.log('buscar_comprobante_idCliente req.params', req.params);
 
     if (req.user) {
-        if (req.user.rol == 'Administrador') {
+        if (req.user.rol == 'Administrador' || req.user.rol == 'Almacenero') {
             try {
                 let pool = await sql.connect(dbConfig);
                 let compras = await pool
                     .request()
-                    .input('idCliente', sql.Int, idProveedor)
+                    .input('idProveedor', sql.Int, idProveedor)
                     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .query("SELECT compCompra FROM Compras WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa");
+                    .query("SELECT compCompra FROM Compras WHERE idProveedor = @idProveedor AND idEmpresa = @idEmpresa");
 
 
                 res.status(200).send({ data: compras.recordset });

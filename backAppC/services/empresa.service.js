@@ -64,6 +64,329 @@ exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
 };
 
 /**
+ * Crea los comprobantes predeterminados para una nueva empresa
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @returns {Array} Array con los comprobantes creados
+ */
+exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
+    console.log('Creando comprobantes predeterminados para empresa:', idEmpresa);
+    
+    const sql = require('mssql');
+    
+    const comprobantesPredeterminados = [
+        { codigo: '01', nombre: 'Factura Electrónica', serie: 'F001', numero: 0, activo: 1 },
+        { codigo: '03', nombre: 'Boleta de Venta Electrónica', serie: 'B001', numero: 0, activo: 1 },
+        { codigo: '07', nombre: 'Nota de Crédito Electrónica', serie: 'FC01', numero: 0, activo: 1 },
+        { codigo: '08', nombre: 'Nota de Débito Electrónica', serie: 'FD01', numero: 0, activo: 1 },
+        { codigo: '09', nombre: 'Guía de Remisión Electrónica', serie: 'T001', numero: 0, activo: 1 }
+    ];
+
+    const comprobantesCreados = [];
+
+    try {
+        for (const comp of comprobantesPredeterminados) {
+            const result = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('codigo', sql.VarChar(2), comp.codigo)
+                .input('nombre', sql.VarChar(50), comp.nombre)
+                .input('serie', sql.VarChar(4), comp.serie)
+                .input('numero', sql.Int, comp.numero)
+                .input('activo', sql.Bit, comp.activo)
+                .query(`
+                    INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo)
+                    OUTPUT INSERTED.idComprobante
+                    VALUES (@idEmpresa, @codigo, @nombre, @serie, @numero, @activo)
+                `);
+
+            const idComprobante = result.recordset[0].idComprobante;
+            comprobantesCreados.push({ idComprobante, ...comp });
+            console.log(`Comprobante creado: ${comp.nombre} - ${comp.serie}`);
+        }
+
+        console.log(`✓ ${comprobantesCreados.length} comprobantes predeterminados creados`);
+        return comprobantesCreados;
+
+    } catch (error) {
+        console.error('Error creando comprobantes predeterminados:', error);
+        throw new Error('Error al crear comprobantes predeterminados: ' + error.message);
+    }
+};
+
+/**
+ * Crea la sucursal principal para una nueva empresa
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @param {Object} datosEmpresa - Datos de la empresa (razon_Social, direccion, etc.)
+ * @returns {Object} Sucursal creada
+ */
+exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
+    console.log('Creando sucursal principal para empresa:', idEmpresa);
+    
+    const sql = require('mssql');
+    const idSucursal = uuidv4();
+
+    try {
+        await pool.request()
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('nombre', sql.VarChar(50), 'Sucursal Principal')
+            .input('direccion', sql.VarChar(200), datosEmpresa.direccion || 'Sin dirección')
+            .input('telefono', sql.VarChar(20), datosEmpresa.celular || '')
+            .input('estado', sql.Bit, 1)
+            .query(`
+                INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, telefono, estado, fRegistro)
+                VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @telefono, @estado, GETDATE())
+            `);
+
+        console.log(`✓ Sucursal principal creada: ${idSucursal}`);
+        return { idSucursal, nombre: 'Sucursal Principal' };
+
+    } catch (error) {
+        console.error('Error creando sucursal principal:', error);
+        throw new Error('Error al crear sucursal principal: ' + error.message);
+    }
+};
+
+/**
+ * Crea las secuencias iniciales para los comprobantes de la sucursal principal
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @param {String} idSucursal - ID de la sucursal principal
+ * @param {Array} comprobantes - Array de comprobantes creados
+ * @returns {Array} Secuencias creadas
+ */
+exports.crearSecuenciasIniciales = async (pool, idEmpresa, idSucursal, comprobantes) => {
+    console.log('Creando secuencias iniciales para sucursal:', idSucursal);
+    
+    const sql = require('mssql');
+    const secuenciasCreadas = [];
+
+    try {
+        for (const comp of comprobantes) {
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('idComprobante', sql.VarChar(2), comp.codigo)
+                .input('serie', sql.VarChar(4), comp.serie)
+                .input('ultimoNumero', sql.Int, 0)
+                .query(`
+                    INSERT INTO Secuencias (idEmpresa, idSucursal, idComprobante, serie, ultimoNumero, fActualizacion)
+                    VALUES (@idEmpresa, @idSucursal, @idComprobante, @serie, @ultimoNumero, GETDATE())
+                `);
+
+            secuenciasCreadas.push({ codigo: comp.codigo, serie: comp.serie });
+            console.log(`Secuencia creada: ${comp.codigo} - ${comp.serie}`);
+        }
+
+        console.log(`✓ ${secuenciasCreadas.length} secuencias creadas`);
+        return secuenciasCreadas;
+
+    } catch (error) {
+        console.error('Error creando secuencias:', error);
+        throw new Error('Error al crear secuencias: ' + error.message);
+    }
+};
+
+/**
+ * Crea las ubicaciones predeterminadas para una sucursal
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idSucursal - ID de la sucursal
+ * @returns {Array} Ubicaciones creadas
+ */
+exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
+    console.log('Creando ubicaciones predeterminadas para sucursal:', idSucursal);
+    
+    const sql = require('mssql');
+    
+    const ubicacionesPredeterminadas = [
+        { codigoUbicacion: 'MOSTRADOR', prioridad: 1 },
+        { codigoUbicacion: 'ANDAMIO-1', prioridad: 2 },
+        { codigoUbicacion: 'ANDAMIO-2', prioridad: 3 }
+    ];
+
+    const ubicacionesCreadas = [];
+
+    try {
+        for (const ubi of ubicacionesPredeterminadas) {
+            await pool.request()
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('codigoUbicacion', sql.VarChar(20), ubi.codigoUbicacion)
+                .input('prioridad', sql.Int, ubi.prioridad)
+                .query(`
+                    INSERT INTO UbicacionesPrioridad (idSucursal, codigoUbicacion, prioridad)
+                    VALUES (@idSucursal, @codigoUbicacion, @prioridad)
+                `);
+
+            ubicacionesCreadas.push(ubi);
+            console.log(`Ubicación creada: ${ubi.codigoUbicacion}`);
+        }
+
+        console.log(`✓ ${ubicacionesCreadas.length} ubicaciones predeterminadas creadas`);
+        return ubicacionesCreadas;
+
+    } catch (error) {
+        console.error('Error creando ubicaciones predeterminadas:', error);
+        throw new Error('Error al crear ubicaciones predeterminadas: ' + error.message);
+    }
+};
+
+/**
+ * Crea las listas de precios predeterminadas para una empresa
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @param {String} idSucursal - ID de la sucursal principal
+ * @returns {Array} Listas de precios creadas
+ */
+exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) => {
+    console.log('Creando listas de precios predeterminadas para empresa:', idEmpresa);
+    
+    const sql = require('mssql');
+    
+    // Estructura: idLista, idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, fechaFin, activo, fCreacion
+    const listasPredeterminadas = [
+        { nombre: 'Precio Normal', principal: true, conIgv: true, idMoneda: 1 },
+        { nombre: 'Precio Verano', principal: false, conIgv: true, idMoneda: 1 }
+    ];
+
+    const listasCreadas = [];
+
+    try {
+        for (const lista of listasPredeterminadas) {
+            const result = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('nombre', sql.VarChar(100), lista.nombre)
+                .input('idMoneda', sql.Int, lista.idMoneda)
+                .input('principal', sql.Bit, lista.principal ? 1 : 0)
+                .input('conIgv', sql.Bit, lista.conIgv ? 1 : 0)
+                .input('activo', sql.Bit, 1)
+                .query(`
+                    INSERT INTO ListasPrecio (idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, activo, fCreacion)
+                    OUTPUT INSERTED.idLista
+                    VALUES (@idEmpresa, @idSucursal, @nombre, @idMoneda, @principal, @conIgv, GETDATE(), @activo, GETDATE())
+                `);
+
+            const idLista = result.recordset[0]?.idLista;
+            listasCreadas.push({ idLista, ...lista });
+            console.log(`Lista de precios creada: ${lista.nombre}`);
+        }
+
+        console.log(`✓ ${listasCreadas.length} listas de precios predeterminadas creadas`);
+        return listasCreadas;
+
+    } catch (error) {
+        console.error('Error creando listas de precios predeterminadas:', error);
+        throw new Error('Error al crear listas de precios predeterminadas: ' + error.message);
+    }
+};
+
+/**
+ * Inicializa todos los datos maestros para una nueva empresa
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @param {Object} datosEmpresa - Datos de la empresa
+ * @returns {Object} Resumen de datos creados
+ */
+exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
+    console.log('🚀 Inicializando datos maestros para empresa:', idEmpresa);
+    
+    const resultado = {
+        roles: [],
+        comprobantes: [],
+        sucursal: null,
+        secuencias: [],
+        ubicaciones: [],
+        listasPrecios: [],
+        errores: []
+    };
+
+    try {
+        // 1. Crear roles
+        try {
+            resultado.roles = await exports.crearRolesPredeterminados(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando roles:', error.message);
+            resultado.errores.push({ tipo: 'roles', mensaje: error.message });
+        }
+
+        // 2. Crear comprobantes
+        try {
+            resultado.comprobantes = await exports.crearComprobantesPredeterminados(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando comprobantes:', error.message);
+            resultado.errores.push({ tipo: 'comprobantes', mensaje: error.message });
+        }
+
+        // 3. Crear sucursal principal
+        try {
+            resultado.sucursal = await exports.crearSucursalPrincipal(pool, idEmpresa, datosEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando sucursal:', error.message);
+            resultado.errores.push({ tipo: 'sucursal', mensaje: error.message });
+        }
+
+        // 4. Crear secuencias solo si tenemos comprobantes y sucursal
+        if (resultado.comprobantes.length > 0 && resultado.sucursal) {
+            try {
+                resultado.secuencias = await exports.crearSecuenciasIniciales(
+                    pool, 
+                    idEmpresa, 
+                    resultado.sucursal.idSucursal, 
+                    resultado.comprobantes
+                );
+            } catch (error) {
+                console.error('⚠️ Error creando secuencias:', error.message);
+                resultado.errores.push({ tipo: 'secuencias', mensaje: error.message });
+            }
+        }
+
+        // 5. Crear ubicaciones predeterminadas para la sucursal
+        if (resultado.sucursal) {
+            try {
+                resultado.ubicaciones = await exports.crearUbicacionesPredeterminadas(
+                    pool,
+                    resultado.sucursal.idSucursal
+                );
+            } catch (error) {
+                console.error('⚠️ Error creando ubicaciones:', error.message);
+                resultado.errores.push({ tipo: 'ubicaciones', mensaje: error.message });
+            }
+        }
+
+        // 6. Crear listas de precios predeterminadas
+        if (resultado.sucursal) {
+            try {
+                resultado.listasPrecios = await exports.crearListasPreciosPredeterminadas(
+                    pool,
+                    idEmpresa,
+                    resultado.sucursal.idSucursal
+                );
+            } catch (error) {
+                console.error('⚠️ Error creando listas de precios:', error.message);
+                resultado.errores.push({ tipo: 'listasPrecios', mensaje: error.message });
+            }
+        }
+
+        console.log('✅ Inicialización completada:', {
+            roles: resultado.roles.length,
+            comprobantes: resultado.comprobantes.length,
+            sucursal: resultado.sucursal ? 'OK' : 'ERROR',
+            secuencias: resultado.secuencias.length,
+            ubicaciones: resultado.ubicaciones.length,
+            listasPrecios: resultado.listasPrecios.length,
+            errores: resultado.errores.length
+        });
+
+        return resultado;
+
+    } catch (error) {
+        console.error('❌ Error general en inicialización:', error);
+        throw error;
+    }
+};
+
+/**
  * Verifica si la empresa tiene colaboradores
  * @param {Object} pool - Conexión a la base de datos
  * @param {String} idEmpresa - ID de la empresa

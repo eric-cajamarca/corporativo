@@ -1163,42 +1163,9 @@ export class UpdateComprasComponent {
         //   }
         // });
       
-      //deseo recorrer detalleCompras y crear un nuevo objeto con los campos que necesito
-      const estockSucursal = this.detalleCompras.forEach((element: any) => {
-        let detalleCompra = {
-          idStockSucursal: element.idStockSucursal,
-          idEmpresa: element.idEmpresa,
-          idSucursal: element.idSucursal,
-          idProducto: element.idProducto,
-          cantidadAnterior: element.cantidadAnterior,
-          cantidad: element.cantidad,
-          ubicacion: element.ubicacion,
-          
-          
-        };
-
-        console.log('estockSucursal', estockSucursal);
-      }
-      );
-      
-      this._sucursalService.crear_stock_sucursal_idEmpresa( estockSucursal).subscribe(
-        response => {
-          console.log('response', response);
-          if (response.data != undefined) {
-            iziToast.show({
-              title: 'SUCCESS',
-              titleColor: '#006400',
-              color: '#FFF',
-              class: 'text-success',
-              position: 'topRight',
-              message: 'El stock de la sucursal se actualizó correctamente.'
-            });
-          }
-        },
-        error => {
-          console.log(error);
-        }
-      );
+      // Nota: El stock y lotes ahora se manejan en el backend al crear/editar detalle compra
+      // No es necesario actualizar stock manualmente desde el frontend
+      console.log('✓ Detalle de compra actualizado. Stock manejado por backend.');
     }
 
     //aqui elimino los idDetalleCompra que se eliminaron

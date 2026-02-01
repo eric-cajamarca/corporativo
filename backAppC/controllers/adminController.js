@@ -364,15 +364,20 @@ const admin_login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error en login:', error);
-    
-    // Manejar errores específicos del Service
-    if (error.message === 'RUC no existe' || 
-        error.message === 'El email no existe o no tiene permisos para acceder' ||
-        error.message === 'La contraseña es incorrecta') {
+    console.error('Error en login:', error.message);
+    if (error.stack) console.error(error.stack);
+
+    // Errores de negocio → 401
+    const mensajes401 = [
+      'RUC no existe o empresa inactiva',
+      'El email no existe o no tiene permisos para acceder',
+      'La contraseña es incorrecta',
+      'El usuario está deshabilitado. Contacte al administrador.'
+    ];
+    if (mensajes401.includes(error.message)) {
       return res.status(401).send({ message: error.message, data: undefined });
     }
-    
+
     res.status(500).send({ message: 'Error interno del servidor', data: undefined });
   }
 };

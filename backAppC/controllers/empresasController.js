@@ -182,16 +182,39 @@ const createEmpresa = async function (req, res) {
 
             console.log('✓ Empresa creada con ID:', idEmpresa);
 
-            // Crear roles predeterminados para la nueva empresa
+            // Inicializar datos maestros de la empresa
             try {
-                await empresaService.crearRolesPredeterminados(pool, idEmpresa);
-                console.log('✓ Roles predeterminados creados para la empresa');
-            } catch (errorRoles) {
-                console.error('⚠️ Error creando roles predeterminados:', errorRoles);
-                // No bloqueamos el registro si fallan los roles
-            }
+                const datosEmpresa = {
+                    razon_Social,
+                    correo,
+                    celular,
+                    direccion: req.body.direccion || 'Sin dirección'
+                };
+                
+                const resultadoInicializacion = await empresaService.inicializarDatosEmpresa(pool, idEmpresa, datosEmpresa);
+                
+                console.log('✅ Datos maestros inicializados:', {
+                    roles: resultadoInicializacion.roles.length,
+                    comprobantes: resultadoInicializacion.comprobantes.length,
+                    sucursal: resultadoInicializacion.sucursal ? 'OK' : 'ERROR',
+                    secuencias: resultadoInicializacion.secuencias.length,
+                    errores: resultadoInicializacion.errores.length
+                });
 
-            res.status(200).send({ data: idEmpresa });
+                // Devolver el ID de la empresa junto con el ID de la sucursal principal
+                res.status(200).send({ 
+                    data: idEmpresa,
+                    sucursalPrincipal: resultadoInicializacion.sucursal?.idSucursal,
+                    mensaje: 'Empresa creada exitosamente con datos maestros inicializados'
+                });
+            } catch (errorInicializacion) {
+                console.error('⚠️ Error inicializando datos maestros:', errorInicializacion);
+                // La empresa se creó pero falló la inicialización - devolver el ID de todas formas
+                res.status(200).send({ 
+                    data: idEmpresa,
+                    warning: 'Empresa creada pero algunos datos maestros no se inicializaron correctamente'
+                });
+            }
         }
         catch (error) {
             console.error('Error al crear la Empresa:', error);

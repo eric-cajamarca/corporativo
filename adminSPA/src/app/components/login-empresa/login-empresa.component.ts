@@ -12,7 +12,7 @@ declare var iziToast: any;
   standalone: true,
   imports: [FormsModule, CommonModule],
   templateUrl: './login-empresa.component.html',
-  styleUrl: './login-empresa.component.css'
+  styleUrls: ['./login-empresa.component.css', './login-empresa-wizard.css']
 })
 export class LoginEmpresaComponent implements OnInit {
 
@@ -24,6 +24,10 @@ export class LoginEmpresaComponent implements OnInit {
   public emailInvalid: boolean = false;
   public showPassword: boolean = false;
   public loading: boolean = false;
+
+  // Control de pasos del wizard
+  public currentStep: number = 1; // 1: Empresa, 2: Usuario, 3: Acceso (resumen)
+  public maxStepReached: number = 1; // Para controlar navegación hacia adelante
 
   // Información de empresa recordada
   public empresaRecordada: any = null;
@@ -51,6 +55,8 @@ export class LoginEmpresaComponent implements OnInit {
     this.emailInvalid = false;
     this.showPassword = false;
     this.loading = false;
+    this.currentStep = 1;
+    this.maxStepReached = 1;
   }
 
   loadEmpresaRecordada(): void {
@@ -208,5 +214,120 @@ export class LoginEmpresaComponent implements OnInit {
     if (!event.target.checked) {
       localStorage.removeItem('empresaRecordada');
     }
+  }
+
+  // ============================================
+  // FUNCIONES DEL WIZARD DE PASOS
+  // ============================================
+
+  /**
+   * Navega al paso especificado
+   */
+  goToStep(step: number): void {
+    // Solo permitir navegar a pasos ya visitados o al siguiente paso si es válido
+    if (step <= this.maxStepReached || (step === this.currentStep + 1 && this.canProceedToNextStep())) {
+      this.currentStep = step;
+      if (step > this.maxStepReached) {
+        this.maxStepReached = step;
+      }
+    }
+  }
+
+  /**
+   * Avanza al siguiente paso si la validación es correcta
+   */
+  nextStep(): void {
+    if (this.canProceedToNextStep()) {
+      this.currentStep++;
+      if (this.currentStep > this.maxStepReached) {
+        this.maxStepReached = this.currentStep;
+      }
+    } else {
+      this.showStepValidationError();
+    }
+  }
+
+  /**
+   * Retrocede al paso anterior
+   */
+  previousStep(): void {
+    if (this.currentStep > 1) {
+      this.currentStep--;
+    }
+  }
+
+  /**
+   * Verifica si se puede avanzar al siguiente paso
+   */
+  canProceedToNextStep(): boolean {
+    switch (this.currentStep) {
+      case 1: // Paso Empresa: validar RUC
+        this.validateRuc();
+        return this.user.ruc && this.user.ruc.length === 11 && !this.rucInvalid;
+      
+      case 2: // Paso Usuario: validar email
+        this.validateEmail();
+        return this.user.email && !this.emailInvalid;
+      
+      case 3: // Paso Acceso: ya está en el último paso
+        return true;
+      
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Muestra errores de validación según el paso actual
+   */
+  private showStepValidationError(): void {
+    let message = '';
+    
+    switch (this.currentStep) {
+      case 1:
+        if (!this.user.ruc) {
+          message = 'Por favor, ingrese el RUC de la empresa';
+        } else if (this.rucInvalid) {
+          message = 'El RUC ingresado no es válido. Debe tener 11 dígitos y comenzar con 1 o 2';
+        }
+        break;
+      
+      case 2:
+        if (!this.user.email) {
+          message = 'Por favor, ingrese el correo electrónico';
+        } else if (this.emailInvalid) {
+          message = 'El correo electrónico ingresado no es válido';
+        }
+        break;
+    }
+
+    if (message) {
+      iziToast.warning({
+        title: 'Validación',
+        message: message,
+        position: 'topRight'
+      });
+    }
+  }
+
+  /**
+   * Verifica si un paso está activo
+   */
+  isStepActive(step: number): boolean {
+    return this.currentStep === step;
+  }
+
+  /**
+   * Verifica si un paso está completado
+   */
+  isStepCompleted(step: number): boolean {
+    return step < this.currentStep;
+  }
+
+  /**
+   * Verifica si un paso es accesible (clickeable)
+   */
+  isStepAccessible(step: number): boolean {
+    return step <= this.maxStepReached;
   }
 }

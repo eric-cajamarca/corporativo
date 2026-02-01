@@ -1,0 +1,148 @@
+/* Estilos adicionales para el wizard de login */
+
+/* Animación de transición entre pasos */
+.step-content {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Conector entre pasos */
+.step-connector {
+  width: 60px;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 10px;
+  transition: all 0.3s ease;
+}
+
+.step-connector.active {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Botones de navegación del wizard */
+.next-step-button,
+.prev-step-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.next-step-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 100%;
+  justify-content: center;
+}
+
+.next-step-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+}
+
+.next-step-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.prev-step-button {
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 10px 20px;
+}
+
+.prev-step-button:hover {
+  background: #e2e8f0;
+  transform: translateX(-2px);
+}
+
+.step-navigation {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.step-navigation .next-step-button {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* Resumen de datos en paso 3 */
+.login-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 20px 0;
+}
+
+.login-summary h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 13px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* Ajustes responsive */
+@media (max-width: 480px) {
+  .login-steps {
+    padding: 15px 20px;
+  }
+
+  .step-connector {
+    width: 40px;
+    margin: 0 5px;
+  }
+
+  .step-label {
+    font-size: 11px;
+  }
+
+  .step-icon {
+    width: 35px;
+    height: 35px;
+  }
+}

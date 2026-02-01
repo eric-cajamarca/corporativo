@@ -85,12 +85,29 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.step.clickable {
+  cursor: pointer;
+}
+
+.step.clickable:hover .step-icon {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
 }
 
 .step.active .step-icon {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.step.completed .step-icon {
+  background: #10b981;
+  color: white;
 }
 
 .step-icon {
@@ -98,6 +115,7 @@
   height: 40px;
   border-radius: 50%;
   background: #e2e8f0;
+  transition: all 0.3s ease;
   color: #718096;
   display: flex;
   align-items: center;
@@ -124,6 +142,11 @@
   height: 2px;
   background: #e2e8f0;
   margin: 0 10px;
+  transition: all 0.3s ease;
+}
+
+.step-connector.active {
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
 }
 
 /* Campos del formulario */

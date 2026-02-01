@@ -60,7 +60,7 @@ exports.buscarPorEmail = async (pool, email, idEmpresa) => {
     .request()
     .input('email', sql.VarChar(100), email)
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query('SELECT idUsuario, contraseña, idRol, nombres, apellidos FROM UsuarioWeb WHERE email = @email and idEmpresa = @idEmpresa');
+    .query('SELECT idUsuario, password, idRol, nombres, apellidos, email, estado FROM UsuarioWeb WHERE email = @email AND idEmpresa = @idEmpresa');
   
   return result.recordset.length > 0 ? result.recordset[0] : null;
 };
@@ -72,9 +72,17 @@ exports.buscarPorEmailYRuc = async (pool, email, idEmpresa) => {
     .input('email', sql.VarChar, email)
     .query(`
       SELECT 
-        UW.*, 
+        UW.idUsuario,
+        UW.idEmpresa,
+        UW.nombres,
+        UW.apellidos,
+        UW.email,
+        UW.password,
+        UW.idRol,
+        UW.estado,
+        UW.fRegistro,
         R.descripcion as rol
-      FROM usuarioWeb UW
+      FROM UsuarioWeb UW
       INNER JOIN Rol R ON UW.idRol = R.idRol
       WHERE UW.email = @email AND UW.idEmpresa = @idEmpresa
     `);
