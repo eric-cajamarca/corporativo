@@ -501,33 +501,22 @@ const eliminar_borrador_compras_empresa = async (req, res) => {
 // )
 
 const obtener_correlativos_empresa = async (req, res) => {
-    const idEmpresa = req.user.empresa;
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let correlativos = await pool
-                    .request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .query("SELECT * FROM Correlativos WHERE idEmpresa = @idEmpresa");
-                res.status(200).send({ data: correlativos.recordset });
-            } catch (error) {
-                console.log('obterner correlativos error: ' + error);
-                res.status(500).send({ message: 'Error al obtener los correlativos', data: undefined });
-            }
-
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const idEmpresa = req.user?.empresa;
+    if (!idEmpresa) {
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
+    try {
+        const pool = await sql.connect(dbConfig);
+        const correlativos = await pool
+            .request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('SELECT * FROM Correlativos WHERE idEmpresa = @idEmpresa');
+        res.status(200).send({ data: correlativos.recordset });
+    } catch (error) {
+        console.error('obtener_correlativos error:', error);
+        res.status(500).send({ message: 'Error al obtener los correlativos', data: undefined });
     }
-
-
-}
+};
 
 const editar_correlativos_empresa = async function (req, res) {
     const idCorrelativo = req.params.id;

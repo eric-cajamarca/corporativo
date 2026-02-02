@@ -49,7 +49,7 @@ const obtenerPermisosPorRol = async (pool, idRol, idEmpresa) => {
  * Obtiene los permisos de un usuario basado en su rol
  */
 const obtenerPermisosPorUsuario = async (pool, idUsuario, idEmpresa) => {
-    console.log('idUsusario en obtener permisos usuario', idUsuario);
+    console.log('idUsuario en obtener permisos usuario', idUsuario);
     const result = await pool.request()
         .input('idUsuario', sql.UniqueIdentifier, idUsuario)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)

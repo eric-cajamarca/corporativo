@@ -21,7 +21,8 @@ interface Colaborador {
   email: string;
   estado: boolean;
   idRol: string;
-  descripcion: string; // nombre del rol
+  rol: string; // nombre del rol (viene del backend como R.descripcion as rol)
+  descripcion?: string; // alias legacy si la API lo envía
   fRegistro: string;
   ultimoLogin: string;
 }
@@ -131,6 +132,7 @@ export class IndexColaboradorComponent implements OnInit {
     this.adminService.getAdmin().subscribe({
       next: (response) => {
         if (response.data) {
+          console.log('response.data en cargarColaboradores: ', response.data);
           this.colaboradores = response.data;
           this.colaboradores_const = response.data;
         } else {

@@ -1,6 +1,10 @@
 const xml2js = require('xml2js');
 require('dotenv').config();
 const JSZip = require('jszip');
+const sql = require('mssql');
+const dbConfig = require('../dbconfig');
+const factilizaRepository = require('../repositories/factiliza.repository');
+const { normalizeData } = require('../helpers/normalizeXmlComprobante');
 
 const getAnexo = async function(req, res) {
   try {
@@ -348,6 +352,80 @@ const getXmlSunat = async function (req, res) {
   }
 };
 
+/**
+ * Consulta comprobante SUNAT vía Factiliza y devuelve datos ya normalizados.
+ * Requiere auth. Token y credenciales SOL pueden venir de EmpresaFactiliza o del body.
+ */
+const consultarComprobanteSunat = async function (req, res) {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const idEmpresa = req.user.empresa;
+    const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = req.body;
+
+    if (!proveedor || !tipo_doc || !serie || !correlativo) {
+      return res.status(400).json({ message: 'Faltan datos: proveedor, tipo_doc, serie, correlativo' });
+    }
+
+    const pool = await sql.connect(dbConfig);
+    const acceso = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
+
+    const rucFinal = ruc || acceso.rucEmpresa;
+    const usuarioFinal = usuario || acceso.usuarioSol;
+    const passwordFinal = password || acceso.passwordSol;
+
+    if (!rucFinal || !usuarioFinal || !passwordFinal) {
+      return res.status(400).json({
+        message: 'Configure Factiliza para su empresa (ruc, usuario, contraseña SOL) o envíelos en el body'
+      });
+    }
+
+    const token = acceso.token || process.env.FACTILIZA_TOKEN;
+    if (!token) {
+      return res.status(403).json({ message: 'No hay token Factiliza configurado para su empresa' });
+    }
+
+    const urlApi = acceso.urlApi || 'https://api.factiliza.com/v1/sunat/xml';
+    const apiBody = { ruc: rucFinal, usuario: usuarioFinal, password: passwordFinal, proveedor, tipo_doc, serie, correlativo };
+
+    const response = await fetch(urlApi, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(apiBody)
+    });
+
+    const raw = await response.text();
+    let respuesta;
+    try { respuesta = JSON.parse(raw); } catch {
+      return res.status(500).json({ message: 'Respuesta no válida de Factiliza', raw: raw.substring(0, 200) });
+    }
+
+    if (!response.ok || (respuesta.status && respuesta.status !== 200)) {
+      return res.status(respuesta.status || response.status || 500).json(respuesta);
+    }
+
+    const zipBase64 = respuesta.data;
+    if (!zipBase64) return res.status(404).json({ message: 'No se recibió XML en la respuesta' });
+
+    const zipBuffer = Buffer.from(zipBase64, 'base64');
+    const zip = await JSZip.loadAsync(zipBuffer);
+    const xmlFile = Object.values(zip.files).find(f => f.name && f.name.toLowerCase().endsWith('.xml'));
+    if (!xmlFile) return res.status(404).json({ message: 'No se encontró XML dentro del ZIP' });
+
+    const xmlContent = await xmlFile.async('text');
+
+    const parsed = await xml2js.parseStringPromise(xmlContent, { explicitArray: false, ignoreAttrs: false }).catch(() => null);
+    if (!parsed) return res.status(500).json({ message: 'Error al parsear el XML' });
+
+    const normalized = normalizeData(parsed);
+    return res.status(200).json({ message: 'Consulta exitosa', data: normalized });
+  } catch (e) {
+    console.error('consultarComprobanteSunat:', e);
+    return res.status(500).json({ message: e.message || 'Error al procesar comprobante' });
+  }
+};
+
 module.exports = { 
   getAnexo,
   getDni,
@@ -357,5 +435,6 @@ module.exports = {
   getPlaca,
   getSoat,
   getLicencia,
-  getXmlSunat
+  getXmlSunat,
+  consultarComprobanteSunat
 };

@@ -133,6 +133,16 @@ GO
 -- =============================================
 -- TABLAS MULTIEMPRESA - USUARIOS Y ROLES
 -- =============================================
+CREATE TABLE [dbo].[Correlativos](
+    [idCorrelativo] [int] IDENTITY(1,1) NOT NULL,
+    [idEmpresa] [uniqueidentifier] NOT NULL,
+    [numero] [int] NOT NULL,
+    CONSTRAINT [PK_Correlativos] PRIMARY KEY CLUSTERED ([idCorrelativo] ASC)
+);
+
+ALTER TABLE [dbo].[Correlativos]
+ADD CONSTRAINT [FK_Correlativos_Empresas]
+FOREIGN KEY([idEmpresa]) REFERENCES [dbo].[Empresas]([idEmpresa]) ON DELETE CASCADE;
 
 -- Tabla de roles mejorada
 CREATE TABLE Rol (
@@ -469,9 +479,9 @@ CREATE TABLE Lotes (
     fechaVencimiento DATETIME NULL,
     numeroLote VARCHAR(50) NULL,
 
-    FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE CASCADE,
+    FOREIGN KEY (idProducto) REFERENCES Productos(idProducto),
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE
+    FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal)
 );
 GO
 
@@ -570,7 +580,7 @@ CREATE TABLE Secuencias (
 
     CONSTRAINT PK_Secuencias PRIMARY KEY (idEmpresa, idSucursal, idComprobante, serie),
     CONSTRAINT FK_Secuencias_Empresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-    CONSTRAINT FK_Secuencias_Sucursal FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal) ON DELETE CASCADE
+    CONSTRAINT FK_Secuencias_Sucursal FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal)
 );
 GO
 
@@ -638,7 +648,7 @@ CREATE TABLE DetalleCompras (
 
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
     FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal),
-    FOREIGN KEY (idCompra) REFERENCES Compras(idCompra) ON DELETE CASCADE,
+    FOREIGN KEY (idCompra) REFERENCES Compras(idCompra),
     FOREIGN KEY (idProducto) REFERENCES Productos(idProducto),
     FOREIGN KEY (idPresentacion) REFERENCES Presentacion(idPresentacion),
     FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)

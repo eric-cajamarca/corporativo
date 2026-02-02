@@ -279,8 +279,33 @@ const gestionProductos_Compras = async (req, res) => {
   }
 };
 
+/**
+ * Obtiene un idUsuario válido para la empresa (req.user.sub o primer usuario de la empresa).
+ * Evita FK violation cuando el token tiene sub = idEmpresa (login como empresa sin admin).
+ */
+const resolverIdUsuarioParaProducto = async (pool, idEmpresa, subFromToken) => {
+  if (!subFromToken || !idEmpresa) return null;
+  try {
+    const r = await pool.request()
+      .input('idUsuario', sql.UniqueIdentifier, subFromToken)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query('SELECT idUsuario FROM UsuarioWeb WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa');
+    if (r.recordset && r.recordset.length > 0) return r.recordset[0].idUsuario;
+    const fallback = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query('SELECT TOP 1 idUsuario FROM UsuarioWeb WHERE idEmpresa = @idEmpresa');
+    if (fallback.recordset && fallback.recordset.length > 0) return fallback.recordset[0].idUsuario;
+  } catch (e) {
+    console.error('resolverIdUsuarioParaProducto:', e.message);
+  }
+  return null;
+};
+
 const crear_producto = async (req, res) => {
-   const {
+  if (!req.user) {
+    return res.status(500).send({ message: "No Access", data: undefined });
+  }
+  const {
     Codigo,
     idCategoria,
     idMarca,
@@ -292,107 +317,98 @@ const crear_producto = async (req, res) => {
     idProducto,
   } = req.body;
 
+  const idEmpresa = req.user.empresa;
+  if (!idEmpresa) {
+    return res.status(401).send({ message: "Empresa no identificada", data: undefined });
+  }
 
-  // Obtener fecha actual
+  const cUnitarioNum = parseFloat(cUnitario);
+  if (Number.isNaN(cUnitarioNum) || cUnitarioNum < 0) {
+    return res.status(400).send({
+      message: "Costo unitario debe ser un número válido mayor o igual a 0",
+      data: undefined,
+    });
+  }
+
   var hoy = new Date();
-  var dd = hoy.getDate();
-  var mm = hoy.getMonth() + 1;
+  var dd = String(hoy.getDate()).padStart(2, "0");
+  var mm = String(hoy.getMonth() + 1).padStart(2, "0");
   var yyyy = hoy.getFullYear();
-
-  // Dar formato a la fecha datetime
   const FIngreso = yyyy + "-" + mm + "-" + dd;
 
   const datosProducto = {
-    idProducto: idProducto ? idProducto : uuidv4(),
-    Codigo: Codigo,
-    idCategoria: idCategoria ? parseInt(idCategoria) : null,
-    descripcion: descripcion,
-    idMarca: idMarca ? parseInt(idMarca) : null,
-    idPresentacion: idPresentacion ? parseInt(idPresentacion) : null,
-    cUnitario: parseFloat(cUnitario),
+    idProducto: idProducto || uuidv4(),
+    Codigo: Codigo != null ? String(Codigo).trim() : "",
+    idCategoria: idCategoria != null ? parseInt(idCategoria, 10) : null,
+    descripcion: descripcion != null ? String(descripcion).trim() : "",
+    idMarca: idMarca != null ? parseInt(idMarca, 10) : null,
+    idPresentacion: idPresentacion != null ? parseInt(idPresentacion, 10) : null,
+    cUnitario: cUnitarioNum,
     fProduccion: fProduccion ? convertirFormato(fProduccion) : null,
     fVencimiento: fVencimiento ? convertirFormato(fVencimiento) : null,
-    idEmpresa: req.user.empresa,
-    idUsuario: req.user.sub,
-    FIngreso: FIngreso, // Fecha actual
-    estado: 1, // Estado activo por defecto
-    facturar: "SI", // Asignar valor por defecto
-    alertaMinimo: 5, // Valor por defecto
-    alertaMaximo: 50, // Valor por defecto
-    VecesVendidas: 0, // Valor por defecto
-
+    idEmpresa,
+    idUsuario: null,
+    FIngreso,
+    estado: 1,
+    facturar: "SI",
+    alertaMinimo: 5,
+    alertaMaximo: 50,
+    VecesVendidas: 0,
   };
 
-  //Validación básica
   if (
     !datosProducto.Codigo ||
-    !datosProducto.idCategoria ||
-    !datosProducto.idMarca ||
+    datosProducto.idCategoria === null || Number.isNaN(datosProducto.idCategoria) ||
+    datosProducto.idMarca === null || Number.isNaN(datosProducto.idMarca) ||
     !datosProducto.descripcion ||
-    !datosProducto.idPresentacion ||
-    !datosProducto.cUnitario
+    datosProducto.idPresentacion === null || Number.isNaN(datosProducto.idPresentacion)
   ) {
-    res
-      .status(400)
-      .send({
-        message: "Todos los campos obligatorios deben ser completados",
-        data: undefined,
-      });
-    return;
+    return res.status(400).send({
+      message: "Todos los campos obligatorios deben ser completados (código, categoría, marca, descripción, presentación, costo unitario).",
+      data: undefined,
+    });
   }
 
-  
-  if (req.user) {
-    if (req.user.rol == "Administrador") {
-      try {
-        let pool = await sql.connect(dbConfig);
-        let productos = await pool
-          .request()
-          .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
-          .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)
-          .input("Codigo", sql.VarChar, datosProducto.Codigo.toString())
-          .input("idCategoria", sql.Int, parseInt(datosProducto.idCategoria))
-          .input("descripcion", sql.VarChar, datosProducto.descripcion)
-          .input("idMarca", sql.Int, parseInt(datosProducto.idMarca)) // idMarca
-          .input("idPresentacion", sql.Int, parseInt(datosProducto.idPresentacion))
-          .input("cUnitario", sql.Decimal(18, 5), parseFloat(datosProducto.cUnitario))
-          .input(
-            "fProduccion", sql.VarChar, datosProducto.fProduccion ? datosProducto.fProduccion.toString() : null
-          )
-          .input(
-            "fVencimiento", sql.VarChar, datosProducto.fVencimiento ? datosProducto.fVencimiento.toString() : null
-          )
-          .input("alertaMinimo", sql.Decimal, 5)
-          .input("alertaMaximo", sql.Decimal, 50)
-          .input("VecesVendidas", sql.Int, 0)
-          .input("facturar", sql.VarChar, datosProducto.facturar.toString())
-          .input("idUsuario", sql.UniqueIdentifier, datosProducto.idUsuario)
-          .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
-          .input("estado", sql.Bit, 1) // estado
-          .query(
-            "INSERT INTO Productos VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)"
-          );
-
-        res.status(200).send({ data: datosProducto.idProducto });
-        console.log("producto creado ", datosProducto.idProducto);
-      } catch (error) {
-        console.log("crear productos error: " + error);
-        res
-          .status(500)
-          .send({ message: "Error al crear los productos", data: undefined });
-      }
-    } else {
-      console.log("no tiene permisos");
-      res
-        .status(200)
-        .send({
-          message: "No tiene permisos para realizar esta acción",
-          data: undefined,
-        });
+  try {
+    const pool = await sql.connect(dbConfig);
+    datosProducto.idUsuario = await resolverIdUsuarioParaProducto(pool, idEmpresa, req.user.sub);
+    if (!datosProducto.idUsuario) {
+      console.error("crear_producto: no se encontró idUsuario válido para empresa", idEmpresa);
+      return res.status(400).send({
+        message: "No hay usuario asociado a la empresa para registrar el producto. Contacte al administrador.",
+        data: undefined,
+      });
     }
-  } else {
-    console.log("no tiene acceso");
-    res.status(500).send({ message: "No Access", data: undefined });
+
+    await pool.request()
+      .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
+      .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)
+      .input("Codigo", sql.VarChar, datosProducto.Codigo)
+      .input("idCategoria", sql.Int, datosProducto.idCategoria)
+      .input("descripcion", sql.VarChar, datosProducto.descripcion)
+      .input("idMarca", sql.Int, datosProducto.idMarca)
+      .input("idPresentacion", sql.Int, datosProducto.idPresentacion)
+      .input("cUnitario", sql.Decimal(18, 5), datosProducto.cUnitario)
+      .input("fProduccion", sql.VarChar, datosProducto.fProduccion)
+      .input("fVencimiento", sql.VarChar, datosProducto.fVencimiento)
+      .input("alertaMinimo", sql.Decimal, 5)
+      .input("alertaMaximo", sql.Decimal, 50)
+      .input("VecesVendidas", sql.Int, 0)
+      .input("facturar", sql.VarChar, datosProducto.facturar)
+      .input("idUsuario", sql.UniqueIdentifier, datosProducto.idUsuario)
+      .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
+      .input("estado", sql.Bit, 1)
+      .query(
+        "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)"
+      );
+
+    res.status(200).send({ data: datosProducto.idProducto });
+  } catch (error) {
+    console.error("crear_producto error:", error.message);
+    res.status(500).send({
+      message: error.message && error.message.length < 200 ? error.message : "Error al crear los productos",
+      data: undefined,
+    });
   }
 };
 

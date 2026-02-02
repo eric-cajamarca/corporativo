@@ -363,13 +363,14 @@ exports.verificarStockVariante = async (pool, idVariante, idEmpresa) => {
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query(`
                 SELECT 
-                    COALESCE(SUM(ss.cantidad), 0) as totalStock,
-                    COUNT(DISTINCT ss.idSucursal) as sucursalesConStock
-                FROM StockSucursal ss
-                INNER JOIN VariantesProducto v ON ss.idProducto = v.idVariante
+                    COALESCE(SUM(l.cantidadDisponible), 0) as totalStock,
+                    COUNT(DISTINCT l.idSucursal) as sucursalesConStock
+                FROM Lotes l
+                INNER JOIN VariantesProducto v ON l.idProducto = v.idVariante
                 INNER JOIN Productos p ON v.idProductoBase = p.idProducto
                 WHERE v.idVariante = @idVariante
-                AND ss.idEmpresa = @idEmpresa
+                AND l.idEmpresa = @idEmpresa
+                AND l.cantidadDisponible > 0
             `);
         
         return result.recordset[0];
@@ -388,15 +389,17 @@ exports.obtenerStockVariante = async (pool, idVariante, idEmpresa) => {
                 SELECT 
                     s.idSucursal,
                     s.nombre as sucursal,
-                    COALESCE(ss.cantidad, 0) as cantidad,
-                    ss.fIngreso,
-                    ss.ubicacion
+                    COALESCE(SUM(l.cantidadDisponible), 0) as cantidad,
+                    MAX(l.fechaIngreso) as fIngreso,
+                    NULL as ubicacion
                 FROM Sucursal s
-                LEFT JOIN StockSucursal ss ON s.idSucursal = ss.idSucursal 
-                    AND ss.idProducto = @idVariante
-                    AND ss.idEmpresa = @idEmpresa
+                LEFT JOIN Lotes l ON s.idSucursal = l.idSucursal 
+                    AND l.idProducto = @idVariante
+                    AND l.idEmpresa = @idEmpresa
+                    AND l.cantidadDisponible > 0
                 WHERE s.idEmpresa = @idEmpresa
                 AND s.estado = 1
+                GROUP BY s.idSucursal, s.nombre
                 ORDER BY s.nombre
             `);
         

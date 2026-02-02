@@ -89,7 +89,7 @@ const crear_detalle_compras_idcompra = async function (req, res) {
                     VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)
                 `);
 
-            // Crear nuevo lote por cada línea de compra (según base_datos_mejorada)
+            // Crear lote por cada línea de compra (stock por Lotes; ya no se usa StockSucursal)
             await transaction.request()
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('idProducto', sql.UniqueIdentifier, idProducto)
@@ -103,45 +103,8 @@ const crear_detalle_compras_idcompra = async function (req, res) {
                     VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento)
                 `);
 
-            // Actualizar o insertar StockSucursal (stock agregado por sucursal)
-            const existeStock = await transaction.request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .query(`
-                    SELECT idStockSucursal, cantidad FROM StockSucursal
-                    WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal AND idProducto = @idProducto
-                `);
-
-            if (existeStock.recordset.length > 0) {
-                const idStockSucursal = existeStock.recordset[0].idStockSucursal;
-                const cantidadAnterior = parseFloat(existeStock.recordset[0].cantidad) || 0;
-                await transaction.request()
-                    .input('idStockSucursal', sql.Int, idStockSucursal)
-                    .input('cantidad', sql.Decimal(18, 2), cantidadAnterior + cantidadVal)
-                    .input('ubicacion', sql.VarChar(50), ubicacionVal)
-                    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                    .query(`
-                        UPDATE StockSucursal SET cantidad = @cantidad, ubicacion = ISNULL(@ubicacion, ubicacion), fIngreso = GETDATE(), idUsuario = @idUsuario
-                        WHERE idStockSucursal = @idStockSucursal
-                    `);
-            } else {
-                await transaction.request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                    .input('idProducto', sql.UniqueIdentifier, idProducto)
-                    .input('cantidad', sql.Decimal(18, 2), cantidadVal)
-                    .input('ubicacion', sql.VarChar(50), ubicacionVal)
-                    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                    .query(`
-                        INSERT INTO StockSucursal (idEmpresa, idSucursal, idProducto, cantidad, ubicacion, fIngreso, idUsuario)
-                        VALUES (@idEmpresa, @idSucursal, @idProducto, @cantidad, @ubicacion, GETDATE(), @idUsuario)
-                    `);
-            }
-
             await transaction.commit();
-            console.log('DetalleCompra, Lote y StockSucursal creados/actualizados correctamente');
-            res.status(200).send({ data: 1, message: 'Detalle de compra registrado. Lote y stock actualizados.' });
+            res.status(200).send({ data: 1, message: 'Detalle de compra registrado. Lote creado.' });
         } catch (err) {
             await transaction.rollback();
             throw err;

@@ -28,13 +28,12 @@ const getAdmin = async function (req, res) {
 
     // 4. Llamar al Service
     const usuarios = await usuarioService.getAdmin(pool, req.user.empresa);
-
+    console.log('usuarios en controller: ', usuarios);
     // 5. Responder HTTP
     res.status(200).send({ data: usuarios });
-
   } catch (error) {
     console.error('Error al obtener usuarios:', error);
-    res.status(500).send({ data: undefined });
+    res.status(500).send({ data: undefined, message: 'Error al obtener usuarios' });
   }
 };
 
@@ -270,10 +269,6 @@ const obtener_datos_colaborador_admin = async (req, res) => {
         res.status(500).send({ message: 'No Access' });
     }
 };
-
-
-
-
 
 
 

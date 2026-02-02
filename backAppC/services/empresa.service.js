@@ -281,6 +281,36 @@ exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) 
     }
 };
 
+/** Número por defecto del correlativo al crear una nueva empresa */
+const NUMERO_CORRELATIVO_INICIAL = 10000;
+
+/**
+ * Crea el registro de correlativo inicial para una nueva empresa (códigos de producto con correlativo automático).
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @param {Number} numeroInicial - Número con el que empieza el correlativo (default 10000)
+ * @returns {Object} { idCorrelativo, idEmpresa, numero }
+ */
+exports.crearCorrelativoInicial = async (pool, idEmpresa, numeroInicial = NUMERO_CORRELATIVO_INICIAL) => {
+    const sql = require('mssql');
+    try {
+        const result = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('numero', sql.Int, numeroInicial)
+            .query(`
+                INSERT INTO Correlativos (idEmpresa, numero)
+                OUTPUT INSERTED.idCorrelativo, INSERTED.idEmpresa, INSERTED.numero
+                VALUES (@idEmpresa, @numero)
+            `);
+        const row = result.recordset[0];
+        console.log(`✓ Correlativo inicial creado para empresa: numero=${row?.numero}`);
+        return row;
+    } catch (error) {
+        console.error('Error creando correlativo inicial:', error);
+        throw new Error('Error al crear correlativo inicial: ' + error.message);
+    }
+};
+
 /**
  * Inicializa todos los datos maestros para una nueva empresa
  * @param {Object} pool - Conexión a la base de datos
@@ -298,6 +328,7 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         secuencias: [],
         ubicaciones: [],
         listasPrecios: [],
+        correlativo: null,
         errores: []
     };
 
@@ -368,6 +399,14 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             }
         }
 
+        // 7. Crear correlativo inicial (número por defecto 10000 para códigos de producto)
+        try {
+            resultado.correlativo = await exports.crearCorrelativoInicial(pool, idEmpresa, NUMERO_CORRELATIVO_INICIAL);
+        } catch (error) {
+            console.error('⚠️ Error creando correlativo inicial:', error.message);
+            resultado.errores.push({ tipo: 'correlativo', mensaje: error.message });
+        }
+
         console.log('✅ Inicialización completada:', {
             roles: resultado.roles.length,
             comprobantes: resultado.comprobantes.length,
@@ -375,6 +414,7 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             secuencias: resultado.secuencias.length,
             ubicaciones: resultado.ubicaciones.length,
             listasPrecios: resultado.listasPrecios.length,
+            correlativo: resultado.correlativo ? 'OK' : 'ERROR',
             errores: resultado.errores.length
         });
 
@@ -440,12 +480,12 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
         // Verificar proveedores
         const proveedores = await pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .query('SELECT COUNT(*) as total FROM Proveedor WHERE idEmpresa = @idEmpresa');
+            .query('SELECT COUNT(*) as total FROM Proveedores WHERE idEmpresa = @idEmpresa');
 
         // Verificar clientes
         const clientes = await pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .query('SELECT COUNT(*) as total FROM Cliente WHERE idEmpresa = @idEmpresa');
+            .query('SELECT COUNT(*) as total FROM Clientes WHERE idEmpresa = @idEmpresa');
 
         return {
             tieneColaboradores: colaboradores.recordset[0].total > 0,

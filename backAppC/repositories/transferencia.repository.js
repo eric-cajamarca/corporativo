@@ -93,14 +93,15 @@ exports.obtenerStockProducto = async (transaction, idProducto, idSucursal, idEmp
             .input('idSucursal', sql.UniqueIdentifier, idSucursal)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query(`
-                SELECT cantidad
-                FROM StockSucursal
+                SELECT SUM(cantidadDisponible) AS cantidad
+                FROM Lotes
                 WHERE idProducto = @idProducto
                 AND idSucursal = @idSucursal
                 AND idEmpresa = @idEmpresa
+                AND cantidadDisponible > 0
             `);
-        
-        return result.recordset[0] || null;
+        const row = result.recordset[0];
+        return row && row.cantidad != null ? { cantidad: parseFloat(row.cantidad) } : null;
     } catch (error) {
         throw new Error(`Repository Error: ${error.message}`);
     }
@@ -108,71 +109,65 @@ exports.obtenerStockProducto = async (transaction, idProducto, idSucursal, idEmp
 
 exports.ajustarStock = async (transaction, datos) => {
     try {
-        const { 
-            idEmpresa, 
-            idSucursal, 
-            idProducto, 
+        const {
+            idEmpresa,
+            idSucursal,
+            idProducto,
             cantidad,
-            idUsuario,
-            tipoMovimiento,
-            idMovimiento,
-            observaciones 
+            idUsuario
         } = datos;
 
-        // Verificar si existe registro en StockSucursal
-        const existe = await transaction.request()
+        if (cantidad > 0) {
+            // Entrada: insertar nuevo lote
+            const result = await transaction.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('idProducto', sql.UniqueIdentifier, idProducto)
+                .input('cantidadIngresada', sql.Decimal(18, 3), cantidad)
+                .input('cantidadDisponible', sql.Decimal(18, 3), cantidad)
+                .input('costoUnitario', sql.Decimal(18, 6), 0)
+                .query(`
+                    INSERT INTO Lotes (idEmpresa, idSucursal, idProducto, costoUnitario, cantidadIngresada, cantidadDisponible)
+                    VALUES (@idEmpresa, @idSucursal, @idProducto, @costoUnitario, @cantidadIngresada, @cantidadDisponible)
+                `);
+            return result;
+        }
+
+        // Salida: restar de lotes por FIFO (fechaIngreso)
+        let restante = Math.abs(cantidad);
+        const lotes = await transaction.request()
             .input('idProducto', sql.UniqueIdentifier, idProducto)
             .input('idSucursal', sql.UniqueIdentifier, idSucursal)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query(`
-                SELECT COUNT(*) as existe
-                FROM StockSucursal
-                WHERE idProducto = @idProducto
-                AND idSucursal = @idSucursal
-                AND idEmpresa = @idEmpresa
+                SELECT idLote, cantidadDisponible
+                FROM Lotes
+                WHERE idProducto = @idProducto AND idSucursal = @idSucursal AND idEmpresa = @idEmpresa AND cantidadDisponible > 0
+                ORDER BY fechaIngreso ASC
             `);
 
-        if (existe.recordset[0].existe > 0) {
-            // Actualizar stock existente
-            const result = await transaction.request()
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('cantidad', sql.Decimal(18,3), cantidad)
-                .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                .query(`
-                    UPDATE StockSucursal 
-                    SET cantidad = cantidad + @cantidad,
-                        idUsuario = @idUsuario,
-                        fIngreso = GETDATE()
-                    WHERE idProducto = @idProducto
-                    AND idSucursal = @idSucursal
-                    AND idEmpresa = @idEmpresa
-                `);
-            
-            return result;
-        } else {
-            // Insertar nuevo registro (si cantidad es positiva)
-            if (cantidad > 0) {
-                const result = await transaction.request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                    .input('idProducto', sql.UniqueIdentifier, idProducto)
-                    .input('cantidad', sql.Decimal(18,3), cantidad)
-                    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                    .query(`
-                        INSERT INTO StockSucursal 
-                        (idEmpresa, idSucursal, idProducto, cantidad, idUsuario)
-                        VALUES (@idEmpresa, @idSucursal, @idProducto, @cantidad, @idUsuario)
-                    `);
-                
-                return result;
-            } else {
-                throw new Error('NO_EXISTE_STOCK_PARA_RESTAR');
-            }
+        if (!lotes.recordset.length) {
+            throw new Error('NO_EXISTE_STOCK_PARA_RESTAR');
         }
+
+        for (const lote of lotes.recordset) {
+            if (restante <= 0) break;
+            const disp = parseFloat(lote.cantidadDisponible) || 0;
+            const restar = Math.min(disp, restante);
+            const nuevaCantidad = Math.max(0, disp - restar);
+            await transaction.request()
+                .input('idLote', sql.UniqueIdentifier, lote.idLote)
+                .input('cantidadDisponible', sql.Decimal(18, 3), nuevaCantidad)
+                .query('UPDATE Lotes SET cantidadDisponible = @cantidadDisponible WHERE idLote = @idLote');
+            restante -= restar;
+        }
+
+        if (restante > 0) {
+            throw new Error('STOCK_INSUFICIENTE');
+        }
+        return { rowsAffected: [1] };
     } catch (error) {
-        throw new Error(`Repository Error: ${error.message}`);
+        throw new Error(error.message || `Repository Error: ${error.message}`);
     }
 };
 

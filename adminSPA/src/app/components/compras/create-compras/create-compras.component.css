@@ -30,6 +30,10 @@
   border-bottom: 1px solid #e0e0e0;
 }
 
+.create-compras-card .card-header {
+  border-radius: 5px 5px 0 0;
+}
+
 /* Formularios dentro de cards */
 .row.form-group {
   margin-left: -8px;

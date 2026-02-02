@@ -50,8 +50,21 @@ exports.obtenerUsuariosAdmin = async (pool, idEmpresa) => {
   const result = await pool
     .request()
     .input('empresa', sql.UniqueIdentifier, idEmpresa)
-    .query('SELECT * FROM UsuarioWeb UW INNER JOIN Rol R ON UW.idRol = R.idRol WHERE UW.idEmpresa = @empresa');
-  
+    .query(`
+      SELECT 
+        UW.idUsuario,
+        UW.idEmpresa,
+        UW.nombres,
+        UW.apellidos,
+        UW.email,
+        UW.idRol,
+        UW.estado,
+        UW.fRegistro,
+        R.descripcion as rol
+      FROM UsuarioWeb UW
+      INNER JOIN Rol R ON UW.idRol = R.idRol
+      WHERE UW.idEmpresa = @empresa
+    `);
   return result.recordset;
 };
 

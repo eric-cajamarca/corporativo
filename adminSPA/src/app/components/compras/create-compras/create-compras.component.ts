@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { ComprasService } from '../../../services/compras.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ProductoService } from '../../../services/producto.service';
+import { ProductoCreate } from '../../../models/producto.models';
 import { SucursalService } from '../../../services/sucursal.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
@@ -104,7 +105,7 @@ export class CreateComprasComponent {
     fproduccion: '',
     fvencimiento: '',
   };
-  public correlativo: any = '';
+  public correlativo: { idCorrelativo?: string; numero?: number; [key: string]: unknown } = { numero: 0 };
   public loadButton: boolean = false;
   public marcas: any = [];
   // FORMATO_FECHA = FORMATO_FECHA;
@@ -141,9 +142,9 @@ export class CreateComprasComponent {
   ) {
     //this.token = this._cookieService.get('token');
     this.consultaForm = this.fb.group({
-      ruc: ['', [Validators.required, Validators.pattern(/^\d{11}$/)]],
-      usuario: ['', Validators.required],
-      password: ['', Validators.required],
+      ruc: ['', [Validators.pattern(/^\d{11}$/)]],
+      usuario: [''],
+      password: [''],
       proveedor: ['', [Validators.required, Validators.pattern(/^\d{11}$/)]],
       tipo_doc: ['01', Validators.required],
       serie: ['', [Validators.required, Validators.maxLength(4)]],
@@ -184,169 +185,106 @@ export class CreateComprasComponent {
   //   );
   // }
 
-  // Método para consultar XML
-  async consultarComprobante() {
-    if (this.consultaForm.invalid) {
-      return;
-    }
+  /** Consulta comprobante SUNAT vía backend; el backend devuelve datos ya normalizados. */
+  consultarComprobante() {
+    if (this.consultaForm.invalid) return;
 
     this.loading = true;
     this.comprobante = null;
     this.error = '';
-    this.xmlContent = '';
 
-    console.log('Formulario válido', this.consultaForm.value);
+    const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = this.consultaForm.value;
+    const body: any = { proveedor, tipo_doc, serie, correlativo };
+    if (ruc) body.ruc = ruc;
+    if (usuario) body.usuario = usuario;
+    if (password) body.password = password;
 
-    const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } =
-      this.consultaForm.value;
-    console.log(
-      'Consultando comprobante:',
-      ruc,
-      usuario,
-      password,
-      proveedor,
-      tipo_doc,
-      serie,
-      correlativo
-    );
+    this.sunatService.consultarComprobanteSunat(body).subscribe({
+      next: (response) => {
+        this.loading = false;
+        this.error = '';
+        this.comprobante = response?.data ?? null;
+        console.log('this.comprobante', this.comprobante);
+        
+        if (!this.comprobante) {
+          iziToast.error({ title: 'Error', message: 'No se recibieron datos del comprobante', position: 'topRight' });
+          return;
+        }
 
-    try {
-      const respuesta = await this.sunatService
-        .getComprobante(
-          ruc,
-          usuario,
-          password,
-          proveedor,
-          tipo_doc,
-          serie,
-          correlativo
-        )
-        .toPromise();
-      console.log('Respuesta del servicio:', respuesta);
-      this.comprobante = await this.sunatService.procesarYMostrarXML(respuesta);
-      console.log('Datos en JSON: this.comprobante', this.comprobante);
+        const info = this.comprobante.informacionGeneral || {};
+        const emisor = this.comprobante.emisor || {};
+        const totales = this.comprobante.totales || {};
+        const impuestos = this.comprobante.impuestos || {}; 
 
-      //aqui quiero pasar los datos de this.comprobante a this.compras
-
-      this.loading = false;
-      this.error = '';
-
-      if (this.comprobante) {
-        // Extraer serie y número de la propiedad serieNumero (ejemplo: "FC06-00000039")
-        if (this.comprobante.informacionGeneral.serieNumero) {
-          const [serie, numero] =
-            this.comprobante.informacionGeneral.serieNumero.split('-');
-          this.compras.serie = serie || '';
-          this.compras.numero = numero || '';
+        if (info.serieNumero) {
+          const [s, n] = String(info.serieNumero).split('-');
+          this.compras.serie = s || '';
+          this.compras.numero = n || '';
         } else {
           this.compras.serie = '';
           this.compras.numero = '';
         }
-        this.compras.idComprobante = this.comprobante.tipoComprobante || '1';
-        this.compras.ruc = this.comprobante.emisor.ruc || '';
-
-        this.compras.fEmision = this.formatFecha(this.comprobante.informacionGeneral.fechaEmision) || '';
-        this.compras.fVencimiento = this.formatFecha(this.comprobante.informacionGeneral.fechaVencimiento) || '';
+        this.compras.idComprobante = info.tipoDocumento || '1';
+        this.compras.ruc = emisor.ruc || '';
+        this.compras.fEmision = this.formatFecha(info.fechaEmision) || '';
+        this.compras.fVencimiento = this.formatFecha(info.fechaVencimiento) || '';
         this.compras.observacion = this.comprobante.observacion || '';
-        
-        // Robust: convierte comas a punto, parsea y devuelve 0 si no es número válido
-        // const igvParsed = parseFloat(String(this.comprobante.totalImpuestos).replace(',', '.'));
-        //this.compras.igv = this.comprobante.Impuestos.total || 0;
-        // this.compras.subtotal = this.comprobante.totales.totalValorVenta || 0;
-        // this.compras.total = this.comprobante.totales.totalVenta || 0;
-        
-      }
-      
-      console.log(this.compras);
 
-      //aqui quiero guardar los datos de comprobante.detalle a detalleCompras: any = [];
-      // if (this.comprobante.detalle && Array.isArray(this.comprobante.detalle)) {
-      //   this.detalleCompras = this.comprobante.detalle.map((item: any) => ({
-      //     idProducto: item.id, // Puedes intentar mapearlo si tienes lógica para buscar el producto
-      //     codigo: item.codigoProducto || '',
-      //     descripcion: item.descripcion || '',
-      //     cUnitario: item.precioUnitario || 0,
-      //     cantidad: item.cantidad || 0,
-      //     subtotal: (item.precioUnitario || 0) * (item.cantidad || 0),
-      //     categoria: {},
-      //     presentacion: item.unidadMedida,
-      //     sucursal: {},
-      //     useCorrelativo: false,
-      //     ubicacion: '',
-      //     fproduccion: item.fproduccion || '',
-      //     fvencimiento: item.fvencimiento || '',
-      //   }));
-      // }
+        const sub = parseFloat(String(totales.totalValorVenta || 0).replace(',', '.')) || 0;
+        const igv = parseFloat(String(impuestos.total || totales.totalImpuestos || 0).replace(',', '.')) || 0;
+        const total = parseFloat(String(totales.totalVenta || totales.totalPagar || 0).replace(',', '.')) || 0;
+        this.compras.subTotal = sub;
+        this.compras.igv = igv;
+        this.compras.total = total;
 
-      if (
-        this.comprobante?.detalles &&
-        Array.isArray(this.comprobante.detalles)
-      ) {
-        this.detalleCompras = this.comprobante.detalles
-          .map((item: any) => {
-            // Verifica que el item no sea null/undefined
-            if (!item) return null;
+        if (this.compras.ruc) this.buscar();
 
-            // Buscar la presentación correspondiente y crear un fallback si no existe
-            const selectedPresentacion = this.presentacion?.find(
-              (p: any) => p.codigo === (item.unidadMedida || item.presentacion)
-            );
-            const presentacionObj = selectedPresentacion || {
-              nombre: item.unidadMedida || item.presentacion || 'UND',
-            };
+        const detalles = this.comprobante.detalles;
+        if (Array.isArray(detalles) && detalles.length > 0) {
+          const idSucursalDefault = this.compras.idSucursal || (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
+          const sucursalObj = idSucursalDefault ? this.sucursales?.find((s: any) => s.idSucursal === idSucursalDefault) : null;
 
-            return {
-
-              idProducto: null,
-              codigo: item.codigoProducto || item.codigo || '',
-              descripcion: item.descripcion || 'Sin descripción',
-              cUnitario: Number(item.precioUnitario ?? item.pUnitario ?? 0),
-              cantidad: Number(item.cantidad ?? 0),
-              subtotal:
-                Number(item.precioUnitario ?? 0) * Number(item.cantidad ?? 0) ||
-                0,
-              categoria: item.categoria || {},
-              presentacion: presentacionObj,
-              sucursal: item.sucursal || {},
-              useCorrelativo: Boolean(item.useCorrelativo || false),
-              ubicacion: item.ubicacion || '',
-              fproduccion: item.fproduccion || null,
-              fvencimiento: item.fvencimiento || null,
-            };
-          })
-          .filter((item: null) => item !== null); // Filtra items nulos
-
-        console.log('Resultado del mapeo:', this.detalleCompras); // Verifica el resultado
+          this.detalleCompras = detalles
+            .map((item: any) => {
+              if (!item) return null;
+              const selectedPresentacion = this.presentacion?.find(
+                (p: any) => (p.codigo || p.Codigo) === (item.unidadMedida || item.presentacion)
+              );
+              const presentacionObj = selectedPresentacion || { nombre: item.unidadMedida || item.presentacion || 'UND' };
+              const cant = Number(item.cantidad ?? 0);
+              const pUnit = Number(item.precioUnitario ?? item.pUnitario ?? 0);
+              return {
+                idProducto: null,
+                codigo: item.codigoProducto || item.codigo || '',
+                descripcion: item.descripcion || 'Sin descripción',
+                cUnitario: pUnit,
+                cantidad: cant,
+                subtotal: cant * pUnit,
+                categoria: item.categoria || {},
+                presentacion: presentacionObj,
+                sucursal: sucursalObj || item.sucursal || {},
+                idSucursal: idSucursalDefault || item.idSucursal,
+                useCorrelativo: false,
+                ubicacion: item.ubicacion || '',
+                fproduccion: item.fproduccion || null,
+                fvencimiento: item.fvencimiento || null,
+              };
+            })
+            .filter((x: any) => x != null);
+          this.sumarFooterFactura();
+        } else {
+          iziToast.warning({ title: 'Aviso', message: 'El comprobante no tiene líneas de detalle', position: 'topRight' });
+        }
         this.consultManual = true;
-      } else {
-        console.warn(
-          'comprobante.detalle no es un array válido:',
-          this.comprobante?.detalle
-        );
-        iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#FFF',
-              class: 'text-danger',
-              position: 'topRight',
-              message: 'Inténtelo nuevamente'
-            });
-         this.loading = false;   
-      }
-    } catch (err) {
-      this.error = err instanceof Error ? err.message : 'Error desconocido';
-      iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#FFF',
-              class: 'text-danger',
-              position: 'topRight',
-              message: this.error
-            });
-      
-      this.comprobante = null;
-      this.loading = false;
-    }
+      },
+      error: (err) => {
+        this.loading = false;
+        this.comprobante = null;
+        this.error = err?.error?.message || err?.message || 'Error al consultar el comprobante';
+        iziToast.error({ title: 'Error', message: this.error, position: 'topRight' });
+      },
+    });
+  }
 
     // try {
     //   const respuesta = await this.sunatService.getComprobante(ruc, tipoDocumento, serie, numero).toPromise();
@@ -395,7 +333,6 @@ export class CreateComprasComponent {
     //       // console.error(err);
     //     }
     //   });
-  }
 
   private formatFecha(input: string | Date | null): string {
     if (!input) return '';
@@ -525,16 +462,16 @@ export class CreateComprasComponent {
       }
     );
 
-    this._comprasService.obtener_correlativo_empresa().subscribe(
-      (response) => {
-        this.correlativo = response.data[0];
-
-        console.log('this.correlativo', this.correlativo);
+    this._comprasService.obtener_correlativo_empresa().subscribe({
+      next: (response) => {
+        const data = response?.data?.[0];
+        this.correlativo = data && typeof data === 'object' ? data : this.correlativo;
       },
-      (error) => {
-        console.log(error);
-      }
-    );
+      error: (err) => {
+        console.error('obtener_correlativo_empresa:', err);
+        // Mantener correlativo inicial { numero: 0 } si la API falla (ej. 500)
+      },
+    });
 
     // this._sucursalService.obtener_stock_sucursales_idempresa().subscribe(
     //   (response) => {
@@ -657,14 +594,15 @@ export class CreateComprasComponent {
     console.log('this.filtro', this.filtro);
     console.log('this.proveedores.ruc', this.compras.ruc);
 
-    this._proveedoresService.obtener_proveedor_ruc(this.compras.ruc).subscribe(
-      (response) => {
-        if (response.data && response.data.length > 0) {
+    this._proveedoresService.obtener_proveedor_ruc(this.compras.ruc).subscribe({
+      next: (response) => {
+        if (response?.data && response.data.length > 0) {
           this.proveedores = response.data[0];
-          this.compras.idProveedor = this.proveedores.idProveedor;
-          this.compras.idDocumento = this.proveedores.idDocumento;
-          console.log(this.proveedores);
+          this.compras.idProveedor = this.proveedores?.idProveedor;
+          this.compras.idDocumento = this.proveedores?.idDocumento;
         } else {
+          this.proveedores = {};
+          this.compras.idProveedor = '';
           iziToast.show({
             title: 'ERROR',
             titleColor: '#FF0000',
@@ -674,11 +612,13 @@ export class CreateComprasComponent {
             message: 'El proveedor no existe.',
           });
         }
-      }
-      // error => {
-      //   console.log(error);
-      // }
-    );
+      },
+      error: (err) => {
+        console.error('buscar proveedor:', err);
+        this.proveedores = {};
+        this.compras.idProveedor = '';
+      },
+    });
   }
 
   quitar(idx: any, subtotal: any) {
@@ -708,7 +648,7 @@ export class CreateComprasComponent {
       this.nuevoProducto.cantidad = 0;
       this.nuevoProducto.cantidadAnterior = this.prodSelecionado.cantidad;
       this.nuevoProducto.ubicacion = this.prodSelecionado.ubicacion;
-      this.nuevoProducto.idStockSucursal = this.prodSelecionado.idStockSucursal;
+      this.nuevoProducto.idLote = this.prodSelecionado.idLote ?? this.prodSelecionado.idStockSucursal;
       this.nuevoProducto.idEmpresa = this.prodSelecionado.idEmpresa;
 
       this.nuevoProducto.fProduccion =
@@ -999,14 +939,17 @@ export class CreateComprasComponent {
 
     console.log('this.detalleCompras', this.detalleCompras);
 
-    //deseo recorrer detalleCompras y sumar el subtotal y guardarlo en this.compras.total
     this.compras.subTotal = 0;
     this.detalleCompras.forEach((element: any) => {
-      this.compras.subTotal = this.compras.subTotal + element.subtotal;
+      const subtotalItem = element.subtotal ?? ((Number(element.cantidad) || 0) * (Number(element.cUnitario ?? element.pUnitario) || 0));
+      element.subtotal = subtotalItem;
+      this.compras.subTotal = this.compras.subTotal + subtotalItem;
     });
 
     this.nuevoProducto = {};
-    this.correlativo.numero = this.correlativo.numero + 1;
+    if (this.correlativo && typeof this.correlativo === 'object') {
+      this.correlativo.numero = (Number(this.correlativo.numero) || 0) + 1;
+    }
     this.sumarFooterFactura();
   }
 
@@ -1022,18 +965,20 @@ export class CreateComprasComponent {
       this.nuevoProducto = {};
       this.sumarDetalleCompras();
       this.sumarFooterFactura();
-      this.correlativo.numero = this.correlativo.numero + 1;
+      if (this.correlativo && typeof this.correlativo === 'object') {
+        this.correlativo.numero = (Number(this.correlativo.numero) || 0) + 1;
+      }
     }
   }
 
   sumarDetalleCompras() {
-    //deseo recorrer detalleCompras y sumar el subtotal y guardarlo en this.compras.total
     this.compras.subTotal = 0;
     this.detalleCompras.forEach((element: any) => {
-      this.compras.subTotal = this.compras.subTotal + element.subtotal;
-      element.total = element.cantidad * element.pUnitario;
+      const subtotalItem = element.subtotal ?? ((Number(element.cantidad) || 0) * (Number(element.cUnitario ?? element.pUnitario) || 0));
+      element.subtotal = subtotalItem;
+      this.compras.subTotal = this.compras.subTotal + subtotalItem;
+      element.total = (Number(element.cantidad) || 0) * (Number(element.pUnitario ?? element.cUnitario) || 0);
     });
-
     this.sumarFooterFactura();
   }
 
@@ -1059,7 +1004,7 @@ export class CreateComprasComponent {
 
   buscarFactura() {
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
-    this.compras.idProveedor = this.proveedores.idProveedor;
+    this.compras.idProveedor = this.proveedores?.idProveedor ?? '';
   }
 
   registrarCompras() {
@@ -1132,8 +1077,16 @@ export class CreateComprasComponent {
               )
             );
           } else {
-            this.actualizarProducto(element.idProducto, nuevoProducto);
-            observables.push(this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra));
+            observables.push(
+              this._productoService.actualizarProducto(element.idProducto, nuevoProducto).pipe(
+                switchMap(() => this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra)),
+                catchError((err) => {
+                  console.error('Error actualizando producto:', err);
+                  iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', position: 'topRight', message: 'No se pudo actualizar el producto.' });
+                  return of(null);
+                })
+              )
+            );
           }
         }
         if (observables.length === 0) {
@@ -1157,14 +1110,15 @@ export class CreateComprasComponent {
         });
         this._router.navigate(['/compras']);
       },
-      error: (err) => {
+      error: (err: unknown) => {
+        const e = err as { error?: { message?: string }; message?: string };
         iziToast.show({
           title: 'ERROR',
           titleColor: '#FF0000',
           color: '#FFF',
           class: 'text-danger',
           position: 'topRight',
-          message: err?.error?.message || err?.message || 'Error al registrar la compra.',
+          message: e?.error?.message || e?.message || 'Error al registrar la compra.',
         });
       },
     });
@@ -1213,12 +1167,11 @@ export class CreateComprasComponent {
     this.loadButton = false;
   }
 
-  private crearStockSucursal(nuevoProducto: any) {
-    console.log('nuevoProducto para crear stock', nuevoProducto);
+  private crearStockSucursal(nuevoProducto: unknown): void {
     this._sucursalService
       .crear_stock_sucursal_idEmpresa(nuevoProducto)
-      .subscribe(
-        (stockResponse) => {
+      .subscribe({
+        next: (stockResponse: { data?: unknown }) => {
           if (stockResponse.data != undefined) {
             iziToast.show({
               title: 'SUCCESS',
@@ -1228,20 +1181,17 @@ export class CreateComprasComponent {
               position: 'topRight',
               message: 'El stock se registró correctamente.',
             });
-            console.log('Stock creado', stockResponse.data);
           }
         },
-        (stockError) => {
-          console.log(stockError);
-        }
-      );
+        error: (stockError: unknown) => {
+          console.error('crearStockSucursal:', stockError);
+        },
+      });
   }
 
-  private actualizarProducto(element: any, nuevoProducto: any) {
-    console.log('actualizarProducto', element, nuevoProducto);
-
-    this._productoService.actualizarProducto(element, nuevoProducto).subscribe(
-      (response) => {
+  private actualizarProducto(element: unknown, nuevoProducto: unknown): void {
+    this._productoService.actualizarProducto(element as string, nuevoProducto as ProductoCreate).subscribe({
+      next: (response: { data?: unknown }) => {
         if (response.data != undefined) {
           iziToast.show({
             title: 'SUCCESS',
@@ -1251,23 +1201,21 @@ export class CreateComprasComponent {
             position: 'topRight',
             message: 'El producto se actualizó correctamente.',
           });
-
-          console.log('Producto actualizado', response.data);
         }
       },
-      (error) => {
-        console.log(error);
-      }
-    );
+      error: (err: unknown) => {
+        console.error('actualizarProducto:', err);
+      },
+    });
   }
 
-  private editarStockSucursal(element: any, nuevoProducto: any) {
-    console.log('editarStockSucursal', nuevoProducto);
-    console.log('element.idProducto', element);
+  private editarStockSucursal(element: unknown, nuevoProducto: unknown): void {
+    const idLote = (element as { idLote?: string; idStockSucursal?: string })?.idLote ?? (element as { idStockSucursal?: string })?.idStockSucursal;
+    const body = { cantidad: (nuevoProducto as { cantidad?: number })?.cantidad };
     this._sucursalService
-      .editar_stock_sucursal(element, nuevoProducto)
-      .subscribe(
-        (response) => {
+      .editar_stock_sucursal(idLote, body)
+      .subscribe({
+        next: (response: { data?: unknown }) => {
           if (response.data != undefined) {
             iziToast.show({
               title: 'SUCCESS',
@@ -1277,22 +1225,19 @@ export class CreateComprasComponent {
               position: 'topRight',
               message: 'El stock se actualizó correctamente.',
             });
-
-            console.log('Stock actualizado', response.data);
           }
         },
-        (error) => {
-          console.log(error);
-        }
-      );
+        error: (err: unknown) => {
+          console.error('editarStockSucursal:', err);
+        },
+      });
   }
 
-  private crearDetalleCompra(nuevoDetalleCompra: any) {
-    console.log('nuevoDetalleCompra', nuevoDetalleCompra);
+  private crearDetalleCompra(nuevoDetalleCompra: unknown): void {
     this._comprasService
       .crear_detalle_compras_idcompra(nuevoDetalleCompra)
-      .subscribe(
-        (detalleResponse) => {
+      .subscribe({
+        next: (detalleResponse: { data?: unknown }) => {
           if (detalleResponse.data != undefined) {
             iziToast.show({
               title: 'SUCCESS',
@@ -1303,22 +1248,21 @@ export class CreateComprasComponent {
               message: 'El detalle de compra se registró correctamente.',
             });
           }
-          console.log('detallecreado', detalleResponse.data);
         },
-        (detalleError) => {
-          console.log(detalleError);
-        }
-      );
+        error: (detalleError: unknown) => {
+          console.error('crearDetalleCompra:', detalleError);
+        },
+      });
   }
 
-  private editarCorrelativo() {
+  private editarCorrelativo(): void {
     this._comprasService
       .editar_correlativos_empresa(
         this.correlativo.idCorrelativo,
         this.correlativo
       )
-      .subscribe(
-        (correlativoResponse) => {
+      .subscribe({
+        next: (correlativoResponse: { data?: unknown }) => {
           if (correlativoResponse.data != undefined) {
             iziToast.show({
               title: 'SUCCESS',
@@ -1330,10 +1274,10 @@ export class CreateComprasComponent {
             });
           }
         },
-        (correlativoError) => {
-          console.log(correlativoError);
-        }
-      );
+        error: (correlativoError: unknown) => {
+          console.error('editarCorrelativo:', correlativoError);
+        },
+      });
   }
 
   ///hasta aqui el registro de las compras
@@ -1376,6 +1320,18 @@ export class CreateComprasComponent {
     this.consultManual = true;
   }
 
+  /** Etiqueta del tipo de comprobante según código SUNAT (01=Factura, 03=Boleta, etc.) */
+  getTipoComprobanteLabel(codigo: string | undefined): string {
+    if (!codigo) return '-';
+    const map: Record<string, string> = {
+      '01': 'Factura',
+      '03': 'Boleta',
+      '07': 'Nota de Crédito',
+      '08': 'Nota de Débito',
+    };
+    return map[String(codigo).trim()] || `Comprobante (${codigo})`;
+  }
+
   onInput() {
     this.compras.total =
       this.compras.subTotal +
@@ -1410,7 +1366,7 @@ export class CreateComprasComponent {
   }
 
   buscarProductos(): void {
-    const term = this.searchTerm.toLowerCase().trim();
+    const term: string = this.searchTerm.toLowerCase().trim();
     console.log('Término de búsqueda:', term);
     
     if (term === '') {
@@ -1478,7 +1434,7 @@ export class CreateComprasComponent {
   abrirBuscadorModal(): void {
     this.searchTerm = '';
     this.productos_filtrados = this.productos_const ?? [];
-    const el = document.getElementById('buscadorModal');
+    const el: HTMLElement | null = document.getElementById('buscadorModal');
     if (el) {
       const modal = new bootstrap.Modal(el);
       modal.show();

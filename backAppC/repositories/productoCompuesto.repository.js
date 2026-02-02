@@ -118,7 +118,7 @@ exports.calcularStockCompuestoRepo = async (pool, idProductoPadre, idEmpresa, id
             FROM ProductosCompuestos pc
             INNER JOIN Productos p ON pc.idProductoHijo = p.idProducto
             CROSS JOIN Sucursal s
-            LEFT JOIN StockSucursal ss ON p.idProducto = ss.idProducto 
+            LEFT JOIN (SELECT idSucursal, idProducto, idEmpresa, SUM(cantidadDisponible) AS cantidad FROM Lotes GROUP BY idSucursal, idProducto, idEmpresa) ss ON p.idProducto = ss.idProducto 
                 AND s.idSucursal = ss.idSucursal
                 AND ss.idEmpresa = @idEmpresa
             WHERE pc.idProductoPadre = @idProductoPadre
@@ -171,7 +171,7 @@ exports.verificarComponentesEnStock = async (pool, idProductoPadre, cantidadRequ
                     END as tieneStock
                 FROM ProductosCompuestos pc
                 INNER JOIN Productos p ON pc.idProductoHijo = p.idProducto
-                LEFT JOIN StockSucursal ss ON p.idProducto = ss.idProducto 
+                LEFT JOIN (SELECT idSucursal, idProducto, idEmpresa, SUM(cantidadDisponible) AS cantidad FROM Lotes GROUP BY idSucursal, idProducto, idEmpresa) ss ON p.idProducto = ss.idProducto 
                     AND ss.idSucursal = @idSucursal
                     AND ss.idEmpresa = @idEmpresa
                 WHERE pc.idProductoPadre = @idProductoPadre

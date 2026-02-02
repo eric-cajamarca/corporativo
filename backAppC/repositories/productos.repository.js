@@ -58,10 +58,9 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
             s.nombre as sucursal,
             p.cUnitario,
             ss.cantidad as stock,
-            p.tipoProducto,
             p.fProduccion,
             p.fVencimiento
-        FROM StockSucursal ss
+        FROM (SELECT idEmpresa, idSucursal, idProducto, SUM(cantidadDisponible) AS cantidad FROM Lotes GROUP BY idEmpresa, idSucursal, idProducto) ss
         INNER JOIN Productos p ON ss.idProducto = p.idProducto
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
@@ -274,10 +273,9 @@ exports.obtenerProductosCompras = async (pool, idEmpresa) => {
             s.nombre as sucursal,
             p.cUnitario,
             ss.cantidad as stock,
-            p.tipoProducto,
             p.fProduccion,
             p.fVencimiento
-        FROM StockSucursal ss
+        FROM (SELECT idEmpresa, idSucursal, idProducto, SUM(cantidadDisponible) AS cantidad FROM Lotes GROUP BY idEmpresa, idSucursal, idProducto) ss
         INNER JOIN Productos p ON ss.idProducto = p.idProducto
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion

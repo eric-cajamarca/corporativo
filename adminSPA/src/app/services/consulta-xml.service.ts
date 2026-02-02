@@ -62,6 +62,21 @@ export class ConsultaXMLService {
   // }
 
 
+  /**
+   * Consulta comprobante SUNAT vía backend (Factiliza). El backend devuelve datos ya normalizados.
+   * ruc, usuario, password son opcionales si la empresa tiene configurado EmpresaFactiliza.
+   */
+  consultarComprobanteSunat(
+    body: { ruc?: string; usuario?: string; password?: string; proveedor: string; tipo_doc: string; serie: string; correlativo: string }
+  ): Observable<{ message: string; data: any }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this.http.post<{ message: string; data: any }>(
+      this.url + 'consultar-comprobante-sunat',
+      body,
+      { headers, withCredentials: true }
+    );
+  }
+
   getComprobante(
     ruc: string,
     usuario: string,
@@ -70,25 +85,10 @@ export class ConsultaXMLService {
     tipo_doc: string,
     serie: string,
     correlativo: string
-  ): Observable<any> {                                    // 2. Blob → archivo XML
-    const headers = new HttpHeaders({
-      'Content-Type':'application/json'
-                     // 3. Bearer explícito
-    });
-    
-    const body = {
-      ruc,
-      usuario,
-      password,
-      proveedor,
-      tipo_doc,
-      serie,
-      correlativo
-    };
-
-    console.log('body',body);
-    // 4. POST a la misma ruta base, sin parámetros en URL
-    return this.http.post(this.url+'/xml',body, {headers, withCredentials: true});
+  ): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    const body = { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo };
+    return this.http.post(this.url + 'xml', body, { headers, withCredentials: true });
   }
 
 

@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
+import { ComprasService } from '../../../services/compras.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -66,8 +67,14 @@ export class IndexConfiguracionComponent implements OnInit {
     modoMantenimiento: false
   };
 
+  /** Correlativo de códigos de producto (número inicial por defecto 10000) */
+  public correlativo: { idCorrelativo?: number; numero?: number } = { numero: 10000 };
+  public correlativoGuardando = false;
+  public correlativoMensaje: string | null = null;
+
   constructor(
     private _adminService: AdminService,
+    private _comprasService: ComprasService,
     private _router: Router
   ) {}
 
@@ -76,8 +83,45 @@ export class IndexConfiguracionComponent implements OnInit {
   }
 
   cargarConfiguracion(): void {
-    // Aquí cargaríamos la configuración desde el backend
-    console.log('Cargando configuración del sistema...');
+    this._comprasService.obtener_correlativo_empresa().subscribe({
+      next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
+        const lista = response?.data;
+        if (lista && lista.length > 0 && lista[0]) {
+          this.correlativo = {
+            idCorrelativo: lista[0].idCorrelativo,
+            numero: lista[0].numero ?? 10000
+          };
+        } else {
+          this.correlativo = { numero: 10000 };
+        }
+      },
+      error: () => {
+        this.correlativo = { numero: 10000 };
+      }
+    });
+  }
+
+  guardarCorrelativo(): void {
+    if (this.correlativo.numero == null || this.correlativo.numero < 0) {
+      this.correlativoMensaje = 'El número debe ser mayor o igual a 0.';
+      return;
+    }
+    if (!this.correlativo.idCorrelativo) {
+      this.correlativoMensaje = 'No hay correlativo configurado para esta empresa. Se crea al dar de alta la empresa.';
+      return;
+    }
+    this.correlativoMensaje = null;
+    this.correlativoGuardando = true;
+    this._comprasService.editar_correlativos_empresa(this.correlativo.idCorrelativo, { numero: this.correlativo.numero }).subscribe({
+      next: () => {
+        this.correlativoGuardando = false;
+        this.correlativoMensaje = 'Correlativo guardado correctamente.';
+      },
+      error: () => {
+        this.correlativoGuardando = false;
+        this.correlativoMensaje = 'Error al guardar el correlativo.';
+      }
+    });
   }
 
   guardarConfiguracionGeneral(): void {

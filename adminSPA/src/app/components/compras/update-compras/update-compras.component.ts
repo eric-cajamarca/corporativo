@@ -560,7 +560,7 @@ export class UpdateComprasComponent {
       this.nuevoProducto.idMarca = this.prodSelecionado.producto.idMarca;
       this.nuevoProducto.cantidadAnterior = this.prodSelecionado.cantidad;
       this.nuevoProducto.ubicacion = this.prodSelecionado.ubicacion;
-      this.nuevoProducto.idStockSucursal = this.prodSelecionado.idStockSucursal;
+      this.nuevoProducto.idLote = this.prodSelecionado.idLote ?? this.prodSelecionado.idStockSucursal;
       this.nuevoProducto.idEmpresa = this.prodSelecionado.idEmpresa;
 
       this.nuevoProducto.fProduccion = this.prodSelecionado.producto.fProduccion;
@@ -778,23 +778,22 @@ export class UpdateComprasComponent {
           this.nuevoProducto.idProducto = response.data;
           this.obtenerProductos();
 
-          //ahora quiero crear un nuevo registro en stockSucursales con estos datos idSucursal, idProducto, cantidad, ubicacion y idEmpresa
-          let stockSucursal = {
+          // Crear lote (stock) con idSucursal, idProducto, cantidad, costoUnitario
+          let stockSucursal: Record<string, unknown> = {
             idSucursal: this.nuevoProducto.idSucursal,
             idProducto: this.nuevoProducto.idProducto,
             cantidad: this.nuevoProducto.cantidad,
-            ubicacion: this.nuevoProducto.ubicacion,
+            costoUnitario: this.nuevoProducto.cUnitario ?? 0,
             idEmpresa: this.compras.idEmpresa
+          };
+          if (this.nuevoProducto.idLote) {
+            stockSucursal['idLote'] = this.nuevoProducto.idLote;
           }
 
           console.log('stockSucursal antes de enviar a backend', stockSucursal);
           this._sucursalService.crear_stock_sucursal_idEmpresa(stockSucursal).subscribe(
             response => {
-              console.log('response', response);
               if (response.data) {
-                this.stockSucursales.push(response.data);
-                console.log('this.stockSucursales', this.stockSucursales);
-
                 iziToast.show({
                   title: 'OK',
                   titleColor: '#008000',

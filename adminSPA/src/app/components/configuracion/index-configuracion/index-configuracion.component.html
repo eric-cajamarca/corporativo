@@ -269,6 +269,30 @@
                       </label>
                     </div>
                   </div>
+                  <!-- Correlativo inicial (códigos de producto) -->
+                  <div class="col-12 mt-2 pt-3 border-top">
+                    <h6 class="text-muted mb-2">Correlativo de códigos de producto</h6>
+                    <p class="small text-muted mb-2">Número con el que se genera el siguiente código al dar de alta un producto nuevo (por defecto 10000).</p>
+                    <div class="row g-2 align-items-center">
+                      <div class="col-auto">
+                        <label for="correlativoNumero" class="form-label mb-0">Número inicial</label>
+                      </div>
+                      <div class="col-md-3">
+                        <input type="number" class="form-control" id="correlativoNumero" [(ngModel)]="correlativo.numero" name="correlativoNumero" min="0" step="1">
+                      </div>
+                      <div class="col-auto">
+                        <button type="button" class="btn btn-outline-primary" (click)="guardarCorrelativo()" [disabled]="correlativoGuardando || !correlativo.idCorrelativo">
+                          <i class="fas fa-save me-1"></i>{{ correlativoGuardando ? 'Guardando...' : 'Guardar correlativo' }}
+                        </button>
+                      </div>
+                    </div>
+                    @if (correlativoMensaje) {
+                      <div class="mt-2 small" [class.text-success]="correlativoMensaje.includes('correctamente')" [class.text-danger]="!correlativoMensaje.includes('correctamente')">{{ correlativoMensaje }}</div>
+                    }
+                    @if (!correlativo.idCorrelativo && correlativo.numero != null) {
+                      <p class="small text-warning mt-1 mb-0">El correlativo se crea al dar de alta una nueva empresa. Si no aparece, contacte al administrador.</p>
+                    }
+                  </div>
                 </div>
                 <div class="mt-3">
                   <button type="button" class="btn btn-primary" (click)="guardarConfiguracionFacturacion()">

@@ -1,6 +1,9 @@
 const express = require('express');
 const factilizaController = require('../controllers/factilizaController');
+const auth = require('../middlewares/autenticate');
 const api = express.Router();
+
+api.post('/consultar-comprobante-sunat', auth.auth, factilizaController.consultarComprobanteSunat);
 
 api.get('/ruc/anexo/:ruc', factilizaController.getAnexo);
 api.get('/dni/:dni', factilizaController.getDni);
