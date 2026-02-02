@@ -1,4 +1,41 @@
+/* =============================================
+   LAYOUT: sidebar visible → contenido centrado;
+   sidebar oculto → contenido se extiende y sigue centrado
+   ============================================= */
 
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+.content-wrap {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.compras-card {
+  width: 100%;
+}
 
 /* aqui ponemos el css para la tabla de compras */
 
@@ -161,4 +198,9 @@
 .table-responsive td:nth-child(6) { /* Cantidad */
   width: 80px;
 }
+
+
+
+
+
 

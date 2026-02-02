@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComprasService } from '../../../services/compras.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -24,6 +24,7 @@ import { saveAs } from 'file-saver';
 import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
 import { ProveedoresService } from '../../../services/proveedores.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -31,17 +32,22 @@ const FORMATO_FECHA = 'dd/MM/yyyy';
 
 @Component({
   selector: 'app-create-compras',
+  standalone: true,
   imports: [
     FormsModule,
     RouterModule,
     CommonModule,
     TopnavComponent,
+    SidebarComponent,
     ReactiveFormsModule,
   ],
   templateUrl: './create-compras.component.html',
   styleUrl: './create-compras.component.css',
 })
 export class CreateComprasComponent {
+  /** Estado del sidebar: contenido se centra o se extiende según esté visible u oculto */
+  sidebarCollapsed = signal<boolean>(false);
+
   public compras: any = {
     idSucursal: '',
     idComprobante: '',
@@ -64,6 +70,10 @@ export class CreateComprasComponent {
   };
 
   
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
 
   public consultManual = false;
   public idCompra: any = '';

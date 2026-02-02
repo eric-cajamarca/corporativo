@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { Router, RouterModule } from '@angular/router';
 import { ComprasService } from '../../../services/compras.service';
@@ -16,6 +16,7 @@ import { numeroALetras } from '../../../utils/numeroALetras';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa } from '../../../models/empresa.model';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 
 
@@ -83,12 +84,16 @@ export interface DatosPdf {
 
 @Component({
   selector: 'app-index-compras',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, NgbPagination],
+  standalone: true,
+  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, NgbPagination, SidebarComponent],
   templateUrl: './index-compras.component.html',
   styleUrl: './index-compras.component.css'
 })
 export class IndexComprasComponent {
-  
+
+  /** Estado del sidebar (para layout con topnav) */
+  sidebarCollapsed = signal<boolean>(false);
+
   empresa!: Empresa;
 
   public clientes: Array<any> = [];
@@ -122,6 +127,10 @@ export class IndexComprasComponent {
   
 
   
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
+
   constructor(
     private _adminService: AdminService,
     private _router: Router,

@@ -1,7 +1,13 @@
-<app-topnav></app-topnav>
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
 
-<div class="container mt-4">
-  <div class="card shadow-sm">
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<!-- Contenido principal: se desplaza según estado del sidebar -->
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="card shadow-sm compras-card">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
       <h4 class="mb-0 fw-semibold">
         <i class="bi bi-receipt me-2"></i>Mostrando todas tus compras
@@ -261,4 +267,5 @@
       </ngb-pagination>
     </div>
   </div>
-</div>
+  </div>
+</main>
