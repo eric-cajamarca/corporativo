@@ -95,11 +95,7 @@ export class LoginEmpresaComponent implements OnInit {
   // Funciones adicionales
   recuperarPassword(event: Event): void {
     event.preventDefault();
-    iziToast.info({
-      title: 'Recuperar Contraseña',
-      message: 'Funcionalidad próximamente disponible. Contacte al administrador del sistema.',
-      position: 'topRight'
-    });
+    this._router.navigate(['/recuperar-password']);
   }
 
   contactarSoporte(event: Event): void {

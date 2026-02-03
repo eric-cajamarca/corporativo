@@ -138,7 +138,7 @@ const crear_lista_precio = async function (req, res) {
             activo 
         } = req.body;
 
-        const idSucursal = req.body.idSucursal || null;
+        const idSucursal = (req.body.idSucursal === 'null' || req.body.idSucursal === '' || req.body.idSucursal === undefined) ? null : req.body.idSucursal;
         console.log('idEmpresa from req.user:', req.user);
         
         // Validación básica en el controller
@@ -253,8 +253,10 @@ const editar_lista_precio = async function (req, res) {
             fecha_fin, 
             activo 
         } = req.body;
+
+        const idSucursalNormalizado = (idSucursal === 'null' || idSucursal === '' || idSucursal === undefined) ? null : idSucursal;
         
-        if (!idLista || !idSucursal || !nombre || !idMoneda) {
+        if (!idLista || !nombre || !idMoneda) {
             return res.status(400).send({ 
                 message: 'Faltan campos requeridos', 
                 data: undefined 
@@ -268,7 +270,7 @@ const editar_lista_precio = async function (req, res) {
             { 
                 idLista, 
                 idEmpresa, 
-                idSucursal, 
+                idSucursal: idSucursalNormalizado, 
                 nombre, 
                 idMoneda, 
                 principal: principal || false, 

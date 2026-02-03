@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { LoginEmpresaComponent } from './components/login-empresa/login-empresa.component';
+import { RecuperarPasswordComponent } from './components/recuperar-password/recuperar-password.component';
 import { IndexEmpresaComponent } from './components/empresa/index-empresa/index-empresa.component';
 import { CreateEmpresaComponent } from './components/empresa/create-empresa/create-empresa.component';
 import { UpdateEmpresaComponent } from './components/empresa/update-empresa/update-empresa.component';
@@ -61,6 +62,10 @@ export const routes: Routes = [
     { path:'login-empresa', 
         component: LoginEmpresaComponent,
         title: 'Login Empresa',
+     },
+    { path: 'recuperar-password',
+        component: RecuperarPasswordComponent,
+        title: 'Recuperar contraseña',
      },
      {
         path: 'empresa',

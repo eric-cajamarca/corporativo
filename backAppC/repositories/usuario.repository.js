@@ -175,3 +175,15 @@ exports.updateUsuarioConPassword = async (pool, idUsuario, datos) => {
     throw new Error(`DB Error updateConPass: ${error.message}`);
   }
 }
+
+/**
+ * Actualiza solo la contraseña del usuario (para recuperación de contraseña).
+ */
+exports.actualizarSoloPassword = async (pool, idUsuario, passwordHash) => {
+  const result = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('password', sql.Text, passwordHash)
+    .query('UPDATE UsuarioWeb SET password = @password WHERE idUsuario = @idUsuario');
+  return result.rowsAffected[0];
+};

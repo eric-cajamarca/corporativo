@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, signal } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -8,18 +8,20 @@ import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var bootstrap: any;
 
 @Component({
   selector: 'app-create-precios',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, TopnavComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, TopnavComponent, SidebarComponent],
   templateUrl: './create-precios.component.html',
   styleUrls: ['./create-precios.component.css']
 
 })
 export class CreatePreciosComponent implements OnInit {
+  sidebarCollapsed = signal<boolean>(false);
   @ViewChild('modalNuevaLista') modalNuevaLista!: ElementRef;
 
   // Datos
@@ -41,6 +43,11 @@ export class CreatePreciosComponent implements OnInit {
   
   // Modal
   modal: any;
+
+  
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -241,7 +248,11 @@ export class CreatePreciosComponent implements OnInit {
     console.log('Guardando lista de precios...', this.formListaPrecio.value);
     if (this.formListaPrecio.invalid) return;
     
-    const formData = this.formListaPrecio.value;
+    const raw = this.formListaPrecio.value;
+    const formData = {
+      ...raw,
+      idSucursal: raw.idSucursal === 'null' || raw.idSucursal === '' || raw.idSucursal === undefined ? null : raw.idSucursal
+    };
     console.log('Datos del formulario:', formData);
     
     if (formData.idLista) {

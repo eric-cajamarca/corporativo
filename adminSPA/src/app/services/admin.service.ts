@@ -38,6 +38,18 @@ export class AdminService {
     });
   }
 
+  /** Solicitar recuperación de contraseña (RUC + email). Devuelve token para paso siguiente. */
+  recuperarPassword(ruc: string, email: string): Observable<any> {
+    const headers = new HttpHeaders().set('Content-Type', 'application/json');
+    return this._http.post(this.url + 'recuperar-password', { ruc, email }, { headers });
+  }
+
+  /** Restablecer contraseña con el token recibido. */
+  restablecerPassword(token: string, newPassword: string): Observable<any> {
+    const headers = new HttpHeaders().set('Content-Type', 'application/json');
+    return this._http.post(this.url + 'restablecer-password', { token, newPassword }, { headers });
+  }
+
   //api.get('/getEmpresa_login',auth.auth, adminController.getEmpresa_login);
   getEmpresa_login(): Observable<any> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });

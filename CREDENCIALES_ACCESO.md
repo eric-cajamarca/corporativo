@@ -43,6 +43,15 @@ ng serve --port 4200
    - Email: `ericortizguevara@gmail.com`
    - Contraseña: `123456`
 
+### **Recuperar contraseña (enlace por correo)**
+- En la pantalla de login, clic en **"Recuperar contraseña"** o ir a: `http://localhost:4200/recuperar-password`
+- Paso 1: Ingresar **RUC** de la empresa y **correo** (el de la empresa o el del colaborador). Se envía un **enlace al correo registrado** (no se muestra en pantalla).
+- Paso 2: Abrir el enlace recibido en el correo y establecer la **nueva contraseña** (mínimo 6 caracteres). El enlace es válido 15 minutos.
+- **Producción:** configurar SMTP en el backend (ver sección "Configuración de correo" más abajo).
+
+### **Nota: intentos fallidos**
+- El sistema **no bloquea** la cuenta tras varios intentos fallidos de login; esa funcionalidad no está implementada. Si se desea, se puede añadir más adelante (por ejemplo, bloqueo temporal o captcha).
+
 ## 📊 **Funcionalidades Disponibles por Rol**
 
 ### **Administrador:**
@@ -78,6 +87,21 @@ $2a$08$iD7U/5D7Kc.BOH06wQg/.uGB7pY9CNSd2LYwEabV3QM9GCHIYQmby
 - **Base de Datos:** `SistemaInventario`
 - **Usuario:** `sa`
 - **Contraseña:** `123456`
+
+### **Configuración de correo (recuperación de contraseña):**
+En la carpeta del backend (`backAppC`) agregue en su archivo `.env` las variables SMTP para que el enlace de recuperación llegue por correo. Sin SMTP, en desarrollo el enlace se muestra en la consola del servidor.
+
+```env
+FRONTEND_URL=http://localhost:4200
+SMTP_HOST=smtp.ejemplo.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=correo@ejemplo.com
+SMTP_PASS=su_contraseña_o_app_password
+SMTP_FROM=nombre <correo@ejemplo.com>
+```
+
+Ejemplo con Gmail: use una contraseña de aplicación (no la contraseña normal), `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`.
 
 ### **API Endpoints:**
 - **Base URL:** `http://localhost:3000/api`

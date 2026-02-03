@@ -484,7 +484,6 @@ abrirModalPrecios(item: any) {
 
     this.modalService.open(ModalPreciosComponent, {
       size: 'sm',
-      centered: true,
       backdrop: 'static'
     }, {
       precios: opcionesPrecios,

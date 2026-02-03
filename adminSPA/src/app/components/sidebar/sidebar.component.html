@@ -3,7 +3,7 @@
   class="sidebar-mobile-toggle d-lg-none" 
   (click)="toggleMobileSidebar()"
   [class.active]="isMobileOpen()">
-  <i class="fas" [class.fa-bars]="!isMobileOpen()" [class.fa-times]="isMobileOpen()"></i>
+  <i class="bi bi-list" [class.fa-bars]="!isMobileOpen()" [class.fa-times]="isMobileOpen()"></i>
 </button>
 
 <!-- Overlay para móvil -->
@@ -22,11 +22,11 @@
   <!-- Header del sidebar -->
   <div class="sidebar-header">
     <div class="sidebar-brand" *ngIf="!isCollapsed()">
-      <i class="fas fa-building text-primary me-2"></i>
+      <i class="bi bi-building text-primary me-2"></i>
       <span class="brand-text">{{empresaNombre() || 'Sistema'}}</span>
     </div>
     <div class="sidebar-brand-collapsed" *ngIf="isCollapsed()">
-      <i class="fas fa-building text-primary"></i>
+      <i class="bi bi-building text-primary"></i>
     </div>
     
     <!-- Botón toggle desktop -->

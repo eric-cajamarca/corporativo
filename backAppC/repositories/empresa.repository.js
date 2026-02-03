@@ -19,3 +19,15 @@ exports.buscarPorRuc = async (pool, ruc) => {
 
   return result.recordset.length > 0 ? result.recordset[0] : null;
 };
+
+/**
+ * Actualiza solo la contraseña de la empresa (para recuperación)
+ */
+exports.actualizarPassword = async (pool, idEmpresa, passwordHash) => {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('password', sql.VarChar(255), passwordHash)
+    .query('UPDATE Empresas SET password = @password WHERE idEmpresa = @idEmpresa');
+  return result.rowsAffected[0];
+};

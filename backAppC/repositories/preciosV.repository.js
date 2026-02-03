@@ -1,5 +1,11 @@
 const sql = require('mssql');
 
+/** Convierte valor a GUID válido o null (para idSucursal opcional). Evita string 'null' que falla en sql.UniqueIdentifier */
+function toGuidOrNull(val) {
+    if (val === null || val === undefined || val === '' || val === 'null') return null;
+    return val;
+}
+
 exports.crearPrecioProducto = async (pool, precioData) => {
     const { idLista, idProducto, precio, idMoneda, idUsuario } = precioData;
     
@@ -129,7 +135,7 @@ exports.crearListaPrecio = async (pool, listaData) => {
         const result = await pool
 
             .request()
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal || null)
+            .input('idSucursal', sql.UniqueIdentifier, toGuidOrNull(idSucursal))
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .input('nombre', sql.VarChar(100), nombre)
             .input('idMoneda', sql.Int, idMoneda)
@@ -140,7 +146,7 @@ exports.crearListaPrecio = async (pool, listaData) => {
             .input('activo', sql.Bit, activo)
             .query(`
                 INSERT INTO ListasPrecio 
-                (idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fecha_inicio, fecha_fin, activo) 
+                (idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, fechaFin, activo) 
                 VALUES (@idEmpresa, @idSucursal, @nombre, @idMoneda, @principal, @conIgv, @fecha_inicio, @fecha_fin, @activo)
             `);
         
@@ -207,7 +213,7 @@ exports.actualizarListaPrecio = async (pool, listaData) => {
             .request()
             .input('idLista', sql.Int, idLista)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal || null)
+            .input('idSucursal', sql.UniqueIdentifier, toGuidOrNull(idSucursal))
             .input('nombre', sql.VarChar(100), nombre)
             .input('idMoneda', sql.Int, idMoneda)
             .input('principal', sql.Bit, principal)
@@ -223,8 +229,8 @@ exports.actualizarListaPrecio = async (pool, listaData) => {
                     idMoneda = @idMoneda, 
                     principal = @principal, 
                     conIgv = @conIgv, 
-                    fecha_inicio = @fecha_inicio, 
-                    fecha_fin = @fecha_fin, 
+                    fechaInicio = @fecha_inicio, 
+                    fechaFin = @fecha_fin, 
                     activo = @activo 
                 WHERE idLista = @idLista
             `);

@@ -1,509 +1,295 @@
-<app-topnav></app-topnav>
-<div class="container-fluid py-4">
-    
-    <!-- Card Principal -->
-    <div class="card shadow-sm mb-4 border-0">
-        <div class="card-body">
-            <div class="row align-items-center g-3">
-                
-                <!-- Título -->
-                <div class="col-md-3">
-                    <h4 class="mb-0 text-primary">
-                        <i class="bi bi-tag-fill me-2"></i>Gestor de Precios
-                    </h4>
-                </div>
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
 
-                <!-- Selector de Lista de Precios -->
-                <div class="col-md-5">
-                    <label class="form-label small text-muted mb-1">Seleccionar Lista de Precios</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light">
-                            <i class="bi bi-list-ul text-primary"></i>
-                        </span>
-                        <select class="form-select" id="listaPreciosSelect" 
-                                [(ngModel)]="listaSeleccionadaId" 
-                                (ngModelChange)="onListaSeleccionada()">
-                            <option [value]="null">-- Seleccionar lista --</option>
-                            <option *ngFor="let lista of listasPrecio" [value]="lista.idLista" 
-                                    [attr.data-moneda]="lista.idMoneda" [attr.data-conigv]="lista.conIgv">
-                                {{lista.nombre}} {{lista.principal ? '(Principal)' : ''}}
-                            </option>
-                        </select>
-                        <button class="btn btn-outline-primary" type="button" 
-                                [disabled]="!listaSeleccionadaId"
-                                (click)="editarListaSeleccionada()">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                    </div>
-                </div>
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
 
-                <!-- Botones de Acción -->
-                <div class="col-md-4 text-end">
-                    <button class="btn btn-success" (click)="abrirModalNuevaLista()">
-                        <i class="bi bi-plus-circle me-1"></i> Nueva Lista
-                    </button>
-                    <button class="btn btn-primary ms-2" [disabled]="!listaSeleccionadaId" 
-                            (click)="guardarPrecios()">
-                        <i class="bi bi-save me-1"></i> Guardar Precios
-                    </button>
-                </div>
-            </div>
-
-            <!-- Badges Informativos -->
-            <div class="row mt-3" *ngIf="listaSeleccionada">
-                <div class="col-12">
-                    <span class="badge bg-info text-dark me-2">
-                        <i class="bi bi-shop me-1"></i> Sucursal: {{listaSeleccionada.nombreSucursal || 'Global'}}
-                    </span>
-                    <span class="badge bg-secondary me-2">
-                        <i class="bi bi-calendar-event me-1"></i> 
-                        Vigencia: {{listaSeleccionada.fecha_inicio | date:'dd/MM/yyyy'}} - 
-                        {{listaSeleccionada.fecha_fin ? (listaSeleccionada.fecha_fin | date:'dd/MM/yyyy') : 'Indefinido'}}
-                    </span>
-                    <span class="badge" 
-                          [class.bg-success]="listaSeleccionada.conIgv"
-                          [class.bg-warning]="!listaSeleccionada.conIgv">
-                        <i class="bi bi-percent me-1"></i>
-                        {{listaSeleccionada.conIgv ? 'Incluye IGV' : 'Sin IGV'}}
-                    </span>
-                    <span class="badge bg-light text-dark border ms-2" *ngIf="listaSeleccionada.activo">
-                        <i class="bi bi-check-circle text-success me-1"></i> Activo
-                    </span>
-                    <!-- Estado Inactivo -->
-                    <span class="badge bg-danger text-white ms-2" *ngIf="!listaSeleccionada.activo">
-                        <i class="bi bi-x-circle me-1"></i> Inactivo
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabla de Productos -->
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3 border-0">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <h5 class="mb-0">Listado de Productos</h5>
-                </div>
-                <div class="col-md-6">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light">
-                            <i class="bi bi-search text-secondary"></i>
-                        </span>
-                        <input type="text" class="form-control" placeholder="Buscar producto por nombre o SKU..."
-                               [(ngModel)]="filtroBusqueda" (input)="filtrarProductos()">
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="table-responsive" *ngIf="productosFiltrados.length > 0">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr >
-                        <th scope="col" width="120">SKU / codigo</th>
-                        <th scope="col">Producto</th>
-                        <th scope="col" width="120" class="text-end">Costo Ref.</th>
-                        <th scope="col" width="140" class="text-end">Precio Actual</th>
-                        <th scope="col" width="200" class="text-center">Nuevo Precio 
-                            <span class="badge bg-light text-dark ms-1">
-                                {{simboloMoneda}}
-                            </span>
-                        </th>
-                        <th scope="col" width="120" class="text-center">Última Act.</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr *ngFor="let producto of productosFiltrados">
-                        <td class="fw-semibold">{{producto.sku || producto.codigo}}</td>
-                        <td>
-                            <div class="fw-bold">{{producto.descripcion}}</div>
-                            <small class="text-muted">{{producto.descripcionPres || 'Sin categoría'}}</small>
-                        </td>
-                        <td class="text-end text-muted">{{simboloMoneda}} {{producto.cUnitario || '0.00'}}</td>
-                        <td class="text-end">
-                            <span class="fw-semibold">{{simboloMoneda}} {{producto.precioActual || '0.00'}}</span>
-                        </td>
-                        <td class="text-center">
-                            <div class="input-group input-group-sm justify-content-center">
-                                <span class="input-group-text bg-light">{{simboloMoneda}}</span>
-                                <input type="number" 
-                                       class="form-control text-end"
-                                       step="0.01" 
-                                       min="0"
-                                       [(ngModel)]="producto.nuevoPrecio"
-                                       [placeholder]="producto.precioActual?.toString() || '0.00'"
-                                       (change)="validarPrecio(producto)">
-                                <button class="btn btn-outline-secondary" type="button"
-                                        *ngIf="producto.precioActual && producto.nuevoPrecio !== producto.precioActual"
-                                        (click)="restaurarPrecio(producto)">
-                                    <i class="bi bi-arrow-counterclockwise"></i>
-                                </button>
-                            </div>
-                            <small class="text-muted" *ngIf="producto.precioActual && producto.nuevoPrecio">
-                                <span [class.text-success]="producto.nuevoPrecio > producto.precioActual"
-                                      [class.text-danger]="producto.nuevoPrecio < producto.precioActual">
-                                    {{calcularVariacion(producto)}}%
-                                </span>
-                            </small>
-                        </td>
-                        <td class="text-center small text-muted">
-                            {{producto.fActualizacion ? (producto.fActualizacion | date:'dd/MM/yyyy HH:mm') : 'Nunca'}}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Estado vacío -->
-        <div class="text-center py-5" *ngIf="productos.length === 0">
-            <i class="bi bi-inbox display-1 text-muted"></i>
-            <h5 class="mt-3 text-muted">No hay productos disponibles</h5>
-            <p class="text-muted">Agrega productos primero para asignarles precios.</p>
-        </div>
-
-        <div class="text-center py-5" *ngIf="productos.length > 0 && productosFiltrados.length === 0">
-            <i class="bi bi-search display-1 text-muted"></i>
-            <h5 class="mt-3 text-muted">No se encontraron productos</h5>
-            <p class="text-muted">Intenta con otro término de búsqueda.</p>
-        </div>
-
-        <div class="card-footer bg-white text-muted small border-0 pt-3">
-            Mostrando {{productosFiltrados.length}} de {{productos.length}} productos
-        </div>
-    </div>
-</div>
-
-<!-- Modal Nueva Lista de Precios -->
-<div class="modal fade" id="modalNuevaLista" tabindex="-1" aria-hidden="true" #modalNuevaLista>
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-plus-circle me-2"></i>
-                    {{listaEditar ? 'Editar' : 'Crear'}} Lista de Precios
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form [formGroup]="formListaPrecio" (ngSubmit)="guardarListaPrecio()">
-                    <div class="row g-3">
-                        
-                        <!-- Nombre de la Lista -->
-                        <div class="col-md-6">
-                            <label class="form-label">Nombre de la Lista <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" formControlName="nombre" 
-                                   placeholder="Ej. Cyber Wow 2025" [class.is-invalid]="formListaPrecio.get('nombre')?.invalid && formListaPrecio.get('nombre')?.touched">
-                            <div class="invalid-feedback" *ngIf="formListaPrecio.get('nombre')?.invalid && formListaPrecio.get('nombre')?.touched">
-                                El nombre es requerido (mínimo 3 caracteres)
-                            </div>
-                        </div>
-
-                        <!-- Sucursal -->
-                        <div class="col-md-6">
-                            <label class="form-label">Sucursal</label>
-                            <select class="form-select" formControlName="idSucursal">
-                                <option [value]="null">Global (Todas las sucursales)</option>
-                                <option *ngFor="let sucursal of sucursales" [value]="sucursal.idsucursal">
-                                    {{sucursal.nombre}}
-                                </option>
-                            </select>
-                        </div>
-
-                        <!-- Moneda -->
-                        <div class="col-md-4">
-                            <label class="form-label">Moneda <span class="text-danger">*</span></label>
-                            <select class="form-select" formControlName="idMoneda">
-                                <option [value]="null">Seleccionar...</option>
-                                <option *ngFor="let moneda of monedas" [value]="moneda.idMoneda">
-                                    {{moneda.descripcion}} ({{moneda.simbolo}})
-                                </option>
-                            </select>
-                            <!-- <div class="invalid-feedback" *ngIf="formListaPrecio.get('idMoneda')?.invalid && formListaPrecio.get('idMoneda')?.touched">
-                                Selecciona una moneda
-                            </div> -->
-                        </div>
-
-                        <!-- Fecha Inicio -->
-                        <div class="col-md-4">
-                            <label class="form-label">Fecha Inicio <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" formControlName="fecha_inicio"
-                                   [class.is-invalid]="formListaPrecio.get('fecha_inicio')?.invalid && formListaPrecio.get('fecha_inicio')?.touched">
-                            <div class="invalid-feedback" *ngIf="formListaPrecio.get('fecha_inicio')?.invalid && formListaPrecio.get('fecha_inicio')?.touched">
-                                La fecha de inicio es requerida
-                            </div>
-                        </div>
-
-                        <!-- Fecha Fin -->
-                        <div class="col-md-4">
-                            <label class="form-label">Fecha Fin (Opcional)</label>
-                            <input type="date" class="form-control" formControlName="fecha_fin">
-                            <div class="form-text">Dejar vacío si es indefinido.</div>
-                        </div>
-
-                        <!-- Opciones -->
-                        <div class="col-12 mt-4">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="checkPrincipal" 
-                                       formControlName="principal">
-                                <label class="form-check-label" for="checkPrincipal">
-                                    <strong>Lista Principal (Por Defecto)</strong>
-                                    <small class="d-block text-muted">
-                                        Si se activa, reemplazará a la actual lista por defecto.
-                                    </small>
-                                </label>
-                            </div>
-                            
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" id="checkIgv" 
-                                       formControlName="conIgv">
-                                <label class="form-check-label" for="checkIgv">
-                                    <strong>Precios Incluyen IGV</strong>
-                                </label>
-                            </div>
-
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="checkActivo" 
-                                       formControlName="activo">
-                                <label class="form-check-label" for="checkActivo">
-                                    <strong>Activo</strong>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="modal-footer mt-4">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary" >
-                            <i class="bi bi-save me-1"></i>
-                            {{listaEditar ? 'Actualizar' : 'Guardar'}} Lista
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 
+<!-- Contenido principal: se desplaza según estado del sidebar -->
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap">
     <div class="container-fluid py-4">
-        
-       
-        <div class="card shadow-sm mb-4">
+    
+        <!-- Card Principal -->
+        <div class="card shadow-sm mb-4 border-0">
             <div class="card-body">
                 <div class="row align-items-center g-3">
                     
-                   
+                    <!-- Título -->
                     <div class="col-md-3">
-                        <h4 class="mb-0 text-primary"><i class="bi bi-tag-fill"></i> Gestor de Precios</h4>
+                        <h4 class="mb-0 text-primary">
+                            <i class="bi bi-tag-fill me-2"></i>Gestor de Precios
+                        </h4>
                     </div>
-
-                   
+    
+                    <!-- Selector de Lista de Precios -->
                     <div class="col-md-5">
                         <label class="form-label small text-muted mb-1">Seleccionar Lista de Precios</label>
                         <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-list-ul"></i></span>
-                            <select class="form-select" id="listaSelector">
-                               
-                                <option value="1" data-moneda="PEN" data-igv="1">Lista Normal (S/.) - Con IGV</option>
-                                <option value="2" data-moneda="USD" data-igv="0">Lista Mayorista ($) - Sin IGV</option>
-                                <option value="3" data-moneda="PEN" data-igv="1">Cyber 2025 (S/.) - Con IGV</option>
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-list-ul text-primary"></i>
+                            </span>
+                            <select class="form-select" id="listaPreciosSelect" 
+                                    [(ngModel)]="listaSeleccionadaId" 
+                                    (ngModelChange)="onListaSeleccionada()">
+                                <option [value]="null">-- Seleccionar lista --</option>
+                                <option *ngFor="let lista of listasPrecio" [value]="lista.idLista" 
+                                        [attr.data-moneda]="lista.idMoneda" [attr.data-conigv]="lista.conIgv">
+                                    {{lista.nombre}} {{lista.principal ? '(Principal)' : ''}}
+                                </option>
                             </select>
-                            <button class="btn btn-outline-secondary" type="button" title="Editar Lista Actual">
+                            <button class="btn btn-outline-primary" type="button" 
+                                    [disabled]="!listaSeleccionadaId"
+                                    (click)="editarListaSeleccionada()">
                                 <i class="bi bi-pencil"></i>
                             </button>
                         </div>
                     </div>
-
-                  
+    
+                    <!-- Botones de Acción -->
                     <div class="col-md-4 text-end">
-                       
-                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevaLista">
-                            <i class="bi bi-plus-circle"></i> Nueva Lista
+                        <button class="btn btn-success" (click)="abrirModalNuevaLista()">
+                            <i class="bi bi-plus-circle me-1"></i> Nueva Lista
                         </button>
-                       
-                        <button class="btn btn-primary ms-2">
-                            <i class="bi bi-save"></i> Guardar Precios
+                        <button class="btn btn-primary ms-2" [disabled]="!listaSeleccionadaId" 
+                                (click)="guardarPrecios()">
+                            <i class="bi bi-save me-1"></i> Guardar Precios
                         </button>
                     </div>
                 </div>
-
-                
-                <div class="row mt-3">
+    
+                <!-- Badges Informativos -->
+                <div class="row mt-3" *ngIf="listaSeleccionada">
                     <div class="col-12">
-                        <span class="badge bg-info text-dark me-2"><i class="bi bi-shop"></i> Sucursal: Global</span>
-                        <span class="badge bg-secondary me-2"><i class="bi bi-calendar-event"></i> Vigencia: 01/01/2025 - Indefinido</span>
-                        <span class="badge bg-warning text-dark" id="badgeImpuesto">Incluye IGV</span>
+                        <span class="badge bg-info text-dark me-2">
+                            <i class="bi bi-shop me-1"></i> Sucursal: {{listaSeleccionada.nombreSucursal || 'Global'}}
+                        </span>
+                        <span class="badge bg-secondary me-2">
+                            <i class="bi bi-calendar-event me-1"></i> 
+                            Vigencia: {{listaSeleccionada.fecha_inicio | date:'dd/MM/yyyy'}} - 
+                            {{listaSeleccionada.fecha_fin ? (listaSeleccionada.fecha_fin | date:'dd/MM/yyyy') : 'Indefinido'}}
+                        </span>
+                        <span class="badge" 
+                              [class.bg-success]="listaSeleccionada.conIgv"
+                              [class.bg-warning]="!listaSeleccionada.conIgv">
+                            <i class="bi bi-percent me-1"></i>
+                            {{listaSeleccionada.conIgv ? 'Incluye IGV' : 'Sin IGV'}}
+                        </span>
+                        <span class="badge bg-light text-dark border ms-2" *ngIf="listaSeleccionada.activo">
+                            <i class="bi bi-check-circle text-success me-1"></i> Activo
+                        </span>
+                        <!-- Estado Inactivo -->
+                        <span class="badge bg-danger text-white ms-2" *ngIf="!listaSeleccionada.activo">
+                            <i class="bi bi-x-circle me-1"></i> Inactivo
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
-
-        
-        <div class="card shadow-sm">
-            <div class="card-header bg-white py-3">
-                <div class="row">
+    
+        <!-- Tabla de Productos -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-0">
+                <div class="row align-items-center">
                     <div class="col-md-6">
                         <h5 class="mb-0">Listado de Productos</h5>
                     </div>
                     <div class="col-md-6">
-                        <input type="text" class="form-control form-control-sm" placeholder="Buscar producto por nombre o SKU...">
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">
+                                <i class="bi bi-search text-secondary"></i>
+                            </span>
+                            <input type="text" class="form-control" placeholder="Buscar producto por nombre o SKU..."
+                                   [(ngModel)]="filtroBusqueda" (input)="filtrarProductos()">
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div class="table-responsive">
+            <div class="table-responsive" *ngIf="productosFiltrados.length > 0">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light bg-light-header">
-                        <tr>
-                            <th scope="col">SKU / Código</th>
+                    <thead class="table-light">
+                        <tr >
+                            <th scope="col" width="120">SKU / codigo</th>
                             <th scope="col">Producto</th>
-                            <th scope="col" class="text-end">Costo Ref.</th>
-                            <th scope="col" class="text-end">Precio Actual</th>
-                            <th scope="col" class="text-center">Nuevo Precio <span id="symbolHeader">(S/.)</span></th>
-                            <th scope="col" class="text-center">Última Act.</th>
+                            <th scope="col" width="120" class="text-end">Costo Ref.</th>
+                            <th scope="col" width="140" class="text-end">Precio Actual</th>
+                            <th scope="col" width="200" class="text-center">Nuevo Precio 
+                                <span class="badge bg-light text-dark ms-1">
+                                    {{simboloMoneda}}
+                                </span>
+                            </th>
+                            <th scope="col" width="120" class="text-center">Última Act.</th>
                         </tr>
                     </thead>
                     <tbody>
-                       
-                        <tr>
-                            <td>PROD-001</td>
+                        <tr *ngFor="let producto of productosFiltrados">
+                            <td class="fw-semibold">{{producto.sku || producto.codigo}}</td>
                             <td>
-                                <div class="fw-bold">Monitor LED 24"</div>
-                                <small class="text-muted">Electrónica</small>
+                                <div class="fw-bold">{{producto.descripcion}}</div>
+                                <small class="text-muted">{{producto.descripcionPres || 'Sin categoría'}}</small>
                             </td>
-                            <td class="text-end text-muted">S/. 400.00</td> 
-                            <td class="text-end">S/. 550.00</td>
-                            
-                            
+                            <td class="text-end text-muted">{{simboloMoneda}} {{producto.cUnitario || '0.00'}}</td>
+                            <td class="text-end">
+                                <span class="fw-semibold">{{simboloMoneda}} {{producto.precioActual || '0.00'}}</span>
+                            </td>
                             <td class="text-center">
-                                <div class="input-group input-group-sm justify-content-end">
-                                    <span class="input-group-text symbol-span">S/.</span>
+                                <div class="input-group input-group-sm justify-content-center">
+                                    <span class="input-group-text bg-light">{{simboloMoneda}}</span>
                                     <input type="number" 
-                                        class="form-control price-input" 
-                                        step="0.01" 
-                                        value="550.00"
-                                        name="precio_PROD001"> 
+                                           class="form-control text-end"
+                                           step="0.01" 
+                                           min="0"
+                                           [(ngModel)]="producto.nuevoPrecio"
+                                           [placeholder]="producto.precioActual?.toString() || '0.00'"
+                                           (change)="validarPrecio(producto)">
+                                    <button class="btn btn-outline-secondary" type="button"
+                                            *ngIf="producto.precioActual && producto.nuevoPrecio !== producto.precioActual"
+                                            (click)="restaurarPrecio(producto)">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
                                 </div>
+                                <small class="text-muted" *ngIf="producto.precioActual && producto.nuevoPrecio">
+                                    <span [class.text-success]="producto.nuevoPrecio > producto.precioActual"
+                                          [class.text-danger]="producto.nuevoPrecio < producto.precioActual">
+                                        {{calcularVariacion(producto)}}%
+                                    </span>
+                                </small>
                             </td>
-                            
-                            <td class="text-center small text-muted">07/12/2025</td>
-                        </tr>
-
-                        
-                        <tr>
-                            <td>PROD-002</td>
-                            <td>
-                                <div class="fw-bold">Teclado Mecánico RGB</div>
-                                <small class="text-muted">Periféricos</small>
+                            <td class="text-center small text-muted">
+                                {{producto.fActualizacion ? (producto.fActualizacion | date:'dd/MM/yyyy HH:mm') : 'Nunca'}}
                             </td>
-                            <td class="text-end text-muted">S/. 120.00</td>
-                            <td class="text-end">S/. 180.00</td>
-                            
-                            
-                            <td class="text-center">
-                                <div class="input-group input-group-sm justify-content-end">
-                                    <span class="input-group-text symbol-span">S/.</span>
-                                    <input type="number" 
-                                        class="form-control price-input" 
-                                        step="0.01" 
-                                        value="180.00"
-                                        name="precio_PROD002">
-                                </div>
-                            </td>
-                            
-                            <td class="text-center small text-muted">06/12/2025</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer text-muted small">
-                Mostrando 2 de 500 productos
+    
+            <!-- Estado vacío -->
+            <div class="text-center py-5" *ngIf="productos.length === 0">
+                <i class="bi bi-inbox display-1 text-muted"></i>
+                <h5 class="mt-3 text-muted">No hay productos disponibles</h5>
+                <p class="text-muted">Agrega productos primero para asignarles precios.</p>
+            </div>
+    
+            <div class="text-center py-5" *ngIf="productos.length > 0 && productosFiltrados.length === 0">
+                <i class="bi bi-search display-1 text-muted"></i>
+                <h5 class="mt-3 text-muted">No se encontraron productos</h5>
+                <p class="text-muted">Intenta con otro término de búsqueda.</p>
+            </div>
+    
+            <div class="card-footer bg-white text-muted small border-0 pt-3">
+                Mostrando {{productosFiltrados.length}} de {{productos.length}} productos
             </div>
         </div>
     </div>
-
     
-    <div class="modal fade" id="modalNuevaLista" tabindex="-1" aria-hidden="true">
+    <!-- Modal Nueva Lista de Precios -->
+    <div class="modal fade" id="modalNuevaLista" tabindex="-1" aria-hidden="true" #modalNuevaLista>
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Crear Nueva Lista de Precios</h5>
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        {{listaEditar ? 'Editar' : 'Crear'}} Lista de Precios
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="formNuevaLista">
+                    <form [formGroup]="formListaPrecio" (ngSubmit)="guardarListaPrecio()">
                         <div class="row g-3">
                             
+                            <!-- Nombre de la Lista -->
                             <div class="col-md-6">
                                 <label class="form-label">Nombre de la Lista <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" placeholder="Ej. Cyber Wow 2025" required>
+                                <input type="text" class="form-control" formControlName="nombre" 
+                                       placeholder="Ej. Cyber Wow 2025" [class.is-invalid]="formListaPrecio.get('nombre')?.invalid && formListaPrecio.get('nombre')?.touched">
+                                <div class="invalid-feedback" *ngIf="formListaPrecio.get('nombre')?.invalid && formListaPrecio.get('nombre')?.touched">
+                                    El nombre es requerido (mínimo 3 caracteres)
+                                </div>
                             </div>
-
-                            
+    
+                            <!-- Sucursal -->
                             <div class="col-md-6">
                                 <label class="form-label">Sucursal</label>
-                                <select class="form-select">
-                                    <option value="">Global (Todas las sucursales)</option>
-                                    <option value="SUC-001">Lima Centro</option>
-                                    <option value="SUC-002">Arequipa Norte</option>
+                                <select class="form-select" formControlName="idSucursal">
+                                    <option [ngValue]="null">Global (Todas las sucursales)</option>
+                                    <option *ngFor="let sucursal of sucursales" [ngValue]="sucursal.idsucursal">
+                                        {{sucursal.nombre}}
+                                    </option>
                                 </select>
                             </div>
-
-                          
+    
+                            <!-- Moneda -->
                             <div class="col-md-4">
                                 <label class="form-label">Moneda <span class="text-danger">*</span></label>
-                                <select class="form-select">
-                                    <option value="1">Soles (PEN)</option>
-                                    <option value="2">Dólares (USD)</option>
+                                <select class="form-select" formControlName="idMoneda">
+                                    <option [value]="null">Seleccionar...</option>
+                                    <option *ngFor="let moneda of monedas" [value]="moneda.idMoneda">
+                                        {{moneda.descripcion}} ({{moneda.simbolo}})
+                                    </option>
                                 </select>
+                                <!-- <div class="invalid-feedback" *ngIf="formListaPrecio.get('idMoneda')?.invalid && formListaPrecio.get('idMoneda')?.touched">
+                                    Selecciona una moneda
+                                </div> -->
                             </div>
-
-                           
+    
+                            <!-- Fecha Inicio -->
                             <div class="col-md-4">
                                 <label class="form-label">Fecha Inicio <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" required>
+                                <input type="date" class="form-control" formControlName="fecha_inicio"
+                                       [class.is-invalid]="formListaPrecio.get('fecha_inicio')?.invalid && formListaPrecio.get('fecha_inicio')?.touched">
+                                <div class="invalid-feedback" *ngIf="formListaPrecio.get('fecha_inicio')?.invalid && formListaPrecio.get('fecha_inicio')?.touched">
+                                    La fecha de inicio es requerida
+                                </div>
                             </div>
-
-                            
+    
+                            <!-- Fecha Fin -->
                             <div class="col-md-4">
                                 <label class="form-label">Fecha Fin (Opcional)</label>
-                                <input type="date" class="form-control">
+                                <input type="date" class="form-control" formControlName="fecha_fin">
                                 <div class="form-text">Dejar vacío si es indefinido.</div>
                             </div>
-
-                           
-                            <div class="col-md-12 mt-4">
-                                <div class="form-check form-switch mb-2">
-                                    
-                                    <input class="form-check-input" type="checkbox" id="checkPrincipal">
+    
+                            <!-- Opciones -->
+                            <div class="col-12 mt-4">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="checkPrincipal" 
+                                           formControlName="principal">
                                     <label class="form-check-label" for="checkPrincipal">
                                         <strong>Lista Principal (Por Defecto)</strong>
-                                        <small class="d-block text-muted">Si se activa, reemplazará a la actual lista por defecto.</small>
+                                        <small class="d-block text-muted">
+                                            Si se activa, reemplazará a la actual lista por defecto.
+                                        </small>
                                     </label>
                                 </div>
                                 
-                                <div class="form-check form-switch mb-2">
-                                  
-                                    <input class="form-check-input" type="checkbox" id="checkIgv" checked>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="checkIgv" 
+                                           formControlName="conIgv">
                                     <label class="form-check-label" for="checkIgv">
                                         <strong>Precios Incluyen IGV</strong>
                                     </label>
                                 </div>
-
+    
                                 <div class="form-check form-switch">
-                                    
-                                    <input class="form-check-input" type="checkbox" id="checkActivo" checked>
-                                    <label class="form-check-label" for="checkActivo">Activo</label>
+                                    <input class="form-check-input" type="checkbox" id="checkActivo" 
+                                           formControlName="activo">
+                                    <label class="form-check-label" for="checkActivo">
+                                        <strong>Activo</strong>
+                                    </label>
                                 </div>
                             </div>
                         </div>
+    
+                        <div class="modal-footer mt-4">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary" >
+                                <i class="bi bi-save me-1"></i>
+                                {{listaEditar ? 'Actualizar' : 'Guardar'}} Lista
+                            </button>
+                        </div>
                     </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary">Guardar Lista</button>
                 </div>
             </div>
         </div>
-    </div> -->
+    </div>
+  </div>  
+</main>

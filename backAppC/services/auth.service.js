@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('../helpers/jwt');
+const jwtHelper = require('../helpers/jwt');
 const empresaRepository = require('../repositories/empresa.repository');
 const usuarioRepository = require('../repositories/usuario.repository');
+const emailService = require('./email.service');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 
@@ -219,4 +220,70 @@ exports.updateAdministrador = async (pool, id, datos, usuarioAutenticado) => {
     });
   }
 }
+
+/**
+ * Solicitar recuperación de contraseña: valida RUC + email (empresa o colaborador), genera token y envía el enlace por correo.
+ * No revela si el email existe o no (mensaje genérico por seguridad). El token solo llega a la bandeja del correo registrado.
+ */
+exports.solicitarRecuperacion = async (pool, ruc, email) => {
+  const empresa = await empresaRepository.buscarPorRuc(pool, ruc);
+  if (!empresa) {
+    throw new Error('RUC_NO_ENCONTRADO');
+  }
+
+  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:4200').replace(/\/$/, '');
+
+  const colaborador = await usuarioRepository.buscarPorEmailYRuc(pool, email, empresa.idEmpresa);
+  if (colaborador) {
+    const token = jwtHelper.createResetToken({
+      tipo: 'colaborador',
+      idEmpresa: empresa.idEmpresa,
+      idUsuario: colaborador.idUsuario,
+      email
+    });
+    const recoveryLink = `${frontendUrl}/recuperar-password?token=${encodeURIComponent(token)}`;
+    await emailService.enviarLinkRecuperacion(email, recoveryLink, 'colaborador');
+    return { sent: true };
+  }
+
+  if (empresa.correo === email) {
+    const token = jwtHelper.createResetToken({
+      tipo: 'empresa',
+      idEmpresa: empresa.idEmpresa,
+      idUsuario: null,
+      email
+    });
+    const recoveryLink = `${frontendUrl}/recuperar-password?token=${encodeURIComponent(token)}`;
+    await emailService.enviarLinkRecuperacion(email, recoveryLink, 'empresa');
+    return { sent: true };
+  }
+
+  throw new Error('EMAIL_NO_COINCIDE');
+};
+
+/**
+ * Restablecer contraseña con el token recibido en recuperación.
+ */
+exports.restablecerPassword = async (pool, token, newPassword) => {
+  if (!newPassword || newPassword.trim().length < 6) {
+    throw new Error('La contraseña debe tener al menos 6 caracteres');
+  }
+
+  const decoded = jwtHelper.verifyResetToken(token);
+  const hashedPassword = await bcrypt.hash(newPassword.trim(), 8);
+
+  if (decoded.tipo === 'empresa') {
+    const rows = await empresaRepository.actualizarPassword(pool, decoded.idEmpresa, hashedPassword);
+    if (rows === 0) throw new Error('No se pudo actualizar la contraseña');
+    return { message: 'Contraseña de empresa actualizada correctamente' };
+  }
+
+  if (decoded.tipo === 'colaborador') {
+    const rows = await usuarioRepository.actualizarSoloPassword(pool, decoded.idUsuario, hashedPassword);
+    if (!rows || rows === 0) throw new Error('No se pudo actualizar la contraseña');
+    return { message: 'Contraseña de colaborador actualizada correctamente' };
+  }
+
+  throw new Error('Token inválido');
+};
 
