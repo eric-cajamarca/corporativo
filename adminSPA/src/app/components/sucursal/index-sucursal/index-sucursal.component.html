@@ -1,124 +1,129 @@
-<app-topnav></app-topnav>
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
 
-<div class="container bg-white my-4 py-3 rounded shadow-sm">
-  <div class="card border-0">
-    <div class="card-header bg-transparent border-0 pb-0">
-      <div class="d-flex justify-content-between align-items-center flex-wrap">
-        <h4 class="mb-3 mb-md-0 fw-semibold">
-          Mostrando todas las sucursales
-        </h4>
-        
-        <div class="d-flex flex-column align-items-end">
-          <button class="btn btn-primary mb-2" 
-                  [routerLink]="['/editar-empresa']" 
-                  routerLinkActive="active">
-            Crear nueva sucursal
-          </button>
-          <small class="text-muted text-end">Puede crear una nueva sucursal en editar empresa con permisos de administrador</small>
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<!-- Contenido principal: se desplaza según estado del sidebar -->
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container bg-white my-4 py-3 rounded shadow-sm">
+      <div class="card border-0">
+        <div class="card-header bg-transparent border-0 pb-0">
+          <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <h4 class="mb-3 mb-md-0 fw-semibold">
+              Mostrando todas las sucursales
+            </h4>
+            <button class="btn btn-primary mb-2" 
+                      [routerLink]="['/editar-empresa']" 
+                      routerLinkActive="active">
+                Crear nueva sucursal
+              </button>
+            
+          </div>
         </div>
-      </div>
-    </div>
-
-    <div class="card-body">
-      <!-- Mensaje cuando no hay sucursales -->
-      <div *ngIf="sucursales_const.length === 0" class="alert alert-danger">
-        <div class="d-flex align-items-center">
-          <i class="bi bi-exclamation-triangle-fill me-2"></i>
-          <p class="mb-0">No tienes sucursales registradas</p>
-        </div>
-      </div>
-
-      <!-- Tabla de sucursales -->
-      <div *ngIf="sucursales_const.length > 0" class="table-responsive">
-        <table class="table table-hover align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Nombre</th>
-              <th>Dirección</th>
-              <th>Registro</th>
-              <th>Estado</th>
-              <th class="text-end">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of sucursales | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
-              <td>{{ item.nombre }}</td>
-              <td>{{ item.direccion }}</td>
-              <td>{{ item.fregistro }}</td>
-              <td>
-                <span class="badge" [ngClass]="item.estado ? 'bg-success' : 'bg-danger'">
-                  {{ item.estado ? 'Activo' : 'Inactivo' }}
-                </span>
-              </td>
-              <td class="text-end">
-                <!-- Dropdown de opciones con Bootstrap nativo -->
-                <div class="dropdown">
-                  <button class="btn btn-sm btn-primary dropdown-toggle" type="button" 
-                          data-bs-toggle="dropdown" aria-expanded="false">
-                    Opciones
-                  </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li>
-                      <a class="dropdown-item" style="cursor: pointer;" 
-                         data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idSucursal">
-                        {{ item.estado ? 'Desactivar' : 'Activar' }}
-                      </a>
-                    </li>
-                    <li>
-                      <a class="dropdown-item" [routerLink]="['/sucursal', item.idSucursal]">
-                        Editar
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-
-                <!-- Modal de confirmación -->
-                <div class="modal fade" [id]="'update-'+item.idSucursal" tabindex="-1" 
-                     aria-labelledby="updateModalLabel" aria-hidden="true">
-                  <div class="modal-dialog">
-                    <div class="modal-content">
-                      <div class="modal-header">
-                        <h5 class="modal-title" id="updateModalLabel">
-                          Cambio de estado de la sucursal: {{item.nombre}}
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                      </div>
-                      <div class="modal-body">
-                        <p>¿Está seguro que desea cambiar el estado de la sucursal?</p>
-                      </div>
-                      <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-primary" 
-                                (click)="actualizarEstado(item.idSucursal, item.estado)" 
-                                data-bs-dismiss="modal"
-                                [disabled]="load_estado">
-                          <span *ngIf="!load_estado">Confirmar</span>
-                          <span *ngIf="load_estado" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                          <span *ngIf="load_estado" class="ms-1">Procesando...</span>
-                        </button>
+    
+        <div class="card-body">
+          <!-- Mensaje cuando no hay sucursales -->
+          <div *ngIf="sucursales_const.length === 0" class="alert alert-danger">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              <p class="mb-0">No tienes sucursales registradas</p>
+            </div>
+          </div>
+    
+          <!-- Tabla de sucursales -->
+          <div *ngIf="sucursales_const.length > 0" class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Nombre</th>
+                  <th>Dirección</th>
+                  <th>Registro</th>
+                  <th>Estado</th>
+                  <th class="text-end">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let item of sucursales | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+                  <td>{{ item.nombre }}</td>
+                  <td>{{ item.direccion }}</td>
+                  <td>{{ item.fregistro }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="item.estado ? 'bg-success' : 'bg-danger'">
+                      {{ item.estado ? 'Activo' : 'Inactivo' }}
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    <!-- Dropdown de opciones con Bootstrap nativo -->
+                    <div class="dropdown">
+                      <button class="btn btn-sm btn-primary dropdown-toggle" type="button" 
+                              data-bs-toggle="dropdown" aria-expanded="false">
+                        Opciones
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                          <a class="dropdown-item" style="cursor: pointer;" 
+                             data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idSucursal">
+                            {{ item.estado ? 'Desactivar' : 'Activar' }}
+                          </a>
+                        </li>
+                        <li>
+                          <a class="dropdown-item" [routerLink]="['/sucursal', item.idSucursal]">
+                            Editar
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+    
+                    <!-- Modal de confirmación -->
+                    <div class="modal fade" [id]="'update-'+item.idSucursal" tabindex="-1" 
+                         aria-labelledby="updateModalLabel" aria-hidden="true">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title" id="updateModalLabel">
+                              Cambio de estado de la sucursal: {{item.nombre}}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>¿Está seguro que desea cambiar el estado de la sucursal?</p>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" 
+                                    (click)="actualizarEstado(item.idSucursal, item.estado)" 
+                                    data-bs-dismiss="modal"
+                                    [disabled]="load_estado">
+                              <span *ngIf="!load_estado">Confirmar</span>
+                              <span *ngIf="load_estado" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                              <span *ngIf="load_estado" class="ms-1">Procesando...</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+    
+          <!-- Paginación personalizada -->
+          <ngb-pagination 
+              *ngIf="sucursales.length > 0"
+              [(page)]="page"
+              [pageSize]="pageSize"
+              [collectionSize]="sucursales.length"
+              [maxSize]="maxSize"
+              [rotate]="rotate"
+              [boundaryLinks]="boundaryLinks"
+              (pageChange)="onPageChange($event)"
+              aria-label="Paginación de sucursales"
+              class="d-flex justify-content-center my-4">
+            </ngb-pagination>
+        </div>
       </div>
-
-      <!-- Paginación personalizada -->
-      <ngb-pagination 
-          *ngIf="sucursales.length > 0"
-          [(page)]="page"
-          [pageSize]="pageSize"
-          [collectionSize]="sucursales.length"
-          [maxSize]="maxSize"
-          [rotate]="rotate"
-          [boundaryLinks]="boundaryLinks"
-          (pageChange)="onPageChange($event)"
-          aria-label="Paginación de sucursales"
-          class="d-flex justify-content-center my-4">
-        </ngb-pagination>
     </div>
   </div>
-</div>
+</main>

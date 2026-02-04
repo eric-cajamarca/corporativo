@@ -184,7 +184,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'DASHBOARD',
             nombre: 'Dashboard',
-            icono: 'fas fa-tachometer-alt',
+            icono: 'bi bi-speedometer2',
             ruta: '/home',
             permiso: 'VER_DASHBOARD',
             visible: esAdmin || permisos.includes('VER_DASHBOARD')
@@ -192,7 +192,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'CAJA',
             nombre: 'Caja',
-            icono: 'fas fa-cash-register',
+            icono: 'bi bi-cash-coin',
             ruta: '/caja',
             permiso: 'VER_CAJA',
             visible: esAdmin || permisos.includes('VER_CAJA')
@@ -200,7 +200,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'CREDITOS',
             nombre: 'Créditos',
-            icono: 'fas fa-hand-holding-usd',
+            icono: 'bi bi-credit-card',
             ruta: '/creditos',
             permiso: 'VER_CREDITOS',
             visible: esAdmin || permisos.includes('VER_CREDITOS')
@@ -208,7 +208,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'ANALISIS',
             nombre: 'Análisis',
-            icono: 'fas fa-chart-line',
+            icono: 'bi bi-graph-up',
             ruta: '/analisis',
             permiso: 'VER_ANALISIS',
             visible: esAdmin || permisos.includes('VER_ANALISIS')
@@ -219,7 +219,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'VENTAS',
             nombre: 'Ventas',
-            icono: 'fas fa-shopping-cart',
+            icono: 'bi bi-cart',
             ruta: null,
             permiso: 'VER_VENTAS',
             visible: esAdmin || permisos.includes('VER_VENTAS'),
@@ -232,7 +232,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'COMPRAS',
             nombre: 'Compras',
-            icono: 'fas fa-shopping-bag',
+            icono: 'bi bi-bag',
             ruta: null,
             permiso: 'VER_COMPRAS',
             visible: esAdmin || permisos.includes('VER_COMPRAS'),
@@ -245,7 +245,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'INVENTARIO',
             nombre: 'Inventario',
-            icono: 'fas fa-boxes',
+            icono: 'bi bi-box-seam',
             ruta: null,
             permiso: 'VER_INVENTARIO',
             visible: esAdmin || permisos.includes('VER_INVENTARIO'),
@@ -273,7 +273,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'CLIENTES',
             nombre: 'Clientes',
-            icono: 'fas fa-users',
+            icono: 'bi bi-people',
             ruta: null,
             permiso: 'VER_CLIENTES',
             visible: esAdmin || permisos.includes('VER_CLIENTES'),
@@ -296,7 +296,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'CONFIGURACION',
             nombre: 'Configuración',
-            icono: 'fas fa-cog',
+            icono: 'bi bi-gear',
             ruta: null,
             permiso: 'VER_CONFIGURACION',
             visible: esAdmin || permisos.includes('VER_CONFIGURACION'),
@@ -318,7 +318,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'EMPRESA',
             nombre: 'Empresa',
-            icono: 'fas fa-building',
+            icono: 'bi bi-building',
             ruta: '/editar-empresa',
             permiso: 'VER_EMPRESA',
             visible: esAdmin || permisos.includes('VER_EMPRESA')

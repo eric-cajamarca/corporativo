@@ -1,0 +1,39 @@
+.modal-header {
+  border-bottom: 2px solid #e9ecef;
+}
+
+.modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.accordion-button {
+  font-weight: 600;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: #f8f9fa;
+  color: #212529;
+}
+
+.accordion-button:focus {
+  box-shadow: none;
+  border-color: #e9ecef;
+}
+
+.table-responsive {
+  border-radius: 8px;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.form-control-sm,
+.form-select-sm {
+  font-size: 0.875rem;
+}
+
+.btn-close-white {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}

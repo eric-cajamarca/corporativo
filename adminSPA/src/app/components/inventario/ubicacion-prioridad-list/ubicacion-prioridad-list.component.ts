@@ -1,30 +1,87 @@
-import { Component } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UbicacionPrioridad } from '../../../models/ubicacion-prioridad.model';
 import { UbicacionPrioridadService } from '../../../services/ubicacion-prioridad.service';
+import { SucursalService } from '../../../services/sucursal.service';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
+import { FormsModule } from '@angular/forms';
+
+declare var iziToast: any;
 
 @Component({
   selector: 'app-ubicacion-prioridad-list',
   standalone: true,
-  imports: [CommonModule, TopnavComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
   templateUrl: './ubicacion-prioridad-list.component.html',
   styleUrl: './ubicacion-prioridad-list.component.css'
 })
-export class UbicacionPrioridadListComponent {
+export class UbicacionPrioridadListComponent implements OnInit {
+  // Input opcional para filtrar por sucursal
+  @Input() sucursalFiltro: string | null = null;
+  
   // Lista de ubicaciones
   ubicaciones: UbicacionPrioridad[] = [];
   
   // Agrupadas por sucursal para mejor visualización
   ubicacionesPorSucursal: { [key: string]: UbicacionPrioridad[] } = {};
   
+  // Lista de sucursales
+  sucursales: any[] = [];
+  
+  // Formulario para nueva ubicación
+  nuevaUbicacionForm: FormGroup;
+  mostrandoFormNuevo = false;
+  
+  // Modo edición
+  editandoId: number | null = null;
+  formEdicion: FormGroup;
+  
   // Bandera de carga
   isLoading = true;
+  guardando = false;
 
-  constructor(private ubicacionService: UbicacionPrioridadService) {}
+  /** Expone Object para usar Object.keys en el template */
+  readonly objectRef = Object;
+
+  constructor(
+    public activeModal: NgbActiveModal,
+    private ubicacionService: UbicacionPrioridadService,
+    private sucursalService: SucursalService,
+    private fb: FormBuilder
+  ) {
+    this.nuevaUbicacionForm = this.fb.group({
+      idSucursal: ['', Validators.required],
+      codigoUbicacion: ['', [Validators.required, Validators.maxLength(20)]],
+      prioridad: [999, [Validators.required, Validators.min(1)]]
+    });
+
+    this.formEdicion = this.fb.group({
+      codigoUbicacion: ['', [Validators.required, Validators.maxLength(20)]],
+      prioridad: [999, [Validators.required, Validators.min(1)]]
+    });
+  }
 
   ngOnInit(): void {
+    this.cargarSucursales();
     this.cargarUbicaciones();
+  }
+
+  /**
+   * Carga las sucursales para el select
+   */
+  cargarSucursales(): void {
+    this.sucursalService.obtener_sucursal_todos().subscribe({
+      next: (response: any) => {
+        this.sucursales = response.data || [];
+        if (this.sucursalFiltro) {
+          this.nuevaUbicacionForm.patchValue({ idSucursal: this.sucursalFiltro });
+        }
+      },
+      error: (error) => {
+        console.error('Error cargando sucursales:', error);
+      }
+    });
   }
 
   /**
@@ -33,7 +90,15 @@ export class UbicacionPrioridadListComponent {
   cargarUbicaciones(): void {
     this.isLoading = true;
     this.ubicacionService.obtener_ubicacionesPrioridad_todos().subscribe({
-      next: (data) => {
+      next: (response: any) => {
+        let data = response.data || response;
+        data = Array.isArray(data) ? data : [];
+        
+        // Filtrar por sucursal si está especificado
+        if (this.sucursalFiltro) {
+          data = data.filter((u: any) => u.idSucursal === this.sucursalFiltro);
+        }
+        
         this.ubicaciones = data;
         this.agruparPorSucursal();
         this.isLoading = false;
@@ -41,6 +106,12 @@ export class UbicacionPrioridadListComponent {
       error: (error) => {
         console.error('Error al cargar ubicaciones', error);
         this.isLoading = false;
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: 'Error al cargar las ubicaciones',
+          position: 'topRight'
+        });
       }
     });
   }
@@ -57,39 +128,210 @@ export class UbicacionPrioridadListComponent {
       }
       this.ubicacionesPorSucursal[key].push(ubicacion);
     }
+    
+    // Ordenar por prioridad dentro de cada sucursal
+    Object.keys(this.ubicacionesPorSucursal).forEach(key => {
+      this.ubicacionesPorSucursal[key].sort((a, b) => 
+        (a.prioridad || 999) - (b.prioridad || 999)
+      );
+    });
   }
 
   /**
-   * Cambia prioridad de una ubicación (drag & drop)
+   * Muestra formulario para crear nueva ubicación
    */
-  actualizarPrioridad(idUbicacion: number, nuevaPrioridad: number): void {
-    this.ubicacionService.actualizar_ubicacionPrioridad(idUbicacion, { prioridad: nuevaPrioridad }).subscribe({
+  mostrarFormNuevo(): void {
+    this.mostrandoFormNuevo = true;
+    this.nuevaUbicacionForm.reset({
+      idSucursal: this.sucursalFiltro || '',
+      codigoUbicacion: '',
+      prioridad: 999
+    });
+  }
+
+  /**
+   * Cancela creación de nueva ubicación
+   */
+  cancelarNuevo(): void {
+    this.mostrandoFormNuevo = false;
+    this.nuevaUbicacionForm.reset();
+  }
+
+  /**
+   * Crea nueva ubicación
+   */
+  crearUbicacion(): void {
+    if (this.nuevaUbicacionForm.invalid) {
+      iziToast.show({
+        title: 'Validación',
+        titleColor: '#ffc107',
+        message: 'Complete todos los campos requeridos',
+        position: 'topRight'
+      });
+      return;
+    }
+
+    this.guardando = true;
+    const datos = this.nuevaUbicacionForm.value;
+    
+    this.ubicacionService.crear_ubicacionPrioridad(datos).subscribe({
       next: () => {
-        alert('Prioridad actualizada');
+        this.guardando = false;
+        this.mostrandoFormNuevo = false;
+        iziToast.show({
+          title: 'Éxito',
+          titleColor: '#28a745',
+          message: 'Ubicación creada correctamente',
+          position: 'topRight'
+        });
         this.cargarUbicaciones();
       },
-      error: (error) => alert('Error: ' + error.message)
+      error: (error) => {
+        this.guardando = false;
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: error.error?.message || 'Error al crear la ubicación',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  /**
+   * Inicia edición de una ubicación
+   */
+  iniciarEdicion(ubicacion: UbicacionPrioridad): void {
+    this.editandoId = ubicacion.idUbicacion!;
+    this.formEdicion.patchValue({
+      codigoUbicacion: ubicacion.codigoUbicacion,
+      prioridad: ubicacion.prioridad
+    });
+  }
+
+  /**
+   * Cancela edición
+   */
+  cancelarEdicion(): void {
+    this.editandoId = null;
+    this.formEdicion.reset();
+  }
+
+  /**
+   * Guarda cambios de edición
+   */
+  guardarEdicion(idUbicacion: number): void {
+    if (this.formEdicion.invalid) {
+      iziToast.show({
+        title: 'Validación',
+        titleColor: '#ffc107',
+        message: 'Complete todos los campos requeridos',
+        position: 'topRight'
+      });
+      return;
+    }
+
+    this.guardando = true;
+    const datos = this.formEdicion.value;
+    
+    this.ubicacionService.actualizar_ubicacionPrioridad(idUbicacion, datos).subscribe({
+      next: () => {
+        this.guardando = false;
+        this.editandoId = null;
+        iziToast.show({
+          title: 'Éxito',
+          titleColor: '#28a745',
+          message: 'Ubicación actualizada correctamente',
+          position: 'topRight'
+        });
+        this.cargarUbicaciones();
+      },
+      error: (error) => {
+        this.guardando = false;
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: error.error?.message || 'Error al actualizar la ubicación',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  /**
+   * Cambia prioridad de una ubicación directamente
+   */
+  actualizarPrioridad(idUbicacion: number, nuevaPrioridad: number): void {
+    if (nuevaPrioridad < 1) {
+      iziToast.show({
+        title: 'Validación',
+        titleColor: '#ffc107',
+        message: 'La prioridad debe ser mayor a 0',
+        position: 'topRight'
+      });
+      return;
+    }
+
+    this.ubicacionService.actualizar_ubicacionPrioridad(idUbicacion, { prioridad: nuevaPrioridad }).subscribe({
+      next: () => {
+        iziToast.show({
+          title: 'Éxito',
+          titleColor: '#28a745',
+          message: 'Prioridad actualizada',
+          position: 'topRight'
+        });
+        this.cargarUbicaciones();
+      },
+      error: (error) => {
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: error.error?.message || 'Error al actualizar la prioridad',
+          position: 'topRight'
+        });
+      }
     });
   }
 
   /**
    * Elimina ubicación
    */
-  eliminarUbicacion(idUbicacion: number): void {
-    if (confirm('¿Eliminar ubicación? Se perderán las asignaciones de stock.')) {
+  eliminarUbicacion(idUbicacion: number, codigoUbicacion: string): void {
+    if (confirm(`¿Está seguro de eliminar la ubicación "${codigoUbicacion}"?\n\nSe perderán las asignaciones de stock asociadas.`)) {
       this.ubicacionService.eliminar_ubicacionPrioridad(idUbicacion).subscribe({
         next: () => {
-          alert('Ubicación eliminada');
+          iziToast.show({
+            title: 'Éxito',
+            titleColor: '#28a745',
+            message: 'Ubicación eliminada correctamente',
+            position: 'topRight'
+          });
           this.cargarUbicaciones();
         },
-        error: (error) => alert('Error: ' + error.message)
+        error: (error) => {
+          iziToast.show({
+            title: 'Error',
+            titleColor: '#dc3545',
+            message: error.error?.message || 'Error al eliminar la ubicación',
+            position: 'topRight'
+          });
+        }
       });
     }
   }
 
-  onPrioridadBlur(id: number, event: Event) {
-  const input = event.target as HTMLInputElement;
-  this.actualizarPrioridad(id, Number(input.value));
-}
+  /**
+   * Obtiene nombre de sucursal
+   */
+  getNombreSucursal(idSucursal: string): string {
+    const sucursal = this.sucursales.find(s => s.idSucursal === idSucursal);
+    return sucursal ? `${sucursal.codigo} - ${sucursal.direccion}` : idSucursal.slice(0, 8) + '...';
+  }
 
+  /**
+   * Cierra el modal
+   */
+  cerrar(): void {
+    this.activeModal.close({ success: true });
+  }
 }

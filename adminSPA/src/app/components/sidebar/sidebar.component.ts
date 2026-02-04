@@ -95,16 +95,16 @@ export class SidebarComponent implements OnInit {
     if (!estado) return;
 
     const navegacionBasica: MenuItem[] = [
-      { nombre: 'Dashboard', icono: 'fas fa-tachometer-alt', ruta: '/home', visible: true },
+      { nombre: 'Dashboard', icono: 'bi bi-speedometer2', ruta: '/home', visible: true },
       { tipo: 'separador' },
-      { nombre: 'Configuración Empresa', icono: 'fas fa-building', ruta: '/editar-empresa', visible: true },
+      { nombre: 'Configuración Empresa', icono: 'bi bi-building', ruta: '/editar-empresa', visible: true },
     ];
 
     // Si no tiene colaboradores, solo mostrar colaboradores
     if (!estado.tieneColaboradores) {
       navegacionBasica.push({ 
         nombre: 'Crear Primer Colaborador', 
-        icono: 'fas fa-user-plus', 
+        icono: 'bi bi-person-plus', 
         ruta: '/colaborador/create', 
         visible: true 
       });
@@ -116,15 +116,15 @@ export class SidebarComponent implements OnInit {
     const navegacionCompleta: MenuItem[] = [
       ...navegacionBasica,
       { tipo: 'separador' },
-      { nombre: 'Colaboradores', icono: 'fas fa-users', ruta: '/colaborador', visible: true },
-      { nombre: 'Ventas', icono: 'fas fa-shopping-cart', ruta: '/ventas', visible: true },
-      { nombre: 'Compras', icono: 'fas fa-shopping-bag', ruta: '/compras', visible: true },
-      { nombre: 'Inventario', icono: 'fas fa-boxes', ruta: '/inventario', visible: true },
-      { nombre: 'Productos', icono: 'fas fa-box', ruta: '/productos', visible: true },
-      { nombre: 'Clientes', icono: 'fas fa-users', ruta: '/clientes', visible: true },
-      { nombre: 'Proveedores', icono: 'fas fa-truck', ruta: '/proveedores', visible: true },
+      { nombre: 'Colaboradores', icono: 'bi bi-people', ruta: '/colaborador', visible: true },
+      { nombre: 'Ventas', icono: 'bi bi-cart', ruta: '/ventas', visible: true },
+      { nombre: 'Compras', icono: 'bi bi-bag', ruta: '/compras', visible: true },
+      { nombre: 'Inventario', icono: 'bi bi-box-seam', ruta: '/inventario', visible: true },
+      { nombre: 'Productos', icono: 'bi bi-box', ruta: '/productos', visible: true },
+      { nombre: 'Clientes', icono: 'bi bi-people', ruta: '/clientes', visible: true },
+      { nombre: 'Proveedores', icono: 'bi bi-truck', ruta: '/proveedores', visible: true },
       { tipo: 'separador' },
-      { nombre: 'Configuración', icono: 'fas fa-cog', ruta: '/configuracion', visible: true },
+      { nombre: 'Configuración', icono: 'bi bi-gear', ruta: '/configuracion', visible: true },
     ];
 
     this.menuItems.set(navegacionCompleta);
@@ -154,11 +154,11 @@ export class SidebarComponent implements OnInit {
    */
   private cargarNavegacionDefecto(): void {
     const navegacionDefecto: MenuItem[] = [
-      { nombre: 'Dashboard', icono: 'fas fa-tachometer-alt', ruta: '/home', visible: true },
+      { nombre: 'Dashboard', icono: 'bi bi-speedometer2', ruta: '/home', visible: true },
       { tipo: 'separador' },
-      { nombre: 'Ventas', icono: 'fas fa-shopping-cart', ruta: '/ventas', visible: true },
-      { nombre: 'Compras', icono: 'fas fa-shopping-bag', ruta: '/compras', visible: true },
-      { nombre: 'Inventario', icono: 'fas fa-boxes', ruta: '/inventario', visible: true },
+      { nombre: 'Ventas', icono: 'bi bi-cart', ruta: '/ventas', visible: true },
+      { nombre: 'Compras', icono: 'bi bi-bag', ruta: '/compras', visible: true },
+      { nombre: 'Inventario', icono: 'bi bi-box-seam', ruta: '/inventario', visible: true },
     ];
     this.menuItems.set(navegacionDefecto);
   }

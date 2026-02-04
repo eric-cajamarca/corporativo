@@ -1,0 +1,191 @@
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<!-- Contenido principal -->
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h1 class="content-title mb-1">Inventario</h1>
+        <p class="content-subtitle text-muted mb-0">Gestión completa de lotes y ubicaciones</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estadísticas -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card stat-card stat-card-primary">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="stat-label">Total de Lotes</h6>
+              <h3 class="stat-value mb-0">{{ totalLotes }}</h3>
+            </div>
+            <div class="stat-icon">
+              <i class="fas fa-boxes fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card stat-card-success">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="stat-label">Stock Total</h6>
+              <h3 class="stat-value mb-0">{{ totalStock }}</h3>
+            </div>
+            <div class="stat-icon">
+              <i class="fas fa-warehouse fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card stat-card-info">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="stat-label">Lotes Recientes</h6>
+              <h3 class="stat-value mb-0">{{ lotesRecientes.length }}</h3>
+            </div>
+            <div class="stat-icon">
+              <i class="fas fa-clock fa-2x"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accesos Rápidos -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">
+        <i class="fas fa-bolt me-2"></i>
+        Accesos Rápidos
+      </h5>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4 col-sm-6">
+          <button type="button" class="btn btn-outline-primary w-100 h-100 quick-action-btn" (click)="abrirCrearLote($event)">
+            <i class="fas fa-plus-circle fa-2x mb-2"></i>
+            <div>Nuevo Lote</div>
+            <small class="text-muted">Crear lote manualmente</small>
+          </button>
+        </div>
+        <div class="col-md-4 col-sm-6">
+          <button type="button" class="btn btn-outline-success w-100 h-100 quick-action-btn" (click)="abrirListaLotes($event)">
+            <i class="fas fa-list fa-2x mb-2"></i>
+            <div>Gestionar Lotes</div>
+            <small class="text-muted">Ver y editar lotes</small>
+          </button>
+        </div>
+        <div class="col-md-4 col-sm-6">
+          <button type="button" class="btn btn-outline-info w-100 h-100 quick-action-btn" (click)="abrirAsignarUbicaciones($event)">
+            <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+            <div>Asignar Ubicaciones</div>
+            <small class="text-muted">Distribuir stock en ubicaciones</small>
+          </button>
+        </div>
+        <div class="col-md-4 col-sm-6">
+          <button type="button" class="btn btn-outline-warning w-100 h-100 quick-action-btn" (click)="abrirMovimientoUbicacion($event)">
+            <i class="fas fa-exchange-alt fa-2x mb-2"></i>
+            <div>Mover Stock</div>
+            <small class="text-muted">Trasladar entre ubicaciones</small>
+          </button>
+        </div>
+        <div class="col-md-4 col-sm-6">
+          <button type="button" class="btn btn-outline-secondary w-100 h-100 quick-action-btn" (click)="abrirUbicacionesPrioridad($event)">
+            <i class="fas fa-sort-numeric-down fa-2x mb-2"></i>
+            <div>Ubicaciones</div>
+            <small class="text-muted">Configurar prioridades</small>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lotes Recientes -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">
+        <i class="fas fa-history me-2"></i>
+        Lotes Recientes
+      </h5>
+      <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirListaLotes($event)">
+        Ver Todos
+      </button>
+    </div>
+    <div class="card-body">
+      @if (cargandoEstadisticas) {
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary"></div>
+        </div>
+      } @else if (lotesRecientes.length === 0) {
+        <div class="text-center py-4 text-muted">
+          <i class="fas fa-box-open fa-3x mb-2"></i>
+          <p class="mb-0">No hay lotes registrados</p>
+          <button type="button" class="btn btn-primary mt-2" (click)="abrirCrearLote($event)">
+            Crear Primer Lote
+          </button>
+        </div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Sucursal</th>
+                <th>Costo Unit.</th>
+                <th>Disponible</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (lote of lotesRecientes; track lote.idLote) {
+                <tr>
+                  <td>{{ lote.nombreProducto || 'N/D' }}</td>
+                  <td>{{ lote.nombreSucursal || 'N/D' }}</td>
+                  <td>S/ {{ lote.costoUnitario | number:'1.2-2' }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="{
+                      'bg-success': lote.cantidadDisponible > 50,
+                      'bg-warning': lote.cantidadDisponible <= 50 && lote.cantidadDisponible > 10,
+                      'bg-danger': lote.cantidadDisponible <= 10
+                    }">
+                      {{ lote.cantidadDisponible }}
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                      <button 
+                        class="btn btn-outline-success" 
+                        (click)="inventarioModal.abrirAsignarUbicaciones(lote.idLote, lote.cantidadDisponible)"
+                        title="Asignar Ubicaciones">
+                        <i class="fas fa-map-marker-alt"></i>
+                      </button>
+                      <button 
+                        class="btn btn-outline-info" 
+                        (click)="inventarioModal.abrirMovimientoUbicacion(lote.idLote)"
+                        title="Mover Stock">
+                        <i class="fas fa-exchange-alt"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</main>

@@ -1,4 +1,5 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
+import { signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { ComprasService } from '../../../services/compras.service';
 import { SucursalService } from '../../../services/sucursal.service';
@@ -6,6 +7,7 @@ import { ProductoService } from '../../../services/producto.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoCompuestoService } from '../../../services/producto-compuesto.service';
 import { ProductovarianteService } from '../../../services/productovariante.service';
@@ -15,12 +17,15 @@ import { ProductovarianteService } from '../../../services/productovariante.serv
 
 @Component({
   selector: 'app-index-producto',
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, NgbPagination],
+  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, SidebarComponent, NgbPagination],
   templateUrl: './index-producto.component.html',
   styleUrl: './index-producto.component.css'
 })
 export class IndexProductoComponent {
-   // NUEVAS VARIABLES PARA MODALES
+   // Estado del sidebar
+  sidebarCollapsed = signal<boolean>(false);
+
+  // NUEVAS VARIABLES PARA MODALES
   @ViewChild('modalConvertirCompuesto') modalConvertirCompuesto!: ElementRef;
   @ViewChild('modalGestionarVariantes') modalGestionarVariantes!: ElementRef;
   
@@ -84,6 +89,18 @@ export class IndexProductoComponent {
   ngOnInit(): void {
     this.initData();
 
+    // Verificar preferencia de sidebar
+    const collapsed = localStorage.getItem('sidebarCollapsed');
+    if (collapsed === 'true') {
+      this.sidebarCollapsed.set(true);
+    }
+  }
+
+  /**
+   * Maneja el toggle del sidebar
+   */
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
   }
 
   initData() {

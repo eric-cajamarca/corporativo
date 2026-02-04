@@ -1,66 +1,156 @@
-<div class="container mt-4">
-  <div class="card">
-    <div class="card-header bg-warning text-dark">
-      <h3>🔄 Traslado entre Ubicaciones</h3>
-    </div>
-    <div class="card-body">
-      <form [formGroup]="movimientoForm" (ngSubmit)="ejecutarMovimiento()">
-        
-        <!-- Selección de Lote -->
-        <div class="mb-3">
-          <label for="lote" class="form-label">Lote *</label>
-          <select 
-            id="lote" 
-            formControlName="idLote" 
-            class="form-control"
-            (change)="onLoteSeleccionado()"
-          >
-            <option value="" disabled>Seleccione un lote</option>
-            <option *ngFor="let lote of lotes" [value]="lote.idLote">
-              {{ lote.idLote | slice:0:8 }}... ({{ lote.cantidadDisponible }} unid.)
-            </option>
-          </select>
-        </div>
+<div class="modal-header bg-warning text-dark">
+  <h5 class="modal-title">
+    <i class="fas fa-exchange-alt me-2"></i>
+    Traslado entre Ubicaciones
+  </h5>
+  <button type="button" class="btn-close" (click)="cancelar()"></button>
+</div>
 
-        <!-- Ubicación Origen -->
-        <div class="mb-3">
-          <label for="origen" class="form-label">Desde Ubicación *</label>
-          <select id="origen" formControlName="idUbicacionOrigen" class="form-control">
-            <option value="" disabled>Seleccione origen</option>
-            <option *ngFor="let u of ubicacionesOrigen" [value]="u.idUbicacion">
+<div class="modal-body">
+  <form [formGroup]="movimientoForm" (ngSubmit)="ejecutarMovimiento()">
+    <!-- Selección de Lote -->
+    <div class="mb-3">
+      <label for="lote" class="form-label">Lote *</label>
+      @if (cargandoLotes) {
+        <div class="text-center py-2">
+          <div class="spinner-border spinner-border-sm text-primary"></div>
+        </div>
+      } @else {
+        <select 
+          id="lote" 
+          formControlName="idLote" 
+          class="form-select"
+          [class.is-invalid]="hasError('idLote')"
+          (change)="onLoteSeleccionado()">
+          <option value="">Seleccione un lote</option>
+          @for (lote of lotes; track lote.idLote) {
+            <option [value]="lote.idLote">
+              {{ lote.nombreProducto || 'Lote' }} - {{ lote.idLote | slice:0:8 }}... 
+              ({{ lote.cantidadDisponible }} unid.)
+            </option>
+          }
+        </select>
+        @if (hasError('idLote')) {
+          <div class="invalid-feedback">Seleccione un lote</div>
+        }
+      }
+    </div>
+
+    <!-- Ubicación Origen -->
+    <div class="mb-3">
+      <label for="origen" class="form-label">Desde Ubicación *</label>
+      @if (cargandoUbicaciones) {
+        <div class="text-center py-2">
+          <div class="spinner-border spinner-border-sm text-primary"></div>
+        </div>
+      } @else {
+        <select 
+          id="origen" 
+          formControlName="idUbicacionOrigen" 
+          class="form-select"
+          [class.is-invalid]="hasError('idUbicacionOrigen')"
+          (change)="onUbicacionOrigenSeleccionada()">
+          <option value="">Seleccione origen</option>
+          @for (u of ubicacionesOrigen; track u.idUbicacion) {
+            <option [value]="u.idUbicacion">
               {{ u.codigoUbicacion }} ({{ u.cantidad }} unid.)
             </option>
-          </select>
-        </div>
-
-        <!-- Ubicación Destino -->
-        <div class="mb-3">
-          <label for="destino" class="form-label">Hacia Ubicación *</label>
-          <select id="destino" formControlName="idUbicacionDestino" class="form-control">
-            <option value="" disabled>Seleccione destino</option>
-            <option *ngFor="let u of ubicacionesDestino" [value]="u.idUbicacion">
-              {{ u.codigoUbicacion }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Cantidad -->
-        <div class="mb-3">
-          <label for="cantidad" class="form-label">Cantidad a Mover *</label>
-          <input 
-            type="number" 
-            id="cantidad" 
-            formControlName="cantidad" 
-            class="form-control"
-            min="1"
-          >
-        </div>
-
-        <!-- Botones -->
-        <button type="submit" class="btn btn-warning" [disabled]="movimientoForm.invalid">
-          <i class="bi bi-arrow-left-right"></i> Ejecutar Movimiento
-        </button>
-      </form>
+          }
+        </select>
+        @if (hasError('idUbicacionOrigen')) {
+          <div class="invalid-feedback">Seleccione una ubicación origen</div>
+        }
+        @if (ubicacionesOrigen.length === 0 && movimientoForm.get('idLote')?.value) {
+          <small class="text-muted">Este lote no tiene ubicaciones asignadas</small>
+        }
+      }
     </div>
-  </div>
+
+    <!-- Stock disponible en origen -->
+    @if (stockDisponibleOrigen > 0) {
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Stock disponible en origen:</strong> {{ stockDisponibleOrigen }} unidades
+      </div>
+    }
+
+    <!-- Ubicación Destino -->
+    <div class="mb-3">
+      <label for="destino" class="form-label">Hacia Ubicación *</label>
+      <select 
+        id="destino" 
+        formControlName="idUbicacionDestino" 
+        class="form-select"
+        [class.is-invalid]="hasError('idUbicacionDestino')"
+        [disabled]="ejecutando || ubicacionesDestino.length === 0 || !movimientoForm.get('idUbicacionOrigen')?.value">
+        <option value="">Seleccione destino</option>
+        @for (u of ubicacionesDestino; track u.idUbicacion) {
+          <option [value]="u.idUbicacion">
+            {{ u.codigoUbicacion }} (Prioridad: {{ u.prioridad }})
+          </option>
+        }
+      </select>
+      @if (hasError('idUbicacionDestino')) {
+        <div class="invalid-feedback">Seleccione una ubicación destino</div>
+      }
+      @if (ubicacionesDestino.length === 0 && movimientoForm.get('idUbicacionOrigen')?.value) {
+        <small class="text-muted">No hay otras ubicaciones disponibles</small>
+      }
+    </div>
+
+    <!-- Cantidad -->
+    <div class="mb-3">
+      <label for="cantidad" class="form-label">Cantidad a Mover *</label>
+      <input 
+        type="number" 
+        id="cantidad" 
+        formControlName="cantidad" 
+        class="form-control"
+        [class.is-invalid]="hasError('cantidad')"
+        (blur)="validarCantidad()"
+        [max]="stockDisponibleOrigen"
+        min="1">
+      @if (hasError('cantidad')) {
+        <div class="invalid-feedback">Ingrese una cantidad válida</div>
+      }
+      @if (stockDisponibleOrigen > 0) {
+        <small class="text-muted">Máximo: {{ stockDisponibleOrigen }} unidades</small>
+      }
+    </div>
+
+    <!-- Resumen del movimiento -->
+    @if (movimientoForm.get('cantidad')?.value > 0 && movimientoForm.get('idUbicacionOrigen')?.value && movimientoForm.get('idUbicacionDestino')?.value) {
+      <div class="alert alert-success">
+        <i class="fas fa-check-circle me-2"></i>
+        <strong>Resumen:</strong> Mover 
+        <strong>{{ movimientoForm.get('cantidad')?.value }}</strong> unidades desde 
+        <strong>{{ codigoUbicacionOrigen }}</strong> 
+        hacia 
+        <strong>{{ codigoUbicacionDestino }}</strong>
+      </div>
+    }
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button 
+    type="button" 
+    class="btn btn-secondary" 
+    (click)="cancelar()"
+    [disabled]="ejecutando">
+    <i class="fas fa-times me-1"></i>Cancelar
+  </button>
+  <button 
+    type="button" 
+    class="btn btn-warning" 
+    (click)="ejecutarMovimiento()" 
+    [disabled]="movimientoForm.invalid || ejecutando || stockDisponibleOrigen === 0">
+    @if (ejecutando) {
+      <span class="spinner-border spinner-border-sm me-1"></span>
+      Ejecutando...
+    } @else {
+      <i class="fas fa-exchange-alt me-1"></i>
+      Ejecutar Movimiento
+    }
+  </button>
 </div>

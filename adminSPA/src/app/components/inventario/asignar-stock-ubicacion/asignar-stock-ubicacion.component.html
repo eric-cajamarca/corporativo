@@ -1,43 +1,135 @@
-<app-topnav></app-topnav>
-<div class="modal-header">
-  <h4 class="modal-title">📍 Asignar Stock a Ubicaciones</h4>
-  <button type="button" class="btn-close" (click)="activeModal.dismiss()"></button>
+<div class="modal-header bg-primary text-white">
+  <h5 class="modal-title">
+    <i class="fas fa-map-marker-alt me-2"></i>
+    Asignar Stock a Ubicaciones
+  </h5>
+  <button type="button" class="btn-close btn-close-white" (click)="cancelar()"></button>
 </div>
-<div class="modal-body">
-  <p>Total a asignar: <strong>{{ cantidadTotal }}</strong> unidades</p>
-  <p class="text-danger">Restante: {{ cantidadRestante }}</p>
 
-  <div *ngIf="ubicaciones.length === 0" class="alert alert-warning">
-    No hay ubicaciones configuradas para esta sucursal
+<div class="modal-body">
+  <!-- Loading del lote -->
+  <div *ngIf="cargandoLote" class="text-center py-4">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Cargando información del lote...</span>
+    </div>
   </div>
 
-  <table class="table table-sm" *ngIf="ubicaciones.length > 0">
-    <thead>
-      <tr>
-        <th>Ubicación</th>
-        <th>Cantidad a asignar</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let asignacion of asignaciones">
-        <td>{{ asignacion.codigoUbicacion }}</td>
-        <td>
-          <input 
-            type="number" 
-            class="form-control form-control-sm" 
-            [(ngModel)]="asignacion.cantidad"
-            (input)="calcularRestante()"
-            min="0"
-            [max]="cantidadRestante + asignacion.cantidad"
-          >
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- Contenido principal -->
+  <div *ngIf="!cargandoLote">
+    <!-- Información del lote -->
+    <div class="alert alert-info mb-3" *ngIf="infoLote">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong>Lote:</strong> {{ infoLote.idLote | slice:0:8 }}... | 
+          <strong>Total a asignar:</strong> <span class="badge bg-primary">{{ cantidadTotal }}</span> unidades
+        </div>
+        <button 
+          class="btn btn-sm btn-outline-primary" 
+          (click)="distribuirAutomatico()"
+          [disabled]="cantidadRestante === 0 || ubicaciones.length === 0">
+          <i class="fas fa-magic me-1"></i>Distribuir Automático
+        </button>
+      </div>
+    </div>
+
+    <!-- Indicador de cantidad restante -->
+    <div class="alert" [ngClass]="cantidadRestante === 0 ? 'alert-success' : 'alert-warning'" role="alert">
+      <div class="d-flex justify-content-between align-items-center">
+        <span>
+          <i class="fas" [ngClass]="cantidadRestante === 0 ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+          <strong>Unidades restantes por asignar:</strong> 
+          <span class="badge" [ngClass]="cantidadRestante === 0 ? 'bg-success' : 'bg-warning'">
+            {{ cantidadRestante }}
+          </span>
+        </span>
+        <small *ngIf="cantidadRestante === 0" class="text-success">
+          <i class="fas fa-check me-1"></i>Listo para guardar
+        </small>
+      </div>
+    </div>
+
+    <!-- Loading de ubicaciones -->
+    <div *ngIf="cargandoUbicaciones" class="text-center py-3">
+      <div class="spinner-border spinner-border-sm text-primary"></div>
+      <p class="text-muted mt-2 mb-0">Cargando ubicaciones...</p>
+    </div>
+
+    <!-- Sin ubicaciones -->
+    <div *ngIf="!cargandoUbicaciones && ubicaciones.length === 0" class="alert alert-warning">
+      <i class="fas fa-exclamation-triangle me-2"></i>
+      No hay ubicaciones configuradas para esta sucursal. 
+      <br>
+      <small>Configure las ubicaciones desde el módulo de inventario primero.</small>
+    </div>
+
+    <!-- Tabla de asignaciones -->
+    <div *ngIf="!cargandoUbicaciones && ubicaciones.length > 0" class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 50px;">Prioridad</th>
+            <th>Ubicación</th>
+            <th style="width: 150px;">Cantidad</th>
+            <th style="width: 100px;">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let asignacion of asignaciones" [class.table-success]="asignacion.cantidad > 0">
+            <td>
+              <span class="badge bg-secondary">{{ asignacion.prioridad }}</span>
+            </td>
+            <td>
+              <strong>{{ asignacion.codigoUbicacion }}</strong>
+            </td>
+            <td>
+              <input 
+                type="number" 
+                class="form-control form-control-sm" 
+                [(ngModel)]="asignacion.cantidad"
+                (input)="calcularRestante()"
+                (blur)="validarCantidad(asignacion, $event)"
+                min="0"
+                [max]="cantidadTotal"
+                [disabled]="guardando"
+                placeholder="0"
+              >
+            </td>
+            <td>
+              <small class="text-muted">
+                {{ cantidadTotal > 0 ? ((asignacion.cantidad / cantidadTotal) * 100).toFixed(1) : 0 }}%
+              </small>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="2" class="text-end">Total asignado:</th>
+            <th>{{ cantidadTotal - cantidadRestante }} / {{ cantidadTotal }}</th>
+            <th>
+              <span class="badge" [ngClass]="cantidadRestante === 0 ? 'bg-success' : 'bg-warning'">
+                {{ cantidadRestante === 0 ? '100%' : ((cantidadTotal - cantidadRestante) / cantidadTotal * 100).toFixed(1) + '%' }}
+              </span>
+            </th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
 </div>
+
 <div class="modal-footer">
-  <button class="btn btn-secondary" (click)="activeModal.dismiss()">Cancelar</button>
-  <button class="btn btn-success" (click)="guardarAsignacion()" [disabled]="cantidadRestante !== 0">
-    Guardar Asignación
+  <button 
+    class="btn btn-secondary" 
+    (click)="cancelar()"
+    [disabled]="guardando">
+    <i class="fas fa-times me-1"></i>Cancelar
+  </button>
+  <button 
+    class="btn btn-success" 
+    (click)="guardarAsignacion()" 
+    [disabled]="cantidadRestante !== 0 || guardando || ubicaciones.length === 0">
+    <span *ngIf="guardando" class="spinner-border spinner-border-sm me-1"></span>
+    <i *ngIf="!guardando" class="fas fa-save me-1"></i>
+    {{ guardando ? 'Guardando...' : 'Guardar Asignación' }}
   </button>
 </div>

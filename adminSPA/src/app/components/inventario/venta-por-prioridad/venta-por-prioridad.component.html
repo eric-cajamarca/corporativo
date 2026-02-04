@@ -1,58 +1,198 @@
-<div class="container mt-4">
-  <div class="card">
-    <div class="card-header bg-success text-white">
-      <h3>💰 Venta con Descuento Automático</h3>
-    </div>
-    <div class="card-body">
-      <form [formGroup]="ventaForm" (ngSubmit)="procesarVenta()">
-        
-        <!-- Sucursal -->
-        <div class="mb-3">
-          <label for="sucursal" class="form-label">Sucursal *</label>
-          <select id="sucursal" formControlName="idSucursal" class="form-control">
-            <option value="" disabled>Seleccione sucursal</option>
-            <option value="UUID_SUCURSAL_1">Sucursal Principal</option>
-          </select>
-        </div>
+<div class="modal-header bg-success text-white">
+  <h5 class="modal-title">
+    <i class="fas fa-shopping-cart me-2"></i>
+    Venta por Prioridad de Ubicaciones
+  </h5>
+  <button type="button" class="btn-close btn-close-white" (click)="cancelar()"></button>
+</div>
 
-        <!-- Productos a vender -->
-        <div class="mb-3">
-          <h5>Productos</h5>
-          <div formArrayName="productosVendidos">
-            <div *ngFor="let producto of productosVendidos.controls; let i=index" [formGroupName]="i">
-              <div class="row">
-                <div class="col-md-7">
-                  <select formControlName="idProducto" class="form-control">
-                    <option value="" disabled>Producto</option>
-                    <option *ngFor="let p of productos" [value]="p.id">{{ p.nombre }}</option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <input type="number" formControlName="cantidad" class="form-control" placeholder="Cantidad">
-                </div>
-                <div class="col-md-2">
-                  <button class="btn btn-sm btn-danger" (click)="eliminarProductoVenta(i)">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-primary mt-2" (click)="agregarProductoVenta()">
-            + Agregar Producto
+<div class="modal-body">
+  @if (cargando) {
+    <div class="text-center py-5">
+      <div class="spinner-border text-success" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+    </div>
+  } @else {
+    <form [formGroup]="ventaForm" (ngSubmit)="procesarVenta()">
+      <!-- Sucursal -->
+      <div class="mb-3">
+        <label for="sucursal" class="form-label">Sucursal *</label>
+        <select 
+          id="sucursal" 
+          formControlName="idSucursal" 
+          class="form-select"
+          [class.is-invalid]="ventaForm.get('idSucursal')?.invalid && ventaForm.get('idSucursal')?.touched">
+          <option value="">Seleccione sucursal</option>
+          @for (sucursal of sucursales; track sucursal.idSucursal) {
+            <option [value]="sucursal.idSucursal">
+              {{ sucursal.codigo }} - {{ sucursal.direccion }}
+            </option>
+          }
+        </select>
+      </div>
+
+      <!-- Buscar y agregar productos -->
+      <div class="mb-3">
+        <label class="form-label">Agregar Productos</label>
+        <div class="input-group">
+          <input 
+            type="text" 
+            class="form-control" 
+            placeholder="Buscar producto por código o descripción..."
+            [(ngModel)]="buscandoProducto"
+            [ngModelOptions]="{standalone: true}"
+            (input)="filtrarProductos()">
+          <button 
+            type="button" 
+            class="btn btn-outline-secondary" 
+            (click)="buscandoProducto = ''; filtrarProductos()">
+            <i class="fas fa-times"></i>
           </button>
         </div>
+        
+        <!-- Lista de productos filtrados -->
+        @if (buscandoProducto && productosFiltrados.length > 0) {
+          <div class="list-group mt-2" style="max-height: 200px; overflow-y: auto;">
+            @for (producto of productosFiltrados; track producto.idProducto) {
+              <button 
+                type="button" 
+                class="list-group-item list-group-item-action"
+                (click)="agregarProductoVenta(producto)">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <strong>{{ producto.codigo }}</strong> - {{ producto.descripcion }}
+                    <br>
+                    <small class="text-muted">Stock: {{ producto.stock || 0 }} | Precio: S/ {{ producto.pVenta || 0 }}</small>
+                  </div>
+                  <i class="fas fa-plus text-success"></i>
+                </div>
+              </button>
+            }
+          </div>
+        }
+      </div>
 
-        <!-- Botón procesar -->
-        <button type="submit" class="btn btn-success btn-lg" [disabled]="ventaForm.invalid">
-          <i class="bi bi-cart-check"></i> Procesar Venta
-        </button>
-
-        <!-- Nota explicativa -->
-        <div class="alert alert-info mt-3">
-          <strong>Nota:</strong> El sistema aplicará el descuento automáticamente según la prioridad de ubicaciones.
+      <!-- Productos agregados a la venta -->
+      <div class="mb-3">
+        <h6>Productos en la Venta</h6>
+        <div formArrayName="productosVendidos">
+          @if (productosVendidos.length === 0) {
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle me-2"></i>
+              No hay productos agregados. Busque y agregue productos arriba.
+            </div>
+          } @else {
+            @for (productoControl of productosVendidos.controls; track $index; let i = $index) {
+              <div class="card mb-2" [formGroupName]="i">
+                <div class="card-body">
+                  <div class="row align-items-center">
+                    <div class="col-md-5">
+                      <select 
+                        formControlName="idProducto" 
+                        class="form-select form-select-sm"
+                        (change)="onProductoSeleccionado(i)">
+                        <option value="">Seleccione producto</option>
+                        @for (p of productos; track p.idProducto) {
+                          <option [value]="p.idProducto">
+                            {{ p.codigo }} - {{ p.descripcion }} (Stock: {{ p.stock || 0 }})
+                          </option>
+                        }
+                      </select>
+                    </div>
+                    <div class="col-md-3">
+                      <input 
+                        type="number" 
+                        formControlName="cantidad" 
+                        class="form-control form-control-sm" 
+                        placeholder="Cantidad"
+                        min="1"
+                        (input)="onCantidadChange(i)">
+                    </div>
+                    <div class="col-md-3">
+                      @if (getProductoInfo(productoControl.get('idProducto')?.value)) {
+                        <small class="text-muted">
+                          Subtotal: S/ {{ (getProductoInfo(productoControl.get('idProducto')?.value).pVenta || 0) * (productoControl.get('cantidad')?.value || 0) }}
+                        </small>
+                      }
+                    </div>
+                    <div class="col-md-1">
+                      <button 
+                        type="button" 
+                        class="btn btn-sm btn-outline-danger" 
+                        (click)="eliminarProductoVenta(i)">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- Preview de movimientos por prioridad -->
+                  @if (previewMovimientos[productoControl.get('idProducto')?.value]) {
+                    <div class="mt-2">
+                      <small class="text-muted">
+                        <i class="fas fa-map-marker-alt me-1"></i>
+                        <strong>Descuento desde:</strong>
+                        @for (mov of previewMovimientos[productoControl.get('idProducto')?.value]; track mov.ubicacion) {
+                          <span class="badge bg-info me-1">
+                            {{ mov.ubicacion }} ({{ mov.cantidad }})
+                          </span>
+                        }
+                      </small>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          }
         </div>
-      </form>
-    </div>
-  </div>
+      </div>
+
+      <!-- Resumen de la venta -->
+      @if (productosVendidos.length > 0) {
+        <div class="alert alert-success">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>Total de la Venta:</strong>
+              <h4 class="mb-0">S/ {{ getTotalVenta().toFixed(2) }}</h4>
+            </div>
+            <div>
+              <small class="text-muted">
+                {{ productosVendidos.length }} producto(s) en la venta
+              </small>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Nota explicativa -->
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Nota:</strong> El sistema aplicará el descuento automáticamente según la prioridad de ubicaciones 
+        (menor número = mayor prioridad).
+      </div>
+    </form>
+  }
+</div>
+
+<div class="modal-footer">
+  <button 
+    type="button" 
+    class="btn btn-secondary" 
+    (click)="cancelar()"
+    [disabled]="procesando">
+    <i class="fas fa-times me-1"></i>Cancelar
+  </button>
+  <button 
+    type="button" 
+    class="btn btn-success" 
+    (click)="procesarVenta()" 
+    [disabled]="ventaForm.invalid || procesando || productosVendidos.length === 0">
+    @if (procesando) {
+      <span class="spinner-border spinner-border-sm me-1"></span>
+      Procesando...
+    } @else {
+      <i class="fas fa-cart-check me-1"></i>
+      Procesar Venta (S/ {{ getTotalVenta().toFixed(2) }})
+    }
+  </button>
 </div>

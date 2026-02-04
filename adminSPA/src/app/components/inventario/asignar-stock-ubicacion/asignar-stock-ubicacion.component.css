@@ -1,0 +1,33 @@
+.modal-header {
+  border-bottom: 2px solid #e9ecef;
+}
+
+.modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.table-responsive {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.table tbody tr.table-success {
+  background-color: #d1e7dd;
+}
+
+.form-control-sm {
+  font-size: 0.875rem;
+}
+
+.badge {
+  font-weight: 500;
+}
+
+.btn-close-white {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}

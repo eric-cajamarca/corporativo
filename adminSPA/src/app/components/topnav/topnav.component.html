@@ -1,5 +1,5 @@
 <!-- Topnav principal -->
-<nav class="topnav" *ngIf="isAuthenticated">
+<nav class="topnav" [class.sidebar-collapsed]="sidebarCollapsed" *ngIf="isAuthenticated">
   <div class="topnav-container">
     <!-- Lado izquierdo -->
     <div class="topnav-left">

@@ -1,21 +1,24 @@
-import { Component, TemplateRef } from '@angular/core';
+import { Component, signal, TemplateRef } from '@angular/core';
 import { SucursalService } from '../../../services/sucursal.service';
 import { FormsModule } from '@angular/forms';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var bootstrap: any;
 
 @Component({
   selector: 'app-index-sucursal',
-  imports: [FormsModule, NgbPagination, TopnavComponent, RouterModule, CommonModule],
+  imports: [FormsModule, NgbPagination, TopnavComponent, SidebarComponent, RouterModule, CommonModule],
   templateUrl: './index-sucursal.component.html',
   styleUrl: './index-sucursal.component.css'
 })
 export class IndexSucursalComponent {
-  
+
+  // Estado del sidebar
+  sidebarCollapsed = signal<boolean>(false);
   public sucursales: Array<any> = [];
 
   public token:any;
@@ -28,6 +31,10 @@ export class IndexSucursalComponent {
   public maxSize = 10;
   public rotate = true;
   public boundaryLinks = true;
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
 
   constructor(
     private _sucursalcervice: SucursalService,

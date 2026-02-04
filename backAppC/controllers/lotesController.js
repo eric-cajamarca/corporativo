@@ -26,7 +26,7 @@ const getById = async function (req, res) {
             console.log('idLote recibido en controller:', idLote);
             const lote = await lotesService.getById(idLote);
             console.log('Lote obtenido en controller:', lote);
-            res.satus(200).send({success: true, data: lote });
+            res.status(200).send({ success: true, data: lote });
         } catch (error) {
             res.status(500).send({ success: false, data:undefined });
         }

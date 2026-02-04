@@ -696,6 +696,13 @@
         
                         <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0"><i class="bi bi-cart-check"></i> Detalle de Compra</h5>
+                            <button 
+                                type="button" 
+                                class="btn btn-sm btn-outline-light" 
+                                (click)="abrirGestionLotes()"
+                                title="Gestionar Lotes e Inventario">
+                                <i class="bi bi-boxes"></i> Gestionar Inventario
+                            </button>
         
                             <div class="align-items-center" style="display: inline-flex; ">
         
@@ -751,16 +758,31 @@
                                             <td style="width: 60px; text-align: center;">{{ item?.fvencimiento || '-' }}</td>
                                             <td style="width: 60px; text-align: center;">{{ item?.sucursal?.nombre || '-' }}</td>
                                             <td>
-                                                <a style="cursor: pointer;" class="text-danger"
-                                                    (click)="quitar(idx, item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)))">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                                <a style="cursor: pointer; margin-left: 15px;" class="text-warning"
-                                                    (click)="seleccionarDetalle(idx)" data-bs-toggle="modal"
-                                                    data-bs-target="#addProductoDetalle">
-                                                    <i class="bi bi-pen-fill"></i>
-                                                </a>
-        
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a style="cursor: pointer;" class="text-danger"
+                                                        (click)="quitar(idx, item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)))"
+                                                        title="Eliminar">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                    <a style="cursor: pointer; margin-left: 8px;" class="text-warning"
+                                                        (click)="seleccionarDetalle(idx)" data-bs-toggle="modal"
+                                                        data-bs-target="#addProductoDetalle"
+                                                        title="Editar">
+                                                        <i class="bi bi-pen-fill"></i>
+                                                    </a>
+                                                    @if (item?.idLote) {
+                                                        <a style="cursor: pointer; margin-left: 8px;" class="text-info"
+                                                            (click)="gestionarLoteDetalle(item)"
+                                                            title="Gestionar Lote">
+                                                            <i class="bi bi-box"></i>
+                                                        </a>
+                                                        <a style="cursor: pointer; margin-left: 8px;" class="text-success"
+                                                            (click)="asignarUbicacionesDetalle(item)"
+                                                            title="Asignar Ubicaciones">
+                                                            <i class="bi bi-geo-alt"></i>
+                                                        </a>
+                                                    }
+                                                </div>
                                             </td>
                                             <div class="modal fade" id="addProductoDetalle" tabindex="-1" aria-hidden="true">
                                                 <div class="modal-dialog">

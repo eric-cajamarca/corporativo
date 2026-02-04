@@ -3,7 +3,7 @@
   class="sidebar-mobile-toggle d-lg-none" 
   (click)="toggleMobileSidebar()"
   [class.active]="isMobileOpen()">
-  <i class="bi bi-list" [class.fa-bars]="!isMobileOpen()" [class.fa-times]="isMobileOpen()"></i>
+  <i class="bi" [class.bi-list]="!isMobileOpen()" [class.bi-x-lg]="isMobileOpen()"></i>
 </button>
 
 <!-- Overlay para móvil -->
@@ -34,7 +34,7 @@
       class="sidebar-toggle-btn d-none d-lg-flex" 
       (click)="toggleSidebar()" 
       [title]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'">
-      <i class="fas" [class.fa-chevron-left]="!isCollapsed()" [class.fa-chevron-right]="isCollapsed()"></i>
+      <i class="bi" [class.bi-chevron-left]="!isCollapsed()" [class.bi-chevron-right]="isCollapsed()"></i>
     </button>
     
     <!-- Botón cerrar móvil -->
@@ -91,7 +91,7 @@
             [title]="isCollapsed() ? item.nombre : ''">
             <i class="nav-icon" [class]="item.icono"></i>
             <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
-            <i class="submenu-arrow fas fa-chevron-down" *ngIf="!isCollapsed()"></i>
+            <i class="submenu-arrow bi bi-chevron-down" *ngIf="!isCollapsed()"></i>
           </a>
           
           <!-- Submenú -->
@@ -131,7 +131,7 @@
       class="logout-btn" 
       (click)="logout()"
       [title]="isCollapsed() ? 'Cerrar sesión' : ''">
-      <i class="fas fa-sign-out-alt"></i>
+      <i class="bi bi-box-arrow-right"></i>
       <span *ngIf="!isCollapsed()">Cerrar sesión</span>
     </button>
   </div>

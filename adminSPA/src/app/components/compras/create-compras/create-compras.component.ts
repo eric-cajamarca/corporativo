@@ -25,6 +25,7 @@ import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { InventarioModalService } from '../../../services/inventario-modal.service';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -144,6 +145,7 @@ export class CreateComprasComponent {
     private _categoriaService: CategoriaService,
     private _presentacionService: PresentacionService,
     private _marcaService: variosService,
+    private inventarioModal: InventarioModalService,
     private _router: Router,
 
     // consultarxml
@@ -1118,7 +1120,9 @@ export class CreateComprasComponent {
           position: 'topRight',
           message: 'Compra registrada correctamente.',
         });
-        this._router.navigate(['/compras']);
+        
+        // Ofrecer gestionar lotes e inventario
+        this.afterCompraRegistrada();
       },
       error: (err: unknown) => {
         const e = err as { error?: { message?: string }; message?: string };
@@ -1132,6 +1136,86 @@ export class CreateComprasComponent {
         });
       },
     });
+  }
+
+  /**
+   * Después de registrar compra exitosamente, ofrece gestionar inventario
+   */
+  private afterCompraRegistrada(): void {
+    // Esperar un momento para que el usuario vea el mensaje de éxito
+    setTimeout(() => {
+      const respuesta = confirm(
+        '¿Desea gestionar los lotes e inventario de los productos comprados?\n\n' +
+        'Puede asignar ubicaciones a los lotes creados desde el módulo de inventario.'
+      );
+      
+      if (respuesta) {
+        // Abrir modal de lista de lotes filtrada por la compra reciente
+        this.inventarioModal.abrirLoteList({ idSucursal: this.compras.idSucursal })
+          .then(() => {
+            // Después de cerrar el modal, navegar a compras
+            this._router.navigate(['/compras']);
+          })
+          .catch(() => {
+            // Si cancela, navegar normalmente
+            this._router.navigate(['/compras']);
+          });
+      } else {
+        this._router.navigate(['/compras']);
+      }
+    }, 500);
+  }
+
+  /**
+   * Abre modal para gestionar lotes desde un detalle de compra
+   */
+  gestionarLoteDetalle(detalle: any): void {
+    if (!detalle.idLote) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        message: 'Este producto aún no tiene lote asignado',
+        position: 'topRight'
+      });
+      return;
+    }
+    
+    this.inventarioModal.abrirLoteForm(detalle.idLote).then(result => {
+      if (result?.success) {
+        // Recargar datos si es necesario
+      }
+    }).catch(() => {});
+  }
+
+  /**
+   * Abre modal para asignar ubicaciones a un lote desde detalle de compra
+   */
+  asignarUbicacionesDetalle(detalle: any): void {
+    if (!detalle.idLote) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        message: 'Este producto aún no tiene lote asignado',
+        position: 'topRight'
+      });
+      return;
+    }
+    
+    const cantidadTotal = detalle.cantidad || detalle.cantidadDisponible || 0;
+    this.inventarioModal.abrirAsignarUbicaciones(detalle.idLote, cantidadTotal).then(result => {
+      if (result?.success) {
+        // Actualizar vista si es necesario
+      }
+    }).catch(() => {});
+  }
+
+  /**
+   * Abre modal de lista de lotes desde compras
+   */
+  abrirGestionLotes(): void {
+    this.inventarioModal.abrirLoteList({ idSucursal: this.compras.idSucursal })
+      .then(() => {})
+      .catch(() => {});
   }
 
   private validarCamposObligatorios(): boolean {

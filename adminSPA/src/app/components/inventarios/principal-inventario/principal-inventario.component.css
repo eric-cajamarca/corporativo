@@ -1,0 +1,194 @@
+/* =============================================
+   LAYOUT PRINCIPAL
+   ============================================= */
+
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+/* =============================================
+   HEADER
+   ============================================= */
+
+.content-header {
+  margin-bottom: 24px;
+}
+
+.content-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1f2e;
+  margin: 0;
+}
+
+.content-subtitle {
+  font-size: 0.9rem;
+}
+
+/* =============================================
+   STAT CARDS
+   ============================================= */
+
+.stat-card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.stat-card-success {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+}
+
+.stat-card-info {
+  background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+  color: white;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.stat-icon {
+  opacity: 0.3;
+}
+
+/* =============================================
+   QUICK ACTION BUTTONS
+   ============================================= */
+
+.quick-action-btn {
+  padding: 24px 16px;
+  border-radius: 12px;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.quick-action-btn i {
+  margin-bottom: 8px;
+}
+
+.quick-action-btn div {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* =============================================
+   CARD
+   ============================================= */
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+}
+
+.card-header {
+  background: #fff;
+  border-bottom: 1px solid #f1f3f4;
+  padding: 16px 20px;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* =============================================
+   TABLE
+   ============================================= */
+
+.table {
+  margin-bottom: 0;
+}
+
+.table th {
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: none;
+  padding: 12px 16px;
+  background: #f8f9fa;
+}
+
+.table td {
+  vertical-align: middle;
+  padding: 12px 16px;
+  border-color: #f1f3f4;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+
+@media (max-width: 767.98px) {
+  .main-content {
+    padding: 16px;
+  }
+
+  .content-title {
+    font-size: 1.25rem;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .quick-action-btn {
+    min-height: 120px;
+    padding: 16px 12px;
+  }
+}

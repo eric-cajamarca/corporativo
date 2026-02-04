@@ -4,12 +4,27 @@ const dbConfig = require('../dbconfig');
 
 
 async function getAll(idEmpresa) {
-    console.log('idEmpresa en getAll repository:', idEmpresa);
     const pool = await sql.connect(dbConfig);
     const result = await pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .query('SELECT * FROM Lotes WHERE idEmpresa = @idEmpresa ORDER BY fechaIngreso DESC');
-        console.log('Lotes obtenidos:', result.recordset);
+        .query(`
+            SELECT 
+                l.idLote, 
+                l.idEmpresa, 
+                l.idProducto, 
+                l.idSucursal, 
+                l.costoUnitario, 
+                l.cantidadIngresada, 
+                l.cantidadDisponible,
+                CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
+                p.descripcion AS nombreProducto,
+                s.nombre AS nombreSucursal
+            FROM Lotes l
+            LEFT JOIN Productos p ON l.idProducto = p.idProducto
+            LEFT JOIN Sucursal s ON l.idSucursal = s.idSucursal
+            WHERE l.idEmpresa = @idEmpresa 
+            ORDER BY l.fechaIngreso DESC
+        `);
     return result.recordset;
 }
 
@@ -27,7 +42,7 @@ async function getById(idLote) {
                 idSucursal, 
                 costoUnitario, 
                 cantidadIngresada, 
-                
+                cantidadDisponible
             FROM Lotes 
             WHERE idLote = @idLote
         `);

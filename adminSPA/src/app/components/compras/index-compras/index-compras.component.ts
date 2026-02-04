@@ -17,6 +17,7 @@ import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa } from '../../../models/empresa.model';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { InventarioModalService } from '../../../services/inventario-modal.service';
 
 
 
@@ -142,7 +143,8 @@ export class IndexComprasComponent {
     private _marcaService: variosService,
     private pdfService: PdfService,
     private excelService: ExcelService,
-    private empresaService: EmpresaService
+    private empresaService: EmpresaService,
+    private inventarioModal: InventarioModalService
   ) { }
 
   ngOnInit(): void {
@@ -518,6 +520,30 @@ export class IndexComprasComponent {
       next: blob => this.excelService.descargar(blob, `${datosExcel.filename}.xlsx`),
       error: err => console.error('Error Excel', err)
     });
+  }
+
+  /**
+   * Abre modal para gestionar lotes e inventario de una compra
+   */
+  gestionarInventarioCompra(compra: any): void {
+    this.inventarioModal.abrirLoteList({ 
+      idSucursal: compra.idSucursal,
+      idCompra: compra.idcompra 
+    }).then(() => {
+      // Recargar datos si es necesario
+    }).catch(() => {});
+  }
+
+  /**
+   * Abre modal para asignar ubicaciones desde una compra
+   */
+  asignarUbicacionesCompra(compra: any): void {
+    // Primero cargar los lotes de esta compra
+    this.inventarioModal.abrirLoteList({ 
+      idSucursal: compra.idSucursal 
+    }).then(() => {
+      // El usuario puede seleccionar lotes desde el modal
+    }).catch(() => {});
   }
 
 }
