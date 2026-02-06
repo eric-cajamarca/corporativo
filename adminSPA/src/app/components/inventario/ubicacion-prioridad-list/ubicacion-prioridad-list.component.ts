@@ -91,15 +91,17 @@ export class UbicacionPrioridadListComponent implements OnInit {
     this.isLoading = true;
     this.ubicacionService.obtener_ubicacionesPrioridad_todos().subscribe({
       next: (response: any) => {
-        let data = response.data || response;
-        data = Array.isArray(data) ? data : [];
-        
-        // Filtrar por sucursal si está especificado
+        const raw = response?.data ?? response;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.ubicaciones = arr.map((u: any) => ({
+          idUbicacion: u.idUbicacion != null ? Number(u.idUbicacion) : undefined,
+          idSucursal: u.idSucursal,
+          codigoUbicacion: u.codigoUbicacion ?? '',
+          prioridad: u.prioridad != null ? Number(u.prioridad) : 999
+        })).filter((u: any) => u.idUbicacion != null && !isNaN(u.idUbicacion));
         if (this.sucursalFiltro) {
-          data = data.filter((u: any) => u.idSucursal === this.sucursalFiltro);
+          this.ubicaciones = this.ubicaciones.filter((u: any) => u.idSucursal === this.sucursalFiltro);
         }
-        
-        this.ubicaciones = data;
         this.agruparPorSucursal();
         this.isLoading = false;
       },
@@ -325,7 +327,10 @@ export class UbicacionPrioridadListComponent implements OnInit {
    */
   getNombreSucursal(idSucursal: string): string {
     const sucursal = this.sucursales.find(s => s.idSucursal === idSucursal);
-    return sucursal ? `${sucursal.codigo} - ${sucursal.direccion}` : idSucursal.slice(0, 8) + '...';
+    if (!sucursal) return (idSucursal || '').toString().slice(0, 8) + '...';
+    const nombre = sucursal.nombre || sucursal.codigo || 'Sucursal';
+    const direccion = sucursal.direccion || 'Sin dirección';
+    return `${nombre} - ${direccion}`;
   }
 
   /**

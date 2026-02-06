@@ -58,7 +58,7 @@ export class AuthService {
   verifyToken() {
     return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
       tap(response => this.handleAuthResponse(response)),
-      map(response => !!response?.data),
+      map(response => response?.active === true),
       catchError(error => {
         console.error('verifyToken error:', error?.status, error?.message);
         this.handleAuthError();
@@ -91,8 +91,7 @@ export class AuthService {
 //   }
 
   private handleAuthResponse(response: any) {
-    console.log('handleAuthResponse', response);
-    if (response?.data) {
+    if (response?.active === true && response?.data) {
       const d = response.data;
       this._userData.set({
         razonSocial: d.razonSocial || '',
@@ -100,15 +99,10 @@ export class AuthService {
         rol: d.roles ?? d.rol ?? '',
         lastVerified: Date.now()
       });
-      console.log('Usuario conectado:', this._userData());
     } else {
       this._userData.set(null);
-      // Solo redirigir a login si NO estamos en una ruta pública
       if (!this.isPublicRoute()) {
         this.router.navigate(['/login-empresa']);
-        console.log('No hay empresa conectada, redirigiendo a login');
-      } else {
-        console.log('No hay empresa conectada pero estamos en ruta pública, no redirigir');
       }
     }
   }

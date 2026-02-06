@@ -30,7 +30,7 @@
                   <option value="">Seleccione...</option>
                   @for (sucursal of sucursales; track sucursal.idSucursal) {
                     <option [value]="sucursal.idSucursal">
-                      {{ sucursal.codigo }} - {{ sucursal.direccion }}
+                      {{ sucursal.nombre || sucursal.codigo || 'Sucursal' }} - {{ sucursal.direccion || 'Sin dirección' }}
                     </option>
                   }
                 </select>

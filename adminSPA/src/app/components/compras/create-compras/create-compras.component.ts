@@ -79,6 +79,8 @@ export class CreateComprasComponent {
   public consultManual = false;
   public idCompra: any = '';
   public indexDetalle: any = 0;
+  /** Si true, al registrar cada ítem se asigna a ubicación por defecto. Si false, podrá gestionar ubicaciones manualmente después. */
+  public asignarUbicacionPorDefecto = true;
   public detalleCompras: any = [];
   public nuevoDetalleCompra: any = {};
   public comprobantes: any = [];
@@ -1069,6 +1071,7 @@ export class CreateComprasComponent {
             idProducto: element.idProducto || null,
             ubicacion: element.ubicacion ?? null,
             fechaVencimiento: element.fVencimiento || element.fvencimiento || null,
+            asignarPorDefecto: this.asignarUbicacionPorDefecto,
           };
 
           if (element.idProducto == null || element.idProducto === undefined || element.idProducto === '') {
@@ -1142,24 +1145,15 @@ export class CreateComprasComponent {
    * Después de registrar compra exitosamente, ofrece gestionar inventario
    */
   private afterCompraRegistrada(): void {
-    // Esperar un momento para que el usuario vea el mensaje de éxito
     setTimeout(() => {
-      const respuesta = confirm(
-        '¿Desea gestionar los lotes e inventario de los productos comprados?\n\n' +
-        'Puede asignar ubicaciones a los lotes creados desde el módulo de inventario.'
-      );
-      
+      const mensaje = this.asignarUbicacionPorDefecto
+        ? 'El stock se asignó a la ubicación por defecto.\n\n¿Desea ver o editar los lotes e inventario?'
+        : '¿Desea asignar ahora las ubicaciones a los lotes creados?\n\nPuede hacerlo desde Inventario más tarde si lo prefiere.';
+      const respuesta = confirm(mensaje);
       if (respuesta) {
-        // Abrir modal de lista de lotes filtrada por la compra reciente
         this.inventarioModal.abrirLoteList({ idSucursal: this.compras.idSucursal })
-          .then(() => {
-            // Después de cerrar el modal, navegar a compras
-            this._router.navigate(['/compras']);
-          })
-          .catch(() => {
-            // Si cancela, navegar normalmente
-            this._router.navigate(['/compras']);
-          });
+          .then(() => this._router.navigate(['/compras']))
+          .catch(() => this._router.navigate(['/compras']));
       } else {
         this._router.navigate(['/compras']);
       }

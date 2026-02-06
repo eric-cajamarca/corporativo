@@ -2,6 +2,8 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const prodController = require('./productosController');
 const preciosVController = require('./preciosVController');
+const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
+const lotesUbicacionRepository = require('../repositories/lotesUbicacion.repository');
 
 // create table DetalleCompras
 // (
@@ -48,10 +50,7 @@ const obtener_detalle_compras_idcompra = async function (req, res) {
 }
 
 const crear_detalle_compras_idcompra = async function (req, res) {
-
-    const { idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, fechaVencimiento, ubicacion } = req.body;
-    console.log('crear_detalle_compras_idcompra: ', req.body);
-
+    const { idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, fechaVencimiento, ubicacion, asignarPorDefecto } = req.body;
     const idUsuario = req.user.sub || req.user.idUsuario;
     const idEmpresa = req.user.empresa;
 
@@ -65,16 +64,22 @@ const crear_detalle_compras_idcompra = async function (req, res) {
     const pUnitarioFormateado = parseFloat(pUnitario) || 0;
     const cantidadVal = parseFloat(cantidad) || 0;
     const totalVal = parseFloat(total) || 0;
-    const ubicacionVal = ubicacion || null;
     const fechaVencimientoVal = fechaVencimiento || null;
+    const asignarUbicacionDefecto = asignarPorDefecto !== false;
 
     try {
+        let idUbicacionDefault = null;
+        if (asignarUbicacionDefecto) {
+            idUbicacionDefault = await ubicacionesPrioridadRepository.getOrCreateDefaultForSucursal(idSucursal);
+        }
+
         const pool = await sql.connect(dbConfig);
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
 
         try {
-            await transaction.request()
+            const reqTr = transaction.request();
+            await reqTr
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('idSucursal', sql.UniqueIdentifier, idSucursal)
                 .input('idCompra', sql.UniqueIdentifier, idCompra)
@@ -89,8 +94,35 @@ const crear_detalle_compras_idcompra = async function (req, res) {
                     VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)
                 `);
 
-            // Crear lote por cada línea de compra (stock por Lotes; ya no se usa StockSucursal)
-            await transaction.request()
+            let numeroLote = null;
+            try {
+                const rNum = await transaction.request()
+                    .input('idCompra', sql.UniqueIdentifier, idCompra)
+                    .query('SELECT numeroLote FROM Compras WHERE idCompra = @idCompra');
+                numeroLote = rNum.recordset && rNum.recordset[0] ? rNum.recordset[0].numeroLote : null;
+            } catch (_) {
+                numeroLote = null;
+            }
+            if (numeroLote == null) {
+                const rNext = await transaction.request()
+                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                    .query(`
+                        SELECT ISNULL(MAX(TRY_CAST(numeroLote AS INT)), 0) + 1 AS siguiente FROM Lotes WHERE idEmpresa = @idEmpresa
+                    `);
+                numeroLote = (rNext.recordset && rNext.recordset[0] && rNext.recordset[0].siguiente) ? String(rNext.recordset[0].siguiente) : '1';
+                try {
+                    await transaction.request()
+                        .input('idCompra', sql.UniqueIdentifier, idCompra)
+                        .input('numeroLote', sql.Int, parseInt(numeroLote, 10))
+                        .query('UPDATE Compras SET numeroLote = @numeroLote WHERE idCompra = @idCompra');
+                } catch (_) {
+                    // Columna numeroLote puede no existir; se usa igual para el lote
+                }
+            } else {
+                numeroLote = String(numeroLote);
+            }
+
+            const loteInsert = await transaction.request()
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('idProducto', sql.UniqueIdentifier, idProducto)
                 .input('idSucursal', sql.UniqueIdentifier, idSucursal)
@@ -98,13 +130,31 @@ const crear_detalle_compras_idcompra = async function (req, res) {
                 .input('cantidadIngresada', sql.Decimal(18, 2), cantidadVal)
                 .input('cantidadDisponible', sql.Decimal(18, 2), cantidadVal)
                 .input('fechaVencimiento', sql.DateTime, fechaVencimientoVal)
+                .input('numeroLote', sql.VarChar(50), numeroLote)
                 .query(`
-                    INSERT INTO Lotes (idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento)
-                    VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento)
+                    INSERT INTO Lotes (idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, numeroLote)
+                    OUTPUT INSERTED.idLote
+                    VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @numeroLote)
                 `);
+            const idLote = loteInsert.recordset && loteInsert.recordset[0] ? loteInsert.recordset[0].idLote : null;
+
+            if (asignarUbicacionDefecto && idLote && idUbicacionDefault) {
+                await transaction.request()
+                    .input('idLote', sql.UniqueIdentifier, idLote)
+                    .input('idUbicacion', sql.Int, idUbicacionDefault)
+                    .input('cantidad', sql.Int, Math.round(cantidadVal))
+                    .query('INSERT INTO LotesUbicacion (idLote, idUbicacion, cantidad) VALUES (@idLote, @idUbicacion, @cantidad)');
+            }
 
             await transaction.commit();
-            res.status(200).send({ data: 1, message: 'Detalle de compra registrado. Lote creado.' });
+            res.status(200).send({
+                data: 1,
+                message: asignarUbicacionDefecto
+                    ? 'Detalle de compra registrado. Lote y ubicación por defecto creados.'
+                    : 'Detalle de compra registrado. Lote creado. Asigne ubicaciones desde Inventario.',
+                numeroLote,
+                idLote
+            });
         } catch (err) {
             await transaction.rollback();
             throw err;

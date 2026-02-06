@@ -22,7 +22,7 @@ async function update(idLote, loteData) {
 }
 
 async function deleted(idLote) {
-    return await lotesRepository.delete(idLote);
+    return await lotesRepository.deleted(idLote);
 }
 
 // Función crítica para ventas/compras

@@ -17,7 +17,7 @@ async function update(idUbicacion, ubicacionData) {
 }
 
 async function deleted(idUbicacion) {
-    return await ubicacionesPrioridadRepository.delete(idUbicacion);
+    return await ubicacionesPrioridadRepository.deleted(idUbicacion);
 }
 
 module.exports = {

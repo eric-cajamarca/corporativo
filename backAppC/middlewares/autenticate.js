@@ -31,3 +31,24 @@ exports.auth = function(req, res, next) {
         return res.status(403).send({ message: 'InvalidToken' });
     }
 };
+
+/**
+ * Mismo flujo que auth pero sin devolver 403: si no hay token o es inválido, solo llama next().
+ * Sirve para rutas que deben responder siempre 200 y decidir en el controller (ej. getEmpresa_login).
+ */
+exports.optionalAuth = function (req, res, next) {
+    const token = req.cookies && req.cookies.token;
+    if (!token) {
+        return next();
+    }
+    try {
+        const payload = jwt.verify(token, secret);
+        if (payload.exp <= moment().unix()) {
+            return next();
+        }
+        req.user = payload;
+    } catch (error) {
+        // Token inválido o expirado; no asignar req.user, no 403
+    }
+    next();
+};

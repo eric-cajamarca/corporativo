@@ -107,20 +107,24 @@ export class LoteFormComponent implements OnInit {
     if (!this.idLote) return;
     
     this.cargando = true;
+    this.loteForm.enable();
     this.loteService.obtener_lote_id(this.idLote).subscribe({
       next: (response: any) => {
         const lote = response.data || response;
-        this.loteForm.patchValue({
-          idProducto: lote.idProducto,
-          idSucursal: lote.idSucursal,
-          costoUnitario: lote.costoUnitario,
-          cantidadIngresada: lote.cantidadIngresada
-        });
+        if (lote) {
+          this.loteForm.patchValue({
+            idProducto: lote.idProducto,
+            idSucursal: lote.idSucursal,
+            costoUnitario: lote.costoUnitario ?? 0,
+            cantidadIngresada: lote.cantidadIngresada ?? lote.cantidadDisponible ?? 0
+          });
+        }
         this.cargando = false;
       },
       error: (error) => {
         console.error('Error al cargar lote', error);
         this.cargando = false;
+        this.loteForm.enable();
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
@@ -146,14 +150,16 @@ export class LoteFormComponent implements OnInit {
       return;
     }
 
+    const loteData = this.loteForm.getRawValue();
     this.guardando = true;
-    const loteData = this.loteForm.value;
+    this.loteForm.disable();
 
     if (this.isEditMode && this.idLote) {
       // Modo edición
       this.loteService.actualizar_lote(this.idLote, loteData).subscribe({
         next: (response: any) => {
           this.guardando = false;
+          this.loteForm.enable();
           iziToast.show({
             title: 'Éxito',
             titleColor: '#28a745',
@@ -164,6 +170,7 @@ export class LoteFormComponent implements OnInit {
         },
         error: (error) => {
           this.guardando = false;
+          this.loteForm.enable();
           iziToast.show({
             title: 'Error',
             titleColor: '#dc3545',
@@ -182,6 +189,7 @@ export class LoteFormComponent implements OnInit {
       this.loteService.crear_lote(nuevoLote).subscribe({
         next: (response: any) => {
           this.guardando = false;
+          this.loteForm.enable();
           iziToast.show({
             title: 'Éxito',
             titleColor: '#28a745',
@@ -198,6 +206,7 @@ export class LoteFormComponent implements OnInit {
         },
         error: (error) => {
           this.guardando = false;
+          this.loteForm.enable();
           iziToast.show({
             title: 'Error',
             titleColor: '#dc3545',

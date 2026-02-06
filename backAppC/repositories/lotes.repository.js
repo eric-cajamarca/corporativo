@@ -13,6 +13,7 @@ async function getAll(idEmpresa) {
                 l.idEmpresa, 
                 l.idProducto, 
                 l.idSucursal, 
+                l.numeroLote,
                 l.costoUnitario, 
                 l.cantidadIngresada, 
                 l.cantidadDisponible,
@@ -29,25 +30,37 @@ async function getAll(idEmpresa) {
 }
 
 async function getById(idLote) {
-    console.log('idLote en getById repository:', idLote);
     const pool = await sql.connect(dbConfig);
-    
-    const result = await pool.request()
-        .input('idLote', sql.UniqueIdentifier, idLote)
-        .query(`
-            SELECT 
-                idLote, 
-                idEmpresa, 
-                idProducto, 
-                idSucursal, 
-                costoUnitario, 
-                cantidadIngresada, 
-                cantidadDisponible
-            FROM Lotes 
-            WHERE idLote = @idLote
-        `);
-        console.log('Lote obtenido en repository:', result.recordset[0]);
-    return result.recordset[0];
+    try {
+        const result = await pool.request()
+            .input('idLote', sql.UniqueIdentifier, idLote)
+            .query(`
+                SELECT 
+                    idLote, 
+                    idEmpresa, 
+                    idProducto, 
+                    idSucursal, 
+                    CONVERT(DECIMAL(18,6), costoUnitario) AS costoUnitario,
+                    CONVERT(DECIMAL(18,2), cantidadIngresada) AS cantidadIngresada,
+                    CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
+                FROM Lotes 
+                WHERE idLote = @idLote
+            `);
+        const row = result.recordset && result.recordset[0];
+        if (!row) return null;
+        return {
+            idLote: row.idLote,
+            idEmpresa: row.idEmpresa,
+            idProducto: row.idProducto,
+            idSucursal: row.idSucursal,
+            costoUnitario: row.costoUnitario != null ? Number(row.costoUnitario) : 0,
+            cantidadIngresada: row.cantidadIngresada != null ? Number(row.cantidadIngresada) : 0,
+            cantidadDisponible: row.cantidadDisponible != null ? Number(row.cantidadDisponible) : 0
+        };
+    } catch (err) {
+        console.error('lotes.repository getById error:', err.message);
+        throw err;
+    }
 }
 
 async function getBySucursal(idEmpresa, idSucursal) {

@@ -60,7 +60,7 @@ export class AsignarStockUbicacionComponent {
     this.loteService.obtener_lote_id(this.idLote).subscribe({
       next: (response: any) => {
         this.infoLote = response.data || response;
-        this.idSucursal = this.infoLote.idSucursal;
+        this.idSucursal = (this.infoLote?.idSucursal ?? this.infoLote?.IdSucursal) ?? '';
         this.cargandoLote = false;
         this.cargarUbicaciones();
       },
@@ -93,16 +93,28 @@ export class AsignarStockUbicacionComponent {
 
     this.cargandoUbicaciones = true;
     this.ubicacionService.obtener_ubicacionesPrioridad_sucursal(this.idSucursal).subscribe({
-      next: (data: any) => {
-        this.ubicaciones = Array.isArray(data) ? data : (data.data || []);
+      next: (response: any) => {
+        const raw = response?.data ?? response;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.ubicaciones = arr.map((u: any) => {
+          const idUbicacion = u.idUbicacion ?? u.IdUbicacion;
+          const idSucursal = u.idSucursal ?? u.IdSucursal;
+          const codigoUbicacion = u.codigoUbicacion ?? u.CodigoUbicacion ?? '';
+          const prioridad = u.prioridad ?? u.Prioridad;
+          return {
+            idUbicacion: idUbicacion != null && idUbicacion !== '' ? Number(idUbicacion) : undefined,
+            idSucursal,
+            codigoUbicacion: String(codigoUbicacion || ''),
+            prioridad: prioridad != null && prioridad !== '' ? Number(prioridad) : 999
+          };
+        }).filter((u: any) => u.idUbicacion != null && !isNaN(u.idUbicacion));
         this.inicializarAsignaciones();
         this.cargandoUbicaciones = false;
-        
         if (this.ubicaciones.length === 0) {
           iziToast.show({
             title: 'Advertencia',
             titleColor: '#ffc107',
-            message: 'No hay ubicaciones configuradas para esta sucursal. Configure ubicaciones primero.',
+            message: 'No hay ubicaciones configuradas para esta sucursal. Cree una desde Inventario > Ubicaciones.',
             position: 'topRight'
           });
         }
@@ -124,17 +136,17 @@ export class AsignarStockUbicacionComponent {
    * Inicializa array de asignaciones con 0 en cada ubicación
    */
   inicializarAsignaciones(): void {
-    // Ordenar por prioridad (menor número = mayor prioridad)
-    const ubicacionesOrdenadas = [...this.ubicaciones].sort((a, b) => 
+    const ubicacionesOrdenadas = [...this.ubicaciones].sort((a, b) =>
       (a.prioridad || 999) - (b.prioridad || 999)
     );
-
-    this.asignaciones = ubicacionesOrdenadas.map(u => ({
-      idUbicacion: u.idUbicacion!,
-      codigoUbicacion: u.codigoUbicacion,
-      prioridad: u.prioridad || 999,
-      cantidad: 0
-    }));
+    this.asignaciones = ubicacionesOrdenadas
+      .filter(u => u.idUbicacion != null && !isNaN(Number(u.idUbicacion)))
+      .map(u => ({
+        idUbicacion: Number(u.idUbicacion),
+        codigoUbicacion: u.codigoUbicacion || '',
+        prioridad: u.prioridad ?? 999,
+        cantidad: 0
+      }));
   }
 
   /**

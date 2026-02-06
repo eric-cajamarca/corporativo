@@ -38,28 +38,16 @@ const getAdmin = async function (req, res) {
 };
 
 const getEmpresa_login = async function (req, res) {
-    console.log('getEmpresa_login - Verificando token...');
-    console.log('Cookies recibidas:', req.cookies);
-    console.log('Token presente:', !!req.cookies.token);
-    
     if (!req.user) {
-        console.log('❌ No hay req.user - Token no válido o no presente');
-        return res.status(401).send({ message: 'No autenticado' });
+        return res.status(200).send({ active: false, data: null });
     }
-    
-    console.log('✓ Usuario autenticado:', req.user.email, '- Empresa:', req.user.empresa);
 
     try {
         const pool = await sql.connect(dbConfig);
-
         const empresaResult = await empresaService.getDatosEmpresaLogin(pool, req.user);
-        // Verificar si obtuvimos al menos algún dato
-        
-        console.log('✓ Datos de empresa obtenidos correctamente');
-        return res.status(200).send({ data: empresaResult, message: 'Datos obtenidos correctamente' });
-        
+        return res.status(200).send({ active: true, data: empresaResult });
     } catch (error) {
-        console.error('❌ Error al obtener datos:', error);
+        console.error('Error al obtener datos getEmpresa_login:', error);
         return res.status(500).send({ message: 'Error interno del servidor' });
     }
 };

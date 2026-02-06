@@ -57,9 +57,14 @@
     <!-- Sin ubicaciones -->
     <div *ngIf="!cargandoUbicaciones && ubicaciones.length === 0" class="alert alert-warning">
       <i class="fas fa-exclamation-triangle me-2"></i>
-      No hay ubicaciones configuradas para esta sucursal. 
+      No hay ubicaciones configuradas para esta sucursal.
       <br>
-      <small>Configure las ubicaciones desde el módulo de inventario primero.</small>
+      <small>Cree una desde Inventario &gt; Ubicaciones (prioridades), luego vuelva aquí y pulse Refrescar.</small>
+      <div class="mt-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" (click)="cargarUbicaciones()">
+          <i class="fas fa-sync-alt me-1"></i>Refrescar ubicaciones
+        </button>
+      </div>
     </div>
 
     <!-- Tabla de asignaciones -->

@@ -12,7 +12,7 @@
 .main-content {
   margin-left: 260px;
   margin-top: 64px;
-  padding: 24px;
+  padding: 12px 16px;
   min-height: calc(100vh - 64px);
   transition: margin-left 0.3s ease;
 }
@@ -28,38 +28,40 @@
 }
 
 .content-wrap {
-  max-width: 1600px;
-  margin-left: auto;
-  margin-right: auto;
+  max-width: 100%;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
-
-
 
 /* Estilos generales para el contenedor principal */
 .container {
-  width: 95%;
-  max-width: 95%;
-  padding: 0;
-  margin: 10px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 4px;
+  margin: 0 4px;
 }
 
-/* Estilos para todos los cards */
+/* Estilos para todos los cards: ocupan todo el espacio, márgenes reducidos */
 .cabecera-compra .card,
 .tabla-busqueda .card,
 .nuevo-producto .card,
 .tabla-detalle .card,
 .totales .card {
   width: 100% !important;
-  margin: 0 0 10px 0;
+  margin: 0 0 8px 0;
   border-radius: 5px;
 }
 
-/* Eliminar márgenes internos no deseados */
 .card-body {
-  padding: 1.25rem;
+  padding: 1rem 1.25rem;
 }
 
 /* Cabecera principal */
+.cabecera-compra {
+  margin-top: 8px;
+}
+
 .cabecera-compra .card > h2 {
   padding: 15px 20px;
   margin: 0;
@@ -90,9 +92,20 @@
   padding: 0;
 }
 
-/* Ajustes específicos para la tabla de detalle */
+/* Tabla detalle compra: más altura y espacio disponible */
+.tabla-detalle .card {
+  margin-bottom: 8px;
+}
+
+.tabla-detalle .card-body {
+  padding: 0.75rem 1rem;
+}
+
 .tabla-detalle .table-responsive {
-  height: 300px;
+  min-height: 320px;
+  max-height: min(420px, calc(100vh - 420px));
+  overflow: auto;
+  background: #fff;
 }
 
 /* Eliminar márgenes en inputs y selects */

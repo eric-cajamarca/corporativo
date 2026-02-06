@@ -6,7 +6,7 @@ var auth  = require('../middlewares/autenticate');
 // Rutas para el CRUD de ventas
 api.get('/admin',auth.auth, adminController.getAdmin);
 api.get('/obtener_datos_colaborador_admin/:id',auth.auth, adminController.obtener_datos_colaborador_admin);
-api.get('/getEmpresa_login',auth.auth, adminController.getEmpresa_login);
+api.get('/getEmpresa_login', auth.optionalAuth, adminController.getEmpresa_login);
 api.post('/admin_login', adminController.admin_login);
 api.post('/recuperar-password', adminController.recuperarPassword);
 api.post('/restablecer-password', adminController.restablecerPassword);

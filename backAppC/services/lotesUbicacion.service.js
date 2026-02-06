@@ -17,7 +17,7 @@ async function updateCantidad(idLote, idUbicacion, cantidad) {
 }
 
 async function deleted(idLote, idUbicacion) {
-    return await lotesUbicacionRepository.delete(idLote, idUbicacion);
+    return await lotesUbicacionRepository.deleted(idLote, idUbicacion);
 }
 
 // Función para aplicar reglas de prioridad en ventas

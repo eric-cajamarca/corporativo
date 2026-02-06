@@ -8,11 +8,22 @@ const getAll = async function (req, res){
     }else{
         try {
             const ubicaciones = await ubicacionesPrioridadService.getAll();
-            res.status(200).send({ success: true, data: ubicaciones });
+            const data = Array.isArray(ubicaciones) ? ubicaciones.map(normalizarUbicacion) : ubicaciones;
+            res.status(200).send({ success: true, data });
         } catch (error) {
             res.status(500).send({ success: false, error: error.message });
         }
     }
+}
+
+function normalizarUbicacion(u) {
+    if (!u) return u;
+    return {
+        idUbicacion: u.idUbicacion ?? u.IdUbicacion,
+        idSucursal: u.idSucursal ?? u.IdSucursal,
+        codigoUbicacion: u.codigoUbicacion ?? u.CodigoUbicacion ?? '',
+        prioridad: u.prioridad ?? u.Prioridad ?? 999
+    };
 }
 
 const getBySucursal = async function (req, res) {
@@ -22,7 +33,8 @@ const getBySucursal = async function (req, res) {
         try {
             const { idSucursal } = req.params;
             const ubicaciones = await ubicacionesPrioridadService.getBySucursal(idSucursal);
-            res.status(200).send({ success: true, data: ubicaciones });
+            const data = Array.isArray(ubicaciones) ? ubicaciones.map(normalizarUbicacion) : [];
+            res.status(200).send({ success: true, data });
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
         }
