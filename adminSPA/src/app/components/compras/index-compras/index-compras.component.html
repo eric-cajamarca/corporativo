@@ -112,13 +112,13 @@
                           <a class="dropdown-item d-flex align-items-center" 
                             data-bs-toggle="modal"
                             [attr.data-bs-target]="'#consulta-'+item.compCompra" 
-                            (click)="consultaCompCompra(item.idcompra)">
+                            (click)="consultaCompCompra(item.idCompra || item.idcompra)">
                             <i class="bi bi-eye me-2"></i>Ver detalles
                           </a>
                         </li>
                         <li *ngIf="item.compCompra">
                           <a class="dropdown-item d-flex align-items-center" 
-                            [routerLink]="['/compras',item.idcompra]">
+                            [routerLink]="['/compras', item.idCompra || item.idcompra]">
                             <i class="bi bi-pencil me-2"></i>Editar
                           </a>
                         </li>
@@ -127,10 +127,10 @@
                             <i class="bi bi-eye me-2"></i>Ver PDF
                           </a>
                         </li>
-                        <li *ngIf="item.idcompra">
+                        <li *ngIf="item.idCompra || item.idcompra">
                           <a class="dropdown-item d-flex align-items-center text-danger" 
                             data-bs-toggle="modal"
-                            [attr.data-bs-target]="'#delete-'+item.idcompra">
+                            [attr.data-bs-target]="'#delete-'+(item.idCompra || item.idcompra)">
                             <i class="bi bi-trash me-2"></i>Eliminar
                           </a>
                         </li>
@@ -207,16 +207,16 @@
                       <tbody>
                         <tr *ngFor="let detalle of detalleCompras">
                           <td>{{detalle.codigo}}</td>
-                          <td>{{detalle.categoria.nombre}}</td>
+                          <td>{{detalle.categoria?.nombre}}</td>
                           <td>{{detalle.descripcion}}</td>
-                          <td>{{detalle.marca.nombre}}</td>
-                          <td class="text-center">{{detalle.presentacion.Descripcion}}</td>
+                          <td>{{detalle.marca?.nombre}}</td>
+                          <td class="text-center">{{detalle.presentacion?.Descripcion}}</td>
                           <td class="text-end">{{detalle.cantidad}}</td>
                           <td class="text-end">{{detalle.cUnitario | number:'1.2-2'}}</td>
                           <td class="text-end">{{detalle.subtotal | number:'1.2-2'}}</td>
                           <td class="text-center">{{detalle.fProduccion}}</td>
                           <td class="text-center">{{detalle.fVencimiento}}</td>
-                          <td class="text-center">{{detalle.sucursal.nombre}}</td>
+                          <td class="text-center">{{detalle.sucursal?.nombre}}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -234,11 +234,11 @@
       </div>
       <!-- Modal de Eliminación -->
       <div *ngFor="let item of compras">
-        <div class="modal fade" [id]="'delete-'+item.idcompra" tabindex="-1">
+        <div class="modal fade" [id]="'delete-'+(item.idCompra || item.idcompra)" tabindex="-1">
           <div class="modal-dialog">
             <div class="modal-content">
               <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">Eliminar compra: {{item.idcompra}}</h5>
+                <h5 class="modal-title">Eliminar compra: {{item.idCompra || item.idcompra}}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div class="modal-body">
@@ -251,7 +251,7 @@
                 </button>
                 <button type="button" 
                         class="btn btn-danger"
-                        (click)="set_eliminar(item.idcompra)"
+                        (click)="set_eliminar(item.idCompra || item.idcompra)"
                         [disabled]="load_estado">
                   <span *ngIf="!load_estado">Sí, Eliminar</span>
                   <span *ngIf="load_estado">

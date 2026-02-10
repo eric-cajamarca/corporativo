@@ -259,16 +259,17 @@ export class IndexComprasComponent {
     }
   }
 
-  consultaCompCompra(id: any,) {
-    // this.load_estado = true;
+  consultaCompCompra(id: any) {
+    if (id == null || id === '') {
+      console.error('consultaCompCompra: idCompra no disponible');
+      return;
+    }
     this.loadDetalleCompras = true;
 
-    //codigo para retrazar la ejecucion de la funcion
     setTimeout(() => {
       this.loadDetalleCompras = false;
     }, 3000);
 
-    console.log('aqui consultaCompCompra', id);
     this._comprasService.obtener_detalle_compras_idcompra(id).subscribe(
       response => {
         console.log('response.data');
@@ -276,44 +277,54 @@ export class IndexComprasComponent {
         if (response.data != undefined) {
 
           response.data.forEach((element: any) => {
-            //buscar en this.productos el codigo y traer todo el objeto del codigo
             const selectedObject = this.productos.find((item: any) => item.idProducto == element.idProducto);
             element.producto = selectedObject;
 
-            //buscar en this.sucursales el idSucursal y traer todo el objeto del idSucursal
             const selectedObjectSucursal = this.sucursales.find((item: any) => item.idSucursal == element.idSucursal);
             element.sucursal = selectedObjectSucursal;
 
-            //buscar en this.categoria el idCategoria y traer todo el objeto del idCategoria
-            const selectedObjectCategoria = this.categoria.find((item: any) => item.idCategoria == element.producto.idCategoria);
-            element.categoria = selectedObjectCategoria;
+            if (element.producto) {
+              const p = element.producto;
+              // El API de productos devuelve categoria y marca como nombres (string), no como IDs
+              const selectedObjectCategoria = this.categoria.find((c: any) =>
+                (c.nombre || '').trim() === (p.categoria || '').trim()
+              ) ?? this.categoria.find((c: any) => c.idCategoria == p.idCategoria);
+              element.categoria = selectedObjectCategoria;
 
-            //buscar en this.presentacion el idPresentacion y traer todo el objeto del idPresentacion
+              const selectedObjectMarca = this.marcas.find((m: any) =>
+                (m.nombre || '').trim() === (p.marca || '').trim()
+              ) ?? this.marcas.find((m: any) => m.idMarca == p.idMarca);
+              element.marca = selectedObjectMarca;
 
-            const selectedObjectPresentacion = this.presentacion.find((item: any) => item.idPresentacion == element.producto.idPresentacion);
-            element.presentacion = selectedObjectPresentacion;
-            
-            //buscar en this.marcas el idMarca y traer todo el objeto del idMarca
-            const selectedObjectMarca = this.marcas.find((item: any) => item.idMarca == element.producto.idMarca);
-            element.marca = selectedObjectMarca;
-
-          }
-          );
+              // Presentación: el API devuelve descripcionPres y codigoPresentacion
+              const selectedObjectPresentacion = this.presentacion.find((pr: any) =>
+                (pr.Descripcion || pr.descripcion || '').trim() === (p.descripcionPres || '').trim() ||
+                (pr.codigo || '').trim() === (p.codigoPresentacion || '').trim()
+              ) ?? this.presentacion.find((pr: any) => pr.idPresentacion == p.idPresentacion);
+              element.presentacion = selectedObjectPresentacion;
+            } else {
+              element.categoria = undefined;
+              element.presentacion = undefined;
+              element.marca = undefined;
+            }
+          });
           this.detalleCompras = response.data;
           this.detalleCompras_const = this.detalleCompras;
 
-
-          //quiero recorrer detallecompras y modificar algunos campos
           this.detalleCompras.forEach((element: any) => {
-            element.idPresentacion = element.producto.idPresentacion;
-            element.idCategoria = element.producto.idCategoria;
-            element.idSucursal = element.sucursal.idSucursal;
             element.cUnitario = element.pUnitario;
             element.subtotal = element.total;
-            element.descripcion = element.producto.descripcion;
-            element.codigo = element.producto.Codigo;
-            element.fProduccion = element.producto.fProduccion;
-            element.fVencimiento = element.producto.fVencimiento;
+            if (element.producto) {
+              element.idPresentacion = element.producto.idPresentacion;
+              element.idCategoria = element.producto.idCategoria;
+              element.descripcion = element.producto.descripcion;
+              element.codigo = element.producto.Codigo ?? element.producto.codigo;
+              element.fProduccion = element.producto.fProduccion;
+              element.fVencimiento = element.producto.fVencimiento;
+            }
+            if (element.sucursal) {
+              element.idSucursal = element.sucursal.idSucursal;
+            }
           });
 
 
@@ -528,7 +539,7 @@ export class IndexComprasComponent {
   gestionarInventarioCompra(compra: any): void {
     this.inventarioModal.abrirLoteList({ 
       idSucursal: compra.idSucursal,
-      idCompra: compra.idcompra 
+      idCompra: compra.idCompra || compra.idcompra 
     }).then(() => {
       // Recargar datos si es necesario
     }).catch(() => {});

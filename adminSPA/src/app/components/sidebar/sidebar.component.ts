@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal, effect, Output, EventEmitter, Input } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { Component, OnInit, OnDestroy, signal, effect, Output, EventEmitter, Input } from '@angular/core';
+import { Router, RouterModule, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { PermisosService } from '../../services/permisos.service';
 import { AuthService } from '../../services/auth.service';
 import { EmpresaService } from '../../services/empresa.service';
@@ -13,7 +14,7 @@ import { MenuItem } from '../../interfaces/permisos-interface';
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.css'
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnInit, OnDestroy {
   // Estado del sidebar
   isCollapsed = signal<boolean>(false);
   isMobileOpen = signal<boolean>(false);
@@ -60,15 +61,29 @@ export class SidebarComponent implements OnInit {
     });
   }
 
+  private routerEventsSubscription: ReturnType<Router['events']['subscribe']> | null = null;
+
   ngOnInit(): void {
     this.cargarEstadoConfiguracion();
     this.cargarNavegacion();
-    
+
+    // Abrir el submenú que contiene la ruta actual al navegar (conserva flechas y estado)
+    this.routerEventsSubscription = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(() => this.abrirSubmenuSegunRutaActual());
+
+    // Aplicar una vez por si la ruta actual ya es un submenú (ej. recarga de página)
+    setTimeout(() => this.abrirSubmenuSegunRutaActual(), 0);
+
     // Verificar si hay preferencia guardada
     const collapsed = localStorage.getItem('sidebarCollapsed');
     if (collapsed === 'true') {
       this.isCollapsed.set(true);
     }
+  }
+
+  ngOnDestroy(): void {
+    this.routerEventsSubscription?.unsubscribe();
   }
 
   /**
@@ -89,10 +104,34 @@ export class SidebarComponent implements OnInit {
   }
 
   /**
-   * Actualiza la navegación basada en el estado de configuración
+   * Actualiza la navegación basada en el estado de configuración.
+   * No reemplaza el menú cuando la API ya devolvió ítems con submenús (para conservar las flechas).
    */
   private actualizarNavegacionSegunEstado(estado: any): void {
     if (!estado) return;
+
+    const navegacionDesdeApi = this.permisosService.navegacion();
+    const tieneMenuConSubmenus = navegacionDesdeApi?.some(
+      (item) => item.submenu && (item.submenu?.length ?? 0) > 0
+    ) ?? false;
+
+    if (tieneMenuConSubmenus && navegacionDesdeApi && navegacionDesdeApi.length > 0) {
+      // Respetar el menú de la API (con submenús y flechas); solo inyectar "Crear Primer Colaborador" si aplica
+      if (!estado.tieneColaboradores) {
+        const items = [...navegacionDesdeApi];
+        const sepIndex = items.findIndex((i) => i.tipo === 'separador');
+        const insertIndex = sepIndex >= 0 ? sepIndex + 1 : items.length;
+        items.splice(insertIndex, 0, {
+          nombre: 'Crear Primer Colaborador',
+          icono: 'bi bi-person-plus',
+          ruta: '/colaborador/create',
+          visible: true,
+        });
+        this.menuItems.set(items);
+      }
+      this.abrirSubmenuSegunRutaActual();
+      return;
+    }
 
     const navegacionBasica: MenuItem[] = [
       { nombre: 'Dashboard', icono: 'bi bi-speedometer2', ruta: '/home', visible: true },
@@ -100,19 +139,17 @@ export class SidebarComponent implements OnInit {
       { nombre: 'Configuración Empresa', icono: 'bi bi-building', ruta: '/editar-empresa', visible: true },
     ];
 
-    // Si no tiene colaboradores, solo mostrar colaboradores
     if (!estado.tieneColaboradores) {
-      navegacionBasica.push({ 
-        nombre: 'Crear Primer Colaborador', 
-        icono: 'bi bi-person-plus', 
-        ruta: '/colaborador/create', 
-        visible: true 
+      navegacionBasica.push({
+        nombre: 'Crear Primer Colaborador',
+        icono: 'bi bi-person-plus',
+        ruta: '/colaborador/create',
+        visible: true,
       });
       this.menuItems.set(navegacionBasica);
       return;
     }
 
-    // Si ya tiene colaboradores, mostrar todas las opciones
     const navegacionCompleta: MenuItem[] = [
       ...navegacionBasica,
       { tipo: 'separador' },
@@ -128,6 +165,26 @@ export class SidebarComponent implements OnInit {
     ];
 
     this.menuItems.set(navegacionCompleta);
+  }
+
+  /**
+   * Abre el submenú que contiene la ruta actual (para que la flecha y el submenú se mantengan visibles al navegar).
+   */
+  private abrirSubmenuSegunRutaActual(): void {
+    const url = this.router.url;
+    const items = this.menuItems();
+    for (const item of items) {
+      if (item.submenu?.length) {
+        const modulo = item.modulo ?? '';
+        const algunaRutaActiva = item.submenu.some(
+          (sub) => sub.ruta === url || url.startsWith(sub.ruta + '/')
+        );
+        if (algunaRutaActiva) {
+          this.openSubmenu.set(modulo);
+          return;
+        }
+      }
+    }
   }
 
   /**

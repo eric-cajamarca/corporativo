@@ -201,64 +201,64 @@ const crear_compra = async (req, res) => {
 }
 
 const editar_compra = async function (req, res) {
-    console.log("editar_compra req.body", req.body);
-    console.log("editar_compra req.params", req.params);
-    const { compCompra, serie, numero, idProveedor, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario } = req.body;
-    //quiero convertir fEmision y fVencimiento a formato de fecha DateTime
-
+    const { compCompra, serie, numero, idProveedor, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario: idUsuarioBody } = req.body;
 
     const idcompra = req.params.id;
     const idEmpresa = req.user.empresa;
+    const idUsuario = idUsuarioBody || req.user.sub || req.user.idUsuario;
 
-    // Supongamos que tienes una fecha en formato '2024-03-09'
-    const fechaOriginalE = req.body.fEmision;
-    // Convertir la cadena a un objeto Date
-    const fechaObjetoE = new Date(fechaOriginalE);
-    // Formatear la fecha en el nuevo formato '2024-03-01 00:00:00.000'
-    const fechaFormateadaE = fechaObjetoE.toISOString().slice(0, 19).replace('T', ' ') + '.000';
-    const fEmision = fechaFormateadaE;
+    const idProveedorInt = parseInt(String(idProveedor), 10);
+    if (isNaN(idProveedorInt)) {
+        return res.status(400).send({ message: 'idProveedor inválido', data: undefined });
+    }
 
-    // Supongamos que tienes una fecha en formato '2024-03-09'
-    const fechaOriginal = req.body.fVencimiento;
-    // Convertir la cadena a un objeto Date
-    const fechaObjeto = new Date(fechaOriginal);
-    // Formatear la fecha en el nuevo formato '2024-03-01 00:00:00.000'
-    const fechaFormateada = fechaObjeto.toISOString().slice(0, 19).replace('T', ' ') + '.000';
-    const fVencimiento = fechaFormateada;
+    let fEmision = null;
+    let fVencimiento = null;
+    if (req.body.fEmision) {
+        const fechaObjetoE = new Date(req.body.fEmision);
+        if (!isNaN(fechaObjetoE.getTime())) {
+            fEmision = fechaObjetoE.toISOString().slice(0, 19).replace('T', ' ') + '.000';
+        }
+    }
+    if (req.body.fVencimiento) {
+        const fechaObjetoV = new Date(req.body.fVencimiento);
+        if (!isNaN(fechaObjetoV.getTime())) {
+            fVencimiento = fechaObjetoV.toISOString().slice(0, 19).replace('T', ' ') + '.000';
+        }
+    }
 
     if (req.user) {
         if (req.user.rol == 'Administrador' || req.user.rol == 'Almacenero') {
-            //aqui deseo editar la compra
-            
             try {
                 let pool = await sql.connect(dbConfig);
-                let editarCompra = await pool
-                    .request()
+                const request = pool.request()
                     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-                    .input("compCompra", sql.VarChar, compCompra)
                     .input("idcompra", sql.UniqueIdentifier, idcompra)
-                    .input("serie", sql.VarChar, serie)
-                    .input("numero", sql.VarChar, numero)
-                    .input("fEmision", sql.DateTime, fEmision)
-                    .input("fVencimiento", sql.DateTime, fVencimiento)
-                    .input("idProveedor", sql.Int, idProveedor)
-                    .input("idMoneda", sql.Int, idMoneda)
-                    .input("idEstadoPago", sql.Int, idEstadoPago)
-                    .input("subTotal", sql.Decimal, subTotal)
-                    .input("igv", sql.Decimal, igv)
-                    .input("exonerado", sql.Decimal, exonerado)
-                    .input("gratuito", sql.Decimal, gratuito)
-                    .input("otrosCargos", sql.Decimal, otrosCargos)
-                    .input("descuentos", sql.Decimal, descuentos)
-                    .input("total", sql.Decimal, total)
-                    .input("idMediosPago", sql.Int, idMediosPago)
-                    .input("compRelacionado", sql.VarChar, compRelacionado)
-                    .input("idUsuario", sql.UniqueIdentifier, idUsuario)
-                    .query("UPDATE Compras SET compCompra=@compCompra, serie = @serie, numero = @numero, fEmision = @fEmision, fVencimiento = @fVencimiento, idProveedor = @idProveedor, idMoneda = @idMoneda, idEstadoPago = @idEstadoPago, subTotal = @subTotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total, idMediosPago = @idMediosPago, compRelacionado = @compRelacionado, idUsuario = @idUsuario WHERE idEmpresa = @idEmpresa AND idCompra = @idcompra");
+                    .input("compCompra", sql.VarChar, compCompra ?? '')
+                    .input("serie", sql.VarChar, serie ?? '')
+                    .input("numero", sql.VarChar, numero ?? '')
+                    .input("idProveedor", sql.Int, idProveedorInt)
+                    .input("idMoneda", sql.Int, idMoneda ?? 1)
+                    .input("idEstadoPago", sql.Int, idEstadoPago ?? 1)
+                    .input("subTotal", sql.Decimal(18, 2), subTotal ?? 0)
+                    .input("igv", sql.Decimal(18, 2), igv ?? 0)
+                    .input("exonerado", sql.Decimal(18, 2), exonerado ?? 0)
+                    .input("gratuito", sql.Decimal(18, 2), gratuito ?? 0)
+                    .input("otrosCargos", sql.Decimal(18, 2), otrosCargos ?? 0)
+                    .input("descuentos", sql.Decimal(18, 2), descuentos ?? 0)
+                    .input("total", sql.Decimal(18, 2), total ?? 0)
+                    .input("idMediosPago", sql.Int, idMediosPago ?? 1)
+                    .input("compRelacionado", sql.VarChar, compRelacionado ?? '')
+                    .input("idUsuario", sql.UniqueIdentifier, idUsuario);
+
+                request.input("fEmision", sql.DateTime, fEmision);
+                request.input("fVencimiento", sql.DateTime, fVencimiento);
+
+                let editarCompra = await request.query("UPDATE Compras SET compCompra=@compCompra, serie=@serie, numero=@numero, fEmision=ISNULL(@fEmision, fEmision), fVencimiento=@fVencimiento, idProveedor=@idProveedor, idMoneda=@idMoneda, idEstadoPago=@idEstadoPago, subTotal=@subTotal, igv=@igv, exonerado=@exonerado, gratuito=@gratuito, otrosCargos=@otrosCargos, descuentos=@descuentos, total=@total, idMediosPago=@idMediosPago, compRelacionado=@compRelacionado, idUsuario=@idUsuario WHERE idEmpresa=@idEmpresa AND idCompra=@idcompra");
 
                 res.status(200).send({ message: 'Compra editada correctamente', data: editarCompra.rowsAffected });
             } catch (error) {
-                console.log('editar compras error: ' + error);
+                console.error('editar compras error:', error);
                 res.status(500).send({ message: 'Error al editar la compra', data: undefined });
             }
         } else {

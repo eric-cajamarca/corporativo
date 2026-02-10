@@ -1,6 +1,5 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-const prodController = require('./productosController');
 const preciosVController = require('./preciosVController');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const lotesUbicacionRepository = require('../repositories/lotesUbicacion.repository');
@@ -21,7 +20,9 @@ const lotesUbicacionRepository = require('../repositories/lotesUbicacion.reposit
 
 const obtener_detalle_compras_idcompra = async function (req, res) {
     const idCompra = req.params.id;
-    console.log('obtener_detalle_compras_idcompra: ', idCompra);
+    if (!idCompra || idCompra === 'undefined' || idCompra === 'null') {
+        return res.status(400).send({ message: 'idCompra es requerido', data: undefined });
+    }
     if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
@@ -215,40 +216,6 @@ const editar_detalle_compras_idcompra = async (req, res) => {
         });
 
         console.log('DetalleCompra en editar_detalle_compras_idcompra ', DetalleCompra);
-
-
-        // productos = DetalleCompra.map(compra => compra.producto);
-        //Extracción de productos con campos adicionales
-        const productos = DetalleCompra.map(compra => {
-            const { idProducto, idEmpresa, idCategoria, idDetalleCompra, idSucursal, idCompra, idMarca, idPresentacion, pUnitario, descripcion, fProduccion, fVencimiento, codigo } = compra;
-            return {
-                codigo,
-                idProducto,
-                idEmpresa,
-                idCategoria,
-                descripcion,
-                idMarca,
-                idPresentacion,
-                pUnitario,
-                fProduccion,
-                fVencimiento,
-                idDetalleCompra,
-                idSucursal,
-                idCompra,
-
-            };
-        });
-
-        console.log('producto en editar_detalle_compras_idcompra: ', productos);
-
-        try {
-            for (const detalle of productos) {
-                await prodController.actualizar_producto(detalle);
-            }
-
-        } catch (error) {
-            console.log('error en actualizar_producto: ', error);
-        }
 
 
         const idUsuario = req.user.sub;

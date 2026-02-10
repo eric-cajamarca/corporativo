@@ -631,6 +631,14 @@ CREATE TABLE Compras (
 );
 GO
 
+--IF NOT EXISTS (
+--    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+--    WHERE TABLE_NAME = 'Compras' AND COLUMN_NAME = 'numeroLote'
+--)
+--BEGIN
+--    ALTER TABLE Compras ADD numeroLote INT NULL;
+--END
+--GO
 -- Tabla de detalle de compras mejorada
 CREATE TABLE DetalleCompras (
     idDetalleCompra INT IDENTITY(1,1) PRIMARY KEY NOT NULL,

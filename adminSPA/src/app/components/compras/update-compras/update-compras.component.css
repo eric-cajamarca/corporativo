@@ -1,9 +1,56 @@
+/* Layout: sidebar y contenido (igual que create-compras) */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 12px 16px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+.content-wrap {
+  max-width: 100%;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
 /* Estilos generales para el contenedor principal */
 .container {
-  width: 95%;
-  max-width: 95%;
-  padding: 0;
-  margin: 10px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 4px;
+  margin: 0 4px;
+}
+
+.create-compras-card .card-header {
+  border-radius: 5px 5px 0 0;
+}
+
+.table-row-hover:hover {
+  background-color: rgba(32, 201, 151, 0.1);
+}
+
+.columna-descripcion {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Estilos para todos los cards */
