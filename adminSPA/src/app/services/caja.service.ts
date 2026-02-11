@@ -16,6 +16,12 @@ export class CajaService {
     this.url = global.url;
   }
 
+  // Crear nueva caja
+  crearCaja(data: { idSucursal: string; nombre: string; descripcion?: string }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url + 'caja/cajas', data, { headers, withCredentials: true });
+  }
+
   // Obtener todas las cajas disponibles
   obtenerCajas(): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -98,6 +104,108 @@ export class CajaService {
     let params = fecha ? `?fecha=${fecha}` : '';
     return this._http.get(this.url+'caja/resumen-diario' + params, {
       headers: headers,
+      withCredentials: true
+    });
+  }
+
+  /** Arqueo dinámico: conceptos y formas de pago según movimientos reales (sin tabla fija). */
+  obtenerArqueoDinamico(fecha: string, idCaja?: string): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    let params = `?fecha=${fecha}`;
+    if (idCaja && idCaja !== 'TODAS') params += `&idCaja=${idCaja}`;
+    return this._http.get(this.url + 'caja/arqueo-dinamico' + params, {
+      headers,
+      withCredentials: true
+    });
+  }
+
+  // Recibos de egreso (movimientos tipo E)
+  getRecibosEgreso(filtros?: { fechaDesde?: string; fechaHasta?: string }): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    let params = '';
+    if (filtros) {
+      const q = new URLSearchParams();
+      if (filtros.fechaDesde) q.append('fechaDesde', filtros.fechaDesde);
+      if (filtros.fechaHasta) q.append('fechaHasta', filtros.fechaHasta);
+      params = '?' + q.toString();
+    }
+    return this._http.get(this.url + 'caja/recibos-egreso' + params, { headers, withCredentials: true });
+  }
+
+  // Recibos de ingreso (movimientos tipo I)
+  getRecibosIngreso(filtros?: { fechaDesde?: string; fechaHasta?: string }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    const q = new URLSearchParams();
+    if (filtros?.fechaDesde) q.append('fechaDesde', filtros.fechaDesde);
+    if (filtros?.fechaHasta) q.append('fechaHasta', filtros.fechaHasta);
+    q.append('tipoMovimiento', 'I');
+    return this._http.get(this.url + 'caja/movimientos?' + q.toString(), { headers, withCredentials: true });
+  }
+
+  // Registrar movimiento (egreso): backend espera idApertura
+  registrarMovimientoEgreso(data: {
+    idApertura: string;
+    idTipoMovimientoCaja: number;
+    concepto: string;
+    monto: number;
+    idMediosPago?: number;
+    documentoRelacionado?: string;
+    observaciones?: string;
+  }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url + 'caja/movimiento', {
+      idApertura: data.idApertura,
+      idTipoMovimientoCaja: data.idTipoMovimientoCaja,
+      concepto: data.concepto,
+      monto: data.monto,
+      idMediosPago: data.idMediosPago ?? null,
+      idMoneda: 1,
+      documentoRelacionado: data.documentoRelacionado ?? null,
+      observaciones: data.observaciones ?? null
+    }, { headers, withCredentials: true });
+  }
+
+  // Registrar movimiento (ingreso): mismo endpoint que egreso, con idTipoMovimientoCaja tipo I
+  registrarMovimientoIngreso(data: {
+    idApertura: string;
+    idTipoMovimientoCaja: number;
+    concepto: string;
+    monto: number;
+    idMediosPago?: number;
+    documentoRelacionado?: string;
+    observaciones?: string;
+  }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url + 'caja/movimiento', {
+      idApertura: data.idApertura,
+      idTipoMovimientoCaja: data.idTipoMovimientoCaja,
+      concepto: data.concepto,
+      monto: data.monto,
+      idMediosPago: data.idMediosPago ?? null,
+      idMoneda: 1,
+      documentoRelacionado: data.documentoRelacionado ?? null,
+      observaciones: data.observaciones ?? null
+    }, { headers, withCredentials: true });
+  }
+
+  eliminarMovimiento(idMovimientoCaja: string): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.delete(this.url + 'caja/movimientos/' + idMovimientoCaja, {
+      headers,
+      withCredentials: true
+    });
+  }
+
+  actualizarMovimiento(idMovimientoCaja: string, data: {
+    concepto: string;
+    monto: number;
+    idMediosPago?: number;
+    documentoRelacionado?: string;
+    observaciones?: string;
+  }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.put(this.url + 'caja/movimientos/' + idMovimientoCaja, data, {
+      headers,
       withCredentials: true
     });
   }

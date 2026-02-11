@@ -5,9 +5,14 @@ const CajaServices = require('../services/caja.service');
 // Obtener cajas disponibles para la empresa
 const obtenerCajas = async (req, res) => {
   try {
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!idEmpresa) {
+      return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: [] });
+    }
     const pool = await sql.connect(dbConfig);
-    const cajas = await CajaServices.obtenerCajasService(pool, req.user);
-    res.status(200).send({ data: cajas });
+    const userWithEmpresa = { ...req.user, empresa: idEmpresa };
+    const cajas = await CajaServices.obtenerCajasService(pool, userWithEmpresa);
+    res.status(200).send({ data: Array.isArray(cajas) ? cajas : [] });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
@@ -21,8 +26,43 @@ const obtenerCajas = async (req, res) => {
     console.error("Error obtener cajas:", error);
     res.status(500).send({
       message: "Error al obtener las cajas",
-      data: undefined
+      data: []
     });
+  }
+};
+
+// Crear nueva caja
+const crearCaja = async (req, res) => {
+  try {
+    const { idSucursal, nombre, descripcion } = req.body;
+    if (!idSucursal || !nombre || !nombre.trim()) {
+      return res.status(400).send({
+        message: "Sucursal y nombre son obligatorios",
+        data: undefined
+      });
+    }
+    const pool = await sql.connect(dbConfig);
+    const result = await CajaServices.crearCajaService(pool, req.user, {
+      idSucursal,
+      nombre: nombre.trim(),
+      descripcion: descripcion || null
+    });
+    res.status(200).send({
+      message: "Caja registrada correctamente",
+      data: result
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permisos", data: undefined });
+    }
+    if (error.message === "DATOS_INVALIDOS") {
+      return res.status(400).send({ message: "Sucursal y nombre son obligatorios", data: undefined });
+    }
+    console.error("Error crear caja:", error);
+    res.status(500).send({ message: "Error al registrar la caja", data: undefined });
   }
 };
 
@@ -63,6 +103,12 @@ const abrirCaja = async (req, res) => {
     if (error.message === "CAJA_YA_ABIERTA") {
       return res.status(400).send({
         message: "La caja ya está abierta",
+        data: undefined
+      });
+    }
+    if (error.message === "CAJA_SIN_SUCURSAL") {
+      return res.status(400).send({
+        message: "La caja no tiene sucursal asignada",
         data: undefined
       });
     }
@@ -187,13 +233,14 @@ const registrarMovimiento = async (req, res) => {
 // Obtener movimientos de caja
 const obtenerMovimientosCaja = async (req, res) => {
   try {
-    const { idApertura, fechaDesde, fechaHasta } = req.query;
+    const { idApertura, fechaDesde, fechaHasta, tipoMovimiento } = req.query;
 
     const pool = await sql.connect(dbConfig);
     const movimientos = await CajaServices.obtenerMovimientosCajaService(pool, req.user, {
       idApertura,
       fechaDesde,
-      fechaHasta
+      fechaHasta,
+      tipoMovimiento: tipoMovimiento || null
     });
 
     res.status(200).send({ data: movimientos });
@@ -233,6 +280,86 @@ const obtenerTiposMovimientoCaja = async (req, res) => {
   }
 };
 
+// Recibos de egreso (movimientos tipo Egreso)
+const obtenerRecibosEgreso = async (req, res) => {
+  try {
+    const { fechaDesde, fechaHasta } = req.query;
+    const pool = await sql.connect(dbConfig);
+    const lista = await CajaServices.obtenerRecibosEgresoService(pool, req.user, {
+      fechaDesde: fechaDesde || null,
+      fechaHasta: fechaHasta || null
+    });
+    res.status(200).send({ data: lista });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permisos", data: undefined });
+    }
+    console.error("Error obtener recibos egreso:", error);
+    res.status(500).send({ message: "Error al obtener recibos de egreso", data: undefined });
+  }
+};
+
+// Eliminar movimiento (recibo egreso)
+const eliminarMovimientoCaja = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const deleted = await CajaServices.eliminarMovimientoCajaService(pool, req.user, id);
+    if (deleted === 0) {
+      return res.status(404).send({ message: "Movimiento no encontrado", data: undefined });
+    }
+    res.status(200).send({ message: "Movimiento eliminado", data: deleted });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permisos", data: undefined });
+    }
+    console.error("Error eliminar movimiento:", error);
+    res.status(500).send({ message: "Error al eliminar", data: undefined });
+  }
+};
+
+// Actualizar movimiento (recibo egreso)
+const actualizarMovimientoCaja = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { concepto, monto, idMediosPago, documentoRelacionado, observaciones } = req.body;
+    if (!concepto || monto === undefined || monto <= 0) {
+      return res.status(400).send({
+        message: "concepto y monto son requeridos",
+        data: undefined
+      });
+    }
+    const pool = await sql.connect(dbConfig);
+    const updated = await CajaServices.actualizarMovimientoCajaService(pool, req.user, {
+      idMovimientoCaja: id,
+      concepto,
+      monto,
+      idMediosPago: idMediosPago || null,
+      documentoRelacionado: documentoRelacionado || null,
+      observaciones: observaciones || null
+    });
+    if (updated === 0) {
+      return res.status(404).send({ message: "Movimiento no encontrado", data: undefined });
+    }
+    res.status(200).send({ message: "Movimiento actualizado", data: updated });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permisos", data: undefined });
+    }
+    console.error("Error actualizar movimiento:", error);
+    res.status(500).send({ message: "Error al actualizar", data: undefined });
+  }
+};
+
 // Obtener resumen de caja diario
 const obtenerResumenCajaDiario = async (req, res) => {
   try {
@@ -260,12 +387,40 @@ const obtenerResumenCajaDiario = async (req, res) => {
   }
 };
 
+// Arqueo dinámico: conceptos y formas de pago según movimientos reales del día (sin tabla fija)
+const obtenerArqueoDinamico = async (req, res) => {
+  try {
+    const { fecha, idCaja } = req.query;
+    const pool = await sql.connect(dbConfig);
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!idEmpresa) {
+      return res.status(403).send({ message: "No autorizado: falta empresa", data: undefined });
+    }
+    const data = await CajaServices.obtenerArqueoDinamicoService(pool, req.user, fecha, idCaja || "TODAS");
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permisos", data: undefined });
+    }
+    console.error("Error obtener arqueo dinámico:", error);
+    res.status(500).send({ message: "Error al obtener arqueo", data: undefined });
+  }
+};
+
 module.exports = {
   obtenerCajas,
+  crearCaja,
   abrirCaja,
   cerrarCaja,
   registrarMovimiento,
   obtenerMovimientosCaja,
+  obtenerRecibosEgreso,
+  eliminarMovimientoCaja,
+  actualizarMovimientoCaja,
   obtenerTiposMovimientoCaja,
-  obtenerResumenCajaDiario
+  obtenerResumenCajaDiario,
+  obtenerArqueoDinamico
 };

@@ -48,9 +48,14 @@ import { VentaPorPrioridadComponent } from './components/inventario/venta-por-pr
 import { AsignarStockUbicacionComponent } from './components/inventario/asignar-stock-ubicacion/asignar-stock-ubicacion.component';
 import { IndexCajaComponent } from './components/caja/index-caja/index-caja.component';
 import { IndexCreditosComponent } from './components/creditos/index-creditos/index-creditos.component';
+import { ArqueoCajaComponent } from './components/caja/arqueo-caja/arqueo-caja.component';
 import { DashboardAnalisisComponent } from './components/analisis/dashboard-analisis/dashboard-analisis.component';
 import { IndexConfiguracionComponent } from './components/configuracion/index-configuracion/index-configuracion.component';
 import { IndexReportesComponent } from './components/reportes/index-reportes/index-reportes.component';
+import { PagoProveedoresComponent } from './components/caja/pago-proveedores/pago-proveedores.component';
+import { ReciboIngresoComponent } from './components/caja/recibo-ingreso/recibo-ingreso.component';
+import { ReciboEgresoComponent } from './components/caja/recibo-egreso/recibo-egreso.component';
+import { ConteoDineroComponent } from './components/caja/conteo-dinero/conteo-dinero.component';
 
 export const routes: Routes = [
     {
@@ -181,6 +186,11 @@ export const routes: Routes = [
 
      // Nuevos módulos
      { path: 'caja', component: IndexCajaComponent, canActivate: [AuthGuard], title: 'Gestión de Caja' },
+     { path: 'caja/arqueo', component: ArqueoCajaComponent, canActivate: [AuthGuard], title: 'Arqueo de Caja' },
+     { path: 'caja/pago-proveedores', component: PagoProveedoresComponent, canActivate: [AuthGuard], title: 'Pago a Proveedores' },
+     { path: 'caja/recibo-ingreso', component: ReciboIngresoComponent, canActivate: [AuthGuard], title: 'Recibo de Ingreso' },
+     { path: 'caja/recibo-egreso', component: ReciboEgresoComponent, canActivate: [AuthGuard], title: 'Recibo de Egreso' },
+     { path: 'caja/conteo-dinero', component: ConteoDineroComponent, canActivate: [AuthGuard], title: 'Conteo de Dinero' },
      { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard], title: 'Créditos y Cuotas' },
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },

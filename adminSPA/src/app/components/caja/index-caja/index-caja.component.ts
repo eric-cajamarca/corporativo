@@ -1,22 +1,28 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
+import { SucursalService } from '../../../services/sucursal.service';
 import { Caja, MovimientoCaja, TipoMovimientoCaja } from '../../../interfaces/caja-interface';
+import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-index-caja',
-  imports: [FormsModule, RouterModule, CommonModule],
+  standalone: true,
+  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent],
   templateUrl: './index-caja.component.html',
   styleUrl: './index-caja.component.css'
 })
 export class IndexCajaComponent implements OnInit {
+  sidebarCollapsed = signal<boolean>(false);
 
   public cajas: Caja[] = [];
+  public sucursales: Sucursal[] = [];
   public movimientos: MovimientoCaja[] = [];
   public tiposMovimiento: TipoMovimientoCaja[] = [];
 
@@ -24,6 +30,13 @@ export class IndexCajaComponent implements OnInit {
   public mostrarModalApertura = false;
   public mostrarModalMovimiento = false;
   public mostrarModalCierre = false;
+  public mostrarModalNuevaCaja = false;
+
+  public nuevaCaja = {
+    idSucursal: '',
+    nombre: '',
+    descripcion: ''
+  };
 
   public montoInicial = 0;
   public movimiento = {
@@ -44,29 +57,46 @@ export class IndexCajaComponent implements OnInit {
   public loading = false;
 
   constructor(
-    private cajaService: CajaService
+    private cajaService: CajaService,
+    private sucursalService: SucursalService
   ) {}
 
   ngOnInit(): void {
     this.cargarCajas();
     this.cargarTiposMovimiento();
+    this.cargarSucursales();
+  }
+
+  onSidebarToggle( collapsed: boolean ): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
+
+  cargarSucursales() {
+    this.sucursalService.obtener_sucursal_idempresa().subscribe({
+      next: (response) => {
+        if (response?.data) {
+          this.sucursales = Array.isArray(response.data) ? response.data : [];
+        }
+      },
+      error: () => {}
+    });
   }
 
   cargarCajas() {
     this.loading = true;
     this.cajaService.obtenerCajas().subscribe({
       next: (response) => {
-        if (response.data) {
-          this.cajas = response.data;
-        }
+        const data = response?.data ?? response;
+        this.cajas = Array.isArray(data) ? data : [];
         this.loading = false;
       },
       error: (error) => {
         console.error('Error al cargar cajas:', error);
         iziToast.error({
           title: 'Error',
-          message: 'Error al cargar las cajas'
+          message: error?.error?.message || 'Error al cargar las cajas'
         });
+        this.cajas = [];
         this.loading = false;
       }
     });
@@ -140,7 +170,43 @@ export class IndexCajaComponent implements OnInit {
     this.mostrarModalApertura = false;
     this.mostrarModalMovimiento = false;
     this.mostrarModalCierre = false;
+    this.mostrarModalNuevaCaja = false;
     this.cajaSeleccionada = null;
+  }
+
+  abrirModalNuevaCaja() {
+    this.nuevaCaja = { idSucursal: '', nombre: '', descripcion: '' };
+    this.mostrarModalNuevaCaja = true;
+  }
+
+  registrarNuevaCaja() {
+    if (!this.nuevaCaja.idSucursal || !this.nuevaCaja.nombre?.trim()) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'Seleccione sucursal e ingrese el nombre de la caja'
+      });
+      return;
+    }
+    this.loading = true;
+    this.cajaService.crearCaja({
+      idSucursal: this.nuevaCaja.idSucursal,
+      nombre: this.nuevaCaja.nombre.trim(),
+      descripcion: this.nuevaCaja.descripcion?.trim() || undefined
+    }).subscribe({
+      next: () => {
+        iziToast.success({ title: 'Éxito', message: 'Caja registrada correctamente' });
+        this.cerrarModales();
+        this.cargarCajas();
+        this.loading = false;
+      },
+      error: (error) => {
+        iziToast.error({
+          title: 'Error',
+          message: error.error?.message || 'Error al registrar la caja'
+        });
+        this.loading = false;
+      }
+    });
   }
 
   abrirCaja() {

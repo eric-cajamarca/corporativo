@@ -1,6 +1,4 @@
-import { Component } from '@angular/core';
-import { forkJoin } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { Component, OnInit, signal } from '@angular/core';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -20,8 +18,10 @@ import { Documento } from '../../../interfaces/documento-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ModalService } from '../../../services/modal.service';
+import { VentasService } from '../../../services/ventas.service';
+import { CajaService } from '../../../services/caja.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -34,11 +34,11 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-ventas',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule,IndexClientesComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, TopnavComponent, SidebarComponent],
   templateUrl: './create-ventas.component.html',
   styleUrl: './create-ventas.component.css'
 })
-export class CreateVentasComponent {
+export class CreateVentasComponent implements OnInit {
 
   public productos: any[] = [];
   private productos_const: any[] = [];
@@ -80,18 +80,21 @@ export class CreateVentasComponent {
     tipoDocumento: '1',
     razonsocial: '',
     direccion: '',
-
   };
+  public cajas: any[] = [];
+  public sidebarCollapsed = signal(false);
+  public loading = false;
+
   public ventas: any = {
     compVenta: '0000-00000000',
     idComprobante: '',
     serie: '0000',
-    numero: 0,
+    numero: '00000000',
     idSucursal: '',
-    idcliente: '',
+    idCliente: '',
     idDocumento: '',
-    idMoneda: '1',
-    idEstadoPago: '2',
+    idMoneda: 1,
+    idEstadoPago: 2,
     idMediosPago: '5',
     fEmision: '',
     fechaPago: '',
@@ -118,21 +121,40 @@ export class CreateVentasComponent {
     private _comprobanteService: ComprobanteService,
     private _tablasSunatService: TablasSunatService,
     private _documentosService: DocumentoService,
-    private modalService: ModalService
+    private modalService: ModalService,
+    private ventasService: VentasService,
+    private cajaService: CajaService
+  ) {}
 
-  ) { }
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
 
- ngOnInit(): void {
-
-
+  ngOnInit(): void {
     this._documentosService.obtener_documento1().subscribe({
-      next: (response) => {
-        this.documento = response.data; // ✅ Asigna directo el array
-        console.log('Documentos:', this.documento);
-      },
-      error: (error) => console.error(error)
+      next: (response) => { this.documento = response.data || []; },
+      error: () => {}
     });
-
+    this._sucursalService.obtener_sucursal_todos().subscribe({
+      next: (r) => {
+        this.sucursales = r.data || r || [];
+        if (this.sucursales.length && !this.ventas.idSucursal) {
+          this.ventas.idSucursal = this.sucursales[0].idSucursal;
+        }
+      },
+      error: () => {}
+    });
+    this.cajaService.obtenerCajas().subscribe({
+      next: (r) => {
+        this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
+      },
+      error: () => {}
+    });
+    const hoy = new Date().toISOString().split('T')[0];
+    if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
+    if (!this.ventas.fVencimiento) this.ventas.fVencimiento = hoy;
+    const collapsed = localStorage.getItem('sidebarCollapsed');
+    if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargarDatos();
   }
   // Función para cargar todos los productos
@@ -314,12 +336,11 @@ export class CreateVentasComponent {
     const comp = compByName;
 
     if (comp) {
-      // Asignar de forma segura y normalizando tipos
-      // this.ventas.serie = comp.serie ?? '';
-      // this.ventas.numero = comp.numero != null ? Number(comp.numero) : 0;
       this.ventas.idComprobante = comp.idComprobante ?? comp.id ?? '';
-      // this.ventas.compVenta = comp.serie + '-' + (comp.numero != null ? String(comp.numero).padStart(8, '0') : '00000000');
-      // console.log('Datos del comprobante cargados en ventas:', this.ventas);
+      this.ventas.serie = comp.serie ?? '0000';
+      const nextNum = (comp.numero != null ? Number(comp.numero) : 0) + 1;
+      this.ventas.numero = String(nextNum).padStart(8, '0');
+      this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
     } else {
       // No se encontró: limpia o conserva según prefieras — aquí limpiamos para evitar datos inconsistentes
       console.warn('No se encontró comprobante para el valor:', valor);
@@ -448,15 +469,12 @@ export class CreateVentasComponent {
     this.actualizaTotales();
   }
 
-  actualizaPrecio(item: any, el: any) {
-    console.log('Elemento editado para el:', el);
-    console.log('Elemento editado para Item:', item);
-    //const nuevo = parseFloat(el.target.innerText.replace('S/', '').trim(),10);
-    const nuevo = parseInt(el.target.innerText.trim(), 10);
-    if (!isNaN(nuevo)) {
+  actualizaPrecio(item: any, el: any): void {
+    const raw = (el.target?.innerText ?? '').replace(/[^\d.,]/g, '').replace(',', '.').trim();
+    const nuevo = parseFloat(raw);
+    if (!isNaN(nuevo) && nuevo >= 0) {
       item.pVenta = nuevo;
     }
-    console.log('Nuevo precio establecido:', item.producto);
     this.actualizaTotales();
   }
 
@@ -668,16 +686,19 @@ abrirModalPrecios(item: any) {
     return this.detallePago.reduce((sum: any, item: { monto: any; }) => sum + item.monto, 0);
   }
 
-  // Agregar detalle
+  // Agregar detalle (guardamos idFormaPago para enviar como idMediosPago al API)
   agregarDetalle(): void {
-    if (this.detailForm.monto > 0) {
+    const monto = Number(this.detailForm.monto);
+    const idForma = this.formaPagoSeleccionada?.idFormaPago != null ? Number(this.formaPagoSeleccionada.idFormaPago) : 0;
+    if (monto > 0 && idForma) {
+      const desc = this.formasPago.find((f: FormaPago) => f.idFormaPago === idForma)?.descripcion || 'Pago';
       this.detallePago.push({
         item: this.detallePago.length + 1,
-        descripcion: this.detailForm.formaPago,
-        monto: this.detailForm.monto,
+        idFormaPago: idForma,
+        descripcion: desc,
+        monto,
         referencia: this.detailForm.referencia || 'N/A'
       });
-      // Resetear formulario
       this.detailForm = { formaPago: 'Efectivo', monto: 0, referencia: '' };
     }
   }
@@ -689,19 +710,127 @@ abrirModalPrecios(item: any) {
     this.detallePago.forEach((item: { item: any; }, idx: number) => item.item = idx + 1);
   }
 
-  // Guardar pago
-  guardarPago() {
-    // console.log('Detalles guardados:', this.detallePago);
-    // const modal = bootstrap.Modal.getInstance(document.getElementById('modalPago'));
-    // modal?.hide();
+  guardarPago(): void {
+    const modalEl = document.getElementById('modalPago');
+    const inst = bootstrap.Modal.getInstance(modalEl);
+    inst?.hide();
   }
-}
 
+  /** Registra la venta completa: Ventas + DetalleVenta + DetallePagoVenta + MovimientosCaja (si hay pago) */
+  registrarVenta(): void {
+    if (this.carrito.length === 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
+      return;
+    }
+    if (!this.ventas.idComprobante) {
+      iziToast.warning({ title: 'Advertencia', message: 'Seleccione tipo de comprobante (Datos del Comprobante).' });
+      return;
+    }
+    if (!this.ventas.idSucursal) {
+      iziToast.warning({ title: 'Advertencia', message: 'Seleccione sucursal.' });
+      return;
+    }
+    const idCliente = this.cliente?.idCliente != null ? Number(this.cliente.idCliente) : null;
+    if (idCliente == null || idCliente === 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'Seleccione un cliente (Información del Cliente).' });
+      return;
+    }
 
+    const totalVenta = Number(this.ventas.total) || 0;
+    const totalPago = this.calcularTotalTabla();
+    if (totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
+      iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
+      return;
+    }
 
+    const ventaPayload = {
+      idSucursal: this.ventas.idSucursal,
+      serie: String(this.ventas.serie || '0000').substring(0, 4),
+      numero: String(this.ventas.numero || '00000000').substring(0, 8),
+      compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
+      idComprobante: Number(this.ventas.idComprobante),
+      fEmision: this.ventas.fEmision ? new Date(this.ventas.fEmision).toISOString() : new Date().toISOString(),
+      fVencimiento: this.ventas.fVencimiento ? new Date(this.ventas.fVencimiento).toISOString() : new Date().toISOString(),
+      idCliente,
+      idMoneda: Number(this.ventas.idMoneda) || 1,
+      tCambio: 1,
+      subtotal: Number(this.ventas.subTotal) || 0,
+      igv: Number(this.ventas.igv) || 0,
+      exonerado: Number(this.ventas.exonerado) || 0,
+      gratuito: Number(this.ventas.gratuito) || 0,
+      otrosCargos: Number(this.ventas.otrosCargos) || 0,
+      descuentos: Number(this.ventas.descuentos) || 0,
+      total: totalVenta,
+      idMediosPago: String(this.ventas.idMediosPago || '5'),
+      idEstadoSunat: 1,
+      compRelacionado: this.ventas.observacion || null
+    };
 
+    const detalles = this.carrito.map((item: any) => {
+      const cant = Number(item.cantidad) || 0;
+      const pVenta = Number(item.pVenta) || 0;
+      const subtotal = cant * pVenta;
+      return {
+        idProducto: item.idProducto,
+        cantidad: cant,
+        pVenta,
+        descuento: 0,
+        subtotal,
+        igv: 0,
+        isc: 0,
+        total: subtotal,
+        hVenta: new Date().toISOString(),
+        cantEntregada: cant,
+        idEstadoPedido: 1
+      };
+    });
 
-function captureError(arg0: () => never[]): import("rxjs").OperatorFunction<any, unknown> {
-  throw new Error('Function not implemented.');
+    const detallePago = this.detallePago
+      .filter((d: any) => d.monto > 0 && (d.idFormaPago != null || d.idMediosPago != null))
+      .map((d: any) => ({
+        idMediosPago: Number(d.idMediosPago ?? d.idFormaPago),
+        monto: Number(d.monto)
+      }));
+
+    let idApertura: string | undefined;
+    if (detallePago.length > 0 && this.cajas.length > 0) {
+      idApertura = this.cajas[0].idApertura;
+    }
+
+    this.loading = true;
+    this.ventasService.crearVentaCompleta({
+      venta: ventaPayload,
+      detalles,
+      detallePago: detallePago.length > 0 ? detallePago : undefined,
+      idApertura
+    }).subscribe({
+      next: (res) => {
+        this.loading = false;
+        iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
+        this.limpiarVenta();
+      },
+      error: (err) => {
+        this.loading = false;
+        iziToast.error({
+          title: 'Error',
+          message: err.error?.error || err.error?.message || 'Error al registrar la venta.'
+        });
+      }
+    });
+  }
+
+  limpiarVenta(): void {
+    this.carrito = [];
+    this.detallePago = [];
+    this.actualizaTotales();
+    this.pagaCon = 0;
+    this.vuelto = 0;
+    const comp = this.comprobantes.find((c: any) => String(c.idComprobante || c.id) === String(this.ventas.idComprobante));
+    if (comp) {
+      const nextNum = (comp.numero != null ? Number(comp.numero) : 0) + 1;
+      this.ventas.numero = String(nextNum).padStart(8, '0');
+      this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
+    }
+  }
 }
 

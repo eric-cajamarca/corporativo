@@ -1,0 +1,256 @@
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="container-fluid">
+    <div class="card shadow-sm">
+      <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+          <i class="fas fa-hand-holding-usd me-2"></i>
+          Pago a Proveedores
+        </h5>
+        <div class="d-flex align-items-center gap-2">
+          <input type="text" class="form-control form-control-sm" style="width: 80px;" placeholder="N°"
+                 [(ngModel)]="filtros.numero" (keyup.enter)="buscar()">
+          <div class="input-group input-group-sm" style="width: 200px;">
+            <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="filtros.buscar" (keyup.enter)="buscar()">
+            <button class="btn btn-outline-light" type="button" (click)="buscar()">
+              <i class="fas fa-search"></i>
+            </button>
+          </div>
+          <span class="text-white-50 small">{{ list.length }}</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 200px;">
+                  <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirNuevo()" title="Nuevo recibo de pago"></i>
+                  Acciones
+                </th>
+                <th>Fecha</th>
+                <th>Documento</th>
+                <th>Proveedor</th>
+                <th class="text-end">Deuda</th>
+                <th class="text-end">Pagado</th>
+                <th class="text-end">Saldo</th>
+                <th>C.Pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="loading">
+                <td colspan="8" class="text-center py-3">Cargando...</td>
+              </tr>
+              <tr *ngFor="let item of list">
+                <td>
+                  <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar / Registrar pago">
+                    <i class="fas fa-pencil-alt"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-info me-1" (click)="ver(item)" title="Ver">
+                    <i class="fas fa-search"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-warning" (click)="imprimir(item)" title="Imprimir">
+                    <i class="fas fa-print"></i>
+                  </button>
+                </td>
+                <td>{{ formatFecha(item.fecha) }}</td>
+                <td>{{ item.documento }}</td>
+                <td>{{ item.proveedor }}</td>
+                <td class="text-end">{{ formatCurrency(item.deuda) }}</td>
+                <td class="text-end">{{ formatCurrency(item.pagado) }}</td>
+                <td class="text-end">{{ formatCurrency(item.saldo) }}</td>
+                <td>{{ item.medioPago || '-' }}</td>
+              </tr>
+              <tr *ngIf="!loading && list.length === 0">
+                <td colspan="8" class="text-center py-4 text-muted">No hay compras / cuentas por pagar.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal Recibo de Pago (fuera de main, z-index 1050) -->
+<div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-secondary text-white">
+        <h5 class="modal-title">Recibo de Pago</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarForm()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Documento</label>
+            <select class="form-select form-select-sm" disabled>
+              <option>RECIBO DE PAGO</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">N°</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.serie" placeholder="0001">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.numero" placeholder="0000002">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Fecha Emisión</label>
+            <div class="d-flex align-items-center gap-1">
+              <input type="date" class="form-control form-control-sm" [(ngModel)]="form.fechaEmision">
+              <i class="fas fa-calendar-alt text-muted"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Proveedor</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" [(ngModel)]="proveedorBusqueda" placeholder="RUC / documento"
+                     (keyup.enter)="buscarProveedor()">
+              <button class="btn btn-outline-secondary" type="button" (click)="buscarProveedor()" title="Buscar">
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">&nbsp;</label>
+            <input type="text" class="form-control form-control-sm" [value]="proveedorSeleccionado?.razonSocial || ''"
+                   readonly placeholder="Razón social del proveedor">
+          </div>
+        </div>
+        <div class="row g-2 mb-2" *ngIf="proveedorSeleccionado">
+          <div class="col-12">
+            <label class="form-label">Dirección</label>
+            <input type="text" class="form-control form-control-sm" [value]="proveedorSeleccionado.direccion || ''"
+                   readonly placeholder="Dirección">
+          </div>
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Deuda Total</label>
+            <input type="text" class="form-control form-control-sm" [value]="formatCurrency(deudaTotal)" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Importe a Cancelar</label>
+            <input type="number" class="form-control form-control-sm" [(ngModel)]="form.importeACancelar"
+                   step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Medio de pago</label>
+            <select class="form-select form-select-sm" [(ngModel)]="form.idMediosPago">
+              <option [ngValue]="null">::Seleccione::</option>
+              <option *ngFor="let mp of mediosPago" [ngValue]="mp.idMediosPago">{{ mp.descripcion }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Observaciones</label>
+          <textarea class="form-control form-control-sm" rows="2" [(ngModel)]="form.observaciones"
+                    placeholder="Observaciones"></textarea>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label">Comprobantes (compras pendientes del proveedor)</label>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>Comprobante</th>
+                  <th>Fecha Venta</th>
+                  <th class="text-end">Total Comprobante</th>
+                  <th>Fecha Vencimiento</th>
+                  <th class="text-end">Importe Pagado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of comprobantes">
+                  <td>{{ c.item }}</td>
+                  <td>{{ c.comprobante }}</td>
+                  <td>{{ formatFecha(c.fechaVenta) }}</td>
+                  <td class="text-end">{{ formatCurrency(c.totalComprobante) }}</td>
+                  <td>{{ formatFecha(c.fechaVencimiento) }}</td>
+                  <td>
+                    <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="c.importePagado"
+                           step="0.01" min="0" [max]="c.totalComprobante" placeholder="0.00">
+                  </td>
+                </tr>
+                <tr *ngIf="comprobantes.length === 0 && proveedorSeleccionado">
+                  <td colspan="6" class="text-center text-muted py-2">No hay compras pendientes para este proveedor.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="d-flex justify-content-end gap-4 mt-2">
+            <div>
+              <label class="form-label small mb-0">Total</label>
+              <input type="text" class="form-control form-control-sm text-end" style="width: 120px;"
+                     [value]="formatCurrency(totalImportePagado)" readonly>
+            </div>
+            <div>
+              <label class="form-label small mb-0">Saldo</label>
+              <input type="text" class="form-control form-control-sm text-end" style="width: 120px;"
+                     [value]="formatCurrency(saldoDespuesPago)" readonly>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="cajas.length" class="mb-2">
+          <label class="form-label">Caja (apertura activa)</label>
+          <select class="form-select form-select-sm" [(ngModel)]="form.idApertura">
+            <option value="">Seleccione caja</option>
+            <option *ngFor="let c of cajas" [value]="c.idApertura">{{ c.nombre }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" (click)="guardar()">
+          <i class="fas fa-save me-1"></i> Guardar
+        </button>
+        <button type="button" class="btn btn-danger" (click)="cerrarForm()">
+          <i class="fas fa-times me-1"></i> Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ver -->
+<div class="modal fade" [class.show]="mostrarVer" [style.display]="mostrarVer ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">Consultar comprobante</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarVer()"></button>
+      </div>
+      <div class="modal-body" *ngIf="itemVer">
+        <p><strong>Documento:</strong> {{ itemVer.documento }}</p>
+        <p><strong>Fecha:</strong> {{ formatFecha(itemVer.fecha) }}</p>
+        <p><strong>Proveedor:</strong> {{ itemVer.proveedor }}</p>
+        <p><strong>Deuda:</strong> {{ formatCurrency(itemVer.deuda) }}</p>
+        <p><strong>Pagado:</strong> {{ formatCurrency(itemVer.pagado) }}</p>
+        <p><strong>Saldo:</strong> {{ formatCurrency(itemVer.saldo) }}</p>
+        <p><strong>C.Pago:</strong> {{ itemVer.medioPago || '-' }}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarVer()">Cerrar</button>
+        <button type="button" class="btn btn-warning" *ngIf="itemVer" (click)="imprimir(itemVer); cerrarVer()">
+          <i class="fas fa-print me-1"></i> Imprimir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer" style="z-index: 1040;"></div>

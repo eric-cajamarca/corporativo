@@ -51,8 +51,25 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
     .query(`INSERT INTO Ventas 
       (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoSunat, compRelacionado, idUsuario) 
+      OUTPUT INSERTED.idVenta
       VALUES 
       (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoSunat, @compRelacionado, @idUsuario)`);
 
   return result;
+};
+
+/** Inserta el desglose de pagos de una venta (ej: 40 efectivo + 40 yape). Requiere tabla DetallePagoVenta. */
+exports.insertarDetallePagoVenta = async (transaction, idVenta, detallePago) => {
+  if (!detallePago || detallePago.length === 0) return;
+  const req = transaction.request();
+  for (const pago of detallePago) {
+    const idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
+    const monto = Number(pago.monto);
+    if (idMediosPago == null || monto <= 0) continue;
+    await req
+      .input('idVenta', sql.Int, idVenta)
+      .input('idMediosPago', sql.Int, idMediosPago)
+      .input('monto', sql.Decimal(18, 2), monto)
+      .query('INSERT INTO DetallePagoVenta (idVenta, idMediosPago, monto) VALUES (@idVenta, @idMediosPago, @monto)');
+  }
 };

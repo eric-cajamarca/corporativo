@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CreditosService } from '../../../services/creditos.service';
@@ -7,16 +7,19 @@ import { ClienteService } from '../../../services/cliente.service';
 import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfaces/creditos-interface';
 import { Cliente } from '../../../interfaces/cliente-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var iziToast: any;
 
 @Component({
   selector: 'app-index-creditos',
-  imports: [FormsModule, RouterModule, CommonModule],
+  standalone: true,
+  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent],
   templateUrl: './index-creditos.component.html',
   styleUrl: './index-creditos.component.css'
 })
 export class IndexCreditosComponent implements OnInit {
+  sidebarCollapsed = signal<boolean>(false);
 
   public creditos: CreditoCliente[] = [];
   public cuotas: CuotaCredito[] = [];
@@ -51,10 +54,13 @@ export class IndexCreditosComponent implements OnInit {
     idCliente: '',
     estado: '',
     fechaDesde: '',
-    fechaHasta: ''
+    fechaHasta: '',
+    numero: '',
+    buscar: ''
   };
 
   public loading = false;
+  public mostrarVerCuotas = false;
 
   constructor(
     private creditosService: CreditosService,
@@ -65,6 +71,12 @@ export class IndexCreditosComponent implements OnInit {
     this.cargarClientes();
     this.cargarResumenCreditos();
     this.cargarCreditos();
+    const collapsed = localStorage.getItem('sidebarCollapsed');
+    if (collapsed === 'true') this.sidebarCollapsed.set(true);
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarClientes() {
@@ -86,18 +98,56 @@ export class IndexCreditosComponent implements OnInit {
       next: (response) => {
         if (response.data) {
           this.creditos = response.data;
+        } else {
+          this.creditos = [];
         }
         this.loading = false;
       },
-      error: (error) => {
-        console.error('Error al cargar créditos:', error);
-        iziToast.error({
-          title: 'Error',
-          message: 'Error al cargar los créditos'
-        });
+      error: () => {
+        iziToast.error({ title: 'Error', message: 'Error al cargar los créditos' });
         this.loading = false;
       }
     });
+  }
+
+  /** Lista filtrada por numero y buscar (y opcionalmente por estado/fechas) */
+  get creditosFiltrados(): CreditoCliente[] {
+    let list = this.creditos;
+    const b = (this.filtros.buscar || '').toLowerCase().trim();
+    const n = (this.filtros.numero || '').trim();
+    if (b) {
+      list = list.filter(c => {
+        const nombre = this.getClienteNombre(c.idCliente).toLowerCase();
+        const doc = (c.idVenta || '').toLowerCase();
+        const id = (c.idCredito || '').toLowerCase();
+        return nombre.includes(b) || doc.includes(b) || id.includes(b);
+      });
+    }
+    if (n) {
+      list = list.filter(c =>
+        (c.idCredito || '').includes(n) || (c.idVenta || '').includes(n)
+      );
+    }
+    if (this.filtros.estado) {
+      list = list.filter(c => c.estado === this.filtros.estado);
+    }
+    if (this.filtros.fechaDesde) {
+      list = list.filter(c => (c.fechaCredito || '').split('T')[0] >= this.filtros.fechaDesde);
+    }
+    if (this.filtros.fechaHasta) {
+      list = list.filter(c => (c.fechaCredito || '').split('T')[0] <= this.filtros.fechaHasta);
+    }
+    return list;
+  }
+
+  buscar() {
+    this.cargarCreditos();
+  }
+
+  getPagado(credito: CreditoCliente): number {
+    if (credito.totalPagado != null) return credito.totalPagado;
+    const saldo = credito.saldoPendiente ?? 0;
+    return Math.max(0, (credito.montoTotal || 0) - saldo);
   }
 
   cargarResumenCreditos() {
@@ -113,27 +163,69 @@ export class IndexCreditosComponent implements OnInit {
     });
   }
 
+  /** Abre modal Ver Cuotas y carga las cuotas del crédito */
   verCuotas(credito: CreditoCliente) {
     this.creditoSeleccionado = credito;
+    this.mostrarVerCuotas = true;
     this.loading = true;
-
     this.creditosService.obtenerCuotasCredito(credito.idCredito).subscribe({
       next: (response) => {
-        if (response.data) {
-          this.cuotas = response.data;
-          this.mostrarCuotas = true;
-        }
+        this.cuotas = response.data || [];
         this.loading = false;
       },
-      error: (error) => {
-        console.error('Error al cargar cuotas:', error);
-        iziToast.error({
-          title: 'Error',
-          message: 'Error al cargar las cuotas'
-        });
+      error: () => {
+        iziToast.error({ title: 'Error', message: 'Error al cargar las cuotas' });
         this.loading = false;
       }
     });
+  }
+
+  ver(credito: CreditoCliente) {
+    this.verCuotas(credito);
+  }
+
+  /** Editar: abre el modal de cuotas para gestionar pagos */
+  editar(credito: CreditoCliente) {
+    this.verCuotas(credito);
+  }
+
+  eliminar(credito: CreditoCliente) {
+    if (!confirm('¿Desea obtener información sobre eliminación de créditos?')) return;
+    iziToast.info({
+      title: 'Eliminar crédito',
+      message: 'La eliminación o cancelación de créditos debe realizarse desde el módulo de administración o con el soporte del sistema.'
+    });
+  }
+
+  imprimir(credito: CreditoCliente) {
+    const ventana = window.open('', '_blank');
+    if (!ventana) return;
+    const nombre = this.getClienteNombre(credito.idCliente);
+    const pagado = this.getPagado(credito);
+    const saldo = credito.saldoPendiente ?? 0;
+    ventana.document.write(`
+      <html><head><title>Crédito ${credito.idCredito}</title></head>
+      <body style="font-family: sans-serif; padding: 20px;">
+        <h2>Cobranza de Créditos - Comprobante</h2>
+        <p><b>Id. Crédito:</b> ${credito.idCredito || '-'}</p>
+        <p><b>Cliente:</b> ${nombre}</p>
+        <p><b>Fecha:</b> ${credito.fechaCredito ? new Date(credito.fechaCredito).toLocaleDateString('es-PE') : '-'}</p>
+        <p><b>Documento/Venta:</b> ${credito.idVenta || '-'}</p>
+        <p><b>Monto Total:</b> S/ ${(credito.montoTotal ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+        <p><b>Pagado:</b> S/ ${pagado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+        <p><b>Saldo:</b> S/ ${saldo.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+        <p><b>Estado:</b> ${credito.estado || '-'}</p>
+      </body></html>
+    `);
+    ventana.document.close();
+    ventana.print();
+    ventana.close();
+  }
+
+  cerrarModalVerCuotas() {
+    this.mostrarVerCuotas = false;
+    this.creditoSeleccionado = null;
+    this.cuotas = [];
   }
 
   abrirModalNuevoCredito() {
@@ -170,8 +262,6 @@ export class IndexCreditosComponent implements OnInit {
   cerrarModales() {
     this.mostrarModalNuevoCredito = false;
     this.mostrarModalPagarCuota = false;
-    this.mostrarCuotas = false;
-    this.creditoSeleccionado = null;
   }
 
   crearCredito() {
@@ -225,8 +315,11 @@ export class IndexCreditosComponent implements OnInit {
         });
         this.cerrarModales();
         if (this.creditoSeleccionado) {
-          this.verCuotas(this.creditoSeleccionado);
+          this.creditosService.obtenerCuotasCredito(this.creditoSeleccionado.idCredito).subscribe({
+            next: (response) => { this.cuotas = response.data || []; }
+          });
         }
+        this.cargarCreditos();
         this.cargarResumenCreditos();
         this.loading = false;
       },
@@ -250,7 +343,9 @@ export class IndexCreditosComponent implements OnInit {
       idCliente: '',
       estado: '',
       fechaDesde: '',
-      fechaHasta: ''
+      fechaHasta: '',
+      numero: '',
+      buscar: ''
     };
     this.cargarCreditos();
   }

@@ -193,17 +193,53 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             modulo: 'CAJA',
             nombre: 'Caja',
             icono: 'bi bi-cash-coin',
-            ruta: '/caja',
+            ruta: null,
             permiso: 'VER_CAJA',
-            visible: esAdmin || permisos.includes('VER_CAJA')
-        },
-        {
-            modulo: 'CREDITOS',
-            nombre: 'Créditos',
-            icono: 'bi bi-credit-card',
-            ruta: '/creditos',
-            permiso: 'VER_CREDITOS',
-            visible: esAdmin || permisos.includes('VER_CREDITOS')
+            visible: esAdmin || permisos.includes('VER_CAJA'),
+            submenu: [
+                {
+                    nombre: 'Gestión de Cajas',
+                    ruta: '/caja',
+                    permiso: 'VER_CAJA',
+                    visible: esAdmin || permisos.includes('VER_CAJA')
+                },
+                {
+                    nombre: 'Cobranza de Créditos',
+                    ruta: '/creditos',
+                    permiso: 'VER_CREDITOS',
+                    visible: esAdmin || permisos.includes('VER_CREDITOS')
+                },
+                {
+                    nombre: 'Pago a Proveedores',
+                    ruta: '/caja/pago-proveedores',
+                    permiso: 'VER_COMPRAS',
+                    visible: esAdmin || permisos.includes('VER_COMPRAS')
+                },
+                {
+                    nombre: 'Recibo Ingreso',
+                    ruta: '/caja/recibo-ingreso',
+                    permiso: 'REGISTRAR_MOVIMIENTOS',
+                    visible: esAdmin || permisos.includes('REGISTRAR_MOVIMIENTOS')
+                },
+                {
+                    nombre: 'Recibo Egreso',
+                    ruta: '/caja/recibo-egreso',
+                    permiso: 'REGISTRAR_MOVIMIENTOS',
+                    visible: esAdmin || permisos.includes('REGISTRAR_MOVIMIENTOS')
+                },
+                {
+                    nombre: 'Arqueo de Caja',
+                    ruta: '/caja/arqueo',
+                    permiso: 'VER_ARQUEO',
+                    visible: esAdmin || permisos.includes('VER_ARQUEO')
+                },
+                {
+                    nombre: 'Conteo de Dinero',
+                    ruta: '/caja/conteo-dinero',
+                    permiso: 'VER_CAJA',
+                    visible: esAdmin || permisos.includes('VER_CAJA')
+                }
+            ]
         },
         {
             modulo: 'ANALISIS',

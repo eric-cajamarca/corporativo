@@ -1,0 +1,333 @@
+import { CommonModule } from '@angular/common';
+import { Component, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
+import { CajaService } from '../../../services/caja.service';
+import { TablasSunatService } from '../../../services/tablas-sunat.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { TopnavComponent } from '../../topnav/topnav.component';
+
+declare var iziToast: any;
+
+export interface ReciboEgresoItem {
+  idMovimientoCaja: string;
+  idApertura?: string;
+  fechaMovimiento: string;
+  concepto: string;
+  monto: number;
+  tipoMovimiento?: string;
+  medioPago?: string;
+  documentoRelacionado?: string;
+  observaciones?: string;
+  usuario?: string;
+  glosa?: string;
+  entregueA?: string;
+}
+
+@Component({
+  selector: 'app-recibo-egreso',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  templateUrl: './recibo-egreso.component.html',
+  styleUrl: './recibo-egreso.component.css'
+})
+export class ReciboEgresoComponent implements OnInit {
+  sidebarCollapsed = signal<boolean>(false);
+  list: ReciboEgresoItem[] = [];
+  cajas: any[] = [];
+  tiposMovimiento: any[] = [];
+  mediosPago: any[] = [];
+  loading = false;
+
+  filtros = {
+    numero: '',
+    buscar: '',
+    fechaDesde: '',
+    fechaHasta: ''
+  };
+
+  mostrarForm = false;
+  mostrarVer = false;
+  editandoId: string | null = null;
+  itemVer: ReciboEgresoItem | null = null;
+
+  form = {
+    idApertura: '',
+    idTipoMovimientoCaja: 0,
+    concepto: '',
+    personal: '',
+    glosa: '',
+    entregueA: '',
+    importe: 0,
+    idMediosPago: null as number | null,
+    tipoDocumento: '',
+    referencia: '',
+    fechaEmision: ''
+  };
+
+  serie = '0001';
+  numero = '';
+
+  constructor(
+    private cajaService: CajaService,
+    private tablasSunat: TablasSunatService
+  ) {}
+
+  ngOnInit(): void {
+    const hoy = new Date().toISOString().split('T')[0];
+    const hace30 = new Date();
+    hace30.setDate(hace30.getDate() - 30);
+    this.filtros.fechaDesde = hace30.toISOString().split('T')[0];
+    this.filtros.fechaHasta = hoy;
+    this.form.fechaEmision = hoy;
+    this.cargarDatos();
+    this.cargarRecibos();
+    this.tiposEgreso();
+    this.tablasSunat.obtener_medios_pago().subscribe({
+      next: (r) => { this.mediosPago = r.data || []; },
+      error: () => {}
+    });
+    const collapsed = localStorage.getItem('sidebarCollapsed');
+    if (collapsed === 'true') this.sidebarCollapsed.set(true);
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
+
+  private tiposEgreso(): void {
+    this.cajaService.obtenerTiposMovimiento().subscribe({
+      next: (r) => {
+        this.tiposMovimiento = (r.data || []).filter((t: any) => t.tipo === 'E');
+        if (this.tiposMovimiento.length && !this.form.idTipoMovimientoCaja) {
+          this.form.idTipoMovimientoCaja = this.tiposMovimiento[0].idTipoMovimientoCaja;
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  cargarDatos(): void {
+    this.cajaService.obtenerCajas().subscribe({
+      next: (r) => {
+        this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
+      },
+      error: () => {}
+    });
+  }
+
+  cargarRecibos(): void {
+    this.loading = true;
+    const desde = this.filtros.fechaDesde ? this.filtros.fechaDesde + 'T00:00:00' : '';
+    const hasta = this.filtros.fechaHasta ? this.filtros.fechaHasta + 'T23:59:59' : '';
+    this.cajaService.getRecibosEgreso({ fechaDesde: desde || undefined, fechaHasta: hasta || undefined }).subscribe({
+      next: (r) => {
+        let data = (r.data || []).map((m: any) => this.mapItem(m));
+        if (this.filtros.buscar) {
+          const b = this.filtros.buscar.toLowerCase();
+          data = data.filter((x: ReciboEgresoItem) =>
+            (x.concepto || '').toLowerCase().includes(b) ||
+            (x.entregueA || '').toLowerCase().includes(b) ||
+            (x.glosa || '').toLowerCase().includes(b) ||
+            (x.documentoRelacionado || '').toLowerCase().includes(b)
+          );
+        }
+        if (this.filtros.numero) {
+          data = data.filter((x: ReciboEgresoItem) => (x.documentoRelacionado || '').includes(this.filtros.numero));
+        }
+        this.list = data;
+        this.loading = false;
+      },
+      error: () => { this.loading = false; }
+    });
+  }
+
+  private mapItem(m: any): ReciboEgresoItem {
+    const obs = (m.observaciones || '').trim();
+    let entregueA = '';
+    let glosa = obs;
+    if (obs.includes('|')) {
+      const parts = obs.split('|').map((p: string) => p.trim());
+      const ent = parts.find((p: string) => p.toLowerCase().startsWith('entregué a:') || p.toLowerCase().startsWith('entregue a:'));
+      const g = parts.find((p: string) => p.toLowerCase().startsWith('glosa:'));
+      if (ent) entregueA = ent.replace(/^entregu[eé] a:\s*/i, '').trim();
+      if (g) glosa = g.replace(/^glosa:\s*/i, '').trim();
+      if (!ent && !g && parts.length >= 2) {
+        entregueA = parts[0];
+        glosa = parts[1];
+      }
+    }
+    const doc = m.documentoRelacionado || ('RE 0001-' + (m.idMovimientoCaja || '').slice(-6));
+    return {
+      idMovimientoCaja: m.idMovimientoCaja,
+      idApertura: m.idApertura,
+      fechaMovimiento: m.fechaMovimiento,
+      concepto: m.concepto,
+      monto: Number(m.monto),
+      medioPago: m.medioPago,
+      documentoRelacionado: doc,
+      observaciones: m.observaciones,
+      usuario: m.usuario,
+      glosa,
+      entregueA: entregueA || (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : '')
+    };
+  }
+
+  buscar(): void {
+    this.cargarRecibos();
+  }
+
+  abrirNuevo(): void {
+    this.editandoId = null;
+    this.form = {
+      idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
+      idTipoMovimientoCaja: this.tiposMovimiento.length ? this.tiposMovimiento[0].idTipoMovimientoCaja : 0,
+      concepto: '',
+      personal: '',
+      glosa: '',
+      entregueA: '',
+      importe: 0,
+      idMediosPago: null,
+      tipoDocumento: '',
+      referencia: '',
+      fechaEmision: new Date().toISOString().split('T')[0]
+    };
+    this.numero = '';
+    this.mostrarForm = true;
+  }
+
+  editar(item: ReciboEgresoItem): void {
+    this.editandoId = item.idMovimientoCaja;
+    this.form = {
+      idApertura: item.idApertura || '',
+      idTipoMovimientoCaja: 0,
+      concepto: item.concepto,
+      personal: '',
+      glosa: item.glosa || '',
+      entregueA: item.entregueA || '',
+      importe: item.monto,
+      idMediosPago: null,
+      tipoDocumento: '',
+      referencia: item.documentoRelacionado || '',
+      fechaEmision: item.fechaMovimiento ? item.fechaMovimiento.split('T')[0] : ''
+    };
+    this.numero = item.documentoRelacionado || '';
+    this.mostrarForm = true;
+  }
+
+  ver(item: ReciboEgresoItem): void {
+    this.itemVer = item;
+    this.mostrarVer = true;
+  }
+
+  cerrarForm(): void {
+    this.mostrarForm = false;
+    this.editandoId = null;
+  }
+
+  cerrarVer(): void {
+    this.mostrarVer = false;
+    this.itemVer = null;
+  }
+
+  guardar(): void {
+    if (!this.form.concepto.trim() || this.form.importe <= 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'Concepto e importe son obligatorios.' });
+      return;
+    }
+    const observaciones = [this.form.entregueA ? 'Entregué a: ' + this.form.entregueA : '', this.form.glosa ? 'Glosa: ' + this.form.glosa : ''].filter(Boolean).join(' | ');
+
+    if (this.editandoId) {
+      this.cajaService.actualizarMovimiento(this.editandoId, {
+        concepto: this.form.concepto,
+        monto: this.form.importe,
+        idMediosPago: this.form.idMediosPago ?? undefined,
+        documentoRelacionado: this.form.referencia || undefined,
+        observaciones: observaciones || undefined
+      }).subscribe({
+        next: () => {
+          iziToast.success({ title: 'Éxito', message: 'Recibo actualizado.' });
+          this.cerrarForm();
+          this.cargarRecibos();
+        },
+        error: (e) => {
+          iziToast.error({ title: 'Error', message: e.error?.message || 'Error al actualizar.' });
+        }
+      });
+      return;
+    }
+
+    if (!this.form.idApertura) {
+      iziToast.warning({ title: 'Advertencia', message: 'Debe haber una caja abierta para registrar el egreso.' });
+      return;
+    }
+    if (!this.form.idTipoMovimientoCaja) {
+      iziToast.warning({ title: 'Advertencia', message: 'No hay tipo de movimiento Egreso configurado. Configure TiposMovimientoCaja en la base de datos.' });
+      return;
+    }
+    this.cajaService.registrarMovimientoEgreso({
+      idApertura: this.form.idApertura,
+      idTipoMovimientoCaja: this.form.idTipoMovimientoCaja,
+      concepto: this.form.concepto,
+      monto: this.form.importe,
+      idMediosPago: this.form.idMediosPago ?? undefined,
+      documentoRelacionado: this.form.referencia || undefined,
+      observaciones: observaciones || undefined
+    }).subscribe({
+      next: () => {
+        iziToast.success({ title: 'Éxito', message: 'Recibo de egreso registrado.' });
+        this.cerrarForm();
+        this.cargarRecibos();
+        this.cargarDatos();
+      },
+      error: (e) => {
+        iziToast.error({ title: 'Error', message: e.error?.message || 'Error al guardar.' });
+      }
+    });
+  }
+
+  eliminar(item: ReciboEgresoItem): void {
+    if (!confirm('¿Eliminar este recibo de egreso?')) return;
+    this.cajaService.eliminarMovimiento(item.idMovimientoCaja).subscribe({
+      next: () => {
+        iziToast.success({ title: 'Éxito', message: 'Recibo eliminado.' });
+        this.cargarRecibos();
+      },
+      error: (e) => {
+        iziToast.error({ title: 'Error', message: e.error?.message || 'Error al eliminar.' });
+      }
+    });
+  }
+
+  imprimir(item: ReciboEgresoItem): void {
+    const ventana = window.open('', '_blank');
+    if (!ventana) return;
+    ventana.document.write(`
+      <html><head><title>Recibo Egreso ${item.documentoRelacionado || ''}</title></head>
+      <body style="font-family: sans-serif; padding: 20px;">
+        <h2>Recibo de Egreso</h2>
+        <p><b>Documento:</b> ${item.documentoRelacionado || '-'}</p>
+        <p><b>Fecha:</b> ${this.formatFecha(item.fechaMovimiento)}</p>
+        <p><b>Concepto:</b> ${item.concepto}</p>
+        <p><b>Glosa:</b> ${item.glosa || '-'}</p>
+        <p><b>Entregué a:</b> ${item.entregueA || '-'}</p>
+        <p><b>Importe:</b> ${this.formatCurrency(item.monto)}</p>
+        <p><b>C.Pago:</b> ${item.medioPago || '-'}</p>
+        <p><b>Usuario:</b> ${item.usuario || '-'}</p>
+      </body></html>
+    `);
+    ventana.document.close();
+    ventana.print();
+    ventana.close();
+  }
+
+  formatCurrency(n: number): string {
+    return (n ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  formatFecha(s: string): string {
+    if (!s) return '-';
+    const d = new Date(s);
+    return d.toLocaleDateString('es-PE');
+  }
+}

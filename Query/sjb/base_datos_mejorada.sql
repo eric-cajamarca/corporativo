@@ -1030,9 +1030,10 @@ CREATE TABLE AperturasCaja (
     FOREIGN KEY (idCaja) REFERENCES Cajas(idCaja),
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
     FOREIGN KEY (idSucursal) REFERENCES Sucursal(idSucursal),
-    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
-    CONSTRAINT UQ_AperturasCaja_CajaAbierta UNIQUE (idCaja, estado) WHERE estado = 1
+    FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
 );
+GO
+CREATE UNIQUE NONCLUSTERED INDEX UQ_AperturasCaja_CajaAbierta ON AperturasCaja(idCaja, estado) WHERE estado = 1;
 GO
 
 -- Cierre de caja

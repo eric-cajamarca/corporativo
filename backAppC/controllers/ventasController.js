@@ -162,26 +162,47 @@ const actualizarVenta = async function (req, res) {
 
 
 const crearVentaCompleta = async (req, res) => {
-  const { venta, detalles } = req.body; // venta = {}, detalles = []
-  const pool = await sql.connect();
+  const { venta, detalles, detallePago, idApertura } = req.body; // detallePago = [{ idMediosPago, monto }], opcional
+  const pool = await sql.connect(dbConfig);
+  const CajaRepository = require('../repositories/caja.repository');
+  const ventasRepository = require('../repositories/ventas.repository');
 
+  const transaction = new sql.Transaction(pool);
   try {
-    await pool.request().query('BEGIN TRANSACTION');
-    
-    // ✅ Servicio 1: Crea venta
-    const ventaResult = await ventasService.crearVenta(pool, venta, req.user.empresa);
+    await transaction.begin();
+
+    const ventaResult = await ventasRepository.insertar(transaction, venta, req.user.empresa, req.user.sub);
     const idVenta = ventaResult.recordset[0].idVenta;
 
-    // ✅ Servicio 2: Crea múltiples detalles
     for (const det of detalles) {
-      await detalleVentaService.crearDetalle(pool, { ...det, idVenta }, req.user.empresa);
+      await detalleVentaService.crearDetalle(transaction, { ...det, idVenta });
     }
-    
-    await pool.request().query('COMMIT');
-    res.json({ success: true, idVenta });
 
+    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
+      await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);
+      let idAperturaActual = idApertura || null;
+      if (!idAperturaActual && venta.idSucursal) {
+        const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, venta.idSucursal);
+        idAperturaActual = apertura?.idApertura;
+      }
+      if (idAperturaActual) {
+        await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
+          idApertura: idAperturaActual,
+          idEmpresa: req.user.empresa,
+          idSucursal: venta.idSucursal,
+          idUsuario: req.user.sub,
+          idVenta,
+          compVenta: venta.compVenta || (venta.serie + '-' + venta.numero),
+          detallePago
+        });
+      }
+    }
+
+    await transaction.commit();
+    res.json({ success: true, idVenta });
   } catch (error) {
-    await pool.request().query('ROLLBACK');
+    await transaction.rollback();
+    console.error('Error crearVentaCompleta:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -370,17 +391,16 @@ const eliminarDetalleVenta = async function (req, res) {
 
 module.exports = {
     crearVenta,
+    crearVentaCompleta,
     obtenerVentaPorId,
     obtenerVentas,
     actualizarVenta,
-    //detalle venta
-    crearDetalleVenta,
+    // detalle venta (crearDetalleVenta está comentado; se usa crearVentaCompleta)
     crearDetalleVenta_DescontarStock,
     actualizarDetalleVenta,
     obtenerDetalleVenta_idVenta,
     obtenerVenta_idDetalle,
     eliminarDetalleVenta
-    
 }
 
 

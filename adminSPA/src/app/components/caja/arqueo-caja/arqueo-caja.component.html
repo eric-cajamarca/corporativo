@@ -1,0 +1,143 @@
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav> 
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+              <h5 class="card-title mb-0">
+                <i class="fas fa-balance-scale me-2"></i>
+                Arqueo de Caja
+              </h5>
+            </div>
+            <div class="card-body">
+    
+              <!-- Filtros superiores -->
+              <div class="row mb-3">
+                <div class="col-md-3 mb-2">
+                  <label class="form-label">Fecha:</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="fecha">
+                </div>
+                <div class="col-md-3 mb-2">
+                  <label class="form-label">Caja:</label>
+                  <select class="form-select form-select-sm" [(ngModel)]="cajaSeleccionada">
+                    <option value="TODAS">::Todas::</option>
+                    <option *ngFor="let c of cajas" [value]="c.idCaja">{{c.nombre}}</option>
+                  </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                  <label class="form-label">Usuario:</label>
+                  <!-- Por ahora solo ::Todos::, se puede ampliar luego -->
+                  <select class="form-select form-select-sm" [(ngModel)]="usuarioSeleccionado">
+                    <option value="TODOS">::Todos::</option>
+                  </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end justify-content-end gap-1 flex-wrap">
+                  <button class="btn btn-primary btn-sm" (click)="consultar()" [disabled]="loading">
+                    <i class="fas fa-search"></i> Consultar
+                  </button>
+                  <button class="btn btn-danger btn-sm" type="button" disabled>
+                    <i class="fas fa-file-pdf"></i> Pdf
+                  </button>
+                  <button class="btn btn-success btn-sm" type="button" disabled>
+                    <i class="fas fa-print"></i> Imprimir
+                  </button>
+                  <button class="btn btn-info btn-sm text-white" type="button" disabled>
+                    <i class="fas fa-save"></i> Guardar
+                  </button>
+                  <button class="btn btn-secondary btn-sm" type="button" [routerLink]="['/home']">
+                    <i class="fas fa-times"></i> Cerrar
+                  </button>
+                </div>
+              </div>
+    
+              <!-- Tabla de conceptos (dinámica: solo los que hubo ese día) -->
+              <div class="table-responsive mb-4">
+                <table class="table table-bordered table-sm">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width: 50%;">Concepto</th>
+                      <th style="width: 50%;" class="text-end">Importe</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let fila of resumenConceptos">
+                      <td>
+                        <i class="{{fila.icono}} me-2 text-muted"></i>
+                        {{fila.concepto}}
+                      </td>
+                      <td class="text-end" [ngClass]="{'text-success': fila.importe > 0, 'text-danger': fila.importe < 0}">
+                        {{fila.importe >= 0 ? '+' : ''}}{{formatCurrency(fila.importe)}}
+                      </td>
+                    </tr>
+                    <tr class="fw-bold">
+                      <td>Total</td>
+                      <td class="text-end">{{formatCurrency(totalConceptos)}}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+    
+              <!-- Movimientos de Ingresos -->
+              <div class="mb-4">
+                <h6 class="text-center fw-bold mb-2">Movimientos de Ingresos</h6>
+                <div class="table-responsive">
+                  <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Forma Pago</th>
+                        <th class="text-end">Importe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let mov of movimientosIngresos">
+                        <td>{{mov.formaPago}}</td>
+                        <td class="text-end">{{formatCurrency(mov.importe)}}</td>
+                      </tr>
+                      <tr class="fw-bold">
+                        <td>Total</td>
+                        <td class="text-end">{{formatCurrency(totalMovimientosIngresos)}}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+    
+              <!-- Movimientos de Egresos -->
+              <div>
+                <h6 class="text-center fw-bold mb-2">Movimientos de Egresos</h6>
+                <div class="table-responsive">
+                  <table class="table table-bordered table-sm">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Forma Pago</th>
+                        <th class="text-end">Importe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let mov of movimientosEgresos">
+                        <td>{{mov.formaPago}}</td>
+                        <td class="text-end">{{formatCurrency(mov.importe)}}</td>
+                      </tr>
+                      <tr class="fw-bold">
+                        <td>Total</td>
+                        <td class="text-end">{{formatCurrency(totalMovimientosEgresos)}}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+    
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+

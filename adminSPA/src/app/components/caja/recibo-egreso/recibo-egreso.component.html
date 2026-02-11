@@ -1,0 +1,202 @@
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<div class="container-fluid">
+  <div class="card shadow-sm">
+    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+      <h5 class="card-title mb-0">
+        <i class="fas fa-file-invoice me-2"></i>
+        Recibos de Egreso
+      </h5>
+      <div class="d-flex align-items-center gap-2">
+        <input type="text" class="form-control form-control-sm" style="width: 80px;" placeholder="N°"
+               [(ngModel)]="filtros.numero" (keyup.enter)="buscar()">
+        <div class="input-group input-group-sm" style="width: 200px;">
+          <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="filtros.buscar" (keyup.enter)="buscar()">
+          <button class="btn btn-outline-light" type="button" (click)="buscar()">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+        <span class="text-white-50 small">{{ list.length }}</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 120px;">
+                
+                  <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirNuevo()" title="Nuevo"></i>
+                
+                Acciones
+              </th>
+              <th>Fecha</th>
+              <th>Documento</th>
+              <th>Concepto</th>
+              <th>Glosa</th>
+              <th>Entregué a</th>
+              <th class="text-end">Importe</th>
+              <th>C.Pago</th>
+              <th>Usuario</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="loading">
+              <td colspan="9" class="text-center py-3">Cargando...</td>
+            </tr>
+            <tr *ngFor="let item of list">
+              <td>
+                <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar">
+                  <i class="fas fa-pencil-alt"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar">
+                  <i class="fas fa-trash"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-info me-1" (click)="ver(item)" title="Consultar">
+                  <i class="fas fa-search"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-warning" (click)="imprimir(item)" title="Imprimir">
+                  <i class="fas fa-print"></i>
+                </button>
+              </td>
+              <td>{{ formatFecha(item.fechaMovimiento) }}</td>
+              <td>{{ item.documentoRelacionado || '-' }}</td>
+              <td>{{ item.concepto }}</td>
+              <td>{{ item.glosa || '------' }}</td>
+              <td>{{ item.entregueA || '-' }}</td>
+              <td class="text-end">{{ formatCurrency(item.monto) }}</td>
+              <td>{{ item.medioPago ? '{' + (item.medioPago).slice(0, 3).toUpperCase() + '}' : '-' }}</td>
+              <td>{{ item.usuario || '-' }}</td>
+            </tr>
+            <tr *ngIf="!loading && list.length === 0">
+              <td colspan="9" class="text-center py-4 text-muted">No hay recibos de egreso.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- Modales fuera de main para que cubran toda la pantalla (sidebar + topnav + contenido) -->
+<!-- Modal Crear / Editar -->
+<div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">{{ editandoId ? 'Editar' : 'Nuevo' }} Recibo de Egreso</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarForm()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label">Documento</label>
+            <select class="form-select form-select-sm" disabled>
+              <option>RECIBO EGRESO</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">N°</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="serie" placeholder="0001" [readonly]="!!editandoId">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="numero" placeholder="0000508" [readonly]="!!editandoId">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Fecha Emisión</label>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="form.fechaEmision">
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Concepto</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.concepto" placeholder="Concepto">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Personal</label>
+            <select class="form-select form-select-sm" [(ngModel)]="form.personal">
+              <option value="">::Ninguno::</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Glosa</label>
+          <textarea class="form-control form-control-sm" rows="2" [(ngModel)]="form.glosa" placeholder="Glosa"></textarea>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Entregue a</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.entregueA" placeholder="Entregue a">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Importe</label>
+            <input type="number" class="form-control form-control-sm" [(ngModel)]="form.importe" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Tipo Documento / Medio de pago</label>
+            <select class="form-select form-select-sm" [(ngModel)]="form.idMediosPago">
+              <option [ngValue]="null">::Seleccione::</option>
+              <option *ngFor="let mp of mediosPago" [ngValue]="mp.idMediosPago">{{ mp.descripcion }}</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Referencia</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.referencia" placeholder="Referencia">
+          </div>
+        </div>
+        <div *ngIf="!editandoId && cajas.length" class="mb-2">
+          <label class="form-label">Caja (apertura activa)</label>
+          <select class="form-select form-select-sm" [(ngModel)]="form.idApertura">
+            <option value="">Seleccione caja</option>
+            <option *ngFor="let c of cajas" [value]="c.idApertura">{{ c.nombre }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" (click)="guardar()">
+          <i class="fas fa-save me-1"></i> Guardar
+        </button>
+        <button type="button" class="btn btn-danger" (click)="cerrarForm()">
+          <i class="fas fa-times me-1"></i> Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ver -->
+<div class="modal fade" [class.show]="mostrarVer" [style.display]="mostrarVer ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">Consultar Recibo de Egreso</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarVer()"></button>
+      </div>
+      <div class="modal-body" *ngIf="itemVer">
+        <p><strong>Documento:</strong> {{ itemVer.documentoRelacionado }}</p>
+        <p><strong>Fecha:</strong> {{ formatFecha(itemVer.fechaMovimiento) }}</p>
+        <p><strong>Concepto:</strong> {{ itemVer.concepto }}</p>
+        <p><strong>Glosa:</strong> {{ itemVer.glosa || '-' }}</p>
+        <p><strong>Entregué a:</strong> {{ itemVer.entregueA || '-' }}</p>
+        <p><strong>Importe:</strong> {{ formatCurrency(itemVer.monto) }}</p>
+        <p><strong>C.Pago:</strong> {{ itemVer.medioPago || '-' }}</p>
+        <p><strong>Usuario:</strong> {{ itemVer.usuario || '-' }}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarVer()">Cerrar</button>
+        <button type="button" class="btn btn-warning" *ngIf="itemVer" (click)="imprimir(itemVer); cerrarVer()">
+          <i class="fas fa-print me-1"></i> Imprimir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer" style="z-index: 1040;"></div>

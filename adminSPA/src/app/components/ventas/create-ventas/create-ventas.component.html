@@ -1,39 +1,36 @@
-<app-topnav></app-topnav>
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
 
-<div class="app-container">
-  <main class="app-main">
-    <div class="container-fluid h-100">
-      <div class="row h-100">
-        <!-- BOTONES QUE ABREN LOS MODALES -->
-      <div class="d-flex justify-content-between align-items-center mt-3" style="margin-bottom: 10px;">
-
-        <button class="btn btn-outline-primary rounded-pill"
-                data-bs-toggle="modal" data-bs-target="#modalComprobante">
-          <i class="bi bi-receipt me-2"></i>Datos del Comprobante
-        </button>
-
-        @if(ventas?.idComprobante != '0'){
-           <button class="btn btn-outline-secondary rounded-pill"
-                data-bs-toggle="modal" data-bs-target="#modalCliente">
-              <i class="bi bi-person-lines-fill me-2"></i>Información del Cliente
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="app-container">
+    <div class="container-fluid py-3">
+      <div class="row">
+        <!-- Pasos: Comprobante → Cliente → Pago → Registrar -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-primary rounded-pill"
+                    data-bs-toggle="modal" data-bs-target="#modalComprobante">
+              <i class="bi bi-receipt me-2"></i>Datos del Comprobante
             </button>
-            
-            @if(cliente?.idCliente){
-              <button class="btn btn-outline-warning rounded-pill"
-                data-bs-toggle="modal"
-                data-bs-target="#modalPago">
-                <i class="bi bi-credit-card me-2"></i>Forma de pago
-              </button>
-            }
+            <button type="button" class="btn btn-outline-secondary rounded-pill"
+                    data-bs-toggle="modal" data-bs-target="#modalCliente"
+                    [disabled]="!ventas?.idComprobante">
+              <i class="bi bi-person-lines-fill me-2"></i>Cliente
+            </button>
+            <button type="button" class="btn btn-outline-warning rounded-pill"
+                    data-bs-toggle="modal" data-bs-target="#modalPago"
+                    [disabled]="!cliente?.idCliente">
+              <i class="bi bi-credit-card me-2"></i>Forma de pago
+            </button>
+          </div>
+          <button type="button" class="btn btn-success btn-lg rounded-pill"
+                  (click)="registrarVenta()"
+                  [disabled]="loading || carrito.length === 0">
+            <i class="bi bi-check2-circle me-2"></i>{{ loading ? 'Guardando...' : 'Registrar venta' }}
+          </button>
+        </div>
 
-            
-        }
-
-        
-      </div>
-
-        <!-- COLUMNA IZQUIERDA: Productos y Carrito -->
-        <div class="col-lg-12 col-md-12 left-column">
+        <div class="col-12">
 
           <!-- CARD: Detalle de Venta -->
           <section class="cart-section card">
@@ -168,14 +165,10 @@
             </div>
           </section>
         </div>
-
-        <!-- COLUMNA DERECHA: Comprobante -->
-        
-
       </div>
     </div>
-  </main>
-</div>
+  </div>
+</main>
 
 <!-- ------------------------------------------------------------------ -->
 <!-- MODAL (fuera del card, al final del template) -->
@@ -255,7 +248,13 @@
       </div>
       <div class="modal-body p-4">
         <div class="row g-3">
-          <!-- Tipo -->
+          <div class="col-md-6">
+            <label class="form-label">Sucursal</label>
+            <select class="form-select" [(ngModel)]="ventas.idSucursal">
+              <option value="">Seleccione sucursal</option>
+              <option *ngFor="let s of sucursales" [value]="s.idSucursal">{{ s.nombre }}</option>
+            </select>
+          </div>
           <div class="col-md-6">
             <label class="form-label">Tipo de comprobante</label>
             <select class="form-select" [(ngModel)]="ventas.compVenta" (change)="cargarDatosComprobante($event)">
@@ -266,23 +265,15 @@
               <option value="cotizacion">Cotización</option>
             </select>
           </div>
-          <!-- Serie -->
-          <!-- <div class="col-md-3">
-            <label class="form-label">Serie</label>
-            <input type="text" class="form-control" [(ngModel)]="ventas.serie" placeholder="Ej. B001">
-          </div> -->
-          <!-- Número -->
-          <!-- <div class="col-md-3">
-            <label class="form-label">Número</label>
-            <input type="number" class="form-control" [(ngModel)]="ventas.numero" placeholder="000000">
-          </div> -->
-
-          <!-- Fechas -->
-          <div class="col-md-6">
+          <div class="col-md-4">
+            <label class="form-label">Serie - Número</label>
+            <input type="text" class="form-control" [value]="ventas.compVenta" readonly>
+          </div>
+          <div class="col-md-4">
             <label class="form-label">F. Emisión</label>
             <input type="date" class="form-control" [(ngModel)]="ventas.fEmision">
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label">F. Vencimiento</label>
             <input type="date" class="form-control" [(ngModel)]="ventas.fVencimiento">
           </div>
@@ -317,17 +308,13 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-check-circle me-2"></i>Guardar cambios
-        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ========================================================= -->
-<!--  MODAL 2: INFORMACIÓN DEL CLIENTE                       -->
+<!-- MODAL 2: INFORMACIÓN DEL CLIENTE -->
 <!-- ========================================================= -->
 <div class="modal fade" id="modalCliente" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -457,7 +444,7 @@
             <label class="form-label small">Forma de pago</label>
             <select class="form-select form-select-sm" [(ngModel)]="formaPagoSeleccionada.idFormaPago">
               <option value="" selected disabled>Seleccionar...</option>
-              <option *ngFor="let f of formasPago" [value]="f.idFormaPago">{{ f.descripcion }}</option>
+              <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
               
             </select>
           </div>

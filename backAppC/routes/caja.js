@@ -10,6 +10,7 @@ router.use(querySafeMiddleware);
 
 // Rutas para cajas
 router.get('/cajas', cajaController.obtenerCajas);
+router.post('/cajas', cajaController.crearCaja);
 
 // Rutas para aperturas de caja
 router.post('/abrir', cajaController.abrirCaja);
@@ -18,11 +19,15 @@ router.post('/cerrar', cajaController.cerrarCaja);
 // Rutas para movimientos de caja
 router.post('/movimiento', cajaController.registrarMovimiento);
 router.get('/movimientos', cajaController.obtenerMovimientosCaja);
+router.get('/recibos-egreso', cajaController.obtenerRecibosEgreso);
+router.delete('/movimientos/:id', cajaController.eliminarMovimientoCaja);
+router.put('/movimientos/:id', cajaController.actualizarMovimientoCaja);
 
 // Rutas para tipos de movimiento
 router.get('/tipos-movimiento', cajaController.obtenerTiposMovimientoCaja);
 
 // Rutas para reportes
 router.get('/resumen-diario', cajaController.obtenerResumenCajaDiario);
+router.get('/arqueo-dinamico', cajaController.obtenerArqueoDinamico);
 
 module.exports = router;
