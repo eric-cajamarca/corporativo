@@ -10,6 +10,7 @@ import { IndexColaboradorComponent } from './components/colaboradores/index-cola
 import { CreateColaboradorComponent } from './components/colaboradores/create-colaborador/create-colaborador.component';
 import { UpdateColaboradorComponent } from './components/colaboradores/update-colaborador/update-colaborador.component';
 import { IndexProductoComponent } from './components/productos/index-producto/index-producto.component';
+import { CreateProductoComponent } from './components/productos/create-producto/create-producto.component';
 import { IndexCategoriaComponent } from './components/categorias/index-categoria/index-categoria.component';
 import { CreateCategoriaComponent } from './components/categorias/create-categoria/create-categoria.component';
 import { IndexMarcaComponent } from './components/marcas/index-marca/index-marca.component';
@@ -123,7 +124,12 @@ export const routes: Routes = [
       component: IndexProductoComponent,
       canActivate: [AuthGuard],
       title: 'Productos',
-
+     },
+     {
+      path: 'productos/create',
+      component: CreateProductoComponent,
+      canActivate: [AuthGuard],
+      title: 'Crear Producto',
      },
      {
       path: 'categorias',

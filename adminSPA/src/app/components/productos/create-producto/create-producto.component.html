@@ -1,31 +1,39 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+@if (esModal) {
+  <div class="modal-header">
+    <h5 class="modal-title">
+      <i class="bi bi-plus-circle me-2"></i>
+      Nuevo producto
+    </h5>
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="cancelar()"></button>
+  </div>
+}
 
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
-
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
-  <div class="content-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <div>
-        <nav aria-label="breadcrumb">
-          <ol class="breadcrumb mb-1">
-            <li class="breadcrumb-item"><a routerLink="/productos">Productos</a></li>
-            <li class="breadcrumb-item active">Nuevo Producto</li>
-          </ol>
-        </nav>
-        <h1 class="content-title mb-0">Crear Producto</h1>
+@if (!esModal) {
+  <app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+  <app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+  <main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+    <div class="content-header">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+              <li class="breadcrumb-item"><a routerLink="/productos">Productos</a></li>
+              <li class="breadcrumb-item active">Nuevo Producto</li>
+            </ol>
+          </nav>
+          <h1 class="content-title mb-0">Crear Producto</h1>
+        </div>
       </div>
     </div>
-  </div>
+}
 
-  @if (cargandoDatos()) {
-    <div class="text-center py-5">
-      <span class="spinner-border spinner-border-lg"></span>
-      <p class="mt-3 text-muted">Cargando datos...</p>
-    </div>
-  } @else {
+@if (cargandoDatos()) {
+  <div [class.modal-body]="esModal" class="text-center py-5">
+    <span class="spinner-border spinner-border-lg"></span>
+    <p class="mt-3 text-muted">Cargando datos...</p>
+  </div>
+} @else {
+  <div [class.modal-body]="esModal">
     <div class="card">
       <div class="card-header">
         <!-- Tabs -->
@@ -349,24 +357,42 @@
         </form>
       </div>
 
-      <div class="card-footer d-flex justify-content-between">
-        <button class="btn btn-outline-secondary" (click)="cancelar()">
-          <i class="fas fa-times me-1"></i>
-          Cancelar
-        </button>
-        <button 
-          class="btn btn-primary" 
-          (click)="guardarProducto()"
-          [disabled]="guardando()">
-          @if (guardando()) {
-            <span class="spinner-border spinner-border-sm me-1"></span>
-            Guardando...
-          } @else {
-            <i class="fas fa-save me-1"></i>
-            Guardar Producto
-          }
-        </button>
-      </div>
+      @if (!esModal) {
+        <div class="card-footer d-flex justify-content-between">
+          <button class="btn btn-outline-secondary" (click)="cancelar()">
+            <i class="fas fa-times me-1"></i>
+            Cancelar
+          </button>
+          <button 
+            class="btn btn-primary" 
+            (click)="guardarProducto()"
+            [disabled]="guardando()">
+            @if (guardando()) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+              Guardando...
+            } @else {
+              <i class="fas fa-save me-1"></i>
+              Guardar Producto
+            }
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (esModal) {
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="cancelar()">Cancelar</button>
+      <button type="button" class="btn btn-primary" (click)="guardarProducto()" [disabled]="guardando()">
+        @if (guardando()) {
+          <span class="spinner-border spinner-border-sm me-1"></span>
+        }
+        Guardar producto
+      </button>
     </div>
   }
-</main>
+}
+
+@if (!esModal) {
+  </main>
+}

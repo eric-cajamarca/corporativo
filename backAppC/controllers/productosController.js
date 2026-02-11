@@ -2,6 +2,7 @@ const dbConfig = require('../dbconfig');
 const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
 const ProductosServices = require('../services/productos.service');
+const preciosVRepository = require('../repositories/preciosV.repository');
 
 
 
@@ -94,7 +95,7 @@ const obtener_productos_compras = async (req, res) => {
 
 const obtener_productos_id = async (req, res) => {
   try {
-    const { idProducto } = req.params;
+    const idProducto = req.params.id;
 
     const pool = await sql.connect(dbConfig);
 
@@ -307,6 +308,7 @@ const crear_producto = async (req, res) => {
   }
   const {
     Codigo,
+    codigo,
     idCategoria,
     idMarca,
     descripcion,
@@ -315,6 +317,12 @@ const crear_producto = async (req, res) => {
     fProduccion,
     fVencimiento,
     idProducto,
+    alertaMinimo,
+    alertaMaximo,
+    estado,
+    tipoProducto,
+    lote,
+    precioVenta,
   } = req.body;
 
   const idEmpresa = req.user.empresa;
@@ -330,6 +338,12 @@ const crear_producto = async (req, res) => {
     });
   }
 
+  const codigoFinal = (Codigo != null && Codigo !== '') ? String(Codigo).trim() : (codigo != null ? String(codigo).trim() : '');
+  const alertaMin = alertaMinimo != null && !Number.isNaN(parseFloat(alertaMinimo)) ? parseFloat(alertaMinimo) : 5;
+  const alertaMax = alertaMaximo != null && !Number.isNaN(parseFloat(alertaMaximo)) ? parseFloat(alertaMaximo) : 50;
+  const estadoBit = estado === false || estado === 0 ? 0 : 1;
+  const tipoProd = (tipoProducto === 'C' || tipoProducto === 'S') ? tipoProducto : 'S';
+
   var hoy = new Date();
   var dd = String(hoy.getDate()).padStart(2, "0");
   var mm = String(hoy.getMonth() + 1).padStart(2, "0");
@@ -338,7 +352,7 @@ const crear_producto = async (req, res) => {
 
   const datosProducto = {
     idProducto: idProducto || uuidv4(),
-    Codigo: Codigo != null ? String(Codigo).trim() : "",
+    Codigo: codigoFinal,
     idCategoria: idCategoria != null ? parseInt(idCategoria, 10) : null,
     descripcion: descripcion != null ? String(descripcion).trim() : "",
     idMarca: idMarca != null ? parseInt(idMarca, 10) : null,
@@ -349,10 +363,11 @@ const crear_producto = async (req, res) => {
     idEmpresa,
     idUsuario: null,
     FIngreso,
-    estado: 1,
+    estado: estadoBit,
     facturar: "SI",
-    alertaMinimo: 5,
-    alertaMaximo: 50,
+    alertaMinimo: alertaMin,
+    alertaMaximo: alertaMax,
+    tipoProducto: tipoProd,
     VecesVendidas: 0,
   };
 
@@ -369,6 +384,13 @@ const crear_producto = async (req, res) => {
     });
   }
 
+  if (lote && (!lote.idSucursal || lote.cantidadIngresada == null || lote.cantidadIngresada < 0)) {
+    return res.status(400).send({
+      message: "Si registra lote inicial, indique sucursal y cantidad mayor o igual a 0.",
+      data: undefined,
+    });
+  }
+
   try {
     const pool = await sql.connect(dbConfig);
     datosProducto.idUsuario = await resolverIdUsuarioParaProducto(pool, idEmpresa, req.user.sub);
@@ -380,27 +402,68 @@ const crear_producto = async (req, res) => {
       });
     }
 
-    await pool.request()
-      .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
-      .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)
-      .input("Codigo", sql.VarChar, datosProducto.Codigo)
-      .input("idCategoria", sql.Int, datosProducto.idCategoria)
-      .input("descripcion", sql.VarChar, datosProducto.descripcion)
-      .input("idMarca", sql.Int, datosProducto.idMarca)
-      .input("idPresentacion", sql.Int, datosProducto.idPresentacion)
-      .input("cUnitario", sql.Decimal(18, 5), datosProducto.cUnitario)
-      .input("fProduccion", sql.VarChar, datosProducto.fProduccion)
-      .input("fVencimiento", sql.VarChar, datosProducto.fVencimiento)
-      .input("alertaMinimo", sql.Decimal, 5)
-      .input("alertaMaximo", sql.Decimal, 50)
-      .input("VecesVendidas", sql.Int, 0)
-      .input("facturar", sql.VarChar, datosProducto.facturar)
-      .input("idUsuario", sql.UniqueIdentifier, datosProducto.idUsuario)
-      .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
-      .input("estado", sql.Bit, 1)
-      .query(
-        "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)"
-      );
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      await transaction.request()
+        .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
+        .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)
+        .input("Codigo", sql.VarChar, datosProducto.Codigo)
+        .input("idCategoria", sql.Int, datosProducto.idCategoria)
+        .input("descripcion", sql.VarChar, datosProducto.descripcion)
+        .input("idMarca", sql.Int, datosProducto.idMarca)
+        .input("idPresentacion", sql.Int, datosProducto.idPresentacion)
+        .input("cUnitario", sql.Decimal(18, 5), datosProducto.cUnitario)
+        .input("fProduccion", sql.VarChar, datosProducto.fProduccion)
+        .input("fVencimiento", sql.VarChar, datosProducto.fVencimiento)
+        .input("alertaMinimo", sql.Decimal(18, 2), datosProducto.alertaMinimo)
+        .input("alertaMaximo", sql.Decimal(18, 2), datosProducto.alertaMaximo)
+        .input("VecesVendidas", sql.Int, 0)
+        .input("facturar", sql.VarChar, datosProducto.facturar)
+        .input("idUsuario", sql.UniqueIdentifier, datosProducto.idUsuario)
+        .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
+        .input("estado", sql.Bit, datosProducto.estado)
+        .input("tipoProducto", sql.Char(1), datosProducto.tipoProducto)
+        .query(
+          "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto)"
+        );
+
+      if (lote && lote.idSucursal && (lote.cantidadIngresada > 0 || lote.costoUnitario != null)) {
+        const cantidad = Math.max(0, parseInt(lote.cantidadIngresada, 10) || 0);
+        const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
+        await transaction.request()
+          .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+          .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
+          .input("idSucursal", sql.UniqueIdentifier, lote.idSucursal)
+          .input("costoUnitario", sql.Decimal(18, 6), costoLote)
+          .input("cantidadIngresada", sql.Decimal(18, 2), cantidad)
+          .input("cantidadDisponible", sql.Decimal(18, 2), cantidad)
+          .query(
+            "INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible) VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)"
+          );
+      }
+
+      const precioVal = parseFloat(precioVenta);
+      if (!Number.isNaN(precioVal) && precioVal > 0) {
+        const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
+        const lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
+        if (lista && lista.idLista && lista.idMoneda) {
+          await preciosVRepository.crearPrecioProducto(transaction, {
+            idLista: lista.idLista,
+            idProducto: datosProducto.idProducto,
+            precio: precioVal,
+            idMoneda: lista.idMoneda,
+            idUsuario: datosProducto.idUsuario,
+          });
+        }
+      }
+
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
 
     res.status(200).send({ data: datosProducto.idProducto });
   } catch (error) {
@@ -505,13 +568,20 @@ const crear_producto_compra = async (datosProducto, user) => {
 };
 
 const actualizar_producto = async function (req, res) {
-  console.log("actualizar producto producto controlleer ", req.body);
-  console.log("req.params.id ", req.params.id);
-   const idProducto = req.params.id;
-   const {Codigo, idCategoria, descripcion, idPresentacion, cUnitario, fProduccion, fVencimiento } = req.body;
-
-  
-  // console.log('idProducto ', req.params.id)
+  const idProducto = req.params.id;
+  const {
+    Codigo,
+    idCategoria,
+    descripcion,
+    idPresentacion,
+    cUnitario,
+    fProduccion,
+    fVencimiento,
+    alertaMinimo,
+    alertaMaximo,
+    estado,
+    tipoProducto,
+  } = req.body;
 
   const detalle = {
     idProducto: idProducto,
@@ -523,23 +593,16 @@ const actualizar_producto = async function (req, res) {
     cUnitario: parseFloat(cUnitario),
     fProduccion: fProduccion ? convertirFormato(fProduccion) : null,
     fVencimiento: fVencimiento ? convertirFormato(fVencimiento) : null,
+    alertaMinimo: alertaMinimo != null ? parseFloat(alertaMinimo) : undefined,
+    alertaMaximo: alertaMaximo != null ? parseFloat(alertaMaximo) : undefined,
+    estado: estado !== undefined ? (estado ? 1 : 0) : undefined,
+    tipoProducto: tipoProducto === 'C' || tipoProducto === 'S' ? tipoProducto : undefined,
     idEmpresa: req.user.empresa,
-    idUsuario: req.user.sub,
-    FIngreso: new Date(), // Fecha actual
-    estado: 1, // Estado activo por defecto
-    facturar: "SI", // Asignar valor por defecto
-    alertaMinimo: 5, // Valor por defecto
-    alertaMaximo: 50, // Valor por defecto
-    VecesVendidas: 0, // Valor por defecto
-    };
+  };
 
-
-
-    //if (req.user) {
-  //if (req.user.rol == 'Administrador') {
   try {
     let pool = await sql.connect(dbConfig);
-    let productos = await pool
+    const request = pool
       .request()
       .input("idProducto", sql.UniqueIdentifier, detalle.idProducto)
       .input("idEmpresa", sql.UniqueIdentifier, detalle.idEmpresa)
@@ -550,18 +613,39 @@ const actualizar_producto = async function (req, res) {
       .input("idPresentacion", sql.Int, detalle.idPresentacion)
       .input("cUnitario", sql.Decimal(18, 5), detalle.cUnitario)
       .input("fProduccion", sql.VarChar, detalle.fProduccion)
-      .input("fVencimiento", sql.VarChar, detalle.fVencimiento)
-      .query(
-        "UPDATE Productos SET Codigo = @Codigo, idCategoria = @idCategoria, descripcion = @descripcion, idPresentacion = @idPresentacion, cUnitario = @cUnitario, fProduccion = @fProduccion, fVencimiento = @fVencimiento WHERE idProducto = @idProducto and idEmpresa = @idEmpresa"
-      );
+      .input("fVencimiento", sql.VarChar, detalle.fVencimiento);
 
-    console.log("productosresult actualizar productos", productos.rowsAffected);
-    //res.status(200).send({ data: productos.rowsAffected });
+    let updateSql =
+      "UPDATE Productos SET Codigo = @Codigo, idCategoria = @idCategoria, descripcion = @descripcion, idMarca = @idMarca, idPresentacion = @idPresentacion, cUnitario = @cUnitario, fProduccion = @fProduccion, fVencimiento = @fVencimiento";
+
+    if (detalle.tipoProducto !== undefined) {
+      request.input("tipoProducto", sql.Char(1), detalle.tipoProducto);
+      updateSql += ", tipoProducto = @tipoProducto";
+    }
+
+    if (detalle.alertaMinimo !== undefined) {
+      request.input("alertaMinimo", sql.Decimal(18, 2), detalle.alertaMinimo);
+      updateSql += ", alertaMinimo = @alertaMinimo";
+    }
+    if (detalle.alertaMaximo !== undefined) {
+      request.input("alertaMaximo", sql.Decimal(18, 2), detalle.alertaMaximo);
+      updateSql += ", alertaMaximo = @alertaMaximo";
+    }
+    if (detalle.estado !== undefined) {
+      request.input("estado", sql.Bit, detalle.estado);
+      updateSql += ", estado = @estado";
+    }
+
+    updateSql += " WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa";
+    const productos = await request.query(updateSql);
+
+    res.status(200).send({ data: productos.rowsAffected });
   } catch (error) {
-    console.log("actualizar productos error: " + error);
-    res
-      .status(200)
-      .send({ message: "Error al actualizar los productos", data: undefined });
+    console.error("actualizar productos error:", error);
+    res.status(500).send({
+      message: "Error al actualizar los productos",
+      data: undefined,
+    });
   }
   // } else {
   //     res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });

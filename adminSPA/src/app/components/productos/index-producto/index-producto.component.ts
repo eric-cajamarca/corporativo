@@ -11,8 +11,11 @@ import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoCompuestoService } from '../../../services/producto-compuesto.service';
 import { ProductovarianteService } from '../../../services/productovariante.service';
+import { ProductoDetalleModalService } from '../../../services/producto-detalle-modal.service';
+import { ProductoEditarModalService } from '../../../services/producto-editar-modal.service';
+import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
 
- declare var iziToast: any;
+declare var iziToast: any;
  declare var bootstrap: any;
 
 @Component({
@@ -72,6 +75,9 @@ export class IndexProductoComponent {
     private _productoService: ProductoService,
     private _productoCompuestoService: ProductoCompuestoService,
     private _productoVarianteService: ProductovarianteService,
+    private _productoDetalleModal: ProductoDetalleModalService,
+    private _productoEditarModal: ProductoEditarModalService,
+    private _productoCrearModal: ProductoCrearModalService,
   ) {
    // this.token = this._cookieService.get('token');
   }
@@ -137,12 +143,22 @@ export class IndexProductoComponent {
     }
   }
 
-  consultaidProducto(id: any,) {
-    // this.load_estado = true;
-    
+  abrirDetalleProducto(idProducto: string): void {
+    this._productoDetalleModal.abrir(idProducto).then(() => {
+      this.initData();
+    }).catch(() => {});
+  }
 
+  abrirEditarProducto(idProducto: string): void {
+    this._productoEditarModal.abrir(idProducto).then(() => {
+      this.initData();
+    }).catch(() => {});
+  }
 
-
+  abrirCrearProducto(): void {
+    this._productoCrearModal.abrir().then(() => {
+      this.initData();
+    }).catch(() => {});
   }
 
 

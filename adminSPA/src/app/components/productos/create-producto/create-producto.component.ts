@@ -1,7 +1,8 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, Optional, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
 import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
@@ -81,6 +82,9 @@ export class CreateProductoComponent implements OnInit {
   precioVenta = 0;
   margenGanancia = 0;
 
+  /** true cuando se abre como modal (desde ProductoCrearModalService) */
+  esModal = false;
+
   constructor(
     private fb: FormBuilder,
     private productoService: ProductoService,
@@ -88,8 +92,11 @@ export class CreateProductoComponent implements OnInit {
     private marcaService: MarcaService,
     private presentacionService: PresentacionService,
     private sucursalService: SucursalService,
-    private router: Router
-  ) {}
+    private router: Router,
+    @Optional() public activeModal: NgbActiveModal
+  ) {
+    this.esModal = !!this.activeModal;
+  }
 
   ngOnInit(): void {
     this.initForm();
@@ -210,18 +217,27 @@ export class CreateProductoComponent implements OnInit {
 
     this.guardando.set(true);
 
+    const v = this.productoForm.value;
     const producto = {
-      ...this.productoForm.value,
-      cUnitario: this.loteData.costoUnitario || 0,
-      // Datos de lote si está activo
-      lote: this.modoLote() ? {
+      Codigo: v.codigo,
+      idCategoria: Number(v.idCategoria),
+      idMarca: Number(v.idMarca),
+      descripcion: v.descripcion,
+      idPresentacion: Number(v.idPresentacion),
+      cUnitario: this.loteData.costoUnitario != null ? Number(this.loteData.costoUnitario) : 0,
+      fProduccion: v.fProduccion || undefined,
+      fVencimiento: v.fVencimiento || undefined,
+      alertaMinimo: v.alertaMinimo != null ? Number(v.alertaMinimo) : 10,
+      alertaMaximo: v.alertaMaximo != null ? Number(v.alertaMaximo) : 100,
+      estado: !!v.estado,
+      tipoProducto: (v.tipoProducto === 'C' || v.tipoProducto === 'S') ? v.tipoProducto : 'S',
+      lote: this.modoLote() && this.loteData.idSucursal ? {
         idSucursal: this.loteData.idSucursal,
         costoUnitario: this.loteData.costoUnitario,
         cantidadIngresada: this.loteData.cantidadIngresada,
         ubicacion: this.loteData.ubicacion
       } : null,
-      // Precio de venta
-      precioVenta: this.precioVenta || 0
+      precioVenta: this.precioVenta && this.precioVenta > 0 ? this.precioVenta : 0
     };
 
     this.productoService.crearProducto(producto).subscribe({
@@ -234,7 +250,11 @@ export class CreateProductoComponent implements OnInit {
             message: 'Producto creado correctamente',
             position: 'topRight'
           });
-          this.router.navigate(['/productos']);
+          if (this.activeModal) {
+            this.activeModal.close(true);
+          } else {
+            this.router.navigate(['/productos']);
+          }
         } else {
           iziToast.show({
             title: 'Error',
@@ -277,6 +297,10 @@ export class CreateProductoComponent implements OnInit {
   }
 
   cancelar(): void {
-    this.router.navigate(['/productos']);
+    if (this.activeModal) {
+      this.activeModal.dismiss();
+    } else {
+      this.router.navigate(['/productos']);
+    }
   }
 }

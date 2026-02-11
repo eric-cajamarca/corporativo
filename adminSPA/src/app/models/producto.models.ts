@@ -3,6 +3,7 @@
 export interface Producto {
   idProducto: string;
   Codigo: string;
+  codigo?: string;
   descripcion: string;
   cUnitario: number;
   fProduccion?: string;
@@ -10,12 +11,27 @@ export interface Producto {
   categoria: string;
   marca: string;
   presentacion: string;
+  codigoPresentacion?: string;
   estado: number;
   alertaMinimo: number;
   alertaMaximo: number;
   fechaIngreso: string;
   fechaProduccion?: string;
   fechaVencimiento?: string;
+  /** IDs para edición (respuesta GET por id) */
+  idCategoria?: number;
+  idMarca?: number;
+  idPresentacion?: number;
+  tipoProducto?: string;
+  vecesVendidas?: number;
+  facturar?: string;
+}
+
+export interface LoteInicialCreate {
+  idSucursal: string;
+  costoUnitario: number;
+  cantidadIngresada: number;
+  ubicacion?: string;
 }
 
 export interface ProductoCreate {
@@ -28,6 +44,12 @@ export interface ProductoCreate {
   fProduccion?: string;
   fVencimiento?: string;
   idProducto?: string;
+  alertaMinimo?: number;
+  alertaMaximo?: number;
+  estado?: boolean;
+  tipoProducto?: string;
+  lote?: LoteInicialCreate | null;
+  precioVenta?: number;
 }
 
 export interface ProductoResponse {

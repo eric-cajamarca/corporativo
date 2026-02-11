@@ -13,7 +13,7 @@
         <p class="content-subtitle text-muted mb-0">Gestiona tu inventario de productos</p>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary" routerLink="/productos/create">
+        <button class="btn btn-outline-primary" (click)="abrirCrearProducto()">
           <i class="fas fa-plus me-1"></i>
           Nuevo Producto
         </button>
@@ -21,13 +21,10 @@
     </div>
   </div>
 
-  <div class="card" style="border-radius: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
-    <div class="card">
+  <div class="card">
       <div class="card-header">
-  
-        <!-- Title -->
-        <h4 class="card-header-title">
-          Mostrando todos tus productos
+        <h4 class="card-header-title mb-0">
+          Listado de productos
         </h4>
   
         <!-- <button class="btn btn-primary" [routerLink]="['/compras/create']" routerLinkActive="active"
@@ -60,7 +57,7 @@
         </div>
         <div class="table-responsive" style="height:500px;">
           <table class="table table-striped table-hover">
-            <thead class="table-dark" style="position: sticky; top: 0; z-index: 100;">
+            <thead class="table-primary" style="position: sticky; top: 0; z-index: 100;">
               <tr>
                 <th>Codigo</th>
                 <th>Categoría</th>
@@ -97,10 +94,7 @@
                   <span class="badge bg-danger" *ngIf="item.condicion != 'ACTIVO'">No Activo</span> -->
                 </td>
                 <td>
-                  <span>{{item.fProduccion}}</span>
-                  <span class="badge bg-success" *ngIf="item.descripcion === 'Pagado'"> Pagado</span>
-                  <span class="badge bg-warning" *ngIf="item.descripcion === 'Pendiente'"> Pendiente</span>
-    
+                  <span>{{ item.fProduccion || '—' }}</span>
                 </td>
                 <td style="width: 60px; text-align: right;">
                   <span>{{item.fVencimiento}}</span>
@@ -116,16 +110,15 @@
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
                       
-                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" data-bs-toggle="modal"
-                        [attr.data-bs-target]="'#consulta-'+item.idProducto"   (click)="consultaidProducto(item.idProducto)">
-                        <i></i> &nbsp; Ver detalles
+                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" (click)="abrirDetalleProducto(item.idProducto)">
+                        <i class="bi bi-eye me-1"></i> Ver detalle
                       </a>
-                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto"  [routerLink]="['/productos',item.idProducto]">
-                        <i></i> &nbsp; Editar
+                      <a class="dropdown-item" *ngIf="item.idProducto" (click)="abrirEditarProducto(item.idProducto)">
+                        <i class="bi bi-pencil me-1"></i> Editar
                       </a>
-                      <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.idProducto" data-bs-toggle="modal"
+                      <a style="cursor: pointer;" class="dropdown-item text-danger" *ngIf="item.idProducto" data-bs-toggle="modal"
                         [attr.data-bs-target]="'#delete-'+item.idProducto">
-                        <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Eliminar
+                        <i class="bi bi-trash me-1"></i> Eliminar
                       </a>
                       <!-- En el dropdown "Opciones", AGREGAR después de las opciones existentes: -->
                       <div class="dropdown-divider"></div>
@@ -159,29 +152,6 @@
                           <i class="bi bi-palette-fill me-1"></i> Ver Variantes
                         </a>
                     </ul>
-                  </div>
-    
-                  <div class="modal fade modal-fullscreen" id="consulta-{{item.idProducto}}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-xl" role="document">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="exampleModalLabel">Detalles del producto: {{item.descripcion}} </h5>
-                                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                    <i aria-hidden="true" class="ki ki-close"></i>
-                                </button>
-                            </div>
-                            <div class="modal-body">
-                                <p>Aqui se muestra los detalles del producto.</p>
-    
-                                
-                                        
-                            </div>
-                            <div class="modal-footer">
-                              <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
-                                
-                            </div>
-                        </div>
-                    </div>
                   </div>
     
                   <div class="modal fade" id="delete-{{item.idProducto}}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -554,10 +524,7 @@
     
         </div>
       </ng-container>
-  
-      
-  
-    </div>
+
     <ngb-pagination 
           *ngIf="productos.length > 0"
           [(page)]="page"
@@ -570,9 +537,7 @@
           aria-label="Paginación de productos"
           class="d-flex justify-content-center my-4">
         </ngb-pagination>
-    <!-- <ngb-pagination *ngIf="productos.length >= 1" [(page)]="page" [pageSize]="pageSize" [maxSize]="10" [rotate]="true"
-      [boundaryLinks]="true" [collectionSize]="productos.length">
+    <!-- <ngb-pagination *ngIf="productos.length >= 1" [(page)]="page" ...
     </ngb-pagination> -->
-
   </div>
 </main>
