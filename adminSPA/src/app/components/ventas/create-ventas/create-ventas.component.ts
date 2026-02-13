@@ -22,6 +22,7 @@ import { ModalService } from '../../../services/modal.service';
 import { VentasService } from '../../../services/ventas.service';
 import { CajaService } from '../../../services/caja.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { FactilizaService } from '../../../services/factiliza.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -76,14 +77,20 @@ export class CreateVentasComponent implements OnInit {
   public cajaMovimientos:{} ={
     idFormaPago:0,
   };
-  public cliente : any = {
-    tipoDocumento: '1',
-    razonsocial: '',
+  public cliente: any = {
+    idCliente: '',
+    idDocumento: '',
+    ruc: '',
+    rSocial: '',
     direccion: '',
+    correo: '',
+    celular: '',
+    condicion: 'ACTIVO'
   };
   public cajas: any[] = [];
   public sidebarCollapsed = signal(false);
   public loading = false;
+  public clienteBuscando = false;
 
   public ventas: any = {
     compVenta: '0000-00000000',
@@ -123,7 +130,8 @@ export class CreateVentasComponent implements OnInit {
     private _documentosService: DocumentoService,
     private modalService: ModalService,
     private ventasService: VentasService,
-    private cajaService: CajaService
+    private cajaService: CajaService,
+    private _factilizaService: FactilizaService
   ) {}
 
   onSidebarToggle(collapsed: boolean): void {
@@ -279,9 +287,13 @@ export class CreateVentasComponent implements OnInit {
     this.productos_filtrados = this.stockSucursales_const;
   }
 
+  /** idDocumento según tabla Documentos: RUC = 6, DNI = 1 (Perú). */
+  private readonly ID_DOC_RUC = '6';
+  private readonly ID_DOC_DNI = '1';
+
   /**
    * Carga serie y número desde la tabla Comprobantes (BD) al seleccionar un tipo de comprobante.
-   * Los comprobantes vienen de obtenerComprobantesVenta() (habilitados para ventas en Configuración).
+   * Ajusta el tipo de documento: Factura (01) = RUC, otros = DNI.
    */
   cargarDatosComprobantePorId(idComprobante: string | number): void {
     if (idComprobante == null || idComprobante === '') {
@@ -299,6 +311,7 @@ export class CreateVentasComponent implements OnInit {
       const siguienteNumero = (comp.numero != null ? Number(comp.numero) : 0) + 1;
       this.ventas.numero = String(siguienteNumero).padStart(8, '0');
       this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
+      this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
     } else {
       this.ventas.serie = '';
       this.ventas.numero = '';
@@ -516,75 +529,127 @@ abrirModalPrecios(item: any) {
 
   limpiarCliente() {}
 
-  onInputNumero(): void {
-    const long = this.cliente.ruc.length;
-    if (!this.documento) {
-    console.error('Documento no cargado');
-    return;
+  /** Valor a mostrar en Razón Social / Nombre (soporta distintas claves del API). */
+  getRazonSocialDisplay(): string {
+    const c = this.cliente;
+    if (!c) return '';
+    return (c.rSocial ?? c.r_Social ?? c.rsocial ?? c.nombre_o_razon_social ?? c.razonSocial ?? c.RazonSocial ?? '').toString().trim();
   }
 
-  const id = this.documento[0].idDocumento;
-//  const long = id.length;
-
-  if (long === 8 && id === '1') {
-    console.log('buscando dni');
-    this.buscarRuc();
+  /** True si hay cliente elegido: con idCliente (BD/lista) o con documento y razón social (se creará al registrar). */
+  tieneClienteParaVenta(): boolean {
+    if (!this.cliente) return false;
+    if (this.cliente.idCliente != null && this.cliente.idCliente !== '' && this.cliente.idCliente !== 0) return true;
+    const ruc = (this.cliente.ruc ?? '').toString().trim();
+    const nombre = this.getRazonSocialDisplay();
+    return ruc.length > 0 && nombre.length > 0;
   }
 
-  if (long === 11 && id === '6') {
-    console.log('buscando ruc');
-    this.buscarRuc();
-  }
-  }
-
-  buscarRuc() {
-    console.log('Buscando RUC:', this.cliente.ruc);
-   
-      this._clienteService.obtener_cliente_ruc(this.cliente.ruc).subscribe(
-        (response) => {
-          console.log('response cliente por ruc', response.data);
-          if (response.data != undefined && response.data.length > 0) {
-            this.cliente = response.data[0];
-
-            console.log('this.cliente', this.cliente);
-            this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe(
-              (response) => {
-                  this.direccionCliente = response.data[0];
-                  this.cliente.direccion = this.direccionCliente.direccion
-                  console.log("direcciones", response)
+  /**
+   * Busca cliente: primero en BD por número de documento; si no existe, consulta API Factiliza (RUC/DNI).
+   */
+  buscarDocumentoCliente(): void {
+    const numero = (this.cliente.ruc ?? '').toString().trim();
+    const idDoc = this.ventas.idDocumento;
+    if (!numero) {
+      iziToast.warning({ title: 'Aviso', message: 'Ingrese el número de documento.', position: 'topRight' });
+      return;
+    }
+    if (idDoc === this.ID_DOC_RUC && numero.length !== 11) {
+      iziToast.warning({ title: 'Aviso', message: 'El RUC debe tener 11 dígitos.', position: 'topRight' });
+      return;
+    }
+    if (idDoc === this.ID_DOC_DNI && numero.length !== 8) {
+      iziToast.warning({ title: 'Aviso', message: 'El DNI debe tener 8 dígitos.', position: 'topRight' });
+      return;
+    }
+    this.clienteBuscando = true;
+    this._clienteService.obtener_cliente_ruc(numero).subscribe({
+      next: (response) => {
+        if (response.data != null && response.data.length > 0) {
+          const row = response.data[0];
+          this.cliente = {
+            idCliente: row.idCliente,
+            idDocumento: row.idDocumento,
+            ruc: row.ruc,
+            rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? row.razonSocial ?? row.RazonSocial ?? '').toString().trim(),
+            direccion: (row.direccion ?? '').toString(),
+            correo: row.correo ?? '',
+            celular: row.celular ?? '',
+            condicion: row.condicion ?? 'ACTIVO'
+          };
+          console.log('[Ventas] Datos del cliente (desde BD):', { row, cliente: this.cliente });
+          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+            next: (dirRes) => {
+              if (dirRes.data && dirRes.data[0]) {
+                this.direccionCliente = dirRes.data[0];
+                this.cliente.direccion = this.direccionCliente.direccion ?? '';
               }
-              
-            )
-          }else{
-            iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#f39999ff',
-              class: 'text-danger',
-              position: 'topRight',
-              message: 'El cliente no existe.',
-            });
-          }
-        },
-        (error) => {
-          console.log(error);
+              this.clienteBuscando = false;
+            },
+            error: () => { this.clienteBuscando = false; }
+          });
+          iziToast.success({ title: 'OK', message: 'Cliente encontrado en base de datos.', position: 'topRight' });
+        } else {
+          this.consultarDocumentoApi(numero, idDoc);
         }
-      );
-    
-
-    
-
+      },
+      error: () => {
+        this.clienteBuscando = false;
+        iziToast.error({ title: 'Error', message: 'Error al buscar en base de datos.', position: 'topRight' });
+      }
+    });
   }
 
-  clienteSeleccionado(event: any) {
-    this.cliente = event;
-    console.log('Cliente seleccionado en CreateVentasComponent:', this.cliente);
+  private consultarDocumentoApi(numero: string, idDoc: string): void {
+    const isRuc = idDoc === this.ID_DOC_RUC;
+    const obs = isRuc ? this._factilizaService.getRuc(numero) : this._factilizaService.getDni(numero);
+    obs.subscribe({
+      next: (response: any) => {
+        const data = response.data ?? response;
+        const rSocial = (data.nombre_o_razon_social ?? data.razonSocial ?? data.nombre ?? data.razon_social ?? '').toString().trim();
+        const nombreCompletoDni = data.apellidoPaterno != null
+          ? `${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''} ${data.nombres || ''}`.trim()
+          : (data.nombres ?? '');
+        const direccion = (data.direccion_completa ?? data.direccion ?? data.direccionCompleta ?? '').toString().trim();
+        this.cliente = {
+          idCliente: '',
+          idDocumento: idDoc,
+          ruc: (data.numero ?? numero).toString().trim(),
+          rSocial: rSocial || nombreCompletoDni || '',
+          direccion,
+          correo: this.cliente?.correo ?? '',
+          celular: (this.cliente?.celular ?? data.celular ?? '').toString(),
+          condicion: (data.condicion ?? data.estado ?? 'ACTIVO').toString()
+        };
+        this.clienteBuscando = false;
+        console.log('[Ventas] Datos del cliente (desde API Factiliza):', { data, cliente: this.cliente });
+        iziToast.info({ title: 'Info', message: 'Cliente no registrado. Se creará al registrar la venta.', position: 'topRight' });
+      },
+      error: (err) => {
+        this.clienteBuscando = false;
+        const msg = err?.error?.message ?? (isRuc ? 'RUC no encontrado.' : 'DNI no encontrado.');
+        iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+      }
+    });
+  }
 
-    // 2.  Cerrar el modal vía JS
-  const modalEl = document.getElementById('clientesModal');
-  const modalInst = bootstrap.Modal.getInstance(modalEl);
-  modalInst.hide();
-  this.buscarRuc()
+  clienteSeleccionado(event: any): void {
+    const e = event || {};
+    this.cliente = {
+      idCliente: e.idCliente,
+      idDocumento: e.idDocumento,
+      ruc: e.ruc,
+      rSocial: (e.rSocial ?? e.r_Social ?? e.rsocial ?? e.razonSocial ?? e.RazonSocial ?? '').toString().trim(),
+      direccion: (e.direccion ?? '').toString(),
+      correo: e.correo ?? '',
+      celular: e.celular ?? '',
+      condicion: e.condicion ?? 'ACTIVO'
+    };
+    console.log('[Ventas] Datos del cliente (elegido de lista):', { event: e, cliente: this.cliente });
+    const modalEl = document.getElementById('clientesModal');
+    const modalInst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
+    modalInst?.hide();
   }
 
 
@@ -672,7 +737,7 @@ abrirModalPrecios(item: any) {
     inst?.hide();
   }
 
-  /** Registra la venta completa: Ventas + DetalleVenta + DetallePagoVenta + MovimientosCaja (si hay pago) */
+  /** Registra la venta completa. Si el cliente no tiene idCliente, lo crea antes en BD. */
   registrarVenta(): void {
     if (this.carrito.length === 0) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
@@ -686,9 +751,15 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'Seleccione sucursal.' });
       return;
     }
-    const idCliente = this.cliente?.idCliente != null ? Number(this.cliente.idCliente) : null;
+    const ruc = (this.cliente?.ruc ?? '').toString().trim();
+    const rSocial = (this.cliente?.rSocial ?? '').toString().trim();
+    let idCliente = this.cliente?.idCliente != null ? Number(this.cliente.idCliente) : null;
     if (idCliente == null || idCliente === 0) {
-      iziToast.warning({ title: 'Advertencia', message: 'Seleccione un cliente (Información del Cliente).' });
+      if (!ruc || !rSocial) {
+        iziToast.warning({ title: 'Advertencia', message: 'Complete información del cliente (número y razón social).' });
+        return;
+      }
+      this.crearClienteYRegistrarVenta();
       return;
     }
 
@@ -698,6 +769,61 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
       return;
     }
+    this.enviarVentaConCliente(idCliente);
+  }
+
+  private crearClienteYRegistrarVenta(): void {
+    const payload = {
+      idDocumento: this.ventas.idDocumento || this.ID_DOC_DNI,
+      ruc: (this.cliente.ruc ?? '').toString().trim(),
+      rSocial: (this.cliente.rSocial ?? '').toString().trim(),
+      correo: this.cliente.correo ?? null,
+      celular: this.cliente.celular ?? null,
+      condicion: this.cliente.condicion ?? 'ACTIVO'
+    };
+    this.loading = true;
+    this._clienteService.crear_cliente(payload).subscribe({
+      next: (res: any) => {
+        const creado = res?.data;
+        const idCliente = creado?.idCliente != null ? Number(creado.idCliente) : null;
+        if (idCliente == null) {
+          this._clienteService.obtener_cliente_ruc(payload.ruc).subscribe({
+            next: (r: any) => {
+              if (r.data && r.data.length > 0) {
+                this.cliente.idCliente = r.data[0].idCliente;
+                this.enviarVentaConCliente(Number(this.cliente.idCliente));
+              } else {
+                this.loading = false;
+                iziToast.error({ title: 'Error', message: 'No se pudo obtener el cliente creado.' });
+              }
+            },
+            error: () => {
+              this.loading = false;
+              iziToast.error({ title: 'Error', message: 'No se pudo crear el cliente.' });
+            }
+          });
+        } else {
+          this.cliente.idCliente = idCliente;
+          this.enviarVentaConCliente(idCliente);
+        }
+      },
+      error: (err) => {
+        this.loading = false;
+        const msg = err?.error?.message ?? 'No se pudo crear el cliente.';
+        iziToast.error({ title: 'Error', message: msg });
+      }
+    });
+  }
+
+  private enviarVentaConCliente(idCliente: number): void {
+    const totalVenta = Number(this.ventas.total) || 0;
+    const totalPago = this.calcularTotalTabla();
+    if (totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
+      this.loading = false;
+      iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
+      return;
+    }
+    this.loading = true;
 
     const ventaPayload = {
       idSucursal: this.ventas.idSucursal,
@@ -753,14 +879,13 @@ abrirModalPrecios(item: any) {
       idApertura = this.cajas[0].idApertura;
     }
 
-    this.loading = true;
     this.ventasService.crearVentaCompleta({
       venta: ventaPayload,
       detalles,
       detallePago: detallePago.length > 0 ? detallePago : undefined,
       idApertura
     }).subscribe({
-      next: (res) => {
+      next: () => {
         this.loading = false;
         iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
         this.limpiarVenta();

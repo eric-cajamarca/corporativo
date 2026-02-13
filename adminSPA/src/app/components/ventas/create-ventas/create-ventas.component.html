@@ -19,7 +19,7 @@
             </button>
             <button type="button" class="btn btn-outline-warning rounded-pill"
                     data-bs-toggle="modal" data-bs-target="#modalPago"
-                    [disabled]="!cliente?.idCliente">
+                    [disabled]="!tieneClienteParaVenta()">
               <i class="bi bi-credit-card me-2"></i>Forma de pago
             </button>
           </div>
@@ -316,39 +316,55 @@
       </div>
       <div class="modal-body p-4">
         <div class="row g-3">
-          <!-- Tipo doc + Número -->
+          <!-- Tipo doc (según comprobante: Factura=RUC, otros=DNI) + Número -->
           <div class="col-md-3">
-            <label class="form-label">Tipo</label>
-            <select class="form-select" [(ngModel)]="ventas.idDocumento">
+            <label class="form-label">Tipo documento</label>
+            <select class="form-select" [(ngModel)]="ventas.idDocumento" [disabled]="!ventas.idComprobante">
               <option *ngFor="let d of documento" [value]="d.idDocumento">{{ d.nombre }}</option>
             </select>
+            <small class="text-muted" *ngIf="ventas.idComprobante">Según comprobante (Factura=RUC)</small>
           </div>
-          <div class="col-md-5">
+          <div class="col-md-4">
             <label class="form-label">Número</label>
             <input type="text" class="form-control" [(ngModel)]="cliente.ruc" 
-            [placeholder]="cliente.tipoDoc === 'ruc' ? '20123456789' : '12345678'" (input)="onInputNumero()" >
+                   [placeholder]="ventas.idDocumento === '6' ? '11 dígitos RUC' : '8 dígitos DNI'" 
+                   maxlength="11" inputmode="numeric" pattern="[0-9]*">
           </div>
-          <!-- <div class="col-md-4 d-grid">
-            <button class="btn btn-outline-primary" (click)="buscarRuc()">
-              <i class="bi bi-search me-2"></i>Buscar
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-primary w-100" (click)="buscarDocumentoCliente()" [disabled]="clienteBuscando">
+              <i class="bi bi-search me-1"></i>{{ clienteBuscando ? '...' : 'Buscar' }}
             </button>
-          </div> -->
-          <button class="btn btn-outline-primary"
-                  data-bs-toggle="modal"
-                  data-bs-target="#clientesModal">
-            <i class="bi bi-search me-2"></i>Buscar
-          </button>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#clientesModal">
+              <i class="bi bi-list me-1"></i>Elegir de lista
+            </button>
+          </div>
 
-          <!-- Razón Social -->
+          <!-- Razón Social / Nombre -->
           <div class="col-12">
             <label class="form-label">Razón Social / Nombre</label>
-            <input type="text" class="form-control" [(ngModel)]="cliente.rSocial" readonly>
+            <input type="text" class="form-control" [value]="getRazonSocialDisplay()" readonly placeholder="Busque por documento para cargar">
           </div>
 
-          <!-- Dirección -->
+          <!-- Dirección (solo lectura, datos internos) -->
           <div class="col-12">
             <label class="form-label">Dirección</label>
             <input type="text" class="form-control" [(ngModel)]="cliente.direccion" readonly>
+          </div>
+
+          <!-- Celular y Correo (editables) -->
+          <div class="col-md-6">
+            <label class="form-label">Celular</label>
+            <input type="text" class="form-control" [(ngModel)]="cliente.celular" placeholder="Opcional">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Correo electrónico</label>
+            <input type="email" class="form-control" [(ngModel)]="cliente.correo" placeholder="Opcional">
+          </div>
+
+          <div class="col-12" *ngIf="getRazonSocialDisplay() && !cliente.idCliente">
+            <div class="alert alert-info py-2 mb-0 small">Cliente no registrado. Se creará al registrar la venta.</div>
           </div>
         </div>
       </div>
