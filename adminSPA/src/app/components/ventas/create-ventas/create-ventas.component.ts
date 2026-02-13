@@ -184,7 +184,10 @@ export class CreateVentasComponent implements OnInit {
   this._documentosService.getFormasPago().subscribe({
     next: (response) => {
       this.formasPago = response.data || [];
-      console.log('formaspago', this.formasPago);
+      const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+      if (efectivo) {
+        this.formaPagoSeleccionada = { ...efectivo };
+      }
     },
     error: (err) => {
       console.error('Error:', err);
@@ -720,7 +723,10 @@ abrirModalPrecios(item: any) {
         monto,
         referencia: this.detailForm.referencia || 'N/A'
       });
-      this.detailForm = { formaPago: 'Efectivo', monto: 0, referencia: '' };
+      const totalVenta = Number(this.ventas.total) || 0;
+      const totalPagado = this.calcularTotalTabla();
+      const saldoPendiente = Math.max(0, totalVenta - totalPagado);
+      this.detailForm = { formaPago: 'Efectivo', monto: saldoPendiente, referencia: '' };
     }
   }
 
@@ -731,9 +737,21 @@ abrirModalPrecios(item: any) {
     this.detallePago.forEach((item: { item: any; }, idx: number) => item.item = idx + 1);
   }
 
+  /** Al abrir el modal Forma de pago: selecciona Efectivo y pone el monto = deuda total. */
+  abrirModalPago(): void {
+    const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+    if (efectivo) {
+      this.formaPagoSeleccionada = { ...efectivo };
+    }
+    const total = Number(this.ventas.total) || 0;
+    this.detailForm.monto = total;
+    this.pagaCon = total;
+    this.calcularVuelto();
+  }
+
   guardarPago(): void {
     const modalEl = document.getElementById('modalPago');
-    const inst = bootstrap.Modal.getInstance(modalEl);
+    const inst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
     inst?.hide();
   }
 
