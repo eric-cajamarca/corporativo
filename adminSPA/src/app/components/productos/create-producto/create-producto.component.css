@@ -8,6 +8,38 @@
   background: #f5f7fa;
 }
 
+/* Dentro del modal: no forzar altura para que el footer sea visible */
+:host-context(.modal-content) {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: transparent;
+}
+
+:host-context(.modal-content) .modal-header {
+  flex-shrink: 0;
+}
+
+:host-context(.modal-content) .modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 60vh;
+}
+
+:host-context(.modal-content) .modal-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 1px solid #dee2e6;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  gap: 0.5rem;
+}
+
 .main-content {
   margin-left: 260px;
   margin-top: 64px;

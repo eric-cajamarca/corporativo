@@ -1,18 +1,29 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, signal } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ComprasService } from '../../../services/compras.service';
+import { ImpuestoService } from '../../../services/impuesto.service';
+import { ComprobanteService } from '../../../services/comprobante.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { Impuesto } from '../../../interfaces/impuesto.interface';
+
+declare var iziToast: any;
 
 @Component({
   selector: 'app-index-configuracion',
-  imports: [FormsModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, CommonModule, TopnavComponent, SidebarComponent],
   templateUrl: './index-configuracion.component.html',
   styleUrl: './index-configuracion.component.css'
 })
 export class IndexConfiguracionComponent implements OnInit {
+  @ViewChild('modalImpuestoForm') modalImpuestoRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('modalComprobantes') modalComprobantesRef?: ElementRef<HTMLDivElement>;
+
+  /** Estado del sidebar (colapsado/expandido) para layout y topnav */
+  sidebarCollapsed = signal<boolean>(false);
 
   // Configuración general
   public configuracion = {
@@ -72,9 +83,30 @@ export class IndexConfiguracionComponent implements OnInit {
   public correlativoGuardando = false;
   public correlativoMensaje: string | null = null;
 
+  /** Impuestos */
+  impuestos: Impuesto[] = [];
+  impuestosCargando = false;
+  impuestoGuardando = false;
+  impuestoEditando: Impuesto | null = null;
+  impuestoForm = {
+    descripcion: '',
+    porcentaje: 0,
+    pIncluyeIGV: false,
+    estado: true
+  };
+
+  /** Comprobantes (series y correlativos) */
+  comprobantes: Array<{ idComprobante: number; codigo: string; nombre: string; serie: string; numero: number; usarEnVenta: boolean; usarEnCompra: boolean }> = [];
+  comprobantesCargando = false;
+  comprobanteGuardandoId: number | null = null;
+  comprobanteCreando = false;
+  nuevoComprobante = { codigo: '', nombre: '', serie: '', numero: 1, usarEnVenta: true, usarEnCompra: true };
+
   constructor(
     private _adminService: AdminService,
     private _comprasService: ComprasService,
+    private _impuestoService: ImpuestoService,
+    private _comprobanteService: ComprobanteService,
     private _router: Router
   ) {}
 
@@ -166,10 +198,234 @@ export class IndexConfiguracionComponent implements OnInit {
     }
   }
 
-  navigateTo(module: string): void {
-    // Aquí implementaríamos la navegación a diferentes módulos
-    console.log('Navegando a:', module);
+  /** Carga la lista de impuestos de la empresa */
+  cargarImpuestos(): void {
+    this.impuestosCargando = true;
+    this._impuestoService.obtenerTodos().subscribe({
+      next: (response) => {
+        const list = response?.data ?? [];
+        this.impuestos = list.map((i: { idImpuesto: number; descripcion: string; porcentaje: number; estado?: boolean | number; pIncluyeIGV?: boolean | number }) => ({
+          ...i,
+          estado: !!(i.estado === true || i.estado === 1),
+          pIncluyeIGV: !!(i.pIncluyeIGV === true || i.pIncluyeIGV === 1)
+        })) as Impuesto[];
+        this.impuestosCargando = false;
+      },
+      error: () => {
+        this.impuestosCargando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudieron cargar los impuestos.' });
+        }
+      }
+    });
+  }
 
+  /** Abre el modal para crear un nuevo impuesto */
+  abrirModalCrearImpuesto(): void {
+    this.impuestoEditando = null;
+    this.impuestoForm = { descripcion: '', porcentaje: 0, pIncluyeIGV: false, estado: true };
+  }
+
+  /** Abre el modal para editar un impuesto */
+  abrirModalEditarImpuesto(imp: Impuesto): void {
+    this.impuestoEditando = imp;
+    this.impuestoForm = {
+      descripcion: imp.descripcion,
+      porcentaje: imp.porcentaje ?? 0,
+      pIncluyeIGV: !!imp.pIncluyeIGV,
+      estado: !!imp.estado
+    };
+  }
+
+  /** Cierra el modal de impuesto (Bootstrap 5) */
+  private cerrarModalImpuesto(): void {
+    const el = this.modalImpuestoRef?.nativeElement;
+    if (el && typeof (window as any).bootstrap !== 'undefined') {
+      (window as any).bootstrap.Modal.getInstance(el)?.hide();
+    }
+  }
+
+  /** Guarda el impuesto (crear o actualizar) */
+  guardarImpuesto(): void {
+    const desc = (this.impuestoForm.descripcion || '').trim();
+    if (!desc) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Validación', message: 'La descripción es obligatoria.' });
+      }
+      return;
+    }
+    const payload = {
+      descripcion: desc,
+      porcentaje: this.impuestoForm.porcentaje ?? 0,
+      pIncluyeIGV: !!this.impuestoForm.pIncluyeIGV,
+      estado: !!this.impuestoForm.estado
+    };
+    this.impuestoGuardando = true;
+    if (this.impuestoEditando != null) {
+      this._impuestoService.actualizar(this.impuestoEditando.idImpuesto, payload).subscribe({
+        next: () => {
+          this.impuestoGuardando = false;
+          this.cerrarModalImpuesto();
+          this.cargarImpuestos();
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({ title: 'OK', message: 'Impuesto actualizado correctamente.' });
+          }
+        },
+        error: (err) => {
+          this.impuestoGuardando = false;
+          const msg = err?.error?.message || 'Error al actualizar el impuesto.';
+          if (typeof iziToast !== 'undefined') {
+            iziToast.error({ title: 'Error', message: msg });
+          }
+        }
+      });
+    } else {
+      this._impuestoService.crear(payload).subscribe({
+        next: () => {
+          this.impuestoGuardando = false;
+          this.cerrarModalImpuesto();
+          this.cargarImpuestos();
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({ title: 'OK', message: 'Impuesto registrado correctamente.' });
+          }
+        },
+        error: (err) => {
+          this.impuestoGuardando = false;
+          const msg = err?.error?.message || 'Error al crear el impuesto.';
+          if (typeof iziToast !== 'undefined') {
+            iziToast.error({ title: 'Error', message: msg });
+          }
+        }
+      });
+    }
+  }
+
+  /** Cambia el estado activo/inactivo del impuesto */
+  cambiarEstadoImpuesto(imp: Impuesto): void {
+    const nuevoEstado = !imp.estado;
+    this._impuestoService.actualizarEstado(imp.idImpuesto, nuevoEstado).subscribe({
+      next: () => {
+        this.cargarImpuestos();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: nuevoEstado ? 'Impuesto activado.' : 'Impuesto desactivado.' });
+        }
+      },
+      error: (err) => {
+        const msg = err?.error?.message || 'Error al cambiar el estado.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg });
+        }
+      }
+    });
+  }
+
+  /** Abre el modal de comprobantes y carga la lista */
+  abrirModalComprobantes(): void {
+    this.nuevoComprobante = { codigo: '', nombre: '', serie: '', numero: 1, usarEnVenta: true, usarEnCompra: true };
+    this.cargarComprobantes();
+  }
+
+  /** Carga comprobantes de la empresa */
+  cargarComprobantes(): void {
+    this.comprobantesCargando = true;
+    this._comprobanteService.obtener_comprobantes().subscribe({
+      next: (response) => {
+        this.comprobantes = (response?.data ?? []).map((c: any) => ({
+          idComprobante: c.idComprobante,
+          codigo: c.codigo ?? '',
+          nombre: c.nombre ?? '',
+          serie: c.serie ?? '',
+          numero: c.numero != null ? Number(c.numero) : 0,
+          usarEnVenta: c.usarEnVenta !== false,
+          usarEnCompra: c.usarEnCompra !== false
+        }));
+        this.comprobantesCargando = false;
+      },
+      error: () => {
+        this.comprobantesCargando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudieron cargar los comprobantes.' });
+        }
+      }
+    });
+  }
+
+  /** Guarda serie, número y flags de un comprobante (no modifica código SUNAT) */
+  guardarComprobante(comp: { idComprobante: number; serie: string; numero: number; usarEnVenta: boolean; usarEnCompra: boolean }): void {
+    this.comprobanteGuardandoId = comp.idComprobante;
+    this._comprobanteService.actualizar(comp.idComprobante, {
+      serie: comp.serie?.trim() || '',
+      numero: comp.numero,
+      usarEnVenta: comp.usarEnVenta,
+      usarEnCompra: comp.usarEnCompra
+    }).subscribe({
+      next: () => {
+        this.comprobanteGuardandoId = null;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Comprobante actualizado.' });
+        }
+      },
+      error: (err) => {
+        this.comprobanteGuardandoId = null;
+        const msg = err?.error?.message || 'Error al actualizar.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg });
+        }
+      }
+    });
+  }
+
+  /** Crea un nuevo comprobante para la empresa */
+  agregarComprobante(): void {
+    const cod = (this.nuevoComprobante.codigo || '').trim();
+    const nom = (this.nuevoComprobante.nombre || '').trim();
+    const ser = (this.nuevoComprobante.serie || '').trim();
+    if (!cod) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Validación', message: 'El código (SUNAT) es obligatorio.' });
+      }
+      return;
+    }
+    if (!nom) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Validación', message: 'El nombre es obligatorio.' });
+      }
+      return;
+    }
+    if (!ser) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Validación', message: 'La serie es obligatoria.' });
+      }
+      return;
+    }
+    const numero = this.nuevoComprobante.numero != null ? this.nuevoComprobante.numero : 1;
+    const usarEnVenta = this.nuevoComprobante.usarEnVenta !== false;
+    const usarEnCompra = this.nuevoComprobante.usarEnCompra !== false;
+    this.comprobanteCreando = true;
+    this._comprobanteService.crear({ codigo: cod, nombre: nom, serie: ser, numero, usarEnVenta, usarEnCompra }).subscribe({
+      next: () => {
+        this.comprobanteCreando = false;
+        this.nuevoComprobante = { codigo: '', nombre: '', serie: '', numero: 1, usarEnVenta: true, usarEnCompra: true };
+        this.cargarComprobantes();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Comprobante agregado.' });
+        }
+      },
+      error: (err) => {
+        this.comprobanteCreando = false;
+        const msg = err?.error?.message || 'Error al crear comprobante.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg });
+        }
+      }
+    });
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
+
+  navigateTo(module: string): void {
     switch (module) {
       case 'dashboard':
         this._router.navigate(['/home']);

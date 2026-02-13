@@ -45,6 +45,7 @@ const analisisRoutes = require('./routes/analisis');
 const permisosRoutes = require('./routes/permisos');
 const gestoresRoutes = require('./routes/gestores');
 const usuarioSucursalRoutes = require('./routes/usuarioSucursal');
+const impuestosRoutes = require('./routes/impuestos');
 
 
 const app = express();
@@ -159,6 +160,7 @@ app.use('/api', tablasSunatRoutes);
 app.use('/api', categoriaRoutes);
 app.use('/api', presentacionRoutes);
 app.use('/api', marcaRoutes);
+app.use('/api', impuestosRoutes);
 app.use('/api', unidporcajaRoutes);
 app.use('/api', preciosVRoutes);
 app.use('/api', proveedoresRoutes);

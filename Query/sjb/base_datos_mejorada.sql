@@ -269,6 +269,22 @@ CREATE TABLE Marcas (
 );
 GO
 
+-- Tabla de impuestos por empresa (IGV, EXO, etc.)
+CREATE TABLE Impuestos (
+    idImpuesto INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    descripcion VARCHAR(50) NOT NULL,
+    estado BIT NOT NULL DEFAULT 1,
+    porcentaje DECIMAL(5,2) NOT NULL DEFAULT 0,
+    pIncluyeIGV BIT NOT NULL DEFAULT 0,
+    fCreacion DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
+    CONSTRAINT UQ_Impuestos_EmpresaDescripcion UNIQUE (idEmpresa, descripcion)
+);
+GO
+CREATE INDEX IX_Impuestos_EmpresaEstado ON Impuestos(idEmpresa, estado);
+GO
+
 -- Tabla de clientes mejorada
 CREATE TABLE Clientes (
     idCliente INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
@@ -563,9 +579,11 @@ CREATE TABLE Comprobantes (
     serie VARCHAR(4) NOT NULL,
     numero INT NOT NULL DEFAULT 0,
     activo BIT DEFAULT 1,
+    usarEnVenta BIT NOT NULL DEFAULT 1,
+    usarEnCompra BIT NOT NULL DEFAULT 1,
 
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-    CONSTRAINT UQ_Comprobantes_EmpresaSerie UNIQUE (idEmpresa, serie)
+    CONSTRAINT UQ_Comprobantes_EmpresaCodigo UNIQUE (idEmpresa, codigo)
 );
 GO
 

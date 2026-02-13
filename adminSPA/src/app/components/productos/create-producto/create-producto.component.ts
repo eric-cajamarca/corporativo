@@ -39,12 +39,12 @@ interface Sucursal {
   selector: 'app-create-producto',
   standalone: true,
   imports: [
-    CommonModule, 
-    FormsModule, 
-    ReactiveFormsModule, 
-    RouterModule, 
-    TopnavComponent, 
-    SidebarComponent
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    RouterModule,
+    TopnavComponent,
+    SidebarComponent,
   ],
   templateUrl: './create-producto.component.html',
   styleUrl: './create-producto.component.css'
@@ -175,8 +175,8 @@ export class CreateProductoComponent implements OnInit {
     });
 
     // Cargar sucursales
-    this.sucursalService.obtener_sucursales().subscribe({
-      next: (response) => {
+    this.sucursalService.obtener_sucursal_todos().subscribe({
+      next: (response: { data?: Sucursal[] }) => {
         this.sucursales = response.data || [];
         if (this.sucursales.length > 0) {
           this.loteData.idSucursal = this.sucursales[0].idSucursal;

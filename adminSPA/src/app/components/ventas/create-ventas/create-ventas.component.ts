@@ -185,7 +185,7 @@ export class CreateVentasComponent implements OnInit {
   });
 
   
-    this._comprobanteService.obtener_comprobantes().subscribe(
+    this._comprobanteService.obtenerComprobantesVenta().subscribe(
       (response) => {
         this.comprobantes = response.data;
         console.log('comprobantes',this.comprobantes);
@@ -279,74 +279,30 @@ export class CreateVentasComponent implements OnInit {
     this.productos_filtrados = this.stockSucursales_const;
   }
 
-//   cargarDatosComprobante(evt: Event): void {
-//   const valor = (evt.target as HTMLInputElement).value;   // boleta | factura | nota | cotizacion
-//   console.log('Comprobante seleccionado:', valor);
-//   const comp = this.comprobantes.find((c: { nombre: string; }) => c.nombre === valor);
-
-//   if (comp) {
-//     this.ventas.serie = comp.serie;
-//     this.ventas.numero = comp.numero;
-//     this.ventas.idComprobante = comp.idComprobante;
-//   }
-
-//   console.log('Datos del comprobante cargados en ventas:', this.ventas);
-// }
-
-// ...existing code...
-  cargarDatosComprobante(evt: Event): void {
-    // obtener valor desde el input (manteniendo el enfoque actual)
-    let valor = (evt.target as HTMLInputElement).value?.toString().trim();
-    console.log('Comprobante seleccionado:', valor);
-
-    if (!valor) {
-      // Si el input está vacío, limpiar campos relacionados
+  /**
+   * Carga serie y número desde la tabla Comprobantes (BD) al seleccionar un tipo de comprobante.
+   * Los comprobantes vienen de obtenerComprobantesVenta() (habilitados para ventas en Configuración).
+   */
+  cargarDatosComprobantePorId(idComprobante: string | number): void {
+    if (idComprobante == null || idComprobante === '') {
       this.ventas.serie = '';
-      this.ventas.numero = 0;
+      this.ventas.numero = '';
+      this.ventas.compVenta = '';
       this.ventas.idComprobante = '';
-      console.warn('Valor de comprobante vacío, se limpiaron los datos en ventas.');
       return;
     }
-
-    if(valor === 'nota'){
-      valor = 'nota de pedido';
-    }
-        
-    // switch (valor) {
-    //   case 'factura':
-    //     this.documento.idDocumento = '6';
-    //     break;
-    //   case 'boleta':
-    //   case 'cotizacion':
-    //   case 'nota de pedido':
-    //     this.documento.idDocumento = '1';
-    //     break;
-    //   default:
-    //     console.warn('Valor no reconocido:', valor);
-    // }
-
-    //this.ventas.idDocumento = this.documento.idDocumento;
-
-    // 1) Buscar por nombre (insensible a mayúsculas/espacios)
-    const compByName = this.comprobantes.find((c: any) =>
-      (c.nombre ?? '').toString().trim().toLowerCase() === valor.toLowerCase()
-    );
-
-    
-    const comp = compByName;
-
+    const id = Number(idComprobante);
+    const comp = this.comprobantes.find((c: any) => Number(c.idComprobante) === id);
     if (comp) {
-      this.ventas.idComprobante = comp.idComprobante ?? comp.id ?? '';
-      this.ventas.serie = comp.serie ?? '0000';
-      const nextNum = (comp.numero != null ? Number(comp.numero) : 0) + 1;
-      this.ventas.numero = String(nextNum).padStart(8, '0');
+      this.ventas.idComprobante = comp.idComprobante;
+      this.ventas.serie = comp.serie ?? '';
+      const siguienteNumero = (comp.numero != null ? Number(comp.numero) : 0) + 1;
+      this.ventas.numero = String(siguienteNumero).padStart(8, '0');
       this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
     } else {
-      // No se encontró: limpia o conserva según prefieras — aquí limpiamos para evitar datos inconsistentes
-      console.warn('No se encontró comprobante para el valor:', valor);
       this.ventas.serie = '';
-      this.ventas.numero = 0;
-      this.ventas.idComprobante = '';
+      this.ventas.numero = '';
+      this.ventas.compVenta = '';
     }
   }
 

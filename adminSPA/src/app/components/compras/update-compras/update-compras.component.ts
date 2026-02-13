@@ -185,7 +185,7 @@ export class UpdateComprasComponent {
     this.updateDetalleCompra = 0;
     this.updatecompra = 0;
 
-    this._comprobanteService.obtener_comprobantes().subscribe(
+    this._comprobanteService.obtenerComprobantesCompra().subscribe(
       response => {
         this.comprobantes = response.data;
         console.log(this.comprobantes);
