@@ -3,6 +3,7 @@ import { AdminService } from '../../../services/admin.service';
 import { ComprasService } from '../../../services/compras.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
+import { EmpresaService } from '../../../services/empresa.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -25,13 +26,14 @@ export class IndexConfiguracionComponent implements OnInit {
   /** Estado del sidebar (colapsado/expandido) para layout y topnav */
   sidebarCollapsed = signal<boolean>(false);
 
-  // Configuración general
+  // Configuración general (se llena con la empresa del usuario logueado)
   public configuracion = {
-    nombreEmpresa: 'AVE FENIX S.A.C.',
-    ruc: '20611688564',
-    telefono: '+51 999 999 999',
-    email: 'ventas@avefenix.com',
-    direccion: 'Av. Principal 123, Lima, Perú',
+    idEmpresa: '' as string | number,
+    nombreEmpresa: '',
+    ruc: '',
+    telefono: '',
+    email: '',
+    direccion: '',
     logo: '',
     moneda: 'PEN',
     idioma: 'es',
@@ -107,6 +109,7 @@ export class IndexConfiguracionComponent implements OnInit {
     private _comprasService: ComprasService,
     private _impuestoService: ImpuestoService,
     private _comprobanteService: ComprobanteService,
+    private _empresaService: EmpresaService,
     private _router: Router
   ) {}
 
@@ -115,6 +118,7 @@ export class IndexConfiguracionComponent implements OnInit {
   }
 
   cargarConfiguracion(): void {
+    this.cargarEmpresaYDireccion();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;
@@ -130,6 +134,36 @@ export class IndexConfiguracionComponent implements OnInit {
       error: () => {
         this.correlativo = { numero: 10000 };
       }
+    });
+  }
+
+  /** Carga datos de la empresa con la que el usuario inició sesión (mismo criterio que update-empresa). */
+  cargarEmpresaYDireccion(): void {
+    this._empresaService.getEmpresas_id().subscribe({
+      next: (response: { data?: any[] }) => {
+        const empresa = response?.data?.[0];
+        if (empresa) {
+          this.configuracion.idEmpresa = empresa.idEmpresa ?? '';
+          this.configuracion.nombreEmpresa = empresa.razon_Social ?? empresa.nombre_Comercial ?? empresa.alias ?? '';
+          this.configuracion.ruc = empresa.ruc ?? '';
+          this.configuracion.telefono = empresa.celular ?? '';
+          this.configuracion.email = empresa.correo ?? '';
+          this.configuracion.logo = empresa.logo ?? '';
+        }
+      },
+      error: () => {}
+    });
+    this._empresaService.getDireccionEmpresa_id().subscribe({
+      next: (response: { data?: any[] }) => {
+        const direcciones = response?.data ?? [];
+        const principal = direcciones.find((d: any) => d.principal === true || d.principal === 1);
+        const dir = principal ?? direcciones[0];
+        if (dir) {
+          const partes = [dir.direccion, dir.referencia].filter(Boolean);
+          this.configuracion.direccion = partes.length > 0 ? partes.join(', ') : '';
+        }
+      },
+      error: () => {}
     });
   }
 

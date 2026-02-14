@@ -517,7 +517,9 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   }
 };
 
-/** Arqueo dinámico: resumen por concepto (tipo movimiento) y por forma de pago para una fecha. */
+/** Arqueo dinámico: resumen por concepto (tipo movimiento) y por forma de pago para una fecha.
+ *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago (las formas realmente usadas en la venta).
+ *  Para el resto usa MovimientosCaja + MediosPago. */
 exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, fecha, idCaja) => {
   const fechaFiltro = fecha || new Date().toISOString().split('T')[0];
   const filtrarPorCaja = idCaja && idCaja !== 'TODAS';
@@ -527,7 +529,24 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, fecha, idCaja) => {
     .input("fecha", sql.Date, fechaFiltro);
   if (filtrarPorCaja) request.input("idCaja", sql.UniqueIdentifier, idCaja);
 
-  const result = await request.query(`
+  const sqlVentas = `
+    SELECT
+      tmc.nombre AS concepto,
+      tmc.tipo AS tipoOperacion,
+      ISNULL(fp.descripcion, 'Sin especificar') AS formaPago,
+      SUM(dpv.monto) AS importe
+    FROM MovimientosCaja mc
+    INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
+    INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
+    INNER JOIN DetallePagoVenta dpv ON dpv.idVenta = mc.idVenta
+    LEFT JOIN FormasPago fp ON fp.idFormaPago = dpv.idMediosPago
+    WHERE mc.idEmpresa = @idEmpresa
+      AND CONVERT(DATE, mc.fechaMovimiento) = @fecha
+      AND mc.idVenta IS NOT NULL
+      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+    GROUP BY tmc.nombre, tmc.tipo, fp.descripcion
+  `;
+  const sqlOtros = `
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
@@ -539,9 +558,16 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, fecha, idCaja) => {
     LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
       AND CONVERT(DATE, mc.fechaMovimiento) = @fecha
+      AND (mc.idVenta IS NULL OR mc.idVenta = 0)
       ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
     GROUP BY tmc.nombre, tmc.tipo, mp.descripcion
-    ORDER BY tmc.tipo DESC, tmc.nombre, formaPago
+  `;
+
+  const result = await request.query(`
+    (${sqlVentas})
+    UNION ALL
+    (${sqlOtros})
+    ORDER BY tipoOperacion DESC, concepto, formaPago
   `);
 
   return result.recordset;

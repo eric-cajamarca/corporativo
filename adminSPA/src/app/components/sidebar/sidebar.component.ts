@@ -268,12 +268,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Navega a una ruta
+   * Navega a una ruta. Nueva venta se abre en otra pestaña.
    */
   navigateTo(ruta: string | null): void {
     if (ruta) {
-      this.router.navigate([ruta]);
-      // Cerrar sidebar en móvil después de navegar
+      if (ruta === '/ventas/create') {
+        const segments = ruta.split('/').filter(Boolean);
+        const url = this.router.serializeUrl(this.router.createUrlTree(segments));
+        window.open(url, '_blank');
+      } else {
+        this.router.navigate([ruta]);
+      }
       this.closeMobileSidebar();
     }
   }

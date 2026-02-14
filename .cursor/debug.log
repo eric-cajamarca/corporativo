@@ -1,0 +1,6 @@
+{"location":"ventasController.js:crearVentaCompleta:entry","message":"crearVentaCompleta entry","data":{"idComprobante":15,"serie":"B001","numero":"00000004","detallesCount":1,"idSucursal":"6AC6C2DB-4669-40AC-A2F0-2ED4192082D9"},"timestamp":1771099206558,"hypothesisId":"H1-H5"}
+{"location":"ventasController.js:crearVentaCompleta:afterInsert","message":"venta insertada","data":{"idVenta":6},"timestamp":1771099206762,"hypothesisId":"H1"}
+{"location":"ventasController.js:crearVentaCompleta:entry","message":"crearVentaCompleta entry","data":{"idComprobante":15,"serie":"B001","numero":"00000004","detallesCount":1,"idSucursal":"6AC6C2DB-4669-40AC-A2F0-2ED4192082D9"},"timestamp":1771099251763,"hypothesisId":"H1-H5"}
+{"location":"ventasController.js:crearVentaCompleta:afterInsert","message":"venta insertada","data":{"idVenta":7},"timestamp":1771099251916,"hypothesisId":"H1"}
+{"location":"ventasController.js:crearVentaCompleta:entry","message":"crearVentaCompleta entry","data":{"idComprobante":15,"serie":"B001","numero":"00000004","detallesCount":1,"idSucursal":"6AC6C2DB-4669-40AC-A2F0-2ED4192082D9"},"timestamp":1771099287749,"hypothesisId":"H1-H5"}
+{"location":"ventasController.js:crearVentaCompleta:afterInsert","message":"venta insertada","data":{"idVenta":8},"timestamp":1771099287891,"hypothesisId":"H1"}

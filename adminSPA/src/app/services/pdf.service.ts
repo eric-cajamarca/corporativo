@@ -21,10 +21,21 @@ export class PdfService {
   constructor(private http: HttpClient) {}
 
   // Método principal - recibe datos estructurados
-  generarPdfDinamico(datos: PdfDatosDinamicos, tipo: string = 'reporte', fontSize: number = 10): Observable<Blob> {
+  generarPdfDinamico(datos: PdfDatosDinamicos, tipo: string = 'reporte', fontSize: number = 10, formato?: 'A4' | 'A5' | 'ticket'): Observable<Blob> {
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,
-      { datos, tipo, fontSize },
+      { datos, tipo, fontSize, formato: formato || 'A4' },
+      { responseType: 'blob' }
+    );
+  }
+
+  /** Genera PDF de comprobante de venta (A4, A5 o ticket). */
+  generarPdfComprobanteVenta(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
+    const payload = { ...datos };
+    if (nombreArchivo) payload.nombreArchivo = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'comprobante-venta', fontSize: formato === 'ticket' ? 8 : 10, formato },
       { responseType: 'blob' }
     );
   }

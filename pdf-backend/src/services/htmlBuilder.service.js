@@ -185,6 +185,95 @@ class HtmlBuilderService {
       <tbody>${filasHtml}</tbody>
     </table>`;
   }
+
+  /**
+   * Construye HTML para comprobante de venta (factura/boleta/ticket).
+   * @param {Object} params - empresa, venta, cliente, items, cantidadLetras
+   */
+  construirHtmlComprobanteVenta(params) {
+    const {
+      empresa = {},
+      venta = {},
+      cliente = {},
+      items = [],
+      cantidadLetras = ''
+    } = params;
+
+    const titulo = venta.nombreComprobante || 'Comprobante';
+    const compVenta = venta.compVenta || '';
+    const fEmision = venta.fEmision || '';
+    const subtotal = Number(venta.subtotal) || 0;
+    const igv = Number(venta.igv) || 0;
+    const descuentos = Number(venta.descuentos) || 0;
+    const total = Number(venta.total) || 0;
+
+    const filas = items.map(it => {
+      const desc = it.descripcion || it.desc || '';
+      const cant = Number(it.cantidad) != null ? Number(it.cantidad) : 0;
+      const pUnit = Number(it.pVenta) != null ? Number(it.pVenta) : Number(it.pUnit) || 0;
+      const importe = Number(it.total) != null ? Number(it.total) : (Number(it.subtotal) || cant * pUnit);
+      return `<tr><td>${cant}</td><td>${desc}</td><td class="text-end">${pUnit.toFixed(2)}</td><td class="text-end">${importe.toFixed(2)}</td></tr>`;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${titulo} ${compVenta}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 12px; color: #333; }
+    .header { border-bottom: 2px solid #0056b3; padding-bottom: 8px; margin-bottom: 12px; }
+    .logo { max-width: 80px; height: auto; }
+    .datos-empresa h3 { margin: 0 0 4px 0; color: #0056b3; font-size: 12px; }
+    .datos-empresa p { margin: 0; line-height: 1.3; font-size: 9px; }
+    .datos-cliente { margin: 10px 0; padding: 8px; border: 1px solid #ddd; background: #f9f9f9; font-size: 9px; }
+    table.detalle { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9px; }
+    table.detalle th, table.detalle td { border: 1px solid #ccc; padding: 4px 6px; }
+    table.detalle th { background: #f2f2f2; font-weight: bold; }
+    .text-end { text-align: right; }
+    .totales-table { width: 100%; margin-top: 8px; font-size: 9px; }
+    .totales-table td { padding: 2px 0; }
+    .totales-table td:last-child { text-align: right; font-weight: bold; }
+    .son { margin-top: 10px; font-size: 9px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <table style="width:100%; border:none;">
+      <tr>
+        <td style="border:none; width:28%; vertical-align:top;">
+          ${empresa.logo ? `<img src="${empresa.logo}" alt="Logo" class="logo">` : ''}
+        </td>
+        <td style="border:none; padding-left:10px;">
+          <div class="datos-empresa">
+            <h3>${empresa.nombre || ''}</h3>
+            <p>${empresa.ruc ? 'RUC: ' + empresa.ruc + '<br>' : ''}${empresa.direccion || ''}<br>${empresa.telefono || ''}</p>
+          </div>
+        </td>
+        <td style="border:none; text-align:right; vertical-align:top;">
+          <strong>${titulo}</strong><br>${compVenta}<br>Fecha: ${fEmision}
+        </td>
+      </tr>
+    </table>
+  </div>
+  <div class="datos-cliente">
+    <strong>Cliente:</strong> ${cliente.rSocial || cliente.razonSocial || ''}<br>
+    ${cliente.ruc ? 'RUC: ' + cliente.ruc + '<br>' : ''}${cliente.direccion || ''}
+  </div>
+  <table class="detalle">
+    <thead><tr><th>Cant.</th><th>Descripción</th><th class="text-end">P. Unit.</th><th class="text-end">Importe</th></tr></thead>
+    <tbody>${filas}</tbody>
+  </table>
+  <table class="totales-table">
+    <tr><td>Subtotal</td><td>${subtotal.toFixed(2)}</td></tr>
+    <tr><td>IGV</td><td>${igv.toFixed(2)}</td></tr>
+    <tr><td>Descuentos</td><td>${descuentos.toFixed(2)}</td></tr>
+    <tr><td><strong>Total S/</strong></td><td><strong>${total.toFixed(2)}</strong></td></tr>
+  </table>
+  <div class="son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+</body>
+</html>`;
+  }
 }
 
 module.exports = new HtmlBuilderService();

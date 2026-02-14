@@ -220,15 +220,15 @@
                           <td>
                             <div class="btn-group btn-group-sm">
                               <button type="button" class="btn btn-outline-primary" (click)="abrirModalEditarImpuesto(imp)" data-bs-toggle="modal" data-bs-target="#modalImpuestoForm" title="Editar">
-                                <i class="fas fa-edit"></i>
+                                <i class="bi bi-pencil"></i>
                               </button>
                               @if (imp.estado) {
                                 <button type="button" class="btn btn-outline-warning" (click)="cambiarEstadoImpuesto(imp)" title="Desactivar">
-                                  <i class="fas fa-toggle-on"></i>
+                                  <i class="bi bi-toggle-on"></i>
                                 </button>
                               } @else {
                                 <button type="button" class="btn btn-outline-success" (click)="cambiarEstadoImpuesto(imp)" title="Activar">
-                                  <i class="fas fa-toggle-off"></i>
+                                  <i class="bi bi-toggle-off"></i>
                                 </button>
                               }
                             </div>

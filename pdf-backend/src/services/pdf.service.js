@@ -1,6 +1,12 @@
 const puppeteer = require('puppeteer');
 
-async function generatePdfFromHtml(html, fontSize = 11) {
+/**
+ * Genera PDF desde HTML.
+ * @param {string} html - HTML del contenido
+ * @param {number} fontSize - Tamaño de fuente base
+ * @param {string} formato - 'A4' | 'A5' | 'ticket' (ticket = 80mm de ancho)
+ */
+async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
   let browser;
   try {
     browser = await puppeteer.launch({
@@ -26,12 +32,20 @@ async function generatePdfFromHtml(html, fontSize = 11) {
 
     await page.setContent(wrappedHtml, { waitUntil: 'networkidle0' });
 
-    return await page.pdf({
-      format: 'A4',
+    const isTicket = String(formato).toLowerCase() === 'ticket';
+    const pdfOptions = {
       printBackground: true,
-      margin: { top: '0.5cm', bottom: '0.5cm', left: '1cm', right: '1cm' },
-      displayHeaderFooter: true
-    });
+      margin: isTicket ? { top: '0.3cm', bottom: '0.3cm', left: '0.3cm', right: '0.3cm' } : { top: '0.5cm', bottom: '0.5cm', left: '1cm', right: '1cm' },
+      displayHeaderFooter: !isTicket
+    };
+    if (isTicket) {
+      pdfOptions.width = '80mm';
+      pdfOptions.height = '297mm';
+    } else {
+      pdfOptions.format = formato === 'A5' ? 'A5' : 'A4';
+    }
+
+    return await page.pdf(pdfOptions);
 
   } finally {
     if (browser) await browser.close();

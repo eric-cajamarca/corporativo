@@ -23,6 +23,10 @@ import { VentasService } from '../../../services/ventas.service';
 import { CajaService } from '../../../services/caja.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { FactilizaService } from '../../../services/factiliza.service';
+import { ImpuestoService } from '../../../services/impuesto.service';
+import { Impuesto } from '../../../interfaces/impuesto.interface';
+import { VentaSesionService } from '../../../services/venta-sesion.service';
+import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -52,7 +56,8 @@ export class CreateVentasComponent implements OnInit {
   public marcas: any = [];
   public stockSucursales: any = [];
   private stockSucursales_const: any = [];
-  private TASA_IGV: number = 0.18;
+  /** Impuestos activos de la empresa (tabla Impuestos por idEmpresa). El footer y el total se calculan solo con estos. */
+  public impuestosActivosEmpresa: Impuesto[] = [];
   public sucursales: Sucursal[] = [];
   public carrito: any[] = [];
   public buscadorModal: any;
@@ -109,6 +114,12 @@ export class CreateVentasComponent implements OnInit {
     observacion: '',
     total: 0,
     igv: 0,
+    isc: 0,
+    /** Detalle de impuestos aplicados (sin IGV; IGV va en línea aparte siempre visible). */
+    impuestosDetalle: [] as { descripcion: string; porcentaje: number; monto: number; pIncluyeIGV: boolean }[],
+    /** IGV: siempre visible. Si la empresa está afecta se calcula; si no, 0. */
+    igvPorcentaje: 0,
+    igvMonto: 0,
     exonerado: 0,
     gratuito: 0,
     otrosCargos: 0,
@@ -117,6 +128,10 @@ export class CreateVentasComponent implements OnInit {
   };
 
   public direccionCliente: any;
+
+  /** Ventas provisionales: sesiones guardadas en localStorage para recuperar tras apagón. */
+  sesionesGuardadas: VentaSesion[] = [];
+  mostrarModalRecuperar = false;
 
   constructor(
     private _productoService: ProductoService,
@@ -131,7 +146,9 @@ export class CreateVentasComponent implements OnInit {
     private modalService: ModalService,
     private ventasService: VentasService,
     private cajaService: CajaService,
-    private _factilizaService: FactilizaService
+    private _factilizaService: FactilizaService,
+    private _impuestoService: ImpuestoService,
+    private ventaSesionService: VentaSesionService
   ) {}
 
   onSidebarToggle(collapsed: boolean): void {
@@ -164,7 +181,93 @@ export class CreateVentasComponent implements OnInit {
     const collapsed = localStorage.getItem('sidebarCollapsed');
     if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargarDatos();
+    this.revisarVentasProvisionales();
   }
+
+  /** Tras cargar datos, revisa si hay ventas provisionales y ofrece recuperarlas. */
+  revisarVentasProvisionales(): void {
+    if (!this.ventaSesionService.tieneSesionesGuardadas()) return;
+    this.sesionesGuardadas = this.ventaSesionService.getSesionesGuardadas();
+    this.mostrarModalRecuperar = true;
+    setTimeout(() => {
+      const el = document.getElementById('modalRecuperar');
+      if (el) bootstrap.Modal.getOrCreateInstance(el).show();
+    }, 300);
+  }
+
+  /** Recupera una venta provisional por id y cierra el modal. */
+  recuperarSesion(sesion: VentaSesion): void {
+    const modalEl = document.getElementById('modalRecuperar');
+    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+    this.ventaSesionService.cargarSesion(sesion.id);
+    this.carrito = Array.isArray(sesion.carrito) ? sesion.carrito.map((x: any) => ({ ...x })) : [];
+    this.ventas = sesion.ventas ? { ...sesion.ventas } : this.ventas;
+    this.detallePago = Array.isArray(sesion.detallePago) ? sesion.detallePago.map((x: any) => ({ ...x })) : [];
+    this.cliente = sesion.cliente ? { ...sesion.cliente } : this.cliente;
+    this.pagaCon = Number(sesion.pagaCon) || 0;
+    this.vuelto = Number(sesion.vuelto) || 0;
+    this.mostrarModalRecuperar = false;
+    this.sesionesGuardadas = [];
+    this.actualizaTotales();
+  }
+
+  /** Descarta todas las ventas provisionales y cierra el modal. */
+  descartarTodasLasProvisionales(): void {
+    const modalEl = document.getElementById('modalRecuperar');
+    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+    this.ventaSesionService.descartarTodas();
+    this.mostrarModalRecuperar = false;
+    this.sesionesGuardadas = [];
+  }
+
+  /** Cierra el modal de recuperación sin elegir (sigue con venta nueva). */
+  cerrarModalRecuperar(): void {
+    const modalEl = document.getElementById('modalRecuperar');
+    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+    this.mostrarModalRecuperar = false;
+    this.sesionesGuardadas = [];
+  }
+
+  /** Guarda el estado actual en la sesión activa (localStorage). No guarda idEmpresa. */
+  guardarEstadoProvisional(): void {
+    const tieneDatos = this.carrito.length > 0 || this.ventas.idComprobante || (this.cliente?.idCliente && this.cliente.idCliente !== '');
+    if (!tieneDatos) return;
+    if (!this.ventaSesionService.getSesionActivaId()) {
+      this.ventaSesionService.obtenerOCrearSesionActiva();
+    }
+    this.ventaSesionService.actualizarSesionActiva({
+      carrito: this.carrito.map((x: any) => ({ ...x })),
+      ventas: { ...this.ventas },
+      detallePago: this.detallePago.map((x: any) => ({ ...x })),
+      cliente: { ...this.cliente },
+      pagaCon: this.pagaCon,
+      vuelto: this.vuelto
+    });
+  }
+
+  /** Anula la venta actual (elimina de provisionales) y deja pantalla lista para nueva venta. */
+  anularVenta(): void {
+    if (!confirm('¿Anular esta venta? Se eliminará de las ventas provisionales.')) return;
+    this.ventaSesionService.eliminarSesionActiva();
+    this.limpiarVenta();
+  }
+  /** Consulta productos para refrescar stock (p. ej. tras registrar una venta). */
+  cargarProductos(): void {
+    this._productoService.obtenerProductosTodos().subscribe({
+      next: (response: any) => {
+        if (response?.data != null) {
+          this.productos = response.data;
+          this.productos_const = this.productos;
+          this.stockSucursales_const = this.productos;
+          this.productos_filtrados = this.stockSucursales_const;
+        }
+      },
+      error: (err) => {
+        console.error('Error al cargar productos:', err);
+      }
+    });
+  }
+
   // Función para cargar todos los productos
   cargarDatos(){
     this._productoService.obtenerProductosTodos().subscribe(
@@ -195,7 +298,15 @@ export class CreateVentasComponent implements OnInit {
     }
   });
 
-  
+    // Impuestos a los que está sujeta la empresa (activos). El footer y el total se calculan solo con estos.
+    this._impuestoService.obtenerTodos().subscribe({
+      next: (res) => {
+        const list: Impuesto[] = res.data || [];
+        this.impuestosActivosEmpresa = list.filter((i: Impuesto) => !!i.estado);
+      },
+      error: () => {}
+    });
+
     this._comprobanteService.obtenerComprobantesVenta().subscribe(
       (response) => {
         this.comprobantes = response.data;
@@ -295,7 +406,7 @@ export class CreateVentasComponent implements OnInit {
   private readonly ID_DOC_DNI = '1';
 
   /**
-   * Carga serie y número desde la tabla Comprobantes (BD) al seleccionar un tipo de comprobante.
+   * Consulta el número correlativo en BD al seleccionar el comprobante y asigna serie/número.
    * Ajusta el tipo de documento: Factura (01) = RUC, otros = DNI.
    */
   cargarDatosComprobantePorId(idComprobante: string | number): void {
@@ -304,22 +415,41 @@ export class CreateVentasComponent implements OnInit {
       this.ventas.numero = '';
       this.ventas.compVenta = '';
       this.ventas.idComprobante = '';
+      this.guardarEstadoProvisional();
       return;
     }
     const id = Number(idComprobante);
-    const comp = this.comprobantes.find((c: any) => Number(c.idComprobante) === id);
-    if (comp) {
-      this.ventas.idComprobante = comp.idComprobante;
-      this.ventas.serie = comp.serie ?? '';
-      const siguienteNumero = (comp.numero != null ? Number(comp.numero) : 0) + 1;
-      this.ventas.numero = String(siguienteNumero).padStart(8, '0');
-      this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
-      this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
-    } else {
-      this.ventas.serie = '';
-      this.ventas.numero = '';
-      this.ventas.compVenta = '';
-    }
+    this.ventas.idComprobante = idComprobante as any;
+    this._comprobanteService.obtenerComprobantesVenta().subscribe({
+      next: (response) => {
+        const lista = response.data || [];
+        this.comprobantes = lista;
+        const comp = lista.find((c: any) => Number(c.idComprobante) === id);
+        if (comp) {
+          this.ventas.serie = comp.serie ?? '';
+          const siguienteNumero = (comp.numero != null ? Number(comp.numero) : 0) + 1;
+          this.ventas.numero = String(siguienteNumero).padStart(8, '0');
+          this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
+          this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
+        } else {
+          this.ventas.serie = '';
+          this.ventas.numero = '00000001';
+          this.ventas.compVenta = (this.ventas.serie ? this.ventas.serie + '-' : '') + this.ventas.numero;
+        }
+        this.guardarEstadoProvisional();
+      },
+      error: () => {
+        const comp = this.comprobantes.find((c: any) => Number(c.idComprobante) === id);
+        if (comp) {
+          this.ventas.serie = comp.serie ?? '';
+          const siguienteNumero = (comp.numero != null ? Number(comp.numero) : 0) + 1;
+          this.ventas.numero = String(siguienteNumero).padStart(8, '0');
+          this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
+          this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
+        }
+        this.guardarEstadoProvisional();
+      }
+    });
   }
 
   seleccionaProducto(prod: any): void {
@@ -411,29 +541,69 @@ export class CreateVentasComponent implements OnInit {
 
 
   actualizaTotales(): void {
-    //quiero recorrer el carrito y sumar el subtotal, igv y total
-    console.log('Calculando totales para el carrito:', this.carrito);
-    console.log('Estado actual de ventas antes de totales:', this.searchCodigo);
-
     this.ventas.subTotal = 0;
+    this.ventas.descuentos = 0;
+    this.ventas.exonerado = 0;
     this.ventas.igv = 0;
+    this.ventas.isc = 0;
+    this.ventas.impuestosDetalle = [];
+    this.ventas.igvPorcentaje = 0;
+    this.ventas.igvMonto = 0;
     this.ventas.total = 0;
-    console.log('aqui muetro el carrito para ver si pventa se modifico', this.carrito);
 
     this.carrito.forEach(item => {
-      const subtotalItem = item.pVenta * item.cantidad;
+      const cant = Number(item.cantidad) || 0;
+      const pVenta = Number(item.pVenta) || 0;
+      const subtotalItem = Math.round(pVenta * cant * 100) / 100;
       this.ventas.subTotal += subtotalItem;
-      console.log(`Subtotal para ${item.descripcion}: ${subtotalItem}`);
+      const precioPrincipal = this.obtenerPrecioPrincipal(item);
+      if (precioPrincipal > pVenta) {
+        this.ventas.descuentos += Math.round((precioPrincipal - pVenta) * cant * 100) / 100;
+      }
     });
-    console.log('Subtotal calculado:', this.ventas.subTotal);
 
-    this.ventas.igv = this.ventas.subTotal * this.TASA_IGV;
-    this.ventas.total = this.ventas.subTotal + this.ventas.igv;
-    console.log('Totales actualizados:', {
-      subTotal: this.ventas.subTotal,
-      igv: this.ventas.igv,
-      total: this.ventas.total
+    this.ventas.subTotal = Math.round(this.ventas.subTotal * 100) / 100;
+    this.ventas.descuentos = Math.round(this.ventas.descuentos * 100) / 100;
+    const neto = Math.round((this.ventas.subTotal - this.ventas.descuentos) * 100) / 100;
+
+    const tieneIGV = this.impuestosActivosEmpresa.some((i: Impuesto) => (i.descripcion || '').toUpperCase().includes('IGV'));
+    if (tieneIGV) {
+      this.ventas.exonerado = 0;
+    } else {
+      this.ventas.exonerado = neto;
+    }
+    const baseGravada = neto;
+
+    const igvImpuesto = this.impuestosActivosEmpresa.find((i: Impuesto) => (i.descripcion || '').toUpperCase().includes('IGV'));
+    if (igvImpuesto) {
+      this.ventas.igvPorcentaje = Number(igvImpuesto.porcentaje) || 0;
+      this.ventas.igvMonto = Math.round(baseGravada * (this.ventas.igvPorcentaje / 100) * 100) / 100;
+      const pIncluyeIGV = !!igvImpuesto.pIncluyeIGV;
+      if (!pIncluyeIGV) {
+        this.ventas.igv = this.ventas.igvMonto;
+      }
+    }
+
+    const otrosImpuestos = this.impuestosActivosEmpresa.filter((i: Impuesto) => {
+      const d = (i.descripcion || '').toUpperCase();
+      return !d.includes('IGV') && d !== 'EXO';
     });
+    let totalImpuestosASumar = this.ventas.igv;
+    this.ventas.impuestosDetalle = otrosImpuestos.map((imp: Impuesto) => {
+      const porcentaje = Number(imp.porcentaje) || 0;
+      const monto = Math.round(baseGravada * (porcentaje / 100) * 100) / 100;
+      const pIncluyeIGV = !!imp.pIncluyeIGV;
+      const esISC = (imp.descripcion || '').toUpperCase().includes('ISC');
+      if (esISC || !pIncluyeIGV) {
+        totalImpuestosASumar += monto;
+      }
+      return { descripcion: imp.descripcion || 'Impuesto', porcentaje, monto, pIncluyeIGV };
+    });
+    this.ventas.isc = this.ventas.impuestosDetalle
+      .filter((i: { descripcion: string }) => (i.descripcion || '').toUpperCase().includes('ISC'))
+      .reduce((s: number, i: { monto: number }) => s + i.monto, 0);
+    this.ventas.total = Math.round((baseGravada + totalImpuestosASumar) * 100) / 100;
+    this.guardarEstadoProvisional();
   }
 
   eliminarDelCarrito(index: number): void {
@@ -649,10 +819,21 @@ abrirModalPrecios(item: any) {
       celular: e.celular ?? '',
       condicion: e.condicion ?? 'ACTIVO'
     };
-    console.log('[Ventas] Datos del cliente (elegido de lista):', { event: e, cliente: this.cliente });
     const modalEl = document.getElementById('clientesModal');
     const modalInst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
     modalInst?.hide();
+    if (this.cliente.idCliente != null && this.cliente.idCliente !== '' && this.cliente.idCliente !== 0) {
+      this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+        next: (dirRes) => {
+          if (dirRes?.data && dirRes.data.length > 0) {
+            this.direccionCliente = dirRes.data[0];
+            this.cliente.direccion = (this.direccionCliente.direccion ?? '').toString();
+          }
+        },
+        error: () => {}
+      });
+    }
+    this.guardarEstadoProvisional();
   }
 
 
@@ -712,7 +893,7 @@ abrirModalPrecios(item: any) {
 
   // Agregar detalle (guardamos idFormaPago para enviar como idMediosPago al API)
   agregarDetalle(): void {
-    const monto = Number(this.detailForm.monto);
+    const monto = Math.round((Number(this.detailForm.monto) || 0) * 100) / 100;
     const idForma = this.formaPagoSeleccionada?.idFormaPago != null ? Number(this.formaPagoSeleccionada.idFormaPago) : 0;
     if (monto > 0 && idForma) {
       const desc = this.formasPago.find((f: FormaPago) => f.idFormaPago === idForma)?.descripcion || 'Pago';
@@ -723,28 +904,38 @@ abrirModalPrecios(item: any) {
         monto,
         referencia: this.detailForm.referencia || 'N/A'
       });
-      const totalVenta = Number(this.ventas.total) || 0;
-      const totalPagado = this.calcularTotalTabla();
-      const saldoPendiente = Math.max(0, totalVenta - totalPagado);
-      this.detailForm = { formaPago: 'Efectivo', monto: saldoPendiente, referencia: '' };
+      this.detailForm.referencia = '';
+      this.actualizarMontoSaldo();
     }
   }
 
   // Eliminar detalle
   eliminarDetalle(index: number): void {
     this.detallePago.splice(index, 1);
-    // Reenumerar items
     this.detallePago.forEach((item: { item: any; }, idx: number) => item.item = idx + 1);
+    this.actualizarMontoSaldo();
   }
 
-  /** Al abrir el modal Forma de pago: selecciona Efectivo y pone el monto = deuda total. */
+  /** Saldo pendiente = total venta − total ya registrado. Redondeado a 2 decimales. */
+  getSaldoPendiente(): number {
+    const total = Number(this.ventas.total) || 0;
+    const pendiente = Math.max(0, total - this.calcularTotalTabla());
+    return Math.round(pendiente * 100) / 100;
+  }
+
+  /** Actualiza el campo monto del detalle para que siempre muestre el saldo pendiente (2 decimales). */
+  actualizarMontoSaldo(): void {
+    this.detailForm.monto = this.getSaldoPendiente();
+  }
+
+  /** Al abrir el modal Forma de pago: selecciona Efectivo y pone el monto = saldo (total de la venta). */
   abrirModalPago(): void {
     const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
     if (efectivo) {
       this.formaPagoSeleccionada = { ...efectivo };
     }
+    this.actualizarMontoSaldo();
     const total = Number(this.ventas.total) || 0;
-    this.detailForm.monto = total;
     this.pagaCon = total;
     this.calcularVuelto();
   }
@@ -856,6 +1047,7 @@ abrirModalPrecios(item: any) {
       tCambio: 1,
       subtotal: Number(this.ventas.subTotal) || 0,
       igv: Number(this.ventas.igv) || 0,
+      isc: Number(this.ventas.isc) || 0,
       exonerado: Number(this.ventas.exonerado) || 0,
       gratuito: Number(this.ventas.gratuito) || 0,
       otrosCargos: Number(this.ventas.otrosCargos) || 0,
@@ -906,6 +1098,7 @@ abrirModalPrecios(item: any) {
       next: () => {
         this.loading = false;
         iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
+        this.ventaSesionService.eliminarSesionActiva();
         this.limpiarVenta();
       },
       error: (err) => {
@@ -921,15 +1114,59 @@ abrirModalPrecios(item: any) {
   limpiarVenta(): void {
     this.carrito = [];
     this.detallePago = [];
-    this.actualizaTotales();
     this.pagaCon = 0;
     this.vuelto = 0;
-    const comp = this.comprobantes.find((c: any) => String(c.idComprobante || c.id) === String(this.ventas.idComprobante));
-    if (comp) {
-      const nextNum = (comp.numero != null ? Number(comp.numero) : 0) + 1;
-      this.ventas.numero = String(nextNum).padStart(8, '0');
-      this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
+
+    // Reset modal comprobante
+    this.ventas = {
+      compVenta: '0000-00000000',
+      idComprobante: '',
+      serie: '0000',
+      numero: '00000000',
+      idSucursal: '',
+      idCliente: '',
+      idDocumento: '',
+      idMoneda: 1,
+      idEstadoPago: 2,
+      idMediosPago: '5',
+      fEmision: '',
+      fechaPago: '',
+      fVencimiento: '',
+      observacion: '',
+      total: 0,
+      igv: 0,
+      isc: 0,
+      impuestosDetalle: [],
+      igvPorcentaje: 0,
+      igvMonto: 0,
+      exonerado: 0,
+      gratuito: 0,
+      otrosCargos: 0,
+      subTotal: 0,
+      descuentos: 0,
+    };
+
+    // Reset información del cliente
+    this.cliente = {
+      idCliente: '',
+      idDocumento: '',
+      ruc: '',
+      rSocial: '',
+      direccion: '',
+      correo: '',
+      celular: '',
+      condicion: 'ACTIVO'
+    };
+    this.direccionCliente = undefined;
+
+    // Reset forma de pago seleccionada a efectivo si existe
+    const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+    if (efectivo) {
+      this.formaPagoSeleccionada = { ...efectivo };
     }
+
+    this.actualizaTotales();
+    this.cargarProductos();
   }
 }
 

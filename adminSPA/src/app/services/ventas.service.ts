@@ -61,4 +61,37 @@ export class VentasService {
       { headers, withCredentials: true }
     );
   }
+
+  /** Lista comprobantes de venta de la empresa (cabecera con comprobante y cliente). */
+  listarVentasEmpresa(): Observable<{ data: VentaListado[] }> {
+    return this._http.get<{ data: VentaListado[] }>(this.url + 'ventas/listar', { withCredentials: true });
+  }
+
+  /** Datos de una venta para generar comprobante PDF (empresa, venta, cliente, items). */
+  getComprobanteParaPdf(idVenta: number): Observable<{ data: ComprobantePdfData }> {
+    return this._http.get<{ data: ComprobantePdfData }>(
+      this.url + 'ventas/comprobante/' + idVenta,
+      { withCredentials: true }
+    );
+  }
+}
+
+export interface ComprobantePdfData {
+  venta: { compVenta: string; nombreComprobante?: string; fEmision: string; subtotal: number; igv: number; descuentos: number; total: number };
+  empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string };
+  cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string };
+  items: Array<{ descripcion: string; cantidad: number; pVenta: number; subtotal?: number; total: number }>;
+}
+
+export interface VentaListado {
+  idVenta: number;
+  compVenta: string;
+  fEmision: string;
+  total: number;
+  idEstadoSunat?: number;
+  serie?: string;
+  numero?: string;
+  nombreComprobante?: string;
+  clienteRazonSocial?: string;
+  clienteRuc?: string;
 }

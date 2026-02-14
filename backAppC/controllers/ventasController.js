@@ -2,6 +2,7 @@ const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const detalleVentaService = require('../services/detalle-ventas.service');
 const stockService = require('../services/stock.service');
+const ventasRepository = require('../repositories/ventas.repository');
 const dbConfig = require('../dbconfig');
 
 
@@ -65,22 +66,39 @@ const obtenerVentaPorId = async function (req, res) {
 
 const obtenerVentas = async function (req, res) {
   const idempresa = req.user.empresa;
-    console.log('idempresa :', idempresa);  
-    if(req.user) {
-        try {
-        let pool = await sql.connect(dbConfig);
-            let result = await pool
-            .request()
-            .input('idempresa', sql.UniqueIdentifier, idempresa)
-            .query('SELECT * FROM Ventas WHERE idEmpresa=@idempresa');
-            res.json(result.recordset);
-        } catch (error) {
-        console.error('Error al obtener las ventas:', error);
-        res.status(500).send('Error al obtener las ventas');
-        }
-    }else {
-      res.status(500).send({ message: 'No Access' });
+  if (!req.user || !idempresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const list = await ventasRepository.listarPorEmpresa(pool, idempresa);
+    res.json({ data: list });
+  } catch (error) {
+    console.error('Error al obtener las ventas:', error);
+    res.status(500).json({ error: 'Error al obtener las ventas' });
+  }
+};
+
+const obtenerComprobanteParaPdf = async function (req, res) {
+  const idVenta = req.params.idVenta;
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  if (!idVenta) {
+    return res.status(400).json({ error: 'idVenta es requerido' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa);
+    if (!data) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
     }
+    res.json({ data });
+  } catch (error) {
+    console.error('Error al obtener comprobante para PDF:', error);
+    res.status(500).json({ error: 'Error al obtener datos del comprobante' });
+  }
 };
 
 //en actualizar venta solo actualizare el estadoPEdido y estado sunat
@@ -171,12 +189,29 @@ const crearVentaCompleta = async (req, res) => {
   try {
     await transaction.begin();
 
+    let idSucursalStock = venta.idSucursal || null;
+    if (!idSucursalStock) {
+      const rsSuc = await transaction.request()
+        .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+        .query('SELECT TOP 1 idSucursal FROM Sucursal WHERE idEmpresa = @idEmpresa');
+      idSucursalStock = rsSuc.recordset?.[0]?.idSucursal || null;
+    }
+
     const ventaResult = await ventasRepository.insertar(transaction, venta, req.user.empresa, req.user.sub);
     const idVenta = ventaResult.recordset[0].idVenta;
 
+    const idSucursalParaStock = idSucursalStock || venta.idSucursal || null;
     for (const det of detalles) {
       await detalleVentaService.crearDetalle(transaction, { ...det, idVenta });
+      await stockService.descontarDesdeLotes(transaction, {
+        idEmpresa: req.user.empresa,
+        idSucursal: idSucursalParaStock,
+        idProducto: det.idProducto,
+        cantidad: det.cantidad
+      });
     }
+
+    await ventasRepository.actualizarNumeroComprobante(transaction, req.user.empresa, venta.idComprobante, venta.numero);
 
     if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
       await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);
@@ -394,6 +429,7 @@ module.exports = {
     crearVentaCompleta,
     obtenerVentaPorId,
     obtenerVentas,
+    obtenerComprobanteParaPdf,
     actualizarVenta,
     // detalle venta (crearDetalleVenta está comentado; se usa crearVentaCompleta)
     crearDetalleVenta_DescontarStock,

@@ -1,3 +1,34 @@
+/* ===== LAYOUT: sidebar + topnav ===== */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+.content-wrap {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ===== VARIABLES ROOT ===== */
 :root {
   --primary-gradient: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
@@ -10,10 +41,17 @@
 }
 
 /* ===== CONTAINER ===== */
+
+
 .ventas-container {
-  padding: 1.5rem;
-  min-height: 100vh;
+  padding: 0.5rem 0;
+  min-height: calc(100vh - 64px);
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.ventas-filtros-row .form-control-sm,
+.ventas-filtros-row .form-select-sm {
+  font-size: 0.875rem;
 }
 
 /* ===== HEADER ACTIONS ===== */
@@ -51,7 +89,7 @@
 
 .card-header {
   border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
-  padding: 1.25rem;
+  padding: 0;
   font-weight: 600;
 }
 
@@ -111,8 +149,12 @@
 }
 
 /* ===== TABLE ===== */
-.table-card {
-  margin-top: 1rem;
+
+
+.table-card .table,
+.table-card .table thead th,
+.table-card .table tbody td {
+  font-size: 13px;
 }
 
 .table {

@@ -24,6 +24,11 @@
               <i class="bi bi-cash-coin me-2"></i>Forma de pago
             </button>
           </div>
+          <button type="button" class="btn btn-outline-danger rounded-pill"
+                  (click)="anularVenta()"
+                  [disabled]="carrito.length === 0 && !ventas.idComprobante">
+            <i class="bi bi-x-circle me-2"></i>Anular venta
+          </button>
           <button type="button" class="btn btn-success btn-lg rounded-pill"
                   (click)="registrarVenta()"
                   [disabled]="loading || carrito.length === 0">
@@ -134,7 +139,7 @@
               <!-- <div class="cart-summary mt-3"> -->
                 <div class="row">
                   <div class="col-12 d-flex justify-content-end">
-                    <div class="bg-light rounded p-2" style="min-width:240px;">
+                    <div class="bg-light rounded p-2" style="min-width:260px;">
                       <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal:</span>
                         <span>S/ {{ ventas.subTotal | number:'1.2-2' }}</span>
@@ -147,17 +152,22 @@
                         <span>Exonerado:</span>
                         <span>S/ {{ ventas.exonerado | number:'1.2-2' }}</span>
                       </div>
-
-                      <div class="d-flex justify-content-between mb-1">
-                        <span>IGV (18%):</span>
-                        <span>S/ {{ ventas.igv | number:'1.2-2' }}</span>
+                      <div class="d-flex justify-content-between mb-2">
+                        <span>IGV{{ ventas.igvPorcentaje !== 0 ? ' (' + ventas.igvPorcentaje + '%)' : '' }}:</span>
+                        <span>S/ {{ ventas.igvMonto | number:'1.2-2' }}</span>
                       </div>
-
+                      @for (imp of ventas.impuestosDetalle; track imp.descripcion) {
+                        @if ((imp.descripcion || '').toUpperCase() !== 'EXO') {
+                          <div class="d-flex justify-content-between mb-2">
+                            <span>{{ imp.descripcion }}{{ imp.porcentaje !== 0 ? ' (' + imp.porcentaje + '%)' : '' }}:</span>
+                            <span>S/ {{ imp.monto | number:'1.2-2' }}</span>
+                          </div>
+                        }
+                      }
                       <hr class="my-2">
-
                       <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold">Total:</span>
-                        <span class="fw-bold">S/ {{ ventas.total}}</span>
+                        <span class="fw-bold">Importe Total:</span>
+                        <span class="fw-bold">S/ {{ ventas.total | number:'1.2-2' }}</span>
                       </div>
                     </div>
                   </div>
@@ -170,6 +180,40 @@
     </div>
   </div>
 </main>
+
+<!-- Modal: Recuperar ventas provisionales (tras apagón o cierre) -->
+<div class="modal fade" id="modalRecuperar" tabindex="-1" aria-labelledby="modalRecuperarLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title" id="modalRecuperarLabel">
+          <i class="bi bi-cloud-download me-2"></i>Ventas provisionales guardadas
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalRecuperar()" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Hay ventas en curso guardadas. Elija una para continuar o descarte todas para empezar de cero.</p>
+        <div class="list-group list-group-flush">
+          @for (s of sesionesGuardadas; track s.id) {
+            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                    (click)="recuperarSesion(s)">
+              <span>{{ s.nombre }}</span>
+              <span class="badge bg-secondary">{{ s.carrito.length }} ítems · S/ {{ (s.ventas?.total ?? 0) | number:'1.2-2' }}</span>
+            </button>
+          }
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalRecuperar()">
+          Continuar sin recuperar
+        </button>
+        <button type="button" class="btn btn-danger" (click)="descartarTodasLasProvisionales()">
+          Descartar todas
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ------------------------------------------------------------------ -->
 <!-- MODAL (fuera del card, al final del template) -->
@@ -323,7 +367,6 @@
             <select class="form-select" [(ngModel)]="ventas.idDocumento" [disabled]="!ventas.idComprobante">
               <option *ngFor="let d of documento" [value]="d.idDocumento">{{ d.nombre }}</option>
             </select>
-            <small class="text-muted" *ngIf="ventas.idComprobante">Según comprobante (Factura=RUC)</small>
           </div>
           <div class="col-md-4">
             <label class="form-label">Número</label>
@@ -338,7 +381,7 @@
           </div>
           <div class="col-md-2 d-flex align-items-end">
             <button type="button" class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#clientesModal">
-              <i class="bi bi-list me-1"></i>Elegir de lista
+              <i class="bi bi-list me-1"></i>Elegir
             </button>
           </div>
 
