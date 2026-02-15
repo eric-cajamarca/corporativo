@@ -27,7 +27,9 @@ export class ArqueoCajaComponent implements OnInit {
   sidebarCollapsed = signal<boolean>(false);
   
 
+  /** Fecha inicial (obligatoria). Si no hay fecha final, se consulta solo ese día. */
   public fecha: string = '';
+  public fechaFinal: string = '';
   public cajas: Caja[] = [];
   public cajaSeleccionada: string = 'TODAS';
   public usuarioSeleccionado: string = 'TODOS';
@@ -91,7 +93,15 @@ export class ArqueoCajaComponent implements OnInit {
     if (!this.fecha) {
       iziToast.warning({
         title: 'Advertencia',
-        message: 'Seleccione una fecha para consultar el arqueo'
+        message: 'Seleccione al menos la fecha inicial para consultar el arqueo'
+      });
+      return;
+    }
+    const usaRango = !!this.fechaFinal;
+    if (usaRango && this.fecha > this.fechaFinal) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'La fecha inicial no puede ser mayor que la fecha final'
       });
       return;
     }
@@ -103,7 +113,12 @@ export class ArqueoCajaComponent implements OnInit {
     this.totalIngresos = 0;
     this.totalEgresos = 0;
 
-    this.cajaService.obtenerArqueoDinamico(this.fecha, this.cajaSeleccionada).subscribe({
+    this.cajaService.obtenerArqueoDinamico({
+      fecha: !usaRango ? this.fecha : undefined,
+      fechaInicial: usaRango ? this.fecha : undefined,
+      fechaFinal: usaRango ? this.fechaFinal : undefined,
+      idCaja: this.cajaSeleccionada
+    }).subscribe({
       next: (response) => {
         const filas: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[] = response.data || [];
 

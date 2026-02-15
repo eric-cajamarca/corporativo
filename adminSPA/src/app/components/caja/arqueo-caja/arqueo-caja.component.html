@@ -8,19 +8,23 @@
       <div class="row">
         <div class="col-12">
           <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header bg-primary text-white text-center">
               <h5 class="card-title mb-0">
                 <i class="fas fa-balance-scale me-2"></i>
                 Arqueo de Caja
               </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body arqueo-card-body">
     
               <!-- Filtros superiores -->
-              <div class="row mb-3">
+              <div class="row mb-3 justify-content-center">
                 <div class="col-md-3 mb-2">
-                  <label class="form-label">Fecha:</label>
+                  <label class="form-label">Fecha inicial:</label>
                   <input type="date" class="form-control form-control-sm" [(ngModel)]="fecha">
+                </div>
+                <div class="col-md-3 mb-2">
+                  <label class="form-label">Fecha final:</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaFinal">
                 </div>
                 <div class="col-md-3 mb-2">
                   <label class="form-label">Caja:</label>
@@ -36,7 +40,9 @@
                     <option value="TODOS">::Todos::</option>
                   </select>
                 </div>
-                <div class="col-md-3 mb-2 d-flex align-items-end justify-content-end gap-1 flex-wrap">
+              </div>
+              <br>
+                <div class="col-12 mb-2 d-flex justify-content-center gap-1 flex-wrap">
                   <button class="btn btn-primary btn-sm" (click)="consultar()" [disabled]="loading">
                     <i class="fas fa-search"></i> Consultar
                   </button>
@@ -53,7 +59,6 @@
                     <i class="fas fa-times"></i> Cerrar
                   </button>
                 </div>
-              </div>
     
               <!-- Tabla de conceptos (dinámica: solo los que hubo ese día) -->
               <div class="table-responsive mb-4">

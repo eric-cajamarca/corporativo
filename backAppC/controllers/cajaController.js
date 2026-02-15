@@ -387,16 +387,21 @@ const obtenerResumenCajaDiario = async (req, res) => {
   }
 };
 
-// Arqueo dinámico: conceptos y formas de pago según movimientos reales del día (sin tabla fija)
+// Arqueo dinámico: conceptos y formas de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal)
 const obtenerArqueoDinamico = async (req, res) => {
   try {
-    const { fecha, idCaja } = req.query;
+    const { fecha, fechaInicial, fechaFinal, idCaja } = req.query;
     const pool = await sql.connect(dbConfig);
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!idEmpresa) {
       return res.status(403).send({ message: "No autorizado: falta empresa", data: undefined });
     }
-    const data = await CajaServices.obtenerArqueoDinamicoService(pool, req.user, fecha, idCaja || "TODAS");
+    const data = await CajaServices.obtenerArqueoDinamicoService(pool, req.user, {
+      fecha: fecha || undefined,
+      fechaInicial: fechaInicial || undefined,
+      fechaFinal: fechaFinal || undefined,
+      idCaja: idCaja || "TODAS"
+    });
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === "NO_ACCESS") {

@@ -149,8 +149,8 @@ exports.obtenerResumenCajaDiarioService = async (pool, user, fecha) => {
   return resumen;
 };
 
-exports.obtenerArqueoDinamicoService = async (pool, user, fecha, idCaja) => {
+exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
-  return CajaRepository.obtenerArqueoDinamicoRepo(pool, user.empresa, fecha, idCaja);
+  return CajaRepository.obtenerArqueoDinamicoRepo(pool, user.empresa, filtros);
 };

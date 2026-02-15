@@ -108,11 +108,15 @@ export class CajaService {
     });
   }
 
-  /** Arqueo dinámico: conceptos y formas de pago según movimientos reales (sin tabla fija). */
-  obtenerArqueoDinamico(fecha: string, idCaja?: string): Observable<any> {
+  /** Arqueo dinámico: conceptos y formas de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal). */
+  obtenerArqueoDinamico(filtros: { fecha?: string; fechaInicial?: string; fechaFinal?: string; idCaja?: string }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    let params = `?fecha=${fecha}`;
-    if (idCaja && idCaja !== 'TODAS') params += `&idCaja=${idCaja}`;
+    const q = new URLSearchParams();
+    if (filtros.fecha) q.append('fecha', filtros.fecha);
+    if (filtros.fechaInicial) q.append('fechaInicial', filtros.fechaInicial);
+    if (filtros.fechaFinal) q.append('fechaFinal', filtros.fechaFinal);
+    if (filtros.idCaja && filtros.idCaja !== 'TODAS') q.append('idCaja', filtros.idCaja);
+    const params = q.toString() ? '?' + q.toString() : '';
     return this._http.get(this.url + 'caja/arqueo-dinamico' + params, {
       headers,
       withCredentials: true

@@ -25,15 +25,55 @@
   }
 }
 
-/* Contenedor centrado: ancho cómodo, ni demasiado grande ni pequeño */
+/* Contenedor más reducido y centrado */
 .content-wrap {
   width: 100%;
-  max-width: 920px;
+  max-width: 640px;
   min-width: 0;
+  margin: 0 auto;
 }
 
 .card {
   max-width: 100%;
+}
+
+.card-header {
+  text-align: center;
+}
+
+.card-header .card-title {
+  width: 100%;
+}
+
+.card-body.arqueo-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.card-body .row,
+.card-body .table-responsive,
+.card-body .mb-4,
+.card-body .col-md-12 {
+  width: 100%;
+  max-width: 100%;
+}
+
+.card-body .row.mb-3 {
+  justify-content: center;
+}
+
+.card-body .d-flex {
+  justify-content: center;
+}
+
+.card-body .table-responsive {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.card-body h6 {
+  width: 100%;
 }
 
 .card-header .card-title i {

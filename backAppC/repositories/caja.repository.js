@@ -517,17 +517,26 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   }
 };
 
-/** Arqueo dinámico: resumen por concepto (tipo movimiento) y por forma de pago para una fecha.
- *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago (las formas realmente usadas en la venta).
- *  Para el resto usa MovimientosCaja + MediosPago. */
-exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, fecha, idCaja) => {
+/** Arqueo dinámico: resumen por concepto y forma de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal).
+ *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago; para el resto usa MovimientosCaja + MediosPago. */
+exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
+  const { fecha, fechaInicial, fechaFinal, idCaja } = filtros || {};
+  const usaRango = fechaInicial && fechaFinal;
   const fechaFiltro = fecha || new Date().toISOString().split('T')[0];
   const filtrarPorCaja = idCaja && idCaja !== 'TODAS';
 
   const request = pool.request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("fecha", sql.Date, fechaFiltro);
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+  if (usaRango) {
+    request.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
+  } else {
+    request.input("fecha", sql.Date, fechaFiltro);
+  }
   if (filtrarPorCaja) request.input("idCaja", sql.UniqueIdentifier, idCaja);
+
+  const condicionFecha = usaRango
+    ? "AND CONVERT(DATE, mc.fechaMovimiento) >= @fechaInicial AND CONVERT(DATE, mc.fechaMovimiento) <= @fechaFinal"
+    : "AND CONVERT(DATE, mc.fechaMovimiento) = @fecha";
 
   const sqlVentas = `
     SELECT
@@ -541,7 +550,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, fecha, idCaja) => {
     INNER JOIN DetallePagoVenta dpv ON dpv.idVenta = mc.idVenta
     LEFT JOIN FormasPago fp ON fp.idFormaPago = dpv.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
-      AND CONVERT(DATE, mc.fechaMovimiento) = @fecha
+      ${condicionFecha}
       AND mc.idVenta IS NOT NULL
       ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
     GROUP BY tmc.nombre, tmc.tipo, fp.descripcion
@@ -557,7 +566,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, fecha, idCaja) => {
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
     LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
-      AND CONVERT(DATE, mc.fechaMovimiento) = @fecha
+      ${condicionFecha}
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)
       ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
     GROUP BY tmc.nombre, tmc.tipo, mp.descripcion
