@@ -77,9 +77,22 @@ export class VentasService {
 }
 
 export interface ComprobantePdfData {
-  venta: { compVenta: string; nombreComprobante?: string; fEmision: string; subtotal: number; igv: number; descuentos: number; total: number };
-  empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string };
-  cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string };
+  venta: {
+    compVenta: string;
+    nombreComprobante?: string;
+    codigoComprobante?: string;
+    fEmision: string;
+    subtotal: number;
+    igv: number;
+    exonerado?: number;
+    gratuito?: number;
+    otrosCargos?: number;
+    descuentos: number;
+    total: number;
+    resumenHash?: string;
+  };
+  empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
+  cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string; tipoDocSunat?: string };
   items: Array<{ descripcion: string; cantidad: number; pVenta: number; subtotal?: number; total: number }>;
 }
 

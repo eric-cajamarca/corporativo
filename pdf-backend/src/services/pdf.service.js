@@ -15,6 +15,7 @@ async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
     });
 
     const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(15000);
     const wrappedHtml = `
       <!DOCTYPE html>
       <html>
@@ -30,7 +31,7 @@ async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
       </head>
       <body>${html}</body></html>`;
 
-    await page.setContent(wrappedHtml, { waitUntil: 'networkidle0' });
+    await page.setContent(wrappedHtml, { waitUntil: 'networkidle0', timeout: 20000 });
 
     const isTicket = String(formato).toLowerCase() === 'ticket';
     const pdfOptions = {

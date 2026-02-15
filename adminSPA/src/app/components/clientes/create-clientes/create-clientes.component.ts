@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -18,6 +18,14 @@ declare var $: any;
   styleUrl: './create-clientes.component.css'
 })
 export class CreateClientesComponent {
+  /** Cuando se abre desde nueva venta: tipo de documento pre-seleccionado. */
+  @Input() idDocumentoPre?: string;
+  /** Cuando se abre desde nueva venta: RUC o DNI pre-cargado. */
+  @Input() rucPre?: string;
+  /** Si es true, al registrar no navega a /cliente sino emite clienteCreado. */
+  @Input() desdeVenta = false;
+  @Output() clienteCreado = new EventEmitter<any>();
+
   public busqueda = false;
   public filtro: any = "";
   public clientes: any = {
@@ -89,16 +97,18 @@ export class CreateClientesComponent {
   }
 
   ngOnInit() {
+    if (this.idDocumentoPre != null && this.idDocumentoPre !== '') {
+      this.clientes.idDocumento = this.idDocumentoPre;
+    }
+    if (this.rucPre != null && this.rucPre !== '') {
+      this.clientes.ruc = this.rucPre;
+    }
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        console.log('this.documento', this.documento);
-
-        //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
-        //  this.documento.forEach((element: { id: string | number; name: any; }) => {
-        //   this.documento[element.id] = element.id;
-        //  });
-
+        if (this.idDocumentoPre != null && this.idDocumentoPre !== '') {
+          this.clientes.idDocumento = this.idDocumentoPre;
+        }
       }
     );
 
@@ -504,38 +514,58 @@ private showError(message: string): void {
         response => {
           if(response.data != undefined){
             this._clientesService.obtener_cliente_ruc(this.clientes.ruc).subscribe(
-              response => {
-                console.log('response.data', response.data);
-                this.direccionClientes.idCliente = response.data[0].idCliente;
-                console.log('this.direccionClientes con idCliente', this.direccionClientes);
-                if(response.data != undefined){
-                  this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe(
-                      response => {
-                        if(response.data != undefined){
-                          iziToast.show({
-                            title: 'SUCCESS',
-                            titleColor: '#006064',
-                            color: '#FFF',
-                            class: 'text-success',
-                            position: 'topRight',
-                            message: 'Cliente creado correctamente'
-                          });
-                          this.btn_registrar = false;
-                          //quiero redirigir a la pagina de index-clientes
-                          this._router.navigate(['/cliente']);
-                        }
-                        
-                      },
-                      error => {
-                        console.log(<any>error);
-                        console.error('Error al crear el cliente:', error);
-                        this.btn_registrar = false;
-                      }
-                    )
+              resCliente => {
+                const row = resCliente?.data?.[0];
+                if (!row) {
+                  this.btn_registrar = false;
+                  return;
                 }
-                
-              }
-            )
+                this.direccionClientes.idCliente = row.idCliente;
+                if (this.desdeVenta) {
+                  const payload = {
+                    idCliente: row.idCliente,
+                    idDocumento: row.idDocumento ?? this.clientes.idDocumento,
+                    ruc: row.ruc ?? this.clientes.ruc,
+                    rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? this.clientes.rSocial ?? '').toString().trim(),
+                    direccion: (this.direccionClientes.direccion ?? '').toString().trim(),
+                    correo: row.correo ?? this.clientes.correo ?? '',
+                    celular: row.celular ?? this.clientes.celular ?? '',
+                    condicion: row.condicion ?? this.clientes.condicion ?? 'ACTIVO'
+                  };
+                  this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe({
+                    next: () => {
+                      payload.direccion = (this.direccionClientes.direccion ?? '').toString().trim();
+                      this.btn_registrar = false;
+                      if (typeof iziToast !== 'undefined') {
+                        iziToast.success({ title: 'OK', message: 'Cliente registrado.', position: 'topRight' });
+                      }
+                      this.clienteCreado.emit(payload);
+                    },
+                    error: () => {
+                      this.btn_registrar = false;
+                      this.clienteCreado.emit(payload);
+                    }
+                  });
+                  return;
+                }
+                this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe(
+                  response => {
+                    if(response.data != undefined){
+                      if (typeof iziToast !== 'undefined') {
+                        iziToast.success({ title: 'OK', message: 'Cliente creado correctamente', position: 'topRight' });
+                      }
+                      this.btn_registrar = false;
+                      this._router.navigate(['/cliente']);
+                    }
+                  },
+                  error => {
+                    console.error('Error al crear el cliente:', error);
+                    this.btn_registrar = false;
+                  }
+                );
+              },
+              () => { this.btn_registrar = false; }
+            );
           }else{
             iziToast.show({
               title: 'ERROR',

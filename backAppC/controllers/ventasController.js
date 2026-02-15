@@ -80,24 +80,32 @@ const obtenerVentas = async function (req, res) {
 };
 
 const obtenerComprobanteParaPdf = async function (req, res) {
-  const idVenta = req.params.idVenta;
   const idEmpresa = req.user?.empresa;
   if (!req.user || !idEmpresa) {
     return res.status(401).json({ message: 'No Access' });
   }
-  if (!idVenta) {
+  const idVentaRaw = req.params.idVenta;
+  if (!idVentaRaw) {
     return res.status(400).json({ error: 'idVenta es requerido' });
   }
+  const idVenta = parseInt(idVentaRaw, 10);
+  if (Number.isNaN(idVenta) || idVenta < 1) {
+    return res.status(400).json({ error: 'idVenta debe ser un número válido' });
+  }
   try {
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
     const pool = await sql.connect(dbConfig);
-    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa);
+    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa, baseUrl);
     if (!data) {
       return res.status(404).json({ error: 'Venta no encontrada' });
     }
     res.json({ data });
   } catch (error) {
     console.error('Error al obtener comprobante para PDF:', error);
-    res.status(500).json({ error: 'Error al obtener datos del comprobante' });
+    const message = process.env.NODE_ENV !== 'production' && error?.message
+      ? error.message
+      : 'Error al obtener datos del comprobante';
+    res.status(500).json({ error: message });
   }
 };
 

@@ -375,8 +375,8 @@
                    maxlength="11" inputmode="numeric" pattern="[0-9]*">
           </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button type="button" class="btn btn-outline-primary w-100" (click)="buscarDocumentoCliente()" [disabled]="clienteBuscando">
-              <i class="bi bi-search me-1"></i>{{ clienteBuscando ? '...' : 'Buscar' }}
+            <button type="button" class="btn btn-outline-primary w-100" (click)="buscarORegistrarCliente()" [disabled]="clienteBuscando">
+              <i class="bi bi-person-plus me-1"></i>{{ clienteBuscando ? '...' : 'Buscar' }}
             </button>
           </div>
           <div class="col-md-2 d-flex align-items-end">
@@ -422,8 +422,7 @@
   </div>
 </div>
 
-<!-- Modal clientes -->
- <!-- Modal: lista de clientes -->
+<!-- Modal: lista de clientes -->
           <div class="modal fade" id="clientesModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
             data-bs-keyboard="false">
             <div class="modal-dialog modal-lg">
@@ -433,11 +432,30 @@
                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body p-0">
-                  <!-- Aquí Angular 19 renderiza el componente -->
                   <app-index-clientes 
                   [modoSelector]="true"
                   (clienteElegido)="clienteSeleccionado($event)">
                   </app-index-clientes>
+                </div>
+              </div>
+            </div>
+          </div>
+
+<!-- Modal: crear cliente (desde nueva venta, con tipo doc y RUC/DNI pre-cargados) -->
+          <div class="modal fade" id="modalCrearCliente" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header bg-gradient-info text-white">
+                  <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Registrar nuevo cliente</h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body p-0">
+                  <app-create-clientes
+                    [idDocumentoPre]="ventas.idDocumento"
+                    [rucPre]="cliente.ruc"
+                    [desdeVenta]="true"
+                    (clienteCreado)="onClienteCreadoDesdeModal($event)">
+                  </app-create-clientes>
                 </div>
               </div>
             </div>

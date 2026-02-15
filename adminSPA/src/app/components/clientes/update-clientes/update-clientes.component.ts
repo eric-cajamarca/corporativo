@@ -38,8 +38,21 @@ export class UpdateClientesComponent {
 
   public str_pais = '';
   public direccionClientes: any = {};
-  public direccionClientes_const: any = [];
+  public direccionClientes_const: any[] = [];
   public data: any = {};
+  public guardandoDireccion = false;
+  public nuevaDireccion: any = {
+    ubigeo: '',
+    codPais: 'PEN',
+    region: '',
+    provincia: '',
+    distrito: '',
+    urbanizacion: '',
+    direccion: '',
+    referencia: '',
+    codLocal: '',
+    principal: true
+  };
 
   constructor(
     private _adminService: AdminService,
@@ -115,47 +128,48 @@ export class UpdateClientesComponent {
           }
         );
 
-        this._clientesService.obtener_direccionesCliente_idCliente(this.clientes.idCliente).subscribe(
+        const idClienteParam = params['id'];
+        this._clientesService.obtener_direccionesCliente_idCliente(idClienteParam).subscribe(
           response => {
-            console.log('response.data', response.data);
-            if (response.data != undefined) {
-
-              this.direccionClientes_const = response.data;
+            const data = response?.data;
+            this.direccionClientes_const = Array.isArray(data) && data.length > 0 ? data : [];
+            if (this.direccionClientes_const.length > 0) {
               console.log('this.direccionClientes_const', this.direccionClientes_const);
 
               //buscar en regiones por el id de response.data.region y asignar el name a direccionEmpresas.region
-              const regionEncontrada = this.regiones.find((element: any) => Number(element.id) === Number(response.data[0].region));
+              const regionEncontrada = this.regiones.find((element: any) => Number(element.id) === Number(this.direccionClientes_const[0].region));
 
               if (regionEncontrada) {
 
                 this.direccionClientes_const[0].nregion = String(regionEncontrada.name);
-                console.log('this.direccionEmpresas.region', this.direccionClientes_const.nregion);
+                console.log('this.direccionEmpresas.region', this.direccionClientes_const[0].nregion);
               }else{
                 console.log('no se encontro la region');
               }
 
 
               //buscar en provincias por el id de response.data.provincia y asignar el name a direccionEmpresas.provincia
-              const provinciaEncontrada = this.provincias.find((element: any) => Number(element.id) === Number(response.data[0].provincia));
+              const provinciaEncontrada = this.provincias.find((element: any) => Number(element.id) === Number(this.direccionClientes_const[0].provincia));
 
               if (provinciaEncontrada) {
 
                 this.direccionClientes_const[0].nprovincia = String(provinciaEncontrada.name);
-                console.log('this.direccionEmpresas.provincia', this.direccionClientes_const.nprovincia);
+                console.log('this.direccionEmpresas.provincia', this.direccionClientes_const[0].nprovincia);
               }
 
               //buscar en distritos por el id de response.data.distrito y asignar el name a direccionEmpresas.distrito
-              const distritoEncontrada = this.distritos.find((element: any) => Number(element.id) === Number(response.data[0].distrito));
+              const distritoEncontrada = this.distritos.find((element: any) => Number(element.id) === Number(this.direccionClientes_const[0].distrito));
 
               if (distritoEncontrada) {
 
                 this.direccionClientes_const[0].ndistrito = String(distritoEncontrada.name);
-                console.log('this.direccionEmpresas.distrito', this.direccionClientes_const.ndistrito);
+                console.log('this.direccionEmpresas.distrito', this.direccionClientes_const[0].ndistrito);
               }
 
-              console.log('this.direccionClientes', this.direccionClientes_const);
             }
-          }
+            console.log('this.direccionClientes_const', this.direccionClientes_const);
+          },
+          () => { this.direccionClientes_const = []; }
         )
       }
 
@@ -350,9 +364,102 @@ export class UpdateClientesComponent {
   }
 
 
-  editarDireccion(id: string) {}
+  editarDireccion(id: string) {
+    const item = this.direccionClientes_const.find((d: any) => Number(d.idDireccionClientes) === Number(id));
+    if (item) {
+      this.direccionClientes = { ...item };
+    }
+  }
 
-  actualizarDireccion() {}
+  actualizarDireccion() {
+    if (!this.direccionClientes?.idDireccionClientes) return;
+    const payload = {
+      idCliente: this.direccionClientes.idCliente,
+      ubigeo: this.direccionClientes.ubigeo ?? '',
+      codPais: this.direccionClientes.codPais ?? 'PEN',
+      region: this.direccionClientes.region ?? '',
+      provincia: this.direccionClientes.provincia ?? '',
+      distrito: this.direccionClientes.distrito ?? '',
+      urbanizacion: this.direccionClientes.urbanizacion ?? '',
+      direccion: this.direccionClientes.direccion ?? '',
+      referencia: this.direccionClientes.referencia ?? '',
+      codLocal: this.direccionClientes.codLocal ?? ''
+    };
+    this._clientesService.editar_direccionCliente(this.direccionClientes.idDireccionClientes, payload).subscribe({
+      next: () => {
+        this.cargarDirecciones();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Dirección actualizada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo actualizar la dirección.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  cargarDirecciones(): void {
+    if (!this.clientes?.idCliente) return;
+    this._clientesService.obtener_direccionesCliente_idCliente(this.clientes.idCliente).subscribe({
+      next: (response) => {
+        const data = response?.data;
+        this.direccionClientes_const = Array.isArray(data) && data.length > 0 ? data : [];
+        if (this.direccionClientes_const.length > 0) {
+          this.regiones.forEach((reg: any) => {
+            const r = this.direccionClientes_const.find((d: any) => Number(d.region) === Number(reg.id));
+            if (r) r.nregion = reg.name;
+          });
+          this.provincias.forEach((prov: any) => {
+            const p = this.direccionClientes_const.find((d: any) => Number(d.provincia) === Number(prov.id));
+            if (p) p.nprovincia = prov.name;
+          });
+          this.distritos.forEach((dist: any) => {
+            const d = this.direccionClientes_const.find((x: any) => Number(x.distrito) === Number(dist.id));
+            if (d) d.ndistrito = dist.name;
+          });
+        }
+      },
+      error: () => { this.direccionClientes_const = []; }
+    });
+  }
+
+  guardarNuevaDireccion(): void {
+    const dir = (this.nuevaDireccion.direccion || '').toString().trim();
+    if (!dir) return;
+    if (!this.clientes?.idCliente) return;
+    const payload = {
+      idCliente: this.clientes.idCliente,
+      ubigeo: (this.nuevaDireccion.ubigeo ?? '').toString().trim(),
+      codpais: (this.nuevaDireccion.codPais ?? 'PEN').toString(),
+      region: (this.nuevaDireccion.region ?? '').toString().trim(),
+      provincia: (this.nuevaDireccion.provincia ?? '').toString().trim(),
+      distrito: (this.nuevaDireccion.distrito ?? '').toString().trim(),
+      urbanizacion: (this.nuevaDireccion.urbanizacion ?? '').toString().trim(),
+      direccion: dir,
+      referencia: (this.nuevaDireccion.referencia ?? '').toString().trim(),
+      codLocal: (this.nuevaDireccion.codLocal ?? '').toString().trim(),
+      principal: true
+    };
+    this.guardandoDireccion = true;
+    this._clientesService.crear_direccionCliente(payload).subscribe({
+      next: () => {
+        this.guardandoDireccion = false;
+        this.nuevaDireccion = { ubigeo: '', codPais: 'PEN', region: '', provincia: '', distrito: '', urbanizacion: '', direccion: '', referencia: '', codLocal: '', principal: true };
+        this.cargarDirecciones();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Dirección registrada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        this.guardandoDireccion = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo registrar la dirección.', position: 'topRight' });
+        }
+      }
+    });
+  }
 
   registrar(registroForm: any) {
 

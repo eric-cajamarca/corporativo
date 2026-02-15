@@ -209,8 +209,40 @@
     </form>
 
 
-    <ng-container *ngIf="direccionClientes !== undefined">
-        <h1>Aquí muestro las direcciones de cliente</h1>
+    <!-- Si el cliente no tiene direcciones: formulario para registrar una -->
+    <ng-container *ngIf="clientes.idCliente && (direccionClientes_const?.length === 0)">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-header-title mb-0"><i class="bi bi-geo-alt"></i> Registrar dirección del cliente</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">El cliente no tiene direcciones. Registre al menos una (tabla DireccionClientes).</p>
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label for="nuevaDireccion" class="form-label">Dirección <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="nuevaDireccion" [(ngModel)]="nuevaDireccion.direccion" name="nuevaDireccion" placeholder="Ej: Av. Principal 123">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="nuevaUbigeo" class="form-label">Ubigeo</label>
+                        <input type="text" class="form-control" id="nuevaUbigeo" [(ngModel)]="nuevaDireccion.ubigeo" name="nuevaUbigeo" placeholder="Opcional">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="nuevaReferencia" class="form-label">Referencia</label>
+                        <input type="text" class="form-control" id="nuevaReferencia" [(ngModel)]="nuevaDireccion.referencia" name="nuevaReferencia" placeholder="Opcional">
+                    </div>
+                    <div class="col-12 mt-2">
+                        <button type="button" class="btn btn-primary" (click)="guardarNuevaDireccion()" [disabled]="guardandoDireccion || !nuevaDireccion.direccion?.trim()">
+                            <span *ngIf="!guardandoDireccion"><i class="bi bi-check-lg"></i> Registrar dirección</span>
+                            <span *ngIf="guardandoDireccion" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </ng-container>
+
+    <ng-container *ngIf="(direccionClientes_const ?? []).length > 0">
+        <h5 class="mb-3">Direcciones del cliente</h5>
         <div *ngFor="let item of direccionClientes_const">
             <div class="card">
                 <div class="card-header">

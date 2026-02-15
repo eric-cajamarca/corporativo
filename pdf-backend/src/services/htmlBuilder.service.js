@@ -135,10 +135,11 @@ class HtmlBuilderService {
           <div class="datos-empresa">
             <h3>${empresa?.nombre || ''}</h3>
             <p>
-              ${empresa?.rubro ? `${empresa.rubro}<br>` : ''}
+              ${empresa?.direccion ? `Dirección: ${empresa.direccion}<br>` : ''}
+              ${empresa?.rubro ? `Rubro: ${empresa.rubro}<br>` : ''}
               ${empresa?.ruc ? `RUC: ${empresa.ruc}<br>` : ''}
-              ${empresa?.direccion ? `${empresa.direccion}<br>` : ''}
-              ${empresa?.telefono ? `Tel: ${empresa.telefono}` : ''}
+              ${empresa?.telefono ? `Cel: ${empresa.telefono}<br>` : ''}
+              ${empresa?.correo ? `Correo: ${empresa.correo}` : ''}
             </p>
           </div>
         </td>
@@ -187,16 +188,161 @@ class HtmlBuilderService {
   }
 
   /**
-   * Construye HTML para comprobante de venta (factura/boleta/ticket).
-   * @param {Object} params - empresa, venta, cliente, items, cantidadLetras
+   * Imagen por defecto cuando la empresa no tiene logo (SVG inline para no depender de red).
    */
-  construirHtmlComprobanteVenta(params) {
+  _defaultLogoDataUri() {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="70" viewBox="0 0 100 70"><rect width="100" height="70" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/><text x="50" y="38" dominant-baseline="middle" text-anchor="middle" fill="#999" font-size="11" font-family="Arial">Logo</text></svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  /**
+   * Resuelve logo: si es URL http(s) la descarga y convierte a data URI para que Puppeteer no dependa de red.
+   * @param {string} logo - URL del logo o ya data URI
+   * @returns {Promise<string>} data URI del logo o default
+   */
+  async _resolveLogoToDataUri(logo) {
+    if (!logo || typeof logo !== 'string') return this._defaultLogoDataUri();
+    const s = logo.trim();
+    if (s.startsWith('data:')) return s;
+    if (!s.startsWith('http://') && !s.startsWith('https://')) return this._defaultLogoDataUri();
+    try {
+      const res = await fetch(s, { headers: { Accept: 'image/*' } });
+      if (!res.ok) return this._defaultLogoDataUri();
+      const buf = await res.arrayBuffer();
+      const b64 = Buffer.from(buf).toString('base64');
+      const contentType = res.headers.get('content-type') || 'image/png';
+      return `data:${contentType};base64,${b64}`;
+    } catch (e) {
+      return this._defaultLogoDataUri();
+    }
+  }
+
+  /**
+   * Formatea fecha ISO a DD/MM/YYYY para SUNAT.
+   */
+  _fechaSunat(iso) {
+    if (!iso) return '';
+    const s = String(iso).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const [y, m, d] = s.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  /**
+   * Construye la cadena para el QR: rucEmisor|codigoComprobante|serie-numero|igv|total|fechaEmision|tipoDocCliente|rucCliente|codigoHash
+   */
+  _buildQrString(empresa, venta, cliente) {
+    const rucEmisor = (empresa && empresa.ruc) ? String(empresa.ruc).trim() : '';
+    const codigo = (venta && venta.codigoComprobante) ? String(venta.codigoComprobante).trim() : '01';
+    const serieNum = (venta && venta.compVenta) ? String(venta.compVenta).trim() : '';
+    const igv = (venta && venta.igv != null) ? Number(venta.igv).toFixed(2) : '0.00';
+    const total = (venta && venta.total != null) ? Number(venta.total).toFixed(2) : '0.00';
+    const fecha = this._fechaSunat(venta && venta.fEmision);
+    const tipoDoc = (cliente && cliente.tipoDocSunat) ? String(cliente.tipoDocSunat).trim() : '6';
+    const rucCliente = (cliente && cliente.ruc) ? String(cliente.ruc).trim() : '';
+    const hash = (venta && venta.resumenHash) ? String(venta.resumenHash).trim() : '';
+    return [rucEmisor, codigo, serieNum, igv, total, fecha, tipoDoc, rucCliente, hash].join('|');
+  }
+
+  /**
+   * Construye HTML para comprobante en formato TICKET (80mm, térmico).
+   * Misma estructura que factura electrónica: empresa, comprobante, cliente, ítems, totales, SON, bloque final con QR.
+   */
+  _buildTicketComprobanteHtml(data) {
+    const {
+      empresa, venta, titulo, compVenta, fEmision,
+      logoSrc, razonSocial, dirCliente, rucCliente,
+      filasItems, lineasTotales, cantidadLetras,
+      textoRepresentacion, resumenHash, qrDataUri
+    } = data;
+    const total = Number(venta.total) || 0;
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${titulo} ${compVenta}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 8px; margin: 0; padding: 4px; color: #000; width: 80mm; max-width: 80mm; }
+    .ticket-center { text-align: center; }
+    .ticket-logo { max-width: 50px; max-height: 40px; margin: 0 auto 2px; display: block; }
+    .ticket-empresa { font-weight: bold; font-size: 9px; margin: 2px 0; line-height: 1.2; }
+    .ticket-ruc { font-size: 7px; }
+    .ticket-dir, .ticket-rubro, .ticket-cel, .ticket-correo { font-size: 6px; margin: 1px 0; }
+    .ticket-sep { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .ticket-comprobante { font-weight: bold; font-size: 9px; margin: 2px 0; }
+    .ticket-fecha { font-size: 7px; margin-bottom: 4px; }
+    .ticket-cliente { text-align: left; font-size: 7px; line-height: 1.25; margin: 4px 0; }
+    .ticket-cliente strong { display: inline; }
+    table.ticket-detalle { width: 100%; border-collapse: collapse; font-size: 7px; margin: 4px 0; }
+    table.ticket-detalle th, table.ticket-detalle td { padding: 1px 2px; border-bottom: 1px solid #eee; }
+    table.ticket-detalle th { text-align: left; font-weight: bold; }
+    .ticket-detalle .num { text-align: right; }
+    .ticket-totales { font-size: 7px; margin: 4px 0; }
+    .ticket-totales td.num { text-align: right; }
+    .ticket-totales tr.total-final { font-weight: bold; font-size: 8px; }
+    .ticket-son { font-size: 7px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; }
+    .ticket-final { margin-top: 6px; padding: 4px 0; font-size: 6px; }
+    .ticket-final .txt { margin-bottom: 2px; }
+    .ticket-final .qr-wrap { text-align: center; margin-top: 4px; }
+    .ticket-final .qr-wrap img { width: 70px; height: 70px; }
+  </style>
+</head>
+<body>
+  <div class="ticket-center">
+    <img src="${logoSrc}" alt="Logo" class="ticket-logo" onerror="this.style.display='none'">
+    <div class="ticket-empresa">${empresa.nombre || ''}</div>
+    ${empresa.direccion ? '<div class="ticket-dir">' + empresa.direccion + '</div>' : ''}
+    <div class="ticket-ruc">RUC: ${empresa.ruc || ''}</div>
+    ${empresa.rubro ? '<div class="ticket-rubro">' + empresa.rubro + '</div>' : ''}
+    ${empresa.telefono ? '<div class="ticket-cel">CEL: ' + empresa.telefono + '</div>' : ''}
+    ${empresa.correo ? '<div class="ticket-correo">' + empresa.correo + '</div>' : ''}
+  </div>
+  <hr class="ticket-sep">
+  <div class="ticket-center">
+    <div class="ticket-comprobante">${titulo}</div>
+    <div>${compVenta}</div>
+    <div class="ticket-fecha">Fecha: ${fEmision}</div>
+  </div>
+  <hr class="ticket-sep">
+  <div class="ticket-cliente">
+    <strong>RUC:</strong> ${rucCliente || '-'}<br>
+    <strong>RAZÓN SOCIAL:</strong> ${razonSocial || '-'}<br>
+    <strong>DIRECCIÓN:</strong> ${dirCliente || '-'}
+  </div>
+  <hr class="ticket-sep">
+  <table class="ticket-detalle">
+    <thead><tr><th>Cant</th><th>Descripción</th><th class="num">P.Unit</th><th class="num">Importe</th></tr></thead>
+    <tbody>${filasItems}</tbody>
+  </table>
+  <hr class="ticket-sep">
+  <table class="ticket-totales" style="width:100%; font-size:7px;">
+    ${lineasTotales}
+  </table>
+  <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  <div class="ticket-final">
+    <div class="txt">${textoRepresentacion}</div>
+    <div class="txt">Visite https://mifacturasunat.com</div>
+    ${resumenHash ? '<div class="txt">Resumen: ' + resumenHash + '</div>' : ''}
+    <div class="qr-wrap"><img src="${qrDataUri}" alt="QR"/></div>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Construye HTML para comprobante de venta (factura/boleta) A4, A5 o ticket.
+   * @param {Object} params - empresa, venta, cliente, items, cantidadLetras, formato
+   */
+  async construirHtmlComprobanteVenta(params) {
+    const QRCode = require('qrcode');
     const {
       empresa = {},
       venta = {},
       cliente = {},
       items = [],
-      cantidadLetras = ''
+      cantidadLetras = '',
+      formato = 'A4'
     } = params;
 
     const titulo = venta.nombreComprobante || 'Comprobante';
@@ -204,16 +350,71 @@ class HtmlBuilderService {
     const fEmision = venta.fEmision || '';
     const subtotal = Number(venta.subtotal) || 0;
     const igv = Number(venta.igv) || 0;
+    const exonerado = Number(venta.exonerado) || 0;
+    const gratuito = Number(venta.gratuito) || 0;
+    const otrosCargos = Number(venta.otrosCargos) || 0;
     const descuentos = Number(venta.descuentos) || 0;
     const total = Number(venta.total) || 0;
+    const resumenHash = (venta.resumenHash && String(venta.resumenHash).trim()) || '';
+
+    const logoSrc = await this._resolveLogoToDataUri(empresa.logo);
+    const qrString = this._buildQrString(empresa, venta, cliente);
+    let qrDataUri = '';
+    try {
+      qrDataUri = await QRCode.toDataURL(qrString, { width: formato === 'ticket' ? 80 : 120, margin: 1 });
+    } catch (e) {
+      qrDataUri = this._defaultLogoDataUri();
+    }
 
     const filas = items.map(it => {
       const desc = it.descripcion || it.desc || '';
       const cant = Number(it.cantidad) != null ? Number(it.cantidad) : 0;
       const pUnit = Number(it.pVenta) != null ? Number(it.pVenta) : Number(it.pUnit) || 0;
       const importe = Number(it.total) != null ? Number(it.total) : (Number(it.subtotal) || cant * pUnit);
-      return `<tr><td>${cant}</td><td>${desc}</td><td class="text-end">${pUnit.toFixed(2)}</td><td class="text-end">${importe.toFixed(2)}</td></tr>`;
+      return `<tr><td class="text-center">${cant}</td><td>${desc}</td><td class="text-end">${pUnit.toFixed(2)}</td><td class="text-end">${importe.toFixed(2)}</td></tr>`;
     }).join('');
+
+    const razonSocial = cliente.rSocial || cliente.razonSocial || '';
+    const dirCliente = cliente.direccion || '';
+
+    const lineasTotales = [
+      { label: 'Subtotal', value: subtotal },
+      ...(exonerado > 0 ? [{ label: 'Exonerado', value: exonerado }] : []),
+      { label: 'IGV (18%)', value: igv },
+      ...(gratuito > 0 ? [{ label: 'Gratuito', value: gratuito }] : []),
+      ...(otrosCargos > 0 ? [{ label: 'Otros cargos', value: otrosCargos }] : []),
+      { label: 'Descuentos', value: descuentos },
+      { label: 'TOTAL (S/)', value: total, total: true }
+    ];
+    const filasTotales = lineasTotales.map(l => `
+      <tr${l.total ? ' class="total-row"' : ''}><td>${l.label}</td><td class="text-end">${Number(l.value).toFixed(2)}</td></tr>`).join('');
+
+    const esFactura = (venta.codigoComprobante || '01') === '01';
+    const textoRepresentacion = esFactura ? 'Representación impresa de la FACTURA ELECTRÓNICA' : 'Representación impresa de la BOLETA DE VENTA ELECTRÓNICA';
+
+    if (formato === 'ticket') {
+      const rucCliente = cliente.ruc != null && String(cliente.ruc).trim() !== '' ? String(cliente.ruc).trim() : '';
+      const ticketTotalesHtml = lineasTotales.map(l =>
+        `<tr${l.total ? ' class="total-final"' : ''}><td>${l.label}</td><td class="num" style="text-align:right">${Number(l.value).toFixed(2)}</td></tr>`
+      ).join('');
+      return this._buildTicketComprobanteHtml({
+        empresa,
+        venta,
+        titulo,
+        compVenta,
+        fEmision,
+        logoSrc,
+        razonSocial,
+        dirCliente,
+        rucCliente,
+        filasItems: filas,
+        lineasTotales: ticketTotalesHtml,
+        cantidadLetras,
+        textoRepresentacion,
+        resumenHash,
+        qrDataUri
+      });
+    }
 
     return `<!DOCTYPE html>
 <html>
@@ -221,56 +422,87 @@ class HtmlBuilderService {
   <meta charset="UTF-8">
   <title>${titulo} ${compVenta}</title>
   <style>
-    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 12px; color: #333; }
-    .header { border-bottom: 2px solid #0056b3; padding-bottom: 8px; margin-bottom: 12px; }
-    .logo { max-width: 80px; height: auto; }
-    .datos-empresa h3 { margin: 0 0 4px 0; color: #0056b3; font-size: 12px; }
-    .datos-empresa p { margin: 0; line-height: 1.3; font-size: 9px; }
-    .datos-cliente { margin: 10px 0; padding: 8px; border: 1px solid #ddd; background: #f9f9f9; font-size: 9px; }
-    table.detalle { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9px; }
-    table.detalle th, table.detalle td { border: 1px solid #ccc; padding: 4px 6px; }
-    table.detalle th { background: #f2f2f2; font-weight: bold; }
+    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 16px; color: #222; }
+    .header { border-bottom: 3px solid #0056b3; padding-bottom: 12px; margin-bottom: 14px; }
+    .logo-cell { width: 26%; vertical-align: top; }
+    .logo { max-width: 150px; max-height: 95px; height: auto; display: block; object-fit: contain; }
+    .datos-empresa { padding-left: 12px; }
+    .datos-empresa h3 { margin: 0 0 6px 0; color: #0056b3; font-size: 14px; font-weight: bold; }
+    .datos-empresa p { margin: 0; line-height: 1.4; font-size: 9px; color: #444; }
+    .comprobante-box { text-align: right; vertical-align: top; }
+    .comprobante-box .tipo { font-size: 14px; font-weight: bold; color: #0056b3; margin-bottom: 4px; }
+    .comprobante-box .numero { font-size: 12px; margin-bottom: 2px; }
+    .comprobante-box .fecha { font-size: 9px; color: #555; }
+    .datos-cliente { margin: 12px 0; padding: 10px 12px; border: 1px solid #ccc; background: #fafafa; font-size: 9px; }
+    .datos-cliente .linea { margin: 2px 0; }
+    table.detalle { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 9px; }
+    table.detalle th, table.detalle td { border: 1px solid #bbb; padding: 6px 8px; }
+    table.detalle th { background: #e8e8e8; font-weight: bold; color: #333; }
+    table.detalle tbody tr:nth-child(even) { background: #f9f9f9; }
     .text-end { text-align: right; }
-    .totales-table { width: 100%; margin-top: 8px; font-size: 9px; }
-    .totales-table td { padding: 2px 0; }
-    .totales-table td:last-child { text-align: right; font-weight: bold; }
-    .son { margin-top: 10px; font-size: 9px; }
+    .text-center { text-align: center; }
+    .totales-box { margin-top: 14px; width: 280px; margin-left: auto; }
+    .totales-box table { width: 100%; font-size: 10px; border-collapse: collapse; }
+    .totales-box td { padding: 4px 8px; border: 1px solid #ddd; }
+    .totales-box td:first-child { background: #f5f5f5; }
+    .totales-box .total-row td { font-weight: bold; background: #e8eef4; font-size: 11px; }
+    .son { margin-top: 14px; padding: 8px; font-size: 10px; border: 1px solid #eee; background: #fafafa; }
+    .son strong { color: #0056b3; }
+    .bloque-final { margin-top: 20px; border: 1px solid #333; padding: 10px 12px; overflow: hidden; }
+    .bloque-final .texto { float: left; width: 70%; font-size: 8px; line-height: 1.4; }
+    .bloque-final .qr { float: right; width: 28%; text-align: right; }
+    .bloque-final .qr img { width: 100px; height: 100px; }
   </style>
 </head>
 <body>
   <div class="header">
     <table style="width:100%; border:none;">
       <tr>
-        <td style="border:none; width:28%; vertical-align:top;">
-          ${empresa.logo ? `<img src="${empresa.logo}" alt="Logo" class="logo">` : ''}
+        <td class="logo-cell" style="border:none;">
+          <img src="${logoSrc}" alt="Logo" class="logo" onerror="this.src='${this._defaultLogoDataUri()}'; this.onerror=null;">
         </td>
-        <td style="border:none; padding-left:10px;">
+        <td style="border:none; padding-left:12px;">
           <div class="datos-empresa">
             <h3>${empresa.nombre || ''}</h3>
-            <p>${empresa.ruc ? 'RUC: ' + empresa.ruc + '<br>' : ''}${empresa.direccion || ''}<br>${empresa.telefono || ''}</p>
+            <p>
+              ${empresa.ruc ? 'RUC: ' + empresa.ruc + '<br>' : ''}
+              ${empresa.direccion ? 'Dirección: ' + empresa.direccion + '<br>' : ''}
+              ${empresa.rubro ? 'Rubro: ' + empresa.rubro + '<br>' : ''}
+              ${empresa.telefono ? 'Cel: ' + empresa.telefono + '<br>' : ''}
+              ${empresa.correo ? 'Correo: ' + empresa.correo : ''}
+            </p>
           </div>
         </td>
-        <td style="border:none; text-align:right; vertical-align:top;">
-          <strong>${titulo}</strong><br>${compVenta}<br>Fecha: ${fEmision}
+        <td class="comprobante-box" style="border:none;">
+          <div class="tipo">${titulo}</div>
+          <div class="numero">${compVenta}</div>
+          <div class="fecha">Fecha de emisión: ${fEmision}</div>
         </td>
       </tr>
     </table>
   </div>
   <div class="datos-cliente">
-    <strong>Cliente:</strong> ${cliente.rSocial || cliente.razonSocial || ''}<br>
-    ${cliente.ruc ? 'RUC: ' + cliente.ruc + '<br>' : ''}${cliente.direccion || ''}
+    <strong>DATOS DEL CLIENTE</strong>
+    <div class="linea"><strong>RUC:</strong> ${cliente.ruc != null && String(cliente.ruc).trim() !== '' ? String(cliente.ruc).trim() : '-'}</div>
+    <div class="linea"><strong>RAZÓN SOCIAL:</strong> ${razonSocial || '-'}</div>
+    <div class="linea"><strong>DIRECCIÓN:</strong> ${dirCliente || '-'}</div>
   </div>
   <table class="detalle">
-    <thead><tr><th>Cant.</th><th>Descripción</th><th class="text-end">P. Unit.</th><th class="text-end">Importe</th></tr></thead>
+    <thead><tr><th class="text-center" style="width:10%;">Cant.</th><th style="width:44%;">Descripción</th><th class="text-end" style="width:18%;">P. Unit. (S/)</th><th class="text-end" style="width:18%;">Importe (S/)</th></tr></thead>
     <tbody>${filas}</tbody>
   </table>
-  <table class="totales-table">
-    <tr><td>Subtotal</td><td>${subtotal.toFixed(2)}</td></tr>
-    <tr><td>IGV</td><td>${igv.toFixed(2)}</td></tr>
-    <tr><td>Descuentos</td><td>${descuentos.toFixed(2)}</td></tr>
-    <tr><td><strong>Total S/</strong></td><td><strong>${total.toFixed(2)}</strong></td></tr>
-  </table>
+  <div class="totales-box">
+    <table>${filasTotales}</table>
+  </div>
   <div class="son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  <div class="bloque-final">
+    <div class="texto">
+      ${textoRepresentacion}<br>
+      Visite https://mifacturasunat.com<br>
+      ${resumenHash ? 'Resumen: ' + resumenHash : ''}
+    </div>
+    <div class="qr"><img src="${qrDataUri}" alt="QR"/></div>
+  </div>
 </body>
 </html>`;
   }

@@ -6,9 +6,17 @@
     <div class="table-card card">
       <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-table"></i> Comprobantes de Ventas</h5>
-        <button type="button" class="btn btn-light btn-sm" (click)="cargarVentas()" [disabled]="loading">
-          <i class="bi bi-arrow-clockwise"></i> Actualizar
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-light btn-sm" (click)="exportarListaPdf()" [disabled]="loading || exportandoLista || ventas.length === 0" title="Vista previa lista en PDF">
+            <i class="bi bi-file-pdf"></i> PDF
+          </button>
+          <button type="button" class="btn btn-light btn-sm" (click)="exportarListaExcel()" [disabled]="loading || exportandoLista || ventas.length === 0" title="Descargar lista en Excel">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+          </button>
+          <button type="button" class="btn btn-light btn-sm" (click)="cargarVentas()" [disabled]="loading">
+            <i class="bi bi-arrow-clockwise"></i> Actualizar
+          </button>
+        </div>
       </div>
       <div class="card-body">
         <!-- Fila única de búsqueda y filtros -->

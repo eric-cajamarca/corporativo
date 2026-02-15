@@ -48,12 +48,30 @@ async function generatePdf(req, res) {
         break;
 
       case 'comprobante-venta':
-        html = htmlBuilder.construirHtmlComprobanteVenta({
+        // #region agent log
+        try {
+          const fs = require('fs');
+          const logLine = JSON.stringify({
+            hypothesisId: 'H3',
+            location: 'pdf.controller.js:generatePdf',
+            message: 'PDF backend recibido empresa.logo',
+            data: {
+              hasEmpresa: !!datos.empresa,
+              logo: datos.empresa?.logo,
+              empresaKeys: datos.empresa ? Object.keys(datos.empresa) : []
+            },
+            timestamp: Date.now()
+          }) + '\n';
+          fs.appendFileSync('c:\\project172026\\.cursor\\debug.log', logLine);
+        } catch (_) {}
+        // #endregion
+        html = await htmlBuilder.construirHtmlComprobanteVenta({
           empresa: datos.empresa,
           venta: datos.venta,
           cliente: datos.cliente,
           items: datos.items || [],
-          cantidadLetras: datos.cantidadLetras || ''
+          cantidadLetras: datos.cantidadLetras || '',
+          formato: formatoPdf
         });
         break;
 

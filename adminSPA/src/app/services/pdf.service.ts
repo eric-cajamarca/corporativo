@@ -32,7 +32,7 @@ export class PdfService {
   /** Genera PDF de comprobante de venta (A4, A5 o ticket). */
   generarPdfComprobanteVenta(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
     const payload = { ...datos };
-    if (nombreArchivo) payload.nombreArchivo = nombreArchivo;
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,
       { datos: payload, tipo: 'comprobante-venta', fontSize: formato === 'ticket' ? 8 : 10, formato },

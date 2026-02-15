@@ -113,32 +113,78 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
   return result.recordset || [];
 };
 
-/** Datos completos de una venta para generar comprobante PDF (cabecera, empresa, cliente, items). */
-exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa) => {
-  const cabecera = await pool
-    .request()
-    .input('idVenta', sql.Int, idVenta)
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT
-        v.idVenta, v.compVenta, v.serie, v.numero,
-        CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
-        v.subtotal, v.igv, v.exonerado, v.descuentos, v.total,
-        c.nombre AS nombreComprobante,
-        cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.direccion AS clienteDireccion
-      FROM Ventas v
-      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-      LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
-      WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
-    `);
+/** Datos completos de una venta para generar comprobante PDF (cabecera, empresa, cliente, items). baseUrl para armar URL del logo (ej: http://localhost:3000). */
+exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = 'http://localhost:3000') => {
+  let cabecera;
+  try {
+    cabecera = await pool
+      .request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT
+          v.idVenta, v.compVenta, v.serie, v.numero,
+          CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+          v.subtotal, v.igv,
+          ISNULL(v.exonerado, 0) AS exonerado,
+          ISNULL(v.gratuito, 0) AS gratuito,
+          ISNULL(v.otrosCargos, 0) AS otrosCargos,
+          ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
+          cl.idCliente AS idCliente,
+          cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
+          (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+      `);
+  } catch (err) {
+    cabecera = await pool
+      .request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT
+          v.idVenta, v.compVenta, v.serie, v.numero,
+          CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+          v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
+          cl.idCliente AS idCliente,
+          cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
+          (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+      `);
+  }
 
-  const empresa = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT razon_Social AS nombre, ruc
-      FROM Empresas WHERE idEmpresa = @idEmpresa
-    `);
+  let empresaResult;
+  try {
+    empresaResult = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
+          ISNULL(e.rubro, '') AS rubro,
+          ISNULL(e.celular, '') AS celular,
+          ISNULL(e.correo, '') AS correo,
+          ISNULL(de.direccion, '') AS direccion
+        FROM Empresas e
+        LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
+        WHERE e.idEmpresa = @idEmpresa
+      `);
+  } catch (err) {
+    empresaResult = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT razon_Social AS nombre, ruc, Logo AS logoArchivo
+        FROM Empresas WHERE idEmpresa = @idEmpresa
+      `);
+  }
+  const empresa = empresaResult;
 
   const items = await pool
     .request()
@@ -150,28 +196,98 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa) => {
       WHERE dv.idVenta = @idVenta
     `);
 
+  const hashResult = await pool
+    .request()
+    .input('idVenta', sql.Int, idVenta)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1 hash AS resumenHash FROM ComprobantesElectronicos
+      WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+    `);
+
   const cab = cabecera.recordset && cabecera.recordset[0] ? cabecera.recordset[0] : null;
-  const emp = empresa.recordset && empresa.recordset[0] ? empresa.recordset[0] : null;
+  const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
   const detalle = items.recordset || [];
+  const hashRow = hashResult.recordset && hashResult.recordset[0] ? hashResult.recordset[0] : null;
+  const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
 
   if (!cab) return null;
+
+  let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '') ? String(cab.clienteDireccion).trim() : '';
+  if (!clienteDireccion && cab.idCliente != null) {
+    try {
+      const dirClienteResult = await pool
+        .request()
+        .input('idCliente', sql.Int, cab.idCliente)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`SELECT TOP 1 ISNULL(direccion, '') AS direccion FROM DireccionClientes WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa ORDER BY idDireccionClientes`);
+      const dirRow = dirClienteResult.recordset && dirClienteResult.recordset[0];
+      if (dirRow && dirRow.direccion) clienteDireccion = String(dirRow.direccion).trim();
+    } catch (_) {}
+  }
+
+  const base = (baseUrl || '').replace(/\/$/, '');
+  const logoFileName = emp && (
+    emp.logoArchivo ?? emp.logoarchivo ?? emp.logo ?? emp.Logo ?? ''
+  );
+  const logoFile = typeof logoFileName === 'string' && String(logoFileName).trim() !== '';
+  const logoUrl = logoFile ? `${base}/logos/${String(logoFileName).trim()}` : `${base}/assets/img/01.jpg`;
+
+  const tipoDocCliente = cab.clienteTipoDoc != null ? String(cab.clienteTipoDoc).trim() : '';
+  const tipoDocSunat = (tipoDocCliente === '6' || (cab.clienteRuc && String(cab.clienteRuc).length === 11)) ? '6' : '1';
+
+  const exonerado = cab.exonerado != null ? Number(cab.exonerado) : 0;
+  const gratuito = cab.gratuito != null ? Number(cab.gratuito) : 0;
+  const otrosCargos = cab.otrosCargos != null ? Number(cab.otrosCargos) : 0;
+
+  const empresaPayload = emp
+    ? {
+        nombre: emp.nombre,
+        ruc: emp.ruc,
+        direccion: (emp.direccion != null && String(emp.direccion).trim()) ? String(emp.direccion).trim() : '',
+        telefono: (emp.celular != null && String(emp.celular).trim()) ? String(emp.celular).trim() : '',
+        rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
+        correo: (emp.correo != null && String(emp.correo).trim()) ? String(emp.correo).trim() : '',
+        logo: logoUrl
+      }
+    : { nombre: '', ruc: '', direccion: '', telefono: '', rubro: '', correo: '', logo: `${base}/assets/img/01.jpg` };
+
+  // #region agent log
+  try {
+    const fs = require('fs');
+    const logLine = JSON.stringify({
+      hypothesisId: 'H1',
+      location: 'ventas.repository.js:obtenerComprobanteParaPdf',
+      message: 'Backend empresa logo',
+      data: { logoUrl, logoFileName: String(logoFileName), base, hasEmp: !!emp },
+      timestamp: Date.now()
+    }) + '\n';
+    fs.appendFileSync('c:\\project172026\\.cursor\\debug.log', logLine);
+  } catch (_) {}
+  // #endregion
 
   return {
     venta: {
       compVenta: cab.compVenta,
       nombreComprobante: cab.nombreComprobante,
+      codigoComprobante: cab.codigoComprobante != null ? String(cab.codigoComprobante).trim() : '01',
       fEmision: cab.fEmision,
       subtotal: cab.subtotal,
       igv: cab.igv,
+      exonerado,
+      gratuito,
+      otrosCargos,
       descuentos: cab.descuentos,
-      total: cab.total
+      total: cab.total,
+      resumenHash
     },
-    empresa: emp ? { nombre: emp.nombre, ruc: emp.ruc, direccion: '', telefono: '' } : {},
+    empresa: empresaPayload,
     cliente: {
       rSocial: cab.clienteRazonSocial,
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
-      direccion: cab.clienteDireccion
+      direccion: clienteDireccion,
+      tipoDocSunat: tipoDocSunat
     },
     items: detalle.map(d => ({
       descripcion: d.descripcion,

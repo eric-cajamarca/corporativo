@@ -9,6 +9,7 @@ import { SucursalService } from '../../../services/sucursal.service';
 import { PresentacionService } from '../../../services/presentacion.service';
 import { variosService } from '../../../services/varios.service';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
+import { CreateClientesComponent } from '../../clientes/create-clientes/create-clientes.component';
 import { ClienteService } from '../../../services/cliente.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
@@ -39,7 +40,7 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-ventas',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, TopnavComponent, SidebarComponent],
   templateUrl: './create-ventas.component.html',
   styleUrl: './create-ventas.component.css'
 })
@@ -836,6 +837,126 @@ abrirModalPrecios(item: any) {
     this.guardarEstadoProvisional();
   }
 
+  /**
+   * Consulta en BD por RUC/DNI: si existe carga los datos del cliente; si no existe abre el modal
+   * create-clientes con tipo doc y número pre-cargados. Al registrar y cerrar el modal, vuelve a
+   * consultar la BD y carga los datos.
+   */
+  buscarORegistrarCliente(): void {
+    const numero = (this.cliente.ruc ?? '').toString().trim();
+    const idDoc = this.ventas.idDocumento;
+    if (!numero) {
+      iziToast.warning({ title: 'Aviso', message: 'Ingrese el número de documento (RUC o DNI).', position: 'topRight' });
+      return;
+    }
+    if (idDoc === this.ID_DOC_RUC && numero.length !== 11) {
+      iziToast.warning({ title: 'Aviso', message: 'El RUC debe tener 11 dígitos.', position: 'topRight' });
+      return;
+    }
+    if (idDoc === this.ID_DOC_DNI && numero.length !== 8) {
+      iziToast.warning({ title: 'Aviso', message: 'El DNI debe tener 8 dígitos.', position: 'topRight' });
+      return;
+    }
+    this.clienteBuscando = true;
+    this._clienteService.obtener_cliente_ruc(numero).subscribe({
+      next: (response) => {
+        if (response.data != null && response.data.length > 0) {
+          this.aplicarClienteDesdeBd(response.data[0]);
+          this.clienteBuscando = false;
+          iziToast.success({ title: 'OK', message: 'Cliente encontrado en base de datos.', position: 'topRight' });
+        } else {
+          this.clienteBuscando = false;
+          this.abrirModalCrearCliente();
+        }
+      },
+      error: () => {
+        this.clienteBuscando = false;
+        iziToast.error({ title: 'Error', message: 'Error al consultar en base de datos.', position: 'topRight' });
+      }
+    });
+  }
+
+  /** Aplica los datos del cliente desde un registro de BD (y carga direcciones). */
+  private aplicarClienteDesdeBd(row: any): void {
+    this.cliente = {
+      idCliente: row.idCliente,
+      idDocumento: row.idDocumento,
+      ruc: row.ruc,
+      rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? row.razonSocial ?? row.RazonSocial ?? '').toString().trim(),
+      direccion: (row.direccion ?? '').toString(),
+      correo: row.correo ?? '',
+      celular: row.celular ?? '',
+      condicion: row.condicion ?? 'ACTIVO'
+    };
+    this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+      next: (dirRes) => {
+        if (dirRes?.data && dirRes.data.length > 0) {
+          this.direccionCliente = dirRes.data[0];
+          this.cliente.direccion = (this.direccionCliente?.direccion ?? this.cliente.direccion ?? '').toString();
+        }
+      },
+      error: () => {}
+    });
+    this.guardarEstadoProvisional();
+  }
+
+  /** Abre el modal de crear cliente con tipo doc y número pre-cargados (desde venta). */
+  abrirModalCrearCliente(): void {
+    const modalEl = document.getElementById('modalCrearCliente');
+    if (modalEl) {
+      const modalInst = (window as any).bootstrap?.Modal.getOrCreateInstance(modalEl);
+      modalInst?.show();
+    }
+  }
+
+  /** Cuando se registra el cliente desde el modal create-clientes: cierra el modal y vuelve a consultar la BD para cargar los datos. */
+  onClienteCreadoDesdeModal(event: any): void {
+    const modalEl = document.getElementById('modalCrearCliente');
+    const modalInst = bootstrap?.Modal?.getInstance?.(modalEl as HTMLElement) ?? (window as any).bootstrap?.Modal?.getInstance?.(modalEl);
+    modalInst?.hide();
+    const numero = (event?.ruc ?? this.cliente?.ruc ?? '').toString().trim();
+    if (!numero) {
+      this.guardarEstadoProvisional();
+      return;
+    }
+    this.clienteBuscando = true;
+    this._clienteService.obtener_cliente_ruc(numero).subscribe({
+      next: (response) => {
+        this.clienteBuscando = false;
+        if (response?.data != null && response.data.length > 0) {
+          this.aplicarClienteDesdeBd(response.data[0]);
+          iziToast.success({ title: 'OK', message: 'Cliente registrado y cargado.', position: 'topRight' });
+        } else {
+          this.cliente = {
+            idCliente: event?.idCliente,
+            idDocumento: event?.idDocumento ?? this.ventas.idDocumento,
+            ruc: numero,
+            rSocial: (event?.rSocial ?? event?.r_Social ?? '').toString().trim(),
+            direccion: (event?.direccion ?? '').toString(),
+            correo: event?.correo ?? '',
+            celular: event?.celular ?? '',
+            condicion: event?.condicion ?? 'ACTIVO'
+          };
+          this.guardarEstadoProvisional();
+        }
+      },
+      error: () => {
+        this.clienteBuscando = false;
+        this.cliente = {
+          idCliente: event?.idCliente,
+          idDocumento: event?.idDocumento ?? this.ventas.idDocumento,
+          ruc: numero,
+          rSocial: (event?.rSocial ?? event?.r_Social ?? '').toString().trim(),
+          direccion: (event?.direccion ?? '').toString(),
+          correo: event?.correo ?? '',
+          celular: event?.celular ?? '',
+          condicion: event?.condicion ?? 'ACTIVO'
+        };
+        this.guardarEstadoProvisional();
+      }
+    });
+  }
+
 
 //  idFormaPago: number;
 //   descripcion:string,
@@ -995,12 +1116,15 @@ abrirModalPrecios(item: any) {
       next: (res: any) => {
         const creado = res?.data;
         const idCliente = creado?.idCliente != null ? Number(creado.idCliente) : null;
+        const enviarVenta = (id: number) => {
+          this.cliente.idCliente = id;
+          this.registrarDireccionClienteSiNuevo(id, () => this.enviarVentaConCliente(id));
+        };
         if (idCliente == null) {
           this._clienteService.obtener_cliente_ruc(payload.ruc).subscribe({
             next: (r: any) => {
               if (r.data && r.data.length > 0) {
-                this.cliente.idCliente = r.data[0].idCliente;
-                this.enviarVentaConCliente(Number(this.cliente.idCliente));
+                enviarVenta(Number(r.data[0].idCliente));
               } else {
                 this.loading = false;
                 iziToast.error({ title: 'Error', message: 'No se pudo obtener el cliente creado.' });
@@ -1012,8 +1136,7 @@ abrirModalPrecios(item: any) {
             }
           });
         } else {
-          this.cliente.idCliente = idCliente;
-          this.enviarVentaConCliente(idCliente);
+          enviarVenta(idCliente);
         }
       },
       error: (err) => {
@@ -1021,6 +1144,31 @@ abrirModalPrecios(item: any) {
         const msg = err?.error?.message ?? 'No se pudo crear el cliente.';
         iziToast.error({ title: 'Error', message: msg });
       }
+    });
+  }
+
+  /**
+   * Registra una dirección en DireccionClientes para un cliente recién creado.
+   * Usa datos por defecto para campos no disponibles. Siempre ejecuta onDone (para continuar con la venta).
+   */
+  registrarDireccionClienteSiNuevo(idCliente: number, onDone: () => void): void {
+    const direccion = (this.cliente?.direccion ?? '').toString().trim() || 'Sin especificar';
+    const payload = {
+      idCliente,
+      direccion,
+      ubigeo: '',
+      codpais: 'PEN',
+      region: '',
+      provincia: '',
+      distrito: '',
+      urbanizacion: '',
+      referencia: '',
+      codLocal: '',
+      principal: true
+    };
+    this._clienteService.crear_direccionCliente(payload).subscribe({
+      next: () => onDone(),
+      error: () => onDone()
     });
   }
 
