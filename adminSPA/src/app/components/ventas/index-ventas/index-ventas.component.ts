@@ -153,6 +153,12 @@ export class IndexVentasComponent implements OnInit {
     return this.idComprobanteStr(v) !== '';
   }
 
+  /** True si la venta se puede editar (comprobante no enviado ni aceptado en SUNAT). */
+  puedeEditarVenta(v: VentaListado): boolean {
+    const id = v?.idEstadoSunat;
+    return id !== 1 && id !== 2 && id !== 3;
+  }
+
   enviarASunat(v: VentaListado): void {
     const id = v?.idComprobanteElectronico != null ? String(v.idComprobanteElectronico).trim() : '';
     if (!id) return;
@@ -193,6 +199,20 @@ export class IndexVentasComponent implements OnInit {
 
   min(a: number, b: number): number {
     return Math.min(a, b);
+  }
+
+  /** Comprobantes válidos SUNAT (aceptados: idEstadoSunat 1, 2, 3) según la lista filtrada actual (ventas). */
+  get resumenValidosSunat(): { cantidad: number; total: number } {
+    const list = this.ventas.filter((v) => v.idEstadoSunat === 1 || v.idEstadoSunat === 2 || v.idEstadoSunat === 3);
+    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+    return { cantidad: list.length, total };
+  }
+
+  /** Comprobantes no válidos SUNAT (pendientes, rechazados, error) según la lista filtrada actual (ventas). */
+  get resumenNoValidosSunat(): { cantidad: number; total: number } {
+    const list = this.ventas.filter((v) => v.idEstadoSunat !== 1 && v.idEstadoSunat !== 2 && v.idEstadoSunat !== 3);
+    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+    return { cantidad: list.length, total };
   }
 
   abrirModalArchivo(v: VentaListado, tipo: 'xml' | 'cdr'): void {

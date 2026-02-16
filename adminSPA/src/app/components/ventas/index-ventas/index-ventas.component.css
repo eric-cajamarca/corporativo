@@ -150,39 +150,115 @@
 
 /* ===== TABLE ===== */
 
-
-.table-card .table,
-.table-card .table thead th,
-.table-card .table tbody td {
-  font-size: 13px;
+.ventas-table-wrap {
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: #fff;
 }
 
-.table {
+.table-ventas {
   margin-bottom: 0;
+  font-size: 0.9rem;
 }
 
-.table thead th {
-  border-top: none;
+.table-card .table-ventas,
+.table-card .table-ventas thead th,
+.table-card .table-ventas tbody td {
+  font-size: 0.9rem;
+}
+
+.table-ventas-thead {
+  background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+  color: #fff;
+}
+
+.table-ventas-thead th {
+  border: none;
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.85rem;
-  letter-spacing: 0.5px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
   padding: 1rem 0.75rem;
+  white-space: nowrap;
 }
 
-.table tbody tr {
+.table-ventas tbody tr {
   transition: var(--transition);
+  border-bottom: 1px solid #eee;
 }
 
-.table tbody tr:hover {
-  background-color: rgba(0, 123, 255, 0.05);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+.table-ventas tbody tr:last-child {
+  border-bottom: none;
 }
 
-.table td {
-  padding: 0.75rem;
+.table-ventas-row:hover {
+  background-color: rgba(44, 62, 80, 0.06);
+}
+
+.table-ventas td {
+  padding: 0.85rem 0.75rem;
   vertical-align: middle;
+}
+
+.cliente-nombre {
+  max-width: 180px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge-estado-sunat {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.35em 0.65em;
+}
+
+.acciones-cell {
+  white-space: nowrap;
+}
+
+.acciones-cell .btn {
+  padding: 0.25rem 0.4rem;
+}
+
+/* Footer resumen */
+.table-ventas-tfoot {
+  background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+  border-top: 2px solid #dee2e6;
+}
+
+.table-ventas-tfoot .resumen-row td {
+  border-bottom: none;
+  font-size: 0.875rem;
+}
+
+.resumen-item {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.resumen-validos {
+  color: #0d6efd;
+}
+
+.resumen-validos i {
+  color: #198754;
+}
+
+.resumen-no-validos {
+  color: #6c757d;
+}
+
+.resumen-no-validos i {
+  color: #dc3545;
+}
+
+.pagination-wrap {
+  padding: 0.5rem 0;
 }
 
 /* ===== MODAL ===== */

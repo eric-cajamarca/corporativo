@@ -4,7 +4,9 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
-import { CotizacionesService, CotizacionDetalleResponse } from '../../../services/cotizaciones.service';
+import { CotizacionesService } from '../../../services/cotizaciones.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 
 declare var iziToast: any;
 
@@ -50,7 +52,8 @@ export class UpdateCotizacionComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private cotizacionesService: CotizacionesService
+    private cotizacionesService: CotizacionesService,
+    private buscadorProductosModal: BuscadorProductosModalService
   ) {}
 
   ngOnInit(): void {
@@ -118,6 +121,40 @@ export class UpdateCotizacionComponent implements OnInit {
 
   formatearMoneda(value: number): string {
     return 'S/ ' + Number(value).toFixed(2);
+  }
+
+  eliminarDetalle(index: number): void {
+    if (index >= 0 && index < this.detalles.length) {
+      this.detalles.splice(index, 1);
+      this.recalcularTotal();
+    }
+  }
+
+  agregarProductos(): void {
+    const idSucursal = this.detalles.length > 0 && this.detalles[0].idSucursal != null
+      ? String(this.detalles[0].idSucursal)
+      : undefined;
+    this.buscadorProductosModal.abrir(idSucursal).then((producto: ProductoSeleccionado | null) => {
+      if (producto == null) return;
+      const idSucursalDetalle = this.detalles.length > 0
+        ? this.detalles[0].idSucursal
+        : 1;
+      const pVenta = Number(producto.pVenta) || 0;
+      const nuevoDetalle: DetalleEdicion = {
+        cantidad: 1,
+        codigo: producto.codigo ?? '',
+        descripcion: producto.descripcion ?? '',
+        idPresentacion: producto.idPresentacion ?? 1,
+        pVenta,
+        descuentos: 0,
+        igv: 0,
+        ISC: 0,
+        total: pVenta,
+        idSucursal: idSucursalDetalle
+      };
+      this.detalles.push(nuevoDetalle);
+      this.recalcularTotal();
+    });
   }
 
   volver(): void {

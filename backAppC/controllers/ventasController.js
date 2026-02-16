@@ -490,6 +490,47 @@ const eliminarDetalleVenta = async function (req, res) {
 
 
 
+/** PUT ventas/editar/:idVenta - Actualiza cabecera y detalle. No permitido si comprobante ya enviado/aceptado en SUNAT (idEstadoSunat 1,2,3). */
+const actualizarVentaEdicion = async (req, res) => {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVentaRaw = req.params.idVenta;
+  const idVenta = parseInt(idVentaRaw, 10);
+  if (Number.isNaN(idVenta) || idVenta < 1) {
+    return res.status(400).json({ error: 'idVenta inválido' });
+  }
+  const { venta: cabecera, detalles } = req.body || {};
+  if (!cabecera || !Array.isArray(detalles)) {
+    return res.status(400).json({ error: 'Se requieren venta y detalles' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa);
+    if (!data || !data.venta) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+    const idEstadoSunat = data.venta.idEstadoSunat;
+    if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) {
+      return res.status(400).json({
+        error: 'No se puede editar: el comprobante ya fue enviado o aceptado en SUNAT.'
+      });
+    }
+    const result = await ventasRepository.actualizarVentaCompleta(pool, idVenta, idEmpresa, {
+      ...cabecera,
+      idEstadoSunat
+    }, detalles);
+    if (result && result.ok === false) {
+      return res.status(400).json({ error: result.error || 'No se pudo actualizar' });
+    }
+    res.json({ message: 'Venta actualizada correctamente' });
+  } catch (error) {
+    console.error('Error al actualizar venta (edición):', error);
+    res.status(500).json({ error: error.message || 'Error al actualizar la venta' });
+  }
+};
+
 module.exports = {
     crearVenta,
     crearVentaCompleta,
@@ -497,6 +538,7 @@ module.exports = {
     obtenerVentas,
     obtenerComprobanteParaPdf,
     actualizarVenta,
+    actualizarVentaEdicion,
     // detalle venta (crearDetalleVenta está comentado; se usa crearVentaCompleta)
     crearDetalleVenta_DescontarStock,
     actualizarDetalleVenta,

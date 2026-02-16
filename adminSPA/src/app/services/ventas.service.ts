@@ -67,17 +67,51 @@ export class VentasService {
     return this._http.get<{ data: VentaListado[] }>(this.url + 'ventas/listar', { withCredentials: true });
   }
 
-  /** Datos de una venta para generar comprobante PDF (empresa, venta, cliente, items). */
+  /** Datos de una venta para generar comprobante PDF o edición (empresa, venta, cliente, items). */
   getComprobanteParaPdf(idVenta: number): Observable<{ data: ComprobantePdfData }> {
     return this._http.get<{ data: ComprobantePdfData }>(
       this.url + 'ventas/comprobante/' + idVenta,
       { withCredentials: true }
     );
   }
+
+  /** Actualiza cabecera y detalle de una venta (solo si no está aceptada en SUNAT). */
+  actualizarVenta(idVenta: number, payload: { venta: VentaEdicionPayload; detalles: DetalleVentaEdicionPayload[] }): Observable<{ message?: string }> {
+    return this._http.put<{ message?: string }>(
+      this.url + 'ventas/editar/' + idVenta,
+      payload,
+      { withCredentials: true }
+    );
+  }
+}
+
+export interface VentaEdicionPayload {
+  fEmision: string;
+  idCliente?: number;
+  subtotal: number;
+  igv: number;
+  descuentos: number;
+  total: number;
+}
+
+export interface DetalleVentaEdicionPayload {
+  idProducto: string;
+  cantidad: number;
+  pVenta: number;
+  descuento?: number;
+  subtotal?: number;
+  total: number;
+  igv?: boolean;
+  isc?: boolean;
 }
 
 export interface ComprobantePdfData {
   venta: {
+    idVenta?: number;
+    idEstadoSunat?: number | null;
+    idSucursal?: string;
+    idComprobante?: number;
+    idCliente?: number;
     compVenta: string;
     nombreComprobante?: string;
     codigoComprobante?: string;
@@ -93,7 +127,16 @@ export interface ComprobantePdfData {
   };
   empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
   cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string; tipoDocSunat?: string };
-  items: Array<{ descripcion: string; cantidad: number; pVenta: number; subtotal?: number; total: number }>;
+  items: Array<{
+    idDetalle?: number;
+    idProducto?: string;
+    codigo?: string;
+    descripcion: string;
+    cantidad: number;
+    pVenta: number;
+    subtotal?: number;
+    total: number;
+  }>;
 }
 
 export interface VentaListado {
@@ -107,6 +150,7 @@ export interface VentaListado {
   nombreComprobante?: string;
   clienteRazonSocial?: string;
   clienteRuc?: string;
+  condicionPago?: string;
   /** Presente cuando la venta tiene comprobante electrónico (para botón Enviar a SUNAT). */
   idComprobanteElectronico?: string;
   /** True si el comprobante tiene XML generado (Facturador). */

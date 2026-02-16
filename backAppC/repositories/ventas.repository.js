@@ -87,41 +87,85 @@ exports.insertarDetallePagoVenta = async (transaction, idVenta, detallePago) => 
 
 /** Lista comprobantes de venta de la empresa con nombre de comprobante, cliente e idComprobanteElectronico para envío SUNAT. */
 exports.listarPorEmpresa = async (pool, idEmpresa) => {
-  const result = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT
-        v.idVenta,
-        v.compVenta,
-        CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
-        v.total,
-        v.idEstadoSunat,
-        v.serie,
-        v.numero,
-        v.idComprobante,
-        v.idCliente,
-        c.nombre AS nombreComprobante,
-        c.codigo AS codigoComprobante,
-        cl.rSocial AS clienteRazonSocial,
-        cl.ruc AS clienteRuc,
-        ce.idComprobanteElectronico,
-        ce.tipoComprobante,
-        e.ruc AS rucEmpresa
-      FROM Ventas v
-      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-      LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
-      LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
-      LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
-      WHERE v.idEmpresa = @idEmpresa
-      ORDER BY v.fEmision DESC
-    `);
+  let result;
+  try {
+    result = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT
+          v.idVenta,
+          v.compVenta,
+          CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+          v.total,
+          v.idEstadoSunat,
+          v.serie,
+          v.numero,
+          v.idComprobante,
+          v.idCliente,
+          v.idMediosPago,
+          ISNULL(mp.descripcion, v.idMediosPago) AS condicionPago,
+          c.nombre AS nombreComprobante,
+          c.codigo AS codigoComprobante,
+          COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
+          COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRuc,
+          ce.idComprobanteElectronico,
+          ce.tipoComprobante,
+          e.ruc AS rucEmpresa
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+        LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+        LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+        WHERE v.idEmpresa = @idEmpresa
+        ORDER BY v.fEmision DESC
+      `);
+  } catch (err) {
+    if (err.message && (err.message.includes('MediosPago') || err.message.includes('Invalid object'))) {
+      result = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT
+            v.idVenta,
+            v.compVenta,
+            CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+            v.total,
+            v.idEstadoSunat,
+            v.serie,
+            v.numero,
+            v.idComprobante,
+            v.idCliente,
+            v.idMediosPago AS condicionPago,
+            c.nombre AS nombreComprobante,
+            c.codigo AS codigoComprobante,
+            COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
+            COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRuc,
+            ce.idComprobanteElectronico,
+            ce.tipoComprobante,
+            e.ruc AS rucEmpresa
+          FROM Ventas v
+          LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+          LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+          LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+          LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+          WHERE v.idEmpresa = @idEmpresa
+          ORDER BY v.fEmision DESC
+        `);
+    } else {
+      throw err;
+    }
+  }
   const rows = result.recordset || [];
   return rows.map((r) => ({
     ...r,
     idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
     tipoComprobante: r.tipoComprobante != null ? String(r.tipoComprobante).trim() : null,
-    rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null
+    rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null,
+    condicionPago: r.condicionPago != null ? String(r.condicionPago).trim() : (r.idMediosPago != null ? String(r.idMediosPago) : ''),
+    clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
+    clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : ''
   }));
 };
 
@@ -135,7 +179,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .query(`
         SELECT
-          v.idVenta, v.compVenta, v.serie, v.numero,
+          v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv,
           ISNULL(v.exonerado, 0) AS exonerado,
@@ -158,7 +202,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .query(`
         SELECT
-          v.idVenta, v.compVenta, v.serie, v.numero,
+          v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
@@ -202,7 +246,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
     .request()
     .input('idVenta', sql.Int, idVenta)
     .query(`
-      SELECT dv.cantidad, dv.pVenta, dv.subtotal, dv.total, p.descripcion
+      SELECT dv.idDetalle, dv.idProducto, dv.cantidad, dv.pVenta, dv.subtotal, dv.total, p.descripcion, p.codigo
       FROM DetalleVenta dv
       INNER JOIN Productos p ON p.idProducto = dv.idProducto
       WHERE dv.idVenta = @idVenta
@@ -280,6 +324,11 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
 
   return {
     venta: {
+      idVenta: cab.idVenta,
+      idEstadoSunat: cab.idEstadoSunat != null ? cab.idEstadoSunat : null,
+      idSucursal: cab.idSucursal,
+      idComprobante: cab.idComprobante,
+      idCliente: cab.idCliente,
       compVenta: cab.compVenta,
       nombreComprobante: cab.nombreComprobante,
       codigoComprobante: cab.codigoComprobante != null ? String(cab.codigoComprobante).trim() : '01',
@@ -302,6 +351,9 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       tipoDocSunat: tipoDocSunat
     },
     items: detalle.map(d => ({
+      idDetalle: d.idDetalle,
+      idProducto: d.idProducto,
+      codigo: d.codigo,
       descripcion: d.descripcion,
       cantidad: d.cantidad,
       pVenta: d.pVenta,
@@ -309,4 +361,85 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       total: d.total
     }))
   };
+};
+
+/** Actualiza cabecera y detalle de una venta. Solo permitir cuando idEstadoSunat no sea Aceptado (1,2,3). */
+exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, detalles) => {
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const idEstadoSunat = cabecera.idEstadoSunat;
+    if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) {
+      await transaction.rollback();
+      return { ok: false, error: 'No se puede editar: el comprobante ya fue enviado o aceptado en SUNAT.' };
+    }
+    const fEmision = cabecera.fEmision || null;
+    const idCliente = cabecera.idCliente != null ? Number(cabecera.idCliente) : null;
+    const subtotal = Number(cabecera.subtotal) || 0;
+    const igv = Number(cabecera.igv) || 0;
+    const descuentos = Number(cabecera.descuentos) || 0;
+    const total = Number(cabecera.total) || 0;
+    if (idCliente != null && idCliente > 0) {
+      await transaction.request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('fEmision', sql.DateTime, fEmision)
+        .input('idCliente', sql.Int, idCliente)
+        .input('subtotal', sql.Decimal(18, 2), subtotal)
+        .input('igv', sql.Decimal(18, 2), igv)
+        .input('descuentos', sql.Decimal(18, 2), descuentos)
+        .input('total', sql.Decimal(18, 2), total)
+        .query(`
+          UPDATE Ventas SET fEmision = @fEmision, idCliente = @idCliente, subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+        `);
+    } else {
+      await transaction.request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('fEmision', sql.DateTime, fEmision)
+        .input('subtotal', sql.Decimal(18, 2), subtotal)
+        .input('igv', sql.Decimal(18, 2), igv)
+        .input('descuentos', sql.Decimal(18, 2), descuentos)
+        .input('total', sql.Decimal(18, 2), total)
+        .query(`
+          UPDATE Ventas SET fEmision = @fEmision, subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+        `);
+    }
+    await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .query('DELETE FROM DetalleVenta WHERE idVenta = @idVenta');
+    for (const d of detalles) {
+      const idProducto = d.idProducto;
+      const cantidad = Number(d.cantidad) || 0;
+      const pVenta = Number(d.pVenta) || 0;
+      const totalItem = Number(d.total) != null ? Number(d.total) : cantidad * pVenta;
+      const subtotalItem = cantidad * pVenta;
+      const descuento = Number(d.descuento) || 0;
+      const igv = d.igv != null ? (d.igv ? 1 : 0) : 0;
+      const isc = d.isc != null ? (d.isc ? 1 : 0) : 0;
+      await transaction.request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idProducto', sql.UniqueIdentifier, idProducto)
+        .input('cantidad', sql.Decimal(18, 3), cantidad)
+        .input('pVenta', sql.Decimal(18, 5), pVenta)
+        .input('descuento', sql.Decimal(18, 2), descuento)
+        .input('subtotal', sql.Decimal(18, 2), subtotalItem)
+        .input('igv', sql.Bit, igv)
+        .input('isc', sql.Bit, isc)
+        .input('total', sql.Decimal(18, 2), totalItem)
+        .input('cantEntregada', sql.Decimal(18, 3), 0)
+        .input('idEstadoPedido', sql.Int, 1)
+        .query(`
+          INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido)
+          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @cantEntregada, @idEstadoPedido)
+        `);
+    }
+    await transaction.commit();
+    return { ok: true };
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
 };

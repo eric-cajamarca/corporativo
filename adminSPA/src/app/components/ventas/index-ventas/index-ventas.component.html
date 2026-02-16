@@ -67,38 +67,48 @@
             <i class="bi bi-inbox me-2"></i>No hay comprobantes de venta para mostrar.
           </div>
         </ng-container>
-        <div class="table-responsive" *ngIf="!loading && ventas.length > 0">
-          <table class="table table-hover table-striped mb-0">
-            <thead class="table-dark">
+        <div class="table-responsive ventas-table-wrap" *ngIf="!loading && ventas.length > 0">
+          <table class="table table-ventas mb-0">
+            <thead class="table-ventas-thead table-dark">
               <tr>
                 <th>ID</th>
-                <th>Fecha y Hora</th>
+                <th>F. Emisión</th>
                 <th>Comprobante</th>
-                <th>RUC</th>
                 <th>Cliente</th>
+                <th>Condición</th>
                 <th class="text-end">Total</th>
-                <th>Estado SUNAT</th>
-                <th>Acciones</th>
+                <th>Est. SUNAT</th>
+                <th class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize">
-                <td>{{ v.idVenta }}</td>
-                <td>{{ formatearFecha(v.fEmision) }}</td>
+              <tr *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize" class="table-ventas-row">
+                <td class="fw-medium">{{ v.idVenta }}</td>
+                <td class="text-nowrap">{{ formatearFecha(v.fEmision) }}</td>
                 <td>{{ v.compVenta || '—' }}</td>
-                <td>{{ v.clienteRuc || '—' }}</td>
-                <td>{{ v.clienteRazonSocial || '—' }}</td>
+                <td>
+                  <span class="cliente-nombre" title="{{ v.clienteRuc || '' }}">{{ v.clienteRazonSocial || '—' }}</span>
+                </td>
+                <td>{{ v.condicionPago || '—' }}</td>
                 <td class="text-end fw-semibold">{{ formatearMoneda(v.total) }}</td>
                 <td>
-                  <span class="badge" [ngClass]="estadoSunatClass(v.idEstadoSunat)">
+                  <span class="badge badge-estado-sunat" [ngClass]="estadoSunatClass(v.idEstadoSunat)">
                     {{ estadoSunatLabel(v.idEstadoSunat) }}
                   </span>
                 </td>
-                <td>
+                <td class="text-center acciones-cell">
+                  <!--
+                  <a [routerLink]="['/ventas/detalle', v.idVenta]" class="btn btn-sm btn-outline-info me-1" title="Ver detalle">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  -->
+                  <a *ngIf="puedeEditarVenta(v)" [routerLink]="['/ventas/editar', v.idVenta]" class="btn btn-sm btn-outline-warning me-1" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </a>
                   <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#pdfModal" title="PDF" (click)="abrirModalPdf(v)">
                     <i class="bi bi-file-pdf"></i>
                   </button>
-                  <button *ngIf="puedeEnviarSunat(v)" type="button" class="btn btn-sm btn-success me-1" title="Enviar a SUNAT" (click)="enviarASunat(v)" [disabled]="enviandoSunatId === idComprobanteStr(v)">
+                  <button *ngIf="puedeEnviarSunat(v) && puedeEditarVenta(v)" type="button" class="btn btn-sm btn-success me-1" title="Enviar a SUNAT" (click)="enviarASunat(v)" [disabled]="enviandoSunatId === idComprobanteStr(v)">
                     <span *ngIf="enviandoSunatId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i> Enviando...</span>
                     <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i> SUNAT</span>
                   </button>
@@ -111,8 +121,25 @@
                 </td>
               </tr>
             </tbody>
+            <tfoot class="table-ventas-tfoot">
+              <tr class="resumen-row">
+                <td colspan="5" class="text-end fw-semibold py-3"></td>
+                <td colspan="3" class="py-3">
+                  <div class="d-flex flex-wrap gap-4 justify-content-end align-items-center">
+                    <span class="resumen-item resumen-validos">
+                      <i class="bi bi-check-circle-fill me-1"></i>
+                      Facturado: <strong>{{ resumenValidosSunat.cantidad }}</strong> comprobante(s) — Total <strong>{{ formatearMoneda(resumenValidosSunat.total) }}</strong>
+                    </span>
+                    <span class="resumen-item resumen-no-validos">
+                      <i class="bi bi-dash-circle me-1"></i>
+                      No Facturado: <strong>{{ resumenNoValidosSunat.cantidad }}</strong> comprobante(s) — Total <strong>{{ formatearMoneda(resumenNoValidosSunat.total) }}</strong>
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
           </table>
-          <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+          <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2 pagination-wrap">
             <span class="text-muted small">Mostrando {{ (page - 1) * pageSize + 1 }} - {{ min((page) * pageSize, ventas.length) }} de {{ ventas.length }}</span>
             <ngb-pagination
               [(page)]="page"

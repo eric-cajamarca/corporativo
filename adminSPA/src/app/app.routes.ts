@@ -35,6 +35,8 @@ import { CreateProgramacionComponent } from './components/programaciones/create-
 import { UpdateProgramacionComponent } from './components/programaciones/update-programacion/update-programacion.component';
 import { IndexVentasComponent } from './components/ventas/index-ventas/index-ventas.component';
 import { CreateVentasComponent } from './components/ventas/create-ventas/create-ventas.component';
+import { DetalleVentaComponent } from './components/ventas/detalle-venta/detalle-venta.component';
+import { UpdateVentaComponent } from './components/ventas/update-venta/update-venta.component';
 import { IndexCotizacionesComponent } from './components/cotizaciones/index-cotizaciones/index-cotizaciones.component';
 import { DetalleCotizacionComponent } from './components/cotizaciones/detalle-cotizacion/detalle-cotizacion.component';
 import { UpdateCotizacionComponent } from './components/cotizaciones/update-cotizacion/update-cotizacion.component';
@@ -178,6 +180,8 @@ export const routes: Routes = [
 
      { path: 'ventas', component: IndexVentasComponent, canActivate: [AuthGuard], title: 'Resumen de ventas'},
      { path: 'ventas/create', component: CreateVentasComponent, canActivate: [AuthGuard], title: 'Crear nueva venta'},
+     { path: 'ventas/detalle/:id', component: DetalleVentaComponent, canActivate: [AuthGuard], title: 'Detalle de venta' },
+     { path: 'ventas/editar/:id', component: UpdateVentaComponent, canActivate: [AuthGuard], title: 'Editar venta' },
 
      { path: 'cotizaciones', component: IndexCotizacionesComponent, canActivate: [AuthGuard], title: 'Cotizaciones' },
      { path: 'cotizaciones/editar/:id', component: UpdateCotizacionComponent, canActivate: [AuthGuard], title: 'Editar cotización' },
