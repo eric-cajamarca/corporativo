@@ -1067,6 +1067,15 @@ abrirModalPrecios(item: any) {
     inst?.hide();
   }
 
+  /** True si el comprobante seleccionado es electrónico (01 Factura, 03 Boleta, 07 NC, 08 ND). */
+  esComprobanteElectronico(): boolean {
+    const id = this.ventas?.idComprobante;
+    if (id == null || id === '') return false;
+    const comp = this.comprobantes?.find((c: any) => Number(c.idComprobante) === Number(id));
+    const codigo = String(comp?.codigo ?? '').trim();
+    return ['01', '03', '07', '08'].includes(codigo);
+  }
+
   /** Registra la venta completa. Si el cliente no tiene idCliente, lo crea antes en BD. */
   registrarVenta(): void {
     if (this.carrito.length === 0) {
@@ -1202,7 +1211,7 @@ abrirModalPrecios(item: any) {
       descuentos: Number(this.ventas.descuentos) || 0,
       total: totalVenta,
       idMediosPago: String(this.ventas.idMediosPago || '5'),
-      idEstadoSunat: 1,
+      idEstadoSunat: this.esComprobanteElectronico() ? 7 : 1,
       compRelacionado: this.ventas.observacion || null
     };
 

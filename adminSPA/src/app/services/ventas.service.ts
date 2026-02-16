@@ -107,4 +107,10 @@ export interface VentaListado {
   nombreComprobante?: string;
   clienteRazonSocial?: string;
   clienteRuc?: string;
+  /** Presente cuando la venta tiene comprobante electrónico (para botón Enviar a SUNAT). */
+  idComprobanteElectronico?: string;
+  /** True si el comprobante tiene XML generado (Facturador). */
+  tieneXml?: boolean;
+  /** True si el comprobante tiene CDR de SUNAT. */
+  tieneCdr?: boolean;
 }

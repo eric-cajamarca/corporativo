@@ -85,7 +85,7 @@ exports.insertarDetallePagoVenta = async (transaction, idVenta, detallePago) => 
   }
 };
 
-/** Lista comprobantes de venta de la empresa con nombre de comprobante y cliente. Fechas en formato ISO. */
+/** Lista comprobantes de venta de la empresa con nombre de comprobante, cliente e idComprobanteElectronico para envío SUNAT. */
 exports.listarPorEmpresa = async (pool, idEmpresa) => {
   const result = await pool
     .request()
@@ -102,15 +102,27 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
         v.idComprobante,
         v.idCliente,
         c.nombre AS nombreComprobante,
+        c.codigo AS codigoComprobante,
         cl.rSocial AS clienteRazonSocial,
-        cl.ruc AS clienteRuc
+        cl.ruc AS clienteRuc,
+        ce.idComprobanteElectronico,
+        ce.tipoComprobante,
+        e.ruc AS rucEmpresa
       FROM Ventas v
       LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
       LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+      LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+      LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
       WHERE v.idEmpresa = @idEmpresa
       ORDER BY v.fEmision DESC
     `);
-  return result.recordset || [];
+  const rows = result.recordset || [];
+  return rows.map((r) => ({
+    ...r,
+    idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
+    tipoComprobante: r.tipoComprobante != null ? String(r.tipoComprobante).trim() : null,
+    rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null
+  }));
 };
 
 /** Datos completos de una venta para generar comprobante PDF (cabecera, empresa, cliente, items). baseUrl para armar URL del logo (ej: http://localhost:3000). */

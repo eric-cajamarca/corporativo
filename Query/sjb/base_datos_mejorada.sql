@@ -1382,8 +1382,8 @@ GO
 CREATE TABLE ConfiguracionFacturacionElectronica (
     idConfiguracion UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     idEmpresa UNIQUEIDENTIFIER NOT NULL,
-    certificadoDigital VARCHAR(500) NULL, -- Path del certificado
-    claveCertificado VARCHAR(100) NULL, -- Clave del certificado
+    certificadoDigital VARCHAR(MAX) NULL, -- Path del certificado
+    claveCertificado VARCHAR(256) NULL, -- Clave del certificado
     usuarioSunat VARCHAR(20) NULL,
     claveSunat VARCHAR(20) NULL,
     urlEnvio VARCHAR(200) NULL, -- URL del servicio de SUNAT
@@ -1393,6 +1393,13 @@ CREATE TABLE ConfiguracionFacturacionElectronica (
     serieBoleta VARCHAR(4) NULL,
     serieNotaCredito VARCHAR(4) NULL,
     serieNotaDebito VARCHAR(4) NULL,
+    rutaCarpetaFacturadorSunat VARCHAR(500) NULL,
+    envioAutomatico BIT NOT NULL DEFAULT 0,
+    minutosEnvioAutomatico INT NOT NULL DEFAULT 10,
+    envioPorLotes BIT NOT NULL DEFAULT 0,
+    programacionEnvioLotes VARCHAR(100) NULL,
+    urlFacturadorSunat VARCHAR(200) NULL,
+    envioDirectoSunat BIT NOT NULL DEFAULT 0,
 
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
     CONSTRAINT UQ_ConfiguracionFacturacionElectronica_Empresa UNIQUE (idEmpresa)

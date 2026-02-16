@@ -1,11 +1,27 @@
+const path = require('path');
+const fs = require('fs');
 const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const detalleVentaService = require('../services/detalle-ventas.service');
 const stockService = require('../services/stock.service');
 const ventasRepository = require('../repositories/ventas.repository');
+const facturacionRepository = require('../repositories/facturacion.repository');
 const dbConfig = require('../dbconfig');
+const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 
-
+/** Devuelve fecha de emisión con hora actual (HH:mm:ss) para ComprobantesElectronicos. */
+function fechaEmisionConHoraActual(fEmision) {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  const hora = `${h}:${m}:${s}`;
+  if (!fEmision) return now;
+  const str = typeof fEmision === 'string' ? fEmision.trim() : (fEmision instanceof Date ? fEmision.toISOString().slice(0, 19).replace('T', ' ') : '');
+  const parteFecha = str.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(parteFecha)) return now;
+  return new Date(`${parteFecha}T${hora}`);
+}
 
 const crearVenta = async function (req, res) {
     const datosVenta = req.body;
@@ -71,7 +87,37 @@ const obtenerVentas = async function (req, res) {
   }
   try {
     const pool = await sql.connect(dbConfig);
-    const list = await ventasRepository.listarPorEmpresa(pool, idempresa);
+    let list = await ventasRepository.listarPorEmpresa(pool, idempresa);
+    const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
+    const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
+    if (rutaFacturador) {
+      const rutaFirma = getRutaFirmaFacturador(rutaFacturador);
+      const rutaRpta = getRutaRptaFacturador(rutaFacturador);
+      list = list.map((r) => {
+        let tieneXml = false;
+        let tieneCdr = false;
+        if (r.idComprobanteElectronico && r.rucEmpresa && r.tipoComprobante != null) {
+          const nombreArchivo = nombreArchivoComprobante({
+            ruc: r.rucEmpresa,
+            tipoComprobante: r.tipoComprobante,
+            serie: r.serie,
+            numero: r.numero
+          });
+          const base = nombreArchivo.replace(/\.json$/i, '');
+          if (rutaFirma) {
+            const xmlPath = path.join(rutaFirma, base + '.xml');
+            try { tieneXml = fs.existsSync(xmlPath); } catch (_) {}
+          }
+          if (rutaRpta) {
+            const zipPath = path.join(rutaRpta, 'R' + base + '.zip');
+            try { tieneCdr = fs.existsSync(zipPath); } catch (_) {}
+          }
+        }
+        return { ...r, tieneXml, tieneCdr };
+      });
+    } else {
+      list = list.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
+    }
     res.json({ data: list });
   } catch (error) {
     console.error('Error al obtener las ventas:', error);
@@ -205,7 +251,9 @@ const crearVentaCompleta = async (req, res) => {
       idSucursalStock = rsSuc.recordset?.[0]?.idSucursal || null;
     }
 
-    const ventaResult = await ventasRepository.insertar(transaction, venta, req.user.empresa, req.user.sub);
+    const fechaEmisionConHora = fechaEmisionConHoraActual(venta.fEmision);
+    const ventaConHora = { ...venta, fEmision: fechaEmisionConHora };
+    const ventaResult = await ventasRepository.insertar(transaction, ventaConHora, req.user.empresa, req.user.sub);
     const idVenta = ventaResult.recordset[0].idVenta;
 
     const idSucursalParaStock = idSucursalStock || venta.idSucursal || null;
@@ -220,6 +268,16 @@ const crearVentaCompleta = async (req, res) => {
     }
 
     await ventasRepository.actualizarNumeroComprobante(transaction, req.user.empresa, venta.idComprobante, venta.numero);
+
+    await facturacionRepository.registrarComprobanteElectronicoPorVentaRepo(
+      transaction,
+      req.user.empresa,
+      idVenta,
+      venta.idComprobante,
+      venta.serie,
+      venta.numero,
+      fechaEmisionConHora
+    );
 
     if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
       await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);

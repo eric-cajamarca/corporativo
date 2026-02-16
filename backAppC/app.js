@@ -42,6 +42,7 @@ const despachosRoutes = require('./routes/despachos');
 const enviosRoutes = require('./routes/envios');
 const facturacionRoutes = require('./routes/facturacion');
 const analisisRoutes = require('./routes/analisis');
+const dashboardRoutes = require('./routes/dashboard');
 const permisosRoutes = require('./routes/permisos');
 const gestoresRoutes = require('./routes/gestores');
 const usuarioSucursalRoutes = require('./routes/usuarioSucursal');
@@ -177,6 +178,7 @@ app.use('/api/despachos', despachosRoutes);
 app.use('/api/envios', enviosRoutes);
 app.use('/api/facturacion', facturacionRoutes);
 app.use('/api/analisis', analisisRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/permisos', permisosRoutes);
 app.use('/api/gestores', gestoresRoutes);
 app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
@@ -184,4 +186,10 @@ app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
+  try {
+    const envioSunatJob = require('./jobs/envioSunat.job');
+    envioSunatJob.iniciar();
+  } catch (e) {
+    console.error('No se pudo iniciar job envío automático SUNAT:', e.message);
+  }
 });

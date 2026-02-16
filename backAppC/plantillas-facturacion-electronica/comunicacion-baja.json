@@ -1,0 +1,30 @@
+{
+  "_comentario": "Plantilla Comunicación de baja (RA). Lista de comprobantes a dar de baja. Guardar en [rutaFacturador]/sunat_archivos/sfs/DATA/[RUC]-RA-[YYYYMMDD]-[CORREL].json. Envío por sendSummary.",
+  "ublVersion": "2.0",
+  "customizationID": "1.0",
+  "tipoResumen": "RA",
+  "fechaEmision": "",
+  "numeroCorrelativo": "",
+  "emisor": {
+    "ruc": "",
+    "razonSocial": "",
+    "nombreComercial": "",
+    "domicilioFiscal": {
+      "ubigueo": "",
+      "direccion": "",
+      "urbanizacion": "",
+      "departamento": "",
+      "provincia": "",
+      "distrito": "",
+      "codigoPais": "PE"
+    }
+  },
+  "bajas": [
+    {
+      "tipoComprobante": "01",
+      "serie": "",
+      "numero": "",
+      "motivoBaja": ""
+    }
+  ]
+}

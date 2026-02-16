@@ -1,0 +1,67 @@
+{
+  "_comentario": "Plantilla Factura electrónica (01). Rellenar desde BD y guardar en [rutaFacturador]/sunat_archivos/sfs/DATA/[RUC]-01-[SERIE]-[NUM].json",
+  "ublVersion": "2.1",
+  "customizationID": "2.0",
+  "tipoComprobante": "01",
+  "serie": "",
+  "numero": "",
+  "fechaEmision": "",
+  "fechaVencimiento": "",
+  "moneda": "PEN",
+  "tipoOperacion": "0101",
+  "emisor": {
+    "ruc": "",
+    "razonSocial": "",
+    "nombreComercial": "",
+    "domicilioFiscal": {
+      "ubigueo": "",
+      "direccion": "",
+      "urbanizacion": "",
+      "departamento": "",
+      "provincia": "",
+      "distrito": "",
+      "codigoPais": "PE"
+    }
+  },
+  "cliente": {
+    "tipoDocumento": "6",
+    "numeroDocumento": "",
+    "razonSocial": "",
+    "direccion": "",
+    "ubigueo": ""
+  },
+  "totales": {
+    "totalGravada": 0,
+    "totalExonerada": 0,
+    "totalInafecta": 0,
+    "totalGratuita": 0,
+    "subtotal": 0,
+    "totalIgv": 0,
+    "totalIsc": 0,
+    "totalOtrosTributos": 0,
+    "totalDescuento": 0,
+    "totalOtrosCargos": 0,
+    "total": 0,
+    "totalLetras": ""
+  },
+  "leyendas": [
+    { "codigo": "1000", "valor": "" }
+  ],
+  "items": [
+    {
+      "numeroOrden": 1,
+      "codigo": "",
+      "descripcion": "",
+      "unidad": "NIU",
+      "cantidad": 0,
+      "valorUnitario": 0,
+      "precioUnitario": 0,
+      "subtotal": 0,
+      "tipoIgv": "10",
+      "igv": 0,
+      "total": 0
+    }
+  ],
+  "guias": [],
+  "relacionados": []
+}

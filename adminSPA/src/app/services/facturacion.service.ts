@@ -24,16 +24,34 @@ export class FacturacionService {
     });
   }
 
+  /** Sube el certificado digital (.pfx) y su clave para firma de XML. No enviar Content-Type para que el browser envíe multipart. */
+  subirCertificado(certificado: File, claveCertificado: string): Observable<any> {
+    const form = new FormData();
+    form.append('certificado', certificado);
+    form.append('claveCertificado', claveCertificado ?? '');
+    return this._http.post(this.url + 'facturacion/configuracion/certificado', form, {
+      withCredentials: true
+    });
+  }
+
   actualizarConfiguracion(data: {
     certificadoDigital?: string;
     claveCertificado?: string;
     usuarioSunat?: string;
     claveSunat?: string;
+    urlEnvio?: string;
+    envioDirectoSunat?: boolean;
     modoPrueba: boolean;
     serieFactura: string;
     serieBoleta: string;
     serieNotaCredito: string;
     serieNotaDebito: string;
+    rutaCarpetaFacturadorSunat?: string;
+    urlFacturadorSunat?: string;
+    envioAutomatico?: boolean;
+    minutosEnvioAutomatico?: number;
+    envioPorLotes?: boolean;
+    programacionEnvioLotes?: string;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'facturacion/configuracion', data, {
@@ -85,12 +103,39 @@ export class FacturacionService {
     });
   }
 
+  /** Envío por lotes: envía todos los comprobantes pendientes de la empresa. */
+  enviarLoteSunat(): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url + 'facturacion/enviar-lote', {}, {
+      headers,
+      withCredentials: true
+    });
+  }
+
   consultarEstadoSunat(idComprobante: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'facturacion/comprobantes/' + idComprobante + '/estado', {
       headers: headers,
       withCredentials: true
     });
+  }
+
+  /** Obtener contenido XML del comprobante (para ver o descargar). */
+  obtenerXmlComprobante(idComprobanteElectronico: string): Observable<{ data: { content: string } }> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<{ data: { content: string } }>(
+      this.url + 'facturacion/comprobantes/' + idComprobanteElectronico + '/xml',
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Obtener contenido CDR del comprobante (para ver o descargar). */
+  obtenerCdrComprobante(idComprobanteElectronico: string): Observable<{ data: { content: string } }> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<{ data: { content: string } }>(
+      this.url + 'facturacion/comprobantes/' + idComprobanteElectronico + '/cdr',
+      { headers, withCredentials: true }
+    );
   }
 
   // Estadísticas de facturación

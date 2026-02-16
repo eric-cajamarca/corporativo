@@ -6,8 +6,8 @@ import { TopnavComponent } from '../topnav/topnav.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
-
-declare var Chart: any;
+import { DashboardService } from '../../services/dashboard.service';
+import { Chart } from 'chart.js/auto';
 
 @Component({
   selector: 'app-inicio',
@@ -48,6 +48,13 @@ export class InicioComponent implements OnInit {
   // Productos más vendidos
   public productosMasVendidos: any[] = [];
 
+  // Ventas mensuales (12 meses) para el gráfico - compatibilidad
+  public ventasMensualesChart: number[] = [];
+  public ventasMensualesLabels: string[] = [];
+  // Vistas del gráfico de tendencia: porDiaHora | mesPorDia | seisMeses | doceMeses
+  public vistaGraficoVentas: 'porDiaHora' | 'mesPorDia' | 'seisMeses' | 'doceMeses' = 'doceMeses';
+  public graficoVentas: { porDiaHora?: { etiquetas: string[]; datos: number[]; leyenda: string }; mesPorDia?: { etiquetas: string[]; datos: number[]; leyenda: string }; seisMeses?: { etiquetas: string[]; datos: number[]; leyenda: string }; doceMeses?: { etiquetas: string[]; datos: number[]; leyenda: string } } | null = null;
+
   // Alertas y notificaciones
   public alertas: any[] = [];
 
@@ -57,7 +64,8 @@ export class InicioComponent implements OnInit {
   constructor(
     private router: Router,
     public authService: AuthService,
-    private permisosService: PermisosService
+    private permisosService: PermisosService,
+    private dashboardService: DashboardService
   ) {
     // Efecto para actualizar datos del usuario
     effect(() => {
@@ -102,84 +110,98 @@ export class InicioComponent implements OnInit {
    * Carga los datos del dashboard
    */
   private cargarDatosDashboard(): void {
-    // Simular carga de datos (reemplazar con llamadas reales al backend)
-    setTimeout(() => {
-      // Datos de ejemplo - Reemplazar con datos reales del backend
-      this.ventasTotales = 125000;
-      this.utilidadNeta = 25000;
-      this.clientesActivos = 450;
-      this.roi = 18.5;
-      
-      this.ventasVariacion = 12.5;
-      this.utilidadVariacion = 8.2;
-      this.clientesVariacion = 5.1;
-
-      this.ingresos = 150000;
-      this.costos = 100000;
-      this.utilidadBruta = 50000;
-      this.gastosOperativos = 25000;
-
-      this.productosMasVendidos = [
-        { nombre: 'Cemento Portland', categoria: 'Materiales', ventas: 1250, monto: 25000 },
-        { nombre: 'Varilla de Hierro', categoria: 'Acero', ventas: 890, monto: 18000 },
-        { nombre: 'Bloques de Concreto', categoria: 'Materiales', ventas: 650, monto: 13000 },
-        { nombre: 'Arena Fina', categoria: 'Agregados', ventas: 520, monto: 10400 },
-        { nombre: 'Pintura Látex', categoria: 'Pinturas', ventas: 380, monto: 9500 }
-      ];
-
-      this.alertas = [
-        {
-          titulo: 'Stock Bajo',
-          mensaje: 'Cemento Portland tiene menos de 50 unidades',
-          icono: 'fa-exclamation-triangle',
-          tipo: 'warning',
-          tiempo: 'Hace 2 horas'
-        },
-        {
-          titulo: 'Pago Pendiente',
-          mensaje: 'Cliente ABC debe S/ 2,500 por factura #00125',
-          icono: 'fa-clock',
-          tipo: 'info',
-          tiempo: 'Hace 4 horas'
-        },
-        {
-          titulo: 'Nueva Venta',
-          mensaje: 'Venta registrada por S/ 1,250',
-          icono: 'fa-check-circle',
-          tipo: 'success',
-          tiempo: 'Hace 6 horas'
+    this.cargandoDatos.set(true);
+    this.dashboardService.obtenerResumen(this.periodoSeleccionado).subscribe({
+      next: (response) => {
+        const d = response.data;
+        if (d) {
+          this.ventasTotales = Number(d.ventasTotales) || 0;
+          this.utilidadNeta = Number(d.utilidadNeta) || 0;
+          this.clientesActivos = Number(d.clientesActivos) || 0;
+          this.roi = Number(d.roi) || 0;
+          this.ventasVariacion = Number(d.ventasVariacion) || 0;
+          this.utilidadVariacion = Number(d.utilidadVariacion) || 0;
+          this.clientesVariacion = Number(d.clientesVariacion) || 0;
+          this.ingresos = Number(d.ingresos) || 0;
+          this.costos = Number(d.costos) || 0;
+          this.utilidadBruta = Number(d.utilidadBruta) || 0;
+          this.gastosOperativos = Number(d.gastosOperativos) || 0;
+          this.productosMasVendidos = Array.isArray(d.productosMasVendidos) ? d.productosMasVendidos : [];
+          this.ventasMensualesChart = Array.isArray(d.ventasMensuales) && d.ventasMensuales.length >= 12
+            ? d.ventasMensuales.slice(0, 12)
+            : (Array.isArray(d.ventasMensuales) ? d.ventasMensuales : []);
+          this.ventasMensualesLabels = Array.isArray(d.ventasMensualesLabels) ? d.ventasMensualesLabels : [];
+          this.graficoVentas = d.graficoVentas || null;
+          this.alertas = Array.isArray(d.alertas) ? d.alertas : [];
         }
-      ];
+        this.cargandoDatos.set(false);
+        setTimeout(() => this.createCharts(), 100);
+      },
+      error: (error) => {
+        console.error('Error al cargar dashboard:', error);
+        this.cargandoDatos.set(false);
+        this.ventasTotales = 0;
+        this.utilidadNeta = 0;
+        this.ingresos = 0;
+        this.costos = 0;
+        this.utilidadBruta = 0;
+        this.gastosOperativos = 0;
+        this.ventasMensualesChart = [];
+      }
+    });
+  }
 
-      this.cargandoDatos.set(false);
-      
-      // Crear gráficos después de cargar datos
-      setTimeout(() => this.createCharts(), 100);
-    }, 500);
+  /**
+   * Cambia la vista del gráfico de tendencia de ventas y redibuja
+   */
+  cambiarVistaGraficoVentas(vista: 'porDiaHora' | 'mesPorDia' | 'seisMeses' | 'doceMeses'): void {
+    this.vistaGraficoVentas = vista;
+    this.createCharts();
+  }
+
+  /**
+   * Obtiene la etiqueta del dropdown para la vista actual del gráfico
+   */
+  get etiquetaVistaGrafico(): string {
+    const map: Record<string, string> = {
+      porDiaHora: 'Por día (Hora)',
+      mesPorDia: 'Mes (Por día)',
+      seisMeses: '6 meses (Por mes)',
+      doceMeses: '12 meses (Por mes)'
+    };
+    return map[this.vistaGraficoVentas] || '12 meses (Por mes)';
   }
 
   /**
    * Crea los gráficos del dashboard
    */
   private createCharts(): void {
-    // Verificar si Chart.js está disponible
-    if (typeof Chart === 'undefined') {
-      console.warn('Chart.js no está disponible');
-      return;
-    }
-
-    // Destruir gráficos existentes
     const existingChart = Chart.getChart("ventasChart");
     if (existingChart) {
       existingChart.destroy();
     }
 
-    // Datos del gráfico
+    const vista = this.vistaGraficoVentas;
+    let chartLabels: string[];
+    let chartData: number[];
+    let leyendaTexto: string;
+
+    if (this.graficoVentas && this.graficoVentas[vista]) {
+      const v = this.graficoVentas[vista]!;
+      chartLabels = v.etiquetas || [];
+      chartData = v.datos || [];
+      leyendaTexto = v.leyenda || 'Ventas';
+    } else {
+      chartLabels = this.ventasMensualesLabels.length >= 12 ? this.ventasMensualesLabels : ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      chartData = this.ventasMensualesChart.length >= 12 ? this.ventasMensualesChart : [...this.ventasMensualesChart, ...Array(12 - this.ventasMensualesChart.length).fill(0)];
+      leyendaTexto = 'Por mes';
+    }
+
     const ventasData = {
-      labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
+      labels: chartLabels,
       datasets: [{
-        label: "Ventas Mensuales (S/)",
-        data: [85000, 92000, 88000, 95000, 102000, 115000, 125000, 118000, 132000, 145000, 138000, 150000],
+        label: `Ventas (S/) - ${leyendaTexto}`,
+        data: chartData,
         backgroundColor: "rgba(102, 126, 234, 0.1)",
         borderColor: "rgba(102, 126, 234, 1)",
         borderWidth: 2,
@@ -193,18 +215,19 @@ export class InicioComponent implements OnInit {
       }]
     };
 
-    const chartOptions = {
+    const chartOptions: Record<string, unknown> = {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'top' },
         tooltip: {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           titleColor: '#fff',
           bodyColor: '#fff',
           callbacks: {
-            label: function(context: any) {
-              return 'S/ ' + context.parsed.y.toLocaleString('es-PE');
+            label: (context: { parsed?: { y?: number | null } }) => {
+              const y = context.parsed?.y ?? 0;
+              return 'S/ ' + Number(y).toLocaleString('es-PE');
             }
           }
         }
@@ -213,8 +236,9 @@ export class InicioComponent implements OnInit {
         y: {
           beginAtZero: true,
           ticks: {
-            callback: function(value: any) {
-              return 'S/ ' + (value / 1000).toFixed(0) + 'k';
+            callback: function(value: number | string) {
+              const n = typeof value === 'number' ? value : parseFloat(String(value));
+              return 'S/ ' + (n / 1000).toFixed(0) + 'k';
             }
           },
           grid: { color: 'rgba(0, 0, 0, 0.05)' }
@@ -228,7 +252,7 @@ export class InicioComponent implements OnInit {
       new Chart(ctx, {
         type: "line",
         data: ventasData,
-        options: chartOptions
+        options: chartOptions as object
       });
     }
   }

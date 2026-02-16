@@ -4,6 +4,7 @@ import { ComprasService } from '../../../services/compras.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { EmpresaService } from '../../../services/empresa.service';
+import { FacturacionService } from '../../../services/facturacion.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -40,16 +41,35 @@ export class IndexConfiguracionComponent implements OnInit {
     zonaHoraria: 'America/Lima'
   };
 
-  // Configuración de facturación
+  // Configuración de facturación (series, ruta y opciones de envío se cargan/guardan en API)
   public facturacion = {
     serieFactura: 'F001',
     serieBoleta: 'B001',
     serieNotaCredito: 'FC01',
     serieNotaDebito: 'FD01',
+    rutaCarpetaFacturadorSunat: '' as string,
+    urlFacturadorSunat: 'http://localhost:9000' as string,
+    envioAutomatico: false,
+    minutosEnvioAutomatico: 10,
+    envioPorLotes: false,
+    programacionEnvioLotes: '' as string,
     igv: 18,
     autoNumeracion: true,
-    enviarSunat: true
+    enviarSunat: true,
+    modoPrueba: true,
+    tieneCertificado: false,
+    envioDirectoSunat: false,
+    urlEnvio: '' as string,
+    usuarioSunat: '' as string,
+    claveSunat: '' as string,
+    rucEmpresa: '' as string
   };
+  public facturacionGuardando = false;
+  public enviandoLote = false;
+  /** Certificado: archivo seleccionado y clave para subir */
+  public certificadoArchivo: File | null = null;
+  public certificadoClave = '';
+  public certificadoSubiendo = false;
 
   // Configuración de inventario
   public inventario = {
@@ -110,6 +130,7 @@ export class IndexConfiguracionComponent implements OnInit {
     private _impuestoService: ImpuestoService,
     private _comprobanteService: ComprobanteService,
     private _empresaService: EmpresaService,
+    private _facturacionService: FacturacionService,
     private _router: Router
   ) {}
 
@@ -119,6 +140,7 @@ export class IndexConfiguracionComponent implements OnInit {
 
   cargarConfiguracion(): void {
     this.cargarEmpresaYDireccion();
+    this.cargarConfiguracionFacturacion();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;
@@ -195,9 +217,129 @@ export class IndexConfiguracionComponent implements OnInit {
     // Llamada al backend para guardar
   }
 
+  /** Carga configuración de facturación electrónica desde el API */
+  cargarConfiguracionFacturacion(): void {
+    this._facturacionService.obtenerConfiguracion().subscribe({
+      next: (res: { data?: any }) => {
+        const c = res?.data;
+        if (c) {
+          this.facturacion.serieFactura = c.serieFactura ?? 'F001';
+          this.facturacion.serieBoleta = c.serieBoleta ?? 'B001';
+          this.facturacion.serieNotaCredito = c.serieNotaCredito ?? 'FC01';
+          this.facturacion.serieNotaDebito = c.serieNotaDebito ?? 'FD01';
+          this.facturacion.rutaCarpetaFacturadorSunat = c.rutaCarpetaFacturadorSunat ?? '';
+          this.facturacion.urlFacturadorSunat = c.urlFacturadorSunat ?? 'http://localhost:9000';
+          this.facturacion.envioAutomatico = c.envioAutomatico === true;
+          this.facturacion.minutosEnvioAutomatico = c.minutosEnvioAutomatico ?? 10;
+          this.facturacion.envioPorLotes = c.envioPorLotes === true;
+          this.facturacion.programacionEnvioLotes = c.programacionEnvioLotes ?? '';
+          this.facturacion.modoPrueba = c.modoPrueba !== false;
+          this.facturacion.tieneCertificado = c.tieneCertificado === true;
+          this.facturacion.envioDirectoSunat = c.envioDirectoSunat === true;
+          this.facturacion.urlEnvio = c.urlEnvio ?? '';
+          this.facturacion.usuarioSunat = c.usuarioSunat ?? '';
+          this.facturacion.claveSunat = ''; // No se devuelve por seguridad; solo se envía al guardar si el usuario la escribe
+          this.facturacion.rucEmpresa = c.rucEmpresa ?? '';
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  onCertificadoArchivoChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input?.files?.[0];
+    this.certificadoArchivo = file ?? null;
+  }
+
+  subirCertificadoFacturacion(): void {
+    if (!this.certificadoArchivo) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Certificado', message: 'Seleccione un archivo .pfx' });
+      }
+      return;
+    }
+    this.certificadoSubiendo = true;
+    this._facturacionService.subirCertificado(this.certificadoArchivo, this.certificadoClave).subscribe({
+      next: () => {
+        this.certificadoSubiendo = false;
+        this.facturacion.tieneCertificado = true;
+        this.certificadoArchivo = null;
+        this.certificadoClave = '';
+        const fileInput = document.getElementById('inputCertificadoPfx') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Certificado', message: 'Certificado guardado correctamente.' });
+        }
+      },
+      error: (err) => {
+        this.certificadoSubiendo = false;
+        const msg = err?.error?.message || err?.message || 'Error al subir el certificado.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg });
+        } else {
+          alert(msg);
+        }
+      }
+    });
+  }
+
   guardarConfiguracionFacturacion(): void {
-    console.log('Guardando configuración de facturación:', this.facturacion);
-    // Llamada al backend para guardar
+    this.facturacionGuardando = true;
+    this._facturacionService.actualizarConfiguracion({
+      serieFactura: this.facturacion.serieFactura,
+      serieBoleta: this.facturacion.serieBoleta,
+      serieNotaCredito: this.facturacion.serieNotaCredito,
+      serieNotaDebito: this.facturacion.serieNotaDebito,
+      rutaCarpetaFacturadorSunat: this.facturacion.rutaCarpetaFacturadorSunat || undefined,
+      urlFacturadorSunat: this.facturacion.urlFacturadorSunat || undefined,
+      urlEnvio: this.facturacion.urlEnvio || undefined,
+      envioDirectoSunat: this.facturacion.envioDirectoSunat,
+      usuarioSunat: this.facturacion.usuarioSunat || undefined,
+      claveSunat: this.facturacion.claveSunat || undefined,
+      envioAutomatico: this.facturacion.envioAutomatico,
+      minutosEnvioAutomatico: this.facturacion.minutosEnvioAutomatico,
+      envioPorLotes: this.facturacion.envioPorLotes,
+      programacionEnvioLotes: this.facturacion.programacionEnvioLotes || undefined,
+      modoPrueba: this.facturacion.modoPrueba
+    }).subscribe({
+      next: () => {
+        this.facturacionGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Guardado', message: 'Configuración de facturación actualizada.' });
+        }
+      },
+      error: () => {
+        this.facturacionGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración de facturación.' });
+        }
+      }
+    });
+  }
+
+  enviarLoteAhora(): void {
+    this.enviandoLote = true;
+    this._facturacionService.enviarLoteSunat().subscribe({
+      next: (res) => {
+        this.enviandoLote = false;
+        const msg = res?.message || `Enviados: ${res?.data?.enviados ?? 0}, errores: ${res?.data?.errores ?? 0}`;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Envío por lotes', message: msg });
+        } else {
+          alert(msg);
+        }
+      },
+      error: (err) => {
+        this.enviandoLote = false;
+        const msg = err?.error?.message || err?.message || 'Error al enviar lote.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg });
+        } else {
+          alert(msg);
+        }
+      }
+    });
   }
 
   guardarConfiguracionInventario(): void {

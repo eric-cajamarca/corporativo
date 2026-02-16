@@ -6,6 +6,7 @@ import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { VentasService, VentaListado } from '../../../services/ventas.service';
+import { FacturacionService } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
@@ -29,7 +30,14 @@ export class IndexVentasComponent implements OnInit {
   ventaSeleccionada: VentaListado | null = null;
   generandoPdf = false;
   exportandoLista = false;
+  enviandoSunatId: string | null = null;
   empresa: EmpresaModel | null = null;
+
+  archivoModalId: string | null = null;
+  archivoModalTipo: 'xml' | 'cdr' | null = null;
+  contenidoArchivo: string | null = null;
+  loadingArchivo = false;
+  archivoError: string | null = null;
 
   page = 1;
   pageSize = 10;
@@ -44,6 +52,7 @@ export class IndexVentasComponent implements OnInit {
 
   constructor(
     private ventasService: VentasService,
+    private facturacionService: FacturacionService,
     private pdfService: PdfService,
     private excelService: ExcelService,
     private empresaService: EmpresaService
@@ -123,15 +132,52 @@ export class IndexVentasComponent implements OnInit {
     this.ventas = [...this.ventasConst];
   }
 
+  /** 7 = Pendiente de envío; 1 = Aceptado; 3 = Aceptado con obs.; 4 = Rechazado; 6 = Error envío. */
   estadoSunatLabel(idEstadoSunat: number | undefined): string {
     if (idEstadoSunat == null) return 'Pendiente';
+    if (idEstadoSunat === 7) return 'Pend. envío';
     if (idEstadoSunat === 1 || idEstadoSunat === 2) return 'Aceptado';
+    if (idEstadoSunat === 3) return 'Aceptado con obs.';
+    if (idEstadoSunat === 6) return 'Error envío';
     return 'Rechazado';
+  }
+
+  /** Id del comprobante electrónico como string (para comparaciones y API). */
+  idComprobanteStr(v: VentaListado): string {
+    const id = v?.idComprobanteElectronico;
+    return id != null ? String(id).trim() : '';
+  }
+
+  /** True si la venta tiene comprobante electrónico (muestra botón Enviar a SUNAT). */
+  puedeEnviarSunat(v: VentaListado): boolean {
+    return this.idComprobanteStr(v) !== '';
+  }
+
+  enviarASunat(v: VentaListado): void {
+    const id = v?.idComprobanteElectronico != null ? String(v.idComprobanteElectronico).trim() : '';
+    if (!id) return;
+    this.enviandoSunatId = id;
+    this.facturacionService.enviarComprobanteSunat(id).subscribe({
+      next: (res) => {
+        this.enviandoSunatId = null;
+        const msg = res?.message || (res?.data?.ok ? 'Enviado a SUNAT' : res?.data?.mensaje || '');
+        if (res?.data?.ok !== false) {
+          this.cargarVentas();
+        }
+        alert(msg);
+      },
+      error: (err) => {
+        this.enviandoSunatId = null;
+        const msg = err?.error?.message || err?.message || 'Error al enviar a SUNAT';
+        alert(msg);
+      }
+    });
   }
 
   estadoSunatClass(idEstadoSunat: number | undefined): string {
     if (idEstadoSunat == null) return 'bg-secondary';
-    if (idEstadoSunat === 1 || idEstadoSunat === 2) return 'bg-info';
+    if (idEstadoSunat === 7) return 'bg-warning text-dark';
+    if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) return 'bg-info';
     return 'bg-danger';
   }
 
@@ -147,6 +193,80 @@ export class IndexVentasComponent implements OnInit {
 
   min(a: number, b: number): number {
     return Math.min(a, b);
+  }
+
+  abrirModalArchivo(v: VentaListado, tipo: 'xml' | 'cdr'): void {
+    const id = this.idComprobanteStr(v);
+    if (!id) return;
+    this.archivoModalId = id;
+    this.archivoModalTipo = tipo;
+    this.contenidoArchivo = null;
+    this.archivoError = null;
+    setTimeout(() => {
+      const el = document.getElementById('archivoModal');
+      if (el && (window as unknown as { bootstrap?: { Modal: { getOrCreateInstance: (e: Element) => { show: () => void } } } }).bootstrap) {
+        (window as unknown as { bootstrap: { Modal: { getOrCreateInstance: (e: Element) => { show: () => void } } } }).bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  cerrarModalArchivo(): void {
+    this.archivoModalId = null;
+    this.archivoModalTipo = null;
+    this.contenidoArchivo = null;
+    this.archivoError = null;
+    const el = document.getElementById('archivoModal');
+    if (el && (window as unknown as { bootstrap?: { Modal: { getOrCreateInstance: (e: Element) => { hide: () => void } } } }).bootstrap) {
+      (window as unknown as { bootstrap: { Modal: { getOrCreateInstance: (e: Element) => { hide: () => void } } } }).bootstrap.Modal.getOrCreateInstance(el).hide();
+    }
+  }
+
+  verArchivo(): void {
+    if (!this.archivoModalId || !this.archivoModalTipo) return;
+    this.loadingArchivo = true;
+    this.archivoError = null;
+    const obs = this.archivoModalTipo === 'xml'
+      ? this.facturacionService.obtenerXmlComprobante(this.archivoModalId)
+      : this.facturacionService.obtenerCdrComprobante(this.archivoModalId);
+    obs.subscribe({
+      next: (res) => {
+        this.contenidoArchivo = res?.data?.content ?? '';
+        this.loadingArchivo = false;
+      },
+      error: (err) => {
+        this.archivoError = err?.error?.message || err?.message || 'Error al cargar el archivo';
+        this.loadingArchivo = false;
+      }
+    });
+  }
+
+  descargarArchivo(): void {
+    if (!this.archivoModalId || !this.archivoModalTipo) return;
+    this.loadingArchivo = true;
+    this.archivoError = null;
+    const obs = this.archivoModalTipo === 'xml'
+      ? this.facturacionService.obtenerXmlComprobante(this.archivoModalId)
+      : this.facturacionService.obtenerCdrComprobante(this.archivoModalId);
+    const ext = this.archivoModalTipo === 'xml' ? 'xml' : 'xml';
+    const nombre = `comprobante-${this.archivoModalTipo}.${ext}`;
+    obs.subscribe({
+      next: (res) => {
+        const content = res?.data?.content ?? '';
+        this.loadingArchivo = false;
+        if (!content) return;
+        const blob = new Blob([content], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombre;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        this.archivoError = err?.error?.message || err?.message || 'Error al descargar el archivo';
+        this.loadingArchivo = false;
+      }
+    });
   }
 
   abrirModalPdf(v: VentaListado): void {

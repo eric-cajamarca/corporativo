@@ -55,3 +55,17 @@ exports.uploadDocumentos = multer({
     fileSize: 5 * 1024 * 1024 // 5MB para documentos
   }
 }).single('documento');
+
+// Certificado digital PFX para firma de XML (facturación electrónica). Se guarda en memoria para enviar a BD.
+const certFileFilter = (req, file, cb) => {
+  const ext = (path.extname(file.originalname) || '').toLowerCase();
+  const ok = ext === '.pfx' || file.mimetype === 'application/x-pkcs12' || file.mimetype === 'application/pkcs12';
+  if (ok) cb(null, true);
+  else cb(new Error('Solo se permiten archivos .pfx (certificado digital)'), false);
+};
+
+exports.uploadCertificadoFacturacion = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: certFileFilter,
+  limits: { fileSize: 2 * 1024 * 1024 } // 2MB
+}).single('certificado');

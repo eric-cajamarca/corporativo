@@ -82,7 +82,7 @@
           <i class="fas fa-chart-line"></i>
         </div>
         <div class="kpi-content">
-          <div class="kpi-value">{{ventasTotales | currency:'PEN':'S/ ':'1.0-0'}}</div>
+          <div class="kpi-value">{{ ventasTotales | currency:'PEN':'S/ ':'1.0-0'}}</div>
           <div class="kpi-label">Ventas Totales</div>
           <div class="kpi-change" [class.positive]="ventasVariacion >= 0" [class.negative]="ventasVariacion < 0">
             <i class="fas" [class.fa-arrow-up]="ventasVariacion >= 0" [class.fa-arrow-down]="ventasVariacion < 0"></i>
@@ -155,13 +155,14 @@
             Tendencia de Ventas
           </h5>
           <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              12 meses
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              {{ etiquetaVistaGrafico }}
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><a class="dropdown-item" href="#">3 meses</a></li>
-              <li><a class="dropdown-item" href="#">6 meses</a></li>
-              <li><a class="dropdown-item" href="#">12 meses</a></li>
+              <li><a class="dropdown-item" href="javascript:void(0)" (click)="cambiarVistaGraficoVentas('porDiaHora')">Por día (Hora)</a></li>
+              <li><a class="dropdown-item" href="javascript:void(0)" (click)="cambiarVistaGraficoVentas('mesPorDia')">Mes (Por día)</a></li>
+              <li><a class="dropdown-item" href="javascript:void(0)" (click)="cambiarVistaGraficoVentas('seisMeses')">6 meses (Por mes)</a></li>
+              <li><a class="dropdown-item" href="javascript:void(0)" (click)="cambiarVistaGraficoVentas('doceMeses')">12 meses (Por mes)</a></li>
             </ul>
           </div>
         </div>

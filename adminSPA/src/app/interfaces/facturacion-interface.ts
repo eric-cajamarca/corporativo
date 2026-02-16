@@ -9,6 +9,8 @@ export interface ConfiguracionFacturacion {
   serieBoleta: string;
   serieNotaCredito: string;
   serieNotaDebito: string;
+  /** Ruta de la carpeta padre del Facturador SUNAT (ej: D:\\SFS_v1.2). Los JSON se guardan en [ruta]/sunat_archivos/sfs/DATA/ */
+  rutaCarpetaFacturadorSunat?: string;
   ultimoNumeroFactura: number;
   ultimoNumeroBoleta: number;
   ultimoNumeroNotaCredito: number;

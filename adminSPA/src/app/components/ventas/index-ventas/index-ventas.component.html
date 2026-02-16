@@ -98,8 +98,16 @@
                   <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#pdfModal" title="PDF" (click)="abrirModalPdf(v)">
                     <i class="bi bi-file-pdf"></i>
                   </button>
-                  <a class="btn btn-sm btn-outline-secondary" title="XML" href="#" (click)="$event.preventDefault()">XML</a>
-                  <a class="btn btn-sm btn-outline-secondary ms-1" title="CDR" href="#" (click)="$event.preventDefault()">CDR</a>
+                  <button *ngIf="puedeEnviarSunat(v)" type="button" class="btn btn-sm btn-success me-1" title="Enviar a SUNAT" (click)="enviarASunat(v)" [disabled]="enviandoSunatId === idComprobanteStr(v)">
+                    <span *ngIf="enviandoSunatId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+                    <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i> SUNAT</span>
+                  </button>
+                  <button type="button" class="btn btn-sm ms-1" [class.btn-primary]="v.tieneXml" [class.btn-outline-secondary]="!v.tieneXml" title="XML" (click)="abrirModalArchivo(v, 'xml')" [disabled]="!idComprobanteStr(v)">
+                    XML
+                  </button>
+                  <button type="button" class="btn btn-sm ms-1" [class.btn-primary]="v.tieneCdr" [class.btn-outline-secondary]="!v.tieneCdr" title="CDR" (click)="abrirModalArchivo(v, 'cdr')" [disabled]="!idComprobanteStr(v)">
+                    CDR
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -145,6 +153,34 @@
           </button>
         </div>
         <p class="text-muted small mt-2 mb-0" *ngIf="generandoPdf"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="archivoModal" tabindex="-1" aria-labelledby="archivoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" [class.bg-primary]="archivoModalTipo === 'xml'" [class.bg-info]="archivoModalTipo === 'cdr'" [class.text-white]="true">
+        <h5 class="modal-title" id="archivoModalLabel">
+          <span *ngIf="archivoModalTipo === 'xml'"><i class="bi bi-file-code"></i> XML</span>
+          <span *ngIf="archivoModalTipo === 'cdr'"><i class="bi bi-file-earmark-check"></i> CDR</span>
+          — Comprobante
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar" (click)="cerrarModalArchivo()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-2 mb-3">
+          <button type="button" class="btn btn-outline-primary" [disabled]="loadingArchivo" (click)="verArchivo()">
+            <i class="bi bi-eye"></i> Ver archivo
+          </button>
+          <button type="button" class="btn btn-outline-success" [disabled]="loadingArchivo" (click)="descargarArchivo()">
+            <i class="bi bi-download"></i> Descargar archivo
+          </button>
+        </div>
+        <p class="text-muted small" *ngIf="loadingArchivo"><i class="bi bi-hourglass-split"></i> Cargando...</p>
+        <p class="text-danger small" *ngIf="archivoError">{{ archivoError }}</p>
+        <pre *ngIf="contenidoArchivo && !loadingArchivo" class="bg-light p-3 rounded small overflow-auto" style="max-height: 70vh;"><code>{{ contenidoArchivo }}</code></pre>
       </div>
     </div>
   </div>

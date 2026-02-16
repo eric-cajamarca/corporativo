@@ -29,11 +29,19 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       claveCertificado,
       usuarioSunat,
       claveSunat,
+      urlEnvio,
+      envioDirectoSunat,
       modoPrueba,
       serieFactura,
       serieBoleta,
       serieNotaCredito,
-      serieNotaDebito
+      serieNotaDebito,
+      rutaCarpetaFacturadorSunat,
+      urlFacturadorSunat,
+      envioAutomatico,
+      minutosEnvioAutomatico,
+      envioPorLotes,
+      programacionEnvioLotes
     } = req.body;
 
     const pool = await sql.connect(dbConfig);
@@ -42,11 +50,19 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       claveCertificado,
       usuarioSunat,
       claveSunat,
+      urlEnvio,
+      envioDirectoSunat,
       modoPrueba,
       serieFactura,
       serieBoleta,
       serieNotaCredito,
-      serieNotaDebito
+      serieNotaDebito,
+      rutaCarpetaFacturadorSunat,
+      urlFacturadorSunat,
+      envioAutomatico,
+      minutosEnvioAutomatico,
+      envioPorLotes,
+      programacionEnvioLotes
     });
 
     res.status(200).send({
@@ -68,6 +84,34 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       message: "Error al actualizar la configuración de facturación",
       data: undefined
     });
+  }
+};
+
+// Subir certificado digital (.pfx) y clave para firma de XML. Multipart: campo 'certificado' (archivo) y 'claveCertificado' (texto).
+const subirCertificadoFacturacion = async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).send({
+        message: "Debe enviar un archivo .pfx en el campo 'certificado'",
+        data: undefined
+      });
+    }
+    const claveCertificado = req.body?.claveCertificado != null ? String(req.body.claveCertificado).trim() : "";
+    const pool = await sql.connect(dbConfig);
+    const result = await FacturacionServices.actualizarCertificadoFacturacionService(
+      pool,
+      req.user,
+      req.file.buffer,
+      claveCertificado
+    );
+    res.status(200).send({ message: result.mensaje, data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos para esta acción", data: undefined });
+    if (error.message === "CERTIFICADO_REQUERIDO") return res.status(400).send({ message: "Archivo de certificado requerido", data: undefined });
+    if (error.message === "CONFIGURACION_FACTURACION_REQUERIDA") return res.status(400).send({ message: "Guarde primero la configuración de facturación", data: undefined });
+    console.error("Error subir certificado facturación:", error);
+    res.status(500).send({ message: error.message || "Error al guardar el certificado", data: undefined });
   }
 };
 
@@ -144,16 +188,23 @@ const generarComprobanteElectronico = async (req, res) => {
   }
 };
 
-// Enviar comprobante a SUNAT
+// Enviar comprobante a SUNAT. Body opcional: { usarXmlUbl: true } para generar XML UBL y enviar sin archivos planos.
 const enviarComprobanteSunat = async (req, res) => {
   try {
     const { idComprobanteElectronico } = req.params;
+    const opciones = { usarXmlUbl: req.body?.usarXmlUbl === true };
 
     const pool = await sql.connect(dbConfig);
-    const result = await FacturacionServices.enviarComprobanteSunatService(pool, req.user, idComprobanteElectronico);
+    const result = await FacturacionServices.enviarComprobanteSunatService(pool, req.user, idComprobanteElectronico, opciones);
 
+    if (result && !result.ok) {
+      return res.status(400).send({
+        message: result.mensaje || "Error al enviar a SUNAT",
+        data: result
+      });
+    }
     res.status(200).send({
-      message: "Comprobante enviado a SUNAT exitosamente",
+      message: result?.mensaje || "Comprobante enviado a SUNAT exitosamente",
       data: result
     });
   } catch (error) {
@@ -166,9 +217,18 @@ const enviarComprobanteSunat = async (req, res) => {
         data: undefined
       });
     }
+    if (error.message === "CONFIG_FACTURADOR_INCOMPLETA") {
+      return res.status(400).send({
+        message: "Configure la carpeta del Facturador SUNAT en Configuración > Facturación",
+        data: undefined
+      });
+    }
+    if (error.message === "CDR_NO_ENCONTRADO" || error.message === "XML no encontrado") {
+      return res.status(404).send({ message: error.message, data: undefined });
+    }
     console.error("Error enviar comprobante SUNAT:", error);
     res.status(500).send({
-      message: "Error al enviar el comprobante a SUNAT",
+      message: error.message || "Error al enviar el comprobante a SUNAT",
       data: undefined
     });
   }
@@ -243,13 +303,70 @@ const obtenerEstadosSunat = async (req, res) => {
   }
 };
 
+// Envío por lotes (manual): envía todos los comprobantes pendientes de la empresa del usuario
+const enviarLoteSunat = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await FacturacionServices.enviarLotePendientesService(pool, req.user.empresa);
+    res.status(200).send({
+      message: `Envío por lotes: ${result.enviados} enviados, ${result.errores} errores`,
+      data: result
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    console.error("Error envío por lotes SUNAT:", error);
+    res.status(500).send({
+      message: error.message || "Error al enviar lote a SUNAT",
+      data: undefined
+    });
+  }
+};
+
+// Obtener contenido XML del comprobante (para ver o descargar)
+const obtenerXmlComprobante = async (req, res) => {
+  try {
+    const { idComprobanteElectronico } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const contenido = await FacturacionServices.obtenerXmlComprobanteService(pool, req.user, idComprobanteElectronico);
+    res.status(200).send({ data: { content: contenido } });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "COMPROBANTE_NO_ENCONTRADO") return res.status(404).send({ message: "Comprobante no encontrado", data: undefined });
+    if (error.message === "CONFIG_FACTURADOR_INCOMPLETA") return res.status(400).send({ message: "Configure la carpeta del Facturador SUNAT", data: undefined });
+    if (error.message && (error.message.includes("XML") || error.message.includes("no encontrado"))) return res.status(404).send({ message: error.message, data: undefined });
+    console.error("Error obtener XML comprobante:", error);
+    res.status(500).send({ message: error.message || "Error al obtener XML", data: undefined });
+  }
+};
+
+// Obtener contenido CDR del comprobante (para ver o descargar)
+const obtenerCdrComprobante = async (req, res) => {
+  try {
+    const { idComprobanteElectronico } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const contenido = await FacturacionServices.obtenerCdrComprobanteService(pool, req.user, idComprobanteElectronico);
+    res.status(200).send({ data: { content: contenido } });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "COMPROBANTE_NO_ENCONTRADO" || error.message === "CDR_NO_ENCONTRADO") return res.status(404).send({ message: "CDR no encontrado", data: undefined });
+    console.error("Error obtener CDR comprobante:", error);
+    res.status(500).send({ message: error.message || "Error al obtener CDR", data: undefined });
+  }
+};
+
 module.exports = {
   obtenerConfiguracionFacturacion,
   actualizarConfiguracionFacturacion,
+  subirCertificadoFacturacion,
   obtenerComprobantesElectronicos,
   generarComprobanteElectronico,
   enviarComprobanteSunat,
   consultarEstadoSunat,
+  enviarLoteSunat,
   obtenerEstadisticasFacturacion,
-  obtenerEstadosSunat
+  obtenerEstadosSunat,
+  obtenerXmlComprobante,
+  obtenerCdrComprobante
 };

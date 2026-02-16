@@ -1,0 +1,36 @@
+const dbConfig = require("../dbconfig");
+const sql = require("mssql");
+const DashboardServices = require("../services/dashboard.service");
+
+const obtenerResumenDashboard = async (req, res) => {
+  try {
+    const { periodo } = req.query;
+    const pool = await sql.connect(dbConfig);
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!idEmpresa) {
+      return res.status(403).send({
+        message: "No autorizado: falta empresa",
+        data: undefined
+      });
+    }
+    const data = await DashboardServices.obtenerResumenDashboardService(
+      pool,
+      req.user,
+      periodo || "Este Mes"
+    );
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    console.error("Error obtener resumen dashboard:", error);
+    res.status(500).send({
+      message: "Error al obtener el resumen del dashboard",
+      data: undefined
+    });
+  }
+};
+
+module.exports = {
+  obtenerResumenDashboard
+};

@@ -1,0 +1,40 @@
+{
+  "_comentario": "Plantilla Resumen diario (RC). Boletas y notas del día. Guardar en [rutaFacturador]/sunat_archivos/sfs/DATA/[RUC]-RC-[YYYYMMDD]-[CORREL].json. Envío por sendSummary.",
+  "ublVersion": "2.0",
+  "customizationID": "1.1",
+  "tipoResumen": "RC",
+  "fechaEmision": "",
+  "numeroCorrelativo": "",
+  "emisor": {
+    "ruc": "",
+    "razonSocial": "",
+    "nombreComercial": "",
+    "domicilioFiscal": {
+      "ubigueo": "",
+      "direccion": "",
+      "urbanizacion": "",
+      "departamento": "",
+      "provincia": "",
+      "distrito": "",
+      "codigoPais": "PE"
+    }
+  },
+  "resumenes": [
+    {
+      "tipoComprobante": "03",
+      "serie": "",
+      "numeroCorrelativoInicio": "",
+      "numeroCorrelativoFin": "",
+      "totalGravada": 0,
+      "totalExonerada": 0,
+      "totalInafecta": 0,
+      "totalGratuita": 0,
+      "totalIgv": 0,
+      "totalIsc": 0,
+      "totalOtrosTributos": 0,
+      "totalDescuento": 0,
+      "totalOtrosCargos": 0,
+      "total": 0
+    }
+  ]
+}

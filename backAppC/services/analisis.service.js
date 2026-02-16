@@ -5,8 +5,8 @@ exports.obtenerDashboardEjecutivoService = async (pool, user) => {
     throw new Error("NO_ACCESS");
   }
 
-  const dashboard = await AnalisisRepository.obtenerDashboardEjecutivoRepo(pool, user.empresa);
-  return dashboard;
+  const recordset = await AnalisisRepository.obtenerDashboardEjecutivoRepo(pool, user.empresa);
+  return recordset && recordset.length > 0 ? recordset[0] : null;
 };
 
 exports.obtenerBalanceGeneralService = async (pool, user, periodo) => {
