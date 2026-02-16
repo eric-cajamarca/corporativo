@@ -1,0 +1,86 @@
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-pencil"></i> Editar cotización</h5>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="volver()">
+          <i class="bi bi-arrow-left"></i> Volver
+        </button>
+      </div>
+      <div class="card-body">
+        <ng-container *ngIf="loading">
+          <p class="text-muted mb-0"><i class="bi bi-hourglass-split"></i> Cargando...</p>
+        </ng-container>
+        <ng-container *ngIf="!loading">
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Comprobante</label>
+              <input type="text" class="form-control" [(ngModel)]="serieNumero" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha emisión</label>
+              <input type="date" class="form-control" [(ngModel)]="fEmision">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fecha vencimiento</label>
+              <input type="date" class="form-control" [(ngModel)]="fVencimiento">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Cliente</label>
+              <input type="text" class="form-control" [ngModel]="clienteRazonSocial" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">RUC</label>
+              <input type="text" class="form-control" [ngModel]="clienteRuc" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Total</label>
+              <input type="text" class="form-control fw-semibold" [value]="formatearMoneda(total)" readonly>
+            </div>
+          </div>
+
+          <h6 class="mt-3">Detalle</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th class="text-end" style="width: 100px;">Cantidad</th>
+                  <th class="text-end" style="width: 120px;">P. venta</th>
+                  <th class="text-end" style="width: 120px;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let d of detalles">
+                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.codigo" readonly></td>
+                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" readonly></td>
+                  <td>
+                    <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.cantidad" (ngModelChange)="recalcularTotal()" step="0.001" min="0">
+                  </td>
+                  <td>
+                    <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.pVenta" (ngModelChange)="recalcularTotal()" step="0.01" min="0">
+                  </td>
+                  <td class="text-end align-middle">{{ formatearMoneda(d.total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" (click)="volver()">Cancelar</button>
+            <button type="button" class="btn btn-primary" (click)="guardar()" [disabled]="saving">
+              <span *ngIf="saving"><i class="bi bi-hourglass-split"></i> Guardando...</span>
+              <span *ngIf="!saving"><i class="bi bi-check-lg"></i> Guardar</span>
+            </button>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+  </div>
+</main>

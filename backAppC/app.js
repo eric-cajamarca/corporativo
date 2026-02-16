@@ -47,6 +47,7 @@ const permisosRoutes = require('./routes/permisos');
 const gestoresRoutes = require('./routes/gestores');
 const usuarioSucursalRoutes = require('./routes/usuarioSucursal');
 const impuestosRoutes = require('./routes/impuestos');
+const cotizacionesRoutes = require('./routes/cotizaciones');
 
 
 const app = express();
@@ -182,6 +183,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/permisos', permisosRoutes);
 app.use('/api/gestores', gestoresRoutes);
 app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
+app.use('/api/cotizaciones', cotizacionesRoutes);
 
 // Iniciar servidor
 app.listen(PORT, () => {

@@ -262,6 +262,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             submenu: [
                 { nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: esAdmin || permisos.includes('CREAR_VENTAS') },
                 { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: esAdmin || permisos.includes('VER_VENTAS') },
+                { nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: esAdmin || permisos.includes('VER_VENTAS') },
                 { nombre: 'Clientes', ruta: '/clientes', permiso: 'VER_CLIENTES', visible: esAdmin || permisos.includes('VER_CLIENTES') }
             ]
         },

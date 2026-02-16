@@ -1,0 +1,23 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+.content-wrap {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}

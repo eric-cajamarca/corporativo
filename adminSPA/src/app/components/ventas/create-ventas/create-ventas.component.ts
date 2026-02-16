@@ -21,6 +21,7 @@ import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
 import { VentasService } from '../../../services/ventas.service';
+import { CotizacionesService } from '../../../services/cotizaciones.service';
 import { CajaService } from '../../../services/caja.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { FactilizaService } from '../../../services/factiliza.service';
@@ -146,6 +147,7 @@ export class CreateVentasComponent implements OnInit {
     private _documentosService: DocumentoService,
     private modalService: ModalService,
     private ventasService: VentasService,
+    private cotizacionesService: CotizacionesService,
     private cajaService: CajaService,
     private _factilizaService: FactilizaService,
     private _impuestoService: ImpuestoService,
@@ -1076,6 +1078,15 @@ abrirModalPrecios(item: any) {
     return ['01', '03', '07', '08'].includes(codigo);
   }
 
+  /** True si el comprobante seleccionado es Cotización (CT). */
+  esCotizacion(): boolean {
+    const id = this.ventas?.idComprobante;
+    if (id == null || id === '') return false;
+    const comp = this.comprobantes?.find((c: any) => Number(c.idComprobante) === Number(id));
+    const codigo = String(comp?.codigo ?? '').trim().toUpperCase();
+    return codigo === 'CT';
+  }
+
   /** Registra la venta completa. Si el cliente no tiene idCliente, lo crea antes en BD. */
   registrarVenta(): void {
     if (this.carrito.length === 0) {
@@ -1104,8 +1115,12 @@ abrirModalPrecios(item: any) {
 
     const totalVenta = Number(this.ventas.total) || 0;
     const totalPago = this.calcularTotalTabla();
-    if (totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
+    if (!this.esCotizacion() && totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
       iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
+      return;
+    }
+    if (this.esCotizacion()) {
+      this.enviarCotizacion(idCliente);
       return;
     }
     this.enviarVentaConCliente(idCliente);
@@ -1178,6 +1193,60 @@ abrirModalPrecios(item: any) {
     this._clienteService.crear_direccionCliente(payload).subscribe({
       next: () => onDone(),
       error: () => onDone()
+    });
+  }
+
+  private enviarCotizacion(idCliente: number): void {
+    this.loading = true;
+    const totalVenta = Number(this.ventas.total) || 0;
+    const cotizacionPayload = {
+      cotizacion: {
+        idComprobante: Number(this.ventas.idComprobante),
+        serie: String(this.ventas.serie || '0000').substring(0, 4),
+        numero: String(this.ventas.numero || '00000000').substring(0, 8),
+        compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
+        fEmision: this.ventas.fEmision ? String(this.ventas.fEmision).substring(0, 10) : new Date().toISOString().substring(0, 10),
+        fVencimiento: this.ventas.fVencimiento ? String(this.ventas.fVencimiento).substring(0, 10) : new Date().toISOString().substring(0, 10),
+        idDocumento: this.ventas.idDocumento != null ? String(this.ventas.idDocumento).substring(0, 1) : '1',
+        idCliente,
+        idSucursal: this.ventas.idSucursal,
+        moneda: null,
+        idCondicionPago: null,
+        total: totalVenta
+      },
+      detalles: this.carrito.map((item: any) => {
+        const cant = Number(item.cantidad) || 0;
+        const pVenta = Number(item.pVenta) || 0;
+        const subtotal = cant * pVenta;
+        return {
+          cantidad: cant,
+          pVenta,
+          descuento: 0,
+          subtotal,
+          igv: 0,
+          isc: 0,
+          total: subtotal,
+          codigo: (item.codigo ?? item.Codigo ?? '').toString(),
+          descripcion: (item.descripcion ?? '').toString(),
+          idPresentacion: item.idPresentacion != null ? item.idPresentacion : 1,
+          idSucursal: this.ventas.idSucursal
+        };
+      })
+    };
+    this.cotizacionesService.crearCotizacion(cotizacionPayload).subscribe({
+      next: () => {
+        this.loading = false;
+        iziToast.success({ title: 'Éxito', message: 'Cotización registrada correctamente.' });
+        this.ventaSesionService.eliminarSesionActiva();
+        this.limpiarVenta();
+      },
+      error: (err) => {
+        this.loading = false;
+        iziToast.error({
+          title: 'Error',
+          message: err.error?.error || err.error?.message || 'Error al registrar la cotización.'
+        });
+      }
     });
   }
 
