@@ -83,6 +83,19 @@ const actualizar = async (req, res) => {
 };
 
 /**
+ * GET /api/impuestos/codigos-sunat - Lista códigos Catálogo 05 SUNAT (tipos de tributos).
+ */
+const codigosSunat = async (req, res) => {
+    try {
+        const data = impuestosService.getCodigosSunat();
+        return res.status(200).send({ data });
+    } catch (error) {
+        console.error('impuestosController codigosSunat:', error);
+        return res.status(500).send({ message: error.message || 'Error al obtener códigos SUNAT', data: undefined });
+    }
+};
+
+/**
  * PUT /api/impuestosestado/:id - Actualiza solo el estado. Body: { estado: true|false }
  */
 const actualizarEstado = async (req, res) => {
@@ -112,5 +125,6 @@ module.exports = {
     obtenerPorId,
     crear,
     actualizar,
-    actualizarEstado
+    actualizarEstado,
+    codigosSunat
 };

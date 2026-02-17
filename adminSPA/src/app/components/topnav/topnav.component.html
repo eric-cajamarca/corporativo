@@ -16,7 +16,7 @@
       </div>
     </div>
 
-    <!-- Centro - Barra de búsqueda -->
+    <!-- Centro - Barra de búsqueda 
     <div class="topnav-center d-none d-lg-flex">
       <div class="search-container">
         <i class="fas fa-search search-icon"></i>
@@ -34,12 +34,12 @@
         </button>
       </div>
     </div>
-
+    -->
     <!-- Lado derecho -->
     <div class="topnav-right">
       <!-- Búsqueda móvil -->
       <button class="topnav-btn d-lg-none">
-        <i class="fas fa-search"></i>
+        <i class="bi bi-search"></i>
       </button>
 
       <!-- Notificaciones -->
@@ -49,7 +49,7 @@
           type="button" 
           data-bs-toggle="dropdown" 
           aria-expanded="false">
-          <i class="fas fa-bell"></i>
+          <i class="bi bi-bell"></i>
           <span class="notification-badge" *ngIf="notificacionesCount > 0">
             {{notificacionesCount}}
           </span>
@@ -80,7 +80,7 @@
               </div>
             </div>
             <div class="notification-empty" *ngIf="notificaciones.length === 0">
-              <i class="fas fa-bell-slash"></i>
+              <i class="bi bi-bell-slash"></i>
               <p>No hay notificaciones</p>
             </div>
           </div>
@@ -91,13 +91,14 @@
       </div>
 
       <!-- Accesos rápidos -->
+       <!--
       <div class="dropdown topnav-dropdown d-none d-md-block">
         <button 
           class="topnav-btn" 
           type="button" 
           data-bs-toggle="dropdown" 
           aria-expanded="false">
-          <i class="fas fa-th"></i>
+          <i class="bi bi-pin"></i>
         </button>
         <div class="dropdown-menu dropdown-menu-end quick-access-dropdown">
           <div class="dropdown-header">Accesos Rápidos</div>
@@ -129,7 +130,7 @@
           </div>
         </div>
       </div>
-
+        -->
       <!-- Separador -->
       <div class="topnav-divider d-none d-md-block"></div>
 

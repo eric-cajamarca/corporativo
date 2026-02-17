@@ -261,6 +261,24 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
     `);
 
+  const impuestosResult = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idImpuesto, descripcion, ISNULL(codigoSunat, '') AS codigoSunat,
+        CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje, pIncluyeIGV
+      FROM Impuestos
+      WHERE idEmpresa = @idEmpresa AND estado = 1
+      ORDER BY descripcion
+    `);
+  const impuestos = (impuestosResult.recordset || []).map(r => ({
+    idImpuesto: r.idImpuesto,
+    descripcion: r.descripcion,
+    codigoSunat: String(r.codigoSunat || '').trim(),
+    porcentaje: r.porcentaje,
+    pIncluyeIGV: !!r.pIncluyeIGV
+  }));
+
   const cab = cabecera.recordset && cabecera.recordset[0] ? cabecera.recordset[0] : null;
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
   const detalle = items.recordset || [];
@@ -359,7 +377,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       pVenta: d.pVenta,
       subtotal: d.subtotal,
       total: d.total
-    }))
+    })),
+    impuestos
   };
 };
 

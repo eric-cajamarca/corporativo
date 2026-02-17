@@ -50,6 +50,36 @@ function fechaParte(fechaStr) {
 }
 
 /**
+ * Resuelve tributo principal para XML/planos desde payload.impuestos y monto de IGV.
+ * Catálogo 05: 1000=IGV, 9997=EXO. Catálogo 07: 10=Gravado, 20=Exonerado.
+ * @param {Array} impuestos - payload.impuestos (codigoSunat, descripcion, porcentaje)
+ * @param {number} igv - venta.igv
+ * @returns {{ codTributo: string, nombreTributo: string, afectacionIgv: string, porcentajeIgv: string }}
+ */
+function resolverTributoPrincipal(impuestos, igv) {
+  const lista = Array.isArray(impuestos) ? impuestos : [];
+  const esGravado = igv > 0;
+  if (esGravado) {
+    const igvImp = lista.find(i => String(i.codigoSunat || "").trim() === "1000") ||
+      lista.find(i => (Number(i.porcentaje) || 0) > 0);
+    return {
+      codTributo: (igvImp && String(igvImp.codigoSunat || "").trim()) ? String(igvImp.codigoSunat).trim() : "1000",
+      nombreTributo: (igvImp && (igvImp.descripcion || "").trim()) ? String(igvImp.descripcion).trim() : "IGV",
+      afectacionIgv: "10",
+      porcentajeIgv: (igvImp && (igvImp.porcentaje != null)) ? String(Number(igvImp.porcentaje)) : "18"
+    };
+  }
+  const exoImp = lista.find(i => String(i.codigoSunat || "").trim() === "9997") ||
+    lista.find(i => (Number(i.porcentaje) || 0) === 0);
+  return {
+    codTributo: (exoImp && String(exoImp.codigoSunat || "").trim()) ? String(exoImp.codigoSunat).trim() : "9997",
+    nombreTributo: (exoImp && (exoImp.descripcion || "").trim()) ? String(exoImp.descripcion).trim() : "EXO",
+    afectacionIgv: "20",
+    porcentajeIgv: "0"
+  };
+}
+
+/**
  * Genera el XML UBL 2.1 Invoice (Factura 01 o Boleta 03) sin firma.
  * La firma debe aplicarse con el certificado (Facturador o módulo de firma).
  * @param {object} payload - { venta, empresa, cliente, items }
@@ -73,11 +103,11 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   const descuentos = toNum(venta.descuentos);
   const { fecha, hora } = fechaParte(venta.fEmision);
   const tipoCod = String(tipoComprobante || "01").trim();
-  const esExonerado = igv === 0;
-  const codTributo = esExonerado ? "9997" : "1000";
-  const nombreTributo = esExonerado ? "EXO" : "IGV";
-  const afectacionIgv = esExonerado ? "20" : "10";
-  const porcentajeIgv = esExonerado ? "0" : "18";
+  const tributo = resolverTributoPrincipal(payload.impuestos || [], igv);
+  const codTributo = tributo.codTributo;
+  const nombreTributo = tributo.nombreTributo;
+  const afectacionIgv = tributo.afectacionIgv;
+  const porcentajeIgv = tributo.porcentajeIgv;
 
   const lineas = [];
   let idx = 1;

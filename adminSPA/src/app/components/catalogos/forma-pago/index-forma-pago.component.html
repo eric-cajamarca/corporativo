@@ -1,0 +1,113 @@
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap container">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+      <h4 class="card-header-title mb-0">Forma Pago</h4>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="text-muted" *ngIf="total >= 0">{{ total }} registro(s)</span>
+        <div class="input-group input-group-merge" style="max-width: 260px;">
+          <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="buscar" (keyup.enter)="filtrar()" />
+          <button class="btn btn-primary" type="button" (click)="filtrar()"><i class="bi bi-search"></i></button>
+        </div>
+        <button class="btn btn-success" type="button" (click)="abrirCrear()"><i class="bi bi-plus-lg"></i> Acciones</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div *ngIf="loading" class="text-center py-4"><span class="spinner-border"></span></div>
+      <table *ngIf="!loading && items.length > 0" class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Acciones</th>
+            <th>Descripción</th>
+            <th>Tipo</th>
+            <th>Requiere referencia</th>
+            <th>Activo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of items">
+            <td>
+              <button class="btn btn-sm btn-outline-primary me-1" (click)="abrirEditar(item)" title="Editar"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-danger me-1" (click)="confirmarEliminar(item)" title="Eliminar"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirVer(item)" title="Ver"><i class="bi bi-search"></i></button>
+            </td>
+            <td>{{ item.descripcion }}</td>
+            <td>{{ item.tipo }}</td>
+            <td>{{ item.requiereReferencia ? 'Sí' : 'No' }}</td>
+            <td>{{ item.activo ? 'Sí' : 'No' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!loading && items.length === 0" class="alert alert-info mb-0">No hay registros.</div>
+      <ngb-pagination
+        *ngIf="!loading && total > pageSize"
+        [(page)]="page"
+        [pageSize]="pageSize"
+        [collectionSize]="total"
+        [maxSize]="maxSize"
+        (pageChange)="onPageChange($event)"
+        class="d-flex justify-content-end mt-3">
+      </ngb-pagination>
+    </div>
+  </div>
+  </div>
+</main>
+
+<!-- Modal Crear/Editar -->
+<div class="modal fade" id="modalFormFormaPago" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ itemEditar.idFormaPago ? 'Editar' : 'Nueva' }} forma de pago</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Descripción</label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: EFECTIVO" maxlength="50" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo</label>
+          <select class="form-select" [(ngModel)]="itemEditar.tipo">
+            <option *ngFor="let t of tipos" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="requiereRefFp" [(ngModel)]="itemEditar.requiereReferencia" />
+          <label class="form-check-label" for="requiereRefFp">Requiere referencia</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="activoFp" [(ngModel)]="itemEditar.activo" />
+          <label class="form-check-label" for="activoFp">Activo</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="guardar()" [disabled]="loadSave">
+          <span *ngIf="loadSave" class="spinner-border spinner-border-sm me-1"></span>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ver -->
+<div class="modal fade" id="modalVerFormaPago" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detalle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" *ngIf="itemVer">
+        <p><strong>Descripción:</strong> {{ itemVer.descripcion }}</p>
+        <p><strong>Tipo:</strong> {{ itemVer.tipo }}</p>
+        <p><strong>Requiere referencia:</strong> {{ itemVer.requiereReferencia ? 'Sí' : 'No' }}</p>
+        <p><strong>Activo:</strong> {{ itemVer.activo ? 'Sí' : 'No' }}</p>
+      </div>
+    </div>
+  </div>
+</div>

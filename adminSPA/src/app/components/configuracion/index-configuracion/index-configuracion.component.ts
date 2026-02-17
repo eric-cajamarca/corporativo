@@ -110,8 +110,11 @@ export class IndexConfiguracionComponent implements OnInit {
   impuestosCargando = false;
   impuestoGuardando = false;
   impuestoEditando: Impuesto | null = null;
+  /** Catálogo 05 SUNAT para selector de código tributo */
+  codigosSunatImpuesto: Array<{ codigo: string; descripcion: string }> = [];
   impuestoForm = {
     descripcion: '',
+    codigoSunat: '' as string,
     porcentaje: 0,
     pIncluyeIGV: false,
     estado: true
@@ -374,14 +377,21 @@ export class IndexConfiguracionComponent implements OnInit {
     }
   }
 
-  /** Carga la lista de impuestos de la empresa */
+  /** Carga la lista de impuestos de la empresa y códigos SUNAT (Catálogo 05) */
   cargarImpuestos(): void {
     this.impuestosCargando = true;
+    this._impuestoService.getCodigosSunat().subscribe({
+      next: (res) => {
+        this.codigosSunatImpuesto = res?.data ?? [];
+      },
+      error: () => {}
+    });
     this._impuestoService.obtenerTodos().subscribe({
       next: (response) => {
         const list = response?.data ?? [];
-        this.impuestos = list.map((i: { idImpuesto: number; descripcion: string; porcentaje: number; estado?: boolean | number; pIncluyeIGV?: boolean | number }) => ({
+        this.impuestos = list.map((i: { idImpuesto: number; descripcion: string; codigoSunat?: string; porcentaje: number; estado?: boolean | number; pIncluyeIGV?: boolean | number }) => ({
           ...i,
+          codigoSunat: i.codigoSunat ?? '',
           estado: !!(i.estado === true || i.estado === 1),
           pIncluyeIGV: !!(i.pIncluyeIGV === true || i.pIncluyeIGV === 1)
         })) as Impuesto[];
@@ -399,7 +409,7 @@ export class IndexConfiguracionComponent implements OnInit {
   /** Abre el modal para crear un nuevo impuesto */
   abrirModalCrearImpuesto(): void {
     this.impuestoEditando = null;
-    this.impuestoForm = { descripcion: '', porcentaje: 0, pIncluyeIGV: false, estado: true };
+    this.impuestoForm = { descripcion: '', codigoSunat: '', porcentaje: 0, pIncluyeIGV: false, estado: true };
   }
 
   /** Abre el modal para editar un impuesto */
@@ -407,6 +417,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.impuestoEditando = imp;
     this.impuestoForm = {
       descripcion: imp.descripcion,
+      codigoSunat: imp.codigoSunat ?? '',
       porcentaje: imp.porcentaje ?? 0,
       pIncluyeIGV: !!imp.pIncluyeIGV,
       estado: !!imp.estado
@@ -432,6 +443,7 @@ export class IndexConfiguracionComponent implements OnInit {
     }
     const payload = {
       descripcion: desc,
+      codigoSunat: (this.impuestoForm.codigoSunat || '').trim() || undefined,
       porcentaje: this.impuestoForm.porcentaje ?? 0,
       pIncluyeIGV: !!this.impuestoForm.pIncluyeIGV,
       estado: !!this.impuestoForm.estado

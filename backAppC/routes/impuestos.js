@@ -4,6 +4,7 @@ const impuestosController = require('../controllers/impuestosController');
 const auth = require('../middlewares/autenticate');
 
 api.get('/impuestos', auth.auth, impuestosController.listar);
+api.get('/impuestos/codigos-sunat', auth.auth, impuestosController.codigosSunat);
 api.get('/impuestos/:id', auth.auth, impuestosController.obtenerPorId);
 api.post('/impuestos', auth.auth, impuestosController.crear);
 api.put('/impuestos/:id', auth.auth, impuestosController.actualizar);

@@ -43,6 +43,37 @@ function escPipe(s) {
 }
 
 /**
+ * Resuelve tributo principal para TRI/DET desde payload.impuestos y monto IGV.
+ * @param {Array} impuestos - payload.impuestos
+ * @param {number} igv - venta.igv
+ * @returns {{ codigoSunat: string, nombreTributo: string, tipoTri: string, afectacion: string, porcentaje: string }}
+ */
+function resolverTributoPrincipal(impuestos, igv) {
+  const lista = Array.isArray(impuestos) ? impuestos : [];
+  const esGravado = igv > 0;
+  if (esGravado) {
+    const imp = lista.find(i => String(i.codigoSunat || "").trim() === "1000") ||
+      lista.find(i => (Number(i.porcentaje) || 0) > 0);
+    return {
+      codigoSunat: (imp && String(imp.codigoSunat || "").trim()) ? String(imp.codigoSunat).trim() : "1000",
+      nombreTributo: (imp && (imp.descripcion || "").trim()) ? String(imp.descripcion).trim() : "IGV",
+      tipoTri: "10",
+      afectacion: "10",
+      porcentaje: (imp && imp.porcentaje != null) ? toNum(imp.porcentaje).toFixed(2) : "18"
+    };
+  }
+  const imp = lista.find(i => String(i.codigoSunat || "").trim() === "9997") ||
+    lista.find(i => (Number(i.porcentaje) || 0) === 0);
+  return {
+    codigoSunat: (imp && String(imp.codigoSunat || "").trim()) ? String(imp.codigoSunat).trim() : "9997",
+    nombreTributo: (imp && (imp.descripcion || "").trim()) ? String(imp.descripcion).trim() : "EXO",
+    tipoTri: "VAT",
+    afectacion: "20",
+    porcentaje: "0.00"
+  };
+}
+
+/**
  * Fecha en formato YYYY-MM-DD para CAB.
  */
 function fechaCab(fechaStr) {
@@ -107,8 +138,9 @@ function generarLineaCAB(payload, tipoComprobante) {
  * Orden: 1-7 (unidad, cantidad, cod producto, cod SUNAT, descripción, valor unit., sum tributos);
  * 8-14 (IGV); 15-21 (ISC); 22-27 (Tributo Otro); 28-33 (ICBPER); 34-36 (precio unit., valor venta ítem, valor referencial).
  * Si el ítem tiene IGV 0 pero el comprobante es gravado (venta.igv > 0), se reparte IGV proporcionalmente.
+ * tributoPrincipal: opcional { codigoSunat, nombreTributo, tipoTri, afectacion, porcentaje } desde payload.impuestos.
  */
-function generarLineasDET(items, venta) {
+function generarLineasDET(items, venta, tributoPrincipal) {
   const lineas = [];
   const detalle = Array.isArray(items) ? items : [];
   const totalSubtotal = detalle.reduce((s, d) => s + toNum(d.subtotal), 0);
@@ -116,6 +148,7 @@ function generarLineasDET(items, venta) {
   if (totalIgvDoc === 0 && venta && toNum(venta.total) > toNum(venta.subtotal)) {
     totalIgvDoc = Math.round((toNum(venta.total) - toNum(venta.subtotal)) * 100) / 100;
   }
+  const trib = tributoPrincipal || resolverTributoPrincipal([], totalIgvDoc);
 
   const igvPorItem = detalle.map((d) => {
     const subtotalItem = toNum(d.subtotal);
@@ -155,13 +188,13 @@ function generarLineasDET(items, venta) {
       desc,                               // 5
       valor5(pVenta),                     // 6 valor unitario 5 decimales
       monto2(igvItem),                    // 7 sumatoria tributos ítem
-      esExonerado ? "9997" : "1000",      // 8 código tributo
+      trib.codigoSunat,                   // 8 código tributo
       esExonerado ? "0.00" : monto2(igvItem),  // 9 monto
       monto2(subtotalItem),               // 10 base
-      esExonerado ? "EXO" : "IGV",        // 11 nombre
-      esExonerado ? "VAT" : "10",         // 12 tipo
-      esExonerado ? "20" : "10",          // 13 afectación (20=exonerado, 10=gravado)
-      esExonerado ? "0.00" : "18",        // 14 porcentaje
+      trib.nombreTributo,                 // 11 nombre
+      trib.tipoTri,                       // 12 tipo
+      trib.afectacion,                    // 13 afectación
+      trib.porcentaje,                    // 14 porcentaje
       "-", "0.00", "",                    // 15-17
       "ISC", "EXC", "01", "2.00", "-", "", "", "",  // 18-25
       "0.00", "-",                        // 26-27
@@ -173,14 +206,9 @@ function generarLineasDET(items, venta) {
     lineas.push(campos.join(SEP) + SEP);
   }
   if (lineas.length === 0) {
-    const codTrib = esExonerado ? "9997" : "1000";
-    const nomTrib = esExonerado ? "EXO" : "IGV";
-    const tipoTrib = esExonerado ? "VAT" : "10";
-    const afect = esExonerado ? "20" : "10";
-    const pct = esExonerado ? "0.00" : "18";
     const vacio = [
       "NIU", "0.000", "1", "-", "Item", "0.00000", "0.00",
-      codTrib, "0.00", "0.00", nomTrib, tipoTrib, afect, pct,
+      trib.codigoSunat, "0.00", "0.00", trib.nombreTributo, trib.tipoTri, trib.afectacion, trib.porcentaje,
       "-", "0.00", "",
       "ISC", "EXC", "01", "2.00", "-", "", "", "",
       "0.00", "-", "", "", "", "", "", "",
@@ -193,19 +221,20 @@ function generarLineasDET(items, venta) {
 
 /**
  * Genera contenido TRI (tributos generales). 5 columnas.
- * Gravado: 1000|IGV|10|base|monto. Exonerado: 9997|EXO|VAT|base|0.00
+ * Usa payload.impuestos para codigoSunat y nombre; si no hay, 1000|IGV|10 o 9997|EXO|VAT.
  */
 function generarTRI(payload) {
-  const { venta = {} } = payload;
+  const { venta = {}, impuestos = [] } = payload;
   const base = toNum(venta.subtotal);
   let igv = toNum(venta.igv);
   if (igv === 0 && toNum(venta.total) > toNum(venta.subtotal)) {
     igv = Math.round((toNum(venta.total) - toNum(venta.subtotal)) * 100) / 100;
   }
+  const trib = resolverTributoPrincipal(impuestos, igv);
   if (igv === 0) {
-    return `9997|EXO|VAT|${monto2(base)}|0.00` + SEP;
+    return `${trib.codigoSunat}|${trib.nombreTributo}|${trib.tipoTri}|${monto2(base)}|0.00` + SEP;
   }
-  return `1000|IGV|10|${monto2(base)}|${monto2(igv)}` + SEP;
+  return `${trib.codigoSunat}|${trib.nombreTributo}|${trib.tipoTri}|${monto2(base)}|${monto2(igv)}` + SEP;
 }
 
 /**
@@ -258,9 +287,10 @@ function generarPAG(payload) {
  * @returns {{ cab, det, tri, ley, aca, dpa, pag }}
  */
 function generarArchivosPlanosFacturaBoleta(payload, tipoComprobante) {
+  const trib = resolverTributoPrincipal(payload.impuestos || [], toNum(payload.venta && payload.venta.igv));
   return {
     cab: generarLineaCAB(payload, tipoComprobante),
-    det: generarLineasDET(payload.items, payload.venta),
+    det: generarLineasDET(payload.items, payload.venta, trib),
     tri: generarTRI(payload),
     ley: generarLEY(payload),
     aca: generarACA(payload),
@@ -323,9 +353,14 @@ function generarLineaCABNota(payload, tipoComprobante) {
  * Misma estructura DET, TRI, LEY, ACA, DPA, PAG que Factura/Boleta; CAB con 21 columnas (Nota 2.1).
  */
 function generarArchivosPlanosNota(payload, tipoComprobante) {
+  let igv = toNum(payload.venta && payload.venta.igv);
+  if (igv === 0 && payload.venta && toNum(payload.venta.total) > toNum(payload.venta.subtotal)) {
+    igv = Math.round((toNum(payload.venta.total) - toNum(payload.venta.subtotal)) * 100) / 100;
+  }
+  const trib = resolverTributoPrincipal(payload.impuestos || [], igv);
   return {
     cab: generarLineaCABNota(payload, tipoComprobante),
-    det: generarLineasDET(payload.items, payload.venta),
+    det: generarLineasDET(payload.items, payload.venta, trib),
     tri: generarTRI(payload),
     ley: generarLEY(payload),
     aca: generarACA(payload),

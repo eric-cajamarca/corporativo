@@ -273,6 +273,7 @@ GO
 CREATE TABLE Impuestos (
     idImpuesto INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
     idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    codigoSunat VARCHAR(4) NULL,
     descripcion VARCHAR(50) NOT NULL,
     estado BIT NOT NULL DEFAULT 1,
     porcentaje DECIMAL(5,2) NOT NULL DEFAULT 0,
@@ -1083,6 +1084,7 @@ CREATE TABLE MovimientosCaja (
     idUsuario UNIQUEIDENTIFIER NOT NULL,
     idTipoMovimientoCaja INT NOT NULL,
     fechaMovimiento DATETIME NOT NULL DEFAULT GETDATE(),
+    idConcepto UNIQUEIDENTIFIER NULL
     concepto VARCHAR(100) NOT NULL,
     monto DECIMAL(18,2) NOT NULL,
     idMediosPago INT NULL,
@@ -1096,7 +1098,8 @@ CREATE TABLE MovimientosCaja (
     FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
     FOREIGN KEY (idTipoMovimientoCaja) REFERENCES TiposMovimientoCaja(idTipoMovimientoCaja),
     FOREIGN KEY (idMediosPago) REFERENCES MediosPago(idMediosPago),
-    FOREIGN KEY (idMoneda) REFERENCES Moneda(idMoneda)
+    FOREIGN KEY (idMoneda) REFERENCES Moneda(idMoneda),
+    FOREIGN KEY (idConcepto) REFERENCES Concepto(idConcepto)
 );
 GO
 

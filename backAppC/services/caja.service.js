@@ -1,4 +1,6 @@
+const sql = require('mssql');
 const CajaRepository = require('../repositories/caja.repository');
+const conceptoRepository = require('../repositories/concepto.repository');
 
 exports.obtenerCajasService = async (pool, user) => {
   if (!user) {
@@ -91,8 +93,40 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
     throw new Error("TIPO_MOVIMIENTO_INVALIDO");
   }
 
-  const result = await CajaRepository.registrarMovimientoRepo(pool, user, datos);
-  return result;
+  // Si viene idConcepto: validar que exista, sea de la empresa y que el tipo coincida (I->INGRESO, E->EGRESO)
+  if (datos.idConcepto) {
+    const concepto = await conceptoRepository.obtenerPorId(pool, datos.idConcepto, user.empresa);
+    if (!concepto) {
+      throw new Error("CONCEPTO_NO_ENCONTRADO");
+    }
+    const tipoOperacion = await CajaRepository.obtenerTipoOperacionPorIdRepo(pool, datos.idTipoMovimientoCaja);
+    const tipoEsperado = tipoOperacion === "I" ? "INGRESO" : tipoOperacion === "E" ? "EGRESO" : null;
+    if (tipoEsperado && concepto.tipo !== tipoEsperado) {
+      throw new Error("EL_CONCEPTO_NO_COINCIDE_CON_EL_TIPO_DE_MOVIMIENTO");
+    }
+    if (!(datos.concepto && String(datos.concepto).trim())) {
+      datos.concepto = concepto.descripcion || "";
+    }
+  }
+
+  const tipoOperacion = await CajaRepository.obtenerTipoOperacionPorIdRepo(pool, datos.idTipoMovimientoCaja);
+  const generarNumeroRecibo = !(datos.documentoRelacionado && String(datos.documentoRelacionado).trim()) && (tipoOperacion === "I" || tipoOperacion === "E");
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    if (generarNumeroRecibo) {
+      const codigo = tipoOperacion === "I" ? "RI" : "RE";
+      const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(transaction, user.empresa, codigo);
+      datos.documentoRelacionado = documentoRelacionado;
+    }
+    const result = await CajaRepository.registrarMovimientoRepo(transaction, user, datos);
+    await transaction.commit();
+    return result;
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
 };
 
 exports.obtenerMovimientosCajaService = async (pool, user, filtros) => {
@@ -111,7 +145,7 @@ exports.obtenerMovimientosCajaService = async (pool, user, filtros) => {
 exports.obtenerRecibosEgresoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
-  const params = { ...filtros, tipoMovimiento: "E" };
+  const params = { ...filtros, tipoMovimiento: "E", soloRecibos: true };
   return CajaRepository.obtenerMovimientosCajaRepo(pool, user.empresa, params);
 };
 
@@ -134,6 +168,31 @@ exports.obtenerTiposMovimientoCajaService = async (pool, user) => {
 
   const tipos = await CajaRepository.obtenerTiposMovimientoCajaRepo(pool);
   return tipos;
+};
+
+exports.crearTipoMovimientoCajaService = async (pool, user, datos) => {
+  if (!user) throw new Error("NO_ACCESS");
+  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  if (!datos.nombre || !datos.tipo) throw new Error("Nombre y tipo son obligatorios.");
+  const tipo = (datos.tipo === "I" || datos.tipo === "E") ? datos.tipo : null;
+  if (!tipo) throw new Error("Tipo debe ser I (Ingreso) o E (Egreso).");
+  return CajaRepository.crearTipoMovimientoCajaRepo(pool, { nombre: datos.nombre.trim(), descripcion: datos.descripcion || null, tipo });
+};
+
+exports.actualizarTipoMovimientoCajaService = async (pool, user, id, datos) => {
+  if (!user) throw new Error("NO_ACCESS");
+  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  if (!datos.nombre || !datos.tipo) throw new Error("Nombre y tipo son obligatorios.");
+  const tipo = (datos.tipo === "I" || datos.tipo === "E") ? datos.tipo : null;
+  if (!tipo) throw new Error("Tipo debe ser I (Ingreso) o E (Egreso).");
+  await CajaRepository.actualizarTipoMovimientoCajaRepo(pool, id, { nombre: datos.nombre.trim(), descripcion: datos.descripcion || null, tipo });
+};
+
+exports.eliminarTipoMovimientoCajaService = async (pool, user, id) => {
+  if (!user) throw new Error("NO_ACCESS");
+  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  const deleted = await CajaRepository.eliminarTipoMovimientoCajaRepo(pool, id);
+  if (deleted === 0) throw new Error("Tipo de movimiento no encontrado.");
 };
 
 exports.obtenerResumenCajaDiarioService = async (pool, user, fecha) => {

@@ -293,15 +293,73 @@ exports.validarTipoMovimientoRepo = async (pool, idTipoMovimientoCaja) => {
   return result.recordset[0].existe > 0;
 };
 
-exports.registrarMovimientoRepo = async (pool, user, datos) => {
+/** Obtiene el tipo ('I' o 'E') del tipo de movimiento de caja. */
+exports.obtenerTipoOperacionPorIdRepo = async (pool, idTipoMovimientoCaja) => {
   const result = await pool
+    .request()
+    .input("idTipoMovimientoCaja", sql.Int, idTipoMovimientoCaja)
+    .query(`SELECT tipo FROM TiposMovimientoCaja WHERE idTipoMovimientoCaja = @idTipoMovimientoCaja`);
+  return result.recordset[0] ? result.recordset[0].tipo : null;
+};
+
+/**
+ * Obtiene y reserva el siguiente número para Recibo Ingreso (RI) o Recibo Egreso (RE).
+ * Debe ejecutarse dentro de una transacción.
+ * @param {object} transaction - Transacción de mssql
+ * @param {string} idEmpresa - UUID empresa
+ * @param {string} codigo - 'RI' o 'RE'
+ * @returns {{ serie: string, numeroFormateado: string, documentoRelacionado: string }}
+ */
+exports.obtenerSiguienteNumeroReciboRepo = async (transaction, idEmpresa, codigo) => {
+  const cod = (codigo === "RI" || codigo === "RE") ? codigo : null;
+  if (!cod) {
+    throw new Error("CODIGO_RECIBO_INVALIDO");
+  }
+  const result = await transaction.request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("codigo", sql.VarChar(2), cod)
+    .query(`
+      UPDATE Comprobantes
+      SET numero = ISNULL(numero, 0) + 1
+      OUTPUT INSERTED.serie, INSERTED.numero
+      WHERE idEmpresa = @idEmpresa AND codigo = @codigo
+    `);
+  const row = result.recordset && result.recordset[0];
+  if (!row) {
+    throw new Error("COMPROBANTE_RI_RE_NO_CONFIGURADO");
+  }
+  const serie = String(row.serie || "0001").trim().substring(0, 4);
+  const num = row.numero != null ? Number(row.numero) : 1;
+  const numeroFormateado = String(num).padStart(8, "0");
+  const documentoRelacionado = cod + " " + serie + "-" + numeroFormateado;
+  return { serie, numeroFormateado, documentoRelacionado };
+};
+
+exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
+  let idSucursal = user.sucursal || null;
+  if (!idSucursal && datos.idApertura) {
+    const resApertura = await poolOrTransaction
+      .request()
+      .input("idApertura", sql.UniqueIdentifier, datos.idApertura)
+      .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
+      .query("SELECT idSucursal FROM AperturasCaja WHERE idApertura = @idApertura AND idEmpresa = @idEmpresa");
+    if (resApertura.recordset && resApertura.recordset[0]) {
+      idSucursal = resApertura.recordset[0].idSucursal;
+    }
+  }
+  if (!idSucursal) {
+    throw new Error("No se pudo determinar la sucursal para el movimiento. Verifique la apertura de caja o el usuario.");
+  }
+
+  const result = await poolOrTransaction
     .request()
     .input("idApertura", sql.UniqueIdentifier, datos.idApertura)
     .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
-    .input("idSucursal", sql.UniqueIdentifier, user.sucursal || null)
+    .input("idSucursal", sql.UniqueIdentifier, idSucursal)
     .input("idUsuario", sql.UniqueIdentifier, user.sub)
     .input("idTipoMovimientoCaja", sql.Int, datos.idTipoMovimientoCaja)
     .input("concepto", sql.VarChar, datos.concepto)
+    .input("idConcepto", sql.UniqueIdentifier, datos.idConcepto || null)
     .input("monto", sql.Decimal(18, 2), datos.monto)
     .input("idMediosPago", sql.Int, datos.idMediosPago || null)
     .input("idMoneda", sql.Int, datos.idMoneda || 1)
@@ -310,13 +368,13 @@ exports.registrarMovimientoRepo = async (pool, user, datos) => {
     .query(`
       INSERT INTO MovimientosCaja (
         idApertura, idEmpresa, idSucursal, idUsuario, idTipoMovimientoCaja,
-        fechaMovimiento, concepto, monto, idMediosPago, idMoneda,
+        fechaMovimiento, concepto, idConcepto, monto, idMediosPago, idMoneda,
         documentoRelacionado, observaciones
       )
       OUTPUT INSERTED.idMovimientoCaja
       VALUES (
         @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
-        GETDATE(), @concepto, @monto, @idMediosPago, @idMoneda,
+        GETDATE(), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
         @documentoRelacionado, @observaciones
       )
     `);
@@ -342,6 +400,12 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
   if (filtros.tipoMovimiento) {
     whereClause += " AND tmc.tipo = @tipoMovimiento";
   }
+  if (filtros.soloRecibos && filtros.tipoMovimiento === "I") {
+    whereClause += " AND mc.documentoRelacionado LIKE 'RI %'";
+  }
+  if (filtros.soloRecibos && filtros.tipoMovimiento === "E") {
+    whereClause += " AND mc.documentoRelacionado LIKE 'RE %'";
+  }
 
   const result = await pool
     .request()
@@ -356,6 +420,8 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
         mc.idApertura,
         mc.fechaMovimiento,
         mc.concepto,
+        mc.idConcepto,
+        ISNULL(conc.descripcion, mc.concepto) AS conceptoCatalogoDescripcion,
         mc.monto,
         tmc.nombre AS tipoMovimiento,
         tmc.tipo AS tipoOperacion,
@@ -366,6 +432,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
         uw.nombres + ' ' + uw.apellidos AS usuario
       FROM MovimientosCaja mc
       INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
+      LEFT JOIN Concepto conc ON mc.idConcepto = conc.idConcepto
       LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
       INNER JOIN Moneda mon ON mc.idMoneda = mon.idMoneda
       INNER JOIN UsuarioWeb uw ON mc.idUsuario = uw.idUsuario
@@ -394,13 +461,14 @@ exports.actualizarMovimientoCajaRepo = async (pool, idEmpresa, datos) => {
     .input("idMovimientoCaja", sql.UniqueIdentifier, datos.idMovimientoCaja)
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("concepto", sql.VarChar, datos.concepto)
+    .input("idConcepto", sql.UniqueIdentifier, datos.idConcepto || null)
     .input("monto", sql.Decimal(18, 2), datos.monto)
     .input("idMediosPago", sql.Int, datos.idMediosPago || null)
     .input("documentoRelacionado", sql.VarChar, datos.documentoRelacionado || null)
     .input("observaciones", sql.VarChar, datos.observaciones || null)
     .query(`
       UPDATE MovimientosCaja
-      SET concepto = @concepto, monto = @monto, idMediosPago = @idMediosPago,
+      SET concepto = @concepto, idConcepto = @idConcepto, monto = @monto, idMediosPago = @idMediosPago,
           documentoRelacionado = @documentoRelacionado, observaciones = @observaciones
       WHERE idMovimientoCaja = @idMovimientoCaja AND idEmpresa = @idEmpresa
     `);
@@ -421,6 +489,45 @@ exports.obtenerTiposMovimientoCajaRepo = async (pool) => {
     `);
 
   return result.recordset;
+};
+
+exports.crearTipoMovimientoCajaRepo = async (pool, datos) => {
+  const result = await pool
+    .request()
+    .input("nombre", sql.VarChar(30), datos.nombre)
+    .input("descripcion", sql.VarChar(100), datos.descripcion || null)
+    .input("tipo", sql.Char(1), datos.tipo)
+    .query(`
+      INSERT INTO TiposMovimientoCaja (nombre, descripcion, tipo)
+      OUTPUT INSERTED.idTipoMovimientoCaja
+      VALUES (@nombre, @descripcion, @tipo)
+    `);
+  return result.recordset[0];
+};
+
+exports.actualizarTipoMovimientoCajaRepo = async (pool, id, datos) => {
+  await pool
+    .request()
+    .input("idTipoMovimientoCaja", sql.Int, id)
+    .input("nombre", sql.VarChar(30), datos.nombre)
+    .input("descripcion", sql.VarChar(100), datos.descripcion || null)
+    .input("tipo", sql.Char(1), datos.tipo)
+    .query(`
+      UPDATE TiposMovimientoCaja
+      SET nombre = @nombre, descripcion = @descripcion, tipo = @tipo
+      WHERE idTipoMovimientoCaja = @idTipoMovimientoCaja
+    `);
+};
+
+exports.eliminarTipoMovimientoCajaRepo = async (pool, id) => {
+  const result = await pool
+    .request()
+    .input("idTipoMovimientoCaja", sql.Int, id)
+    .query(`
+      DELETE FROM TiposMovimientoCaja
+      WHERE idTipoMovimientoCaja = @idTipoMovimientoCaja
+    `);
+  return result.rowsAffected[0];
 };
 
 exports.obtenerResumenCajaDiarioRepo = async (pool, idEmpresa, fecha) => {

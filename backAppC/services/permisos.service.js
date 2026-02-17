@@ -323,6 +323,22 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             tipo: 'separador'
         },
         {
+            modulo: 'CATALOGOS',
+            nombre: 'Catálogos',
+            icono: 'bi bi-journal-bookmark',
+            ruta: null,
+            permiso: 'VER_CONFIGURACION',
+            visible: esAdmin || permisos.includes('VER_CONFIGURACION'),
+            submenu: [
+                { nombre: 'Forma Pago', ruta: '/catalogos/forma-pago', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
+                { nombre: 'Tipo Movimientos', ruta: '/catalogos/tipo-movimientos', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
+                { nombre: 'Conceptos', ruta: '/catalogos/conceptos', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
+                { nombre: 'Clasificación Conceptos', ruta: '/catalogos/clasificacion-conceptos', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
+                { nombre: 'Motivo Traslado', ruta: '/catalogos/motivo-traslado', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
+                { nombre: 'Motivo Nota Credito', ruta: '/catalogos/motivo-nota-credito', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') }
+            ]
+        },
+        {
             modulo: 'DESPACHOS',
             nombre: 'Despachos',
             icono: 'fas fa-truck',

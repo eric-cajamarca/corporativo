@@ -175,6 +175,7 @@ const registrarMovimiento = async (req, res) => {
       idApertura,
       idTipoMovimientoCaja,
       concepto,
+      idConcepto,
       monto,
       idMediosPago,
       idMoneda,
@@ -195,6 +196,7 @@ const registrarMovimiento = async (req, res) => {
       idApertura,
       idTipoMovimientoCaja,
       concepto,
+      idConcepto: idConcepto || null,
       monto,
       idMediosPago,
       idMoneda,
@@ -222,6 +224,18 @@ const registrarMovimiento = async (req, res) => {
         data: undefined
       });
     }
+    if (error.message === "CONCEPTO_NO_ENCONTRADO" || error.message === "EL_CONCEPTO_NO_COINCIDE_CON_EL_TIPO_DE_MOVIMIENTO") {
+      return res.status(400).send({
+        message: error.message === "EL_CONCEPTO_NO_COINCIDE_CON_EL_TIPO_DE_MOVIMIENTO" ? "El concepto no coincide con el tipo de movimiento (Ingreso/Egreso)." : "Concepto no encontrado.",
+        data: undefined
+      });
+    }
+    if (error.message === "COMPROBANTE_RI_RE_NO_CONFIGURADO") {
+      return res.status(400).send({
+        message: "No está configurado el comprobante RI o RE para esta empresa. Ejecute la migración de Comprobantes.",
+        data: undefined
+      });
+    }
     console.error("Error registrar movimiento:", error);
     res.status(500).send({
       message: "Error al registrar el movimiento",
@@ -233,14 +247,15 @@ const registrarMovimiento = async (req, res) => {
 // Obtener movimientos de caja
 const obtenerMovimientosCaja = async (req, res) => {
   try {
-    const { idApertura, fechaDesde, fechaHasta, tipoMovimiento } = req.query;
+    const { idApertura, fechaDesde, fechaHasta, tipoMovimiento, soloRecibos } = req.query;
 
     const pool = await sql.connect(dbConfig);
     const movimientos = await CajaServices.obtenerMovimientosCajaService(pool, req.user, {
       idApertura,
       fechaDesde,
       fechaHasta,
-      tipoMovimiento: tipoMovimiento || null
+      tipoMovimiento: tipoMovimiento || null,
+      soloRecibos: soloRecibos === "true" || soloRecibos === true
     });
 
     res.status(200).send({ data: movimientos });
@@ -277,6 +292,58 @@ const obtenerTiposMovimientoCaja = async (req, res) => {
       message: "Error al obtener los tipos de movimiento",
       data: undefined
     });
+  }
+};
+
+// Crear tipo de movimiento de caja
+const crearTipoMovimientoCaja = async (req, res) => {
+  try {
+    const { nombre, descripcion, tipo } = req.body;
+    const pool = await sql.connect(dbConfig);
+    const result = await CajaServices.crearTipoMovimientoCajaService(pool, req.user, { nombre, descripcion, tipo });
+    res.status(201).send({ message: "Tipo de movimiento creado", data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos", data: undefined });
+    if ((error.message && error.message.includes("UNIQUE")) || error.code === "EREQUEST") {
+      return res.status(400).send({ message: "Ya existe un tipo con ese nombre", data: undefined });
+    }
+    console.error("Error crear tipo movimiento:", error);
+    res.status(500).send({ message: error.message || "Error al crear tipo de movimiento", data: undefined });
+  }
+};
+
+// Actualizar tipo de movimiento de caja
+const actualizarTipoMovimientoCaja = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).send({ message: "ID inválido", data: undefined });
+    const { nombre, descripcion, tipo } = req.body;
+    const pool = await sql.connect(dbConfig);
+    await CajaServices.actualizarTipoMovimientoCajaService(pool, req.user, id, { nombre, descripcion, tipo });
+    res.status(200).send({ message: "Tipo de movimiento actualizado", data: undefined });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos", data: undefined });
+    console.error("Error actualizar tipo movimiento:", error);
+    res.status(500).send({ message: error.message || "Error al actualizar", data: undefined });
+  }
+};
+
+// Eliminar tipo de movimiento de caja
+const eliminarTipoMovimientoCaja = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).send({ message: "ID inválido", data: undefined });
+    const pool = await sql.connect(dbConfig);
+    await CajaServices.eliminarTipoMovimientoCajaService(pool, req.user, id);
+    res.status(200).send({ message: "Tipo de movimiento eliminado", data: undefined });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos", data: undefined });
+    if (error.message === "Tipo de movimiento no encontrado.") return res.status(404).send({ message: error.message, data: undefined });
+    console.error("Error eliminar tipo movimiento:", error);
+    res.status(500).send({ message: error.message || "Error al eliminar", data: undefined });
   }
 };
 
@@ -328,7 +395,7 @@ const eliminarMovimientoCaja = async (req, res) => {
 const actualizarMovimientoCaja = async (req, res) => {
   try {
     const { id } = req.params;
-    const { concepto, monto, idMediosPago, documentoRelacionado, observaciones } = req.body;
+    const { concepto, idConcepto, monto, idMediosPago, documentoRelacionado, observaciones } = req.body;
     if (!concepto || monto === undefined || monto <= 0) {
       return res.status(400).send({
         message: "concepto y monto son requeridos",
@@ -339,6 +406,7 @@ const actualizarMovimientoCaja = async (req, res) => {
     const updated = await CajaServices.actualizarMovimientoCajaService(pool, req.user, {
       idMovimientoCaja: id,
       concepto,
+      idConcepto: idConcepto || null,
       monto,
       idMediosPago: idMediosPago || null,
       documentoRelacionado: documentoRelacionado || null,
@@ -426,6 +494,9 @@ module.exports = {
   eliminarMovimientoCaja,
   actualizarMovimientoCaja,
   obtenerTiposMovimientoCaja,
+  crearTipoMovimientoCaja,
+  actualizarTipoMovimientoCaja,
+  eliminarTipoMovimientoCaja,
   obtenerResumenCajaDiario,
   obtenerArqueoDinamico
 };

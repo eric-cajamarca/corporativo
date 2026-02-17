@@ -178,6 +178,69 @@ export class ArqueoCajaComponent implements OnInit {
     return this.resumenConceptos.reduce((acc, f) => acc + f.importe, 0);
   }
 
+  /** Filas del primer recuadro: siempre estos 5 conceptos con su importe (0 si no hay). */
+  get filasPrimeraTabla(): { clave: string; etiqueta: string; importe: number; icono: string; tipo: string }[] {
+    const ventaContado = this.importePorConcepto('VENTA CONTADO');
+    const cobroCreditos = this.importePorConcepto('PAGO CUOTA');
+    const pagoCreditos = this.importePorConceptoEgreso('COMPRA CONTADO'); // Pago de créditos / compras a proveedor
+    return [
+      { clave: 'VENTA_CONTADO', etiqueta: 'VENTA CONTADO', importe: ventaContado, icono: 'fas fa-shopping-cart', tipo: 'VENTA' },
+      { clave: 'PAGO_CUOTA', etiqueta: 'Cobro de Créditos', importe: cobroCreditos, icono: 'fas fa-hand-holding-usd', tipo: 'COBRO' },
+      { clave: 'INGRESOS', etiqueta: 'Ingresos', importe: this.totalIngresos, icono: 'fas fa-arrow-down', tipo: 'I' },
+      { clave: 'EGRESOS', etiqueta: 'Egresos', importe: -this.totalEgresos, icono: 'fas fa-arrow-up', tipo: 'E' },
+      { clave: 'PAGO_CREDITOS', etiqueta: 'Pago de Créditos', importe: -pagoCreditos, icono: 'fas fa-file-invoice-dollar', tipo: 'PAGO_CREDITO' }
+    ];
+  }
+
+  private importePorConcepto(conceptoConEspacios: string): number {
+    const f = this.resumenConceptos.find(c => c.concepto === conceptoConEspacios && c.tipoOperacion === 'I');
+    return f ? f.importe : 0;
+  }
+
+  private importePorConceptoEgreso(conceptoConEspacios: string): number {
+    const f = this.resumenConceptos.find(c => c.concepto === conceptoConEspacios && c.tipoOperacion === 'E');
+    return f ? Math.abs(f.importe) : 0;
+  }
+
+  detalleConcepto: { concepto: string; items: FilaArqueoConcepto[] } | null = null;
+  mostrarModalDetalle = false;
+
+  verDetalleFila(fila: { clave: string; etiqueta: string; tipo: string }): void {
+    let items: FilaArqueoConcepto[] = [];
+    switch (fila.clave) {
+      case 'VENTA_CONTADO':
+        items = this.resumenConceptos.filter(c => c.concepto === 'VENTA CONTADO');
+        break;
+      case 'PAGO_CUOTA':
+        items = this.resumenConceptos.filter(c => c.concepto === 'PAGO CUOTA');
+        break;
+      case 'INGRESOS':
+        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I');
+        break;
+      case 'EGRESOS':
+        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E');
+        break;
+      case 'PAGO_CREDITOS':
+        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E' && c.concepto === 'COMPRA CONTADO');
+        break;
+      default:
+        items = [];
+    }
+    this.detalleConcepto = { concepto: fila.etiqueta, items };
+    this.mostrarModalDetalle = true;
+  }
+
+  cerrarModalDetalle(): void {
+    this.mostrarModalDetalle = false;
+    this.detalleConcepto = null;
+  }
+
+  /** Subtotal del detalle actual (suma de importes) para el modal. */
+  subtotalDetalleConcepto(): number {
+    if (!this.detalleConcepto || !this.detalleConcepto.items.length) return 0;
+    return this.detalleConcepto.items.reduce((acc, item) => acc + item.importe, 0);
+  }
+
   get totalMovimientosIngresos(): number {
     return this.movimientosIngresos.reduce((acc, m) => acc + m.importe, 0);
   }

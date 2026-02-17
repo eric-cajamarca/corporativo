@@ -1,0 +1,105 @@
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap container">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+      <h4 class="card-header-title mb-0">Tipos de movimiento de caja (TiposMovimientoCaja)</h4>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="text-muted" *ngIf="total >= 0">{{ total }} registro(s)</span>
+        <div class="input-group" style="max-width: 260px;">
+          <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="buscar" (keyup.enter)="filtrar()" />
+          <button class="btn btn-primary" type="button" (click)="filtrar()"><i class="bi bi-search"></i></button>
+        </div>
+        <button class="btn btn-success" (click)="abrirCrear()"><i class="bi bi-plus-lg"></i> Nuevo tipo</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div *ngIf="loading" class="text-center py-4"><span class="spinner-border"></span></div>
+      <table *ngIf="!loading && items.length > 0" class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Acciones</th>
+            <th>Nombre</th>
+            <th>Descripción</th>
+            <th>Tipo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of items">
+            <td>
+              <button class="btn btn-sm btn-outline-primary me-1" (click)="abrirEditar(item)" title="Editar"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-danger me-1" (click)="confirmarEliminar(item)" title="Eliminar"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirVer(item)" title="Ver"><i class="bi bi-search"></i></button>
+            </td>
+            <td>{{ item.nombre }}</td>
+            <td>{{ item.descripcion || '-' }}</td>
+            <td><span [class]="item.tipo === 'I' ? 'badge bg-success' : 'badge bg-danger'">{{ etiquetaTipo(item.tipo) }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!loading && items.length === 0" class="alert alert-info mb-0">No hay registros.</div>
+      <ngb-pagination
+        *ngIf="!loading && total > pageSize"
+        [(page)]="page"
+        [pageSize]="pageSize"
+        [collectionSize]="total"
+        [maxSize]="maxSize"
+        (pageChange)="onPageChange($event)"
+        class="d-flex justify-content-end mt-3">
+      </ngb-pagination>
+    </div>
+  </div>
+  </div>
+</main>
+
+<div class="modal fade" id="modalFormClasif" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ itemEditar.idTipoMovimientoCaja ? 'Editar' : 'Nuevo' }} tipo de movimiento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Nombre <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.nombre" placeholder="Ej: GASTO_ADMINISTRATIVO" maxlength="30" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Descripción</label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: Gastos administrativos" maxlength="100" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo <span class="text-danger">*</span></label>
+          <select class="form-select" [(ngModel)]="itemEditar.tipo">
+            <option value="I">Ingreso (I)</option>
+            <option value="E">Egreso (E)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="guardar()" [disabled]="loadSave">
+          <span *ngIf="loadSave" class="spinner-border spinner-border-sm me-1"></span>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalVerClasif" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detalle tipo de movimiento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" *ngIf="itemVer">
+        <p><strong>Nombre:</strong> {{ itemVer.nombre }}</p>
+        <p><strong>Descripción:</strong> {{ itemVer.descripcion || '-' }}</p>
+        <p><strong>Tipo:</strong> <span [class]="itemVer.tipo === 'I' ? 'badge bg-success' : 'badge bg-danger'">{{ etiquetaTipo(itemVer.tipo) }}</span></p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -3,7 +3,9 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
+import { CatalogosService } from '../../../services/catalogos.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
+import { AuthService } from '../../../services/auth.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
@@ -36,6 +38,7 @@ export class ReciboEgresoComponent implements OnInit {
   list: ReciboEgresoItem[] = [];
   cajas: any[] = [];
   tiposMovimiento: any[] = [];
+  conceptos: any[] = [];
   mediosPago: any[] = [];
   loading = false;
 
@@ -54,6 +57,7 @@ export class ReciboEgresoComponent implements OnInit {
   form = {
     idApertura: '',
     idTipoMovimientoCaja: 0,
+    idConcepto: '' as string,
     concepto: '',
     personal: '',
     glosa: '',
@@ -70,7 +74,9 @@ export class ReciboEgresoComponent implements OnInit {
 
   constructor(
     private cajaService: CajaService,
-    private tablasSunat: TablasSunatService
+    private catalogosService: CatalogosService,
+    private tablasSunat: TablasSunatService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -83,6 +89,10 @@ export class ReciboEgresoComponent implements OnInit {
     this.cargarDatos();
     this.cargarRecibos();
     this.tiposEgreso();
+    this.catalogosService.listarConceptosPorTipo('EGRESO').subscribe({
+      next: (r) => { this.conceptos = r.data || []; },
+      error: () => {}
+    });
     this.tablasSunat.obtener_medios_pago().subscribe({
       next: (r) => { this.mediosPago = r.data || []; },
       error: () => {}
@@ -179,11 +189,13 @@ export class ReciboEgresoComponent implements OnInit {
 
   abrirNuevo(): void {
     this.editandoId = null;
+    const usuarioActual = this.authService.userData()?.nombres ?? 'Usuario';
     this.form = {
       idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
       idTipoMovimientoCaja: this.tiposMovimiento.length ? this.tiposMovimiento[0].idTipoMovimientoCaja : 0,
+      idConcepto: '',
       concepto: '',
-      personal: '',
+      personal: usuarioActual,
       glosa: '',
       entregueA: '',
       importe: 0,
@@ -193,6 +205,7 @@ export class ReciboEgresoComponent implements OnInit {
       fechaEmision: new Date().toISOString().split('T')[0]
     };
     this.numero = '';
+    this.serie = '';
     this.mostrarForm = true;
   }
 
@@ -201,8 +214,9 @@ export class ReciboEgresoComponent implements OnInit {
     this.form = {
       idApertura: item.idApertura || '',
       idTipoMovimientoCaja: 0,
+      idConcepto: (item as any).idConcepto || '',
       concepto: item.concepto,
-      personal: '',
+      personal: item.usuario || '',
       glosa: item.glosa || '',
       entregueA: item.entregueA || '',
       importe: item.monto,
@@ -218,6 +232,12 @@ export class ReciboEgresoComponent implements OnInit {
   ver(item: ReciboEgresoItem): void {
     this.itemVer = item;
     this.mostrarVer = true;
+  }
+
+  onConceptoChange(idConcepto: string): void {
+    if (!idConcepto) return;
+    const c = this.conceptos.find((x: any) => x.idConcepto === idConcepto);
+    if (c && c.descripcion) this.form.concepto = c.descripcion;
   }
 
   cerrarForm(): void {
@@ -240,6 +260,7 @@ export class ReciboEgresoComponent implements OnInit {
     if (this.editandoId) {
       this.cajaService.actualizarMovimiento(this.editandoId, {
         concepto: this.form.concepto,
+        idConcepto: this.form.idConcepto || undefined,
         monto: this.form.importe,
         idMediosPago: this.form.idMediosPago ?? undefined,
         documentoRelacionado: this.form.referencia || undefined,
@@ -269,9 +290,9 @@ export class ReciboEgresoComponent implements OnInit {
       idApertura: this.form.idApertura,
       idTipoMovimientoCaja: this.form.idTipoMovimientoCaja,
       concepto: this.form.concepto,
+      idConcepto: this.form.idConcepto || undefined,
       monto: this.form.importe,
       idMediosPago: this.form.idMediosPago ?? undefined,
-      documentoRelacionado: this.form.referencia || undefined,
       observaciones: observaciones || undefined
     }).subscribe({
       next: () => {

@@ -16,6 +16,7 @@ async function listarPorEmpresa(idEmpresa) {
                 idImpuesto,
                 idEmpresa,
                 descripcion,
+                ISNULL(codigoSunat, '') AS codigoSunat,
                 estado,
                 CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
                 pIncluyeIGV,
@@ -44,6 +45,7 @@ async function obtenerPorId(idImpuesto, idEmpresa) {
                 idImpuesto,
                 idEmpresa,
                 descripcion,
+                ISNULL(codigoSunat, '') AS codigoSunat,
                 estado,
                 CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
                 pIncluyeIGV,
@@ -61,18 +63,19 @@ async function obtenerPorId(idImpuesto, idEmpresa) {
  * @returns {Promise<object>}
  */
 async function crear(idEmpresa, data) {
-    const { descripcion, estado, porcentaje, pIncluyeIGV } = data;
+    const { descripcion, estado, porcentaje, pIncluyeIGV, codigoSunat } = data;
     const pool = await sql.connect(dbConfig);
     const result = await pool
         .request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('descripcion', sql.VarChar(50), descripcion)
+        .input('codigoSunat', sql.VarChar(4), (codigoSunat != null && String(codigoSunat).trim() !== '') ? String(codigoSunat).trim() : null)
         .input('estado', sql.Bit, estado ? 1 : 0)
         .input('porcentaje', sql.Decimal(5, 2), porcentaje)
         .input('pIncluyeIGV', sql.Bit, pIncluyeIGV ? 1 : 0)
         .query(`
-            INSERT INTO Impuestos (idEmpresa, descripcion, estado, porcentaje, pIncluyeIGV)
-            VALUES (@idEmpresa, @descripcion, @estado, @porcentaje, @pIncluyeIGV);
+            INSERT INTO Impuestos (idEmpresa, descripcion, codigoSunat, estado, porcentaje, pIncluyeIGV)
+            VALUES (@idEmpresa, @descripcion, @codigoSunat, @estado, @porcentaje, @pIncluyeIGV);
             SELECT SCOPE_IDENTITY() AS idImpuesto;
         `);
     return result.recordset && result.recordset[0] ? result.recordset[0] : null;
@@ -86,19 +89,20 @@ async function crear(idEmpresa, data) {
  * @returns {Promise<number>} rowsAffected
  */
 async function actualizar(idImpuesto, idEmpresa, data) {
-    const { descripcion, estado, porcentaje, pIncluyeIGV } = data;
+    const { descripcion, estado, porcentaje, pIncluyeIGV, codigoSunat } = data;
     const pool = await sql.connect(dbConfig);
     const result = await pool
         .request()
         .input('idImpuesto', sql.Int, idImpuesto)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('descripcion', sql.VarChar(50), descripcion)
+        .input('codigoSunat', sql.VarChar(4), (codigoSunat != null && String(codigoSunat).trim() !== '') ? String(codigoSunat).trim() : null)
         .input('estado', sql.Bit, estado ? 1 : 0)
         .input('porcentaje', sql.Decimal(5, 2), porcentaje)
         .input('pIncluyeIGV', sql.Bit, pIncluyeIGV ? 1 : 0)
         .query(`
             UPDATE Impuestos
-            SET descripcion = @descripcion, estado = @estado, porcentaje = @porcentaje, pIncluyeIGV = @pIncluyeIGV
+            SET descripcion = @descripcion, codigoSunat = @codigoSunat, estado = @estado, porcentaje = @porcentaje, pIncluyeIGV = @pIncluyeIGV
             WHERE idImpuesto = @idImpuesto AND idEmpresa = @idEmpresa
         `);
     return result.rowsAffected[0];
@@ -126,8 +130,29 @@ async function actualizarEstado(idImpuesto, idEmpresa, estado) {
     return result.rowsAffected[0];
 }
 
+/**
+ * Lista impuestos de la empresa para uso en payload de facturación (codigoSunat incluido).
+ * @param {object} pool - Pool de mssql
+ * @param {string} idEmpresa
+ * @returns {Promise<Array<{ idImpuesto, descripcion, codigoSunat, porcentaje, pIncluyeIGV }>>}
+ */
+async function listarPorEmpresaParaPayload(pool, idEmpresa) {
+    const result = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT idImpuesto, descripcion, ISNULL(codigoSunat, '') AS codigoSunat,
+                CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje, pIncluyeIGV
+            FROM Impuestos
+            WHERE idEmpresa = @idEmpresa AND estado = 1
+            ORDER BY descripcion
+        `);
+    return result.recordset || [];
+}
+
 module.exports = {
     listarPorEmpresa,
+    listarPorEmpresaParaPayload,
     obtenerPorId,
     crear,
     actualizar,

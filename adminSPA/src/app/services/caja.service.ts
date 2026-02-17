@@ -89,13 +89,26 @@ export class CajaService {
     });
   }
 
-  // Obtener tipos de movimiento de caja
+  // Obtener tipos de movimiento de caja (TiposMovimientoCaja)
   obtenerTiposMovimiento(): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'caja/tipos-movimiento', {
-      headers: headers,
-      withCredentials: true
-    });
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url + 'caja/tipos-movimiento', { headers, withCredentials: true });
+  }
+
+  // CRUD TiposMovimientoCaja (clasificación conceptos / tipos movimiento)
+  crearTipoMovimientoCaja(data: { nombre: string; descripcion?: string; tipo: 'I' | 'E' }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url + 'caja/tipos-movimiento', data, { headers, withCredentials: true });
+  }
+
+  actualizarTipoMovimientoCaja(id: number, data: { nombre: string; descripcion?: string; tipo: 'I' | 'E' }): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.put(this.url + 'caja/tipos-movimiento/' + id, data, { headers, withCredentials: true });
+  }
+
+  eliminarTipoMovimientoCaja(id: number): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.delete(this.url + 'caja/tipos-movimiento/' + id, { headers, withCredentials: true });
   }
 
   // Obtener resumen diario de caja
@@ -136,24 +149,25 @@ export class CajaService {
     return this._http.get(this.url + 'caja/recibos-egreso' + params, { headers, withCredentials: true });
   }
 
-  // Recibos de ingreso (movimientos tipo I)
+  // Recibos de ingreso (solo movimientos RI, sin ventas)
   getRecibosIngreso(filtros?: { fechaDesde?: string; fechaHasta?: string }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     const q = new URLSearchParams();
     if (filtros?.fechaDesde) q.append('fechaDesde', filtros.fechaDesde);
     if (filtros?.fechaHasta) q.append('fechaHasta', filtros.fechaHasta);
     q.append('tipoMovimiento', 'I');
+    q.append('soloRecibos', 'true');
     return this._http.get(this.url + 'caja/movimientos?' + q.toString(), { headers, withCredentials: true });
   }
 
-  // Registrar movimiento (egreso): backend espera idApertura
+  // Registrar movimiento (egreso): backend espera idApertura. documentoRelacionado lo genera el backend (RE).
   registrarMovimientoEgreso(data: {
     idApertura: string;
     idTipoMovimientoCaja: number;
     concepto: string;
+    idConcepto?: string;
     monto: number;
     idMediosPago?: number;
-    documentoRelacionado?: string;
     observaciones?: string;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -161,22 +175,22 @@ export class CajaService {
       idApertura: data.idApertura,
       idTipoMovimientoCaja: data.idTipoMovimientoCaja,
       concepto: data.concepto,
+      idConcepto: data.idConcepto ?? null,
       monto: data.monto,
       idMediosPago: data.idMediosPago ?? null,
       idMoneda: 1,
-      documentoRelacionado: data.documentoRelacionado ?? null,
       observaciones: data.observaciones ?? null
     }, { headers, withCredentials: true });
   }
 
-  // Registrar movimiento (ingreso): mismo endpoint que egreso, con idTipoMovimientoCaja tipo I
+  // Registrar movimiento (ingreso): mismo endpoint que egreso, con idTipoMovimientoCaja tipo I. documentoRelacionado lo genera el backend (RI).
   registrarMovimientoIngreso(data: {
     idApertura: string;
     idTipoMovimientoCaja: number;
     concepto: string;
+    idConcepto?: string;
     monto: number;
     idMediosPago?: number;
-    documentoRelacionado?: string;
     observaciones?: string;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -184,10 +198,10 @@ export class CajaService {
       idApertura: data.idApertura,
       idTipoMovimientoCaja: data.idTipoMovimientoCaja,
       concepto: data.concepto,
+      idConcepto: data.idConcepto ?? null,
       monto: data.monto,
       idMediosPago: data.idMediosPago ?? null,
       idMoneda: 1,
-      documentoRelacionado: data.documentoRelacionado ?? null,
       observaciones: data.observaciones ?? null
     }, { headers, withCredentials: true });
   }
@@ -202,6 +216,7 @@ export class CajaService {
 
   actualizarMovimiento(idMovimientoCaja: string, data: {
     concepto: string;
+    idConcepto?: string;
     monto: number;
     idMediosPago?: number;
     documentoRelacionado?: string;

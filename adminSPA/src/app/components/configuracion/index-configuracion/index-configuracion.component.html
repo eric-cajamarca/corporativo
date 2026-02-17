@@ -292,6 +292,7 @@
                     <thead>
                       <tr>
                         <th>Descripción</th>
+                        <th>Cod. SUNAT</th>
                         <th>Porcentaje (%)</th>
                         <th>Incluye IGV</th>
                         <th>Estado</th>
@@ -302,6 +303,7 @@
                       @for (imp of impuestos; track imp.idImpuesto) {
                         <tr>
                           <td>{{ imp.descripcion }}</td>
+                          <td>{{ imp.codigoSunat || '-' }}</td>
                           <td>{{ imp.porcentaje }}</td>
                           <td>{{ imp.pIncluyeIGV ? 'Sí' : 'No' }}</td>
                           <td>
@@ -516,6 +518,15 @@
                 <div class="mb-3">
                   <label for="impuestoDescripcion" class="form-label">Descripción *</label>
                   <input type="text" class="form-control" id="impuestoDescripcion" [(ngModel)]="impuestoForm.descripcion" name="impuestoDescripcion" placeholder="Ej: IGV, EXO">
+                </div>
+                <div class="mb-3">
+                  <label for="impuestoCodigoSunat" class="form-label">Código SUNAT (Catálogo 05)</label>
+                  <select class="form-select" id="impuestoCodigoSunat" [(ngModel)]="impuestoForm.codigoSunat" name="impuestoCodigoSunat">
+                    <option value="">-- Sin código --</option>
+                    @for (c of codigosSunatImpuesto; track c.codigo) {
+                      <option [value]="c.codigo">{{ c.codigo }} - {{ c.descripcion }}</option>
+                    }
+                  </select>
                 </div>
                 <div class="mb-3">
                   <label for="impuestoPorcentaje" class="form-label">Porcentaje (%)</label>

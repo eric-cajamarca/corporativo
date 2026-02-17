@@ -62,6 +62,12 @@ import { PagoProveedoresComponent } from './components/caja/pago-proveedores/pag
 import { ReciboIngresoComponent } from './components/caja/recibo-ingreso/recibo-ingreso.component';
 import { ReciboEgresoComponent } from './components/caja/recibo-egreso/recibo-egreso.component';
 import { ConteoDineroComponent } from './components/caja/conteo-dinero/conteo-dinero.component';
+import { IndexFormaPagoComponent } from './components/catalogos/forma-pago/index-forma-pago.component';
+import { IndexTipoMovimientosComponent } from './components/catalogos/tipo-movimientos/index-tipo-movimientos.component';
+import { IndexClasificacionConceptosComponent } from './components/catalogos/clasificacion-conceptos/index-clasificacion-conceptos.component';
+import { IndexConceptosComponent } from './components/catalogos/conceptos/index-conceptos.component';
+import { IndexMotivoTrasladoComponent } from './components/catalogos/motivo-traslado/index-motivo-traslado.component';
+import { IndexMotivoNotaCreditoComponent } from './components/catalogos/motivo-nota-credito/index-motivo-nota-credito.component';
 
 export const routes: Routes = [
     {
@@ -212,4 +218,12 @@ export const routes: Routes = [
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },
      { path: 'reportes', component: IndexReportesComponent, canActivate: [AuthGuard], title: 'Reportes y Análisis' },
+
+     // Catálogos
+     { path: 'catalogos/forma-pago', component: IndexFormaPagoComponent, canActivate: [AuthGuard], title: 'Forma Pago' },
+     { path: 'catalogos/tipo-movimientos', component: IndexTipoMovimientosComponent, canActivate: [AuthGuard], title: 'Tipo Movimientos' },
+     { path: 'catalogos/conceptos', component: IndexConceptosComponent, canActivate: [AuthGuard], title: 'Conceptos' },
+     { path: 'catalogos/clasificacion-conceptos', component: IndexClasificacionConceptosComponent, canActivate: [AuthGuard], title: 'Clasificación Conceptos' },
+     { path: 'catalogos/motivo-traslado', component: IndexMotivoTrasladoComponent, canActivate: [AuthGuard], title: 'Motivo Traslado' },
+     { path: 'catalogos/motivo-nota-credito', component: IndexMotivoNotaCreditoComponent, canActivate: [AuthGuard], title: 'Motivo Nota Credito' },
 ];

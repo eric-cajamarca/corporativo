@@ -2,7 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { global } from './global';
-import { Impuesto, ImpuestoCreate } from '../interfaces/impuesto.interface';
+import { Impuesto, ImpuestoCreate, CodigoSunatImpuesto } from '../interfaces/impuesto.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -43,5 +43,10 @@ export class ImpuestoService {
       { estado },
       this.getOptions()
     );
+  }
+
+  /** Catálogo 05 SUNAT - Códigos de tipos de tributos (para selector en formulario) */
+  getCodigosSunat(): Observable<{ data: CodigoSunatImpuesto[] }> {
+    return this.http.get<{ data: CodigoSunatImpuesto[] }>(this.url + 'impuestos/codigos-sunat', this.getOptions());
   }
 }

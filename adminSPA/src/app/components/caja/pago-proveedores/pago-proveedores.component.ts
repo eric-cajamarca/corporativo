@@ -377,7 +377,6 @@ export class PagoProveedoresComponent implements OnInit {
       concepto,
       monto: importe,
       idMediosPago: this.form.idMediosPago ?? undefined,
-      documentoRelacionado: this.form.serie + '-' + this.form.numero,
       observaciones: observaciones || undefined
     }).subscribe({
       next: () => {

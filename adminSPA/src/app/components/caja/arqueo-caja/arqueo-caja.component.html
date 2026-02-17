@@ -60,28 +60,35 @@
                   </button>
                 </div>
     
-              <!-- Tabla de conceptos (dinámica: solo los que hubo ese día) -->
+              <!-- Primer recuadro: siempre estos 5 conceptos con botón Ver detalle -->
               <div class="table-responsive mb-4">
                 <table class="table table-bordered table-sm">
                   <thead class="table-light">
                     <tr>
-                      <th style="width: 50%;">Concepto</th>
-                      <th style="width: 50%;" class="text-end">Importe</th>
+                      <th style="width: 40%;">Concepto</th>
+                      <th style="width: 35%;" class="text-end">Importe</th>
+                      <th style="width: 25%;" class="text-center">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let fila of resumenConceptos">
+                    <tr *ngFor="let fila of filasPrimeraTabla">
                       <td>
                         <i class="{{fila.icono}} me-2 text-muted"></i>
-                        {{fila.concepto}}
+                        {{fila.etiqueta}}
                       </td>
                       <td class="text-end" [ngClass]="{'text-success': fila.importe > 0, 'text-danger': fila.importe < 0}">
                         {{fila.importe >= 0 ? '+' : ''}}{{formatCurrency(fila.importe)}}
+                      </td>
+                      <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleFila(fila)" title="Ver detalle">
+                          <i class="fas fa-list"></i> Ver detalle
+                        </button>
                       </td>
                     </tr>
                     <tr class="fw-bold">
                       <td>Total</td>
                       <td class="text-end">{{formatCurrency(totalConceptos)}}</td>
+                      <td></td>
                     </tr>
                   </tbody>
                 </table>
@@ -144,5 +151,53 @@
     </div>
   </div>
 </main>
+
+<!-- Modal detalle por concepto -->
+<div class="modal fade" [class.show]="mostrarModalDetalle" [style.display]="mostrarModalDetalle ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-list me-2"></i>
+          Detalle de {{ detalleConcepto?.concepto }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalDetalle()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive" *ngIf="detalleConcepto && detalleConcepto.items.length > 0">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>Concepto</th>
+                <th class="text-end">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of detalleConcepto.items">
+                <td><i class="{{item.icono}} me-2 text-muted"></i>{{ item.concepto }}</td>
+                <td class="text-end" [ngClass]="{'text-success': item.importe > 0, 'text-danger': item.importe < 0}">
+                  {{ item.importe >= 0 ? '+' : '' }}{{ formatCurrency(item.importe) }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="fw-bold">
+                <td>Subtotal {{ detalleConcepto.concepto }}</td>
+                <td class="text-end">
+                  {{ formatCurrency(subtotalDetalleConcepto()) }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p *ngIf="detalleConcepto && detalleConcepto.items.length === 0" class="text-muted mb-0">No hay movimientos en este concepto.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalDetalle()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalDetalle" style="z-index: 1040;"></div>
 
 

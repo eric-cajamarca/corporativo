@@ -23,8 +23,11 @@ router.get('/recibos-egreso', cajaController.obtenerRecibosEgreso);
 router.delete('/movimientos/:id', cajaController.eliminarMovimientoCaja);
 router.put('/movimientos/:id', cajaController.actualizarMovimientoCaja);
 
-// Rutas para tipos de movimiento
+// Rutas para tipos de movimiento (TiposMovimientoCaja - CRUD)
 router.get('/tipos-movimiento', cajaController.obtenerTiposMovimientoCaja);
+router.post('/tipos-movimiento', cajaController.crearTipoMovimientoCaja);
+router.put('/tipos-movimiento/:id', cajaController.actualizarTipoMovimientoCaja);
+router.delete('/tipos-movimiento/:id', cajaController.eliminarTipoMovimientoCaja);
 
 // Rutas para reportes
 router.get('/resumen-diario', cajaController.obtenerResumenCajaDiario);

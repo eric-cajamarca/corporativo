@@ -50,16 +50,16 @@
             <tr *ngFor="let item of list">
               <td>
                 <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar">
-                  <i class="fas fa-pencil-alt"></i>
+                  <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar">
-                  <i class="fas fa-trash"></i>
+                  <i class="bi bi-trash"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-info me-1" (click)="ver(item)" title="Consultar">
-                  <i class="fas fa-search"></i>
+                  <i class="bi bi-search"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-warning" (click)="imprimir(item)" title="Imprimir">
-                  <i class="fas fa-print"></i>
+                  <i class="bi bi-printer"></i>
                 </button>
               </td>
               <td>{{ formatFecha(item.fechaMovimiento) }}</td>
@@ -99,13 +99,9 @@
               <option>RECIBO EGRESO</option>
             </select>
           </div>
-          <div class="col-md-2">
-            <label class="form-label">N°</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="serie" placeholder="0001" [readonly]="!!editandoId">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">&nbsp;</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="numero" placeholder="0000508" [readonly]="!!editandoId">
+          <div class="col-md-4">
+            <label class="form-label">N° Recibo</label>
+            <input type="text" class="form-control form-control-sm" [ngModel]="editandoId ? numero : 'Se asignará al guardar'" readonly>
           </div>
           <div class="col-md-4">
             <label class="form-label">Fecha Emisión</label>
@@ -114,14 +110,28 @@
         </div>
         <div class="row g-2 mb-2">
           <div class="col-md-6">
-            <label class="form-label">Concepto</label>
+            <label class="form-label">Concepto (catálogo)</label>
+            <select class="form-select form-select-sm" [(ngModel)]="form.idConcepto" (ngModelChange)="onConceptoChange($event)">
+              <option value="">-- Otro / texto libre --</option>
+              <option *ngFor="let c of conceptos" [value]="c.idConcepto">{{ c.descripcion }}</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Concepto (texto)</label>
             <input type="text" class="form-control form-control-sm" [(ngModel)]="form.concepto" placeholder="Concepto">
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Tipo de egreso</label>
+            <select class="form-select form-select-sm" [(ngModel)]="form.idTipoMovimientoCaja">
+              <option [ngValue]="0">::Seleccione::</option>
+              <option *ngFor="let t of tiposMovimiento" [ngValue]="t.idTipoMovimientoCaja">{{ t.nombre }}</option>
+            </select>
           </div>
           <div class="col-md-6">
             <label class="form-label">Personal</label>
-            <select class="form-select form-select-sm" [(ngModel)]="form.personal">
-              <option value="">::Ninguno::</option>
-            </select>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.personal" readonly placeholder="Usuario actual">
           </div>
         </div>
         <div class="mb-2">
