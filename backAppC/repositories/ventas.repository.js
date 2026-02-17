@@ -25,6 +25,8 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     compRelacionado
   } = datosVenta;
 
+  const fVencimientoVal = fVencimiento != null ? fVencimiento : fEmision;
+
   const result = await transaction
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -34,7 +36,7 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('compVenta', sql.VarChar(13), compVenta)
     .input('idComprobante', sql.Int, idComprobante)
     .input('fEmision', sql.DateTime, fEmision)
-    .input('fVencimiento', sql.DateTime, fVencimiento)
+    .input('fVencimiento', sql.DateTime, fVencimientoVal)
     .input('idCliente', sql.Int, idCliente)
     .input('idMoneda', sql.Int, idMoneda)
     .input('tCambio', sql.Decimal(10, 4), tCambio)

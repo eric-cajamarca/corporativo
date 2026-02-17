@@ -9,7 +9,7 @@ export interface CotizacionCabecera {
   numero: string;
   serieNumero?: string;
   fEmision: string;
-  fVencimiento: string;
+  fVencimiento?: string | null;
   idDocumento?: string;
   idCliente: number;
   idSucursal?: string | number;

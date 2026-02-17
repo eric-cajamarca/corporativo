@@ -285,6 +285,7 @@ export class CreateComprasComponent {
               };
             })
             .filter((x: any) => x != null);
+          this.matchDetalleConProductosCargados();
           this.sumarFooterFactura();
         } else {
           iziToast.warning({ title: 'Aviso', message: 'El comprobante no tiene líneas de detalle', position: 'topRight' });
@@ -1113,7 +1114,7 @@ export class CreateComprasComponent {
         this.loadButton = false;
       })
     ).subscribe({
-      next: () => {
+      next: (responses: any) => {
         this.editarCorrelativo();
         iziToast.show({
           title: 'SUCCESS',
@@ -1123,9 +1124,10 @@ export class CreateComprasComponent {
           position: 'topRight',
           message: 'Compra registrada correctamente.',
         });
-        
-        // Ofrecer gestionar lotes e inventario
-        this.afterCompraRegistrada();
+        const idLotes = Array.isArray(responses)
+          ? responses.map((r: any) => r?.idLote).filter(Boolean)
+          : [];
+        this.afterCompraRegistrada(idLotes);
       },
       error: (err: unknown) => {
         const e = err as { error?: { message?: string }; message?: string };
@@ -1142,16 +1144,72 @@ export class CreateComprasComponent {
   }
 
   /**
-   * Después de registrar compra exitosamente, ofrece gestionar inventario
+   * Match del detalle de compras con productos ya cargados: si la descripción coincide, asigna idProducto
+   * y copia los datos del producto (código, categoría, marca, presentación) para mostrar en la tabla.
    */
-  private afterCompraRegistrada(): void {
+  private matchDetalleConProductosCargados(): void {
+    const lista = Array.isArray(this.productos_const) ? this.productos_const : [];
+    const mapDescAProducto: Record<string, any> = {};
+    lista.forEach((p: any) => {
+      const desc = (p.descripcion ?? '').toString().trim();
+      if (desc && p.idProducto && !mapDescAProducto[desc]) mapDescAProducto[desc] = p;
+    });
+    let coincidencias = 0;
+    const detalleCoincidencias: { descripcion: string; idProducto: string }[] = [];
+    const detalleSinMatch: string[] = [];
+    this.detalleCompras.forEach((d: any) => {
+      const key = (d.descripcion ?? '').toString().trim();
+      const producto = key ? mapDescAProducto[key] : null;
+      if (producto) {
+        d.idProducto = producto.idProducto;
+        d.codigo = producto.codigo ?? d.codigo;
+        d.idCategoria = producto.idCategoria ?? d.idCategoria;
+        d.idMarca = producto.idMarca ?? d.idMarca;
+        d.idPresentacion = producto.idPresentacion ?? d.idPresentacion;
+        d.categoria = typeof producto.categoria === 'object' && producto.categoria != null
+          ? producto.categoria
+          : { nombre: (producto.categoria ?? '') || '-' };
+        d.marca = typeof producto.marca === 'object' && producto.marca != null
+          ? producto.marca
+          : { nombre: (producto.marca ?? '') || '-' };
+        d.presentacion = producto.codigoPresentacion != null || producto.descripcionPres != null
+          ? {
+              codigo: producto.codigoPresentacion ?? producto.presentacion?.codigo ?? '',
+              descripcion: producto.descripcionPres ?? producto.presentacion?.descripcion ?? '',
+              Descripcion: producto.descripcionPres ?? producto.presentacion?.Descripcion ?? '',
+              idPresentacion: producto.idPresentacion
+            }
+          : (d.presentacion || { codigo: '-', Descripcion: '-' });
+        d.idSucursal = producto.idSucursal ?? d.idSucursal;
+        d.sucursal = typeof producto.sucursal === 'object' && producto.sucursal != null
+          ? producto.sucursal
+          : { nombre: (producto.sucursal ?? '') || '-', idSucursal: producto.idSucursal };
+        coincidencias++;
+        detalleCoincidencias.push({ descripcion: key, idProducto: producto.idProducto });
+      } else if (key) {
+        detalleSinMatch.push(key);
+      }
+    });
+    
+  }
+
+  /**
+   * Después de registrar compra exitosamente, ofrece gestionar inventario.
+   * Si no se asignó ubicación por defecto, pasa idLotes para mostrar solo lotes de esta compra.
+   */
+  private afterCompraRegistrada(idLotes?: string[]): void {
+    const list = idLotes ?? [];
     setTimeout(() => {
       const mensaje = this.asignarUbicacionPorDefecto
         ? 'El stock se asignó a la ubicación por defecto.\n\n¿Desea ver o editar los lotes e inventario?'
         : '¿Desea asignar ahora las ubicaciones a los lotes creados?\n\nPuede hacerlo desde Inventario más tarde si lo prefiere.';
       const respuesta = confirm(mensaje);
       if (respuesta) {
-        this.inventarioModal.abrirLoteList({ idSucursal: this.compras.idSucursal })
+        const filtros: any = { idSucursal: this.compras.idSucursal };
+        if (!this.asignarUbicacionPorDefecto && list.length > 0) {
+          filtros.idLotes = list;
+        }
+        this.inventarioModal.abrirLoteList(filtros)
           .then(() => this._router.navigate(['/compras']))
           .catch(() => this._router.navigate(['/compras']));
       } else {

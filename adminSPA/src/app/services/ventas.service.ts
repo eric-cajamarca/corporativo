@@ -11,7 +11,7 @@ export interface VentaCompletaPayload {
     compVenta: string;
     idComprobante: number;
     fEmision: string;
-    fVencimiento: string;
+    fVencimiento?: string | null;
     idCliente: number;
     idMoneda: number;
     tCambio?: number;

@@ -92,6 +92,20 @@ const obtener_productos_compras = async (req, res) => {
   }
 };
 
+const match_productos_descripcion = async (req, res) => {
+  try {
+    const descripciones = req.body && req.body.descripciones;
+    const pool = await sql.connect(dbConfig);
+    const matches = await ProductosServices.matchProductosPorDescripcionService(pool, req.user, descripciones || []);
+    res.status(200).send({ data: matches });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(500).send({ message: "No Access", data: undefined });
+    }
+    console.error("match_productos_descripcion:", error);
+    res.status(500).send({ message: "Error al buscar productos por descripción", data: undefined });
+  }
+};
 
 const obtener_productos_id = async (req, res) => {
   try {
@@ -792,11 +806,10 @@ function formatearFecha(date) {
 module.exports = {
   obtener_productos_todos,
   obtener_productos_compras,
+  match_productos_descripcion,
   obtener_productos_id,
   crear_producto,
   gestionProductos_Compras,
   actualizar_producto,
   eliminar_producto,
-
- 
 };

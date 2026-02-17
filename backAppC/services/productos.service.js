@@ -51,3 +51,20 @@ exports.obtenerProductoPorIdService = async (pool, idProducto, user) => {
 
   return producto;
 };
+
+/**
+ * Dado un array de descripciones, retorna los idProducto que coinciden (misma empresa, descripción igual tras trim).
+ * Para uso en compras al cargar detalle desde XML.
+ */
+exports.matchProductosPorDescripcionService = async (pool, user, descripciones) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const list = Array.isArray(descripciones) ? descripciones.map(d => (d || "").trim()).filter(Boolean) : [];
+  if (list.length === 0) return [];
+  const todos = await ProductosRepository.obtenerProductosPorDescripcionRepo(pool, user.empresa);
+  const mapDesc = {};
+  todos.forEach(p => {
+    const d = (p.descripcion || "").trim();
+    if (d && !mapDesc[d]) mapDesc[d] = p.idProducto;
+  });
+  return list.map(desc => ({ descripcion: desc, idProducto: mapDesc[desc] || null }));
+};

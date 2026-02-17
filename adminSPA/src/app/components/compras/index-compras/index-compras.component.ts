@@ -109,9 +109,16 @@ export class IndexComprasComponent {
   public boundaryLinks = true;
 
 
-  public filtro = '';
   public compras: Array<any> = [];
   public compras_const: Array<any> = [];
+
+  filtroFecha = 'all';
+  fechaDesde = '';
+  fechaHasta = '';
+  filtroNumero = '';
+  filtroRuc = '';
+  filtroProveedor = '';
+  filtroTipoComprobante = '';
   public load_compras = true;
   public detCompras: Array<any> = [];
   public marcas: any = [];
@@ -245,18 +252,51 @@ export class IndexComprasComponent {
     );
   }
 
-  filtrar() {
-    
-    if (this.filtro) {
-      // this.load_compras = false;
-      var term = new RegExp(this.filtro, 'i');
-      this.compras = this.compras_const.filter(item => term.test(item.compCompra) || term.test(item.rSocial) || term.test(item.total) || term.test(item.fEmision) || term.test(item.descripcion));
-      console.log('this.compras', this.compras);
-      // this.load_compras = true;
-    } else {
-      this.compras = this.compras_const;
-      // this.load_compras = true;
+  aplicarFiltros(): void {
+    this.page = 1;
+    let list = [...this.compras_const];
+
+    if (this.filtroFecha === 'today') {
+      const hoy = new Date().toISOString().slice(0, 10);
+      list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) === hoy);
+    } else if (this.filtroFecha === 'month') {
+      const now = new Date();
+      const mes = String(now.getMonth() + 1).padStart(2, '0');
+      const anio = now.getFullYear();
+      list = list.filter((c: any) => {
+        const f = (c.fEmision || '').toString().slice(0, 10);
+        return f.startsWith(`${anio}-${mes}`);
+      });
+    } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
+      if (this.fechaDesde) list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) >= this.fechaDesde);
+      if (this.fechaHasta) list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) <= this.fechaHasta);
     }
+
+    const num = (this.filtroNumero || '').trim();
+    if (num) list = list.filter((c: any) => (c.compCompra || '').toLowerCase().includes(num.toLowerCase()));
+
+    const ruc = (this.filtroRuc || '').toLowerCase().trim();
+    if (ruc) list = list.filter((c: any) => (c.ruc || '').toLowerCase().includes(ruc));
+
+    const proveedor = (this.filtroProveedor || '').toLowerCase().trim();
+    if (proveedor) list = list.filter((c: any) => (c.rSocial || '').toLowerCase().includes(proveedor));
+
+    const tipo = (this.filtroTipoComprobante || '').trim();
+    if (tipo) list = list.filter((c: any) => (c.compCompra || '').toLowerCase().includes(tipo.toLowerCase()) || (c.serie || '').toLowerCase().includes(tipo.toLowerCase()));
+
+    this.compras = list;
+  }
+
+  limpiarFiltros(): void {
+    this.page = 1;
+    this.filtroFecha = 'all';
+    this.fechaDesde = '';
+    this.fechaHasta = '';
+    this.filtroNumero = '';
+    this.filtroRuc = '';
+    this.filtroProveedor = '';
+    this.filtroTipoComprobante = '';
+    this.compras = [...this.compras_const];
   }
 
   consultaCompCompra(id: any) {
@@ -398,68 +438,66 @@ export class IndexComprasComponent {
     // cargar más datos cuando cambia la página
   }
 
-  //detalle compras
-  descargarPDF(item: any, detalleCompras: any[]): void {
-    const cantidadALetras = numeroALetras(item.total);
-    console.log('Cantidad en letras:', cantidadALetras);
-    // const empresa: Empresa = {
-    //   nombre: 'Mi Empresa S.A.C.',
-    //   ruc: '20123456789',
-    //   direccion: 'Av. Principal 123, Lima',
-    //   telefono: '(01) 456-7890',
-    //   logo: 'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png'
-    // };
-    //this.empresa.logo = 'http://localhost:3000/api/obtener_logo/' + this.empresa.logo
-   
-    console.log('Empresa para PDF:', this.empresa);
-    
-
-    const cliente: Cliente = {
-      razonSocial: item.rSocial || 'N/A',
-      ruc: item.ruc || 'N/A',
-      direccion: item.direccion || 'N/A',
-      telefono: item.telefono || '',
-      email: item.email || ''
-    };
-
-    const datos: DatosPdf = {
-      comprobante: item.compCompra,
-      emp: this.empresa,
-      cli: cliente,
-      items: detalleCompras.map(d => ({
-        cant: d.cantidad,
-        desc: d.descripcion,
-        pUnit: d.cUnitario,
-        importe: d.cantidad * d.cUnitario
-      })),
-      cantidadLetras: cantidadALetras,
-      totales: {
-        gravado: item.subTotal || 0,
-        inafecto: 0,
-        exonerado: item.exonerado || 0,
-        exportacion: 0,
-        descuentos: item.descuentos || 0,
-        gratuitos: item.gratuito || 0,
-        igv: item.igv || 0,
-        isc: 0,
-        icbper: 0,
-        total: item.total || 0
+  /** Genera el PDF de la compra: primero consulta el detalle del comprobante y luego genera el PDF. */
+  descargarPDF(item: any): void {
+    const idCompra = item.idCompra || item.idcompra;
+    if (!idCompra) {
+      iziToast?.warning?.({ title: 'Aviso', message: 'No hay comprobante asociado', position: 'topRight' });
+      return;
+    }
+    this._comprasService.obtener_detalle_compras_idcompra(idCompra).subscribe({
+      next: (response) => {
+        const raw = response?.data ?? [];
+        const detalle = Array.isArray(raw) ? raw : [];
+        const cantidadALetras = numeroALetras(item.total ?? 0);
+        const columnas = ['Cant.', 'Descripción', 'P. Unit.', 'Importe'];
+        const filas = detalle.map((d: any) => {
+          const cant = Number(d.cantidad) || 0;
+          const pUnit = Number(d.pUnitario) || 0;
+          const importe = Number(d.total) ?? cant * pUnit;
+          const desc = d.descripcion ?? this.productos?.find((p: any) => p.idProducto === d.idProducto)?.descripcion ?? 'Producto';
+          return [cant, desc, pUnit.toFixed(2), importe.toFixed(2)];
+        });
+        const datos = {
+          empresa: this.empresa,
+          titulo: 'Comprobante de Compra',
+          proveedor: {
+            razonSocial: item.rSocial ?? item.razonSocial ?? '—',
+            ruc: item.ruc ?? item.rucProveedor ?? '—',
+            direccion: item.direccion ?? '—',
+            telefono: item.telefono ?? '—'
+          },
+          comprobante: {
+            numero: item.compCompra ?? item.serie + '-' + item.numero ?? '—',
+            serie: item.serie ?? '—',
+            numeroDoc: item.numero ?? '—',
+            fEmision: item.fEmision ?? '—',
+            fVencimiento: item.fVencimiento ?? '—',
+            tipo: item.nombreComprobante ?? item.tipoComprobante ?? 'Comprobante de compra'
+          },
+          totales: {
+            subTotal: item.subTotal ?? 0,
+            igv: item.igv ?? 0,
+            total: item.total ?? 0
+          },
+          columnas,
+          filas,
+          cantidadLetras: cantidadALetras,
+          resumenDigital: 'Representación impresa del comprobante de compra.'
+        };
+        this.pdfService.generarPdfDinamico(datos, 'factura', 9).subscribe({
+          next: blob => this.pdfService.previsualizar(blob),
+          error: err => {
+            console.error('Error al generar el PDF', err);
+            iziToast?.error?.({ title: 'Error', message: 'Error al generar el PDF', position: 'topRight' });
+          }
+        });
       },
-      resumenDigital: 'KAUIjq+FfOy0r9cs+WhJRhmLWsc=',
-      observaciones: [
-        'SOMOS AGENTE DE RETENCION DE IGV R.S. 000229-2024 A PARTIR 01/01/2025',
-        'Representación impresa de la Factura Electrónica, consulte en www.rscloud.com.pe',
-        'Autorizado mediante ...'
-      ]
-    };
-
-
-    
-    this.pdfService.generarPdfDinamico(datos, 'factura', 9).subscribe({
-      next: blob => this.pdfService.previsualizar(blob),
-      error: err => console.error('Error PDF', err)
+      error: (err) => {
+        console.error('Error al obtener detalle de compra', err);
+        iziToast?.error?.({ title: 'Error', message: 'No se pudo cargar el detalle del comprobante', position: 'topRight' });
+      }
     });
-
   }
 
 
@@ -472,10 +510,11 @@ export class IndexComprasComponent {
     const datos = {
       empresa: this.empresa,
       titulo: 'Lista de Compras',
-      columnas: ['#', 'N° Factura', 'Proveedor', 'F. Emisión', 'Total', 'Estado'],
+      columnas: ['#', 'N° Factura', 'RUC Proveedor', 'Proveedor', 'F. Emisión', 'Total', 'Estado'],
       filas: this.compras.map((c, i) => [
         i + 1,
         c.compCompra,
+        c.ruc ?? '—',
         c.rSocial,
         c.fEmision,
         `S/ ${Number(c.total).toFixed(2)}`,
@@ -495,13 +534,14 @@ export class IndexComprasComponent {
       title: 'Lista de Compras',
       filename: `compras_${new Date().getTime()}`,
       worksheetName: 'Compras',
-      columns: ['#', 'N° Factura', 'Proveedor', 'F. Emisión', 'Total', 'Estado'],
+      columns: ['#', 'N° Factura', 'RUC Proveedor', 'Proveedor', 'F. Emisión', 'Total', 'Estado'],
       rows: this.compras.map((c, i) => [
         i + 1,
         c.compCompra,
+        c.ruc ?? '—',
         c.rSocial,
         c.fEmision,
-        Number(c.total), // Número para formato correcto en Excel
+        Number(c.total),
         c.descripcion
       ])
     };

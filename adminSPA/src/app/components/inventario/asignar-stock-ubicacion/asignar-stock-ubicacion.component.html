@@ -85,6 +85,7 @@
             </td>
             <td>
               <strong>{{ asignacion.codigoUbicacion }}</strong>
+              <span *ngIf="asignacion.existente" class="badge bg-info ms-1" title="Ya tenía unidades asignadas">Asignado</span>
             </td>
             <td>
               <input 

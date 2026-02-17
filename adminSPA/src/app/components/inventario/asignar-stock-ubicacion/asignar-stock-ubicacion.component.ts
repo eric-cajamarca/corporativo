@@ -25,8 +25,8 @@ export class AsignarStockUbicacionComponent {
   // Lista de ubicaciones disponibles para la sucursal
   ubicaciones: any[] = [];
   
-  // Distribución del stock entre ubicaciones
-  asignaciones: { idUbicacion: number, cantidad: number, codigoUbicacion: string, prioridad: number }[] = [];
+  // Distribución del stock entre ubicaciones (existente = ya estaba asignado)
+  asignaciones: { idUbicacion: number, cantidad: number, codigoUbicacion: string, prioridad: number, existente?: boolean }[] = [];
   
   // Cantidad restante por asignar
   cantidadRestante = 0;
@@ -78,7 +78,7 @@ export class AsignarStockUbicacionComponent {
   }
 
   /**
-   * Carga ubicaciones de la sucursal del lote
+   * Carga ubicaciones de la sucursal del lote y luego las asignaciones existentes del lote
    */
   cargarUbicaciones(): void {
     if (!this.idSucursal) {
@@ -108,16 +108,7 @@ export class AsignarStockUbicacionComponent {
             prioridad: prioridad != null && prioridad !== '' ? Number(prioridad) : 999
           };
         }).filter((u: any) => u.idUbicacion != null && !isNaN(u.idUbicacion));
-        this.inicializarAsignaciones();
-        this.cargandoUbicaciones = false;
-        if (this.ubicaciones.length === 0) {
-          iziToast.show({
-            title: 'Advertencia',
-            titleColor: '#ffc107',
-            message: 'No hay ubicaciones configuradas para esta sucursal. Cree una desde Inventario > Ubicaciones.',
-            position: 'topRight'
-          });
-        }
+        this.cargarAsignacionesExistentes();
       },
       error: (error) => {
         console.error('Error cargando ubicaciones:', error);
@@ -133,20 +124,60 @@ export class AsignarStockUbicacionComponent {
   }
 
   /**
-   * Inicializa array de asignaciones con 0 en cada ubicación
+   * Carga asignaciones ya existentes para este lote y mezcla con la lista de ubicaciones
    */
-  inicializarAsignaciones(): void {
+  cargarAsignacionesExistentes(): void {
+    this.loteUbicacionService.obtener_ubicacionLote_idLote(this.idLote).subscribe({
+      next: (response: any) => {
+        const raw = response?.data ?? response;
+        const existentes = Array.isArray(raw) ? raw : [];
+        this.inicializarAsignaciones(existentes);
+        this.cargandoUbicaciones = false;
+        if (this.ubicaciones.length === 0) {
+          iziToast.show({
+            title: 'Advertencia',
+            titleColor: '#ffc107',
+            message: 'No hay ubicaciones configuradas para esta sucursal. Cree una desde Inventario > Ubicaciones.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: () => {
+        this.inicializarAsignaciones([]);
+        this.cargandoUbicaciones = false;
+      }
+    });
+  }
+
+  /**
+   * Inicializa asignaciones: pre-rellena con las existentes y el resto en 0. cantidadRestante = total - ya asignado.
+   */
+  inicializarAsignaciones(existentes?: any[]): void {
+    const list = existentes ?? [];
+    const mapExistente = (list || []).reduce((acc: Record<number, number>, e: any) => {
+      const id = e.idUbicacion != null ? Number(e.idUbicacion) : null;
+      if (id != null && !isNaN(id)) acc[id] = Number(e.cantidad) || 0;
+      return acc;
+    }, {});
     const ubicacionesOrdenadas = [...this.ubicaciones].sort((a, b) =>
       (a.prioridad || 999) - (b.prioridad || 999)
     );
     this.asignaciones = ubicacionesOrdenadas
       .filter(u => u.idUbicacion != null && !isNaN(Number(u.idUbicacion)))
-      .map(u => ({
-        idUbicacion: Number(u.idUbicacion),
-        codigoUbicacion: u.codigoUbicacion || '',
-        prioridad: u.prioridad ?? 999,
-        cantidad: 0
-      }));
+      .map(u => {
+        const idUbicacion = Number(u.idUbicacion);
+        const cantidad = mapExistente[idUbicacion] ?? 0;
+        const existente = (mapExistente[idUbicacion] ?? 0) > 0;
+        return {
+          idUbicacion,
+          codigoUbicacion: u.codigoUbicacion || '',
+          prioridad: u.prioridad ?? 999,
+          cantidad,
+          existente
+        };
+      });
+    const totalAsignado = this.asignaciones.reduce((s, a) => s + (Number(a.cantidad) || 0), 0);
+    this.cantidadRestante = this.cantidadTotal - totalAsignado;
   }
 
   /**
@@ -200,10 +231,9 @@ export class AsignarStockUbicacionComponent {
   }
 
   /**
-   * Guarda asignaciones del stock a ubicaciones
+   * Guarda asignaciones: actualiza existentes, crea nuevas, elimina las que quedaron en 0.
    */
   guardarAsignacion(): void {
-    // Validaciones
     if (this.cantidadRestante !== 0) {
       iziToast.show({
         title: 'Validación',
@@ -214,10 +244,10 @@ export class AsignarStockUbicacionComponent {
       return;
     }
 
-    // Filtra solo ubicaciones con cantidad > 0
-    const asignacionesValidas = this.asignaciones.filter(a => a.cantidad > 0);
-    
-    if (asignacionesValidas.length === 0) {
+    const conCantidad = this.asignaciones.filter(a => (Number(a.cantidad) || 0) > 0);
+    const aEliminar = this.asignaciones.filter(a => (Number(a.cantidad) || 0) === 0 && a.existente);
+
+    if (conCantidad.length === 0 && aEliminar.length === 0) {
       iziToast.show({
         title: 'Validación',
         titleColor: '#ffc107',
@@ -228,15 +258,31 @@ export class AsignarStockUbicacionComponent {
     }
 
     this.guardando = true;
+    const observables: any[] = [];
+    conCantidad.forEach(a => {
+      if (a.existente) {
+        observables.push(this.loteUbicacionService.actualizar_cantidad_loteUbicacion({
+          idLote: this.idLote,
+          idUbicacion: a.idUbicacion,
+          cantidad: Number(a.cantidad) || 0
+        }));
+      } else {
+        observables.push(this.loteUbicacionService.crear_loteUbicacion({
+          idLote: this.idLote,
+          idUbicacion: a.idUbicacion,
+          cantidad: Number(a.cantidad) || 0
+        }));
+      }
+    });
+    aEliminar.forEach(a => {
+      observables.push(this.loteUbicacionService.eliminar_loteUbicacion(this.idLote, a.idUbicacion));
+    });
 
-    // Crea todas las asignaciones usando forkJoin
-    const observables = asignacionesValidas.map(a => 
-      this.loteUbicacionService.crear_loteUbicacion({
-        idLote: this.idLote,
-        idUbicacion: a.idUbicacion,
-        cantidad: a.cantidad
-      })
-    );
+    if (observables.length === 0) {
+      this.guardando = false;
+      this.activeModal.close({ success: true, asignaciones: 0 });
+      return;
+    }
 
     forkJoin(observables).subscribe({
       next: () => {
@@ -244,10 +290,10 @@ export class AsignarStockUbicacionComponent {
         iziToast.show({
           title: 'Éxito',
           titleColor: '#28a745',
-          message: `Stock asignado correctamente a ${asignacionesValidas.length} ubicación(es)`,
+          message: 'Asignaciones guardadas correctamente',
           position: 'topRight'
         });
-        this.activeModal.close({ success: true, asignaciones: asignacionesValidas.length });
+        this.activeModal.close({ success: true, asignaciones: conCantidad.length });
       },
       error: (error) => {
         this.guardando = false;

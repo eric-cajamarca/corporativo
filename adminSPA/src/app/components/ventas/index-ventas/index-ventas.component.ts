@@ -363,7 +363,7 @@ export class IndexVentasComponent implements OnInit {
     const datos = {
       empresa: empresaPdf,
       titulo: 'Lista de Ventas',
-      columnas: ['#', 'Fecha', 'Comprobante', 'RUC', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+      columnas: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
       filas: this.ventas.map((v, i) => [
         i + 1,
         this.formatearFecha(v.fEmision),
@@ -396,7 +396,7 @@ export class IndexVentasComponent implements OnInit {
       title: 'Lista de Ventas',
       filename: `ventas_${new Date().getTime()}`,
       worksheetName: 'Ventas',
-      columns: ['#', 'Fecha', 'Comprobante', 'RUC', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+      columns: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
       rows: this.ventas.map((v, i) => [
         i + 1,
         this.formatearFecha(v.fEmision),

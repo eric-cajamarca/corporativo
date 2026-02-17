@@ -417,3 +417,19 @@ exports.obtenerProductoPorIdRepo = async (pool, idProducto, idEmpresa) => {
     throw new Error(`Repository Error: ${error.message}`);
   }
 };
+
+/**
+ * Obtiene idProducto por cada descripción que coincida exactamente (trim, misma empresa).
+ * Retorna array { descripcion, idProducto } para usar en compras al cargar XML.
+ */
+exports.obtenerProductosPorDescripcionRepo = async (pool, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idProducto, LTRIM(RTRIM(descripcion)) AS descripcion
+      FROM Productos
+      WHERE idEmpresa = @idEmpresa AND descripcion IS NOT NULL
+    `);
+  return result.recordset || [];
+};

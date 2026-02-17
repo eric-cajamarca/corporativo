@@ -35,31 +35,53 @@
     <!-- Contenido cuando hay compras -->
     <ng-container *ngIf="compras_const.length > 0">
       <div class="card-body border-bottom">
-              
-        <div class="row">
-          <div>
-            <button class="btn btn-sm " (click)="exportarPDF()">
-            <i class="bi bi-file-pdf"  style="font-size: 40px; color: red;"></i>
-          </button>
-          <button class="btn btn-sm " (click)="exportarExcel()">
-            <i class="bi bi-filetype-xls" style="font-size: 40px; color: green;"></i>
-          </button>
+        <div class="row align-items-end mb-2">
+          <div class="col-auto">
+            <button class="btn btn-sm btn-outline-danger" (click)="exportarPDF()" title="Exportar lista a PDF">
+              <i class="bi bi-file-pdf"></i> PDF
+            </button>
+            <button class="btn btn-sm btn-outline-success" (click)="exportarExcel()" title="Exportar lista a Excel">
+              <i class="bi bi-filetype-xls"></i> Excel
+            </button>
           </div>
-
-          <div class="col-md-8 offset-md-2">
-            <div class="input-group mb-3">
-             
-              <input type="text" 
-                     class="form-control" 
-                     placeholder="Buscar compras..." 
-                     name="filtro"
-                     [(ngModel)]="filtro">
-              <button class="btn btn-primary" 
-                      type="button" 
-                      (click)="filtrar()">
-                <i class="bi bi-search me-2"></i>Buscar
-              </button>
-            </div>
+        </div>
+        <!-- Fila de búsqueda y filtros (como en historial ventas) -->
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-auto">
+            <select class="form-select form-select-sm" [(ngModel)]="filtroFecha" style="min-width: 8rem;">
+              <option value="all">Todos</option>
+              <option value="today">Hoy</option>
+              <option value="month">Este mes</option>
+              <option value="range">Rango</option>
+            </select>
+          </div>
+          <div class="col-auto" *ngIf="filtroFecha === 'range'">
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaDesde" title="Desde">
+          </div>
+          <div class="col-auto" *ngIf="filtroFecha === 'range'">
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" title="Hasta">
+          </div>
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="filtroNumero" placeholder="N° Comprobante" style="min-width: 7rem;">
+          </div>
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="filtroRuc" placeholder="RUC" style="min-width: 6rem;">
+          </div>
+          <div class="col-auto">
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="filtroProveedor" placeholder="Proveedor" style="min-width: 8rem;">
+          </div>
+          <div class="col-auto">
+            <select class="form-select form-select-sm" [(ngModel)]="filtroTipoComprobante" style="min-width: 7rem;">
+              <option value="">Tipo</option>
+              <option value="Factura">Factura</option>
+              <option value="Boleta">Boleta</option>
+              <option value="Nota de Crédito">N. Crédito</option>
+              <option value="Nota de Débito">N. Débito</option>
+            </select>
+          </div>
+          <div class="col-auto d-flex gap-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="limpiarFiltros()">Limpiar</button>
+            <button type="button" class="btn btn-sm btn-primary" (click)="aplicarFiltros()"><i class="bi bi-search"></i> Buscar</button>
           </div>
         </div>
       </div>
@@ -123,7 +145,7 @@
                           </a>
                         </li>
                         <li>
-                          <a class="dropdown-item d-flex align-items-center" (click)="descargarPDF(item, detalleCompras)">
+                          <a class="dropdown-item d-flex align-items-center" (click)="descargarPDF(item)">
                             <i class="bi bi-eye me-2"></i>Ver PDF
                           </a>
                         </li>

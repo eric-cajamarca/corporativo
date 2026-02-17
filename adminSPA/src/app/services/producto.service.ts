@@ -55,5 +55,13 @@ export class ProductoService {
       withCredentials: true
     });
   }
-  
+
+  /** Busca idProducto por descripción exacta (empresa del usuario). Para compras al cargar XML. */
+  matchProductosPorDescripcion(descripciones: string[]): Observable<{ data: Array<{ descripcion: string; idProducto: string | null }> }> {
+    return this._http.post<{ data: Array<{ descripcion: string; idProducto: string | null }> }>(
+      this.url + 'productos/match-descripcion',
+      { descripciones: descripciones || [] },
+      { withCredentials: true }
+    );
+  }
 }

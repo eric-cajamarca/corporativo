@@ -69,10 +69,17 @@ export class LoteListComponent implements OnInit {
   }
 
   /**
-   * Aplica filtros a la lista de lotes
+   * Aplica filtros a la lista de lotes.
+   * Si filtrosIniciales.idLotes está definido (ej. abierto desde compras sin asignar por defecto), solo se muestran esos lotes.
    */
   aplicarFiltros(): void {
     let filtrados = [...this.lotes];
+
+    const idLotesFiltro = this.filtrosIniciales?.idLotes;
+    if (Array.isArray(idLotesFiltro) && idLotesFiltro.length > 0) {
+      const setIds = new Set(idLotesFiltro);
+      filtrados = filtrados.filter(l => l.idLote && setIds.has(l.idLote));
+    }
 
     if (this.filtroProducto) {
       const term = new RegExp(this.filtroProducto, 'i');
@@ -116,15 +123,28 @@ export class LoteListComponent implements OnInit {
   }
 
   /**
-   * Abre modal para asignar ubicaciones a un lote
+   * Abre modal para asignar ubicaciones a un lote.
+   * Si el modal se abrió con idLotes (solo lotes de una compra), al asignar se quita el lote de la lista.
    */
   asignarUbicaciones(lote: Lote): void {
     const cantidadTotal = lote.cantidadDisponible || lote.cantidadIngresada || 0;
     this.inventarioModal.abrirAsignarUbicaciones(lote.idLote!, cantidadTotal).then(result => {
       if (result?.success) {
-        this.cargarLotes();
+        if (Array.isArray(this.filtrosIniciales?.idLotes) && this.filtrosIniciales.idLotes.length > 0) {
+          this.quitarLoteDeLista(lote.idLote!);
+        } else {
+          this.cargarLotes();
+        }
       }
     }).catch(() => {});
+  }
+
+  /**
+   * Quita un lote de la lista local (usado cuando se abre solo con idLotes y el usuario ya asignó ese lote).
+   */
+  private quitarLoteDeLista(idLote: string): void {
+    this.lotes = this.lotes.filter(l => l.idLote !== idLote);
+    this.lotesFiltrados = this.lotesFiltrados.filter(l => l.idLote !== idLote);
   }
 
   /**

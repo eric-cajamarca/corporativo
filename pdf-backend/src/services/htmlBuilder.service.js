@@ -15,6 +15,7 @@ class HtmlBuilderService {
       empresa,
       tablaHtml,
       estiloAdicional = '',
+      contenidoAntesTabla = '',
       contenidoAdicional = ''
     } = params;
 
@@ -121,6 +122,46 @@ class HtmlBuilderService {
       font-size: 9px;
     }
     
+    .bloque-datos {
+      margin-bottom: 18px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .bloque-titulo {
+      margin: 0 0 8px 0;
+      color: #0056b3;
+      font-size: 12px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+    .tabla-datos-inline {
+      width: 100%;
+      border: none;
+      margin: 0;
+      font-size: 9px;
+    }
+    .tabla-datos-inline td {
+      border: none;
+      padding: 2px 8px 2px 0;
+      vertical-align: top;
+    }
+    .tabla-datos-inline td:first-child {
+      width: 140px;
+      color: #555;
+    }
+    .bloque-totales {
+      margin-top: 15px;
+      margin-bottom: 15px;
+    }
+    .titulo-tabla {
+      margin-top: 20px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #0056b3;
+    }
+    
     ${estiloAdicional}
   </style>
 </head>
@@ -150,6 +191,8 @@ class HtmlBuilderService {
   <h2>${titulo}</h2>
   <div class="fecha-reporte">Fecha de reporte: ${new Date().toLocaleDateString('es-PE')}</div>
 
+  ${contenidoAntesTabla}
+
   ${tablaHtml}
 
   ${contenidoAdicional}
@@ -171,10 +214,13 @@ class HtmlBuilderService {
       clasesTd = ''
     } = options;
 
-    const headersHtml = headers.map(h => `<th class="${clasesTh}">${h}</th>`).join('');
-    
-    const filasHtml = filas.map(fila => {
-      const celdas = fila.map(celda => {
+    const headersSafe = Array.isArray(headers) ? headers : [];
+    const filasSafe = Array.isArray(filas) ? filas : [];
+    const headersHtml = headersSafe.map(h => `<th class="${clasesTh}">${h}</th>`).join('');
+
+    const filasHtml = filasSafe.map(fila => {
+      const row = Array.isArray(fila) ? fila : [];
+      const celdas = row.map(celda => {
         const valor = celda !== undefined && celda !== null ? celda : '';
         return `<td class="${clasesTd}">${valor}</td>`;
       }).join('');

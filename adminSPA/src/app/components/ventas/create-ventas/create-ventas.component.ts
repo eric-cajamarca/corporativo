@@ -180,7 +180,7 @@ export class CreateVentasComponent implements OnInit {
     });
     const hoy = new Date().toISOString().split('T')[0];
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
-    if (!this.ventas.fVencimiento) this.ventas.fVencimiento = hoy;
+    // fVencimiento no es obligatorio; no se asigna por defecto
     const collapsed = localStorage.getItem('sidebarCollapsed');
     if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargarDatos();
@@ -1206,7 +1206,7 @@ abrirModalPrecios(item: any) {
         numero: String(this.ventas.numero || '00000000').substring(0, 8),
         compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
         fEmision: this.ventas.fEmision ? String(this.ventas.fEmision).substring(0, 10) : new Date().toISOString().substring(0, 10),
-        fVencimiento: this.ventas.fVencimiento ? String(this.ventas.fVencimiento).substring(0, 10) : new Date().toISOString().substring(0, 10),
+        fVencimiento: this.ventas.fVencimiento ? String(this.ventas.fVencimiento).substring(0, 10) : null,
         idDocumento: this.ventas.idDocumento != null ? String(this.ventas.idDocumento).substring(0, 1) : '1',
         idCliente,
         idSucursal: this.ventas.idSucursal,
@@ -1267,7 +1267,7 @@ abrirModalPrecios(item: any) {
       compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
       idComprobante: Number(this.ventas.idComprobante),
       fEmision: this.ventas.fEmision ? new Date(this.ventas.fEmision).toISOString() : new Date().toISOString(),
-      fVencimiento: this.ventas.fVencimiento ? new Date(this.ventas.fVencimiento).toISOString() : new Date().toISOString(),
+      fVencimiento: this.ventas.fVencimiento ? new Date(this.ventas.fVencimiento).toISOString() : null,
       idCliente,
       idMoneda: Number(this.ventas.idMoneda) || 1,
       tCambio: 1,
