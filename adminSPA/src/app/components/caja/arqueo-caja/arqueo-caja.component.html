@@ -182,13 +182,15 @@
           <table class="table table-sm table-bordered">
             <thead class="table-light">
               <tr>
-                <th>Concepto</th>
-                <th class="text-end">Importe</th>
+                <th>Comprobante</th>
+                <th>Cliente / Proveedor</th>
+                <th class="text-end">Total</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let item of detalleConcepto.items">
-                <td><i class="{{item.icono}} me-2 text-muted"></i>{{ item.concepto }}</td>
+                <td>{{ item.comprobante }}</td>
+                <td>{{ item.clienteOrProveedor }}</td>
                 <td class="text-end" [ngClass]="{'text-success': item.importe > 0, 'text-danger': item.importe < 0}">
                   {{ item.importe >= 0 ? '+' : '' }}{{ formatCurrency(item.importe) }}
                 </td>
@@ -196,7 +198,7 @@
             </tbody>
             <tfoot>
               <tr class="fw-bold">
-                <td>Subtotal {{ detalleConcepto.concepto }}</td>
+                <td colspan="2">Subtotal {{ detalleConcepto.concepto }}</td>
                 <td class="text-end">
                   {{ formatCurrency(subtotalDetalleConcepto()) }}
                 </td>
@@ -230,13 +232,15 @@
           <table class="table table-sm table-bordered">
             <thead class="table-light">
               <tr>
-                <th>Concepto</th>
-                <th class="text-end">Importe</th>
+                <th>Comprobante</th>
+                <th>{{ detalleFormaPago.tipo === 'I' ? 'Cliente' : 'Proveedor' }}</th>
+                <th class="text-end">Total</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let item of detalleFormaPago.items">
-                <td>{{ item.concepto }}</td>
+                <td>{{ item.comprobante }}</td>
+                <td>{{ item.clienteOrProveedor }}</td>
                 <td class="text-end" [ngClass]="{'text-success': item.importe > 0, 'text-danger': item.importe < 0}">
                   {{ item.importe >= 0 ? '+' : '' }}{{ formatCurrency(item.importe) }}
                 </td>
@@ -244,7 +248,7 @@
             </tbody>
             <tfoot>
               <tr class="fw-bold">
-                <td>Subtotal {{ detalleFormaPago.formaPago }}</td>
+                <td colspan="2">Subtotal {{ detalleFormaPago.formaPago }}</td>
                 <td class="text-end">{{ formatCurrency(subtotalDetalleFormaPago()) }}</td>
               </tr>
             </tfoot>

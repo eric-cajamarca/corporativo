@@ -696,6 +696,58 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     ORDER BY tipoOperacion DESC, concepto, formaPago
   `);
 
+  const sqlDetalleVentas = `
+    SELECT
+      tmc.nombre AS concepto,
+      tmc.tipo AS tipoOperacion,
+      ISNULL(mp.descripcion, 'Sin especificar') AS formaPago,
+      mc.monto AS importe,
+      v.serie + '-' + v.numero AS comprobante,
+      ISNULL(cl.rSocial, '') AS clienteOrProveedor
+    FROM MovimientosCaja mc
+    INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
+    INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
+    INNER JOIN Ventas v ON v.idVenta = mc.idVenta AND v.idEmpresa = mc.idEmpresa
+    LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+    LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
+    WHERE mc.idEmpresa = @idEmpresa
+      ${condicionFecha}
+      AND mc.idVenta IS NOT NULL
+      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+  `;
+  const sqlDetalleOtros = `
+    SELECT
+      tmc.nombre AS concepto,
+      tmc.tipo AS tipoOperacion,
+      ISNULL(mp.descripcion, 'Sin especificar') AS formaPago,
+      mc.monto AS importe,
+      ISNULL(mc.documentoRelacionado, '') AS comprobante,
+      ISNULL(mc.concepto, '') AS clienteOrProveedor
+    FROM MovimientosCaja mc
+    INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
+    INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
+    LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
+    WHERE mc.idEmpresa = @idEmpresa
+      ${condicionFecha}
+      AND (mc.idVenta IS NULL OR mc.idVenta = 0)
+      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+  `;
+  let detalleRecordset = [];
+  try {
+    const reqDetalle = pool.request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+    if (usaRango) {
+      reqDetalle.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
+    } else {
+      reqDetalle.input("fecha", sql.Date, fechaFiltro);
+    }
+    if (filtrarPorCaja) reqDetalle.input("idCaja", sql.UniqueIdentifier, idCaja);
+    const resDetalle = await reqDetalle.query(`(${sqlDetalleVentas}) UNION ALL (${sqlDetalleOtros}) ORDER BY tipoOperacion DESC, concepto, formaPago`);
+    detalleRecordset = resDetalle.recordset || [];
+  } catch (err) {
+    console.error("Error obtener detalle arqueo (comprobante/cliente/proveedor):", err);
+  }
+
   let ventasCredito = { concepto: 'VENTA CREDITO', importe: 0 };
   try {
     const reqCredito = pool.request()
@@ -744,5 +796,5 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     console.error("Error obtener total cobro de créditos para arqueo:", err);
   }
 
-  return { movimientos: result.recordset, ventasCredito, cobroCreditos };
+  return { movimientos: result.recordset, detalle: detalleRecordset, ventasCredito, cobroCreditos };
 };

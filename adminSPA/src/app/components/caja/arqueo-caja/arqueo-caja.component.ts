@@ -49,8 +49,11 @@ export class ArqueoCajaComponent implements OnInit {
   /** Filas crudas del arqueo (concepto, tipo, formaPago, importe) para el detalle por forma de pago. */
   public filasArqueoRaw: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[] = [];
 
-  /** Detalle por forma de pago (modal Movimientos Ingresos/Egresos). */
-  public detalleFormaPago: { formaPago: string; tipo: 'I' | 'E'; items: { concepto: string; importe: number }[] } | null = null;
+  /** Detalle por comprobante (comprobante, cliente/proveedor, importe) desde el backend. */
+  public detalleArqueo: { concepto: string; tipoOperacion: string; formaPago: string; importe: number; comprobante: string; clienteOrProveedor: string }[] = [];
+
+  /** Detalle por forma de pago (modal Movimientos Ingresos/Egresos): comprobante, cliente/proveedor, total. */
+  public detalleFormaPago: { formaPago: string; tipo: 'I' | 'E'; items: { comprobante: string; clienteOrProveedor: string; importe: number }[] } | null = null;
   public mostrarModalDetalleFormaPago = false;
 
   public totalIngresos: number = 0;
@@ -134,6 +137,7 @@ export class ArqueoCajaComponent implements OnInit {
     this.movimientosIngresos = [];
     this.movimientosEgresos = [];
     this.filasArqueoRaw = [];
+    this.detalleArqueo = [];
     this.totalIngresos = 0;
     this.totalEgresos = 0;
 
@@ -251,7 +255,8 @@ export class ArqueoCajaComponent implements OnInit {
     return compra + pagoProv;
   }
 
-  detalleConcepto: { concepto: string; items: FilaArqueoConcepto[] } | null = null;
+  /** Items del primer modal: comprobante, cliente/proveedor, importe (desde detalleArqueo). */
+  detalleConcepto: { concepto: string; items: { comprobante: string; clienteOrProveedor: string; importe: number }[] } | null = null;
   mostrarModalDetalle = false;
 
   private normConcepto(s: string): string {
@@ -259,27 +264,37 @@ export class ArqueoCajaComponent implements OnInit {
   }
 
   verDetalleFila(fila: { clave: string; etiqueta: string; tipo: string }): void {
-    let items: FilaArqueoConcepto[] = [];
+    let items: { comprobante: string; clienteOrProveedor: string; importe: number }[] = [];
     switch (fila.clave) {
       case 'VENTA_CONTADO':
-        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I' && this.normConcepto(c.concepto) === 'VENTA CONTADO');
+        items = this.detalleArqueo
+          .filter(d => d.tipoOperacion === 'I' && this.normConcepto(d.concepto) === 'VENTA CONTADO')
+          .map(d => ({ comprobante: d.comprobante, clienteOrProveedor: d.clienteOrProveedor, importe: d.importe }));
         break;
       case 'VENTA_CREDITO':
         if (this.ventasCreditoImporte > 0) {
-          items = [{ concepto: 'Ventas al crédito (por cobrar)', tipoOperacion: 'I', importe: this.ventasCreditoImporte, icono: 'fas fa-credit-card' }];
+          items = [{ comprobante: '—', clienteOrProveedor: '—', importe: this.ventasCreditoImporte }];
         }
         break;
       case 'PAGO_CUOTA':
-        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I' && this.normConcepto(c.concepto) === 'PAGO CUOTA');
+        items = this.detalleArqueo
+          .filter(d => d.tipoOperacion === 'I' && this.normConcepto(d.concepto) === 'PAGO CUOTA')
+          .map(d => ({ comprobante: d.comprobante, clienteOrProveedor: d.clienteOrProveedor, importe: d.importe }));
         break;
       case 'INGRESOS':
-        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I');
+        items = this.detalleArqueo
+          .filter(d => d.tipoOperacion === 'I')
+          .map(d => ({ comprobante: d.comprobante, clienteOrProveedor: d.clienteOrProveedor, importe: d.importe }));
         break;
       case 'EGRESOS':
-        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E');
+        items = this.detalleArqueo
+          .filter(d => d.tipoOperacion === 'E')
+          .map(d => ({ comprobante: d.comprobante, clienteOrProveedor: d.clienteOrProveedor, importe: -d.importe }));
         break;
       case 'PAGO_CREDITOS':
-        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E' && (this.normConcepto(c.concepto) === 'COMPRA CONTADO' || this.normConcepto(c.concepto) === 'PAGO PROVEEDORES'));
+        items = this.detalleArqueo
+          .filter(d => d.tipoOperacion === 'E' && (this.normConcepto(d.concepto) === 'COMPRA CONTADO' || this.normConcepto(d.concepto) === 'PAGO PROVEEDORES'))
+          .map(d => ({ comprobante: d.comprobante, clienteOrProveedor: d.clienteOrProveedor, importe: -d.importe }));
         break;
       default:
         items = [];
@@ -293,7 +308,7 @@ export class ArqueoCajaComponent implements OnInit {
     this.detalleConcepto = null;
   }
 
-  /** Subtotal del detalle actual (suma de importes) para el modal. */
+  /** Subtotal del detalle concepto (suma de importes). */
   subtotalDetalleConcepto(): number {
     if (!this.detalleConcepto || !this.detalleConcepto.items.length) return 0;
     return this.detalleConcepto.items.reduce((acc, item) => acc + item.importe, 0);
@@ -321,11 +336,15 @@ export class ArqueoCajaComponent implements OnInit {
     return (formaPago || '').trim() || 'Sin especificar';
   }
 
-  /** Abre el modal de detalle por forma de pago (ingresos o egresos). */
+  /** Abre el modal de detalle por forma de pago: comprobante, cliente/proveedor, total. */
   verDetalleFormaPago(formaPago: string, tipo: 'I' | 'E'): void {
-    const items = this.filasArqueoRaw
-      .filter(f => f.formaPago === formaPago && f.tipoOperacion === tipo)
-      .map(f => ({ concepto: f.concepto, importe: tipo === 'E' ? -f.importe : f.importe }));
+    const items = this.detalleArqueo
+      .filter(d => d.formaPago === formaPago && d.tipoOperacion === tipo)
+      .map(d => ({
+        comprobante: d.comprobante,
+        clienteOrProveedor: d.clienteOrProveedor,
+        importe: tipo === 'E' ? -d.importe : d.importe
+      }));
     this.detalleFormaPago = { formaPago, tipo, items };
     this.mostrarModalDetalleFormaPago = true;
   }

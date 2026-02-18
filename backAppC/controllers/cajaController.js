@@ -472,6 +472,7 @@ const obtenerArqueoDinamico = async (req, res) => {
     });
     res.status(200).send({
       data: result.movimientos || [],
+      detalle: result.detalle || [],
       ventasCredito: result.ventasCredito || { concepto: 'VENTA CREDITO', importe: 0 },
       cobroCreditos: result.cobroCreditos || { concepto: 'COBRO CREDITOS', importe: 0 }
     });
