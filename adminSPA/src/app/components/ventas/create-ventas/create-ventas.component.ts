@@ -29,6 +29,7 @@ import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { VentaSesionService } from '../../../services/venta-sesion.service';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
+import { CreditosService } from '../../../services/creditos.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -151,7 +152,8 @@ export class CreateVentasComponent implements OnInit {
     private cajaService: CajaService,
     private _factilizaService: FactilizaService,
     private _impuestoService: ImpuestoService,
-    private ventaSesionService: VentaSesionService
+    private ventaSesionService: VentaSesionService,
+    private creditosService: CreditosService
   ) {}
 
   onSidebarToggle(collapsed: boolean): void {
@@ -175,6 +177,9 @@ export class CreateVentasComponent implements OnInit {
     this.cajaService.obtenerCajas().subscribe({
       next: (r) => {
         this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
+        if (this.cajas.length > 0 && this.cajas[0].idSucursal && !this.ventas.idSucursal) {
+          this.ventas.idSucursal = this.cajas[0].idSucursal;
+        }
       },
       error: () => {}
     });
@@ -1097,8 +1102,14 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'Seleccione tipo de comprobante (Datos del Comprobante).' });
       return;
     }
+    if (!this.ventas.idSucursal && this.cajas.length > 0 && this.cajas[0].idSucursal) {
+      this.ventas.idSucursal = this.cajas[0].idSucursal;
+    }
+    if (!this.ventas.idSucursal && this.sucursales.length > 0) {
+      this.ventas.idSucursal = this.sucursales[0].idSucursal;
+    }
     if (!this.ventas.idSucursal) {
-      iziToast.warning({ title: 'Advertencia', message: 'Seleccione sucursal.' });
+      iziToast.warning({ title: 'Advertencia', message: 'No se pudo determinar la sucursal. Abra una caja o configure sucursales.' });
       return;
     }
     const ruc = (this.cliente?.ruc ?? '').toString().trim();
@@ -1123,7 +1134,76 @@ abrirModalPrecios(item: any) {
       this.enviarCotizacion(idCliente);
       return;
     }
+    const totalCredit = this.getTotalVentaAlCredito();
+    if (totalCredit > 0 && (idCliente == null || idCliente === 0)) {
+      iziToast.warning({
+        title: 'Venta al crédito',
+        message: 'No puede registrar una venta al crédito para un cliente nuevo. Los clientes nuevos no están habilitados para crédito. Cree primero el cliente, en Editar marque "Sujeto a crédito" y asigne una línea de crédito, luego registre la venta.'
+      });
+      return;
+    }
+    if (totalCredit > 0 && idCliente) {
+      this.validarYEnviarVentaAlCredito(idCliente, totalCredit);
+      return;
+    }
     this.enviarVentaConCliente(idCliente);
+  }
+
+  /** Monto total de la venta que se paga con condición "crédito" (según descripción del medio de pago en el detalle). */
+  getTotalVentaAlCredito(): number {
+    return this.detallePago
+      .filter((d: any) => (d.descripcion || '').toLowerCase().includes('credito'))
+      .reduce((sum: number, d: any) => sum + (Number(d.monto) || 0), 0);
+  }
+
+  /** Valida sujeto a crédito y línea de crédito; si es válido, envía la venta. */
+  validarYEnviarVentaAlCredito(idCliente: number, totalCredit: number): void {
+    const tieneDatosCredito = this.cliente.sujetoCredito !== undefined && this.cliente.lineaCredito !== undefined;
+    if (tieneDatosCredito) {
+      this.evaluarCreditoYEnviar(this.cliente.sujetoCredito, this.cliente.lineaCredito, idCliente, totalCredit);
+      return;
+    }
+    this._clienteService.obtener_cliente_id(idCliente).subscribe({
+      next: (res: any) => {
+        const row = (res?.data && res.data[0]) ? res.data[0] : res?.data;
+        const sujetoCredito = row?.sujetoCredito === true || row?.sujetoCredito === 1;
+        const lineaCredito = row?.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : 0;
+        this.cliente.sujetoCredito = sujetoCredito;
+        this.cliente.lineaCredito = lineaCredito;
+        this.evaluarCreditoYEnviar(sujetoCredito, lineaCredito, idCliente, totalCredit);
+      },
+      error: () => {
+        iziToast.error({ title: 'Error', message: 'No se pudo verificar los datos del cliente para crédito.' });
+      }
+    });
+  }
+
+  private evaluarCreditoYEnviar(sujetoCredito: boolean, lineaCredito: number, idCliente: number, totalCredit: number): void {
+    if (!sujetoCredito) {
+      iziToast.warning({
+        title: 'Cliente no sujeto a crédito',
+        message: 'Este cliente no está habilitado para ventas al crédito. Edite el cliente y marque "Sujeto a crédito" con una línea de crédito mayor a 0.'
+      });
+      return;
+    }
+    this.creditosService.obtenerCreditosCliente(String(idCliente)).subscribe({
+      next: (res) => {
+        const list = res?.data || [];
+        const deudaActual = list.reduce((sum: number, c: any) => sum + (Number(c.saldoPendiente) || 0), 0);
+        const totalConNuevaVenta = deudaActual + totalCredit;
+        if (totalConNuevaVenta > lineaCredito) {
+          iziToast.warning({
+            title: 'Línea de crédito excedida',
+            message: `La deuda actual del cliente es S/ ${deudaActual.toFixed(2)}. Con esta venta (S/ ${totalCredit.toFixed(2)}) el total sería S/ ${totalConNuevaVenta.toFixed(2)}, que supera su línea de crédito (S/ ${lineaCredito.toFixed(2)}).`
+          });
+          return;
+        }
+        this.enviarVentaConCliente(idCliente);
+      },
+      error: () => {
+        iziToast.error({ title: 'Error', message: 'No se pudo obtener la deuda del cliente.' });
+      }
+    });
   }
 
   private crearClienteYRegistrarVenta(): void {

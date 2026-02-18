@@ -103,16 +103,23 @@
                       <tr>
                         <th>Forma Pago</th>
                         <th class="text-end">Importe</th>
+                        <th class="text-center" style="width: 120px;">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr *ngFor="let mov of movimientosIngresos">
                         <td>{{mov.formaPago}}</td>
                         <td class="text-end">{{formatCurrency(mov.importe)}}</td>
+                        <td class="text-center">
+                          <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleFormaPago(mov.formaPago, 'I')" title="Ver detalle">
+                            <i class="fas fa-list"></i> Detalle
+                          </button>
+                        </td>
                       </tr>
                       <tr class="fw-bold">
                         <td>Total</td>
                         <td class="text-end">{{formatCurrency(totalMovimientosIngresos)}}</td>
+                        <td></td>
                       </tr>
                     </tbody>
                   </table>
@@ -128,16 +135,23 @@
                       <tr>
                         <th>Forma Pago</th>
                         <th class="text-end">Importe</th>
+                        <th class="text-center" style="width: 120px;">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr *ngFor="let mov of movimientosEgresos">
                         <td>{{mov.formaPago}}</td>
                         <td class="text-end">{{formatCurrency(mov.importe)}}</td>
+                        <td class="text-center">
+                          <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleFormaPago(mov.formaPago, 'E')" title="Ver detalle">
+                            <i class="fas fa-list"></i> Detalle
+                          </button>
+                        </td>
                       </tr>
                       <tr class="fw-bold">
                         <td>Total</td>
                         <td class="text-end">{{formatCurrency(totalMovimientosEgresos)}}</td>
+                        <td></td>
                       </tr>
                     </tbody>
                   </table>
@@ -199,5 +213,51 @@
   </div>
 </div>
 <div class="modal-backdrop fade show" *ngIf="mostrarModalDetalle" style="z-index: 1040;"></div>
+
+<!-- Modal detalle por forma de pago (Ingresos / Egresos) -->
+<div class="modal fade" [class.show]="mostrarModalDetalleFormaPago" [style.display]="mostrarModalDetalleFormaPago ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-list me-2"></i>
+          Detalle {{ detalleFormaPago?.tipo === 'I' ? 'Ingresos' : 'Egresos' }} - {{ detalleFormaPago?.formaPago }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalDetalleFormaPago()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive" *ngIf="detalleFormaPago && detalleFormaPago.items.length > 0">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>Concepto</th>
+                <th class="text-end">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of detalleFormaPago.items">
+                <td>{{ item.concepto }}</td>
+                <td class="text-end" [ngClass]="{'text-success': item.importe > 0, 'text-danger': item.importe < 0}">
+                  {{ item.importe >= 0 ? '+' : '' }}{{ formatCurrency(item.importe) }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="fw-bold">
+                <td>Subtotal {{ detalleFormaPago.formaPago }}</td>
+                <td class="text-end">{{ formatCurrency(subtotalDetalleFormaPago()) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p *ngIf="detalleFormaPago && detalleFormaPago.items.length === 0" class="text-muted mb-0">No hay movimientos para esta forma de pago.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalDetalleFormaPago()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalDetalleFormaPago" style="z-index: 1040;"></div>
 
 

@@ -2,19 +2,34 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { from, of, throwError } from 'rxjs';
+import { catchError, concatMap, map, switchMap } from 'rxjs/operators';
 import { CreditosService } from '../../../services/creditos.service';
 import { ClienteService } from '../../../services/cliente.service';
+import { CajaService } from '../../../services/caja.service';
+import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfaces/creditos-interface';
 import { Cliente } from '../../../interfaces/cliente-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 
 declare var iziToast: any;
+
+export interface DetalleCobranzaItem {
+  idCredito: string;
+  comprobante: string;
+  fechaVenta: string;
+  totalComprobante: number;
+  fechaVencimiento: string;
+  importePagado: number;
+  saldoPendiente: number;
+}
 
 @Component({
   selector: 'app-index-creditos',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent, IndexClientesComponent],
   templateUrl: './index-creditos.component.html',
   styleUrl: './index-creditos.component.css'
 })
@@ -33,6 +48,28 @@ export class IndexCreditosComponent implements OnInit {
   public mostrarModalPagarCuota = false;
   public mostrarCuotas = false;
 
+  public mostrarModalNuevaCobranza = false;
+  public mostrarModalBuscarCliente = false;
+  public mostrarModalBuscarComprobantes = false;
+  public creditosClienteParaSelector: (CreditoCliente & { comprobante?: string; proximaCuota?: string })[] = [];
+  public loadingCreditosCliente = false;
+
+  public nuevaCobranza = {
+    numeroDoc: '',
+    fechaEmision: new Date().toISOString().split('T')[0],
+    idCliente: '',
+    nombreCliente: '',
+    direccion: '',
+    lineaAsignada: 0,
+    deudaTotal: 0,
+    aptoCreditos: '—',
+    importeCancelar: 0,
+    idMediosPago: null as number | null,
+    idApertura: '' as string,
+    observaciones: ''
+  };
+  public detalleCobranza: DetalleCobranzaItem[] = [];
+
   public nuevoCredito = {
     idCliente: '',
     idVenta: '',
@@ -42,10 +79,14 @@ export class IndexCreditosComponent implements OnInit {
     cuotaInicial: 0
   };
 
+  public cajas: any[] = [];
+  public mediosPago: any[] = [];
   public pagoCuota = {
     idCuota: '',
     montoPagado: 0,
     formaPago: '',
+    idMediosPago: null as number | null,
+    idApertura: '' as string,
     referencia: '',
     observaciones: ''
   };
@@ -64,13 +105,23 @@ export class IndexCreditosComponent implements OnInit {
 
   constructor(
     private creditosService: CreditosService,
-    private clienteService: ClienteService
+    private clienteService: ClienteService,
+    private cajaService: CajaService,
+    private tablasSunat: TablasSunatService
   ) {}
 
   ngOnInit(): void {
     this.cargarClientes();
     this.cargarResumenCreditos();
     this.cargarCreditos();
+    this.cajaService.obtenerCajas().subscribe({
+      next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
+      error: () => {}
+    });
+    this.tablasSunat.obtener_medios_pago().subscribe({
+      next: (r) => { this.mediosPago = r.data || []; },
+      error: () => {}
+    });
     const collapsed = localStorage.getItem('sidebarCollapsed');
     if (collapsed === 'true') this.sidebarCollapsed.set(true);
   }
@@ -82,9 +133,7 @@ export class IndexCreditosComponent implements OnInit {
   cargarClientes() {
     this.clienteService.obtener_clientes().subscribe({
       next: (response) => {
-        if (response.clientes) {
-          this.clientes = response.clientes;
-        }
+        this.clientes = response.clientes || response.data || [];
       },
       error: (error) => {
         console.error('Error al cargar clientes:', error);
@@ -138,6 +187,11 @@ export class IndexCreditosComponent implements OnInit {
       list = list.filter(c => (c.fechaCredito || '').split('T')[0] <= this.filtros.fechaHasta);
     }
     return list;
+  }
+
+  /** Solo créditos con saldo pendiente > 0 (para pantalla principal) */
+  get creditosPendientes(): CreditoCliente[] {
+    return this.creditosFiltrados.filter(c => (c.saldoPendiente ?? 0) > 0);
   }
 
   buscar() {
@@ -240,6 +294,195 @@ export class IndexCreditosComponent implements OnInit {
     this.mostrarModalNuevoCredito = true;
   }
 
+  abrirModalNuevaCobranza() {
+    this.nuevaCobranza = {
+      numeroDoc: '',
+      fechaEmision: new Date().toISOString().split('T')[0],
+      idCliente: '',
+      nombreCliente: '',
+      direccion: '',
+      lineaAsignada: 0,
+      deudaTotal: 0,
+      aptoCreditos: '—',
+      importeCancelar: 0,
+      idMediosPago: this.mediosPago.length ? this.mediosPago[0].idMediosPago : null,
+      idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
+      observaciones: ''
+    };
+    this.detalleCobranza = [];
+    this.mostrarModalNuevaCobranza = true;
+  }
+
+  cerrarModalNuevaCobranza() {
+    this.mostrarModalNuevaCobranza = false;
+  }
+
+  abrirModalBuscarCliente() {
+    this.mostrarModalBuscarCliente = true;
+  }
+
+  cerrarModalBuscarCliente() {
+    this.mostrarModalBuscarCliente = false;
+  }
+
+  seleccionarClienteCobranza(cliente: any) {
+    const id = (cliente?.idCliente ?? cliente?.id)?.toString().trim() || '';
+    const nombre = (cliente?.rSocial ?? cliente?.r_Social ?? cliente?.nombre ?? '')?.toString().trim() || '';
+    this.nuevaCobranza.idCliente = id;
+    this.nuevaCobranza.nombreCliente = nombre;
+    this.cerrarModalBuscarCliente();
+    this.cargarDatosClienteCobranza(id);
+  }
+
+  cargarDatosClienteCobranza(idCliente: string) {
+    if (!idCliente) return;
+    this.clienteService.obtener_direccionesCliente_idCliente(idCliente).subscribe({
+      next: (r: any) => {
+        const dirs = r.data || r.direcciones || r || [];
+        const primera = Array.isArray(dirs) ? dirs[0] : dirs;
+        this.nuevaCobranza.direccion = (primera?.direccion ?? primera?.nombreDireccion ?? '') || '';
+      },
+      error: () => {}
+    });
+    this.clienteService.obtener_cliente_id(idCliente).subscribe({
+      next: (r: any) => {
+        const raw = r.data ?? r;
+        const cliente = Array.isArray(raw) ? raw[0] : raw;
+        const linea = cliente?.lineaCredito != null && !isNaN(Number(cliente.lineaCredito)) ? Number(cliente.lineaCredito) : 0;
+        this.nuevaCobranza.lineaAsignada = linea;
+      },
+      error: () => { this.nuevaCobranza.lineaAsignada = 0; }
+    });
+    this.creditosService.obtenerCreditosCliente(idCliente).subscribe({
+      next: (res) => {
+        const list = res.data || [];
+        const pendientes = list.filter((c: any) => (c.saldoPendiente ?? 0) > 0);
+        const deudaTotal = pendientes.reduce((sum: number, c: any) => sum + (c.saldoPendiente ?? 0), 0);
+        this.nuevaCobranza.deudaTotal = deudaTotal;
+        this.nuevaCobranza.aptoCreditos = list.length > 0 ? 'Sí' : '—';
+      },
+      error: () => {
+        this.nuevaCobranza.deudaTotal = 0;
+        this.nuevaCobranza.aptoCreditos = '—';
+      }
+    });
+  }
+
+  abrirModalBuscarComprobantes() {
+    if (!this.nuevaCobranza.idCliente) {
+      iziToast.warning({ title: 'Aviso', message: 'Seleccione primero un cliente.' });
+      return;
+    }
+    this.mostrarModalBuscarComprobantes = true;
+    this.loadingCreditosCliente = true;
+    this.creditosService.obtenerCreditosCliente(this.nuevaCobranza.idCliente).subscribe({
+      next: (res) => {
+        const list = (res.data || []).filter((c: any) => (c.saldoPendiente ?? 0) > 0);
+        this.creditosClienteParaSelector = list;
+        this.loadingCreditosCliente = false;
+      },
+      error: () => {
+        this.creditosClienteParaSelector = [];
+        this.loadingCreditosCliente = false;
+      }
+    });
+  }
+
+  cerrarModalBuscarComprobantes() {
+    this.mostrarModalBuscarComprobantes = false;
+  }
+
+  agregarComprobanteADetalle(c: any) {
+    const yaAgregado = this.detalleCobranza.some(d => d.idCredito === c.idCredito);
+    if (yaAgregado) {
+      iziToast.info({ title: 'Aviso', message: 'Este comprobante ya está en el detalle.' });
+      return;
+    }
+    this.detalleCobranza.push({
+      idCredito: c.idCredito,
+      comprobante: c.comprobante || ('Venta ' + (c.idVenta || '')),
+      fechaVenta: c.fechaCredito || '',
+      totalComprobante: c.montoTotal ?? 0,
+      fechaVencimiento: c.proximaCuota || '',
+      importePagado: c.saldoPendiente ?? 0,
+      saldoPendiente: c.saldoPendiente ?? 0
+    });
+  }
+
+  quitarDetalleCobranza(index: number) {
+    this.detalleCobranza.splice(index, 1);
+  }
+
+  get totalDetalleCobranza(): number {
+    return this.detalleCobranza.reduce((sum, d) => sum + d.importePagado, 0);
+  }
+
+  guardarCobranza() {
+    if (!this.nuevaCobranza.idCliente) {
+      iziToast.warning({ title: 'Aviso', message: 'Seleccione un cliente.' });
+      return;
+    }
+    const itemsConImporte = this.detalleCobranza.filter(d => Number(d.importePagado) > 0);
+    if (itemsConImporte.length === 0) {
+      iziToast.warning({ title: 'Aviso', message: 'Agregue comprobantes al detalle e ingrese importes a pagar en cada fila.' });
+      return;
+    }
+    if (this.nuevaCobranza.idMediosPago == null && this.mediosPago.length > 0) {
+      iziToast.warning({ title: 'Aviso', message: 'Seleccione la forma de pago.' });
+      return;
+    }
+    this.loading = true;
+    const payloadBase = {
+      idMediosPago: this.nuevaCobranza.idMediosPago ?? undefined,
+      idApertura: this.nuevaCobranza.idApertura || undefined,
+      observaciones: this.nuevaCobranza.observaciones || undefined
+    };
+    from(itemsConImporte).pipe(
+      concatMap((item: DetalleCobranzaItem) =>
+        this.creditosService.obtenerCuotasCredito(item.idCredito).pipe(
+          switchMap((res: any) => {
+            const cuotas: CuotaCredito[] = res.data || [];
+            const pendiente = cuotas.find((cu: CuotaCredito) => cu.estado === 'PENDIENTE' || cu.estado === 'VENCIDO');
+            if (!pendiente) {
+              return throwError(() => new Error('No hay cuota pendiente para ' + (item.comprobante || item.idCredito)));
+            }
+            const monto = Number(item.importePagado) || 0;
+            if (monto <= 0) return of(null);
+            return this.creditosService.pagarCuota({
+              idCuota: pendiente.idCuota,
+              montoPagado: monto,
+              ...payloadBase
+            }).pipe(
+              map(() => ({ item, comprobante: '' })),
+              catchError((err) => throwError(() => err))
+            );
+          }),
+          catchError((err) => throwError(() => err))
+        )
+      )
+    ).subscribe({
+      next: () => {},
+      error: (err) => {
+        this.loading = false;
+        console.error('Error al guardar cobranza:', err);
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || err?.message || 'Error al registrar el pago de la cobranza.'
+        });
+      },
+      complete: () => {
+        this.loading = false;
+        iziToast.success({
+          title: 'Éxito',
+          message: 'Cobranza registrada. Los pagos se aplicaron a las cuotas pendientes y, si hay caja abierta, al Recibo de Ingreso.'
+        });
+        this.cerrarModalNuevaCobranza();
+        this.cargarCreditos();
+        this.cargarResumenCreditos();
+      }
+    });
+  }
+
   abrirModalPagarCuota(cuota: CuotaCredito) {
     if (cuota.estado === 'PAGADO') {
       iziToast.warning({
@@ -251,8 +494,10 @@ export class IndexCreditosComponent implements OnInit {
 
     this.pagoCuota = {
       idCuota: cuota.idCuota,
-      montoPagado: cuota.saldoPendiente,
+      montoPagado: cuota.saldoPendiente ?? 0,
       formaPago: '',
+      idMediosPago: this.mediosPago.length ? this.mediosPago[0].idMediosPago : null,
+      idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
       referencia: '',
       observaciones: ''
     };
@@ -298,25 +543,36 @@ export class IndexCreditosComponent implements OnInit {
   }
 
   pagarCuota() {
-    if (!this.pagoCuota.formaPago || this.pagoCuota.montoPagado <= 0) {
+    if (this.pagoCuota.montoPagado <= 0) {
       iziToast.warning({
         title: 'Advertencia',
-        message: 'Complete todos los campos requeridos'
+        message: 'Ingrese el monto a pagar'
       });
       return;
     }
 
     this.loading = true;
-    this.creditosService.pagarCuota(this.pagoCuota).subscribe({
+    const payload: any = {
+      idCuota: this.pagoCuota.idCuota,
+      montoPagado: this.pagoCuota.montoPagado,
+      formaPago: this.pagoCuota.formaPago,
+      referencia: this.pagoCuota.referencia,
+      observaciones: this.pagoCuota.observaciones
+    };
+    if (this.pagoCuota.idMediosPago != null) payload.idMediosPago = this.pagoCuota.idMediosPago;
+    if (this.pagoCuota.idApertura) payload.idApertura = this.pagoCuota.idApertura;
+
+    this.creditosService.pagarCuota(payload).subscribe({
       next: (response) => {
-        iziToast.success({
-          title: 'Éxito',
-          message: 'Pago registrado correctamente'
-        });
+        const comprobante = (response?.data?.numeroRecibo || '').toString().trim();
+        const msg = comprobante
+          ? 'Pago registrado. Comprobante de cobranza: Recibo de Ingreso ' + comprobante + '. El monto se refleja en el arqueo de caja.'
+          : 'Pago registrado correctamente.';
+        iziToast.success({ title: 'Éxito', message: msg });
         this.cerrarModales();
         if (this.creditoSeleccionado) {
           this.creditosService.obtenerCuotasCredito(this.creditoSeleccionado.idCredito).subscribe({
-            next: (response) => { this.cuotas = response.data || []; }
+            next: (resp) => { this.cuotas = resp.data || []; }
           });
         }
         this.cargarCreditos();
@@ -350,8 +606,9 @@ export class IndexCreditosComponent implements OnInit {
     this.cargarCreditos();
   }
 
-  getClienteNombre(idCliente: string): string {
-    const cliente = this.clientes.find(c => c.idCliente === idCliente);
+  getClienteNombre(idCliente: string | number): string {
+    const id = idCliente != null ? String(idCliente) : '';
+    const cliente = this.clientes.find(c => String(c.idCliente) === id);
     return cliente ? cliente.rSocial || `${cliente.nombre} ${cliente.apellido || ''}`.trim() : 'Cliente no encontrado';
   }
 

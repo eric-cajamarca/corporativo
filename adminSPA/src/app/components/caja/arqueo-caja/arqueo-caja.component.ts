@@ -37,8 +37,21 @@ export class ArqueoCajaComponent implements OnInit {
   /** Resumen por concepto (dinámico desde API: APERTURA_CAJA, VENTA_CONTADO, etc.) */
   public resumenConceptos: FilaArqueoConcepto[] = [];
 
+  /** Total ventas al crédito del período (informativo, no efectivo en caja). */
+  public ventasCreditoImporte: number = 0;
+
+  /** Total cobro de créditos del período (desde PagosCuotas/CuotasCredito.fechaPago, consultado en backend). */
+  public cobroCreditosImporte: number = 0;
+
   public movimientosIngresos: { formaPago: string; importe: number }[] = [];
   public movimientosEgresos: { formaPago: string; importe: number }[] = [];
+
+  /** Filas crudas del arqueo (concepto, tipo, formaPago, importe) para el detalle por forma de pago. */
+  public filasArqueoRaw: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[] = [];
+
+  /** Detalle por forma de pago (modal Movimientos Ingresos/Egresos). */
+  public detalleFormaPago: { formaPago: string; tipo: 'I' | 'E'; items: { concepto: string; importe: number }[] } | null = null;
+  public mostrarModalDetalleFormaPago = false;
 
   public totalIngresos: number = 0;
   public totalEgresos: number = 0;
@@ -62,9 +75,17 @@ export class ArqueoCajaComponent implements OnInit {
     private cajaService: CajaService
   ) {}
 
+  /** Fecha en zona local YYYY-MM-DD (evita que al recargar aparezca un día adelantado por UTC). */
+  private static fechaLocalHoy(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   ngOnInit(): void {
-    const hoy = new Date();
-    this.fecha = hoy.toISOString().split('T')[0];
+    this.fecha = ArqueoCajaComponent.fechaLocalHoy();
     this.cargarCajas();
   }
 
@@ -108,8 +129,11 @@ export class ArqueoCajaComponent implements OnInit {
 
     this.loading = true;
     this.resumenConceptos = [];
+    this.ventasCreditoImporte = 0;
+    this.cobroCreditosImporte = 0;
     this.movimientosIngresos = [];
     this.movimientosEgresos = [];
+    this.filasArqueoRaw = [];
     this.totalIngresos = 0;
     this.totalEgresos = 0;
 
@@ -129,7 +153,8 @@ export class ArqueoCajaComponent implements OnInit {
         filas.forEach((r: any) => {
           const concepto = r.concepto || 'Sin especificar';
           const tipo = (r.tipoOperacion || 'I') === 'I' ? 'I' : 'E';
-          const formaPago = r.formaPago || 'Sin especificar';
+          const formaPagoRaw = r.formaPago || 'Sin especificar';
+          const formaPago = this.normalizarFormaPago(formaPagoRaw);
           const importe = Number(r.importe || 0);
 
           const keyConcepto = `${concepto}|${tipo}`;
@@ -156,11 +181,19 @@ export class ArqueoCajaComponent implements OnInit {
           })
           .sort((a, b) => (a.tipoOperacion === 'I' ? 0 : 1) - (b.tipoOperacion === 'I' ? 0 : 1));
 
+        this.filasArqueoRaw = filas.map((r: any) => ({
+          concepto: (r.concepto || 'Sin especificar').replace(/_/g, ' '),
+          tipoOperacion: (r.tipoOperacion || 'I') === 'I' ? 'I' : 'E',
+          formaPago: this.normalizarFormaPago(r.formaPago || 'Sin especificar'),
+          importe: Number(r.importe || 0)
+        }));
         this.movimientosIngresos = Array.from(ingresosMap.entries()).map(([formaPago, importe]) => ({ formaPago, importe }));
         this.movimientosEgresos = Array.from(egresosMap.entries()).map(([formaPago, importe]) => ({ formaPago, importe }));
 
         this.totalIngresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'I').reduce((acc, c) => acc + c.importe, 0);
         this.totalEgresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'E').reduce((acc, c) => acc + Math.abs(c.importe), 0);
+        this.ventasCreditoImporte = Number((response as any).ventasCredito?.importe) || 0;
+        this.cobroCreditosImporte = Number((response as any).cobroCreditos?.importe) || 0;
         this.loading = false;
       },
       error: (error) => {
@@ -178,41 +211,66 @@ export class ArqueoCajaComponent implements OnInit {
     return this.resumenConceptos.reduce((acc, f) => acc + f.importe, 0);
   }
 
-  /** Filas del primer recuadro: siempre estos 5 conceptos con su importe (0 si no hay). */
+  /** Filas del primer recuadro: conceptos con su importe. Incluye total ventas al crédito, cobro de créditos y pago a proveedores. */
   get filasPrimeraTabla(): { clave: string; etiqueta: string; importe: number; icono: string; tipo: string }[] {
     const ventaContado = this.importePorConcepto('VENTA CONTADO');
-    const cobroCreditos = this.importePorConcepto('PAGO CUOTA');
-    const pagoCreditos = this.importePorConceptoEgreso('COMPRA CONTADO'); // Pago de créditos / compras a proveedor
     return [
-      { clave: 'VENTA_CONTADO', etiqueta: 'VENTA CONTADO', importe: ventaContado, icono: 'fas fa-shopping-cart', tipo: 'VENTA' },
-      { clave: 'PAGO_CUOTA', etiqueta: 'Cobro de Créditos', importe: cobroCreditos, icono: 'fas fa-hand-holding-usd', tipo: 'COBRO' },
+      { clave: 'VENTA_CONTADO', etiqueta: 'Venta contado', importe: ventaContado, icono: 'fas fa-shopping-cart', tipo: 'VENTA' },
+      { clave: 'VENTA_CREDITO', etiqueta: 'Total ventas al crédito (por cobrar)', importe: this.totalVentasCredito, icono: 'fas fa-credit-card', tipo: 'INFO' },
+      { clave: 'PAGO_CUOTA', etiqueta: 'Total cobro de créditos', importe: this.totalCobroCreditos, icono: 'fas fa-hand-holding-usd', tipo: 'COBRO' },
       { clave: 'INGRESOS', etiqueta: 'Ingresos', importe: this.totalIngresos, icono: 'fas fa-arrow-down', tipo: 'I' },
       { clave: 'EGRESOS', etiqueta: 'Egresos', importe: -this.totalEgresos, icono: 'fas fa-arrow-up', tipo: 'E' },
-      { clave: 'PAGO_CREDITOS', etiqueta: 'Pago de Créditos', importe: -pagoCreditos, icono: 'fas fa-file-invoice-dollar', tipo: 'PAGO_CREDITO' }
+      { clave: 'PAGO_CREDITOS', etiqueta: 'Total pago de créditos a proveedores', importe: -this.totalPagoCreditosProveedores, icono: 'fas fa-file-invoice-dollar', tipo: 'PAGO_CREDITO' }
     ];
   }
 
   private importePorConcepto(conceptoConEspacios: string): number {
-    const f = this.resumenConceptos.find(c => c.concepto === conceptoConEspacios && c.tipoOperacion === 'I');
+    const f = this.resumenConceptos.find(c => c.tipoOperacion === 'I' && this.normConcepto(c.concepto) === this.normConcepto(conceptoConEspacios));
     return f ? f.importe : 0;
   }
 
   private importePorConceptoEgreso(conceptoConEspacios: string): number {
-    const f = this.resumenConceptos.find(c => c.concepto === conceptoConEspacios && c.tipoOperacion === 'E');
+    const f = this.resumenConceptos.find(c => c.tipoOperacion === 'E' && this.normConcepto(c.concepto) === this.normConcepto(conceptoConEspacios));
     return f ? Math.abs(f.importe) : 0;
+  }
+
+  /** Total ventas al crédito (por cobrar, informativo). */
+  get totalVentasCredito(): number {
+    return this.ventasCreditoImporte;
+  }
+
+  /** Total cobro de créditos (desde tabla PagosCuotas por fechaPago en el período). */
+  get totalCobroCreditos(): number {
+    return this.cobroCreditosImporte;
+  }
+
+  /** Total pago de créditos a proveedores (egresos compras / pago proveedores). */
+  get totalPagoCreditosProveedores(): number {
+    const compra = this.importePorConceptoEgreso('COMPRA CONTADO');
+    const pagoProv = this.importePorConceptoEgreso('PAGO PROVEEDORES');
+    return compra + pagoProv;
   }
 
   detalleConcepto: { concepto: string; items: FilaArqueoConcepto[] } | null = null;
   mostrarModalDetalle = false;
 
+  private normConcepto(s: string): string {
+    return (s || '').toUpperCase().replace(/_/g, ' ').trim();
+  }
+
   verDetalleFila(fila: { clave: string; etiqueta: string; tipo: string }): void {
     let items: FilaArqueoConcepto[] = [];
     switch (fila.clave) {
       case 'VENTA_CONTADO':
-        items = this.resumenConceptos.filter(c => c.concepto === 'VENTA CONTADO');
+        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I' && this.normConcepto(c.concepto) === 'VENTA CONTADO');
+        break;
+      case 'VENTA_CREDITO':
+        if (this.ventasCreditoImporte > 0) {
+          items = [{ concepto: 'Ventas al crédito (por cobrar)', tipoOperacion: 'I', importe: this.ventasCreditoImporte, icono: 'fas fa-credit-card' }];
+        }
         break;
       case 'PAGO_CUOTA':
-        items = this.resumenConceptos.filter(c => c.concepto === 'PAGO CUOTA');
+        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I' && this.normConcepto(c.concepto) === 'PAGO CUOTA');
         break;
       case 'INGRESOS':
         items = this.resumenConceptos.filter(c => c.tipoOperacion === 'I');
@@ -221,7 +279,7 @@ export class ArqueoCajaComponent implements OnInit {
         items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E');
         break;
       case 'PAGO_CREDITOS':
-        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E' && c.concepto === 'COMPRA CONTADO');
+        items = this.resumenConceptos.filter(c => c.tipoOperacion === 'E' && (this.normConcepto(c.concepto) === 'COMPRA CONTADO' || this.normConcepto(c.concepto) === 'PAGO PROVEEDORES'));
         break;
       default:
         items = [];
@@ -251,6 +309,35 @@ export class ArqueoCajaComponent implements OnInit {
 
   formatCurrency(valor: number): string {
     return (valor || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /**
+   * Unifica formas de pago equivalentes (EFECTIVO, Efectivo, CONTADO, Contado) en una sola etiqueta
+   * para que no aparezcan duplicadas en Movimientos de Ingresos/Egresos (vienen de FormasPago y MediosPago).
+   */
+  private normalizarFormaPago(formaPago: string): string {
+    const t = (formaPago || '').trim().toUpperCase();
+    if (t === 'CONTADO' || t === 'EFECTIVO') return 'Efectivo';
+    return (formaPago || '').trim() || 'Sin especificar';
+  }
+
+  /** Abre el modal de detalle por forma de pago (ingresos o egresos). */
+  verDetalleFormaPago(formaPago: string, tipo: 'I' | 'E'): void {
+    const items = this.filasArqueoRaw
+      .filter(f => f.formaPago === formaPago && f.tipoOperacion === tipo)
+      .map(f => ({ concepto: f.concepto, importe: tipo === 'E' ? -f.importe : f.importe }));
+    this.detalleFormaPago = { formaPago, tipo, items };
+    this.mostrarModalDetalleFormaPago = true;
+  }
+
+  cerrarModalDetalleFormaPago(): void {
+    this.mostrarModalDetalleFormaPago = false;
+    this.detalleFormaPago = null;
+  }
+
+  subtotalDetalleFormaPago(): number {
+    if (!this.detalleFormaPago || !this.detalleFormaPago.items.length) return 0;
+    return this.detalleFormaPago.items.reduce((acc, item) => acc + item.importe, 0);
   }
 }
 

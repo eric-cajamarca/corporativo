@@ -16,7 +16,7 @@
           <div class="input-group input-group-sm" style="width: 200px;">
             <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="filtros.buscar" (keyup.enter)="buscar()">
             <button class="btn btn-outline-light" type="button" (click)="buscar()">
-              <i class="fas fa-search"></i>
+              <i class="bi bi-search"></i>
             </button>
           </div>
           <span class="text-white-50 small">{{ list.length }}</span>
@@ -47,16 +47,16 @@
               <tr *ngFor="let item of list">
                 <td>
                   <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar / Registrar pago">
-                    <i class="fas fa-pencil-alt"></i>
+                    <i class="bi bi-pencil"></i>
                   </button>
                   <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar">
-                    <i class="fas fa-trash"></i>
+                    <i class="bi bi-trash"></i>
                   </button>
                   <button class="btn btn-sm btn-outline-info me-1" (click)="ver(item)" title="Ver">
-                    <i class="fas fa-search"></i>
+                    <i class="bi bi-search"></i>
                   </button>
                   <button class="btn btn-sm btn-outline-warning" (click)="imprimir(item)" title="Imprimir">
-                    <i class="fas fa-print"></i>
+                    <i class="bi bi-printer"></i>
                   </button>
                 </td>
                 <td>{{ formatFecha(item.fecha) }}</td>

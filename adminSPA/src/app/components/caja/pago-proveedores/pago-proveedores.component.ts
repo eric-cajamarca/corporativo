@@ -379,8 +379,12 @@ export class PagoProveedoresComponent implements OnInit {
       idMediosPago: this.form.idMediosPago ?? undefined,
       observaciones: observaciones || undefined
     }).subscribe({
-      next: () => {
-        iziToast.success({ title: 'Éxito', message: 'Recibo de pago registrado en caja.' });
+      next: (data: any) => {
+        const comprobante = (data?.documentoRelacionado || '').toString().trim() || 'N/A';
+        iziToast.success({
+          title: 'Éxito',
+          message: 'Pago registrado. Comprobante: Recibo de Egreso ' + comprobante + '. El monto se refleja en el arqueo de caja.'
+        });
         this.cerrarForm();
         this.cargarLista();
         this.cargarDatos();

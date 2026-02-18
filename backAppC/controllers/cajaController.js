@@ -464,13 +464,17 @@ const obtenerArqueoDinamico = async (req, res) => {
     if (!idEmpresa) {
       return res.status(403).send({ message: "No autorizado: falta empresa", data: undefined });
     }
-    const data = await CajaServices.obtenerArqueoDinamicoService(pool, req.user, {
+    const result = await CajaServices.obtenerArqueoDinamicoService(pool, req.user, {
       fecha: fecha || undefined,
       fechaInicial: fechaInicial || undefined,
       fechaFinal: fechaFinal || undefined,
       idCaja: idCaja || "TODAS"
     });
-    res.status(200).send({ data });
+    res.status(200).send({
+      data: result.movimientos || [],
+      ventasCredito: result.ventasCredito || { concepto: 'VENTA CREDITO', importe: 0 },
+      cobroCreditos: result.cobroCreditos || { concepto: 'COBRO CREDITOS', importe: 0 }
+    });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });

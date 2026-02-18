@@ -9,6 +9,8 @@ router.use(auth);
 router.use(querySafeMiddleware);
 
 // Rutas para gestión de créditos
+router.get('/todos', creditosController.obtenerCreditosClienteTodos);  // GET /api/creditos/todos = listar todos
+router.get('/cliente', creditosController.obtenerCreditosClienteTodos);
 router.get('/cliente/:idCliente', creditosController.obtenerCreditosCliente);
 router.post('/', creditosController.crearCredito);
 

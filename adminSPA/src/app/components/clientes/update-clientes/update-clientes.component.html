@@ -1,452 +1,199 @@
-<app-topnav></app-topnav>
-<div class="container">
-    <div class="card">
-        <div class="card-header">
-
-            <!-- Title -->
-            <h4 class="card-header-title">
-                Ventana de edición de un registro
-            </h4>
-
-        </div>
-
-        <div class="card-body">
-            <div class="form-group row" style="margin-bottom: 20px;">
-                <label class="col-xl-3 col-lg-3 col-form-label">Tipo de documento</label>
-                <div class="col-lg-9 col-xl-9">
-                    <select required name="idDocumento" [(ngModel)]="clientes.idDocumento" class="form-control">
-                        <option value="" selected disabled>Seleccionar documento...</option>
-                        <option *ngFor="let item of documento" [value]="item.idDocumento">{{ item.nombre }}
-                        </option>
-                    </select>
-                </div>
-            </div>
-
-            <div *ngIf="clientes.idDocumento == 6" class="input-group input-group-merge">
-                <input type="text" class="form-control form-control-appended" placeholder="ingrese el número de RUC"
-                    name="ruc" [(ngModel)]="clientes.ruc">
-                <div class="input-group-append">
-                    <button class="btn btn-primary" (click)="buscar()">
-                        Buscar
-                    </button>
-                </div>
-            </div>
-            <div *ngIf="clientes.idDocumento == 1" class="input-group input-group-merge">
-                <input type="text" class="form-control form-control-appended" placeholder="ingrese el número de DNI"
-                    name="ruc" [(ngModel)]="clientes.ruc">
-                <div class="input-group-append">
-                    <button class="btn btn-primary" (click)="buscar()">
-                        Buscar
-                    </button>
-                </div>
-            </div>
-        </div>
+<app-topnav *ngIf="!modoModal"></app-topnav>
+<div class="container" [class.p-0]="modoModal">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center" [class.bg-primary]="modoModal" [class.text-white]="modoModal">
+      <h4 class="card-header-title mb-0">Edición de cliente</h4>
+      <button *ngIf="modoModal" type="button" class="btn btn-light btn-sm" (click)="cerrarModal()">
+        <i class="bi bi-x-lg me-1"></i>Cerrar
+      </button>
     </div>
 
-    <form id="kt_form" #registroForm="ngForm" (ngSubmit)="registrar(registroForm)">
-        <!-- Card -->
+    <div class="card-body">
+      <!-- Datos del cliente: siempre visibles (RUC o DNI) -->
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Tipo de documento</label>
+          <select name="idDocumento" [(ngModel)]="clientes.idDocumento" class="form-select">
+            <option value="" disabled>Seleccionar...</option>
+            <option *ngFor="let item of documento" [value]="item.idDocumento">{{ item.nombre }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Número (RUC / DNI)</label>
+          <div class="input-group">
+            <input type="text" class="form-control" name="ruc" [(ngModel)]="clientes.ruc"
+              placeholder="RUC o DNI">
+            <button type="button" class="btn btn-primary" (click)="buscar()">Buscar</button>
+          </div>
+        </div>
+      </div>
 
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Razón Social / Nombre</label>
+          <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
+            placeholder="Razón social o nombre">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" name="correo" [(ngModel)]="clientes.correo"
+            placeholder="Opcional">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Teléfono</label>
+          <input type="tel" class="form-control" name="celular" [(ngModel)]="clientes.celular"
+            placeholder="Opcional">
+        </div>
+      </div>
 
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <div class="form-check mt-4">
+            <input type="checkbox" class="form-check-input" id="sujetoCredito" name="sujetoCredito"
+              [(ngModel)]="clientes.sujetoCredito">
+            <label class="form-check-label" for="sujetoCredito">Sujeto a crédito</label>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Línea de crédito (S/)</label>
+          <input type="number" class="form-control" name="lineaCredito" [(ngModel)]="clientes.lineaCredito"
+            placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <button type="button" class="btn btn-primary" (click)="actualizarCliente()" [disabled]="!clientes.idCliente">
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-        <ng-container *ngIf="clientes.idDocumento == 6">
-            <div class="card" style="margin-bottom: 20px;">
-
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="rSocial" class="form-label">Razón Social</label>
-                        <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
-                            placeholder="Ingrese la razón social">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <input type="email" class="form-control" name="correo" [(ngModel)]="clientes.correo"
-                            placeholder="Ingrese el email (opcional)">
-                    </div>
-                    <div class="mb-3">
-                        <label for="celular" class="form-label">Teléfono</label>
-                        <input type="tel" class="form-control" name="celular" [(ngModel)]="clientes.celular"
-                            placeholder="Ingrese el teléfono (opcional)">
-                    </div>
-
-                </div>
-
-                <div style="margin-bottom: 20px; margin-left: 15px;"> 
-                    <button *ngIf="!btn_registrar" type="submit" class="btn btn-success">Registrar</button>
-        
-                    <button *ngIf="btn_registrar" type="button" class="btn btn-success font-weight-bolder px-9 py-4" disabled>
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Registrando...
-                    </button>
-                </div>
-            </div>
-            
-            <!-- <ng-container *ngIf="direccionClientes === undefined">
-                <div class="card">
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" name="mostrarDireccion" [(ngModel)]="mostrarDireccion"
-                                (change)="onCheckboxChange()"> Registrar dirección
-                        </label>
-                    </div>
-                </div>
-
-            </ng-container> -->
-
-            
-        </ng-container>
-
-        <!-- <ng-container *ngIf="clientes.idDocumento == 1">
-            <div class="card" style="margin-bottom: 20px;">
-
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="rSocial" class="form-label">Razón Social</label>
-                        <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
-                            placeholder="Ingrese la razón social">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <input type="email" class="form-control" name="correo" [(ngModel)]="clientes.correo"
-                            placeholder="Ingrese el email (opcional)">
-                    </div>
-                    <div class="mb-3">
-                        <label for="celular" class="form-label">Teléfono</label>
-                        <input type="tel" class="form-control" name="celular" [(ngModel)]="clientes.celular"
-                            placeholder="Ingrese el teléfono (opcional)">
-                    </div>
-
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="mostrarDireccion" [(ngModel)]="mostrarDireccion"
-                        (change)="onCheckboxChange()"> Registrar dirección
-                </label>
-            </div>
-
-            <ng-container *ngIf="mostrarDireccion">
-                <div class="card">
-                    <div class="card-header">
-
-                        
-                        <h4 class="card-header-title">
-                            Registrar dirección
-                        </h4>
-
-                    </div>
-
-                    <div class="card-body">
-                        <ng-container>
-                            
-
-                            <div class="col-sm-6 form-group">
-                                <label for="ac-fn">Región (opcional)</label>
-                                <select id="sl-region" name="region" [(ngModel)]="direccionClientes.region"
-                                    class="form-control" (change)="select_region()">
-                                    <option value="" selected disabled>Seleccionar</option>
-                                    <option value="{{item.id}}" *ngFor="let item of regiones">{{item.name}}</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-6 form-group">
-                                <label for="ac-fn">Provincia (opcional)</label>
-                                <select id="sl-provincia" name="provincia" [(ngModel)]="direccionClientes.provincia"
-                                    class="form-control" disabled (change)="select_provincia()">
-                                    <option value="" selected disabled>Seleccionar</option>
-                                    <option value="{{item.id}}" *ngFor="let item of provincias">{{item.name}}</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-6 form-group">
-                                <label for="ac-fn">Distrito (opcional)</label>
-                                <select id="sl-distrito" name="distrito" [(ngModel)]="direccionClientes.distrito"
-                                    class="form-control" disabled (change)="select_distrito($event)">
-                                    <option value="" selected disabled>Seleccionar</option>
-                                    <option value="{{item.id}}" *ngFor="let item of distritos">{{item.name}}</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="ubigeo" class="form-label">Ubigeo</label>
-                                <input type="text" class="form-control" name="ubigeo"
-                                    [(ngModel)]="direccionClientes.ubigeo" placeholder="Ingrese el ubigeo (opcional)">
-                            </div>
-                        </ng-container>
-
-                        <div class="mb-3">
-                            <label for="direccion" class="form-label">Dirección</label>
-                            <input type="text" class="form-control" name="direccion"
-                                [(ngModel)]="direccionClientes.direccion" placeholder="Ingrese la dirección (opcional)">
-                        </div>
-                        <div class="mb-3">
-                            <label for="referencia" class="form-label">Referencia</label>
-                            <input type="text" class="form-control" name="referencia"
-                                [(ngModel)]="direccionClientes.referencia"
-                                placeholder="Ingrese la referencia (opcional)">
-                        </div>
-
-
-                    </div>
-                </div>
-            </ng-container>
-
-
-        </ng-container> -->
-
-
-
-        <!-- <div>
-            <button *ngIf="!btn_registrar" type="submit" class="btn btn-success">Registrar</button>
-
-            <button *ngIf="btn_registrar" type="button" class="btn btn-success font-weight-bolder px-9 py-4" disabled>
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                Registrando...
+  <!-- Direcciones: encabezado con botón Crear dirección + tabla con Editar -->
+  <div class="card mt-3" *ngIf="clientes.idCliente">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="card-header-title mb-0"><i class="bi bi-geo-alt me-2"></i>Direcciones</h5>
+      <button type="button" class="btn btn-sm btn-success" (click)="mostrarFormNuevaDireccion = !mostrarFormNuevaDireccion">
+        <i class="bi bi-plus-lg me-1"></i>Crear dirección
+      </button>
+    </div>
+    <div class="card-body">
+      <!-- Formulario nueva dirección (se muestra al hacer clic en Crear dirección) -->
+      <div class="border rounded p-3 mb-3" *ngIf="mostrarFormNuevaDireccion">
+        <h6 class="mb-3">Nueva dirección</h6>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label">Dirección <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="nuevaDireccion.direccion" name="nuevaDireccion"
+              placeholder="Ej: Av. Principal 123">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Ubigeo</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevaDireccion.ubigeo" name="nuevaUbigeo" placeholder="Opcional">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Referencia</label>
+            <input type="text" class="form-control" [(ngModel)]="nuevaDireccion.referencia" name="nuevaReferencia" placeholder="Opcional">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-primary me-2" (click)="guardarNuevaDireccion()"
+              [disabled]="guardandoDireccion || !nuevaDireccion.direccion?.trim()">
+              <span *ngIf="!guardandoDireccion"><i class="bi bi-check-lg me-1"></i>Guardar</span>
+              <span *ngIf="guardandoDireccion" class="spinner-border spinner-border-sm"></span>
             </button>
-        </div> -->
-
-        <!-- <button type="submit" class="btn btn-primary" style="margin-top: 20px; margin-bottom: 20px;">Crear Cliente</button> -->
-    </form>
-
-
-    <!-- Si el cliente no tiene direcciones: formulario para registrar una -->
-    <ng-container *ngIf="clientes.idCliente && (direccionClientes_const?.length === 0)">
-        <div class="card mb-3">
-            <div class="card-header">
-                <h5 class="card-header-title mb-0"><i class="bi bi-geo-alt"></i> Registrar dirección del cliente</h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small">El cliente no tiene direcciones. Registre al menos una (tabla DireccionClientes).</p>
-                <div class="row g-2">
-                    <div class="col-12">
-                        <label for="nuevaDireccion" class="form-label">Dirección <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="nuevaDireccion" [(ngModel)]="nuevaDireccion.direccion" name="nuevaDireccion" placeholder="Ej: Av. Principal 123">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="nuevaUbigeo" class="form-label">Ubigeo</label>
-                        <input type="text" class="form-control" id="nuevaUbigeo" [(ngModel)]="nuevaDireccion.ubigeo" name="nuevaUbigeo" placeholder="Opcional">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="nuevaReferencia" class="form-label">Referencia</label>
-                        <input type="text" class="form-control" id="nuevaReferencia" [(ngModel)]="nuevaDireccion.referencia" name="nuevaReferencia" placeholder="Opcional">
-                    </div>
-                    <div class="col-12 mt-2">
-                        <button type="button" class="btn btn-primary" (click)="guardarNuevaDireccion()" [disabled]="guardandoDireccion || !nuevaDireccion.direccion?.trim()">
-                            <span *ngIf="!guardandoDireccion"><i class="bi bi-check-lg"></i> Registrar dirección</span>
-                            <span *ngIf="guardandoDireccion" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <button type="button" class="btn btn-outline-secondary" (click)="mostrarFormNuevaDireccion = false">Cancelar</button>
+          </div>
         </div>
-    </ng-container>
+      </div>
 
-    <ng-container *ngIf="(direccionClientes_const ?? []).length > 0">
-        <h5 class="mb-3">Direcciones del cliente</h5>
-        <div *ngFor="let item of direccionClientes_const">
-            <div class="card">
-                <div class="card-header">
+      <!-- Tabla de direcciones -->
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered">
+          <thead class="table-light">
+            <tr>
+              <th>Ubigeo</th>
+              <th>Dirección</th>
+              <th>Referencia</th>
+              <th>Región</th>
+              <th>Provincia</th>
+              <th>Distrito</th>
+              <th class="text-center">Principal</th>
+              <th class="text-center" style="width: 100px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of direccionClientes_const">
+              <td>{{ item.ubigeo || '—' }}</td>
+              <td>{{ item.direccion || '—' }}</td>
+              <td>{{ item.referencia || '—' }}</td>
+              <td>{{ item.nregion || '—' }}</td>
+              <td>{{ item.nprovincia || '—' }}</td>
+              <td>{{ item.ndistrito || '—' }}</td>
+              <td class="text-center">
+                <span class="badge bg-success" *ngIf="item.principal">Sí</span>
+                <span class="badge bg-secondary" *ngIf="!item.principal">No</span>
+              </td>
+              <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                  data-bs-toggle="modal" [attr.data-bs-target]="'#editar-direccion-' + item.idDireccionClientes"
+                  (click)="editarDireccion(item.idDireccionClientes)">
+                  <i class="bi bi-pencil"></i> Editar dirección
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="(direccionClientes_const?.length ?? 0) === 0">
+              <td colspan="8" class="text-center text-muted py-3">No hay direcciones. Use «Crear dirección» para agregar.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-                    <!-- Title -->
-                    <h6 class="card-header-title">
-                        {{item.ubigeo}} - {{item.direccion}}
-                    </h6>
-
-                </div>
-
-                <div class="card-body" style="background-color: rgb(235, 231, 231);">
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn"> <strong>Region: </strong> {{item.nregion}}
-                        </label><br>
-                        <label for="ac-fn"> <strong>Provincia: </strong>
-                            {{item.nprovincia}}</label><br>
-                        <label for="ac-fn"> <strong>Distrito: </strong> {{item.ndistrito}}
-                        </label>
-
-                    </div>
-                    <hr>
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn"> <strong>Urbanización: </strong>
-                            {{item.urbanizacion}} </label><br>
-                        <label for="ac-fn"> <strong>Dirección: </strong> {{item.direccion}}
-                        </label><br>
-                        <label for="ac-fn"> <strong>Referencia: </strong> {{item.referencia}}
-                        </label>
-
-                    </div>
-
-                    <hr />
-                    <span class="badge bg-success" *ngIf="item.principal">Principal</span>
-                    <span class="badge bg-danger" *ngIf="!item.principal">Establecer como
-                        principal</span>
-
-                    <div style="width: 30%; margin-top: 10px;">
-                        <!-- <button class="btn-warning" style="border-radius: 5px;"> Modificar dirección</button> -->
-                        <button class="btn-warning"
-                            style="border-radius: 5px; margin-right: 20px; margin-bottom: 10px;"
-                            data-bs-toggle="modal" [attr.data-bs-target]="'#editar-' + item.idDireccionClientes"
-                            (click)="editarDireccion(item.idDireccionClientes)">Modificar dirección</button>
-
-                        <!-- Modal de Actualizacion de la direccion-->
-                        <div class="modal fade" [attr.id]="'editar-' + item.idDireccionClientes" tabindex="-1"
-                            role="dialog" aria-labelledby="editarDireccionModalLabel" aria-hidden="true">
-                            <div class="modal-dialog" role="document">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="editarDireccionModalLabel">Editar dirección:
-                                            {{item.direccion}} </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                            aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-
-                                        <!-- direccionClientes -->
-                                        <ng-container>
-
-
-                                            <div class="col-sm-6 form-group">
-                                                <label for="ac-fn">Región (opcional)</label>
-                                                <select id="sl-region" name="region"
-                                                    [(ngModel)]="direccionClientes.region" class="form-control"
-                                                    (change)="select_region()">
-                                                    <option value="" selected disabled>Seleccionar</option>
-                                                    <option value="{{item.id}}" *ngFor="let item of regiones">
-                                                        {{item.name}}
-                                                    </option>
-                                                </select>
-                                            </div>
-                                            <div class="col-sm-6 form-group">
-                                                <label for="ac-fn">Provincia (opcional)</label>
-                                                <select id="sl-provincia" name="provincia"
-                                                    [(ngModel)]="direccionClientes.provincia"
-                                                    class="form-control" disabled (change)="select_provincia()">
-                                                    <option value="" selected disabled>Seleccionar</option>
-                                                    <option value="{{item.id}}" *ngFor="let item of provincias">
-                                                        {{item.name}}</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-sm-6 form-group">
-                                                <label for="ac-fn">Distrito (opcional)</label>
-                                                <select id="sl-distrito" name="distrito"
-                                                    [(ngModel)]="direccionClientes.distrito"
-                                                    class="form-control" disabled
-                                                    (change)="select_distrito($event)">
-                                                    <option value="" selected disabled>Seleccionar</option>
-                                                    <option value="{{item.id}}" *ngFor="let item of distritos">
-                                                        {{item.name}}
-                                                    </option>
-                                                </select>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="ubigeo" class="form-label">Ubigeo</label>
-                                                <input type="text" class="form-control" name="ubigeo"
-                                                    [(ngModel)]="direccionClientes.ubigeo"
-                                                    placeholder="Ingrese el ubigeo (opcional)">
-                                            </div>
-                                        </ng-container>
-
-                                        <div class="mb-3">
-                                            <label for="direccion" class="form-label">Dirección</label>
-                                            <input type="text" class="form-control" name="direccion"
-                                                [(ngModel)]="direccionClientes.direccion"
-                                                placeholder="Ingrese la dirección (opcional)">
-                                        </div>
-                                        <!-- <div class="mb-3">
-                                <label for="referencia" class="form-label">Referencia</label>
-                                <textarea type="text" class="form-control" name="referencia"
-                                    [(ngModel)]="direccionClientes.referencia"
-                                    placeholder="Ingrese la referencia (opcional)"></textarea>
-                            </div> -->
-
-
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary"
-                                            data-bs-dismiss="modal">Cerrar</button>
-                                        <button type="button" class="btn btn-primary"
-                                            (click)="actualizarDireccion()" data-bs-dismiss="modal">Guardar
-                                            cambios</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
-
-                    <!-- <ng-container *ngIf="direccionClientes.region === undefined">
-                        
-                    
-                        <div class="col-sm-6 form-group">
-                            <label for="ac-fn">Región <sup>*<sup></sup></sup></label>
-                            <select id="sl-region" name="region" [(ngModel)]="direccionClientes.region" class="form-control"
-                                (change)="select_region()">
-                                <option value="" selected disabled>Seleccionar</option>
-                                <option value="{{item.id}}" *ngFor="let item of regiones">{{item.name}}</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-6 form-group">
-                            <label for="ac-fn">Provincia <sup>*<sup></sup></sup></label>
-                            <select id="sl-provincia" name="provincia" [(ngModel)]="direccionClientes.provincia"
-                                class="form-control" disabled (change)="select_provincia()">
-                                <option value="" selected disabled>Seleccionar</option>
-                                <option value="{{item.id}}" *ngFor="let item of provincias">{{item.name}}</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-6 form-group">
-                            <label for="ac-fn">Distrito <sup>*<sup></sup></sup></label>
-                            <select id="sl-distrito" name="distrito" [(ngModel)]="direccionClientes.distrito"
-                                class="form-control" disabled (change)="select_distrito($event)">
-                                <option value="" selected disabled>Seleccionar</option>
-                                <option value="{{item.id}}" *ngFor="let item of distritos">{{item.name}}</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="ubigeo" class="form-label">Ubigeo</label>
-                            <input type="text" class="form-control" name="ubigeo" [(ngModel)]="direccionClientes.ubigeo"
-                                placeholder="Ingrese el ubigeo">
-                        </div>
-                    </ng-container>
-                    <ng-container *ngIf="direccionClientes.region !== undefined">
-                        <h6> Consulta a sunat realizada</h6>
-                       
-                        <div class="mb-3">
-                            <label for="region" class="form-label">Región</label>
-                            <input type="text" class="form-control" name="region" [(ngModel)]="direccionClientes.region">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="provincia" class="form-label">Provincia</label>
-                            <input type="text" class="form-control" name="provincia" [(ngModel)]="direccionClientes.provincia">
-                        </div>
-    
-                        <div class="mb-3">
-                            <label for="distrito" class="form-label">Distrito</label>
-                            <input type="text" class="form-control" name="distrito" [(ngModel)]="direccionClientes.distrito">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="ubigeo" class="form-label">Ubigeo</label>
-                            <input type="text" class="form-control" name="ubigeo" [(ngModel)]="direccionClientes.ubigeo"
-                                placeholder="Ingrese el ubigeo">
-                        </div>
-                    </ng-container>
-    
-                        <div class="mb-3">
-                        <label for="direccion" class="form-label">Dirección</label>
-                        <input type="text" class="form-control" name="direccion" [(ngModel)]="direccionClientes.direccion"
-                            placeholder="Ingrese la dirección">
-                    </div>
-                    <div class="mb-3">
-                        <label for="referencia" class="form-label">Referencia</label>
-                        <input type="text" class="form-control" name="referencia" [(ngModel)]="direccionClientes.referencia"
-                            placeholder="Ingrese la referencia (opcional)">
-                    </div>
-                     -->
-
-                </div>
+      <!-- Modal Editar dirección (uno por fila) -->
+      <div *ngFor="let item of direccionClientes_const" class="modal fade" [attr.id]="'editar-direccion-' + item.idDireccionClientes"
+        tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Editar dirección</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Región</label>
+                <select class="form-select" [(ngModel)]="direccionClientes.region" (change)="select_region()">
+                  <option value="" disabled>Seleccionar</option>
+                  <option *ngFor="let r of regiones" [value]="r.id">{{ r.name }}</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Provincia</label>
+                <select class="form-select" [(ngModel)]="direccionClientes.provincia" (change)="select_provincia()">
+                  <option value="" disabled>Seleccionar</option>
+                  <option *ngFor="let p of provincias" [value]="p.id">{{ p.name }}</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Distrito</label>
+                <select class="form-select" [(ngModel)]="direccionClientes.distrito" (change)="select_distrito($event)">
+                  <option value="" disabled>Seleccionar</option>
+                  <option *ngFor="let d of distritos" [value]="d.id">{{ d.name }}</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Ubigeo</label>
+                <input type="text" class="form-control" [(ngModel)]="direccionClientes.ubigeo" name="ubigeo">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Dirección</label>
+                <input type="text" class="form-control" [(ngModel)]="direccionClientes.direccion" name="direccion">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+              <button type="button" class="btn btn-primary" (click)="actualizarDireccion()" data-bs-dismiss="modal">Guardar cambios</button>
+            </div>
+          </div>
         </div>
-
-    </ng-container>
+      </div>
+    </div>
+  </div>
 </div>

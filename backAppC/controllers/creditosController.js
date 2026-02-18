@@ -2,6 +2,31 @@ const dbConfig = require('../dbconfig');
 const sql = require('mssql');
 const CreditosServices = require('../services/creditos.service');
 
+// Obtener todos los créditos de la empresa (sin filtrar por cliente)
+const obtenerCreditosClienteTodos = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const creditos = await CreditosServices.obtenerCreditosClienteService(pool, req.user, '');
+
+    res.status(200).send({ data: creditos });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({
+        message: "No tiene permisos para realizar esta acción",
+        data: undefined
+      });
+    }
+    console.error("Error obtener créditos:", error);
+    res.status(500).send({
+      message: "Error al obtener los créditos",
+      data: undefined
+    });
+  }
+};
+
 // Obtener créditos por cliente
 const obtenerCreditosCliente = async (req, res) => {
   try {
@@ -125,7 +150,8 @@ const pagarCuota = async (req, res) => {
       idMediosPago,
       idMoneda,
       numeroRecibo,
-      observaciones
+      observaciones,
+      idApertura
     } = req.body;
 
     // Validación básica
@@ -143,7 +169,8 @@ const pagarCuota = async (req, res) => {
       idMediosPago,
       idMoneda,
       numeroRecibo,
-      observaciones
+      observaciones,
+      idApertura
     });
 
     res.status(200).send({
@@ -234,6 +261,7 @@ const obtenerEficienciaCobros = async (req, res) => {
 };
 
 module.exports = {
+  obtenerCreditosClienteTodos,
   obtenerCreditosCliente,
   crearCredito,
   obtenerCuotasCredito,

@@ -18,7 +18,7 @@ const dbConfig = require('../dbconfig');
 
 //1. crea el metodo crearCliente segun los datos de la tabla
 const crearCliente = async function (req, res) {
-    const { idDocumento, ruc, rSocial, correo, celular, condicion, } = req.body;
+    const { idDocumento, ruc, rSocial, correo, celular, condicion, sujetoCredito, lineaCredito } = req.body;
 
     //quiero extaer data del req para poder crear el registro
 
@@ -41,6 +41,8 @@ const crearCliente = async function (req, res) {
                 return;
             }
             try {
+                const esSujetoCredito = sujetoCredito === true || sujetoCredito === 1 || String(sujetoCredito).toLowerCase() === 'true';
+                const linea = lineaCredito != null && !isNaN(Number(lineaCredito)) ? Math.max(0, Number(lineaCredito)) : 0;
                 await pool.request()
                     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                     .input('idDocumento', sql.VarChar, idDocumento)
@@ -49,12 +51,14 @@ const crearCliente = async function (req, res) {
                     .input('correo', sql.VarChar, correo || null)
                     .input('celular', sql.VarChar, celular || null)
                     .input('condicion', sql.VarChar, condicion || null)
-                    .query('INSERT INTO Clientes (idEmpresa,idDocumento,ruc,rSocial,correo,celular,condicion,estado) VALUES (@idEmpresa,@idDocumento,@ruc,@rSocial,@correo,@celular,@condicion,1)');
+                    .input('sujetoCredito', sql.Bit, esSujetoCredito ? 1 : 0)
+                    .input('lineaCredito', sql.Decimal(18, 2), linea)
+                    .query('INSERT INTO Clientes (idEmpresa,idDocumento,ruc,rSocial,correo,celular,condicion,estado,sujetoCredito,lineaCredito) VALUES (@idEmpresa,@idDocumento,@ruc,@rSocial,@correo,@celular,@condicion,1,@sujetoCredito,@lineaCredito)');
 
                 const creado = await pool.request()
                     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                     .input('ruc', sql.VarChar, ruc)
-                    .query('SELECT idCliente, idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion, estado FROM Clientes WHERE idEmpresa = @idEmpresa AND ruc = @ruc');
+                    .query('SELECT idCliente, idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion, estado, sujetoCredito, lineaCredito FROM Clientes WHERE idEmpresa = @idEmpresa AND ruc = @ruc');
                 const cliente = creado.recordset && creado.recordset[0] ? creado.recordset[0] : null;
                 res.status(200).send({ message: 'Cliente creado', data: cliente });
             } catch (error) {
@@ -149,15 +153,17 @@ const listarClientes_id = async function (req, res) {
 
 //3. crea el metodo actualizarCliente segun los datos de la tabla
 const actualizarCliente = async function (req, res) {
-    const { idDocumento, ruc, rSocial, correo, celular, condicion, } = req.body;
-    const idCliente = req.params.idCliente;
+    const { idDocumento, ruc, rSocial, correo, celular, condicion, sujetoCredito, lineaCredito } = req.body;
+    const idCliente = req.params.id;
 
     if (req.user) {
         if (req.user.rol == 'Administrador'|| req.user.rol=='Vendedor') {
 
             try {
                 let pool = await sql.connect(dbConfig);
-                let updateCliente = await pool.request()
+                const esSujetoCredito = sujetoCredito === true || sujetoCredito === 1 || String(sujetoCredito).toLowerCase() === 'true';
+                const linea = lineaCredito != null && !isNaN(Number(lineaCredito)) ? Math.max(0, Number(lineaCredito)) : 0;
+                await pool.request()
                     .input('idCliente', sql.Int, idCliente)
                     .input('idDocumento', sql.VarChar, idDocumento)
                     .input('ruc', sql.VarChar, ruc)
@@ -165,8 +171,13 @@ const actualizarCliente = async function (req, res) {
                     .input('correo', sql.VarChar, correo)
                     .input('celular', sql.VarChar, celular)
                     .input('condicion', sql.VarChar, condicion)
-                    .query('update Clientes set idDocumento = @idDocumento, ruc = @ruc, rSocial = @rSocial, correo = @correo, celular = @celular, condicion = @condicion where idCliente = @idCliente');
-                res.status(200).send({ message: 'Cliente actualizado', data: updateCliente.recordset });
+                    .input('sujetoCredito', sql.Bit, esSujetoCredito ? 1 : 0)
+                    .input('lineaCredito', sql.Decimal(18, 2), linea)
+                    .query('UPDATE Clientes SET idDocumento = @idDocumento, ruc = @ruc, rSocial = @rSocial, correo = @correo, celular = @celular, condicion = @condicion, sujetoCredito = @sujetoCredito, lineaCredito = @lineaCredito WHERE idCliente = @idCliente');
+                const actualizado = await pool.request()
+                    .input('idCliente', sql.Int, idCliente)
+                    .query('SELECT idCliente, idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion, estado, sujetoCredito, lineaCredito FROM Clientes WHERE idCliente = @idCliente');
+                res.status(200).send({ message: 'Cliente actualizado', data: actualizado.recordset });
             } catch (error) {
                 res.status(500).send({ message: error.message, data: undefined });
             }

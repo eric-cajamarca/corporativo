@@ -162,6 +162,16 @@ const crear_compra = async (req, res) => {
 
     try {
         const pool = await sql.connect(dbConfig);
+        let idEstadoPagoFinal = idEstadoPago != null ? Number(idEstadoPago) : 2;
+        if (idMediosPago != null) {
+            const rCond = await pool.request()
+                .input('idMediosPago', sql.Int, Number(idMediosPago))
+                .query('SELECT descripcion FROM MediosPago WHERE idMediosPago = @idMediosPago');
+            const desc = rCond.recordset?.[0]?.descripcion || '';
+            if (/credito/i.test(desc)) {
+                idEstadoPagoFinal = 1;
+            }
+        }
         await pool.request()
             .input('idCompra', sql.UniqueIdentifier, idCompra)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -173,7 +183,7 @@ const crear_compra = async (req, res) => {
             .input('fVencimiento', sql.DateTime, fVencimientoVal)
             .input('idProveedor', sql.Int, idProveedor)
             .input('idMoneda', sql.Int, idMoneda)
-            .input('idEstadoPago', sql.Int, idEstadoPago)
+            .input('idEstadoPago', sql.Int, idEstadoPagoFinal)
             .input('subTotal', sql.Decimal(18, 2), subTotal || 0)
             .input('igv', sql.Decimal(18, 2), igv || 0)
             .input('exonerado', sql.Decimal(18, 2), exonerado || 0)

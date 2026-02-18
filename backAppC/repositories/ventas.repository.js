@@ -71,15 +71,22 @@ exports.actualizarNumeroComprobante = async (transaction, idEmpresa, idComproban
     .query('UPDATE Comprobantes SET numero = @numero WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante');
 };
 
-/** Inserta el desglose de pagos de una venta (ej: 40 efectivo + 40 yape). Requiere tabla DetallePagoVenta. */
+/** Inserta el desglose de pagos de una venta (ej: 40 efectivo + 40 yape). Requiere tabla DetallePagoVenta.
+ *  FK DetallePagoVenta.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago (otra tabla),
+ *  el id puede no existir en MediosPago; se valida y se usa un idMediosPago válido como fallback.
+ */
 exports.insertarDetallePagoVenta = async (transaction, idVenta, detallePago) => {
   if (!detallePago || detallePago.length === 0) return;
+  const validIdsResult = await transaction.request().query('SELECT idMediosPago FROM MediosPago');
+  const validIds = new Set((validIdsResult.recordset || []).map(r => Number(r.idMediosPago)).filter(n => !Number.isNaN(n)));
+  const idMediosPagoDefault = validIds.size > 0 ? Math.min(...validIds) : null;
+  if (idMediosPagoDefault == null) return;
   for (const pago of detallePago) {
-    const idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
+    let idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
+    if (idMediosPago == null || !validIds.has(idMediosPago)) idMediosPago = idMediosPagoDefault;
     const monto = Number(pago.monto);
-    if (idMediosPago == null || monto <= 0) continue;
-    const req = transaction.request();
-    await req
+    if (monto <= 0) continue;
+    await transaction.request()
       .input('idVenta', sql.Int, idVenta)
       .input('idMediosPago', sql.Int, idMediosPago)
       .input('monto', sql.Decimal(18, 2), monto)

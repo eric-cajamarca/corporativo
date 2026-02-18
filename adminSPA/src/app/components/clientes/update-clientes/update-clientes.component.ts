@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -18,12 +18,19 @@ declare var bootstrap: any;
   styleUrl: './update-clientes.component.css'
 })
 export class UpdateClientesComponent {
+  /** Si true, se usa dentro de un modal: no se muestra topnav y se puede cerrar con emit. */
+  @Input() modoModal = false;
+  /** Cuando se usa como modal, el id del cliente a editar (si no se usa la ruta). */
+  @Input() idClienteModal: string | number | null = null;
+  @Output() cerrar = new EventEmitter<void>();
 
   public filtro: any = "";
   public clientes: any = {
     correo: '',
     celular: '',
     condicion: 'ACTIVO',
+    sujetoCredito: false,
+    lineaCredito: 0,
   };
   public clienteruc: any = [];
   // public direccionClientes:any=[];
@@ -41,6 +48,7 @@ export class UpdateClientesComponent {
   public direccionClientes_const: any[] = [];
   public data: any = {};
   public guardandoDireccion = false;
+  public mostrarFormNuevaDireccion = false;
   public nuevaDireccion: any = {
     ubigeo: '',
     codPais: 'PEN',
@@ -99,80 +107,43 @@ export class UpdateClientesComponent {
 
   }
 
+  /** Carga los datos del cliente por ID. Público para poder llamarlo desde el modal al abrir (ClienteEditarModalService). */
+  cargarClientePorId(id: string | number): void {
+    if (!id) return;
+    this.clientes.idCliente = id;
+    this._clientesService.obtener_cliente_id(id).subscribe({
+      next: (response) => {
+        if (response.data != undefined) {
+          const data = Array.isArray(response.data) ? response.data : [response.data];
+          data.forEach((item: any) => {
+            this.clientes.idCliente = item.idCliente;
+            this.clientes.ruc = item.ruc;
+            this.clientes.idDocumento = item.idDocumento;
+            this.clientes.rSocial = item.rSocial;
+            this.clientes.correo = item.correo;
+            this.clientes.celular = item.celular;
+            this.clientes.condicion = item.condicion;
+            this.clientes.sujetoCredito = item.sujetoCredito === true || item.sujetoCredito === 1;
+            this.clientes.lineaCredito = item.lineaCredito != null && !isNaN(Number(item.lineaCredito)) ? Number(item.lineaCredito) : 0;
+          });
+          this.cargarDirecciones();
+        }
+      },
+      error: () => {}
+    });
+  }
+
   ngOnInit() {
+    if (this.modoModal && this.idClienteModal != null && this.idClienteModal !== '') {
+      this.cargarClientePorId(this.idClienteModal);
+      return;
+    }
+
     this._route.params.subscribe(
       params => {
-
-        this.clientes.idCliente = params['id'];
-        console.log('this.clientes.idCliente', this.clientes.idCliente);
-
-        this._clientesService.obtener_cliente_id(this.clientes.idCliente ).subscribe(
-          response => {
-            console.log('response.data', response.data);
-            if (response.data != undefined) {
-
-
-              // Modificar el campo 'password' dentro del array 'data'
-              response.data.forEach((item: any) => {
-                this.clientes.idCliente = item.idCliente;
-                this.clientes.ruc = item.ruc;
-                this.clientes.idDocumento = item.idDocumento;
-                this.clientes.rSocial = item.rSocial;
-                this.clientes.correo = item.correo;
-                this.clientes.celular = item.celular;
-                this.clientes.condicion = item.condicion;
-                // this.clientes.fregistro = item.fregistro;
-              });
-              console.log('this.clientes', this.clientes);
-            }
-          }
-        );
-
-        const idClienteParam = params['id'];
-        this._clientesService.obtener_direccionesCliente_idCliente(idClienteParam).subscribe(
-          response => {
-            const data = response?.data;
-            this.direccionClientes_const = Array.isArray(data) && data.length > 0 ? data : [];
-            if (this.direccionClientes_const.length > 0) {
-              console.log('this.direccionClientes_const', this.direccionClientes_const);
-
-              //buscar en regiones por el id de response.data.region y asignar el name a direccionEmpresas.region
-              const regionEncontrada = this.regiones.find((element: any) => Number(element.id) === Number(this.direccionClientes_const[0].region));
-
-              if (regionEncontrada) {
-
-                this.direccionClientes_const[0].nregion = String(regionEncontrada.name);
-                console.log('this.direccionEmpresas.region', this.direccionClientes_const[0].nregion);
-              }else{
-                console.log('no se encontro la region');
-              }
-
-
-              //buscar en provincias por el id de response.data.provincia y asignar el name a direccionEmpresas.provincia
-              const provinciaEncontrada = this.provincias.find((element: any) => Number(element.id) === Number(this.direccionClientes_const[0].provincia));
-
-              if (provinciaEncontrada) {
-
-                this.direccionClientes_const[0].nprovincia = String(provinciaEncontrada.name);
-                console.log('this.direccionEmpresas.provincia', this.direccionClientes_const[0].nprovincia);
-              }
-
-              //buscar en distritos por el id de response.data.distrito y asignar el name a direccionEmpresas.distrito
-              const distritoEncontrada = this.distritos.find((element: any) => Number(element.id) === Number(this.direccionClientes_const[0].distrito));
-
-              if (distritoEncontrada) {
-
-                this.direccionClientes_const[0].ndistrito = String(distritoEncontrada.name);
-                console.log('this.direccionEmpresas.distrito', this.direccionClientes_const[0].ndistrito);
-              }
-
-            }
-            console.log('this.direccionClientes_const', this.direccionClientes_const);
-          },
-          () => { this.direccionClientes_const = []; }
-        )
+        const id = params['id'];
+        if (id) this.cargarClientePorId(id);
       }
-
     );
 
 
@@ -446,6 +417,7 @@ export class UpdateClientesComponent {
     this._clientesService.crear_direccionCliente(payload).subscribe({
       next: () => {
         this.guardandoDireccion = false;
+        this.mostrarFormNuevaDireccion = false;
         this.nuevaDireccion = { ubigeo: '', codPais: 'PEN', region: '', provincia: '', distrito: '', urbanizacion: '', direccion: '', referencia: '', codLocal: '', principal: true };
         this.cargarDirecciones();
         if (typeof iziToast !== 'undefined') {
@@ -549,5 +521,36 @@ export class UpdateClientesComponent {
       // Realiza acciones cuando el checkbox está desmarcado
     }
 
+  }
+
+  /** Guardar cambios del cliente (editar). Incluye sujeto a crédito y línea de crédito. */
+  actualizarCliente(): void {
+    if (!this.clientes?.idCliente) return;
+    const payload = {
+      idDocumento: this.clientes.idDocumento,
+      ruc: this.clientes.ruc,
+      rSocial: this.clientes.rSocial,
+      correo: this.clientes.correo ?? '',
+      celular: this.clientes.celular ?? '',
+      condicion: this.clientes.condicion ?? 'ACTIVO',
+      sujetoCredito: !!this.clientes.sujetoCredito,
+      lineaCredito: this.clientes.lineaCredito != null && !isNaN(Number(this.clientes.lineaCredito)) ? Math.max(0, Number(this.clientes.lineaCredito)) : 0
+    };
+    this._clientesService.editar_cliente(this.clientes.idCliente, payload).subscribe({
+      next: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Cliente actualizado correctamente.', position: 'topRight' });
+        }
+      },
+      error: (err) => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo actualizar el cliente.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  cerrarModal(): void {
+    this.cerrar.emit();
   }
 }

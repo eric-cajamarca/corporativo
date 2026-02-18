@@ -14,6 +14,10 @@ export interface CreditoCliente {
   cuotasPendientes?: number;
   totalPagado?: number;
   saldoPendiente?: number;
+  /** Comprobante (ej. serie-numero de venta) desde el backend */
+  comprobante?: string;
+  /** Próxima fecha de vencimiento de cuota */
+  proximaCuota?: string;
 }
 
 export interface CuotaCredito {

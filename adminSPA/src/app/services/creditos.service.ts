@@ -15,11 +15,23 @@ export class CreditosService {
     this.url = global.url;
   }
 
-  // Obtener créditos por cliente
+  // Listar todos los créditos de la empresa (tabla CreditosClientes)
+  obtenerCreditosTodos(): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url + 'creditos/todos', {
+      headers,
+      withCredentials: true
+    });
+  }
+
+  // Obtener créditos: sin idCliente lista todos; con idCliente filtra por ese cliente
   obtenerCreditosCliente(idCliente: string): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'creditos/cliente/' + idCliente, {
-      headers: headers,
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    if (idCliente == null || String(idCliente).trim() === '') {
+      return this.obtenerCreditosTodos();
+    }
+    return this._http.get(this.url + 'creditos/cliente/' + encodeURIComponent(String(idCliente).trim()), {
+      headers,
       withCredentials: true
     });
   }
@@ -49,11 +61,13 @@ export class CreditosService {
     });
   }
 
-  // Pagar cuota
+  // Pagar cuota (idApertura opcional: si se envía, se genera Recibo de Ingreso y se refleja en arqueo)
   pagarCuota(data: {
     idCuota: string;
     montoPagado: number;
-    formaPago: string;
+    formaPago?: string;
+    idMediosPago?: number | null;
+    idApertura?: string;
     referencia?: string;
     observaciones?: string;
   }): Observable<any> {

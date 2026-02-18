@@ -238,6 +238,7 @@ const crearVentaCompleta = async (req, res) => {
   const pool = await sql.connect(dbConfig);
   const CajaRepository = require('../repositories/caja.repository');
   const ventasRepository = require('../repositories/ventas.repository');
+  const CreditosService = require('../services/creditos.service');
 
   const transaction = new sql.Transaction(pool);
   try {
@@ -299,7 +300,38 @@ const crearVentaCompleta = async (req, res) => {
       }
     }
 
+    let condicionCredito = false;
+    let descMedioPago = '';
+    if (venta.idMediosPago != null && String(venta.idMediosPago).trim() !== '') {
+      const rCond = await transaction.request()
+        .input('idMediosPago', sql.VarChar(20), String(venta.idMediosPago).trim())
+        .query(`SELECT descripcion FROM MediosPago WHERE idMediosPago = TRY_CAST(@idMediosPago AS INT) OR CAST(idMediosPago AS VARCHAR(20)) = @idMediosPago`);
+      descMedioPago = rCond.recordset?.[0]?.descripcion || '';
+      const descNormalizada = descMedioPago.normalize('NFD').replace(/\u0300-\u036f/g, '');
+      condicionCredito = /credito/i.test(descNormalizada) || /cr[éèêëÉÈÊË]dito/i.test(descMedioPago);
+    }
+
     await transaction.commit();
+
+    if (condicionCredito && venta.idCliente && Number(venta.total) > 0) {
+      try {
+        const fEmision = venta.fEmision ? new Date(venta.fEmision) : new Date();
+        const fVencimiento = venta.fVencimiento ? new Date(venta.fVencimiento) : new Date(fEmision.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const plazoDias = Math.max(1, Math.round((fVencimiento - fEmision) / (24 * 60 * 60 * 1000)));
+        await CreditosService.crearCreditoService(pool, req.user, {
+          idVenta: Number(idVenta),
+          idCliente: venta.idCliente,
+          montoTotal: Number(venta.total),
+          plazoDias,
+          tasaInteres: 0,
+          numeroCuotas: 1,
+          fechaVencimiento: fVencimiento
+        });
+      } catch (errCredito) {
+        console.error('Error crear crédito desde venta:', errCredito);
+      }
+    }
+
     res.json({ success: true, idVenta });
   } catch (error) {
     await transaction.rollback();

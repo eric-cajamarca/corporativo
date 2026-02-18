@@ -33,6 +33,8 @@ export class CreateClientesComponent {
     celular: '',
     condicion:'ACTIVO',
     idDocumento: '',
+    sujetoCredito: false,
+    lineaCredito: 0,
   };
   public clienteruc: any = [];
   // public direccionClientes:any=[];

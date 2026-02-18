@@ -6,6 +6,7 @@ exports.obtenerCajasRepo = async (pool, idEmpresa) => {
   const queryConApertura = `
     SELECT
       c.idCaja,
+      c.idSucursal,
       c.nombre,
       c.descripcion,
       ISNULL(s.nombre, '') AS sucursal,
@@ -26,6 +27,7 @@ exports.obtenerCajasRepo = async (pool, idEmpresa) => {
   const querySoloCajas = `
     SELECT
       c.idCaja,
+      c.idSucursal,
       c.nombre,
       c.descripcion,
       ISNULL(s.nombre, '') AS sucursal,
@@ -584,7 +586,8 @@ exports.obtenerAperturaAbiertaPorSucursalRepo = async (pool, idEmpresa, idSucurs
   return result.recordset[0] || null;
 };
 
-/** Registra en caja los movimientos de venta al contado por cada forma de pago. Si ya existían movimientos para idVenta, los elimina y reemplaza (para reflejar cambios de desglose). */
+/** Registra en caja los movimientos de venta al contado por cada forma de pago. Si ya existían movimientos para idVenta, los elimina y reemplaza (para reflejar cambios de desglose).
+ *  FK MovimientosCaja.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago, se valida y se usa un idMediosPago válido como fallback. */
 exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   const { idApertura, idEmpresa, idSucursal, idUsuario, idVenta, compVenta, detallePago } = payload;
   if (!idApertura || !idVenta || !compVenta || !detallePago || detallePago.length === 0) return;
@@ -594,6 +597,11 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   const idTipoVentaContado = tipoVenta.recordset[0]?.idTipoMovimientoCaja;
   if (!idTipoVentaContado) return;
 
+  const validIdsResult = await req.query("SELECT idMediosPago FROM MediosPago");
+  const validIds = new Set((validIdsResult.recordset || []).map((r) => Number(r.idMediosPago)).filter((n) => !Number.isNaN(n)));
+  const idMediosPagoDefault = validIds.size > 0 ? Math.min(...validIds) : null;
+  if (idMediosPagoDefault == null) return;
+
   await req
     .input("idVenta", sql.Int, idVenta)
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
@@ -601,7 +609,8 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
 
   const concepto = "Venta al contado " + (compVenta || "");
   for (const pago of detallePago) {
-    const idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
+    let idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
+    if (idMediosPago == null || !validIds.has(idMediosPago)) idMediosPago = idMediosPagoDefault;
     const monto = Number(pago.monto);
     if (monto <= 0) continue;
     const reqIns = transaction.request();
@@ -625,7 +634,8 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
 };
 
 /** Arqueo dinámico: resumen por concepto y forma de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal).
- *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago; para el resto usa MovimientosCaja + MediosPago. */
+ *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago; para el resto usa MovimientosCaja + MediosPago.
+ *  Incluye ventasCredito: total de ventas con condición Crédito en el período (informativo, no efectivo en caja). */
 exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
   const { fecha, fechaInicial, fechaFinal, idCaja } = filtros || {};
   const usaRango = fechaInicial && fechaFinal;
@@ -686,5 +696,53 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     ORDER BY tipoOperacion DESC, concepto, formaPago
   `);
 
-  return result.recordset;
+  let ventasCredito = { concepto: 'VENTA CREDITO', importe: 0 };
+  try {
+    const reqCredito = pool.request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+    if (usaRango) {
+      reqCredito.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
+    } else {
+      reqCredito.input("fecha", sql.Date, fechaFiltro);
+    }
+    const condicionFechaVentas = usaRango
+      ? "AND CONVERT(DATE, v.fEmision) >= @fechaInicial AND CONVERT(DATE, v.fEmision) <= @fechaFinal"
+      : "AND CONVERT(DATE, v.fEmision) = @fecha";
+    const rCredito = await reqCredito.query(`
+      SELECT ISNULL(SUM(v.total), 0) AS total
+      FROM Ventas v
+      INNER JOIN MediosPago mp ON (mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT) OR CAST(mp.idMediosPago AS VARCHAR(20)) = RTRIM(LTRIM(ISNULL(v.idMediosPago, ''))))
+        AND (mp.descripcion LIKE '%credito%' OR mp.descripcion LIKE '%crédito%' OR LOWER(REPLACE(mp.descripcion, 'í', 'i')) LIKE '%credito%')
+      WHERE v.idEmpresa = @idEmpresa ${condicionFechaVentas}
+    `);
+    const total = rCredito.recordset?.[0]?.total;
+    ventasCredito.importe = Number(total) || 0;
+  } catch (err) {
+    console.error("Error obtener ventas al crédito para arqueo:", err);
+  }
+
+  let cobroCreditos = { concepto: 'COBRO CREDITOS', importe: 0 };
+  try {
+    const reqCobro = pool.request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+    if (usaRango) {
+      reqCobro.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
+    } else {
+      reqCobro.input("fecha", sql.Date, fechaFiltro);
+    }
+    const condicionFechaPago = usaRango
+      ? "AND CONVERT(DATE, pc.fechaPago) >= @fechaInicial AND CONVERT(DATE, pc.fechaPago) <= @fechaFinal"
+      : "AND CONVERT(DATE, pc.fechaPago) = @fecha";
+    const rCobro = await reqCobro.query(`
+      SELECT ISNULL(SUM(pc.montoPagado), 0) AS total
+      FROM PagosCuotas pc
+      WHERE pc.idEmpresa = @idEmpresa ${condicionFechaPago}
+    `);
+    const totalCobro = rCobro.recordset?.[0]?.total;
+    cobroCreditos.importe = Number(totalCobro) || 0;
+  } catch (err) {
+    console.error("Error obtener total cobro de créditos para arqueo:", err);
+  }
+
+  return { movimientos: result.recordset, ventasCredito, cobroCreditos };
 };

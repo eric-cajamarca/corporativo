@@ -1,13 +1,19 @@
 const sql = require("mssql");
+const CajaRepository = require("./caja.repository");
 
+/** Lista créditos de la empresa. Si idCliente viene vacío/null, devuelve todos; si es número, filtra por ese cliente. */
 exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("idCliente", sql.Int, idCliente)
-    .query(`
+  const filtrarPorCliente = idCliente != null && String(idCliente).trim() !== '' && !isNaN(Number(idCliente));
+  const request = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+  if (filtrarPorCliente) request.input("idCliente", sql.Int, Number(idCliente));
+
+  const condicionCliente = filtrarPorCliente ? " AND cc.idCliente = @idCliente" : "";
+
+  try {
+    const result = await request.query(`
       SELECT
         cc.idCredito,
+        cc.idCliente,
         cc.fechaCredito,
         cc.montoTotal,
         cc.plazoDias,
@@ -17,27 +23,65 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
         v.idVenta,
         v.serie + '-' + v.numero AS comprobante,
         uw.nombres + ' ' + uw.apellidos AS usuarioCredito,
-        -- Información de cuotas
         COUNT(cu.idCuota) AS totalCuotas,
         COUNT(CASE WHEN cu.estado = 'PAGADO' THEN 1 END) AS cuotasPagadas,
         COUNT(CASE WHEN cu.estado = 'VENCIDO' THEN 1 END) AS cuotasVencidas,
-        SUM(cu.montoCuota) AS totalCuotasGeneradas,
-        SUM(CASE WHEN cu.estado = 'PAGADO' THEN cu.montoCuota ELSE 0 END) AS totalPagado,
+        ISNULL(SUM(cu.montoCuota), 0) AS totalCuotasGeneradas,
+        ISNULL(SUM(CASE WHEN cu.estado = 'PAGADO' THEN cu.montoCuota ELSE 0 END), 0) AS totalPagado,
+        ISNULL(SUM(ISNULL(cu.saldoPendiente, 0)), 0) AS saldoPendiente,
         MIN(CASE WHEN cu.estado IN ('PENDIENTE', 'VENCIDO') THEN cu.fechaVencimiento END) AS proximaCuota
       FROM CreditosClientes cc
       LEFT JOIN Ventas v ON cc.idVenta = v.idVenta
       LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
       LEFT JOIN UsuarioWeb uw ON cc.idUsuarioCredito = uw.idUsuario
-      WHERE cc.idEmpresa = @idEmpresa
-        AND cc.idCliente = @idCliente
-      GROUP BY cc.idCredito, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
+      WHERE cc.idEmpresa = @idEmpresa${condicionCliente}
+      GROUP BY cc.idCredito, cc.idCliente, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
                cc.tasaInteres, cc.estado, cc.observaciones, v.idVenta,
                v.serie, v.numero, uw.nombres, uw.apellidos
       ORDER BY cc.fechaCredito DESC
     `);
-
-  return result.recordset;
+    return result.recordset;
+  } catch (err) {
+    const msg = err.message || '';
+    const code = err.number ?? err.originalError?.number;
+    if (code === 208 || /Invalid object name|CuotasCredito|UsuarioWeb/.test(msg)) {
+      return await listarCreditosSimple(pool, idEmpresa, filtrarPorCliente ? Number(idCliente) : null);
+    }
+    throw err;
+  }
 };
+
+/** Fallback: listado solo desde CreditosClientes (sin JOINs) cuando faltan tablas relacionadas. */
+async function listarCreditosSimple(pool, idEmpresa, idCliente) {
+  const req = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+  const cond = idCliente != null ? " AND idCliente = @idCliente" : "";
+  if (idCliente != null) req.input("idCliente", sql.Int, idCliente);
+  const result = await req.query(`
+    SELECT
+      idCredito,
+      idCliente,
+      fechaCredito,
+      montoTotal,
+      plazoDias,
+      tasaInteres,
+      estado,
+      observaciones,
+      idVenta AS idVenta,
+      CAST(NULL AS VARCHAR(50)) AS comprobante,
+      CAST(NULL AS VARCHAR(200)) AS usuarioCredito,
+      0 AS totalCuotas,
+      0 AS cuotasPagadas,
+      0 AS cuotasVencidas,
+      0 AS totalCuotasGeneradas,
+      0 AS totalPagado,
+      montoTotal AS saldoPendiente,
+      CAST(NULL AS DATE) AS proximaCuota
+    FROM CreditosClientes
+    WHERE idEmpresa = @idEmpresa${cond}
+    ORDER BY fechaCredito DESC
+  `);
+  return result.recordset;
+}
 
 exports.validarClienteEmpresaRepo = async (pool, idCliente, idEmpresa) => {
   const result = await pool
@@ -99,8 +143,8 @@ exports.crearCreditoRepo = async (pool, user, datos) => {
 
     const idCredito = creditoResult.recordset[0].idCredito;
 
-    // Generar cuotas automáticamente
-    await generarCuotasCredito(request, idCredito, user.empresa, datos.montoTotal, datos.plazoDias, datos.tasaInteres, fechaInicio);
+    // Generar cuotas automáticamente (desde venta: 1 cuota con fecha de vencimiento de la venta)
+    await generarCuotasCredito(request, idCredito, user.empresa, datos.montoTotal, datos.plazoDias, datos.tasaInteres, fechaInicio, datos.numeroCuotas, datos.fechaVencimiento);
 
     await transaction.commit();
     return { idCredito, mensaje: "Crédito y cuotas generadas exitosamente" };
@@ -111,17 +155,21 @@ exports.crearCreditoRepo = async (pool, user, datos) => {
 };
 
 // Función auxiliar para generar cuotas
-async function generarCuotasCredito(request, idCredito, idEmpresa, montoTotal, plazoDias, tasaInteres, fechaInicio) {
-  const numeroCuotas = Math.ceil(plazoDias / 30); // Una cuota por mes
+async function generarCuotasCredito(request, idCredito, idEmpresa, montoTotal, plazoDias, tasaInteres, fechaInicio, numeroCuotasOverride, fechaVencimientoUnica) {
+  const numeroCuotas = numeroCuotasOverride === 1 ? 1 : Math.ceil(plazoDias / 30);
   const montoCuota = montoTotal / numeroCuotas;
   const tasaMensual = (tasaInteres || 0) / 100 / 12;
 
   for (let i = 1; i <= numeroCuotas; i++) {
-    const fechaVencimiento = new Date(fechaInicio);
-    fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
+    let fechaVencimiento;
+    if (numeroCuotasOverride === 1 && fechaVencimientoUnica) {
+      fechaVencimiento = new Date(fechaVencimientoUnica);
+    } else {
+      fechaVencimiento = new Date(fechaInicio);
+      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i);
+    }
 
-    // Calcular interés si aplica
-    const interes = tasaMensual > 0 ? (montoTotal - (i-1) * montoCuota) * tasaMensual : 0;
+    const interes = tasaMensual > 0 ? (montoTotal - (i - 1) * montoCuota) * tasaMensual : 0;
     const capital = montoCuota;
     const totalCuota = capital + interes;
 
@@ -208,16 +256,40 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
       `);
 
     const cuota = cuotaResult.recordset[0];
+    let numeroReciboCobranza = datos.numeroRecibo || null;
+
+    if (datos.idApertura && cuota) {
+      const tipoIngreso = await request.query("SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I'");
+      const idTipoMovimientoCaja = tipoIngreso.recordset?.[0]?.idTipoMovimientoCaja;
+      if (idTipoMovimientoCaja) {
+        try {
+          const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(transaction, user.empresa, "RI");
+          await CajaRepository.registrarMovimientoRepo(transaction, user, {
+            idApertura: datos.idApertura,
+            idTipoMovimientoCaja,
+            concepto: "Cobranza crédito - Cuota " + (cuota.numeroCuota || ""),
+            monto: datos.montoPagado,
+            idMediosPago: datos.idMediosPago || null,
+            idMoneda: datos.idMoneda || 1,
+            documentoRelacionado
+          });
+          numeroReciboCobranza = documentoRelacionado;
+        } catch (errMov) {
+          console.error("Error registrar movimiento cobranza:", errMov);
+        }
+      }
+    }
 
     // Determinar si es pago parcial o total
     const esPagoParcial = datos.montoPagado < cuota.saldoPendiente;
 
     if (esPagoParcial) {
-      // Pago parcial: registrar pago y generar nueva cuota
-      await procesarPagoParcial(request, cuota, datos, user);
+      // Pago parcial: registrar pago y generar nueva cuota (usa su propio request para no duplicar parámetros)
+      await procesarPagoParcial(transaction, cuota, datos, user);
     } else {
-      // Pago total: marcar cuota como pagada
-      await request
+      // Pago total: marcar cuota como pagada (request nuevo para no duplicar idCuota del SELECT inicial)
+      const reqUpdate = transaction.request();
+      await reqUpdate
         .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
         .input("fechaPago", sql.DateTime, new Date())
         .query(`
@@ -227,15 +299,20 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
         `);
     }
 
-    // Registrar el pago
-    await request
+    const idMediosPagoVal = datos.idMediosPago != null ? Number(datos.idMediosPago) : null;
+    const validIdsResult = await request.query("SELECT idMediosPago FROM MediosPago");
+    const validIds = new Set((validIdsResult.recordset || []).map((r) => Number(r.idMediosPago)).filter((n) => !Number.isNaN(n)));
+    const idMediosPagoFinal = idMediosPagoVal != null && validIds.has(idMediosPagoVal) ? idMediosPagoVal : (validIds.size ? Math.min(...validIds) : null);
+
+    const requestPago = transaction.request();
+    await requestPago
       .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
       .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
       .input("idUsuarioPago", sql.UniqueIdentifier, user.sub)
       .input("montoPagado", sql.Decimal(18, 2), datos.montoPagado)
-      .input("idMediosPago", sql.Int, datos.idMediosPago)
+      .input("idMediosPago", sql.Int, idMediosPagoFinal)
       .input("idMoneda", sql.Int, datos.idMoneda || 1)
-      .input("numeroRecibo", sql.VarChar, datos.numeroRecibo || null)
+      .input("numeroRecibo", sql.VarChar, numeroReciboCobranza || datos.numeroRecibo || null)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
       .query(`
         INSERT INTO PagosCuotas (
@@ -252,6 +329,7 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
       idCuota: datos.idCuota,
       montoPagado: datos.montoPagado,
       esPagoParcial,
+      numeroRecibo: numeroReciboCobranza,
       mensaje: esPagoParcial ? "Pago parcial registrado, nueva cuota generada" : "Cuota pagada completamente"
     };
   } catch (error) {
@@ -260,23 +338,26 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
   }
 };
 
-// Función auxiliar para procesar pagos parciales
-async function procesarPagoParcial(request, cuota, datos, user) {
-  // Actualizar cuota actual
-  await request
+// Función auxiliar para procesar pagos parciales (usa request propio para no duplicar parámetros con el request del flujo principal)
+// La cuota actual se marca PAGADA (monto pagado = cancelado); solo el saldo restante genera una nueva cuota pendiente.
+async function procesarPagoParcial(transaction, cuota, datos, user) {
+  const req = transaction.request();
+  // Marcar la cuota actual como PAGADA (el monto pagado queda cancelado; saldoPendiente en 0)
+  await req
     .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
-    .input("nuevoSaldo", sql.Decimal(18, 2), cuota.saldoPendiente - datos.montoPagado)
+    .input("fechaPago", sql.DateTime, new Date())
     .query(`
       UPDATE CuotasCredito
-      SET saldoPendiente = @nuevoSaldo
+      SET estado = 'PAGADO', fechaPago = @fechaPago, saldoPendiente = 0
       WHERE idCuota = @idCuota
     `);
 
-  // Generar nueva cuota con el saldo restante
+  // Generar nueva cuota con el saldo restante (nuevo request para no reutilizar idCuota ni otros params)
+  const reqNueva = transaction.request();
   const nuevaFechaVencimiento = new Date(cuota.fechaVencimiento);
   nuevaFechaVencimiento.setMonth(nuevaFechaVencimiento.getMonth() + 1); // Próximo mes
 
-  await request
+  await reqNueva
     .input("idCredito", sql.UniqueIdentifier, cuota.idCredito)
     .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
     .input("numeroCuota", sql.Int, cuota.numeroCuota + 1)
@@ -294,29 +375,78 @@ async function procesarPagoParcial(request, cuota, datos, user) {
     `);
 }
 
-exports.obtenerResumenCreditosRepo = async (pool, idEmpresa) => {
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT
-        COUNT(DISTINCT cc.idCredito) AS totalCreditos,
-        SUM(cc.montoTotal) AS montoTotalCreditos,
-        COUNT(DISTINCT CASE WHEN cc.estado = 'ACTIVO' THEN cc.idCredito END) AS creditosActivos,
-        SUM(CASE WHEN cc.estado = 'ACTIVO' THEN cc.montoTotal ELSE 0 END) AS montoCreditosActivos,
-        COUNT(cu.idCuota) AS totalCuotas,
-        COUNT(CASE WHEN cu.estado = 'PAGADO' THEN cu.idCuota END) AS cuotasPagadas,
-        COUNT(CASE WHEN cu.estado = 'VENCIDO' THEN cu.idCuota END) AS cuotasVencidas,
-        COUNT(CASE WHEN cu.estado = 'PENDIENTE' THEN cu.idCuota END) AS cuotasPendientes,
-        SUM(CASE WHEN cu.estado = 'PAGADO' THEN cu.montoCuota ELSE 0 END) AS totalCobrado,
-        SUM(cu.saldoPendiente) AS saldoPendienteTotal,
-        AVG(cc.tasaInteres) AS tasaInteresPromedio
-      FROM CreditosClientes cc
-      LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
-      WHERE cc.idEmpresa = @idEmpresa
-    `);
+const resumenCreditosDefault = () => ({
+  totalCreditos: 0,
+  montoTotalCreditos: 0,
+  creditosActivos: 0,
+  montoCreditosActivos: 0,
+  totalCuotas: 0,
+  cuotasPagadas: 0,
+  cuotasVencidas: 0,
+  cuotasPendientes: 0,
+  totalCobrado: 0,
+  saldoPendienteTotal: 0,
+  tasaInteresPromedio: 0,
+  totalMontoOtorgado: 0,
+  totalSaldoPendiente: 0,
+  totalPagado: 0,
+  tasaCobro: 0,
+  eficienciaCobro: 0
+});
 
-  return result.recordset[0];
+exports.obtenerResumenCreditosRepo = async (pool, idEmpresa) => {
+  try {
+    const result = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT
+          COUNT(DISTINCT cc.idCredito) AS totalCreditos,
+          SUM(cc.montoTotal) AS montoTotalCreditos,
+          COUNT(DISTINCT CASE WHEN cc.estado = 'ACTIVO' THEN cc.idCredito END) AS creditosActivos,
+          SUM(CASE WHEN cc.estado = 'ACTIVO' THEN cc.montoTotal ELSE 0 END) AS montoCreditosActivos,
+          COUNT(cu.idCuota) AS totalCuotas,
+          COUNT(CASE WHEN cu.estado = 'PAGADO' THEN cu.idCuota END) AS cuotasPagadas,
+          COUNT(CASE WHEN cu.estado = 'VENCIDO' THEN cu.idCuota END) AS cuotasVencidas,
+          COUNT(CASE WHEN cu.estado = 'PENDIENTE' THEN cu.idCuota END) AS cuotasPendientes,
+          SUM(CASE WHEN cu.estado = 'PAGADO' THEN cu.montoCuota ELSE 0 END) AS totalCobrado,
+          SUM(cu.saldoPendiente) AS saldoPendienteTotal,
+          AVG(cc.tasaInteres) AS tasaInteresPromedio
+        FROM CreditosClientes cc
+        LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
+        WHERE cc.idEmpresa = @idEmpresa
+      `);
+
+    const row = result.recordset[0] || {};
+    const montoTotal = Number(row.montoTotalCreditos) ?? 0;
+    const saldoTotal = Number(row.saldoPendienteTotal) ?? 0;
+    const cobrado = Number(row.totalCobrado) ?? 0;
+    const tasa = Number(row.tasaInteresPromedio) ?? 0;
+    const totalCuotas = Number(row.totalCuotas) || 0;
+    const cuotasPag = Number(row.cuotasPagadas) || 0;
+    return {
+      ...resumenCreditosDefault(),
+      ...row,
+      montoTotalCreditos: montoTotal,
+      montoCreditosActivos: Number(row.montoCreditosActivos) ?? 0,
+      totalCobrado: cobrado,
+      saldoPendienteTotal: saldoTotal,
+      tasaInteresPromedio: tasa,
+      totalMontoOtorgado: montoTotal,
+      totalSaldoPendiente: saldoTotal,
+      totalPagado: cobrado,
+      tasaCobro: tasa,
+      eficienciaCobro: totalCuotas > 0 ? (cuotasPag / totalCuotas) * 100 : 0
+    };
+  } catch (err) {
+    const msg = err.message || '';
+    const code = err.number ?? err.originalError?.number;
+    if (code === 208 || /Invalid object name|CuotasCredito|CreditosClientes/.test(msg)) {
+      console.error("Tablas de créditos no encontradas. Ejecute la migración create_creditos_clientes_cuotas_pagos.sql:", err.message);
+      return resumenCreditosDefault();
+    }
+    throw err;
+  }
 };
 
 exports.obtenerCuotasPendientesRepo = async (pool, idEmpresa, dias = 7) => {

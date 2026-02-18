@@ -16,10 +16,10 @@
           <div class="input-group input-group-sm" style="width: 200px;">
             <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="filtros.buscar" (keyup.enter)="buscar()">
             <button class="btn btn-outline-light" type="button" (click)="buscar()">
-              <i class="fas fa-search"></i>
+              <i class="bi bi-search"></i>
             </button>
           </div>
-          <span class="text-white-50 small">{{ creditosFiltrados.length }}</span>
+          <span class="text-white-50 small">{{ creditosPendientes.length }}</span>
         </div>
       </div>
       <div class="card-body">
@@ -40,49 +40,51 @@
             <thead class="table-light">
               <tr>
                 <th style="width: 200px;">
-                  <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirModalNuevoCredito()" title="Nuevo crédito"></i>
+                  <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirModalNuevaCobranza()" title="Nueva cobranza"></i>
                   Acciones
                 </th>
-                <th>Fecha</th>
                 <th>Cliente</th>
                 <th>Documento</th>
-                <th class="text-end">Monto Total</th>
-                <th class="text-end">Pagado</th>
+                <th>F.Venta</th>
+                <th class="text-end">Total</th>
+                <th>F.Vencimiento</th>
+                <th>Nota Credito</th>
                 <th class="text-end">Saldo</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngIf="loading">
-                <td colspan="8" class="text-center py-3">Cargando...</td>
+                <td colspan="9" class="text-center py-3">Cargando...</td>
               </tr>
-              <tr *ngFor="let credito of creditosFiltrados">
+              <tr *ngFor="let credito of creditosPendientes">
                 <td>
                   <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(credito)" title="Editar / Ver cuotas">
-                    <i class="fas fa-pencil-alt"></i>
+                    <i class="bi bi-pencil"></i>
                   </button>
                   <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(credito)" title="Eliminar">
-                    <i class="fas fa-trash"></i>
+                    <i class="bi bi-trash"></i>
                   </button>
                   <button class="btn btn-sm btn-outline-info me-1" (click)="ver(credito)" title="Ver cuotas">
-                    <i class="fas fa-search"></i>
+                    <i class="bi bi-search"></i>
                   </button>
                   <button class="btn btn-sm btn-outline-warning" (click)="imprimir(credito)" title="Imprimir">
-                    <i class="fas fa-print"></i>
+                    <i class="bi bi-printer"></i>
                   </button>
                 </td>
-                <td>{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
                 <td>{{ getClienteNombre(credito.idCliente) }}</td>
-                <td>{{ credito.idVenta || '—' }}</td>
+                <td>{{ credito.comprobante || (credito.idVenta ? 'Venta ' + credito.idVenta : '—') }}</td>
+                <td>{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
                 <td class="text-end">S/ {{ credito.montoTotal | number:'1.2-2' }}</td>
-                <td class="text-end">S/ {{ getPagado(credito) | number:'1.2-2' }}</td>
+                <td>{{ (credito.proximaCuota | date:'dd/MM/yyyy') || '—' }}</td>
+                <td>—</td>
                 <td class="text-end">S/ {{ (credito.saldoPendiente ?? 0) | number:'1.2-2' }}</td>
                 <td>
                   <span class="badge" [ngClass]="getEstadoBadgeClass(credito.estado)">{{ credito.estado }}</span>
                 </td>
               </tr>
-              <tr *ngIf="!loading && creditosFiltrados.length === 0">
-                <td colspan="8" class="text-center py-4 text-muted">No hay créditos.</td>
+              <tr *ngIf="!loading && creditosPendientes.length === 0">
+                <td colspan="9" class="text-center py-4 text-muted">No hay créditos pendientes.</td>
               </tr>
             </tbody>
           </table>
@@ -92,105 +94,207 @@
   </div>
 </main>
 
-<!-- Modal Nuevo Crédito (fuera de main, z-index 1050) -->
-<div class="modal fade" [class.show]="mostrarModalNuevoCredito" [style.display]="mostrarModalNuevoCredito ? 'block' : 'none'"
+<!-- Modal Nueva Cobranza de Crédito -->
+<div class="modal fade" [class.show]="mostrarModalNuevaCobranza" [style.display]="mostrarModalNuevaCobranza ? 'block' : 'none'"
      tabindex="-1" style="z-index: 1050;">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
         <h5 class="modal-title">
-          <i class="fas fa-plus me-2"></i>
-          Nuevo Crédito
+          <i class="fas fa-hand-holding-usd me-2"></i>
+          Nueva Cobranza de Crédito
         </h5>
-        <button type="button" class="btn-close btn-close-white" (click)="cerrarModales()"></button>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalNuevaCobranza()"></button>
       </div>
       <div class="modal-body">
         <form>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label for="cliente" class="form-label">Cliente *</label>
-                <select class="form-select" id="cliente"
-                        [(ngModel)]="nuevoCredito.idCliente" name="idCliente" required>
-                  <option value="">Seleccionar cliente</option>
-                  <option *ngFor="let cliente of clientes" [value]="cliente.idCliente">
-                    {{ cliente.rSocial || (cliente.nombre + ' ' + (cliente.apellido || '')) }}
-                  </option>
-                </select>
-              </div>
+          <div class="row mb-3">
+            <div class="col-md-2">
+              <label class="form-label">Documento</label>
+              <input type="text" class="form-control" value="RECIBO DE INGRESO" readonly>
             </div>
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label for="venta" class="form-label">Venta Asociada</label>
-                <input type="text" class="form-control" id="venta"
-                       [(ngModel)]="nuevoCredito.idVenta" name="idVenta"
-                       placeholder="ID de la venta (opcional)">
-              </div>
+            <div class="col-md-2">
+              <label class="form-label">Nº</label>
+              <input type="text" class="form-control" [(ngModel)]="nuevaCobranza.numeroDoc" name="numeroDoc" placeholder="Serie-Correlativo">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fecha Emisión</label>
+              <input type="date" class="form-control" [(ngModel)]="nuevaCobranza.fechaEmision" name="fechaEmision">
             </div>
           </div>
-          <div class="row">
-            <div class="col-md-4">
-              <div class="mb-3">
-                <label for="montoTotal" class="form-label">Monto Total *</label>
-                <div class="input-group">
-                  <span class="input-group-text">S/</span>
-                  <input type="number" class="form-control" id="montoTotal"
-                         [(ngModel)]="nuevoCredito.montoTotal" name="montoTotal"
-                         placeholder="0.00" step="0.01" min="0" required>
-                </div>
+          <div class="row mb-3">
+            <div class="col-md-2">
+              <label class="form-label">Cliente</label>
+              <div class="input-group">
+                <input type="text" class="form-control" [(ngModel)]="nuevaCobranza.idCliente" name="idCliente" placeholder="ID" readonly>
+                <button type="button" class="btn btn-outline-primary" (click)="abrirModalBuscarCliente()" title="Buscar cliente por RUC o nombre">
+                  <i class="bi bi-search"></i>
+                </button>
               </div>
             </div>
             <div class="col-md-4">
-              <div class="mb-3">
-                <label for="interes" class="form-label">Interés (%)</label>
-                <div class="input-group">
-                  <input type="number" class="form-control" id="interes"
-                         [(ngModel)]="nuevoCredito.interes" name="interes"
-                         placeholder="0.00" step="0.01" min="0">
-                  <span class="input-group-text">%</span>
-                </div>
-              </div>
+              <label class="form-label">&nbsp;</label>
+              <input type="text" class="form-control" [value]="nuevaCobranza.nombreCliente" placeholder="Nombre del cliente" readonly>
             </div>
-            <div class="col-md-4">
-              <div class="mb-3">
-                <label for="numeroCuotas" class="form-label">Número de Cuotas *</label>
-                <input type="number" class="form-control" id="numeroCuotas"
-                       [(ngModel)]="nuevoCredito.numeroCuotas" name="numeroCuotas"
-                       placeholder="1" min="1" required>
-              </div>
+            <div class="col-md-6">
+              <label class="form-label">Dirección</label>
+              <input type="text" class="form-control" [(ngModel)]="nuevaCobranza.direccion" name="direccion" placeholder="Dirección">
             </div>
           </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label for="cuotaInicial" class="form-label">Cuota Inicial</label>
-                <div class="input-group">
-                  <span class="input-group-text">S/</span>
-                  <input type="number" class="form-control" id="cuotaInicial"
-                         [(ngModel)]="nuevoCredito.cuotaInicial" name="cuotaInicial"
-                         placeholder="0.00" step="0.01" min="0">
-                </div>
-              </div>
+          <div class="row mb-3">
+            <div class="col-md-3">
+              <label class="form-label">Línea Asignada</label>
+              <input type="text" class="form-control" [value]="nuevaCobranza.lineaAsignada | number:'1.2-2'" readonly>
             </div>
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label class="form-label">Monto por Cuota</label>
-                <div class="input-group">
-                  <span class="input-group-text">S/</span>
-                  <input type="text" class="form-control" readonly
-                         [value]="calcularMontoCuota() | number:'1.2-2'">
-                </div>
-              </div>
+            <div class="col-md-3">
+              <label class="form-label">Deuda Total</label>
+              <input type="text" class="form-control" [value]="nuevaCobranza.deudaTotal | number:'1.2-2'" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Apto para créditos</label>
+              <input type="text" class="form-control" [value]="nuevaCobranza.aptoCreditos" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Importe a Cancelar</label>
+              <input type="number" class="form-control" [(ngModel)]="nuevaCobranza.importeCancelar" name="importeCancelar" placeholder="0.00" step="0.01" min="0">
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Forma de pago</label>
+              <select class="form-select" [(ngModel)]="nuevaCobranza.idMediosPago" name="idMediosPagoCobranza">
+                <option [ngValue]="null">-- Seleccione --</option>
+                <option *ngFor="let m of mediosPago" [ngValue]="m.idMediosPago">{{ m.descripcion }}</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Caja (Recibo de Ingreso)</label>
+              <select class="form-select" [(ngModel)]="nuevaCobranza.idApertura" name="idAperturaCobranza">
+                <option value="">-- Sin caja --</option>
+                <option *ngFor="let caja of cajas" [ngValue]="caja.idApertura">{{ caja.descripcion || 'Caja ' + caja.idApertura }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Observaciones</label>
+            <textarea class="form-control" [(ngModel)]="nuevaCobranza.observaciones" name="observaciones" rows="2" placeholder="Observaciones"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Detalle - Comprobantes al crédito</label>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Item</th>
+                    <th>Comprobante</th>
+                    <th>Fecha Venta</th>
+                    <th class="text-end">Total Comprobante</th>
+                    <th>Fecha Vencimiento</th>
+                    <th class="text-end">Importe a pagar</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of detalleCobranza; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ item.comprobante }}</td>
+                    <td>{{ item.fechaVenta | date:'dd/MM/yyyy' }}</td>
+                    <td class="text-end">S/ {{ item.totalComprobante | number:'1.2-2' }}</td>
+                    <td>{{ item.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
+                    <td class="text-end">
+                      <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="item.importePagado" [name]="'importePagado_' + i" step="0.01" min="0" [max]="item.saldoPendiente" placeholder="0.00">
+                    </td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarDetalleCobranza(i)"><i class="bi bi-trash"></i></button></td>
+                  </tr>
+                  <tr>
+                    <td colspan="6" class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalBuscarComprobantes()" [disabled]="!nuevaCobranza.idCliente">
+                        <i class="bi bi-search"></i> Buscar comprobantes al crédito
+                      </button>
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="row">
+              <div class="col-md-3"><strong>Total:</strong> S/ {{ totalDetalleCobranza | number:'1.2-2' }}</div>
+              <div class="col-md-3"><strong>Saldo:</strong> S/ {{ (nuevaCobranza.deudaTotal - totalDetalleCobranza) | number:'1.2-2' }}</div>
             </div>
           </div>
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="cerrarModales()">Cancelar</button>
-        <button type="button" class="btn btn-primary" (click)="crearCredito()" [disabled]="loading">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalNuevaCobranza()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="guardarCobranza()" [disabled]="loading">
           <i class="fas fa-save me-1"></i>
-          {{ loading ? 'Creando...' : 'Crear Crédito' }}
+          {{ loading ? 'Guardando...' : 'Guardar' }}
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Buscar Cliente (lista clientes por RUC o nombre) -->
+<div class="modal fade" [class.show]="mostrarModalBuscarCliente" [style.display]="mostrarModalBuscarCliente ? 'block' : 'none'"
+     tabindex="-1" style="z-index: 1060;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">Buscar cliente (RUC o nombre)</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalBuscarCliente()"></button>
+      </div>
+      <div class="modal-body p-0">
+        <app-index-clientes [modoSelector]="true" (clienteElegido)="seleccionarClienteCobranza($event)"></app-index-clientes>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Buscar Comprobantes al crédito del cliente -->
+<div class="modal fade" [class.show]="mostrarModalBuscarComprobantes" [style.display]="mostrarModalBuscarComprobantes ? 'block' : 'none'"
+     tabindex="-1" style="z-index: 1060;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">Comprobantes al crédito del cliente</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalBuscarComprobantes()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted" *ngIf="!nuevaCobranza.idCliente">Seleccione primero un cliente.</p>
+        <div class="table-responsive" *ngIf="nuevaCobranza.idCliente && creditosClienteParaSelector.length > 0">
+          <table class="table table-hover table-sm">
+            <thead class="table-light">
+              <tr>
+                <th>Comprobante</th>
+                <th>Fecha Venta</th>
+                <th class="text-end">Total</th>
+                <th>Fecha Vencimiento</th>
+                <th class="text-end">Saldo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of creditosClienteParaSelector">
+                <td>{{ c.comprobante || ('Venta ' + c.idVenta) }}</td>
+                <td>{{ c.fechaCredito | date:'dd/MM/yyyy' }}</td>
+                <td class="text-end">S/ {{ c.montoTotal | number:'1.2-2' }}</td>
+                <td>{{ (c.proximaCuota | date:'dd/MM/yyyy') || '—' }}</td>
+                <td class="text-end">S/ {{ (c.saldoPendiente ?? 0) | number:'1.2-2' }}</td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-success" (click)="agregarComprobanteADetalle(c)">
+                    <i class="bi bi-plus"></i> Agregar
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted small" *ngIf="nuevaCobranza.idCliente && creditosClienteParaSelector.length === 0 && !loadingCreditosCliente">No hay comprobantes al crédito con saldo pendiente.</p>
+        <p class="text-muted small" *ngIf="loadingCreditosCliente">Cargando...</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalBuscarComprobantes()">Cerrar</button>
       </div>
     </div>
   </div>
@@ -277,10 +381,26 @@
             </div>
           </div>
           <div class="mb-3">
-            <label for="formaPago" class="form-label">Forma de Pago *</label>
+            <label for="idApertura" class="form-label">Caja (para Recibo de Ingreso y arqueo)</label>
+            <select class="form-select" id="idApertura"
+                    [(ngModel)]="pagoCuota.idApertura" name="idApertura">
+              <option value="">Sin caja (no genera recibo)</option>
+              <option *ngFor="let c of cajas" [ngValue]="c.idApertura">{{ c.nombre || c.idApertura }}</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="idMediosPago" class="form-label">Medio de pago</label>
+            <select class="form-select" id="idMediosPago"
+                    [(ngModel)]="pagoCuota.idMediosPago" name="idMediosPago">
+              <option [ngValue]="null">Seleccionar</option>
+              <option *ngFor="let mp of mediosPago" [ngValue]="mp.idMediosPago">{{ mp.descripcion }}</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="formaPago" class="form-label">Forma de Pago (referencia)</label>
             <select class="form-select" id="formaPago"
-                    [(ngModel)]="pagoCuota.formaPago" name="formaPago" required>
-              <option value="">Seleccionar forma de pago</option>
+                    [(ngModel)]="pagoCuota.formaPago" name="formaPago">
+              <option value="">Opcional</option>
               <option value="EFECTIVO">Efectivo</option>
               <option value="TARJETA">Tarjeta</option>
               <option value="TRANSFERENCIA">Transferencia</option>
@@ -313,4 +433,4 @@
 </div>
 
 <!-- Backdrop para modales -->
-<div class="modal-backdrop fade show" *ngIf="mostrarModalNuevoCredito || mostrarModalPagarCuota || mostrarVerCuotas" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalNuevoCredito || mostrarModalPagarCuota || mostrarVerCuotas || mostrarModalNuevaCobranza || mostrarModalBuscarCliente || mostrarModalBuscarComprobantes" style="z-index: 1040;"></div>

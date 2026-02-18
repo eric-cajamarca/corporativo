@@ -122,7 +122,7 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
     }
     const result = await CajaRepository.registrarMovimientoRepo(transaction, user, datos);
     await transaction.commit();
-    return result;
+    return { ...result, documentoRelacionado: datos.documentoRelacionado || null };
   } catch (err) {
     await transaction.rollback();
     throw err;

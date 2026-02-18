@@ -1,23 +1,27 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ClienteService } from '../../../services/cliente.service';
+import { ClienteEditarModalService } from '../../../services/cliente-editar-modal.service';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 
 declare var iziToast: any;
 @Component({
   selector: 'app-index-clientes',
   standalone: true,
-  imports: [FormsModule,RouterModule,CommonModule, NgbPagination],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination, TopnavComponent, SidebarComponent],
   templateUrl: './index-clientes.component.html',
   styleUrl: './index-clientes.component.css'
 })
 export class IndexClientesComponent {
-  @Input() modoSelector = false;   // true  → dentro de modal
+  @Input() modoSelector = false;   // true  → dentro de modal (sin sidebar)
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
+
+  sidebarCollapsed = signal<boolean>(false);
   
   public clientes: Array<any> = [];
   public clienteSearch: Array<any> = [];
@@ -37,8 +41,15 @@ export class IndexClientesComponent {
   constructor(
     private _adminService: AdminService,
     private _clientesService: ClienteService,
-  ) {
-    //this.token = this._cookieService.get('token');
+    private clienteEditarModal: ClienteEditarModalService
+  ) {}
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarCollapsed.set(collapsed);
+  }
+
+  abrirEditarClienteModal(idCliente: string | number): void {
+    this.clienteEditarModal.abrir(idCliente).then(() => this.init_data());
   }
 
 
