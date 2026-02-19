@@ -9,6 +9,7 @@ import { ProductoService } from '../../../services/producto.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var bootstrap: any;
 
@@ -21,7 +22,6 @@ declare var bootstrap: any;
 
 })
 export class CreatePreciosComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   @ViewChild('modalNuevaLista') modalNuevaLista!: ElementRef;
 
   // Datos
@@ -45,16 +45,13 @@ export class CreatePreciosComponent implements OnInit {
   modal: any;
 
   
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
-
   constructor(
     private fb: FormBuilder,
     private preciosService: PreciosService,
     private _productosService : ProductoService,
     private _sucursalService: SucursalService,
-    private _tablasSunatService: TablasSunatService
+    private _tablasSunatService: TablasSunatService,
+    public sidebarState: SidebarStateService
   ) {
     this.formListaPrecio = this.fb.group({
       idLista: [null],

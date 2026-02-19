@@ -5,8 +5,10 @@ import { Router, RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
 import { PdfService } from '../../../services/pdf.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 
@@ -21,12 +23,18 @@ declare var iziToast: any;
   styleUrl: './index-cotizaciones.component.css'
 })
 export class IndexCotizacionesComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   cotizaciones: CotizacionListado[] = [];
   cotizacionesConst: CotizacionListado[] = [];
   loading = true;
   cotizacionSeleccionada: CotizacionListado | null = null;
   generandoPdf = false;
+  mostrarWhatsappForm = false;
+  whatsappNumber = '';
+  whatsappCaption = '';
+  whatsappFormato: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsapp = false;
+  whatsappMensaje: string | null = null;
+  datosParaWhatsapp: { datos: unknown; nombreArchivo: string } | null = null;
   page = 1;
   pageSize = 10;
 
@@ -40,15 +48,13 @@ export class IndexCotizacionesComponent implements OnInit {
   constructor(
     private cotizacionesService: CotizacionesService,
     private pdfService: PdfService,
-    private router: Router
+    private whatsappService: WhatsappService,
+    private router: Router,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
     this.cargarCotizaciones();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarCotizaciones(): void {
@@ -134,11 +140,100 @@ export class IndexCotizacionesComponent implements OnInit {
 
   abrirModalPdf(c: CotizacionListado): void {
     this.cotizacionSeleccionada = c;
+    this.mostrarWhatsappForm = false;
+    this.datosParaWhatsapp = null;
+    this.whatsappMensaje = null;
     const el = document.getElementById('pdfModalCotizacion');
     if (el && typeof bootstrap !== 'undefined') {
       const modal = bootstrap.Modal.getOrCreateInstance(el);
       modal.show();
     }
+  }
+
+  abrirFormWhatsapp(): void {
+    const c = this.cotizacionSeleccionada;
+    if (!c || c.idCotizacion == null) return;
+    this.generandoPdf = true;
+    this.whatsappMensaje = null;
+    this.cotizacionesService.getCotizacionParaPdf(c.idCotizacion).subscribe({
+      next: (res) => {
+        const d = res.data;
+        this.generandoPdf = false;
+        if (!d) return;
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `cotizacion-${(d.venta?.compVenta || c.serieNumero || 'cotizacion').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.datosParaWhatsapp = { datos, nombreArchivo };
+        this.whatsappNumber = (d.cliente as { celular?: string })?.celular ?? '';
+        this.mostrarWhatsappForm = true;
+      },
+      error: (err) => {
+        this.generandoPdf = false;
+        this.whatsappMensaje = err?.error?.error || err?.message || 'No se pudieron cargar los datos.';
+      }
+    });
+  }
+
+  cerrarFormWhatsapp(): void {
+    this.mostrarWhatsappForm = false;
+    this.datosParaWhatsapp = null;
+    this.whatsappNumber = '';
+    this.whatsappCaption = '';
+    this.whatsappFormato = 'A4';
+    this.whatsappMensaje = null;
+  }
+
+  enviarPdfPorWhatsapp(): void {
+    if (!this.datosParaWhatsapp || !this.whatsappNumber.trim()) {
+      this.whatsappMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsapp = true;
+    this.whatsappMensaje = null;
+    const { datos, nombreArchivo } = this.datosParaWhatsapp;
+    const formato = this.whatsappFormato;
+    this.pdfService.generarPdfComprobanteVenta(datos as any, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this.whatsappService.enviarArchivo(this.whatsappNumber.trim(), base64, nombreArchivo, 'document', this.whatsappCaption.trim() || undefined).subscribe({
+            next: (res) => {
+              this.enviandoWhatsapp = false;
+              this.whatsappMensaje = res.message;
+              if (res.success) setTimeout(() => this.cerrarFormWhatsapp(), 2000);
+            },
+            error: (err) => {
+              this.enviandoWhatsapp = false;
+              this.whatsappMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+            }
+          });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err) => {
+        this.enviandoWhatsapp = false;
+        this.whatsappMensaje = err?.error?.error || err?.message || 'Error al generar el PDF.';
+      }
+    });
   }
 
   generarPdf(formato: 'A4' | 'A5' | 'ticket'): void {

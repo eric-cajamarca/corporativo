@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../topnav/topnav.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
+import { SidebarStateService } from '../../services/sidebar-state.service';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
 import { DashboardService } from '../../services/dashboard.service';
@@ -17,9 +18,6 @@ import { Chart } from 'chart.js/auto';
   styleUrl: './inicio.component.css'
 })
 export class InicioComponent implements OnInit {
-
-  // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
 
   // Información del usuario
   public userName: string = 'Usuario';
@@ -65,7 +63,8 @@ export class InicioComponent implements OnInit {
     private router: Router,
     public authService: AuthService,
     private permisosService: PermisosService,
-    private dashboardService: DashboardService
+    private dashboardService: DashboardService,
+    public sidebarState: SidebarStateService
   ) {
     // Efecto para actualizar datos del usuario
     effect(() => {
@@ -80,11 +79,6 @@ export class InicioComponent implements OnInit {
   ngOnInit(): void {
     this.initializeDashboard();
     
-    // Verificar preferencia de sidebar
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.sidebarCollapsed.set(true);
-    }
   }
 
   /**
@@ -255,13 +249,6 @@ export class InicioComponent implements OnInit {
         options: chartOptions as object
       });
     }
-  }
-
-  /**
-   * Maneja el evento de toggle del sidebar
-   */
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   /**

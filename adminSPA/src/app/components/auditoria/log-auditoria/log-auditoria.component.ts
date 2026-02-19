@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
 import { AuditoriaService, AuditoriaItem } from '../../../services/auditoria.service';
@@ -14,7 +15,6 @@ import { AuditoriaService, AuditoriaItem } from '../../../services/auditoria.ser
   styleUrl: './log-auditoria.component.css'
 })
 export class LogAuditoriaComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   items: AuditoriaItem[] = [];
   total = 0;
   page = 1;
@@ -27,16 +27,13 @@ export class LogAuditoriaComponent implements OnInit {
     fechaHasta: ''
   };
 
-  constructor(private auditoriaService: AuditoriaService) {}
+  constructor(
+    private auditoriaService: AuditoriaService,
+    public sidebarState: SidebarStateService
+  ) {}
 
   ngOnInit(): void {
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargar();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargar(): void {

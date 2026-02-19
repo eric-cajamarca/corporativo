@@ -6,6 +6,7 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var bootstrap: any;
 
@@ -17,8 +18,6 @@ declare var bootstrap: any;
 })
 export class IndexSucursalComponent {
 
-  // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
   public sucursales: Array<any> = [];
 
   public token:any;
@@ -32,12 +31,9 @@ export class IndexSucursalComponent {
   public rotate = true;
   public boundaryLinks = true;
 
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
-
   constructor(
     private _sucursalcervice: SucursalService,
+    public sidebarState: SidebarStateService,
   ) { 
     //this.token = this._cookieService.get('token');
     this.obtenerSucursales();

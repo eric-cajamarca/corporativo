@@ -5,11 +5,13 @@ import { RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { VentasService, VentaListado } from '../../../services/ventas.service';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 import { Empresa as EmpresaModel } from '../../../models/empresa.model';
@@ -22,8 +24,6 @@ import { Empresa as EmpresaModel } from '../../../models/empresa.model';
   styleUrl: './index-ventas.component.css'
 })
 export class IndexVentasComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
-
   ventas: VentaListado[] = [];
   ventasConst: VentaListado[] = [];
   loading = true;
@@ -38,6 +38,14 @@ export class IndexVentasComponent implements OnInit {
   contenidoArchivo: string | null = null;
   loadingArchivo = false;
   archivoError: string | null = null;
+
+  mostrarWhatsappForm = false;
+  whatsappNumber = '';
+  whatsappCaption = '';
+  whatsappFormato: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsapp = false;
+  whatsappMensaje: string | null = null;
+  datosParaWhatsapp: { datos: unknown; nombreArchivo: string } | null = null;
 
   page = 1;
   pageSize = 10;
@@ -55,7 +63,9 @@ export class IndexVentasComponent implements OnInit {
     private facturacionService: FacturacionService,
     private pdfService: PdfService,
     private excelService: ExcelService,
-    private empresaService: EmpresaService
+    private empresaService: EmpresaService,
+    private whatsappService: WhatsappService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -63,10 +73,6 @@ export class IndexVentasComponent implements OnInit {
       this.empresa = emp;
     });
     this.cargarVentas();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarVentas(): void {
@@ -291,6 +297,95 @@ export class IndexVentasComponent implements OnInit {
 
   abrirModalPdf(v: VentaListado): void {
     this.ventaSeleccionada = v;
+    this.mostrarWhatsappForm = false;
+    this.datosParaWhatsapp = null;
+    this.whatsappMensaje = null;
+  }
+
+  abrirFormWhatsapp(): void {
+    const v = this.ventaSeleccionada;
+    if (!v || v.idVenta == null) return;
+    this.generandoPdf = true;
+    this.whatsappMensaje = null;
+    this.ventasService.getComprobanteParaPdf(v.idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        this.generandoPdf = false;
+        if (!d) return;
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || v.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.datosParaWhatsapp = { datos, nombreArchivo };
+        this.whatsappNumber = (d.cliente as { celular?: string })?.celular ?? '';
+        this.mostrarWhatsappForm = true;
+      },
+      error: (err) => {
+        this.generandoPdf = false;
+        this.whatsappMensaje = err?.error?.error || err?.message || 'No se pudieron cargar los datos.';
+      }
+    });
+  }
+
+  cerrarFormWhatsapp(): void {
+    this.mostrarWhatsappForm = false;
+    this.datosParaWhatsapp = null;
+    this.whatsappNumber = '';
+    this.whatsappCaption = '';
+    this.whatsappFormato = 'A4';
+    this.whatsappMensaje = null;
+  }
+
+  enviarPdfPorWhatsapp(): void {
+    if (!this.datosParaWhatsapp || !this.whatsappNumber.trim()) {
+      this.whatsappMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsapp = true;
+    this.whatsappMensaje = null;
+    const { datos, nombreArchivo } = this.datosParaWhatsapp;
+    const formato = this.whatsappFormato;
+    this.pdfService.generarPdfComprobanteVenta(datos as any, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this.whatsappService.enviarArchivo(this.whatsappNumber.trim(), base64, nombreArchivo, 'document', this.whatsappCaption.trim() || undefined).subscribe({
+            next: (res) => {
+              this.enviandoWhatsapp = false;
+              this.whatsappMensaje = res.message;
+              if (res.success) setTimeout(() => this.cerrarFormWhatsapp(), 2000);
+            },
+            error: (err) => {
+              this.enviandoWhatsapp = false;
+              this.whatsappMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+            }
+          });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err) => {
+        this.enviandoWhatsapp = false;
+        this.whatsappMensaje = err?.error?.error || err?.message || 'Error al generar el PDF.';
+      }
+    });
   }
 
   generarPdf(formato: 'A4' | 'A5' | 'ticket'): void {

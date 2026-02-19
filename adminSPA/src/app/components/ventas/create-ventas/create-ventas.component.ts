@@ -24,6 +24,7 @@ import { VentasService } from '../../../services/ventas.service';
 import { CotizacionesService } from '../../../services/cotizaciones.service';
 import { CajaService } from '../../../services/caja.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
@@ -97,7 +98,6 @@ export class CreateVentasComponent implements OnInit {
     condicion: 'ACTIVO'
   };
   public cajas: any[] = [];
-  public sidebarCollapsed = signal(false);
   public loading = false;
   public clienteBuscando = false;
 
@@ -158,12 +158,9 @@ export class CreateVentasComponent implements OnInit {
     private _factilizaService: FactilizaService,
     private _impuestoService: ImpuestoService,
     private ventaSesionService: VentaSesionService,
-    private creditosService: CreditosService
+    private creditosService: CreditosService,
+    public sidebarState: SidebarStateService
   ) {}
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
 
   ngOnInit(): void {
     this._documentosService.obtener_documento1().subscribe({
@@ -193,8 +190,6 @@ export class CreateVentasComponent implements OnInit {
     const hoy = `${y}-${m}-${d}`;
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
     this.revisarVentasProvisionales();

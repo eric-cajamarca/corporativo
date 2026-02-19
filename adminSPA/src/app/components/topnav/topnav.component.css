@@ -163,6 +163,102 @@
   color: #212529;
 }
 
+/* Tipo de cambio */
+.tipo-cambio-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #495057;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.tipo-cambio-badge:hover {
+  background: #e9ecef;
+}
+
+.tipo-cambio-badge .tc-label {
+  font-weight: 600;
+  color: #6c757d;
+}
+
+.tipo-cambio-badge .tc-valores {
+  white-space: nowrap;
+}
+
+/* Dropdown tipo de cambio del mes */
+.tc-mes-dropdown {
+  min-width: 320px;
+  max-width: 380px;
+  padding: 12px;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+}
+
+.tc-mes-header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e9ecef;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.tc-mes-nav {
+  padding: 4px 0;
+}
+
+.tc-mes-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.tc-mes-list {
+  max-height: 280px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+}
+
+.tc-mes-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f1f3f4;
+  align-items: center;
+}
+
+.tc-mes-row-header {
+  font-weight: 600;
+  color: #6c757d;
+  background: #f8f9fa;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.tc-mes-row-header span:nth-child(2),
+.tc-mes-row-header span:nth-child(3) {
+  text-align: right;
+}
+
+.tc-mes-row span:nth-child(2),
+.tc-mes-row span:nth-child(3) {
+  text-align: right;
+}
+
+.tc-mes-loading,
+.tc-mes-empty {
+  padding: 16px;
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
 .notification-badge {
   position: absolute;
   top: 4px;

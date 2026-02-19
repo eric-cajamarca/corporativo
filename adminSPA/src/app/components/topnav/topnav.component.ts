@@ -1,9 +1,10 @@
-import { Component, OnInit, effect, Output, EventEmitter, Input } from '@angular/core';
+import { Component, OnInit, effect, Output, EventEmitter, Input, ChangeDetectorRef } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
+import { TipoCambioService, TipoCambioData } from '../../services/tipo-cambio.service';
 
 @Component({
   selector: 'app-topnav',
@@ -24,6 +25,14 @@ export class TopnavComponent implements OnInit {
   public notificacionesCount: number = 0;
   public notificaciones: any[] = [];
 
+  // Tipo de cambio (solo si empresa autorizada)
+  public tipoCambio: TipoCambioData | null = null;
+  public showTipoCambioDropdown = false;
+  public mesTipoCambio: TipoCambioData[] = [];
+  public mesTipoCambioAnio = new Date().getFullYear();
+  public mesTipoCambioMes = new Date().getMonth() + 1;
+  public loadingTipoCambioMes = false;
+
   // Eventos
   @Output() toggleSidebar = new EventEmitter<void>();
   @Input() sidebarCollapsed: boolean = false;
@@ -36,6 +45,8 @@ export class TopnavComponent implements OnInit {
     private router: Router,
     public authService: AuthService,
     private permisosService: PermisosService,
+    private tipoCambioService: TipoCambioService,
+    private cdr: ChangeDetectorRef,
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -45,11 +56,13 @@ export class TopnavComponent implements OnInit {
         this.userRole = userData.rol || '';
         this.empresaNombre = userData.razonSocial || '';
         this.isAuthenticated = true;
+        this.cargarTipoCambio();
       } else {
         this.userName = '';
         this.userRole = '';
         this.empresaNombre = '';
         this.isAuthenticated = false;
+        this.tipoCambio = null;
       }
     });
   }
@@ -57,7 +70,10 @@ export class TopnavComponent implements OnInit {
   ngOnInit(): void {
     // Inicializar el servicio de autenticación
     this.authService.initialize();
-    
+    // Cargar tipo de cambio tras dar tiempo a que verifyToken complete (por si el effect no disparó)
+    setTimeout(() => {
+      if (this.isAuthenticated) this.cargarTipoCambio();
+    }, 600);
     // Cargar notificaciones (ejemplo)
     this.cargarNotificaciones();
   }
@@ -134,6 +150,66 @@ export class TopnavComponent implements OnInit {
   closeSearchResults(): void {
     this.showSearchResults = false;
     this.searchQuery = '';
+  }
+
+  /**
+   * Carga tipo de cambio del día (solo si empresa autorizada)
+   */
+  private cargarTipoCambio(): void {
+    this.tipoCambioService.getTipoCambioDia().subscribe(data => {
+      this.tipoCambio = data;
+      this.cdr.markForCheck();
+    });
+  }
+
+  toggleTipoCambioDropdown(): void {
+    this.showTipoCambioDropdown = !this.showTipoCambioDropdown;
+    if (this.showTipoCambioDropdown) {
+      const now = new Date();
+      this.mesTipoCambioAnio = now.getFullYear();
+      this.mesTipoCambioMes = now.getMonth() + 1;
+      this.cargarTipoCambioMes();
+    }
+    this.cdr.markForCheck();
+  }
+
+  cargarTipoCambioMes(): void {
+    this.loadingTipoCambioMes = true;
+    this.mesTipoCambio = [];
+    this.cdr.markForCheck();
+    this.tipoCambioService.getTipoCambioMes(this.mesTipoCambioAnio, this.mesTipoCambioMes).subscribe(data => {
+      this.mesTipoCambio = data;
+      this.loadingTipoCambioMes = false;
+      this.cdr.markForCheck();
+    }, () => {
+      this.loadingTipoCambioMes = false;
+      this.cdr.markForCheck();
+    });
+  }
+
+  prevMesTipoCambio(): void {
+    if (this.mesTipoCambioMes === 1) {
+      this.mesTipoCambioMes = 12;
+      this.mesTipoCambioAnio--;
+    } else {
+      this.mesTipoCambioMes--;
+    }
+    this.cargarTipoCambioMes();
+  }
+
+  nextMesTipoCambio(): void {
+    if (this.mesTipoCambioMes === 12) {
+      this.mesTipoCambioMes = 1;
+      this.mesTipoCambioAnio++;
+    } else {
+      this.mesTipoCambioMes++;
+    }
+    this.cargarTipoCambioMes();
+  }
+
+  nombreMes(mes: number): string {
+    const nombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return nombres[mes - 1] || '';
   }
 
   /**

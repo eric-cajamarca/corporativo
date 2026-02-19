@@ -205,9 +205,9 @@
 }
 
 @if (!esModal) {
-  <app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-  <app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
-  <main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+  <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+  <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
     <div class="content-header">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>

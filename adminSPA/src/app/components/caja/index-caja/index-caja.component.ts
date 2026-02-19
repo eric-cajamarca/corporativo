@@ -8,6 +8,7 @@ import { Caja, MovimientoCaja, TipoMovimientoCaja } from '../../../interfaces/ca
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 
@@ -19,8 +20,6 @@ declare var iziToast: any;
   styleUrl: './index-caja.component.css'
 })
 export class IndexCajaComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
-
   public cajas: Caja[] = [];
   public sucursales: Sucursal[] = [];
   public movimientos: MovimientoCaja[] = [];
@@ -58,17 +57,14 @@ export class IndexCajaComponent implements OnInit {
 
   constructor(
     private cajaService: CajaService,
-    private sucursalService: SucursalService
+    private sucursalService: SucursalService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
     this.cargarCajas();
     this.cargarTiposMovimiento();
     this.cargarSucursales();
-  }
-
-  onSidebarToggle( collapsed: boolean ): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarSucursales() {

@@ -1,11 +1,11 @@
 <!-- Sidebar -->
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
 
 <!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
 <!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   
   <!-- Loading Overlay -->
   <div class="loading-overlay" *ngIf="cargandoDatos()">

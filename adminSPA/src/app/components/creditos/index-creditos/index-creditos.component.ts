@@ -12,6 +12,7 @@ import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfac
 import { Cliente } from '../../../interfaces/cliente-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 
 declare var iziToast: any;
@@ -34,8 +35,6 @@ export interface DetalleCobranzaItem {
   styleUrl: './index-creditos.component.css'
 })
 export class IndexCreditosComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
-
   public creditos: CreditoCliente[] = [];
   public cuotas: CuotaCredito[] = [];
   public clientes: Cliente[] = [];
@@ -107,7 +106,8 @@ export class IndexCreditosComponent implements OnInit {
     private creditosService: CreditosService,
     private clienteService: ClienteService,
     private cajaService: CajaService,
-    private tablasSunat: TablasSunatService
+    private tablasSunat: TablasSunatService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -122,12 +122,6 @@ export class IndexCreditosComponent implements OnInit {
       next: (r) => { this.mediosPago = r.data || []; },
       error: () => {}
     });
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarClientes() {

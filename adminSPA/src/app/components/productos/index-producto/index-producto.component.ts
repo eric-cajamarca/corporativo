@@ -8,6 +8,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoCompuestoService } from '../../../services/producto-compuesto.service';
 import { ProductovarianteService } from '../../../services/productovariante.service';
@@ -25,9 +26,6 @@ declare var iziToast: any;
   styleUrl: './index-producto.component.css'
 })
 export class IndexProductoComponent {
-   // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
-
   // NUEVAS VARIABLES PARA MODALES
   @ViewChild('modalConvertirCompuesto') modalConvertirCompuesto!: ElementRef;
   @ViewChild('modalGestionarVariantes') modalGestionarVariantes!: ElementRef;
@@ -78,6 +76,7 @@ export class IndexProductoComponent {
     private _productoDetalleModal: ProductoDetalleModalService,
     private _productoEditarModal: ProductoEditarModalService,
     private _productoCrearModal: ProductoCrearModalService,
+    public sidebarState: SidebarStateService,
   ) {
    // this.token = this._cookieService.get('token');
   }
@@ -94,19 +93,6 @@ export class IndexProductoComponent {
 
   ngOnInit(): void {
     this.initData();
-
-    // Verificar preferencia de sidebar
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.sidebarCollapsed.set(true);
-    }
-  }
-
-  /**
-   * Maneja el toggle del sidebar
-   */
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   initData() {

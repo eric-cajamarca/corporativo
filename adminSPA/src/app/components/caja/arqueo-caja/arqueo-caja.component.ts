@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
 import { Caja } from '../../../interfaces/caja-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
@@ -24,9 +25,6 @@ export interface FilaArqueoConcepto {
   styleUrl: './arqueo-caja.component.css'
 })
 export class ArqueoCajaComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
-  
-
   /** Fecha inicial (obligatoria). Si no hay fecha final, se consulta solo ese día. */
   public fecha: string = '';
   public fechaFinal: string = '';
@@ -75,7 +73,8 @@ export class ArqueoCajaComponent implements OnInit {
   };
 
   constructor(
-    private cajaService: CajaService
+    private cajaService: CajaService,
+    public sidebarState: SidebarStateService
   ) {}
 
   /** Fecha en zona local YYYY-MM-DD (evita que al recargar aparezca un día adelantado por UTC). */
@@ -90,10 +89,6 @@ export class ArqueoCajaComponent implements OnInit {
   ngOnInit(): void {
     this.fecha = ArqueoCajaComponent.fechaLocalHoy();
     this.cargarCajas();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarCajas(): void {

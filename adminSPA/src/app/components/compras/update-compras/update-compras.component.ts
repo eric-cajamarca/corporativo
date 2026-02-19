@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 
 declare var iziToast: any;
@@ -26,12 +27,6 @@ declare var bootstrap: any;
   styleUrl: './update-compras.component.css'
 })
 export class UpdateComprasComponent {
-  sidebarCollapsed = signal<boolean>(false);
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
-
   public compras: any = {
     idEmpresa: '',
     idSucursal: '',
@@ -112,7 +107,8 @@ export class UpdateComprasComponent {
     private _route: ActivatedRoute,
     private _marcaService: variosService,
     private _router: Router,
-    private _cdr: ChangeDetectorRef
+    private _cdr: ChangeDetectorRef,
+    public sidebarState: SidebarStateService
   ) {
     //this.token = this._cookieService.get('token');
   }

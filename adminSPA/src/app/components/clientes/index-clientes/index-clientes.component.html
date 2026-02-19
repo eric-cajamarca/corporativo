@@ -1,9 +1,9 @@
 <ng-container *ngIf="!modoSelector">
-  <app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-  <app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+  <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+  <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 </ng-container>
 
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()" [class.p-0]="modoSelector">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()" [class.p-0]="modoSelector">
   <div class="container" [class.container-fluid]="!modoSelector" style="background-color: white;">
   <div class="row">
     <div class="col-md-12">

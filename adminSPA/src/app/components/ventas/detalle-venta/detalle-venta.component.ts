@@ -3,6 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { VentasService, ComprobantePdfData, EntregaItem } from '../../../services/ventas.service';
 
@@ -14,7 +15,6 @@ import { VentasService, ComprobantePdfData, EntregaItem } from '../../../service
   styleUrl: './detalle-venta.component.css'
 })
 export class DetalleVentaComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   data: ComprobantePdfData | null = null;
   entregas: EntregaItem[] = [];
   loading = true;
@@ -26,12 +26,11 @@ export class DetalleVentaComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private ventasService: VentasService
+    private ventasService: VentasService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
-    const saved = localStorage.getItem('sidebarCollapsed');
-    if (saved === 'true') this.sidebarCollapsed.set(true);
     const id = this.route.snapshot.paramMap.get('id');
     this.idVenta = id ? parseInt(id, 10) : null;
     if (this.idVenta == null || isNaN(this.idVenta)) {
@@ -103,10 +102,6 @@ export class DetalleVentaComponent implements OnInit {
         this.errorEntrega = err.error?.message || 'Error al registrar entrega.';
       }
     });
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   formatearMoneda(value: number | undefined): string {

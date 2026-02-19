@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { CatalogosService } from '../../../services/catalogos.service';
@@ -18,7 +19,6 @@ declare var iziToast: any;
   styleUrl: './index-conceptos.component.css'
 })
 export class IndexConceptosComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   items: any[] = [];
   total = 0;
   buscar = '';
@@ -35,18 +35,13 @@ export class IndexConceptosComponent implements OnInit {
 
   constructor(
     private catalogosService: CatalogosService,
-    private cajaService: CajaService
+    private cajaService: CajaService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargarTiposMovimientoCaja();
     this.cargar();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargarTiposMovimientoCaja(): void {

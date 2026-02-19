@@ -1,34 +1,35 @@
-import { Injectable } from "@angular/core";
-import { CanActivate, Router } from "@angular/router";
-import { AdminService } from "../services/admin.service";
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+import { map } from 'rxjs/operators';
 
-
-
+/**
+ * Guard que restringe el acceso solo al dueño del sistema (rol Administrador).
+ * Debe usarse junto con AuthGuard en rutas que solo el super admin puede ver (ej. Empresas).
+ */
 @Injectable({
-    providedIn: 'root'
-  })
+  providedIn: 'root'
+})
+export class AdminGuard implements CanActivate {
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) {}
 
-  export class AdminGuard implements CanActivate {
-  
-    constructor(
-      private _adminService:AdminService,
-      private _router:Router
-    ){
-    }
-  
-     canActivate(): any {}
-      
-    //   //quiero agregar mas roles al array allowedRoles
-    //   const allowedRoles = ['Administrador', 'Despachador', 'Almacen', 'Vendedor'];
-  
-    
-    //   if (!this._adminService.isAuthenticated(allowedRoles)) {
-    //     // El usuario no tiene permisos, redirige a la página de login
-    //     this._router.navigate(['/login']);
-    //     return false;
-    //   }
-    
-    //   // Usuario autenticado y con roles permitidos, permite la activación de la ruta
-    //   return true;
-    // }
-    }
+  canActivate() {
+    return this.authService.verifyToken().pipe(
+      map(isValid => {
+        if (!isValid) {
+          this.router.navigate(['/login-empresa']);
+          return false;
+        }
+        const rol = this.authService.userData()?.rol ?? '';
+        if (rol !== 'Administrador') {
+          this.router.navigate(['/home']);
+          return false;
+        }
+        return true;
+      })
+    );
+  }
+}

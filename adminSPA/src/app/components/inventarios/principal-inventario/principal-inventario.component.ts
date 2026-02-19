@@ -4,6 +4,7 @@ import { InventarioModalService } from '../../../services/inventario-modal.servi
 import { LotesService } from '../../../services/lotes.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 
@@ -15,9 +16,6 @@ declare var iziToast: any;
   styleUrls: ['./principal-inventario.component.css']
 })
 export class PrincipalInventarioComponent implements OnInit {
-  // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
-
   // Estadísticas
   totalLotes = 0;
   totalStock = 0;
@@ -26,20 +24,12 @@ export class PrincipalInventarioComponent implements OnInit {
 
   constructor(
     public inventarioModal: InventarioModalService,
-    private loteService: LotesService
+    private loteService: LotesService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
     this.cargarEstadisticas();
-    
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.sidebarCollapsed.set(true);
-    }
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   /**

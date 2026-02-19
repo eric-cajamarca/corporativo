@@ -41,6 +41,7 @@ import { IndexCotizacionesComponent } from './components/cotizaciones/index-coti
 import { DetalleCotizacionComponent } from './components/cotizaciones/detalle-cotizacion/detalle-cotizacion.component';
 import { UpdateCotizacionComponent } from './components/cotizaciones/update-cotizacion/update-cotizacion.component';
 import { AuthGuard } from './guards/auth.guard';
+import { AdminGuard } from './guards/admin.guards';
 import { IndexProveedorComponent } from './components/proveedores/index-proveedor/index-proveedor.component';
 import { CreateProveedorComponent } from './components/proveedores/create-proveedor/create-proveedor.component';
 import { UpdateProveedorComponent } from './components/proveedores/update-proveedor/update-proveedor.component';
@@ -89,7 +90,7 @@ export const routes: Routes = [
      {
         path: 'empresa',
         component: IndexEmpresaComponent,
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, AdminGuard],
         title: 'Empresas'
      },
      {

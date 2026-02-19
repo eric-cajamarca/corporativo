@@ -1,8 +1,8 @@
 <!-- Sidebar -->
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="container-fluid">
     <div class="card shadow-sm">
       <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">

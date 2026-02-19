@@ -7,6 +7,7 @@ import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 
 declare var iziToast: any;
@@ -21,8 +22,6 @@ export class IndexClientesComponent {
   @Input() modoSelector = false;   // true  → dentro de modal (sin sidebar)
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
 
-  sidebarCollapsed = signal<boolean>(false);
-  
   public clientes: Array<any> = [];
   public clienteSearch: Array<any> = [];
   public clientes_const: Array<any> = [];
@@ -41,12 +40,9 @@ export class IndexClientesComponent {
   constructor(
     private _adminService: AdminService,
     private _clientesService: ClienteService,
-    private clienteEditarModal: ClienteEditarModalService
+    private clienteEditarModal: ClienteEditarModalService,
+    public sidebarState: SidebarStateService
   ) {}
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
 
   abrirEditarClienteModal(idCliente: string | number): void {
     this.clienteEditarModal.abrir(idCliente).then(() => this.init_data());

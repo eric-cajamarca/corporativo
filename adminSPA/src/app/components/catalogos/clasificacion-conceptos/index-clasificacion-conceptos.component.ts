@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { CajaService } from '../../../services/caja.service';
@@ -24,7 +25,6 @@ export interface TipoMovimientoCajaItem {
   styleUrl: './index-clasificacion-conceptos.component.css'
 })
 export class IndexClasificacionConceptosComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   items: TipoMovimientoCajaItem[] = [];
   itemsCompletos: TipoMovimientoCajaItem[] = [];
   total = 0;
@@ -37,16 +37,13 @@ export class IndexClasificacionConceptosComponent implements OnInit {
   itemVer: TipoMovimientoCajaItem | null = null;
   loadSave = false;
 
-  constructor(private cajaService: CajaService) {}
+  constructor(
+    private cajaService: CajaService,
+    public sidebarState: SidebarStateService
+  ) {}
 
   ngOnInit(): void {
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargar();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   cargar(): void {

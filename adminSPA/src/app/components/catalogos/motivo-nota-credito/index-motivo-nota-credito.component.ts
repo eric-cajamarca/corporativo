@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { CatalogosService } from '../../../services/catalogos.service';
@@ -34,7 +35,6 @@ const DESCRIPCIONES_SUNAT: Record<string, string> = {
   styleUrl: './index-motivo-nota-credito.component.css'
 })
 export class IndexMotivoNotaCreditoComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   items: any[] = [];
   total = 0;
   buscar = '';
@@ -47,21 +47,18 @@ export class IndexMotivoNotaCreditoComponent implements OnInit {
   loadSave = false;
   codigosSunat: string[] = [];
 
-  constructor(private catalogosService: CatalogosService) {}
+  constructor(
+    private catalogosService: CatalogosService,
+    public sidebarState: SidebarStateService
+  ) {}
 
   ngOnInit(): void {
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.catalogosService.codigosSunatMotivoNotaCredito().subscribe({
       next: (res) => {
         this.codigosSunat = res.data || [];
       }
     });
     this.cargar();
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   descripcionSunat(codigo: string): string {

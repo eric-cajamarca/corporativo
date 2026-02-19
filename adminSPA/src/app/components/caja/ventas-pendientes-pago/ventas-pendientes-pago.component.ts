@@ -7,6 +7,7 @@ import { CajaService } from '../../../services/caja.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var bootstrap: any;
@@ -20,7 +21,6 @@ declare var iziToast: any;
   styleUrl: './ventas-pendientes-pago.component.css'
 })
 export class VentasPendientesPagoComponent implements OnInit {
-  sidebarCollapsed = signal(false);
   list: VentaPendientePago[] = [];
   loading = false;
   /** Filtro: idVenta (incluye escaneo código de barras) o nombre/RUC cliente */
@@ -41,12 +41,9 @@ export class VentasPendientesPagoComponent implements OnInit {
     private ventasService: VentasService,
     private cajaService: CajaService,
     private documentoService: DocumentoService,
-    private router: Router
+    private router: Router,
+    public sidebarState: SidebarStateService
   ) {}
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
 
   ngOnInit(): void {
     this.cargarFormasPago();

@@ -8,6 +8,7 @@ import { PermisosService } from '../../../services/permisos.service';
 import { UsuarioSucursalService, SucursalConAsignacion } from '../../../services/usuario-sucursal.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { Permiso } from '../../../interfaces/permisos-interface';
 
@@ -55,8 +56,6 @@ interface SesionUsuario {
 export class IndexColaboradorComponent implements OnInit {
 
   Math: any = Math;
-  // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
 
   // Colaboradores
   colaboradores: Colaborador[] = [];
@@ -109,19 +108,11 @@ export class IndexColaboradorComponent implements OnInit {
     private permisosService: PermisosService,
     private usuarioSucursalService: UsuarioSucursalService,
     private router: Router,
+    public sidebarState: SidebarStateService,
   ) {}
 
   ngOnInit(): void {
     this.cargarColaboradores();
-    
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.sidebarCollapsed.set(true);
-    }
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   // =============================================

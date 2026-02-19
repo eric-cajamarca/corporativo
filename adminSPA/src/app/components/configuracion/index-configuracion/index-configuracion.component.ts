@@ -11,6 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 
 declare var iziToast: any;
@@ -24,9 +25,6 @@ declare var iziToast: any;
 export class IndexConfiguracionComponent implements OnInit {
   @ViewChild('modalImpuestoForm') modalImpuestoRef?: ElementRef<HTMLDivElement>;
   @ViewChild('modalComprobantes') modalComprobantesRef?: ElementRef<HTMLDivElement>;
-
-  /** Estado del sidebar (colapsado/expandido) para layout y topnav */
-  sidebarCollapsed = signal<boolean>(false);
 
   // Configuración general (se llena con la empresa del usuario logueado)
   public configuracion = {
@@ -140,7 +138,8 @@ export class IndexConfiguracionComponent implements OnInit {
     private _empresaService: EmpresaService,
     private _facturacionService: FacturacionService,
     private _ventasService: VentasService,
-    private _router: Router
+    private _router: Router,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -641,10 +640,6 @@ export class IndexConfiguracionComponent implements OnInit {
         }
       }
     });
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   navigateTo(module: string): void {

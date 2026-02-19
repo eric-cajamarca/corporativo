@@ -7,6 +7,7 @@ import { CatalogosService } from '../../../services/catalogos.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { AuthService } from '../../../services/auth.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
@@ -34,7 +35,6 @@ export interface ReciboEgresoItem {
   styleUrl: './recibo-egreso.component.css'
 })
 export class ReciboEgresoComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   list: ReciboEgresoItem[] = [];
   cajas: any[] = [];
   tiposMovimiento: any[] = [];
@@ -76,7 +76,8 @@ export class ReciboEgresoComponent implements OnInit {
     private cajaService: CajaService,
     private catalogosService: CatalogosService,
     private tablasSunat: TablasSunatService,
-    private authService: AuthService
+    private authService: AuthService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -97,12 +98,6 @@ export class ReciboEgresoComponent implements OnInit {
       next: (r) => { this.mediosPago = r.data || []; },
       error: () => {}
     });
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   private tiposEgreso(): void {

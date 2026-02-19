@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { EmpresaService } from '../../../services/empresa.service';
 import { GestoresService, EmpresaGestionada, GestorInfo, BusquedaEmpresaResult, ConfiguracionEmpresa } from '../../../services/gestores.service';
+import { EmpresaFactilizaService, EmpresasServiciosData } from '../../../services/empresa-factiliza.service';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
@@ -20,8 +22,6 @@ declare var bootstrap: any;
 })
 export class IndexEmpresaComponent implements OnInit {
   Math: any = Math;
-  // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
 
   // Empresas
   public empresas: any[] = [];
@@ -55,27 +55,22 @@ export class IndexEmpresaComponent implements OnInit {
   // Tabs del modal principal
   public activeTab = signal<string>('gestores');
 
+  // Servicios API por empresa (tab en modal)
+  public serviciosApiData: EmpresasServiciosData | null = null;
+  public asignacionesServiciosApi: Record<string, Record<string, boolean>> = {};
+  public loadingServiciosApi = signal<boolean>(false);
+  public guardandoServiciosApi = signal<boolean>(false);
+
   constructor(
     public empresaService: EmpresaService,
     public gestoresService: GestoresService,
+    private empresaFactilizaService: EmpresaFactilizaService,
+    public sidebarState: SidebarStateService,
     public router: Router,
   ) {}
 
   ngOnInit(): void {
     this.cargarEmpresas();
-    
-    // Verificar preferencia de sidebar
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.sidebarCollapsed.set(true);
-    }
-  }
-
-  /**
-   * Maneja el toggle del sidebar
-   */
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   /**
@@ -358,13 +353,85 @@ export class IndexEmpresaComponent implements OnInit {
   // =============================================
 
   /**
-   * Cambia al tab de configuración
+   * Cambia al tab de configuración o servicios API
    */
   cambiarTab(tab: string): void {
     this.activeTab.set(tab);
     if (tab === 'configuracion') {
       this.cargarConfiguracion();
+    } else if (tab === 'servicios-api') {
+      this.cargarServiciosApi();
     }
+  }
+
+  /**
+   * Carga empresas, servicios y asignaciones para el tab Servicios API (solo Administrador).
+   */
+  cargarServiciosApi(): void {
+    this.loadingServiciosApi.set(true);
+    this.empresaFactilizaService.getEmpresasServicios().subscribe({
+      next: (res) => {
+        this.serviciosApiData = res.data ?? null;
+        this.asignacionesServiciosApi = res.data?.asignaciones ? JSON.parse(JSON.stringify(res.data.asignaciones)) : {};
+        this.loadingServiciosApi.set(false);
+      },
+      error: (err) => {
+        this.loadingServiciosApi.set(false);
+        console.error('Error cargando servicios API:', err);
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: err?.error?.message || 'Error al cargar servicios por empresa',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  getPuedeUsarServicio(idEmpresa: string, nombreServicio: string): boolean {
+    return !!this.asignacionesServiciosApi[idEmpresa]?.[nombreServicio];
+  }
+
+  setPuedeUsarServicio(idEmpresa: string, nombreServicio: string, value: boolean): void {
+    if (!this.asignacionesServiciosApi[idEmpresa]) {
+      this.asignacionesServiciosApi[idEmpresa] = {};
+    }
+    this.asignacionesServiciosApi[idEmpresa][nombreServicio] = value;
+  }
+
+  guardarServiciosApi(): void {
+    if (!this.serviciosApiData) return;
+    const asignaciones: Array<{ idEmpresa: string; nombreServicio: string; puedeUsar: boolean }> = [];
+    for (const emp of this.serviciosApiData.empresas) {
+      for (const servicio of this.serviciosApiData.servicios) {
+        asignaciones.push({
+          idEmpresa: emp.idEmpresa,
+          nombreServicio: servicio,
+          puedeUsar: this.getPuedeUsarServicio(emp.idEmpresa, servicio)
+        });
+      }
+    }
+    this.guardandoServiciosApi.set(true);
+    this.empresaFactilizaService.guardarEmpresasServicios(asignaciones).subscribe({
+      next: () => {
+        this.guardandoServiciosApi.set(false);
+        iziToast.show({
+          title: 'Éxito',
+          titleColor: '#28a745',
+          message: 'Asignaciones de servicios API guardadas correctamente',
+          position: 'topRight'
+        });
+      },
+      error: (err) => {
+        this.guardandoServiciosApi.set(false);
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: err?.error?.message || 'Error al guardar',
+          position: 'topRight'
+        });
+      }
+    });
   }
 
   /**

@@ -3,6 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { CotizacionesService } from '../../../services/cotizaciones.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
@@ -32,7 +33,6 @@ interface DetalleEdicion {
   styleUrl: './update-cotizacion.component.css'
 })
 export class UpdateCotizacionComponent implements OnInit {
-  sidebarCollapsed = signal<boolean>(false);
   idCotizacion: number | null = null;
   loading = true;
   saving = false;
@@ -53,7 +53,8 @@ export class UpdateCotizacionComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private cotizacionesService: CotizacionesService,
-    private buscadorProductosModal: BuscadorProductosModalService
+    private buscadorProductosModal: BuscadorProductosModalService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -104,10 +105,6 @@ export class UpdateCotizacionComponent implements OnInit {
         this.loading = false;
       }
     });
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   recalcularTotal(): void {

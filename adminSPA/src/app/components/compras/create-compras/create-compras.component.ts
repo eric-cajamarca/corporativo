@@ -25,6 +25,7 @@ import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 
 declare var iziToast: any;
@@ -46,9 +47,6 @@ const FORMATO_FECHA = 'dd/MM/yyyy';
   styleUrl: './create-compras.component.css',
 })
 export class CreateComprasComponent {
-  /** Estado del sidebar: contenido se centra o se extiende según esté visible u oculto */
-  sidebarCollapsed = signal<boolean>(false);
-
   public compras: any = {
     idSucursal: '',
     idComprobante: '',
@@ -71,10 +69,6 @@ export class CreateComprasComponent {
   };
 
   
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
 
   public consultManual = false;
   public idCompra: any = '';
@@ -152,7 +146,8 @@ export class CreateComprasComponent {
 
     // consultarxml
     private fb: FormBuilder,
-    private sunatService: ConsultaXMLService
+    private sunatService: ConsultaXMLService,
+    public sidebarState: SidebarStateService
   ) {
     //this.token = this._cookieService.get('token');
     this.consultaForm = this.fb.group({

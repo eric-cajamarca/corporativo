@@ -1,10 +1,10 @@
 <!-- Sidebar -->
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
 
 <!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav><!-- crea aqui el html para registrar las compras de los productos, haz uso de los componentes de bootstrap para el formulario (compCompra, idComprobante, serie, numero, fEmision, fVencimiento, idProveedor, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario) y la tabla de compras (idSucursal, idcompra,  Cantidad, idproducto, idPresentacion, pUnitario,total, idUsuario).-->
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav><!-- crea aqui el html para registrar las compras de los productos, haz uso de los componentes de bootstrap para el formulario (compCompra, idComprobante, serie, numero, fEmision, fVencimiento, idProveedor, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado, idUsuario) y la tabla de compras (idSucursal, idcompra,  Cantidad, idproducto, idPresentacion, pUnitario,total, idUsuario).-->
 
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-wrap">
     @if(consultManual) {
 

@@ -5,6 +5,7 @@ import { filter } from 'rxjs/operators';
 import { PermisosService } from '../../services/permisos.service';
 import { AuthService } from '../../services/auth.service';
 import { EmpresaService } from '../../services/empresa.service';
+import { SidebarStateService } from '../../services/sidebar-state.service';
 import { MenuItem } from '../../interfaces/permisos-interface';
 
 @Component({
@@ -39,6 +40,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     private permisosService: PermisosService,
     private authService: AuthService,
     private empresaService: EmpresaService,
+    private sidebarState: SidebarStateService,
     private router: Router
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
@@ -75,11 +77,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
     // Aplicar una vez por si la ruta actual ya es un submenú (ej. recarga de página)
     setTimeout(() => this.abrirSubmenuSegunRutaActual(), 0);
 
-    // Verificar si hay preferencia guardada
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.isCollapsed.set(true);
-    }
+    // Sincronizar estado visual con el servicio (ya inicializado desde localStorage)
+    this.isCollapsed.set(this.sidebarState.sidebarCollapsed());
   }
 
   ngOnDestroy(): void {
@@ -226,7 +225,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   toggleSidebar(): void {
     const newState = !this.isCollapsed();
     this.isCollapsed.set(newState);
-    localStorage.setItem('sidebarCollapsed', String(newState));
+    this.sidebarState.setCollapsed(newState);
     this.sidebarToggle.emit(newState);
     
     // Cerrar submenús cuando se colapsa

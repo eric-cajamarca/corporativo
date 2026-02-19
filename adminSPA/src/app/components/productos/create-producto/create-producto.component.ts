@@ -10,6 +10,7 @@ import { PresentacionService } from '../../../services/presentacion.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 
@@ -50,9 +51,6 @@ interface Sucursal {
   styleUrl: './create-producto.component.css'
 })
 export class CreateProductoComponent implements OnInit {
-  // Estado del sidebar
-  sidebarCollapsed = signal<boolean>(false);
-
   // Formulario
   productoForm!: FormGroup;
   
@@ -93,7 +91,8 @@ export class CreateProductoComponent implements OnInit {
     private presentacionService: PresentacionService,
     private sucursalService: SucursalService,
     private router: Router,
-    @Optional() public activeModal: NgbActiveModal
+    @Optional() public activeModal: NgbActiveModal,
+    public sidebarState: SidebarStateService
   ) {
     this.esModal = !!this.activeModal;
   }
@@ -101,15 +100,6 @@ export class CreateProductoComponent implements OnInit {
   ngOnInit(): void {
     this.initForm();
     this.cargarDatos();
-    
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') {
-      this.sidebarCollapsed.set(true);
-    }
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   private initForm(): void {

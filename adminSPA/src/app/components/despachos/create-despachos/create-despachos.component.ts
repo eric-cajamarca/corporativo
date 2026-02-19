@@ -9,6 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 
@@ -42,7 +43,6 @@ export class CreateDespachosComponent {
   loadingVenta = false;
   enviando = false;
   errorVenta = '';
-  sidebarCollapsed = signal<boolean>(false);
 
   constructor(
     private route: ActivatedRoute,
@@ -52,11 +52,8 @@ export class CreateDespachosComponent {
     private _cventaService: CventaService,
     private _dventaService: DventaService,
     private _router: Router,
+    public sidebarState: SidebarStateService,
   ) {}
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
-  }
 
   /** Cargar venta y tipos cuando se entra con idVenta */
   cargarVentaYTipos(): void {
@@ -117,10 +114,6 @@ export class CreateDespachosComponent {
   }
 
   ngOnInit(): void {
-    // Sidebar: mismo layout que el resto de la app (estado desde localStorage)
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
-
     this.route.params.subscribe(params => {
       this.idVenta = params['idVenta'] ?? null;
       this.idempresa = params['id'];

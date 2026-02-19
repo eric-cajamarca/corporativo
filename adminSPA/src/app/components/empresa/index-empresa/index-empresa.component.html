@@ -1,11 +1,11 @@
 <!-- Sidebar -->
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
 
 <!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
 <!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-header">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
@@ -217,6 +217,15 @@
             Configuración
           </button>
         </li>
+        <li class="nav-item">
+          <button 
+            class="nav-link" 
+            [class.active]="activeTab() === 'servicios-api'"
+            (click)="cambiarTab('servicios-api')">
+            <i class="fas fa-plug me-1"></i>
+            Servicios API por empresa
+          </button>
+        </li>
       </ul>
 
       <div class="modal-body">
@@ -402,6 +411,53 @@
             </div>
           }
         }
+
+        <!-- Tab: Servicios API por empresa -->
+        @if (activeTab() === 'servicios-api') {
+          @if (loadingServiciosApi()) {
+            <div class="text-center py-4">
+              <span class="spinner-border"></span>
+              <p class="mt-2 mb-0 text-muted">Cargando servicios y empresas...</p>
+            </div>
+          } @else if (serviciosApiData) {
+            <p class="text-muted small mb-3">Asigne qué servicios API (Factiliza) puede usar cada empresa. Solo el administrador del sistema puede modificar esto.</p>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Empresa (RUC)</th>
+                    @for (servicio of serviciosApiData.servicios; track servicio) {
+                      <th class="text-center">{{ servicio }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (emp of serviciosApiData.empresas; track emp.idEmpresa) {
+                    <tr>
+                      <td>
+                        <span class="fw-medium">{{ emp.razonSocial }}</span>
+                        <br>
+                        <small class="text-muted">{{ emp.ruc }}</small>
+                      </td>
+                      @for (servicio of serviciosApiData.servicios; track servicio) {
+                        <td class="text-center align-middle">
+                          <input 
+                            type="checkbox" 
+                            class="form-check-input"
+                            [checked]="getPuedeUsarServicio(emp.idEmpresa, servicio)"
+                            (change)="setPuedeUsarServicio(emp.idEmpresa, servicio, $any($event.target).checked)">
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (serviciosApiData.empresas.length === 0) {
+              <p class="text-muted mb-0">No hay empresas registradas.</p>
+            }
+          }
+        }
       </div>
 
       <div class="modal-footer">
@@ -418,6 +474,21 @@
             } @else {
               <i class="fas fa-save me-1"></i>
               Guardar Configuración
+            }
+          </button>
+        }
+        @if (activeTab() === 'servicios-api') {
+          <button 
+            type="button" 
+            class="btn btn-primary"
+            (click)="guardarServiciosApi()"
+            [disabled]="guardandoServiciosApi() || !serviciosApiData">
+            @if (guardandoServiciosApi()) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+              Guardando...
+            } @else {
+              <i class="fas fa-save me-1"></i>
+              Guardar asignaciones
             }
           </button>
         }

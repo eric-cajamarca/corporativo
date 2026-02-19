@@ -262,6 +262,7 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
         c.total,
         c.idCliente,
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
+        ISNULL(cl.celular, '') AS clienteCelular,
         (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
@@ -352,6 +353,7 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
       rSocial: cab.clienteRazonSocial,
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
+      celular: (cab.clienteCelular != null && String(cab.clienteCelular).trim() !== '') ? String(cab.clienteCelular).trim() : '',
       direccion: clienteDireccion,
       tipoDocSunat: tipoDocSunat
     },

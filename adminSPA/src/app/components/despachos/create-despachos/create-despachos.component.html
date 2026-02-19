@@ -1,7 +1,7 @@
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-wrap container-fluid">
     <div class="row justify-content-center">
       <div class="col-12 col-lg-11 col-xl-11">

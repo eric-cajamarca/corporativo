@@ -1,7 +1,15 @@
 const express = require('express');
 const factilizaController = require('../controllers/factilizaController');
+const empresaFactilizaController = require('../controllers/empresaFactilizaController');
+const tipoCambioController = require('../controllers/tipoCambioController');
 const auth = require('../middlewares/autenticate');
 const api = express.Router();
+
+api.get('/factiliza/servicios', auth.auth, empresaFactilizaController.getServicios);
+api.get('/factiliza/tipo-cambio', auth.auth, tipoCambioController.getTipoCambioDia);
+api.get('/factiliza/tipo-cambio/mes', auth.auth, tipoCambioController.getTipoCambioMes);
+api.get('/factiliza/empresas-servicios', auth.auth, empresaFactilizaController.getEmpresasServicios);
+api.post('/factiliza/empresas-servicios', auth.auth, empresaFactilizaController.guardarEmpresasServicios);
 
 api.post('/consultar-comprobante-sunat', auth.auth, factilizaController.consultarComprobanteSunat);
 

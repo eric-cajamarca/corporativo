@@ -6,6 +6,7 @@ import { CajaService } from '../../../services/caja.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
@@ -68,12 +69,11 @@ export class ReciboIngresoComponent implements OnInit {
   serie = '0001';
   numero = '';
 
-  sidebarCollapsed = signal<boolean>(false);
-
   constructor(
     private cajaService: CajaService,
     private catalogosService: CatalogosService,
-    private tablasSunat: TablasSunatService
+    private tablasSunat: TablasSunatService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -94,12 +94,6 @@ export class ReciboIngresoComponent implements OnInit {
       next: (r) => { this.mediosPago = r.data || []; },
       error: () => {}
     });
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   private tiposIngreso(): void {

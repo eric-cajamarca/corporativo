@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { DespachoService } from '../../../services/despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { PdfService } from '../../../services/pdf.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -89,6 +90,13 @@ export class IndexDespachosComponent {
   enviandoCrear = false;
   generandoPdf = false;
 
+  mostrarWhatsappForm = false;
+  whatsappNumber = '';
+  whatsappCaption = '';
+  whatsappFormato: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsapp = false;
+  whatsappMensaje: string | null = null;
+
   /** Solo líneas con pendiente > 0 para el modal crear despacho */
   get detalleConPendiente(): DetalleVentaLinea[] {
     const r = this.resultado;
@@ -99,7 +107,8 @@ export class IndexDespachosComponent {
   constructor(
     private despachoService: DespachoService,
     private empresaService: EmpresaService,
-    private pdfService: PdfService
+    private pdfService: PdfService,
+    private whatsappService: WhatsappService
   ) {}
 
   ngOnInit(): void {}
@@ -285,6 +294,82 @@ export class IndexDespachosComponent {
         });
       },
       error: () => { this.generandoPdf = false; }
+    });
+  }
+
+  abrirFormWhatsapp(): void {
+    this.mostrarWhatsappForm = true;
+    this.whatsappMensaje = null;
+  }
+
+  cerrarFormWhatsapp(): void {
+    this.mostrarWhatsappForm = false;
+    this.whatsappNumber = '';
+    this.whatsappCaption = '';
+    this.whatsappFormato = 'A4';
+    this.whatsappMensaje = null;
+  }
+
+  enviarPdfPorWhatsapp(): void {
+    const r = this.resultado;
+    if (!r?.venta || !r?.detalleVenta?.length) return;
+    if (!this.whatsappNumber.trim()) {
+      this.whatsappMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsapp = true;
+    this.whatsappMensaje = null;
+    this.empresaService.getEmpresa$().subscribe({
+      next: (emp) => {
+        const empAny = emp as unknown as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa = {
+          logo: logoStr,
+          nombre: emp?.nombre ?? '',
+          ruc: emp?.ruc ?? '',
+          direccion: emp?.direccion ?? '',
+          telefono: emp?.telefono ?? ''
+        };
+        const venta = { ...r.venta };
+        const cliente = { razonSocial: r.venta.clienteRazonSocial || '', ruc: r.venta.clienteRuc || '' };
+        const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => ({
+          productoCodigo: dv.productoCodigo,
+          productoDescripcion: dv.productoDescripcion,
+          cantidad: dv.cantPendiente ?? dv.cantidad,
+          ubicaciones: dv.ubicaciones || ''
+        }));
+        const datos = { empresa, venta, cliente, items, titulo: 'Comprobante de despacho' };
+        const nombreArchivo = `despacho-${(r.venta.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        this.pdfService.generarPdfComprobanteDespacho(datos, this.whatsappFormato, nombreArchivo).subscribe({
+          next: (blob) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const dataUrl = reader.result as string;
+              const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+              this.whatsappService.enviarArchivo(this.whatsappNumber.trim(), base64, nombreArchivo, 'document', this.whatsappCaption.trim() || undefined).subscribe({
+                next: (res) => {
+                  this.enviandoWhatsapp = false;
+                  this.whatsappMensaje = res.message;
+                  if (res.success) setTimeout(() => this.cerrarFormWhatsapp(), 2000);
+                },
+                error: (err) => {
+                  this.enviandoWhatsapp = false;
+                  this.whatsappMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+                }
+              });
+            };
+            reader.readAsDataURL(blob);
+          },
+          error: () => {
+            this.enviandoWhatsapp = false;
+            this.whatsappMensaje = 'Error al generar el PDF.';
+          }
+        });
+      },
+      error: () => {
+        this.enviandoWhatsapp = false;
+        this.whatsappMensaje = 'Error al cargar empresa.';
+      }
     });
   }
 }

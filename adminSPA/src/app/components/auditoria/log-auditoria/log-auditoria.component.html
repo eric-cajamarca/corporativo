@@ -1,7 +1,7 @@
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-wrap container">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">

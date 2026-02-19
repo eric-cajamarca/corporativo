@@ -7,6 +7,7 @@ import { ComprasService } from '../../../services/compras.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
@@ -76,8 +77,6 @@ export class PagoProveedoresComponent implements OnInit {
     idMediosPago: null as number | null
   };
 
-  sidebarCollapsed = signal<boolean>(false);
-
   /** idEstadoPago: 1 = Pendiente, 2 = Pagado (según sistema) */
   private readonly ESTADO_PENDIENTE = 1;
   private readonly ESTADO_PAGADO = 2;
@@ -86,7 +85,8 @@ export class PagoProveedoresComponent implements OnInit {
     private cajaService: CajaService,
     private comprasService: ComprasService,
     private proveedoresService: ProveedoresService,
-    private tablasSunat: TablasSunatService
+    private tablasSunat: TablasSunatService,
+    public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -99,12 +99,6 @@ export class PagoProveedoresComponent implements OnInit {
       next: (r) => { this.mediosPago = r.data || []; },
       error: () => {}
     });
-    const collapsed = localStorage.getItem('sidebarCollapsed');
-    if (collapsed === 'true') this.sidebarCollapsed.set(true);
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarCollapsed.set(collapsed);
   }
 
   private tiposEgreso(): void {

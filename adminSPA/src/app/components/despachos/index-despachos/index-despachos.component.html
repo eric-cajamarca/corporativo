@@ -70,6 +70,29 @@
                       <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="generandoPdf" (click)="imprimirComprobanteDespacho('A4')">
                         <i class="bi bi-file-earmark-pdf"></i> A4
                       </button>
+                      <button type="button" class="btn btn-outline-success btn-sm" (click)="abrirFormWhatsapp()">
+                        <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+                      </button>
+                    </div>
+                    <div *ngIf="mostrarWhatsappForm" class="mt-2 p-2 border rounded bg-light">
+                      <label class="form-label small">Número (ej. 51999999999)</label>
+                      <input type="text" class="form-control form-control-sm mb-1" [(ngModel)]="whatsappNumber" placeholder="51999999999" />
+                      <label class="form-label small">Formato</label>
+                      <select class="form-select form-select-sm mb-1" [(ngModel)]="whatsappFormato">
+                        <option value="ticket">Ticket</option>
+                        <option value="A5">A5</option>
+                        <option value="A4">A4</option>
+                      </select>
+                      <label class="form-label small">Mensaje opcional</label>
+                      <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappCaption" placeholder="Opcional" />
+                      <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsapp" (click)="enviarPdfPorWhatsapp()">
+                          <span *ngIf="enviandoWhatsapp">Enviando...</span>
+                          <span *ngIf="!enviandoWhatsapp"><i class="bi bi-send"></i> Enviar</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsapp" (click)="cerrarFormWhatsapp()">Cancelar</button>
+                      </div>
+                      <p class="small mt-1 mb-0 text-muted" *ngIf="whatsappMensaje">{{ whatsappMensaje }}</p>
                     </div>
                   </div>
                 </div>

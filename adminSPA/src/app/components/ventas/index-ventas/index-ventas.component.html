@@ -1,7 +1,7 @@
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-wrap ventas-container">
     <div class="table-card card">
       <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
@@ -179,7 +179,31 @@
             <i class="bi bi-file-earmark-pdf"></i> Formato A4
           </button>
         </div>
-        <p class="text-muted small mt-2 mb-0" *ngIf="generandoPdf"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
+        <hr class="my-3" />
+        <button type="button" class="btn btn-outline-success w-100" [disabled]="generandoPdf" (click)="abrirFormWhatsapp()">
+          <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+        </button>
+        <div *ngIf="mostrarWhatsappForm && datosParaWhatsapp" class="mt-3 p-2 border rounded">
+          <label class="form-label small">Número (código país + número, ej. 51999999999)</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappNumber" placeholder="51999999999" />
+          <label class="form-label small">Formato del PDF</label>
+          <select class="form-select form-select-sm mb-2" [(ngModel)]="whatsappFormato">
+            <option value="ticket">Ticket</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+          <label class="form-label small">Mensaje opcional (caption)</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappCaption" placeholder="Opcional" />
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsapp" (click)="enviarPdfPorWhatsapp()">
+              <span *ngIf="enviandoWhatsapp"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+              <span *ngIf="!enviandoWhatsapp"><i class="bi bi-send"></i> Enviar</span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsapp" (click)="cerrarFormWhatsapp()">Cancelar</button>
+          </div>
+          <p class="small mt-2 mb-0" [class.text-success]="whatsappMensaje && whatsappNumber && !enviandoWhatsapp" [class.text-danger]="whatsappMensaje && (enviandoWhatsapp || !whatsappNumber)">{{ whatsappMensaje }}</p>
+        </div>
+        <p class="text-muted small mt-2 mb-0" *ngIf="generandoPdf && !mostrarWhatsappForm"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
       </div>
     </div>
   </div>
