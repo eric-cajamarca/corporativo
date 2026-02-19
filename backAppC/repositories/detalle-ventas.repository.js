@@ -28,7 +28,7 @@ exports.insertar = async (transaction, detalleData) => {
     .input('igv', sql.Bit, igv)
     .input('isc', sql.Bit, isc)
     .input('total', sql.Decimal(18, 2), total)
-    .input('hVenta', sql.DateTime, hVenta)
+    .input('hVenta', sql.VarChar(23), hVenta)
     .input('cantEntregada', sql.Decimal(18, 3), cantEntregada)
     .input('idEstadoPedido', sql.Int, idEstadoPedido)
     .query(`INSERT INTO DetalleVenta 

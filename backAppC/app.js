@@ -6,7 +6,7 @@ const xss = require('xss'); // Solo si vas a usarlo
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const { querySafeMiddleware } = require('./middlewares/tenant-query');
-// Importación de rutas
+// Importaci?n de rutas
 const detalleVentasRoutes = require('./routes/detalleventas');
 const adminRoutes = require('./routes/admin');
 const cventasRoutes = require('./routes/cventas');
@@ -49,6 +49,8 @@ const usuarioSucursalRoutes = require('./routes/usuarioSucursal');
 const impuestosRoutes = require('./routes/impuestos');
 const cotizacionesRoutes = require('./routes/cotizaciones');
 const catalogosRoutes = require('./routes/catalogos');
+const auditoriaRoutes = require('./routes/auditoria');
+const externalRoutes = require('./routes/external');
 
 
 const app = express();
@@ -67,10 +69,10 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// Servir archivos estáticos desde uploads
+// Servir archivos est?ticos desde uploads
 app.use('/logos', express.static(path.join(__dirname, 'uploads/configuraciones')));
 
-// Servir archivos estáticos default
+// Servir archivos est?ticos default
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 
 app.use(cookieParser());
@@ -81,7 +83,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 
-// Middleware CORS - Más restrictivo para producción
+// Middleware CORS - M?s restrictivo para producci?n
 const corsOptions = {
   origin: function (origin, callback) {
     // Permitir requests sin origin (como mobile apps)
@@ -90,7 +92,7 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:4200',  // Desarrollo
       'http://127.0.0.1:4200',  // Desarrollo alternativo
-      process.env.FRONTEND_URL  // Variable de entorno para producción
+      process.env.FRONTEND_URL  // Variable de entorno para producci?n
     ].filter(Boolean); // Remover valores undefined
 
     if (allowedOrigins.includes(origin)) {
@@ -118,15 +120,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Ruta de prueba para conexión a DB
+// Ruta de prueba para conexi?n a DB
 app.get('/database', async (req, res) => {
   try {
     await connectDB();
-    console.log('Conexión exitosa a la base de datos');
-    res.send('¡Conexión exitosa a la base de datos!');
+    console.log('Conexi?n exitosa a la base de datos');
+    res.send('?Conexi?n exitosa a la base de datos!');
   } catch (error) {
     console.error('Error al conectar a la base de datos:', error);
-    res.status(500).send('¡Error al conectar a la base de datos!');
+    res.status(500).send('?Error al conectar a la base de datos!');
   }
 });
 
@@ -186,6 +188,13 @@ app.use('/api/gestores', gestoresRoutes);
 app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
 app.use('/api/catalogos', catalogosRoutes);
+app.use('/api/auditoria', auditoriaRoutes);
+app.use('/api/external', externalRoutes);
+
+// Health para Kubernetes/Ambassador (sin auth)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'backAppC' });
+});
 
 // Iniciar servidor
 app.listen(PORT, () => {
@@ -194,6 +203,6 @@ app.listen(PORT, () => {
     const envioSunatJob = require('./jobs/envioSunat.job');
     envioSunatJob.iniciar();
   } catch (e) {
-    console.error('No se pudo iniciar job envío automático SUNAT:', e.message);
+    console.error('No se pudo iniciar job env?o autom?tico SUNAT:', e.message);
   }
 });

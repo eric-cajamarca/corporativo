@@ -49,6 +49,9 @@
           <button class="nav-link" id="nav-ventas-tab" data-bs-toggle="tab" data-bs-target="#nav-ventas" type="button" role="tab" aria-controls="nav-ventas" aria-selected="false">
             <i class="fas fa-shopping-cart me-2"></i>Ventas
           </button>
+          <button class="nav-link" id="nav-comprobante-defecto-tab" data-bs-toggle="tab" data-bs-target="#nav-comprobante-defecto" type="button" role="tab" aria-controls="nav-comprobante-defecto" aria-selected="false" (click)="cargarVentasDefaults()">
+            <i class="fas fa-file-invoice me-2"></i>Comprobante por defecto
+          </button>
           <button class="nav-link" id="nav-sistema-tab" data-bs-toggle="tab" data-bs-target="#nav-sistema" type="button" role="tab" aria-controls="nav-sistema" aria-selected="false">
             <i class="fas fa-cog me-2"></i>Sistema
           </button>
@@ -441,6 +444,40 @@
         </div>
 
         <!-- Configuración del Sistema -->
+        <!-- Comprobante por defecto (estado pedido y estado pago en nueva venta) -->
+        <div class="tab-pane fade" id="nav-comprobante-defecto" role="tabpanel" aria-labelledby="nav-comprobante-defecto-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Valores por defecto al generar una nueva venta</h5>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small">Estos valores se mostrarán en el modal "Información del comprobante" al crear una venta.</p>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Estado del pedido por defecto</label>
+                  <select class="form-select" [(ngModel)]="ventasDefaults.idEstadoPedidoPorDefecto" name="idEstadoPedidoPorDefecto">
+                    <option [value]="1">Pendiente</option>
+                    <option [value]="2">Entregado</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Estado de pago por defecto</label>
+                  <select class="form-select" [(ngModel)]="ventasDefaults.idEstadoPagoPorDefecto" name="idEstadoPagoPorDefecto">
+                    <option [value]="1">Pendiente</option>
+                    <option [value]="2">Pagado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-3">
+                <button type="button" class="btn btn-primary" (click)="guardarVentasDefaults()" [disabled]="ventasDefaultsGuardando">
+                  <span *ngIf="!ventasDefaultsGuardando"><i class="fas fa-save me-2"></i>Guardar</span>
+                  <span *ngIf="ventasDefaultsGuardando">Guardando…</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="tab-pane fade" id="nav-sistema" role="tabpanel" aria-labelledby="nav-sistema-tab">
           <div class="card">
             <div class="card-header">

@@ -1,5 +1,6 @@
 // repositories/ventas.repository.js
 const sql = require('mssql');
+const { getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 
 exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
   const {
@@ -21,11 +22,15 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     descuentos,
     total,
     idMediosPago,
+    idEstadoPedido,
+    idEstadoPago,
     idEstadoSunat,
     compRelacionado
   } = datosVenta;
 
   const fVencimientoVal = fVencimiento != null ? fVencimiento : fEmision;
+  const idEstadoPedidoVal = idEstadoPedido != null ? parseInt(idEstadoPedido, 10) : 1;
+  const idEstadoPagoVal = idEstadoPago != null ? parseInt(idEstadoPago, 10) : 1;
 
   const result = await transaction
     .request()
@@ -35,8 +40,8 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('numero', sql.VarChar(8), numero)
     .input('compVenta', sql.VarChar(13), compVenta)
     .input('idComprobante', sql.Int, idComprobante)
-    .input('fEmision', sql.DateTime, fEmision)
-    .input('fVencimiento', sql.DateTime, fVencimientoVal)
+    .input('fEmision', sql.VarChar(23), fEmision)
+    .input('fVencimiento', sql.VarChar(23), fVencimientoVal)
     .input('idCliente', sql.Int, idCliente)
     .input('idMoneda', sql.Int, idMoneda)
     .input('tCambio', sql.Decimal(10, 4), tCambio)
@@ -48,14 +53,16 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('descuentos', sql.Decimal(18, 2), descuentos)
     .input('total', sql.Decimal(18, 2), total)
     .input('idMediosPago', sql.VarChar(20), idMediosPago)
+    .input('idEstadoPedido', sql.Int, idEstadoPedidoVal)
+    .input('idEstadoPago', sql.Int, idEstadoPagoVal)
     .input('idEstadoSunat', sql.Int, idEstadoSunat)
     .input('compRelacionado', sql.VarChar(30), compRelacionado)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
     .query(`INSERT INTO Ventas 
-      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoSunat, compRelacionado, idUsuario) 
+      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, idUsuario) 
       OUTPUT INSERTED.idVenta
       VALUES 
-      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoSunat, @compRelacionado, @idUsuario)`);
+      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @idUsuario)`);
 
   return result;
 };
@@ -255,7 +262,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
     .request()
     .input('idVenta', sql.Int, idVenta)
     .query(`
-      SELECT dv.idDetalle, dv.idProducto, dv.cantidad, dv.pVenta, dv.subtotal, dv.total, p.descripcion, p.codigo
+      SELECT dv.idDetalle, dv.idProducto, dv.cantidad, ISNULL(dv.cantEntregada, 0) AS cantEntregada, dv.pVenta, dv.subtotal, dv.total, p.descripcion, p.codigo
       FROM DetalleVenta dv
       INNER JOIN Productos p ON p.idProducto = dv.idProducto
       WHERE dv.idVenta = @idVenta
@@ -335,20 +342,6 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       }
     : { nombre: '', ruc: '', direccion: '', telefono: '', rubro: '', correo: '', logo: `${base}/assets/img/01.jpg` };
 
-  // #region agent log
-  try {
-    const fs = require('fs');
-    const logLine = JSON.stringify({
-      hypothesisId: 'H1',
-      location: 'ventas.repository.js:obtenerComprobanteParaPdf',
-      message: 'Backend empresa logo',
-      data: { logoUrl, logoFileName: String(logoFileName), base, hasEmp: !!emp },
-      timestamp: Date.now()
-    }) + '\n';
-    fs.appendFileSync('c:\\project172026\\.cursor\\debug.log', logLine);
-  } catch (_) {}
-  // #endregion
-
   return {
     venta: {
       idVenta: cab.idVenta,
@@ -383,6 +376,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       codigo: d.codigo,
       descripcion: d.descripcion,
       cantidad: d.cantidad,
+      cantEntregada: d.cantEntregada != null ? Number(d.cantEntregada) : 0,
       pVenta: d.pVenta,
       subtotal: d.subtotal,
       total: d.total
@@ -401,7 +395,8 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       await transaction.rollback();
       return { ok: false, error: 'No se puede editar: el comprobante ya fue enviado o aceptado en SUNAT.' };
     }
-    const fEmision = cabecera.fEmision || null;
+    const fEmisionRaw = cabecera.fEmision || null;
+    const fEmision = fEmisionRaw != null ? (getFechaSoloSQLString(fEmisionRaw) || String(fEmisionRaw).trim().slice(0, 19).replace('T', ' ') + (String(fEmisionRaw).length <= 10 ? ' 00:00:00.000' : '.000')) : null;
     const idCliente = cabecera.idCliente != null ? Number(cabecera.idCliente) : null;
     const subtotal = Number(cabecera.subtotal) || 0;
     const igv = Number(cabecera.igv) || 0;
@@ -411,7 +406,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       await transaction.request()
         .input('idVenta', sql.Int, idVenta)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('fEmision', sql.DateTime, fEmision)
+        .input('fEmision', sql.VarChar(23), fEmision)
         .input('idCliente', sql.Int, idCliente)
         .input('subtotal', sql.Decimal(18, 2), subtotal)
         .input('igv', sql.Decimal(18, 2), igv)
@@ -425,7 +420,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       await transaction.request()
         .input('idVenta', sql.Int, idVenta)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('fEmision', sql.DateTime, fEmision)
+        .input('fEmision', sql.VarChar(23), fEmision)
         .input('subtotal', sql.Decimal(18, 2), subtotal)
         .input('igv', sql.Decimal(18, 2), igv)
         .input('descuentos', sql.Decimal(18, 2), descuentos)
@@ -470,4 +465,46 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     await transaction.rollback();
     throw err;
   }
+};
+
+/** Lista ventas pendientes de pago (idEstadoPago = 1). Filtros opcionales: idVenta, cliente (nombre o RUC). */
+exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
+  const { idVenta, cliente } = filtros;
+  const request = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  let whereClause = 'v.idEmpresa = @idEmpresa AND v.idEstadoPago = 1';
+  if (idVenta != null && String(idVenta).trim() !== '') {
+    request.input('idVenta', sql.Int, parseInt(idVenta, 10));
+    whereClause += ' AND v.idVenta = @idVenta';
+  }
+  if (cliente != null && String(cliente).trim() !== '') {
+    request.input('cliente', sql.VarChar(100), '%' + String(cliente).trim() + '%');
+    whereClause += ' AND (cl.rSocial LIKE @cliente OR cl.ruc LIKE @cliente)';
+  }
+  const result = await request.query(`
+    SELECT
+      v.idVenta,
+      v.compVenta,
+      v.serie,
+      v.numero,
+      CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+      v.total,
+      v.idEstadoPago,
+      cl.rSocial AS clienteRazonSocial,
+      cl.ruc AS clienteRuc
+    FROM Ventas v
+    LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+    WHERE ${whereClause}
+    ORDER BY v.fEmision DESC
+  `);
+  return result.recordset || [];
+};
+
+/** Actualiza estado de pago de una venta (ej: 2 = Pagado). */
+exports.actualizarEstadoPagoVenta = async (transaction, idVenta, idEmpresa, idEstadoPago) => {
+  const req = transaction.request();
+  await req
+    .input('idVenta', sql.Int, idVenta)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idEstadoPago', sql.Int, idEstadoPago)
+    .query('UPDATE Ventas SET idEstadoPago = @idEstadoPago WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa');
 };

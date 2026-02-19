@@ -72,8 +72,9 @@
   <div class="card mt-3" *ngIf="clientes.idCliente">
     <div class="card-header d-flex justify-content-between align-items-center">
       <h5 class="card-header-title mb-0"><i class="bi bi-geo-alt me-2"></i>Direcciones</h5>
-      <button type="button" class="btn btn-sm btn-success" (click)="mostrarFormNuevaDireccion = !mostrarFormNuevaDireccion">
-        <i class="bi bi-plus-lg me-1"></i>Crear dirección
+      <button type="button" class="btn btn-sm btn-success" (click)="onCrearDireccion()" [disabled]="loadingEstablecimientos">
+        <span *ngIf="loadingEstablecimientos" class="spinner-border spinner-border-sm me-1"></span>
+        <i *ngIf="!loadingEstablecimientos" class="bi bi-plus-lg me-1"></i>Crear dirección
       </button>
     </div>
     <div class="card-body">
@@ -117,7 +118,7 @@
               <th>Provincia</th>
               <th>Distrito</th>
               <th class="text-center">Principal</th>
-              <th class="text-center" style="width: 100px;">Acciones</th>
+              <th class="text-center" style="width: 160px;">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -133,10 +134,13 @@
                 <span class="badge bg-secondary" *ngIf="!item.principal">No</span>
               </td>
               <td class="text-center">
-                <button type="button" class="btn btn-sm btn-outline-warning"
-                  data-bs-toggle="modal" [attr.data-bs-target]="'#editar-direccion-' + item.idDireccionClientes"
+                <button type="button" class="btn btn-sm btn-outline-warning me-1"
                   (click)="editarDireccion(item.idDireccionClientes)">
-                  <i class="bi bi-pencil"></i> Editar dirección
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                  (click)="eliminarDireccion(item.idDireccionClientes)">
+                  <i class="bi bi-trash"></i>
                 </button>
               </td>
             </tr>
@@ -147,16 +151,15 @@
         </table>
       </div>
 
-      <!-- Modal Editar dirección (uno por fila) -->
-      <div *ngFor="let item of direccionClientes_const" class="modal fade" [attr.id]="'editar-direccion-' + item.idDireccionClientes"
-        tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
+      <!-- Modal Editar dirección (único, controlado por variable para funcionar dentro de otro modal) -->
+      <div class="modal fade" [class.show]="showModalEditarDireccion" [style.display]="showModalEditarDireccion ? 'block' : 'none'" tabindex="-1" role="dialog" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-scrollable" role="document">
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">Editar dirección</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+              <button type="button" class="btn-close" (click)="cerrarModalEditarDireccion()" aria-label="Cerrar"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body overflow-auto" style="max-height: 70vh;">
               <div class="mb-3">
                 <label class="form-label">Región</label>
                 <select class="form-select" [(ngModel)]="direccionClientes.region" (change)="select_region()">
@@ -186,12 +189,59 @@
                 <label class="form-label">Dirección</label>
                 <input type="text" class="form-control" [(ngModel)]="direccionClientes.direccion" name="direccion">
               </div>
+              <div class="mb-3">
+                <label class="form-label">Referencia</label>
+                <input type="text" class="form-control" [(ngModel)]="direccionClientes.referencia" name="referencia">
+              </div>
+              <div class="mb-3">
+                <div class="form-check">
+                  <input type="checkbox" class="form-check-input" id="editPrincipalCliente" [(ngModel)]="direccionClientes.principal" name="principal">
+                  <label class="form-check-label" for="editPrincipalCliente">Marcar como dirección principal</label>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-              <button type="button" class="btn btn-primary" (click)="actualizarDireccion()" data-bs-dismiss="modal">Guardar cambios</button>
+              <button type="button" class="btn btn-secondary" (click)="cerrarModalEditarDireccion()">Cerrar</button>
+              <button type="button" class="btn btn-primary" (click)="actualizarDireccion()">Guardar cambios</button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Establecimientos RUC (editar cliente) -->
+  <div class="modal fade" [class.show]="showModalEstablecimientos" [style.display]="showModalEstablecimientos ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Establecimientos del RUC</h5>
+          <button type="button" class="btn-close" (click)="closeModalEstablecimientos()"></button>
+        </div>
+        <div class="modal-body overflow-auto" style="max-height: 70vh;">
+          <p class="text-muted small">Seleccione uno o varios para agregar como direcciones del cliente.</p>
+          <div class="mb-2">
+            <label class="me-2">
+              <input type="checkbox" [checked]="listEstablecimientos.length > 0 && selectedEstablecimientoIndices.size === listEstablecimientos.length"
+                (change)="toggleAllEstablecimientos($any($event.target).checked)"> Seleccionar todos
+            </label>
+          </div>
+          <ul class="list-group list-group-flush" style="max-height: 60vh; overflow-y: auto;">
+            <li class="list-group-item d-flex align-items-start" *ngFor="let est of listEstablecimientos; let i = index">
+              <label class="me-2 mt-1">
+                <input type="checkbox" [checked]="selectedEstablecimientoIndices.has(i)" (change)="toggleEstablecimiento(i)">
+              </label>
+              <div class="flex-grow-1">
+                <strong>{{ est.codigo }} – {{ est.tipoEstablecimiento }}</strong>
+                <div class="small text-secondary">{{ est.direccionCompleta || est.direccion }}</div>
+                <div class="small">{{ est.departamento }} – {{ est.provincia }} – {{ est.distrito }}</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeModalEstablecimientos()">Cerrar</button>
+          <button type="button" class="btn btn-primary" (click)="applyEstablecimientosEditar()">Agregar direcciones seleccionadas</button>
         </div>
       </div>
     </div>

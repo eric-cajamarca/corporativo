@@ -32,12 +32,16 @@ export class CreateProveedorComponent {
   public regiones: any = [];
   public provincias: any = [];
   public distritos: any = [];
+  public fullProvincias: any[] = [];
+  public fullDistritos: any[] = [];
   public token: any = "";
   public contBuscar = 0;
   public btn_registrar = false;
   public mostrarDireccion = false;
 
   public str_pais = '';
+  /** Servicio que respondió la última consulta DNI/RUC: 'factiliza' | 'apisperu' */
+  public servicioConsulta: string = '';
   public direccionProveedores: any = {
 
     ubigeo: '',
@@ -50,6 +54,12 @@ export class CreateProveedorComponent {
     urbanizacion: '',
   };
   public data: any = {};
+  /** Establecimientos RUC (Factiliza): lista en modal */
+  public listEstablecimientos: any[] = [];
+  public showModalEstablecimientos = false;
+  public loadingEstablecimientos = false;
+  public selectedEstablecimientoIndices: Set<number> = new Set();
+  public establecimientosPendientes: any[] = [];
 
   constructor(
     private _adminService: AdminService,
@@ -74,14 +84,14 @@ export class CreateProveedorComponent {
     this._adminService.get_Procincias().subscribe(
       response => {
         this.provincias = response;
-        console.log('this.provincias', this.provincias);
+        this.fullProvincias = response || [];
       }
     );
 
     this._adminService.get_Distritos().subscribe(
       response => {
         this.distritos = response;
-        console.log('this.distritos', this.distritos);
+        this.fullDistritos = response || [];
       }
     );
 
@@ -261,76 +271,68 @@ export class CreateProveedorComponent {
 private async handleRucSearch(): Promise<void> {
   try {
     const response = await this._apiperuService.getRucInfo(this.filtro).toPromise();
-    
     if (!response) {
       throw new Error('No se recibieron datos del servicio');
     }
+    const data = response.data ?? response;
+    const source = response._source ?? '';
+    this.servicioConsulta = source === 'factiliza' ? 'Servicio 1 (Factiliza)' : source === 'apisperu' ? 'Servicio 2 (ApisPeru)' : '';
 
-    console.log('Respuesta RUC:', response);
-    // Asignación de datos básicos
-    this.proveedorruc = response;
-    this.proveedores.rSocial = response.razonSocial;
-    this.proveedores.condicion = response.estado;
-    this.direccionProveedores.codpais = "PEN";
-    this.direccionProveedores.ubigeo = response.ubigeo;
-    this.direccionProveedores.direccion = response.direccion;
-
-    // Búsqueda de ubicación geográfica
-    this.direccionProveedores.region = this.findLocationId(
-      this.regiones, 
-      response.departamento, 
-      'departamento'
-    );
-    
-    this.direccionProveedores.provincia = this.findLocationId(
-      this.provincias, 
-      response.provincia, 
-      'provincia'
-    );
-    
-    this.direccionProveedores.distrito = this.findLocationId(
-      this.distritos, 
-      response.distrito, 
-      'distrito'
-    );
-    
-    if (response.success === false) {
-      iziToast.show({
-        title: 'ERROR',
-        titleColor: '#FF0000',
-        color: '#FFF',
-        class: 'text-danger',
-        position: 'topRight',
-        message: response.message || 'Error al consultar RUC'
-      });
-
-      this.busqueda=false;
+    if (response.error) {
+      this.showError(response.error);
+      this.busqueda = false;
+      return;
     }
-    console.log('Datos RUC obtenidos:', this.proveedorruc);
+
+    this.proveedorruc = data;
+    this.proveedores.rSocial = data.razonSocial ?? '';
+    this.proveedores.condicion = data.estado ?? 'ACTIVO';
+    this.direccionProveedores.codpais = 'PEN';
+    this.direccionProveedores.ubigeo = data.ubigeo ?? '';
+    this.direccionProveedores.direccion = data.direccion ?? '';
+
+    const dep = (data.departamento ?? '').trim();
+    const prov = (data.provincia ?? '').trim();
+    const dist = (data.distrito ?? '').trim();
+
+    this.direccionProveedores.region = dep ? this.findLocationId(this.regiones, dep, 'departamento') : undefined;
+    this.direccionProveedores.provincia = prov ? this.findLocationId(this.provincias, prov, 'provincia') : undefined;
+    this.direccionProveedores.distrito = dist ? this.findLocationId(this.distritos, dist, 'distrito') : undefined;
   } catch (error) {
     console.error('Error en búsqueda RUC:', error);
-    throw new Error( 'Error al consultar RUC');
-    this.busqueda=false;
+    this.showError(error instanceof Error ? error.message : 'Error al consultar RUC');
+  } finally {
+    this.busqueda = false;
   }
 }
 
 private async handleDniSearch(): Promise<void> {
   try {
     const response = await this._apiperuService.getDniInfo(this.filtro).toPromise();
-    
     if (!response) {
       throw new Error('No se recibieron datos del servicio');
     }
+    const data = response.data ?? response;
+    const source = response._source ?? '';
+    this.servicioConsulta = source === 'factiliza' ? 'Servicio 1 (Factiliza)' : source === 'apisperu' ? 'Servicio 2 (ApisPeru)' : '';
 
-    this.proveedorruc = response;
-    this.proveedores.rSocial = `${response.apellidoPaterno} ${response.apellidoMaterno}, ${response.nombres}`;
-    
-   
-    
+    if (response.error) {
+      this.showError(response.error);
+      this.busqueda = false;
+      return;
+    }
+
+    this.proveedorruc = data;
+    const ap = (data.apellidoPaterno ?? '').trim();
+    const am = (data.apellidoMaterno ?? '').trim();
+    const nom = (data.nombres ?? '').trim();
+    const partes = [ap, am, nom].filter(Boolean);
+    this.proveedores.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
   } catch (error) {
     console.error('Error en búsqueda DNI:', error);
-    throw new Error('Error al consultar DNI');
-    this.busqueda=false;
+    this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
+  } finally {
+    this.busqueda = false;
   }
 }
 
@@ -409,6 +411,101 @@ private async handleDniSearch(): Promise<void> {
       position: 'topRight',
       message: message
     });
+  }
+
+  openModalEstablecimientos(): void {
+    const ruc = (this.proveedores.ruc || '').trim();
+    if (ruc.length !== 11) {
+      this.showError('Ingrese un RUC de 11 dígitos antes de consultar establecimientos');
+      return;
+    }
+    this.loadingEstablecimientos = true;
+    this._apiperuService.getRucAnexo(ruc).subscribe({
+      next: (res) => {
+        this.loadingEstablecimientos = false;
+        if (res && res.error) {
+          this.showError(res.error);
+          return;
+        }
+        this.listEstablecimientos = Array.isArray(res?.data) ? res.data : [];
+        this.selectedEstablecimientoIndices = new Set();
+        this.showModalEstablecimientos = true;
+        if (this.listEstablecimientos.length === 0) {
+          this.showError('No se encontraron establecimientos para este RUC');
+        }
+      },
+      error: (err) => {
+        this.loadingEstablecimientos = false;
+        this.showError(err?.error?.message || 'Error al obtener establecimientos');
+      }
+    });
+  }
+
+  closeModalEstablecimientos(): void {
+    this.showModalEstablecimientos = false;
+    this.listEstablecimientos = [];
+    this.selectedEstablecimientoIndices = new Set();
+  }
+
+  toggleEstablecimiento(i: number): void {
+    if (this.selectedEstablecimientoIndices.has(i)) {
+      this.selectedEstablecimientoIndices.delete(i);
+    } else {
+      this.selectedEstablecimientoIndices.add(i);
+    }
+    this.selectedEstablecimientoIndices = new Set(this.selectedEstablecimientoIndices);
+  }
+
+  toggleAllEstablecimientos(checked: boolean): void {
+    if (checked) {
+      this.listEstablecimientos.forEach((_, i) => this.selectedEstablecimientoIndices.add(i));
+    } else {
+      this.selectedEstablecimientoIndices.clear();
+    }
+    this.selectedEstablecimientoIndices = new Set(this.selectedEstablecimientoIndices);
+  }
+
+  applyEstablecimientos(): void {
+    const selected = Array.from(this.selectedEstablecimientoIndices)
+      .sort((a, b) => a - b)
+      .map(i => this.listEstablecimientos[i]);
+    if (selected.length === 0) {
+      this.showError('Seleccione al menos un establecimiento');
+      return;
+    }
+    const [first, ...rest] = selected;
+    this.establecimientosPendientes = rest;
+    this.direccionProveedores.codpais = 'PEN';
+    this.direccionProveedores.ubigeo = first.ubigeo ?? '';
+    this.direccionProveedores.direccion = first.direccion ?? first.direccionCompleta ?? '';
+    this.direccionProveedores.referencia = first.tipoEstablecimiento ?? '';
+    this.direccionProveedores.codLocal = first.codigo ?? '0';
+    const dep = (first.departamento ?? '').trim();
+    const prov = (first.provincia ?? '').trim();
+    const dist = (first.distrito ?? '').trim();
+    this.direccionProveedores.region = dep ? this.findLocationId(this.regiones, dep, 'departamento') : '';
+    this.direccionProveedores.provincia = prov ? this.findLocationId(this.provincias, prov, 'provincia') : '';
+    this.direccionProveedores.distrito = dist ? this.findLocationId(this.distritos, dist, 'distrito') : '';
+    this.closeModalEstablecimientos();
+  }
+
+  private buildDireccionProveedorFromEstablecimiento(e: any, idProveedor: number): any {
+    const dep = (e.departamento ?? '').trim();
+    const prov = (e.provincia ?? '').trim();
+    const dist = (e.distrito ?? '').trim();
+    return {
+      idProveedor,
+      ubigeo: e.ubigeo ?? '',
+      codpais: 'PEN',
+      region: dep ? (this.findLocationId(this.regiones, dep, 'departamento') ?? '') : '',
+      provincia: prov ? (this.findLocationId(this.fullProvincias.length ? this.fullProvincias : this.provincias, prov, 'provincia') ?? '') : '',
+      distrito: dist ? (this.findLocationId(this.fullDistritos.length ? this.fullDistritos : this.distritos, dist, 'distrito') ?? '') : '',
+      urbanizacion: '',
+      direccion: e.direccion ?? e.direccionCompleta ?? '',
+      referencia: e.tipoEstablecimiento ?? '',
+      codLocal: e.codigo ?? '0',
+      principal: false
+    };
   }
 
   
@@ -523,38 +620,41 @@ private async handleDniSearch(): Promise<void> {
         response => {
           if(response.data != undefined){
             this._proveedoresService.obtener_proveedor_ruc(this.proveedores.ruc).subscribe(
-              response => {
-                // console.log('response.data', response.data);
-                this.direccionProveedores.idProveedor = response.data[0].idProveedor;
-                // console.log('this.direccionClientes con idCliente', this.direccionClientes);
-                if(response.data != undefined){
-                  this._proveedoresService.crear_direccionProveedor(this.direccionProveedores).subscribe(
-                      response => {
-                        if(response.data != undefined){
-                          iziToast.show({
-                            title: 'SUCCESS',
-                            titleColor: '#006064',
-                            color: '#FFF',
-                            class: 'text-success',
-                            position: 'topRight',
-                            message: 'Cliente creado correctamente'
-                          });
-                          this.btn_registrar = false;
-                          //quiero redirigir a la pagina de index-clientes
-                          this._router.navigate(['/proveedores']);
-                        }
-                        
-                      },
-                      error => {
-                        console.log(<any>error);
-                        console.error('Error al crear el cliente:', error);
-                        this.btn_registrar = false;
-                      }
-                    )
-                }
-                
+              provRes => {
+                this.direccionProveedores.idProveedor = provRes.data[0].idProveedor;
+                const idProveedor = provRes.data[0].idProveedor;
+                const pendientes = this.establecimientosPendientes || [];
+                const crearSiguienteDireccion = (idx: number) => {
+                  if (idx === 0) {
+                    this._proveedoresService.crear_direccionProveedor(this.direccionProveedores).subscribe({
+                      next: () => crearSiguienteDireccion(1),
+                      error: () => crearSiguienteDireccion(1)
+                    });
+                    return;
+                  }
+                  if (idx > pendientes.length) {
+                    iziToast.show({
+                      title: 'SUCCESS',
+                      titleColor: '#006064',
+                      color: '#FFF',
+                      class: 'text-success',
+                      position: 'topRight',
+                      message: 'Proveedor creado correctamente'
+                    });
+                    this.btn_registrar = false;
+                    this._router.navigate(['/proveedores']);
+                    return;
+                  }
+                  const e = pendientes[idx - 1];
+                  const body = this.buildDireccionProveedorFromEstablecimiento(e, idProveedor);
+                  this._proveedoresService.crear_direccionProveedor(body).subscribe({
+                    next: () => crearSiguienteDireccion(idx + 1),
+                    error: () => crearSiguienteDireccion(idx + 1)
+                  });
+                };
+                crearSiguienteDireccion(0);
               }
-            )
+            );
           }else{
             iziToast.show({
               title: 'ERROR',

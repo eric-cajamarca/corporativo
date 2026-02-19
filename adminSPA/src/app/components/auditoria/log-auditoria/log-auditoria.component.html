@@ -1,0 +1,65 @@
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap container">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h4 class="card-header-title mb-0"><i class="bi bi-journal-text me-2"></i>Log de auditoría</h4>
+        <span class="text-muted" *ngIf="total >= 0">{{ total }} registro(s)</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3">
+            <label class="form-label small">Acción</label>
+            <input type="text" class="form-control form-control-sm" placeholder="Ej: LOGIN" [(ngModel)]="filtros.accion" (keyup.enter)="filtrar()" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Desde</label>
+            <input type="datetime-local" class="form-control form-control-sm" [(ngModel)]="filtros.fechaDesde" />
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small">Hasta</label>
+            <input type="datetime-local" class="form-control form-control-sm" [(ngModel)]="filtros.fechaHasta" />
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-primary btn-sm" (click)="filtrar()"><i class="bi bi-search me-1"></i>Filtrar</button>
+          </div>
+        </div>
+        <div *ngIf="loading" class="text-center py-4"><span class="spinner-border"></span></div>
+        <div class="table-responsive" *ngIf="!loading && items.length > 0">
+          <table class="table table-sm table-striped table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>Tabla</th>
+                <th>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of items">
+                <td>{{ formatearFecha(item.fechaAccion) }}</td>
+                <td>{{ item.usuarioNombre || '—' }}</td>
+                <td>{{ item.accion || '—' }}</td>
+                <td>{{ item.tablaAfectada || '—' }}</td>
+                <td>{{ item.ipAddress || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="!loading && items.length === 0" class="alert alert-info mb-0">No hay registros de auditoría.</div>
+        <ngb-pagination
+          *ngIf="!loading && total > pageSize"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="total"
+          [maxSize]="maxSize"
+          (pageChange)="onPageChange($event)"
+          class="d-flex justify-content-end mt-3">
+        </ngb-pagination>
+      </div>
+    </div>
+  </div>
+</main>

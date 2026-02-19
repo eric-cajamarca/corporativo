@@ -716,6 +716,8 @@ CREATE TABLE Ventas (
     descuentos DECIMAL(18,2) NOT NULL DEFAULT 0,
     total DECIMAL(18,2) NOT NULL DEFAULT 0,
     idMediosPago VARCHAR(20) NOT NULL,
+    idEstadoPedido INT NOT NULL DEFAULT 1,
+    idEstadoPago INT NOT NULL DEFAULT 1,
     idEstadoSunat INT NOT NULL DEFAULT 1,
     compRelacionado VARCHAR(30) NULL,
     idUsuario UNIQUEIDENTIFIER NOT NULL,
@@ -730,7 +732,14 @@ CREATE TABLE Ventas (
     CONSTRAINT FK_Ventas_Clientes FOREIGN KEY (idCliente) REFERENCES Clientes(idCliente),
     CONSTRAINT FK_Ventas_Usuario FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
     CONSTRAINT FK_Ventas_UsuarioAnulacion FOREIGN KEY (idUsuarioAnulacion) REFERENCES UsuarioWeb(idUsuario),
+    CONSTRAINT FK_Ventas_EstadoPedido FOREIGN KEY (idEstadoPedido) REFERENCES EstadosPedidos(idEstadoPedido),
+    CONSTRAINT FK_Ventas_EstadoPago FOREIGN KEY (idEstadoPago) REFERENCES EstadoPago(idEstadoPago),
+    CONSTRAINT FK_Ventas_EstadoSunat FOREIGN KEY (idEstadoSunat) REFERENCES EstadoSunat(idEstadoSunat),
     CONSTRAINT UQ_Ventas_SerieNumero UNIQUE (idEmpresa, serie, numero)
+
+    CREATE INDEX IX_Ventas_idEstadoPedido ON Ventas(idEstadoPedido);
+    CREATE INDEX IX_Ventas_idEstadoPago ON Ventas(idEstadoPago);
+    CREATE INDEX IX_Ventas_idEstadoSunat ON Ventas(idEstadoSunat);
 );
 GO
 
@@ -1084,7 +1093,7 @@ CREATE TABLE MovimientosCaja (
     idUsuario UNIQUEIDENTIFIER NOT NULL,
     idTipoMovimientoCaja INT NOT NULL,
     fechaMovimiento DATETIME NOT NULL DEFAULT GETDATE(),
-    idConcepto UNIQUEIDENTIFIER NULL
+    idConcepto UNIQUEIDENTIFIER NULL,
     concepto VARCHAR(100) NOT NULL,
     monto DECIMAL(18,2) NOT NULL,
     idMediosPago INT NULL,

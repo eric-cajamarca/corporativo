@@ -440,8 +440,8 @@ const listarDirecciones_idProveedor = async function (req, res) {
 
 //3. crea el metodo actualizarDireccionCliente segun los datos de la tabla
 const actualizarDireccionProveedor = async function (req, res) {
-    const { idProveedor, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, referencia, codLocal } = req.body;
-    const idDireccionProveedor = req.params.idDireccionProveedor;
+    const { idProveedor, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, referencia, codLocal, principal } = req.body;
+    const idDireccionProveedor = req.params.id || req.params.idDireccionProveedor;
 
     if (req.user) {
         if (req.user.rol == 'Administrador') {
@@ -460,7 +460,8 @@ const actualizarDireccionProveedor = async function (req, res) {
                     .input('direccion', sql.VarChar, direccion)
                     .input('referencia', sql.VarChar, referencia)
                     .input('codLocal', sql.VarChar, codLocal)
-                    .query('update DireccionProveedor set idProveedor = @idProveedor, ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, referencia = @referencia, codLocal = @codLocal where idDireccionProveedor = @idDireccionProveedor');
+                    .input('principal', sql.Bit, principal === true || principal === 1)
+                    .query('update DireccionProveedor set idProveedor = @idProveedor, ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, referencia = @referencia, codLocal = @codLocal, principal = @principal where idDireccionProveedor = @idDireccionProveedor');
 
                 res.status(200).send({ message: 'DireccionProveedor actualizado', data: actualizarDireccionProveedor.recordset });
             } catch (error) {
@@ -479,7 +480,7 @@ const actualizarDireccionProveedor = async function (req, res) {
 
 //crea el metodo eliminarDireccionCliente segun los datos de la tabla
 const eliminarDireccionProveedor = async function (req, res) {
-    const idDireccionProveedor = req.params.idDireccionProveedor;
+    const idDireccionProveedor = req.params.id || req.params.idDireccionProveedor;
 
     if (req.user) {
         if (req.user.rol == 'Administrador') {

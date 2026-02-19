@@ -79,6 +79,7 @@ export class CreateVentasComponent implements OnInit {
 };
   public detallePago: any =[];
   public estadoPago: any = [];
+  public estadosPedidos: any = [];
   public documento: Documento[] = [];
   
   public comprobantes: any = [];
@@ -109,6 +110,7 @@ export class CreateVentasComponent implements OnInit {
     idCliente: '',
     idDocumento: '',
     idMoneda: 1,
+    idEstadoPedido: 1,
     idEstadoPago: 2,
     idMediosPago: '5',
     fEmision: '',
@@ -131,6 +133,9 @@ export class CreateVentasComponent implements OnInit {
   };
 
   public direccionCliente: any;
+
+  /** Valores por defecto de estado pedido y estado pago (según configuración). */
+  configDefaults = { idEstadoPedidoPorDefecto: 1, idEstadoPagoPorDefecto: 2 };
 
   /** Ventas provisionales: sesiones guardadas en localStorage para recuperar tras apagón. */
   sesionesGuardadas: VentaSesion[] = [];
@@ -183,13 +188,32 @@ export class CreateVentasComponent implements OnInit {
       },
       error: () => {}
     });
-    const hoy = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
+    const hoy = `${y}-${m}-${d}`;
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
     const collapsed = localStorage.getItem('sidebarCollapsed');
     if (collapsed === 'true') this.sidebarCollapsed.set(true);
     this.cargarDatos();
+    this.cargarConfigDefaultsVenta();
     this.revisarVentasProvisionales();
+  }
+
+  /** Carga estado pedido y estado pago por defecto desde configuración y los aplica a la venta actual. */
+  cargarConfigDefaultsVenta(): void {
+    this.ventasService.getConfigDefaults().subscribe({
+      next: (res) => {
+        const d = res?.data;
+        if (d) {
+          this.configDefaults.idEstadoPedidoPorDefecto = d.idEstadoPedidoPorDefecto ?? 1;
+          this.configDefaults.idEstadoPagoPorDefecto = d.idEstadoPagoPorDefecto ?? 2;
+          this.ventas.idEstadoPedido = this.configDefaults.idEstadoPedidoPorDefecto;
+          this.ventas.idEstadoPago = this.configDefaults.idEstadoPagoPorDefecto;
+        }
+      },
+      error: () => {}
+    });
   }
 
   /** Tras cargar datos, revisa si hay ventas provisionales y ofrece recuperarlas. */
@@ -338,11 +362,18 @@ export class CreateVentasComponent implements OnInit {
     this._tablasSunatService.obtener_estado_pago().subscribe(
       (response) => {
         this.estadoPago = response.data;
-        console.log(this.estadoPago);
       },
-      (error) => {
-        console.log(error);
-      }
+      (error) => { console.log(error); }
+    );
+
+    this._tablasSunatService.obtener_estados_pedidos().subscribe(
+      (response) => {
+        this.estadosPedidos = response.data || [];
+        if (this.estadosPedidos.length && (this.ventas.idEstadoPedido == null || this.ventas.idEstadoPedido === '')) {
+          this.ventas.idEstadoPedido = this.estadosPedidos[0].idEstadoPedido;
+        }
+      },
+      (error) => { console.log(error); }
     );
 
     this._tablasSunatService.obtener_medios_pago().subscribe(
@@ -1126,7 +1157,9 @@ abrirModalPrecios(item: any) {
 
     const totalVenta = Number(this.ventas.total) || 0;
     const totalPago = this.calcularTotalTabla();
-    if (!this.esCotizacion() && totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    const esPagoPendiente = idEstadoPago === 1;
+    if (!this.esCotizacion() && !esPagoPendiente && totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
       iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
       return;
     }
@@ -1285,7 +1318,7 @@ abrirModalPrecios(item: any) {
         serie: String(this.ventas.serie || '0000').substring(0, 4),
         numero: String(this.ventas.numero || '00000000').substring(0, 8),
         compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
-        fEmision: this.ventas.fEmision ? String(this.ventas.fEmision).substring(0, 10) : new Date().toISOString().substring(0, 10),
+        fEmision: this.ventas.fEmision ? String(this.ventas.fEmision).substring(0, 10) : (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })(),
         fVencimiento: this.ventas.fVencimiento ? String(this.ventas.fVencimiento).substring(0, 10) : null,
         idDocumento: this.ventas.idDocumento != null ? String(this.ventas.idDocumento).substring(0, 1) : '1',
         idCliente,
@@ -1333,7 +1366,9 @@ abrirModalPrecios(item: any) {
   private enviarVentaConCliente(idCliente: number): void {
     const totalVenta = Number(this.ventas.total) || 0;
     const totalPago = this.calcularTotalTabla();
-    if (totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    const esPagoPendiente = idEstadoPago === 1;
+    if (!esPagoPendiente && totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
       this.loading = false;
       iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
       return;
@@ -1359,11 +1394,15 @@ abrirModalPrecios(item: any) {
       otrosCargos: Number(this.ventas.otrosCargos) || 0,
       descuentos: Number(this.ventas.descuentos) || 0,
       total: totalVenta,
-      idMediosPago: String(this.ventas.idMediosPago || '5'),
+      idMediosPago: esPagoPendiente ? '' : String(this.ventas.idMediosPago || '5'),
+      idEstadoPedido: Number(this.ventas.idEstadoPedido) || 1,
+      idEstadoPago,
       idEstadoSunat: this.esComprobanteElectronico() ? 7 : 1,
       compRelacionado: this.ventas.observacion || null
     };
 
+    const idEstadoPedidoVenta = Number(this.ventas.idEstadoPedido) || 1;
+    const esEstadoPendiente = idEstadoPedidoVenta === 1;
     const detalles = this.carrito.map((item: any) => {
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
@@ -1378,8 +1417,8 @@ abrirModalPrecios(item: any) {
         isc: 0,
         total: subtotal,
         hVenta: new Date().toISOString(),
-        cantEntregada: cant,
-        idEstadoPedido: 1
+        cantEntregada: esEstadoPendiente ? 0 : cant,
+        idEstadoPedido: idEstadoPedidoVenta
       };
     });
 
@@ -1423,7 +1462,7 @@ abrirModalPrecios(item: any) {
     this.pagaCon = 0;
     this.vuelto = 0;
 
-    // Reset modal comprobante
+    // Reset modal comprobante (estado pedido y pago según configuración)
     this.ventas = {
       compVenta: '0000-00000000',
       idComprobante: '',
@@ -1433,7 +1472,8 @@ abrirModalPrecios(item: any) {
       idCliente: '',
       idDocumento: '',
       idMoneda: 1,
-      idEstadoPago: 2,
+      idEstadoPedido: this.configDefaults.idEstadoPedidoPorDefecto,
+      idEstadoPago: this.configDefaults.idEstadoPagoPorDefecto,
       idMediosPago: '5',
       fEmision: '',
       fechaPago: '',

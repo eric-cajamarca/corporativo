@@ -40,6 +40,17 @@ export class PdfService {
     );
   }
 
+  /** Genera PDF de comprobante de despacho (lista para almacenero: venta, items con ubicaciones). */
+  generarPdfComprobanteDespacho(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
+    const payload = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'comprobante-despacho', fontSize: formato === 'ticket' ? 8 : 10, formato },
+      { responseType: 'blob' }
+    );
+  }
+
   // Método legacy para HTML directo (si lo necesitas)
   generarPdfHtml(html: string, fontSize: number = 10): Observable<Blob> {
     return this.http.post(

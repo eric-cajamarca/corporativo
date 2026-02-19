@@ -103,9 +103,9 @@ export class IndexReportesComponent implements OnInit {
   inicializarFechas(): void {
     const hoy = new Date();
     const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-
-    this.fechaFin = hoy.toISOString().split('T')[0];
-    this.fechaInicio = primerDiaMes.toISOString().split('T')[0];
+    const fmt = (n: Date) => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    this.fechaFin = fmt(hoy);
+    this.fechaInicio = fmt(primerDiaMes);
   }
 
   cargarReportesPrincipales(): void {

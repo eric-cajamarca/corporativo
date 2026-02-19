@@ -469,14 +469,11 @@ const deleteAdmin = async (req, res) => {
 
 
 const createDireccionEmpresa = async function (req, res) {
-    console.log('crearDireccionEmpresa req.body', req.body);
-    console.log('req.user', req.user);
-
-    // if (req.user) {
-    //     if (req.user.rol == 'Administrador') {
-
     try {
-        let idEmpresa = req.body.idEmpresa;
+        const idEmpresa = (req.user && (req.user.empresa || req.user.idEmpresa)) ? (req.user.empresa || req.user.idEmpresa) : req.body.idEmpresa;
+        if (!idEmpresa) {
+            return res.status(400).send({ message: 'idEmpresa requerido', data: undefined });
+        }
         let ubigeo = req.body.ubigeo;
         let codPais = req.body.codpais;
         let region = req.body.region;
@@ -547,8 +544,10 @@ const createSucursalEmpresa = async function (req, res) {
         }
 
         let idSucursal = uuidv4();
-        let idEmpresa = req.body.idEmpresa;
-
+        const idEmpresa = (req.user && (req.user.empresa || req.user.idEmpresa)) ? (req.user.empresa || req.user.idEmpresa) : req.body.idEmpresa;
+        if (!idEmpresa) {
+            return res.status(400).send({ message: 'idEmpresa requerido', data: undefined });
+        }
         let direccion = req.body.direccion;
         // let idUsuario = req.body.idUsuario;
         let fregistro = moment().format('YYYY-MM-DD');

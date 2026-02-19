@@ -1,4 +1,5 @@
 const sql = require("mssql");
+const { getNowLocal, getNowLocalSQLString, getFechaSoloSQLString } = require("../utils/fechaHoraLocal.util");
 
 exports.obtenerEnviosVentaRepo = async (pool, idEmpresa, idVenta) => {
   const result = await pool
@@ -96,7 +97,7 @@ exports.crearEnvioRepo = async (pool, user, datos) => {
     .input("coordenadas", sql.VarChar, datos.coordenadas || null)
     .input("contactoDestinatario", sql.VarChar, datos.contactoDestinatario || null)
     .input("telefonoDestinatario", sql.VarChar, datos.telefonoDestinatario || null)
-    .input("fechaProgramada", sql.DateTime, datos.fechaProgramada || null)
+    .input("fechaProgramada", sql.VarChar(23), datos.fechaProgramada ? getFechaSoloSQLString(datos.fechaProgramada) || String(datos.fechaProgramada).trim().slice(0, 19).replace('T', ' ') + '.000' : null)
     .input("observaciones", sql.VarChar, datos.observaciones || null)
     .query(`
       INSERT INTO Envios (
@@ -161,11 +162,11 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
     const estadoAnterior = estadoAnteriorResult.recordset[0].idEstadoEnvio;
 
     // Actualizar estado del envío
-    const fechaEntrega = datos.idEstadoEnvio === 4 ? new Date() : null; // 4 = ENTREGADO
+    const fechaEntrega = datos.idEstadoEnvio === 4 ? getNowLocalSQLString() : null; // 4 = ENTREGADO (hora local servidor)
 
     await request
       .input("idEstadoEnvio", sql.Int, datos.idEstadoEnvio)
-      .input("fechaEntrega", sql.DateTime, fechaEntrega)
+      .input("fechaEntrega", sql.VarChar(23), fechaEntrega)
       .input("evidenciaFoto", sql.VarChar, datos.evidenciaFoto || null)
       .query(`
         UPDATE Envios

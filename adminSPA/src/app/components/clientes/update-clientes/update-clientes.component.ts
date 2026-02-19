@@ -38,6 +38,8 @@ export class UpdateClientesComponent {
   public regiones: any = [];
   public provincias: any = [];
   public distritos: any = [];
+  public fullProvincias: any[] = [];
+  public fullDistritos: any[] = [];
   public token: any = "";
   public contBuscar = 0;
   public btn_registrar = false;
@@ -49,6 +51,12 @@ export class UpdateClientesComponent {
   public data: any = {};
   public guardandoDireccion = false;
   public mostrarFormNuevaDireccion = false;
+  public listEstablecimientos: any[] = [];
+  public showModalEstablecimientos = false;
+  public loadingEstablecimientos = false;
+  public selectedEstablecimientoIndices: Set<number> = new Set();
+  /** Modal editar dirección (controlado por variable para que funcione dentro de otro modal). */
+  public showModalEditarDireccion = false;
   public nuevaDireccion: any = {
     ubigeo: '',
     codPais: 'PEN',
@@ -86,14 +94,14 @@ export class UpdateClientesComponent {
     this._adminService.get_Procincias().subscribe(
       response => {
         this.provincias = response;
-        console.log('this.provincias', this.provincias);
+        this.fullProvincias = response || [];
       }
     );
 
     this._adminService.get_Distritos().subscribe(
       response => {
         this.distritos = response;
-        console.log('this.distritos', this.distritos);
+        this.fullDistritos = response || [];
       }
     );
 
@@ -163,35 +171,27 @@ export class UpdateClientesComponent {
     try {
 
       if (this.clientes.ruc.length === 11 && this.clientes.idDocumento === '6') {
-        this._apiperuService.getRucInfo(this.filtro).subscribe(
-          response => {
-            this.clienteruc = response;
-            //divido los datos de la despuesta
-            this.clientes.rSocial = response.razonSocial;
-            this.clientes.condicion = response.estado
-
-
-            ///////////
-            this.direccionClientes.codpais = "PEN";
-            this.direccionClientes.ubigeo = response.ubigeo;
-            this.direccionClientes.region = response.departamento;
-            this.direccionClientes.provincia = response.provincia;
-            this.direccionClientes.distrito = response.distrito;
-            this.direccionClientes.direccion = response.direccion;
-
-            console.log('this.clienteruc: ', this.clienteruc);
+        this._apiperuService.getRucInfo(this.filtro).subscribe({
+          next: (response) => {
+            const data = response?.data ?? response;
+            if (response?.error) {
+              iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', class: 'text-danger', position: 'topRight', message: response.error });
+              return;
+            }
+            this.clienteruc = data;
+            this.clientes.rSocial = data.razonSocial ?? '';
+            this.clientes.condicion = data.estado ?? 'ACTIVO';
+            this.direccionClientes.codpais = 'PEN';
+            this.direccionClientes.ubigeo = data.ubigeo ?? '';
+            this.direccionClientes.direccion = data.direccion ?? '';
+            this.direccionClientes.region = data.departamento ?? '';
+            this.direccionClientes.provincia = data.provincia ?? '';
+            this.direccionClientes.distrito = data.distrito ?? '';
           },
-          error => {
-            iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#FFF',
-              class: 'text-danger',
-              position: 'topRight',
-              message: 'Error al realizar la consulta por falta de datos'
-            });
-          });
-
+          error: () => {
+            iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', class: 'text-danger', position: 'topRight', message: 'Error al realizar la consulta por falta de datos' });
+          }
+        });
       }
 
 
@@ -199,25 +199,25 @@ export class UpdateClientesComponent {
 
 
       if (this.clientes.ruc.length === 8 && this.clientes.idDocumento === '1') {
-        this._apiperuService.getDniInfo(this.filtro).subscribe(
-          response => {
-            this.clienteruc = response;
+        this._apiperuService.getDniInfo(this.filtro).subscribe({
+          next: (response) => {
             //divido los datos de la despuesta
-            this.clientes.rSocial = response.apellidoPaterno + ' ' + response.apellidoMaterno + ', ' + response.nombres;
-
-
-            console.log('this.clienteruc: ', this.clienteruc);
+            const data = response?.data ?? response;
+            if (response?.error) {
+              iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', class: 'text-danger', position: 'topRight', message: response.error });
+              return;
+            }
+            this.clienteruc = data;
+            const ap = (data.apellidoPaterno ?? '').trim();
+            const am = (data.apellidoMaterno ?? '').trim();
+            const nom = (data.nombres ?? '').trim();
+            const partes = [ap, am, nom].filter(Boolean);
+            this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
           },
-          error => {
-            iziToast.show({
-              title: 'ERROR',
-              titleColor: '#FF0000',
-              color: '#FFF',
-              class: 'text-danger',
-              position: 'topRight',
-              message: 'Error al realizar la consulta por falta de datos '
-            });
-          });
+          error: () => {
+            iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', class: 'text-danger', position: 'topRight', message: 'Error al realizar la consulta por falta de datos' });
+          }
+        });
 
       }
     } catch (error) {
@@ -335,11 +335,28 @@ export class UpdateClientesComponent {
   }
 
 
+  private findLocationId(items: any[], name: string, _type: string): string | undefined {
+    if (!items?.length || !name) return undefined;
+    const normalize = (t: string) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const n = normalize(name);
+    let found = items.find((i: any) => normalize(i.name) === n);
+    if (!found) found = items.find((i: any) => normalize(i.name).includes(n));
+    if (!found) found = items.find((i: any) => n.includes(normalize(i.name)));
+    return found ? found.id : undefined;
+  }
+
   editarDireccion(id: string) {
     const item = this.direccionClientes_const.find((d: any) => Number(d.idDireccionClientes) === Number(id));
     if (item) {
       this.direccionClientes = { ...item };
+      this.select_region();
+      this.select_provincia();
+      this.showModalEditarDireccion = true;
     }
+  }
+
+  cerrarModalEditarDireccion(): void {
+    this.showModalEditarDireccion = false;
   }
 
   actualizarDireccion() {
@@ -354,10 +371,12 @@ export class UpdateClientesComponent {
       urbanizacion: this.direccionClientes.urbanizacion ?? '',
       direccion: this.direccionClientes.direccion ?? '',
       referencia: this.direccionClientes.referencia ?? '',
-      codLocal: this.direccionClientes.codLocal ?? ''
+      codLocal: this.direccionClientes.codLocal ?? '',
+      principal: this.direccionClientes.principal === true || this.direccionClientes.principal === 1
     };
     this._clientesService.editar_direccionCliente(this.direccionClientes.idDireccionClientes, payload).subscribe({
       next: () => {
+        this.showModalEditarDireccion = false;
         this.cargarDirecciones();
         if (typeof iziToast !== 'undefined') {
           iziToast.success({ title: 'OK', message: 'Dirección actualizada.', position: 'topRight' });
@@ -371,29 +390,145 @@ export class UpdateClientesComponent {
     });
   }
 
+  eliminarDireccion(id: string | number): void {
+    if (!window.confirm('¿Eliminar esta dirección?')) return;
+    this._clientesService.eliminar_direccionCliente(id).subscribe({
+      next: () => {
+        this.cargarDirecciones();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Dirección eliminada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo eliminar la dirección.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
   cargarDirecciones(): void {
     if (!this.clientes?.idCliente) return;
     this._clientesService.obtener_direccionesCliente_idCliente(this.clientes.idCliente).subscribe({
       next: (response) => {
         const data = response?.data;
-        this.direccionClientes_const = Array.isArray(data) && data.length > 0 ? data : [];
-        if (this.direccionClientes_const.length > 0) {
-          this.regiones.forEach((reg: any) => {
-            const r = this.direccionClientes_const.find((d: any) => Number(d.region) === Number(reg.id));
-            if (r) r.nregion = reg.name;
-          });
-          this.provincias.forEach((prov: any) => {
-            const p = this.direccionClientes_const.find((d: any) => Number(d.provincia) === Number(prov.id));
-            if (p) p.nprovincia = prov.name;
-          });
-          this.distritos.forEach((dist: any) => {
-            const d = this.direccionClientes_const.find((x: any) => Number(x.distrito) === Number(dist.id));
-            if (d) d.ndistrito = dist.name;
-          });
-        }
+        this.direccionClientes_const = Array.isArray(data) ? data : [];
+        const allProv = this.fullProvincias?.length ? this.fullProvincias : this.provincias;
+        const allDist = this.fullDistritos?.length ? this.fullDistritos : this.distritos;
+        this.direccionClientes_const.forEach((d: any) => {
+          const reg = this.regiones.find((r: any) => Number(r.id) === Number(d.region));
+          const prov = allProv.find((p: any) => Number(p.id) === Number(d.provincia));
+          const dist = allDist.find((x: any) => Number(x.id) === Number(d.distrito));
+          d.nregion = reg?.name ?? '';
+          d.nprovincia = prov?.name ?? '';
+          d.ndistrito = dist?.name ?? '';
+        });
       },
       error: () => { this.direccionClientes_const = []; }
     });
+  }
+
+  /** Al hacer clic en Crear dirección: si es RUC y hay establecimientos, muestra modal; si no, muestra form. */
+  onCrearDireccion(): void {
+    const ruc = (this.clientes.ruc || '').trim();
+    if (ruc.length === 11 && this.clientes.idDocumento === '6') {
+      this.loadingEstablecimientos = true;
+      this._apiperuService.getRucAnexo(ruc).subscribe({
+        next: (res) => {
+          this.loadingEstablecimientos = false;
+          if (res && res.error) {
+            this.mostrarFormNuevaDireccion = true;
+            return;
+          }
+          const data = Array.isArray(res?.data) ? res.data : [];
+          if (data.length > 0) {
+            this.listEstablecimientos = data;
+            this.selectedEstablecimientoIndices = new Set();
+            this.showModalEstablecimientos = true;
+          } else {
+            this.mostrarFormNuevaDireccion = true;
+          }
+        },
+        error: () => {
+          this.loadingEstablecimientos = false;
+          this.mostrarFormNuevaDireccion = true;
+        }
+      });
+    } else {
+      this.mostrarFormNuevaDireccion = true;
+    }
+  }
+
+  closeModalEstablecimientos(): void {
+    this.showModalEstablecimientos = false;
+    this.listEstablecimientos = [];
+    this.selectedEstablecimientoIndices = new Set();
+  }
+
+  toggleEstablecimiento(i: number): void {
+    if (this.selectedEstablecimientoIndices.has(i)) {
+      this.selectedEstablecimientoIndices.delete(i);
+    } else {
+      this.selectedEstablecimientoIndices.add(i);
+    }
+    this.selectedEstablecimientoIndices = new Set(this.selectedEstablecimientoIndices);
+  }
+
+  toggleAllEstablecimientos(checked: boolean): void {
+    if (checked) {
+      this.listEstablecimientos.forEach((_, i) => this.selectedEstablecimientoIndices.add(i));
+    } else {
+      this.selectedEstablecimientoIndices.clear();
+    }
+    this.selectedEstablecimientoIndices = new Set(this.selectedEstablecimientoIndices);
+  }
+
+  /** Crea una dirección por cada establecimiento seleccionado y recarga la lista. */
+  applyEstablecimientosEditar(): void {
+    const selected = Array.from(this.selectedEstablecimientoIndices)
+      .sort((a, b) => a - b)
+      .map(i => this.listEstablecimientos[i]);
+    if (selected.length === 0) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', position: 'topRight', message: 'Seleccione al menos un establecimiento' });
+      }
+      return;
+    }
+    if (!this.clientes?.idCliente) return;
+    const idCliente = this.clientes.idCliente;
+    let idx = 0;
+    const crearSiguiente = () => {
+      if (idx >= selected.length) {
+        this.closeModalEstablecimientos();
+        this.cargarDirecciones();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Direcciones agregadas.', position: 'topRight' });
+        }
+        return;
+      }
+      const e = selected[idx++];
+      const dep = (e.departamento ?? '').trim();
+      const prov = (e.provincia ?? '').trim();
+      const dist = (e.distrito ?? '').trim();
+      const payload = {
+        idCliente,
+        ubigeo: e.ubigeo ?? '',
+        codpais: 'PEN',
+        region: dep ? (this.findLocationId(this.regiones, dep, 'd') ?? '') : '',
+        provincia: prov ? (this.findLocationId(this.fullProvincias.length ? this.fullProvincias : this.provincias, prov, 'p') ?? '') : '',
+        distrito: dist ? (this.findLocationId(this.fullDistritos.length ? this.fullDistritos : this.distritos, dist, 'd') ?? '') : '',
+        urbanizacion: '',
+        direccion: e.direccion ?? e.direccionCompleta ?? '',
+        referencia: e.tipoEstablecimiento ?? '',
+        codLocal: e.codigo ?? '0',
+        principal: false
+      };
+      this._clientesService.crear_direccionCliente(payload).subscribe({
+        next: () => crearSiguiente(),
+        error: () => crearSiguiente()
+      });
+    };
+    crearSiguiente();
   }
 
   guardarNuevaDireccion(): void {

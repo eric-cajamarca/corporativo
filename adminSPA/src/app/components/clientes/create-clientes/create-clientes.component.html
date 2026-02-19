@@ -56,6 +56,13 @@
                         <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
                             placeholder="Ingrese la razón social">
                     </div>
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary btn-sm" (click)="openModalEstablecimientos()"
+                            [disabled]="loadingEstablecimientos">
+                            <span *ngIf="loadingEstablecimientos" class="spinner-border spinner-border-sm"></span>
+                            {{ loadingEstablecimientos ? 'Cargando...' : 'Ver establecimientos (RUC)' }}
+                        </button>
+                    </div>
 
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
@@ -147,14 +154,14 @@
             </div>
         </ng-container>
 
-        <ng-container *ngIf="clientes.idDocumento == 1">
+        <ng-container *ngIf="clientes.idDocumento == 1 || clientes.idDocumento == 4">
             <div class="card" style="margin-bottom: 20px;">
 
                 <div class="card-body">
                     <div class="mb-3">
-                        <label for="rSocial" class="form-label">Razón Social</label>
+                        <label for="rSocial" class="form-label">{{ clientes.idDocumento == 4 ? 'Apellidos y nombres' : 'Razón Social' }}</label>
                         <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
-                            placeholder="Ingrese la razón social">
+                            [placeholder]="clientes.idDocumento == 4 ? 'Ingrese apellidos y nombres' : 'Ingrese la razón social'">
                     </div>
 
                     <div class="mb-3">
@@ -272,4 +279,42 @@
 
         <!-- <button type="submit" class="btn btn-primary" style="margin-top: 20px; margin-bottom: 20px;">Crear Cliente</button> -->
     </form>
+
+    <!-- Modal Establecimientos RUC -->
+    <div class="modal fade" [class.show]="showModalEstablecimientos" [style.display]="showModalEstablecimientos ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Establecimientos del RUC</h5>
+                    <button type="button" class="btn-close" (click)="closeModalEstablecimientos()"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Seleccione uno o varios para guardar como direcciones del cliente.</p>
+                    <div class="mb-2">
+                        <label class="me-2">
+                            <input type="checkbox" [checked]="listEstablecimientos.length > 0 && selectedEstablecimientoIndices.size === listEstablecimientos.length"
+                                (change)="toggleAllEstablecimientos($any($event.target).checked)"> Seleccionar todos
+                        </label>
+                    </div>
+                    <ul class="list-group list-group-flush" style="max-height: 60vh; overflow-y: auto;">
+                        <li class="list-group-item d-flex align-items-start" *ngFor="let est of listEstablecimientos; let i = index">
+                            <label class="me-2 mt-1">
+                                <input type="checkbox" [checked]="selectedEstablecimientoIndices.has(i)" (change)="toggleEstablecimiento(i)">
+                            </label>
+                            <div class="flex-grow-1">
+                                <strong>{{ est.codigo }} – {{ est.tipoEstablecimiento }}</strong>
+                                <div class="small text-secondary">{{ est.direccionCompleta || est.direccion }}</div>
+                                <div class="small">{{ est.departamento }} – {{ est.provincia }} – {{ est.distrito }}</div>
+                            </div>
+                        </li>
+                    </ul>
+                    <p *ngIf="listEstablecimientos.length === 0 && showModalEstablecimientos" class="text-muted">No hay establecimientos para mostrar.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" (click)="closeModalEstablecimientos()">Cerrar</button>
+                    <button type="button" class="btn btn-primary" (click)="applyEstablecimientos()">Usar selección</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

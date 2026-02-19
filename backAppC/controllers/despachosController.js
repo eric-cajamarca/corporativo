@@ -29,13 +29,14 @@ const obtenerDespachosVenta = async (req, res) => {
   }
 };
 
-// Crear despacho
+// Crear despacho. Opcional: detalles = [{ idDetalle, idProducto, cantidadADespachar }] para fijar cant. por línea.
 const crearDespacho = async (req, res) => {
   try {
     const {
       idVenta,
       idTipoDespacho,
-      observaciones
+      observaciones,
+      detalles
     } = req.body;
 
     // Validación básica
@@ -50,7 +51,8 @@ const crearDespacho = async (req, res) => {
     const result = await DespachosServices.crearDespachoService(pool, req.user, {
       idVenta,
       idTipoDespacho,
-      observaciones
+      observaciones,
+      detalles: Array.isArray(detalles) ? detalles : undefined
     });
 
     res.status(200).send({
@@ -203,11 +205,47 @@ const obtenerEstadoDespachos = async (req, res) => {
   }
 };
 
+// Buscar venta por número comprobante o idVenta; devuelve venta + despachos + entregadoMismoDia
+const buscarVentaDespachos = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const resultado = await DespachosServices.buscarVentaDespachosService(pool, req.user, req.query);
+    if (!resultado) {
+      return res.status(404).send({ message: "Venta no encontrada", data: null });
+    }
+    res.status(200).send({ message: "OK", data: resultado });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    console.error("Error buscar venta despachos:", error);
+    res.status(500).send({ message: "Error al buscar", data: undefined });
+  }
+};
+
+// Obtener detalle de un despacho (líneas DetalleDespachos)
+const obtenerDetalleDespacho = async (req, res) => {
+  try {
+    const { idDespacho } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const detalle = await DespachosServices.obtenerDetalleDespachoService(pool, req.user, idDespacho);
+    res.status(200).send({ data: detalle });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    console.error("Error obtener detalle despacho:", error);
+    res.status(500).send({ message: "Error al obtener detalle", data: undefined });
+  }
+};
+
 module.exports = {
   obtenerDespachosVenta,
   crearDespacho,
   actualizarCantidadDespachada,
   finalizarDespacho,
   obtenerTiposDespacho,
-  obtenerEstadoDespachos
+  obtenerEstadoDespachos,
+  buscarVentaDespachos,
+  obtenerDetalleDespacho
 };

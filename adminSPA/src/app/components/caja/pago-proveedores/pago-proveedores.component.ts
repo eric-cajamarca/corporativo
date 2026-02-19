@@ -90,7 +90,7 @@ export class PagoProveedoresComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
     this.form.fechaEmision = hoy;
     this.cargarDatos();
     this.cargarProveedores();
@@ -198,7 +198,7 @@ export class PagoProveedoresComponent implements OnInit {
     this.form = {
       serie: '0001',
       numero: '0000002',
-      fechaEmision: new Date().toISOString().split('T')[0],
+      fechaEmision: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })(),
       idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
       idTipoMovimientoCaja: this.tiposMovimiento.length ? this.tiposMovimiento[0].idTipoMovimientoCaja : 0,
       importeACancelar: 0,
@@ -292,7 +292,7 @@ export class PagoProveedoresComponent implements OnInit {
     this.form = {
       serie: '0001',
       numero: '0000002',
-      fechaEmision: new Date().toISOString().split('T')[0],
+      fechaEmision: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })(),
       idApertura: this.cajas.length ? this.cajas[0].idApertura : '',
       idTipoMovimientoCaja: this.tiposMovimiento.length ? this.tiposMovimiento[0].idTipoMovimientoCaja : 0,
       importeACancelar: item.saldo || 0,

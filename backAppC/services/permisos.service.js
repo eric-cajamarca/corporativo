@@ -204,6 +204,12 @@ const obtenerNavegacionSidebar = async (pool, user) => {
                     visible: esAdmin || permisos.includes('VER_CAJA')
                 },
                 {
+                    nombre: 'Ventas pendientes de pago',
+                    ruta: '/caja/ventas-pendientes-pago',
+                    permiso: 'VER_CAJA',
+                    visible: esAdmin || permisos.includes('VER_CAJA')
+                },
+                {
                     nombre: 'Cobranza de Créditos',
                     ruta: '/creditos',
                     permiso: 'VER_CREDITOS',
@@ -357,7 +363,8 @@ const obtenerNavegacionSidebar = async (pool, user) => {
                 { nombre: 'General', ruta: '/configuracion', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
                 { nombre: 'Sucursales', ruta: '/sucursal', permiso: 'GESTIONAR_SUCURSALES', visible: esAdmin || permisos.includes('GESTIONAR_SUCURSALES') },
                 { nombre: 'Colaboradores', ruta: '/colaborador', permiso: 'VER_USUARIOS', visible: esAdmin || permisos.includes('VER_USUARIOS') },
-                { nombre: 'Roles', ruta: '/rol', permiso: 'GESTIONAR_ROLES', visible: esAdmin || permisos.includes('GESTIONAR_ROLES') }
+                { nombre: 'Roles', ruta: '/rol', permiso: 'GESTIONAR_ROLES', visible: esAdmin || permisos.includes('GESTIONAR_ROLES') },
+                { nombre: 'Log de auditoría', ruta: '/auditoria', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') }
             ]
         },
         {

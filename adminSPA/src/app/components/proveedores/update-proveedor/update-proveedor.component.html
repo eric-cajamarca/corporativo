@@ -210,58 +210,91 @@
 
 
     <ng-container *ngIf="direccionProveedores !== undefined">
-        <h3>Aquí muestro las direcciones de proveedores</h3>
-        <div *ngFor="let item of direccionProveedores_const">
-            <div class="card">
-                <div class="card-header">
-
-                    <!-- Title -->
-                    <h6 class="card-header-title">
-                        {{item.ubigeo}} - {{item.direccion}}
-                    </h6>
-
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">Direcciones del proveedor</h3>
+            <button type="button" class="btn btn-sm btn-success" (click)="onCrearDireccion()" [disabled]="loadingEstablecimientos">
+                <span *ngIf="loadingEstablecimientos" class="spinner-border spinner-border-sm me-1"></span>
+                <i *ngIf="!loadingEstablecimientos" class="bi bi-plus-lg me-1"></i>Crear dirección
+            </button>
+        </div>
+        <div class="border rounded p-3 mb-3" *ngIf="mostrarFormNuevaDireccion">
+            <h6 class="mb-3">Nueva dirección</h6>
+            <div class="row g-2">
+                <div class="col-12">
+                    <label class="form-label">Dirección <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" [(ngModel)]="nuevaDireccion.direccion" name="nuevaDireccion"
+                        placeholder="Ej: Av. Principal 123">
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ubigeo</label>
+                    <input type="text" class="form-control" [(ngModel)]="nuevaDireccion.ubigeo" name="nuevaUbigeo" placeholder="Opcional">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Referencia</label>
+                    <input type="text" class="form-control" [(ngModel)]="nuevaDireccion.referencia" name="nuevaReferencia" placeholder="Opcional">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary me-2" (click)="guardarNuevaDireccionProveedor()"
+                        [disabled]="guardandoDireccion || !nuevaDireccion.direccion?.trim()">
+                        <span *ngIf="!guardandoDireccion"><i class="bi bi-check-lg me-1"></i>Guardar</span>
+                        <span *ngIf="guardandoDireccion" class="spinner-border spinner-border-sm"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" (click)="mostrarFormNuevaDireccion = false">Cancelar</button>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ubigeo</th>
+                        <th>Dirección</th>
+                        <th>Referencia</th>
+                        <th>Región</th>
+                        <th>Provincia</th>
+                        <th>Distrito</th>
+                        <th class="text-center">Principal</th>
+                        <th class="text-center" style="width: 160px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let item of direccionProveedores_const">
+                        <td>{{ item.ubigeo || '—' }}</td>
+                        <td>{{ item.direccion || '—' }}</td>
+                        <td>{{ item.referencia || '—' }}</td>
+                        <td>{{ item.nregion || '—' }}</td>
+                        <td>{{ item.nprovincia || '—' }}</td>
+                        <td>{{ item.ndistrito || '—' }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-success" *ngIf="item.principal">Sí</span>
+                            <span class="badge bg-secondary" *ngIf="!item.principal">No</span>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-outline-warning me-1"
+                                data-bs-toggle="modal" [attr.data-bs-target]="'#editar-prov-' + item.idDireccionProveedor"
+                                (click)="editarDireccionProveedor(item.idDireccionProveedor)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                (click)="eliminarDireccionProveedor(item.idDireccionProveedor)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr *ngIf="(direccionProveedores_const?.length ?? 0) === 0">
+                        <td colspan="8" class="text-center text-muted py-3">No hay direcciones. Use «Crear dirección» para agregar.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-                <div class="card-body" style="background-color: rgb(235, 231, 231);">
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn"> <strong>Region: </strong> {{item.nregion}}
-                        </label><br>
-                        <label for="ac-fn"> <strong>Provincia: </strong>
-                            {{item.nprovincia}}</label><br>
-                        <label for="ac-fn"> <strong>Distrito: </strong> {{item.ndistrito}}
-                        </label>
-
-                    </div>
-                    <hr>
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn"> <strong>Urbanización: </strong>
-                            {{item.urbanizacion}} </label><br>
-                        <label for="ac-fn"> <strong>Dirección: </strong> {{item.direccion}}
-                        </label><br>
-                        <label for="ac-fn"> <strong>Referencia: </strong> {{item.referencia}}
-                        </label>
-
-                    </div>
-
-                    <hr />
-                    <span class="badge bg-success" *ngIf="item.principal">Principal</span>
-                    <span class="badge bg-danger" *ngIf="!item.principal">Establecer como
-                        principal</span>
-
-                    <div style="width: 30%; margin-top: 10px;">
-                        <!-- <button class="btn-warning" style="border-radius: 5px;"> Modificar dirección</button> -->
-                        <button class="btn-warning"
-                            style="border-radius: 5px; margin-right: 20px; margin-bottom: 10px;"
-                            data-bs-toggle="modal" [attr.data-bs-target]="'#editar-' + item.idDireccionProveedores"
-                            (click)="editarDireccion(item.idDireccionProveedores)">Modificar dirección</button>
-
-                        <button class="btn-warning"
-                            (click)="consultar()">Consultar</button>
+        <!-- Modales Editar dirección (uno por fila) -->
+        <div *ngFor="let item of direccionProveedores_const">
 
                         <!-- Modal de Actualizacion de la direccion-->
-                        <div class="modal fade" [attr.id]="'editar-' + item.idDireccionProveedores" tabindex="-1"
+                        <div class="modal fade" [attr.id]="'editar-prov-' + item.idDireccionProveedor" tabindex="-1"
                             role="dialog" aria-labelledby="editarDireccionModalLabel" aria-hidden="true">
-                            <div class="modal-dialog" role="document">
+                            <div class="modal-dialog modal-dialog-scrollable" role="document">
                                 <div class="modal-content">
                                     <div class="modal-header bg-secondary">
                                         <h5 class="modal-title" id="editarDireccionModalLabel">Editar dirección:
@@ -269,7 +302,7 @@
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
                                             aria-label="Close"></button>
                                     </div>
-                                    <div class="modal-body">
+                                    <div class="modal-body overflow-auto" style="max-height: 70vh;">
 
                                         <!-- direccionProveedores -->
                                         <ng-container>
@@ -320,104 +353,68 @@
                                             <label for="direccion" class="form-label">Dirección</label>
                                             <input type="text" class="form-control" name="direccion"
                                                 [(ngModel)]="direccionProveedores.direccion"
-                                                placeholder="Ingrese la dirección (opcional)">
+                                                placeholder="Ingrese la dirección">
                                         </div>
-                                        <!-- <div class="mb-3">
-                                <label for="referencia" class="form-label">Referencia</label>
-                                <textarea type="text" class="form-control" name="referencia"
-                                    [(ngModel)]="direccionProveedores.referencia"
-                                    placeholder="Ingrese la referencia (opcional)"></textarea>
-                            </div> -->
-
-
+                                        <div class="mb-3">
+                                            <label for="referencia" class="form-label">Referencia</label>
+                                            <input type="text" class="form-control" name="referencia"
+                                                [(ngModel)]="direccionProveedores.referencia"
+                                                placeholder="Opcional">
+                                        </div>
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" [attr.id]="'editPrincipalProv-' + item.idDireccionProveedor" [(ngModel)]="direccionProveedores.principal" name="principalProv">
+                                                <label class="form-check-label" [attr.for]="'editPrincipalProv-' + item.idDireccionProveedor">Marcar como dirección principal</label>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary"
                                             data-bs-dismiss="modal">Cerrar</button>
                                         <button type="button" class="btn btn-primary"
-                                            (click)="actualizarDireccion()" data-bs-dismiss="modal">Guardar
-                                            cambios</button>
+                                            (click)="actualizarDireccionProveedor()" data-bs-dismiss="modal">Guardar cambios</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                    </div>
+        </div>
 
-<!-- 
-                    <ng-container *ngIf="direccionProveedores.region === undefined">
-                        
-                    
-                        <div class="col-sm-6 form-group">
-                            <label for="ac-fn">Región <sup>*<sup></sup></sup></label>
-                            <select id="sl-region" name="region" [(ngModel)]="direccionProveedores.region" class="form-control"
-                                (change)="select_region()">
-                                <option value="" selected disabled>Seleccionar</option>
-                                <option value="{{item.id}}" *ngFor="let item of regiones">{{item.name}}</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-6 form-group">
-                            <label for="ac-fn">Provincia <sup>*<sup></sup></sup></label>
-                            <select id="sl-provincia" name="provincia" [(ngModel)]="direccionProveedores.provincia"
-                                class="form-control" disabled (change)="select_provincia()">
-                                <option value="" selected disabled>Seleccionar</option>
-                                <option value="{{item.id}}" *ngFor="let item of provincias">{{item.name}}</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-6 form-group">
-                            <label for="ac-fn">Distrito <sup>*<sup></sup></sup></label>
-                            <select id="sl-distrito" name="distrito" [(ngModel)]="direccionProveedores.distrito"
-                                class="form-control" disabled (change)="select_distrito($event)">
-                                <option value="" selected disabled>Seleccionar</option>
-                                <option value="{{item.id}}" *ngFor="let item of distritos">{{item.name}}</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="ubigeo" class="form-label">Ubigeo</label>
-                            <input type="text" class="form-control" name="ubigeo" [(ngModel)]="direccionProveedores.ubigeo"
-                                placeholder="Ingrese el ubigeo">
-                        </div>
-                    </ng-container>
-                    <ng-container *ngIf="direccionProveedores.region !== undefined">
-                        <h6> Consulta a sunat realizada</h6>
-                       
-                        <div class="mb-3">
-                            <label for="region" class="form-label">Región</label>
-                            <input type="text" class="form-control" name="region" [(ngModel)]="direccionProveedores.region">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="provincia" class="form-label">Provincia</label>
-                            <input type="text" class="form-control" name="provincia" [(ngModel)]="direccionProveedores.provincia">
-                        </div>
-    
-                        <div class="mb-3">
-                            <label for="distrito" class="form-label">Distrito</label>
-                            <input type="text" class="form-control" name="distrito" [(ngModel)]="direccionProveedores.distrito">
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="ubigeo" class="form-label">Ubigeo</label>
-                            <input type="text" class="form-control" name="ubigeo" [(ngModel)]="direccionProveedores.ubigeo"
-                                placeholder="Ingrese el ubigeo">
-                        </div>
-                    </ng-container>
-    
-                        <div class="mb-3">
-                        <label for="direccion" class="form-label">Dirección</label>
-                        <input type="text" class="form-control" name="direccion" [(ngModel)]="direccionProveedores.direccion"
-                            placeholder="Ingrese la dirección">
+        <!-- Modal Establecimientos RUC (editar proveedor) -->
+        <div class="modal fade" [class.show]="showModalEstablecimientos" [style.display]="showModalEstablecimientos ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Establecimientos del RUC</h5>
+                        <button type="button" class="btn-close" (click)="closeModalEstablecimientos()"></button>
                     </div>
-                    <div class="mb-3">
-                        <label for="referencia" class="form-label">Referencia</label>
-                        <input type="text" class="form-control" name="referencia" [(ngModel)]="direccionProveedores.referencia"
-                            placeholder="Ingrese la referencia (opcional)">
-                    </div> -->
-                    
-
+                    <div class="modal-body overflow-auto" style="max-height: 70vh;">
+                        <p class="text-muted small">Seleccione uno o varios para agregar como direcciones del proveedor.</p>
+                        <div class="mb-2">
+                            <label class="me-2">
+                                <input type="checkbox" [checked]="listEstablecimientos.length > 0 && selectedEstablecimientoIndices.size === listEstablecimientos.length"
+                                    (change)="toggleAllEstablecimientos($any($event.target).checked)"> Seleccionar todos
+                            </label>
+                        </div>
+                        <ul class="list-group list-group-flush" style="max-height: 60vh; overflow-y: auto;">
+                            <li class="list-group-item d-flex align-items-start" *ngFor="let est of listEstablecimientos; let i = index">
+                                <label class="me-2 mt-1">
+                                    <input type="checkbox" [checked]="selectedEstablecimientoIndices.has(i)" (change)="toggleEstablecimiento(i)">
+                                </label>
+                                <div class="flex-grow-1">
+                                    <strong>{{ est.codigo }} – {{ est.tipoEstablecimiento }}</strong>
+                                    <div class="small text-secondary">{{ est.direccionCompleta || est.direccion }}</div>
+                                    <div class="small">{{ est.departamento }} – {{ est.provincia }} – {{ est.distrito }}</div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" (click)="closeModalEstablecimientos()">Cerrar</button>
+                        <button type="button" class="btn btn-primary" (click)="applyEstablecimientosEditar()">Agregar direcciones seleccionadas</button>
+                    </div>
                 </div>
             </div>
         </div>
-
     </ng-container>
 </div>

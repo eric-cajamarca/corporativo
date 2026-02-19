@@ -5,6 +5,7 @@ import { ImpuestoService } from '../../../services/impuesto.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { FacturacionService } from '../../../services/facturacion.service';
+import { VentasService } from '../../../services/ventas.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -120,6 +121,10 @@ export class IndexConfiguracionComponent implements OnInit {
     estado: true
   };
 
+  /** Comprobante por defecto: estado pedido y estado pago al crear nueva venta */
+  ventasDefaults = { idEstadoPedidoPorDefecto: 1, idEstadoPagoPorDefecto: 2 };
+  ventasDefaultsGuardando = false;
+
   /** Comprobantes (series y correlativos) */
   comprobantes: Array<{ idComprobante: number; codigo: string; nombre: string; serie: string; numero: number; usarEnVenta: boolean; usarEnCompra: boolean }> = [];
   comprobantesCargando = false;
@@ -134,6 +139,7 @@ export class IndexConfiguracionComponent implements OnInit {
     private _comprobanteService: ComprobanteService,
     private _empresaService: EmpresaService,
     private _facturacionService: FacturacionService,
+    private _ventasService: VentasService,
     private _router: Router
   ) {}
 
@@ -141,9 +147,37 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cargarConfiguracion();
   }
 
+  cargarVentasDefaults(): void {
+    this._ventasService.getConfigDefaults().subscribe({
+      next: (res) => {
+        const d = res?.data;
+        if (d) {
+          this.ventasDefaults.idEstadoPedidoPorDefecto = d.idEstadoPedidoPorDefecto ?? 1;
+          this.ventasDefaults.idEstadoPagoPorDefecto = d.idEstadoPagoPorDefecto ?? 2;
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  guardarVentasDefaults(): void {
+    this.ventasDefaultsGuardando = true;
+    this._ventasService.putConfigDefaults({
+      idEstadoPedidoPorDefecto: this.ventasDefaults.idEstadoPedidoPorDefecto,
+      idEstadoPagoPorDefecto: this.ventasDefaults.idEstadoPagoPorDefecto
+    }).subscribe({
+      next: () => {
+        this.ventasDefaultsGuardando = false;
+        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Guardado', message: 'Valores por defecto guardados.', position: 'topRight' });
+      },
+      error: () => { this.ventasDefaultsGuardando = false; }
+    });
+  }
+
   cargarConfiguracion(): void {
     this.cargarEmpresaYDireccion();
     this.cargarConfiguracionFacturacion();
+    this.cargarVentasDefaults();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;

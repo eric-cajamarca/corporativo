@@ -189,7 +189,7 @@ export class UpdateVentaComponent implements OnInit {
     }
     this.saving = true;
     const ventaPayload = {
-      fEmision: this.fEmision ? this.fEmision + 'T00:00:00' : new Date().toISOString().slice(0, 19),
+      fEmision: this.fEmision ? this.fEmision + 'T00:00:00' : (() => { const n = new Date(); const y = n.getFullYear(), m = String(n.getMonth() + 1).padStart(2, '0'), d = String(n.getDate()).padStart(2, '0'); return `${y}-${m}-${d}T00:00:00`; })(),
       idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
       subtotal: this.total / 1.18,
       igv: this.total - this.total / 1.18,

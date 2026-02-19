@@ -62,12 +62,14 @@ import { PagoProveedoresComponent } from './components/caja/pago-proveedores/pag
 import { ReciboIngresoComponent } from './components/caja/recibo-ingreso/recibo-ingreso.component';
 import { ReciboEgresoComponent } from './components/caja/recibo-egreso/recibo-egreso.component';
 import { ConteoDineroComponent } from './components/caja/conteo-dinero/conteo-dinero.component';
+import { VentasPendientesPagoComponent } from './components/caja/ventas-pendientes-pago/ventas-pendientes-pago.component';
 import { IndexFormaPagoComponent } from './components/catalogos/forma-pago/index-forma-pago.component';
 import { IndexTipoMovimientosComponent } from './components/catalogos/tipo-movimientos/index-tipo-movimientos.component';
 import { IndexClasificacionConceptosComponent } from './components/catalogos/clasificacion-conceptos/index-clasificacion-conceptos.component';
 import { IndexConceptosComponent } from './components/catalogos/conceptos/index-conceptos.component';
 import { IndexMotivoTrasladoComponent } from './components/catalogos/motivo-traslado/index-motivo-traslado.component';
 import { IndexMotivoNotaCreditoComponent } from './components/catalogos/motivo-nota-credito/index-motivo-nota-credito.component';
+import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-auditoria.component';
 
 export const routes: Routes = [
     {
@@ -179,6 +181,7 @@ export const routes: Routes = [
 
      { path: 'despachos', component: IndexDespachosComponent, canActivate: [AuthGuard], title: 'Despachos'},
      { path: 'despachos/create', component: CreateDespachosComponent, canActivate: [AuthGuard], title: 'Crear Despacho'},
+     { path: 'despachos/create/:idVenta', component: CreateDespachosComponent, canActivate: [AuthGuard], title: 'Crear Despacho'},
 
      { path: 'programaciones', component: IndexProgramacionComponent, canActivate: [AuthGuard], title: 'Programaciones' },
      { path: 'programacion/create',component: CreateProgramacionComponent, canActivate: [AuthGuard], title: 'Crear Programacion'},
@@ -214,6 +217,7 @@ export const routes: Routes = [
      { path: 'caja/recibo-ingreso', component: ReciboIngresoComponent, canActivate: [AuthGuard], title: 'Recibo de Ingreso' },
      { path: 'caja/recibo-egreso', component: ReciboEgresoComponent, canActivate: [AuthGuard], title: 'Recibo de Egreso' },
      { path: 'caja/conteo-dinero', component: ConteoDineroComponent, canActivate: [AuthGuard], title: 'Conteo de Dinero' },
+     { path: 'caja/ventas-pendientes-pago', component: VentasPendientesPagoComponent, canActivate: [AuthGuard], title: 'Ventas pendientes de pago' },
      { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard], title: 'Créditos y Cuotas' },
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },
@@ -226,4 +230,5 @@ export const routes: Routes = [
      { path: 'catalogos/clasificacion-conceptos', component: IndexClasificacionConceptosComponent, canActivate: [AuthGuard], title: 'Clasificación Conceptos' },
      { path: 'catalogos/motivo-traslado', component: IndexMotivoTrasladoComponent, canActivate: [AuthGuard], title: 'Motivo Traslado' },
      { path: 'catalogos/motivo-nota-credito', component: IndexMotivoNotaCreditoComponent, canActivate: [AuthGuard], title: 'Motivo Nota Credito' },
+  { path: 'auditoria', component: LogAuditoriaComponent, canActivate: [AuthGuard], title: 'Log de auditoría' },
 ];

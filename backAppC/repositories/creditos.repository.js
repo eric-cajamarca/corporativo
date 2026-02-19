@@ -1,5 +1,6 @@
 const sql = require("mssql");
 const CajaRepository = require("./caja.repository");
+const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
 
 /** Lista créditos de la empresa. Si idCliente viene vacío/null, devuelve todos; si es número, filtra por ese cliente. */
 exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
@@ -291,7 +292,7 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
       const reqUpdate = transaction.request();
       await reqUpdate
         .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
-        .input("fechaPago", sql.DateTime, new Date())
+        .input("fechaPago", sql.VarChar(23), getNowLocalSQLString())
         .query(`
           UPDATE CuotasCredito
           SET estado = 'PAGADO', fechaPago = @fechaPago, saldoPendiente = 0
@@ -345,7 +346,7 @@ async function procesarPagoParcial(transaction, cuota, datos, user) {
   // Marcar la cuota actual como PAGADA (el monto pagado queda cancelado; saldoPendiente en 0)
   await req
     .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
-    .input("fechaPago", sql.DateTime, new Date())
+    .input("fechaPago", sql.VarChar(23), getNowLocalSQLString())
     .query(`
       UPDATE CuotasCredito
       SET estado = 'PAGADO', fechaPago = @fechaPago, saldoPendiente = 0

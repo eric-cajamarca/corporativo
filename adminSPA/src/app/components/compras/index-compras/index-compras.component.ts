@@ -257,7 +257,7 @@ export class IndexComprasComponent {
     let list = [...this.compras_const];
 
     if (this.filtroFecha === 'today') {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
       list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) === hoy);
     } else if (this.filtroFecha === 'month') {
       const now = new Date();

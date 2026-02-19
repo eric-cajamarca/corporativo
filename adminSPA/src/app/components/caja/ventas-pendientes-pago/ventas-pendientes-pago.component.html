@@ -1,0 +1,158 @@
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container-fluid">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-wallet2 me-2"></i>Ventas pendientes de pago
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Filtro: idVenta (código de barras) y cliente -->
+          <div class="row mb-3 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label small">ID Venta / Código de barras</label>
+              <input type="text" class="form-control form-control-sm"
+                     [(ngModel)]="filtroIdVenta"
+                     (keydown)="onFiltroKeydown($event)"
+                     placeholder="Escanear o escribir idVenta">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Cliente (nombre o RUC)</label>
+              <input type="text" class="form-control form-control-sm"
+                     [(ngModel)]="filtroCliente"
+                     (keydown)="onFiltroKeydown($event)"
+                     placeholder="Nombre o RUC">
+            </div>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-primary btn-sm w-100" (click)="buscar()" [disabled]="loading">
+                <i class="bi bi-search me-1"></i>Buscar
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>Comprobante</th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>RUC</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let v of list">
+                  <td>{{ v.compVenta || v.serie + '-' + v.numero }}</td>
+                  <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
+                  <td>{{ v.clienteRazonSocial }}</td>
+                  <td>{{ v.clienteRuc }}</td>
+                  <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
+                  <td class="text-center">
+                    <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
+                      <i class="bi bi-cash-coin"></i> Cobrar
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" (click)="editarVenta(v.idVenta)" title="Editar venta">
+                      <i class="bi bi-pencil"></i> Editar
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="list.length === 0 && !loading">
+                  <td colspan="6" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div *ngIf="loading" class="text-center py-3">
+            <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal Formas de pago (Cobrar) -->
+<div class="modal fade" id="modalCobrarPendiente" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-cash-coin me-2"></i>Cobrar comprobante
+          <span *ngIf="ventaSeleccionada"> - {{ ventaSeleccionada.compVenta }}</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalCobrar()" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body" *ngIf="ventaSeleccionada">
+        <p class="mb-2"><strong>Cliente:</strong> {{ ventaSeleccionada.clienteRazonSocial }}</p>
+        <p class="mb-3"><strong>Total a cobrar:</strong> S/ {{ formatNumber(ventaSeleccionada.total) }}</p>
+
+        <h6 class="fw-bold mb-2">Detalle de pago</h6>
+        <div class="row g-2 mb-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small">Forma de pago</label>
+            <select class="form-select form-select-sm" [(ngModel)]="selectedIdFormaPago">
+              <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Monto</label>
+            <input type="number" class="form-control form-control-sm" [(ngModel)]="detailForm.monto" step="0.01" min="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Referencia</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="detailForm.referencia" placeholder="N° operación">
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-success btn-sm w-100" (click)="agregarDetalle()">Agregar</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Forma de pago</th>
+                <th class="text-end">Monto</th>
+                <th>Referencia</th>
+                <th class="text-center">Quitar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let d of detallePago; let i = index">
+                <td>{{ d.item }}</td>
+                <td>{{ d.descripcion }}</td>
+                <td class="text-end">S/ {{ formatNumber(d.monto) }}</td>
+                <td>{{ d.referencia }}</td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarDetalle(i)"><i class="bi bi-trash"></i></button>
+                </td>
+              </tr>
+              <tr *ngIf="detallePago.length === 0">
+                <td colspan="5" class="text-center text-muted">Agregue formas de pago</td>
+              </tr>
+            </tbody>
+            <tfoot class="table-info">
+              <tr>
+                <td colspan="2" class="fw-bold text-end">TOTAL</td>
+                <td class="fw-bold text-end">S/ {{ formatNumber(totalDetallePago()) }}</td>
+                <td colspan="2" class="fw-bold">Saldo: S/ {{ formatNumber(saldoPendiente()) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalCobrar()">Cancelar</button>
+        <button type="button" class="btn btn-success" (click)="guardarPago()" [disabled]="guardandoPago">
+          <i class="bi bi-check-circle me-1"></i>{{ guardandoPago ? 'Guardando...' : 'Guardar pago' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

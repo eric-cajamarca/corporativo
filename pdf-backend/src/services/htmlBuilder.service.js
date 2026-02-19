@@ -299,7 +299,8 @@ class HtmlBuilderService {
       empresa, venta, titulo, compVenta, fEmision,
       logoSrc, razonSocial, dirCliente, rucCliente,
       filasItems, lineasTotales, cantidadLetras,
-      textoRepresentacion, resumenHash, qrDataUri
+      textoRepresentacion, resumenHash, qrDataUri,
+      idVenta = '', barcodeIdVentaUrl = ''
     } = data;
     const total = Number(venta.total) || 0;
     return `<!DOCTYPE html>
@@ -332,6 +333,8 @@ class HtmlBuilderService {
     .ticket-final .txt { margin-bottom: 2px; }
     .ticket-final .qr-wrap { text-align: center; margin-top: 4px; }
     .ticket-final .qr-wrap img { width: 70px; height: 70px; }
+    .ticket-final .barcode-venta { margin-top: 4px; font-size: 6px; }
+    .ticket-final .barcode-venta img { height: 28px; width: auto; max-width: 60mm; }
   </style>
 </head>
 <body>
@@ -371,6 +374,7 @@ class HtmlBuilderService {
     <div class="txt">Visite https://mifacturasunat.com</div>
     ${resumenHash ? '<div class="txt">Resumen: ' + resumenHash + '</div>' : ''}
     <div class="qr-wrap"><img src="${qrDataUri}" alt="QR"/></div>
+    ${barcodeIdVentaUrl ? '<div class="barcode-venta">Venta: ' + idVenta + '<br><img src="' + barcodeIdVentaUrl + '" alt="' + idVenta + '"/></div>' : ''}
   </div>
 </body>
 </html>`;
@@ -394,6 +398,10 @@ class HtmlBuilderService {
     const titulo = venta.nombreComprobante || 'Comprobante';
     const compVenta = venta.compVenta || '';
     const fEmision = venta.fEmision || '';
+    const idVenta = venta.idVenta != null ? String(venta.idVenta) : '';
+    const barcodeIdVentaUrl = idVenta
+      ? 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(idVenta) + '&code=Code128&translate=esc'
+      : '';
     const subtotal = Number(venta.subtotal) || 0;
     const igv = Number(venta.igv) || 0;
     const exonerado = Number(venta.exonerado) || 0;
@@ -458,7 +466,9 @@ class HtmlBuilderService {
         cantidadLetras,
         textoRepresentacion,
         resumenHash,
-        qrDataUri
+        qrDataUri,
+        idVenta,
+        barcodeIdVentaUrl
       });
     }
 
@@ -498,6 +508,8 @@ class HtmlBuilderService {
     .bloque-final .texto { float: left; width: 70%; font-size: 8px; line-height: 1.4; }
     .bloque-final .qr { float: right; width: 28%; text-align: right; }
     .bloque-final .qr img { width: 100px; height: 100px; }
+    .bloque-final .barcode-venta { margin-top: 8px; clear: both; font-size: 8px; }
+    .bloque-final .barcode-venta img { height: 36px; width: auto; max-width: 180px; }
   </style>
 </head>
 <body>
@@ -548,6 +560,7 @@ class HtmlBuilderService {
       ${resumenHash ? 'Resumen: ' + resumenHash : ''}
     </div>
     <div class="qr"><img src="${qrDataUri}" alt="QR"/></div>
+    ${barcodeIdVentaUrl ? '<div class="barcode-venta">Código venta (despachos): <img src="' + barcodeIdVentaUrl + '" alt="' + idVenta + '"/><br><span>' + idVenta + '</span></div>' : ''}
   </div>
 </body>
 </html>`;

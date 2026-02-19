@@ -1,156 +1,266 @@
-<app-topnav></app-topnav>
-
-<div class="main-content">
-  <div class="container-fluid" >
-    <div class="row justify-content-center" >
-      <div class="col-12 col-lg-11 col-xl-11"  style="background-color: white; margin-top: 20px;">
-
-        <h3>Bien venido al módulo de despachos</h3>
-        <p>Aquí se lista el comprobante de compra mas la descripcion de la mercaderia que el cliente a retirado.</p>
-
-
-        <div class="card-body">
-
-          <!-- lista desplegable -->
-          <label for="select">Seleccione una empresa</label><br>
-          <select class="select-empresa" aria-label="Default select example" [(ngModel)]="empresaSeleccionada"
-            (change)="onEmpresaSeleccionada()">
-            <option selected disabled>Selecionar</option>
-            <option *ngFor="let empresa of empresa" [ngValue]="empresa">{{ empresa.Alias }}</option>
-            <!-- <option *ngFor="let empresa of empresa" [value]="empresa.id">{{ empresa.Alias }}</option> -->
-          </select>
-
-
-          <div class="input-group input-group-merge" style="width: 40%;">
-            <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
-              [(ngModel)]="filtro" >
-            <div class="input-group-append">
-              <button class="btn btn-primary" (click)="filtrar()">
-                Buscar
-              </button>
+<main class="py-3">
+  <div class="container-fluid">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-11 col-xl-11">
+          <div class="card table-card">
+            <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="bi bi-truck"></i> Despachos y entregas</h5>
             </div>
+            <div class="card-body">
+              <p class="text-muted mb-3">
+                Busque por <strong>número de comprobante</strong> o por <strong>código de venta (idVenta)</strong>.
+                Puede escanear el código de barras del comprobante para buscar por idVenta.
+              </p>
 
+              <div class="input-group input-group-lg mb-3">
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Nº comprobante (ej. NP01-00000011) o código idVenta"
+                  [(ngModel)]="criterioBusqueda"
+                  (keydown.enter)="buscar()"
+                />
+                <button type="button" class="btn btn-primary" (click)="buscar()" [disabled]="loading">
+                  <span *ngIf="!loading">Buscar</span>
+                  <span *ngIf="loading">Buscando…</span>
+                </button>
+              </div>
 
-          </div>
+              <div *ngIf="errorMsg" class="alert alert-warning" role="alert">
+                {{ errorMsg }}
+              </div>
 
+              <ng-container *ngIf="resultado">
+                <!-- Datos de la venta -->
+                <div class="card mb-3">
+                  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                      <strong>Comprobante:</strong> {{ resultado.venta.compVenta }} &nbsp;|&nbsp;
+                      <strong>Cliente:</strong> {{ resultado.venta.clienteRazonSocial }}
+                      <span *ngIf="resultado.venta.clienteRuc"> ({{ resultado.venta.clienteRuc }})</span>
+                    </div>
+                    <span *ngIf="resultado.entregadoMismoDia" class="badge bg-success">Entregado mismo día</span>
+                  </div>
+                  <div class="card-body">
+                    <div class="alert alert-warning py-2 mb-2" *ngIf="resultado.venta.idEstadoPago === 1" role="alert">
+                      <i class="bi bi-exclamation-triangle me-2"></i><strong>Este comprobante está pendiente de pago.</strong>
+                    </div>
+                    <div class="row small text-muted">
+                      <div class="col-auto"><strong>idVenta:</strong> {{ resultado.venta.idVenta }}</div>
+                      <div class="col-auto"><strong>Emisión:</strong> {{ resultado.venta.fEmision }}</div>
+                      <div class="col-auto"><strong>Total:</strong> {{ resultado.venta.total | number:'1.2-2' }}</div>
+                      <div class="col-auto" *ngIf="resultado.venta.estadoPedidoVentaNombre">
+                        <strong>Estado pedido:</strong> {{ resultado.venta.estadoPedidoVentaNombre }}
+                      </div>
+                      <div class="col-auto" *ngIf="resultado.venta.estadoPagoNombre">
+                        <strong>Estado pago:</strong> {{ resultado.venta.estadoPagoNombre }}
+                      </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+                      <button type="button" class="btn btn-primary" (click)="abrirModalCrearDespacho()">
+                        <i class="bi bi-plus-lg"></i> Crear despacho
+                      </button>
+                      <span class="text-muted small">Imprimir lista para almacenero:</span>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="generandoPdf" (click)="imprimirComprobanteDespacho('ticket')">
+                        <i class="bi bi-printer"></i> Ticket
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="generandoPdf" (click)="imprimirComprobanteDespacho('A5')">
+                        <i class="bi bi-file-earmark-pdf"></i> A5
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="generandoPdf" (click)="imprimirComprobanteDespacho('A4')">
+                        <i class="bi bi-file-earmark-pdf"></i> A4
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-        </div>
-
-        <h5>Comprobante de compra</h5>
-
-        <div class="card">
-          <div class="card-header">
-            Comprobante: {{compVenta.Serie_Numero}} <br>
-            Cliente: {{compVenta.Razon_Social}}
-          </div>
-          <div class="card-body">
-            <h6 class="card-title">Detalle del comprobante</h6>
-
-            <div class="table-responsive">
-              <table class="table table-dark">
-                <thead class="table-dark">
-                  <tr>
-                    <th>Cantidad</th>
-                    <th>Codigo</th>
-                    <th>Descripción</th>
-                    <th>Presentación</th>
-                    <th>Precio</th>
-                    <th>CEntregado</th>
-                    
-
-                  </tr>
-                </thead>
-                <tbody class="table-active">
-                  <tr *ngFor="let item of detalleVenta">
-
-                    <td style="width: 70px;">
-                      <span>{{item.Cantidad}}</span>
-                    </td>
-                    <td>
-                      <span>{{item.Codigo}} </span>
-                    </td>
-                    <td>
-                      <span>{{item.Descripcion}} </span>
-                    </td>
-                    <td style="width: 60px; text-align: center;">
-                      <span>{{item.Presentacion}} </span>
-                    </td>
-                    <td style="width: 60px; text-align: right;">
-                      <span>{{item.PVenta | number:'1.2-2'}} </span>
-                    </td>
-                    <td style="width: 60px; text-align: center;">
-                      <span>{{item.CantEntregado}} </span>
-                    </td>
-                    
-                  </tr>
-
-                </tbody>
-              </table>
-
-            </div>
-
-            <!-- <a [routerLink]="['/despachos/registrar']" [queryParams]="{ idempresa: idempresa, Serie_Numero: compVenta.Serie_Numero }" class="btn btn-primary">Crear nuevo despacho</a> -->
-            <a class="btn btn-primary" [routerLink]="['/despachos/registrar', idempresa, compVenta.Serie_Numero]">Crear
-              nuevo despacho</a>
-            <!-- <a  class="btn btn-primary" [routerLink]="['/despachos/registrar']" >Crear nuevo despacho</a> -->
-          </div>
-        </div>
-
-        <h5>Comprobantes de despachos</h5>
-
-
-        <div class="accordion" id="accordionExample">
-          <div *ngFor="let compEnvioItem of compEnvio" class="accordion-item">
-            <h2 class="accordion-header" id="heading{{compEnvioItem.CompEnvio}}">
-              <button class="accordion-button" type="button" data-bs-toggle="collapse"
-                [attr.data-bs-target]="'#collapse' + compEnvioItem.CompEnvio" aria-expanded="true"
-                [attr.aria-controls]="'collapse' + compEnvioItem.CompEnvio">
-                Comprobante: {{compEnvioItem.CompEnvio}} <br>
-                Fecha: {{compEnvioItem.FEnvio}}
-              </button>
-            </h2>
-            <div [id]="'collapse' + compEnvioItem.CompEnvio" class="accordion-collapse collapse"
-              [attr.aria-labelledby]="'heading' + compEnvioItem.CompEnvio" data-bs-parent="#accordionExample">
-              <div class="accordion-body">
-                <div class="table-responsive">
-                  <table class="table table-dark">
-                    <thead class="table-dark">
+                <!-- Detalle de la venta (DetalleVenta): cantidad, entregada, pendiente, ubicaciones -->
+                <h6 class="mb-2">Detalle de la venta (pendiente por entregar)</h6>
+                <div class="table-responsive mb-3" *ngIf="resultado.detalleVenta?.length">
+                  <table class="table table-sm table-bordered">
+                    <thead class="table-light">
                       <tr>
-                        <!-- <th>Comprobante</th>
-                                    <th>FEnvio</th> -->
+                        <th>Código</th>
                         <th>Descripción</th>
-                        <th>Presentación</th>
                         <th>Cantidad</th>
+                        <th>Entregada</th>
+                        <th>Pendiente</th>
+                        <th>Ubicación (almacén)</th>
                       </tr>
                     </thead>
-                    <tbody class="table-active">
-                      <tr *ngFor="let item of henvio">
-                        <!-- <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
-                                      <span>{{item.CompEnvio}}</span>
-                                    </td>
-                                    <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
-                                      <span>{{item.FEnvio}} </span>
-                                    </td> -->
-                        <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
-                          <span>{{item.Descripcion}} </span>
-                        </td>
-                        <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
-                          <span>{{item.Presentacion}} </span>
-                        </td>
-                        <td *ngIf="item.CompEnvio === compEnvioItem.CompEnvio">
-                          <span>{{item.Cantidad}} </span>
-                        </td>
+                    <tbody>
+                      <tr *ngFor="let dv of resultado.detalleVenta">
+                        <td>{{ dv.productoCodigo }}</td>
+                        <td>{{ dv.productoDescripcion }}</td>
+                        <td>{{ dv.cantidad }}</td>
+                        <td>{{ dv.cantEntregada }}</td>
+                        <td>{{ dv.cantPendiente }}</td>
+                        <td class="small fw-semibold text-dark">{{ dv.ubicaciones ? dv.ubicaciones : 'Sin ubicación' }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-              </div>
+                <p *ngIf="resultado.detalleVenta && resultado.detalleVenta.length === 0" class="text-muted small">No hay detalle de venta.</p>
+
+                <!-- Lista de despachos (acordeón con detalle) -->
+                <h6 class="mb-2">Despachos de esta venta</h6>
+                <div class="accordion" id="accordionDespachos">
+                  <div
+                    *ngFor="let d of resultado.despachos; let i = index"
+                    class="accordion-item"
+                  >
+                    <h2 class="accordion-header" [id]="'heading' + d.idDespacho">
+                      <button
+                        class="accordion-button collapsed"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        [attr.data-bs-target]="'#collapse' + d.idDespacho"
+                        [attr.aria-expanded]="false"
+                        [attr.aria-controls]="'collapse' + d.idDespacho"
+                        (click)="expandirDespacho(d.idDespacho)"
+                      >
+                        <span class="me-2">{{ d.tipoDespacho }}</span>
+                        <span class="text-muted small me-2">{{ d.fechaDespacho }}</span>
+                        <span class="badge me-2" [ngClass]="{
+                          'bg-warning': d.estado === 'PENDIENTE',
+                          'bg-info': d.estado === 'EN_PROCESO',
+                          'bg-success': d.estado === 'COMPLETADO',
+                          'bg-secondary': d.estado === 'CANCELADO'
+                        }">{{ d.estado }}</span>
+                        <span class="small">({{ d.lineasDespachadas }}/{{ d.totalLineas }} líneas)</span>
+                      </button>
+                    </h2>
+                    <div
+                      [id]="'collapse' + d.idDespacho"
+                      class="accordion-collapse collapse"
+                      [attr.aria-labelledby]="'heading' + d.idDespacho"
+                      data-bs-parent="#accordionDespachos"
+                    >
+                      <div class="accordion-body">
+                        <p *ngIf="d.observaciones" class="small text-muted mb-2">{{ d.observaciones }}</p>
+                        <div *ngIf="loadingDetalle[d.idDespacho]" class="text-center py-2">Cargando detalle…</div>
+                        <div *ngIf="!loadingDetalle[d.idDespacho] && (detallePorDespacho[d.idDespacho]?.length || 0) > 0" class="table-responsive">
+                          <table class="table table-sm table-striped">
+                            <thead>
+                              <tr>
+                                <th>Código</th>
+                                <th>Descripción</th>
+                                <th>Solicitada</th>
+                                <th>Despachada</th>
+                                <th>Pendiente</th>
+                                <th>Ubicación</th>
+                                <th>Cant. a despachar</th>
+                                <th>Estado</th>
+                                <th></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr *ngFor="let lin of detallePorDespacho[d.idDespacho]">
+                                <td>{{ lin.productoCodigo }}</td>
+                                <td>{{ lin.productoDescripcion }}</td>
+                                <td>{{ lin.cantidadSolicitada }}</td>
+                                <td>{{ lin.cantidadDespachada }}</td>
+                                <td>{{ pendienteLinea(lin) }}</td>
+                                <td class="small">{{ lin.ubicacionOrigen || lin.ubicacionDestino || '—' }}</td>
+                                <td>
+                                  <input type="number" class="form-control form-control-sm" style="width:5rem"
+                                    [(ngModel)]="cantADespacharEdicion[lin.idDetalleDespacho]"
+                                    [max]="lin.cantidadSolicitada" min="0" step="0.001"
+                                    placeholder="0">
+                                </td>
+                                <td><span class="badge" [ngClass]="lin.estado === 'DESPACHADO' ? 'bg-success' : 'bg-warning'">{{ lin.estado }}</span></td>
+                                <td>
+                                  <button type="button" class="btn btn-sm btn-outline-primary"
+                                    [disabled]="guardandoCantidad[lin.idDetalleDespacho]"
+                                    (click)="guardarCantidadDespachada(d.idDespacho, lin.idDetalleDespacho, cantADespacharEdicion[lin.idDetalleDespacho] ?? lin.cantidadDespachada)">
+                                    {{ guardandoCantidad[lin.idDetalleDespacho] ? '...' : 'Guardar' }}
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div *ngIf="!loadingDetalle[d.idDespacho] && (!detallePorDespacho[d.idDespacho] || detallePorDespacho[d.idDespacho].length === 0)" class="text-muted small">
+                          Sin líneas de detalle.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p *ngIf="resultado.despachos.length === 0" class="text-muted small mt-2">
+                  Aún no hay despachos registrados para esta venta.
+                </p>
+              </ng-container>
             </div>
           </div>
-
         </div>
+      </div>
+    </div>
+</main>
 
+<!-- Modal Crear despacho -->
+<div class="modal fade" [class.show]="modalCrearDespachoAbierto()" [style.display]="modalCrearDespachoAbierto() ? 'block' : 'none'" tabindex="-1"
+     [attr.aria-hidden]="!modalCrearDespachoAbierto()" style="background: rgba(0,0,0,0.5);">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Crear despacho</h5>
+        <button type="button" class="btn-close" (click)="cerrarModalCrearDespacho()" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <ng-container *ngIf="resultado">
+          <p class="small text-muted mb-2">
+            Comprobante: <strong>{{ resultado.venta.compVenta }}</strong><br>
+            Cliente: {{ resultado.venta.clienteRazonSocial }}
+          </p>
+          <p class="small mb-2">Indique la cantidad a despachar por cada ítem (máx. pendiente).</p>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th>Pendiente</th>
+                  <th>Ubicación</th>
+                  <th>Cant. a despachar</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let dv of detalleConPendiente">
+                  <td class="small">{{ dv.productoCodigo }}</td>
+                  <td class="small">{{ dv.productoDescripcion }}</td>
+                  <td>{{ dv.cantPendiente }}</td>
+                  <td class="small fw-semibold">{{ dv.ubicaciones || '—' }}</td>
+                  <td>
+                    <input type="number" class="form-control form-control-sm" style="width:4.5rem"
+                      [(ngModel)]="cantADespacharPanel[dv.idDetalle]"
+                      [max]="dv.cantPendiente" min="0" step="0.001" placeholder="0">
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="mb-3" *ngIf="tiposDespacho.length">
+            <label class="form-label small">Tipo de despacho</label>
+            <select class="form-select form-select-sm" [(ngModel)]="idTipoDespachoPanel">
+              <option *ngFor="let t of tiposDespacho" [value]="t.idTipoDespacho">{{ t.nombre }}</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">Observaciones (opcional)</label>
+            <textarea class="form-control form-control-sm" [(ngModel)]="observacionesPanel" rows="2"></textarea>
+          </div>
+        </ng-container>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalCrearDespacho()">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="crearDespachoDesdeModal()"
+                [disabled]="enviandoCrear || !idTipoDespachoPanel || detalleConPendiente.length === 0">
+          {{ enviandoCrear ? 'Creando…' : 'Crear despacho' }}
+        </button>
       </div>
     </div>
   </div>
 </div>
+<div class="modal-backdrop fade" [class.show]="modalCrearDespachoAbierto()" *ngIf="modalCrearDespachoAbierto()"></div>

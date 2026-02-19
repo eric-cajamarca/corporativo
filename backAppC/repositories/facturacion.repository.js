@@ -1,5 +1,6 @@
 const sql = require("mssql");
 const ventasRepository = require("../repositories/ventas.repository");
+const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
 const { escribirArchivosPlanos, escribirXmlFirma, nombreArchivoComprobante } = require("../utils/facturadorSunat.util");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
 const archivoPlanoFacturador = require("../services/archivoPlanoFacturador.service");
@@ -386,7 +387,7 @@ exports.registrarComprobanteElectronicoPorVentaRepo = async (
     .input("tipoComprobante", sql.VarChar(2), codigoStr)
     .input("serie", sql.VarChar(10), serie != null ? String(serie).trim() : "")
     .input("numero", sql.VarChar(10), numeroStr)
-    .input("fechaEmision", sql.DateTime, fechaEmision)
+    .input("fechaEmision", sql.VarChar(23), typeof fechaEmision === 'string' ? fechaEmision : fechaEmision)
     .query(`
       INSERT INTO ComprobantesElectronicos (
         idEmpresa, idVenta, tipoComprobante, serie, numero,
@@ -493,18 +494,18 @@ exports.listarPendientesEnvioRepo = async (pool, idEmpresa, limite = 500) => {
 
 /** Actualiza ComprobantesElectronicos y Ventas con el resultado del envío (mismo idEstadoSunat). Solo se guarda CDR en BD. */
 exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, resultado) => {
-  const now = new Date();
+  const nowStr = getNowLocalSQLString();
   const req1 = pool.request();
   await req1
     .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
-    .input("fechaEnvio", sql.DateTime, now)
-    .input("fechaRespuesta", sql.DateTime, now)
+    .input("fechaEnvio", sql.VarChar(23), nowStr)
+    .input("fechaRespuesta", sql.VarChar(23), nowStr)
     .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
     .input("descripcionRespuesta", sql.VarChar, resultado.descripcionRespuesta || null)
     .input("cdr", sql.NVarChar, resultado.cdr || null)
     .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat)
     .input("intentosEnvio", sql.Int, 1)
-    .input("ultimoIntento", sql.DateTime, now)
+    .input("ultimoIntento", sql.VarChar(23), nowStr)
     .query(`
       UPDATE ComprobantesElectronicos
       SET fechaEnvio = @fechaEnvio, fechaRespuesta = @fechaRespuesta,

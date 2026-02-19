@@ -131,8 +131,8 @@ const listarDireccionesClientes_idCliente = async function (req, res) {
 
 //3. crea el metodo actualizarDireccionCliente segun los datos de la tabla
 const actualizarDireccionCliente = async function (req, res) {
-    const { idCliente, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, referencia, codLocal } = req.body;
-    const idDireccionCliente = req.params.idDireccionCliente;
+    const { idCliente, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, referencia, codLocal, principal } = req.body;
+    const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
 
     if (req.user) {
         if (req.user.rol == 'Administrador') {
@@ -151,7 +151,8 @@ const actualizarDireccionCliente = async function (req, res) {
                     .input('direccion', sql.VarChar, direccion)
                     .input('referencia', sql.VarChar, referencia)
                     .input('codLocal', sql.VarChar, codLocal)
-                    .query('update DireccionClientes set idCliente = @idCliente, ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, referencia = @referencia, codLocal = @codLocal where idDireccionCliente = @idDireccionCliente');
+                    .input('principal', sql.Bit, principal === true || principal === 1)
+                    .query('update DireccionClientes set idCliente = @idCliente, ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, referencia = @referencia, codLocal = @codLocal, principal = @principal where idDireccionClientes = @idDireccionCliente');
 
                 res.status(200).send({ message: 'DireccionCliente actualizado', data: actualizarDireccionCliente.recordset });
             } catch (error) {
@@ -170,7 +171,7 @@ const actualizarDireccionCliente = async function (req, res) {
 
 //crea el metodo eliminarDireccionCliente segun los datos de la tabla
 const eliminarDireccionCliente = async function (req, res) {
-    const idDireccionCliente = req.params.idDireccionCliente;
+    const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
 
     if (req.user) {
         if (req.user.rol == 'Administrador') {
@@ -179,7 +180,7 @@ const eliminarDireccionCliente = async function (req, res) {
                 let pool = await sql.connect(dbConfig);
                 let eliminarDireccionCliente = await pool.request()
                     .input('idDireccionCliente', sql.Int, idDireccionCliente)
-                    .query('delete from DireccionClientes where idDireccionCliente = @idDireccionCliente');
+                    .query('delete from DireccionClientes where idDireccionClientes = @idDireccionCliente');
 
                 res.status(200).send({ message: 'DireccionCliente eliminado', data: eliminarDireccionCliente.recordset });
             } catch (error) {

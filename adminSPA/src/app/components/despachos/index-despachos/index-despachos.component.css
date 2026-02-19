@@ -1,3 +1,12 @@
+/* Despachos: sin barra lateral, contenido a ancho completo */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+
+
 .card-body{
     margin-left: 0px;
     padding-left: 0px;
@@ -27,4 +36,12 @@ h6{
 }
 h2{
     color: rgb(98, 99, 110);
+}
+
+/* Modal Crear despacho */
+:host .modal {
+  z-index: 1050;
+}
+:host .modal-backdrop {
+  z-index: 1040;
 }

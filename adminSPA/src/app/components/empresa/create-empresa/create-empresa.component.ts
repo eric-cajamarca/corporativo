@@ -258,35 +258,31 @@ export class CreateEmpresaComponent implements OnInit {
     this.apiperuService.getRucInfo(ruc).subscribe({
       next: (response) => {
         this.buscando.set(false);
-        
-        if (response.success === false) {
+        const data = response?.data ?? response;
+        if (response?.error || response?.success === false) {
           iziToast.show({
             title: 'Error',
             titleColor: '#dc3545',
             color: '#FFF',
             class: 'text-danger',
             position: 'topRight',
-            message: 'No se encontró información para el RUC ingresado'
+            message: response?.error || 'No se encontró información para el RUC ingresado'
           });
           this.encontrado.set(false);
           return;
         }
 
-        this.empresaEncontrada = response;
+        this.empresaEncontrada = data;
         this.encontrado.set(true);
-        
-        // Llenar formulario con datos encontrados
         this.empresaForm.patchValue({
-          razonSocial: response.razonSocial || '',
-          nombreComercial: response.nombreComercial || '',
-          condicion: response.condicion || '',
-          estado: response.estado || '',
-          direccion: response.direccion || '',
-          ubigeo: response.ubigeo || ''
+          razonSocial: data.razonSocial || '',
+          nombreComercial: data.nombreComercial || '',
+          condicion: data.condicion || '',
+          estado: data.estado || '',
+          direccion: data.direccion || '',
+          ubigeo: data.ubigeo || ''
         });
-
-        // Buscar y seleccionar ubicación
-        this.seleccionarUbicacion(response);
+        this.seleccionarUbicacion(data);
         
         // Avanzar al siguiente paso
         this.currentStep.set(2);

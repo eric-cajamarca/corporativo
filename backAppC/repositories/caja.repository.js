@@ -1,4 +1,5 @@
 const sql = require("mssql");
+const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
 
 exports.obtenerCajasRepo = async (pool, idEmpresa) => {
   const request = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
@@ -533,7 +534,7 @@ exports.eliminarTipoMovimientoCajaRepo = async (pool, id) => {
 };
 
 exports.obtenerResumenCajaDiarioRepo = async (pool, idEmpresa, fecha) => {
-  const fechaFiltro = fecha || new Date().toISOString().split('T')[0];
+  const fechaFiltro = fecha || getFechaHoyLocal();
 
   const result = await pool
     .request()
@@ -639,7 +640,7 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
 exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
   const { fecha, fechaInicial, fechaFinal, idCaja } = filtros || {};
   const usaRango = fechaInicial && fechaFinal;
-  const fechaFiltro = fecha || new Date().toISOString().split('T')[0];
+  const fechaFiltro = fecha || getFechaHoyLocal();
   const filtrarPorCaja = idCaja && idCaja !== 'TODAS';
 
   const request = pool.request()

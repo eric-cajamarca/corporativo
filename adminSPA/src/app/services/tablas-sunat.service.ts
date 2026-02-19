@@ -44,6 +44,11 @@ export class TablasSunatService {
      });
   }
 
+  obtener_estados_pedidos(): Observable<any> {
+    let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get(this.url + 'estadospedidos', { headers, withCredentials: true });
+  }
+
   obtener_medios_pago(): Observable<any> {
     let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.get(this.url + 'mediospago', { 

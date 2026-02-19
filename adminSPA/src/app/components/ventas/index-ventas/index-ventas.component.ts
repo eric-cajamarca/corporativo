@@ -90,7 +90,7 @@ export class IndexVentasComponent implements OnInit {
     let list = [...this.ventasConst];
 
     if (this.filtroFecha === 'today') {
-      const hoy = new Date().toISOString().slice(0, 10);
+      const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
       list = list.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
     } else if (this.filtroFecha === 'month') {
       const now = new Date();
@@ -324,9 +324,6 @@ export class IndexVentasComponent implements OnInit {
           cantidadLetras,
           nombreArchivo
         };
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index-ventas.component.ts:generarPdf',message:'Frontend datos empresa logo',data:{logoStr,empresaLogo:datos.empresa?.logo,rawEmpresaKeys:d.empresa?Object.keys(d.empresa):[]},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
         this.pdfService.generarPdfComprobanteVenta(datos, formato, nombreArchivo).subscribe({
           next: (blob) => {
             this.pdfService.previsualizar(blob);

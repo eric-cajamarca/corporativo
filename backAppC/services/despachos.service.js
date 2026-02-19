@@ -97,3 +97,24 @@ exports.obtenerEstadoDespachosService = async (pool, user) => {
   const estado = await DespachosRepository.obtenerEstadoDespachosRepo(pool, user.empresa);
   return estado;
 };
+
+/** Buscar venta por compVenta o idVenta; devuelve venta + despachos + entregadoMismoDia. */
+exports.buscarVentaDespachosService = async (pool, user, query) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const compVenta = query.compVenta ? String(query.compVenta).trim() : null;
+  const idVenta = query.idVenta != null && query.idVenta !== '' ? query.idVenta : null;
+  if (!compVenta && !idVenta) return null;
+  return await DespachosRepository.buscarVentaDespachosRepo(pool, user.empresa, { compVenta, idVenta });
+};
+
+/** Obtener detalle de un despacho (DetalleDespachos). */
+exports.obtenerDetalleDespachoService = async (pool, user, idDespacho) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return await DespachosRepository.obtenerDetalleDespachoRepo(pool, idDespacho, user.empresa);
+};
+
+/** Detalle de venta por idVenta para despacho (cantidad, cantEntregada, cantPendiente, ubicaciones). */
+exports.obtenerDetalleVentaParaDespachoService = async (pool, user, idVenta) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return await DespachosRepository.obtenerDetalleVentaParaDespachoRepo(pool, user.empresa, idVenta);
+};

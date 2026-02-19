@@ -5,6 +5,7 @@ var auth  = require('../middlewares/autenticate');
 
 // Rutas para el CRUD de tablas sunat
 api.get('/estadopago',auth.auth, tablasSunatController.obtener_estado_pago);
+api.get('/estadospedidos',auth.auth, tablasSunatController.obtener_estados_pedidos);
 api.get('/mediospago',auth.auth, tablasSunatController.obtener_medios_pago);
 api.get('/estadosunat',auth.auth, tablasSunatController.obtener_estado_sunat);
 api.get('/moneda',auth.auth, tablasSunatController.obtener_moneda);

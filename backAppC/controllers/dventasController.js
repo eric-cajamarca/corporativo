@@ -3,14 +3,24 @@ const dbConfig = require('../dbconfig');
 
 
 async function obtenerDetalleVentas(req, res) {
-
+  const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+  if (!idEmpresa) {
+    return res.status(403).json({ message: 'No autorizado: falta empresa en token' });
+  }
   try {
-    let pool = await sql.connect(dbConfig);
-    let result = await pool.request().query('SELECT * FROM DetalleVentas');
+    const pool = await sql.connect(dbConfig);
+    const result = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT dv.* FROM DetalleVenta dv
+        INNER JOIN Ventas v ON dv.idVenta = v.idVenta
+        WHERE v.idEmpresa = @idEmpresa
+      `);
     res.json(result.recordset);
   } catch (error) {
     console.error('Error al obtener detalle de ventas:', error);
-    res.status(500).send('Error al obtener  detalle de ventas');
+    res.status(500).json({ message: 'Error al obtener detalle de ventas' });
   }
 }
 
@@ -274,29 +284,29 @@ async function actualizarDetalleVenta(req, res) {
 
 
 async function eliminarDetalleVenta(req, res) {
-  const id = req.params.id; // Asegúrate de obtener el ID del registro a eliminar
-  console.log(id);
-
+  const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+  if (!idEmpresa) {
+    return res.status(403).json({ message: 'No autorizado: falta empresa en token' });
+  }
+  const id = req.params.id;
   try {
-    let pool = await sql.connect(dbConfig);
-    let result = await pool
-      .request()
-      .input('id', sql.Int, id) // Asegúrate de usar el tipo de dato adecuado para el campo id
-      .query('SELECT * FROM DetalleVentas WHERE id = @id'); // Buscar el registro con el ID proporcionado
-
-    if (result.recordset.length === 0) { // Si no se encuentra ningún registro con el ID dado
-      return res.status(404).json({ message: 'El registro no existe' });
-    } else { // Si se encuentra el registro
-      let deleteResult = await pool
-        .request()
-        .input('id', sql.Int, id)
-        .query('DELETE FROM DetalleVentas WHERE id = @id'); // Asegúrate de reemplazar 'id' con el nombre del campo ID en tu tabla
-
-      res.json({ message: 'Registro eliminado correctamente' });
+    const pool = await sql.connect(dbConfig);
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    request.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    const check = await request.query(`
+      SELECT dv.idDetalle FROM DetalleVenta dv
+      INNER JOIN Ventas v ON dv.idVenta = v.idVenta
+      WHERE dv.idDetalle = @id AND v.idEmpresa = @idEmpresa
+    `);
+    if (!check.recordset || check.recordset.length === 0) {
+      return res.status(404).json({ message: 'El registro no existe o no pertenece a tu empresa' });
     }
+    await pool.request().input('id', sql.Int, id).query('DELETE FROM DetalleVenta WHERE idDetalle = @id');
+    res.json({ message: 'Registro eliminado correctamente' });
   } catch (error) {
     console.error('Error al eliminar el detalle de venta:', error);
-    res.status(500).send('Error al eliminar el detalle de venta');
+    res.status(500).json({ message: 'Error al eliminar el detalle de venta' });
   }
 }
 

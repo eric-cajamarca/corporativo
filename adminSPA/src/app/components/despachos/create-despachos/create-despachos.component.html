@@ -1,77 +1,98 @@
-<app-topnav></app-topnav>
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarCollapsed()"></app-topnav>
 
+<main class="main-content" [class.sidebar-collapsed]="sidebarCollapsed()">
+  <div class="content-wrap container-fluid">
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-11 col-xl-11">
 
-<div class="container-fluid">
-  <div class="row justify-content-center">
-    <div class="col-12 col-lg-11 col-xl-11">
-
-      <h4>Comprobante de compra</h4>
-
-      <div class="card">
-        <div class="card-header">
-          Comprobante: {{compVenta.Serie_Numero}} <br>
-          Cliente: {{compVenta.Razon_Social}}
-        </div>
-        <div class="card-body">
-          <div>
-            <a class="btn btn-primary" (click)="resetCantEntrega()">Resetear Cantidad Entregada</a>
+        <!-- Modo idVenta: crear despacho desde búsqueda -->
+        <ng-container *ngIf="modoIdVenta">
+          <h4>Crear despacho</h4>
+          <div *ngIf="loadingVenta" class="alert alert-info">Cargando venta…</div>
+          <div *ngIf="errorVenta" class="alert alert-warning">{{ errorVenta }}</div>
+          <div *ngIf="ventaInfo && !loadingVenta" class="card mb-3">
+            <div class="card-header">
+              Comprobante: {{ ventaInfo.compVenta }} — Cliente: {{ ventaInfo.clienteRazonSocial }}
+            </div>
+            <div class="card-body">
+              <p class="mb-2">Total: {{ ventaInfo.total | number:'1.2-2' }}</p>
+              <div class="mb-3">
+                <label class="form-label">Tipo de despacho</label>
+                <select class="form-select" [(ngModel)]="idTipoDespachoSeleccionado">
+                  <option *ngFor="let t of tiposDespacho" [value]="t.idTipoDespacho">{{ t.nombre }}</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Observaciones (opcional)</label>
+                <textarea class="form-control" [(ngModel)]="observacionesNuevo" rows="2"></textarea>
+              </div>
+              <button type="button" class="btn btn-primary" (click)="crearDespachoNuevo()" [disabled]="enviando || !idTipoDespachoSeleccionado">
+                {{ enviando ? 'Creando…' : 'Crear despacho' }}
+              </button>
+              <a class="btn btn-outline-secondary ms-2" routerLink="/despachos">Volver</a>
+            </div>
           </div>
-          <h5 class="card-title">Detalle del comprobante</h5>
+        </ng-container>
 
+        <!-- Modo antiguo: comprobante + detalle con cantidades -->
+        <ng-container *ngIf="!modoIdVenta">
+          <h4>Comprobante de compra</h4>
+          <div class="card">
+            <div class="card-header">
+              Comprobante: {{compVenta.Serie_Numero}} <br>
+              Cliente: {{compVenta.Razon_Social}}
+            </div>
+            <div class="card-body">
+              <div>
+                <a class="btn btn-primary" (click)="resetCantEntrega()">Resetear Cantidad Entregada</a>
+              </div>
+              <h5 class="card-title">Detalle del comprobante</h5>
+              <form #miFormulario="ngForm" (ngSubmit)="guardarDatos(miFormulario.value)">
+                <table class="table table-dark">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Cantidad</th>
+                      <th>Descripción</th>
+                      <th>U.Medida</th>
+                      <th>PVenta</th>
+                      <th>CEntrega</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody class="table-active">
+                    <tr *ngFor="let item of detalleVenta">
+                      <td style="width: 70px;">{{item.Cantidad}}</td>
+                      <td>{{item.Descripcion}}</td>
+                      <td style="width: 60px; text-align: center;">{{item.Presentacion}}</td>
+                      <td style="width: 60px; text-align: right;">{{item.PVenta | number:'1.2-2'}}</td>
+                      <td>
+                        <ng-container *ngIf="item.Cantidad == item.CantEntregado">
+                          <input type="text" name="cantidadIngresar{{item.Id}}" [(ngModel)]="item.CantEntregado"
+                            style="width: 60px; text-align: center; color: blue; background: rgb(214, 158, 158);" required
+                            [max]="item.Cantidad" disabled>
+                        </ng-container>
+                        <ng-container *ngIf="item.Cantidad !== item.CantEntregado">
+                          <input type="text" name="cantidadIngresar{{item.Id}}" [(ngModel)]="item.CantEntregado"
+                            style="width: 60px; text-align: center; color: blue;" required [max]="item.Cantidad">
+                        </ng-container>
+                      </td>
+                      <td [routerLink]="['/despachos']" routerLinkActive="active">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                          class="bi bi-pencil" viewBox="0 0 16 16">
+                          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z" />
+                        </svg>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <button type="submit" class="btn btn-success">Guardar</button>
+              </form>
+            </div>
+          </div>
+        </ng-container>
 
-          <form #miFormulario="ngForm" (ngSubmit)="guardarDatos(miFormulario.value)">
-            <table class="table table-dark">
-              <thead class="table-dark">
-                <tr>
-                  <th>Cantidad</th>
-                  <!-- <th>Código</th> -->
-                  <th>Descripción</th>
-                  <th>U.Medida</th>
-                  <th>PVenta</th>
-                  <th>CEntrega</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody class="table-active">
-                <tr *ngFor="let item of detalleVenta">
-                  <td style="width: 70px;">{{item.Cantidad}}</td>
-                  <!-- <td>{{item.Codigo}}</td> -->
-                  <td>{{item.Descripcion}}</td>
-                  <td style="width: 60px; text-align: center;">{{item.Presentacion}}</td>
-                  <td style="width: 60px; text-align: right;">{{item.PVenta | number:'1.2-2'}}</td>
-                  <td>
-                    <ng-container *ngIf="item.Cantidad == item.CantEntregado">
-                      <input type="text" name="cantidadIngresar{{item.Id}}" [(ngModel)]="item.CantEntregado"
-                        style="width: 60px; text-align: center; color: blue; background: rgb(214, 158, 158);" required
-                        [max]="item.Cantidad" disabled>
-                    </ng-container>
-                    <ng-container *ngIf="item.Cantidad !== item.CantEntregado">
-                      <input type="text" name="cantidadIngresar{{item.Id}}" [(ngModel)]="item.CantEntregado"
-                        style="width: 60px; text-align: center; color: blue;" required [max]="item.Cantidad">
-                    </ng-container>
-
-                  </td>
-                  <td [routerLink]="['/despachos']" routerLinkActive="active">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                      class="bi bi-pencil" viewBox="0 0 16 16">
-                      <path
-                        d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z" />
-                    </svg>
-                  </td>
-
-                </tr>
-              </tbody>
-            </table>
-
-            <button type="submit" class="btn btn-success">Guardar</button>
-          </form>
-
-
-
-        </div>
       </div>
-
-
     </div>
   </div>
-</div>
+</main>

@@ -34,9 +34,8 @@
                             buscando...
                         </button>
                     </div>
-                    
                 </div>
-                
+                <small *ngIf="servicioConsulta" class="text-muted d-block mt-1">Consultado con: {{ servicioConsulta }}</small>
             </div>
         </div>
     </div>
@@ -55,7 +54,13 @@
                         <input type="text" class="form-control" name="rSocial" [(ngModel)]="proveedores.rSocial"
                             placeholder="Ingrese la razón social">
                     </div>
-
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary btn-sm" (click)="openModalEstablecimientos()"
+                            [disabled]="loadingEstablecimientos">
+                            <span *ngIf="loadingEstablecimientos" class="spinner-border spinner-border-sm"></span>
+                            {{ loadingEstablecimientos ? 'Cargando...' : 'Ver establecimientos (RUC)' }}
+                        </button>
+                    </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" class="form-control" name="correo" [(ngModel)]="proveedores.correo"
@@ -271,4 +276,42 @@
 
         <!-- <button type="submit" class="btn btn-primary" style="margin-top: 20px; margin-bottom: 20px;">Crear Cliente</button> -->
     </form>
+
+    <!-- Modal Establecimientos RUC -->
+    <div class="modal fade" [class.show]="showModalEstablecimientos" [style.display]="showModalEstablecimientos ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Establecimientos del RUC</h5>
+                    <button type="button" class="btn-close" (click)="closeModalEstablecimientos()"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Seleccione uno o varios para guardar como direcciones del proveedor.</p>
+                    <div class="mb-2">
+                        <label class="me-2">
+                            <input type="checkbox" [checked]="listEstablecimientos.length > 0 && selectedEstablecimientoIndices.size === listEstablecimientos.length"
+                                (change)="toggleAllEstablecimientos($any($event.target).checked)"> Seleccionar todos
+                        </label>
+                    </div>
+                    <ul class="list-group list-group-flush" style="max-height: 60vh; overflow-y: auto;">
+                        <li class="list-group-item d-flex align-items-start" *ngFor="let est of listEstablecimientos; let i = index">
+                            <label class="me-2 mt-1">
+                                <input type="checkbox" [checked]="selectedEstablecimientoIndices.has(i)" (change)="toggleEstablecimiento(i)">
+                            </label>
+                            <div class="flex-grow-1">
+                                <strong>{{ est.codigo }} – {{ est.tipoEstablecimiento }}</strong>
+                                <div class="small text-secondary">{{ est.direccionCompleta || est.direccion }}</div>
+                                <div class="small">{{ est.departamento }} – {{ est.provincia }} – {{ est.distrito }}</div>
+                            </div>
+                        </li>
+                    </ul>
+                    <p *ngIf="listEstablecimientos.length === 0 && showModalEstablecimientos" class="text-muted">No hay establecimientos para mostrar.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" (click)="closeModalEstablecimientos()">Cerrar</button>
+                    <button type="button" class="btn btn-primary" (click)="applyEstablecimientos()">Usar selección</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

@@ -43,6 +43,8 @@
                   <th>Código</th>
                   <th>Descripción</th>
                   <th class="text-end">Cantidad</th>
+                  <th class="text-end">Entregado</th>
+                  <th class="text-end">Pendiente</th>
                   <th class="text-end">P. venta</th>
                   <th class="text-end">Total</th>
                 </tr>
@@ -52,12 +54,62 @@
                   <td>{{ d.codigo || '—' }}</td>
                   <td>{{ d.descripcion || '—' }}</td>
                   <td class="text-end">{{ d.cantidad }}</td>
+                  <td class="text-end">{{ d.cantEntregada ?? 0 }}</td>
+                  <td class="text-end">{{ pendiente(d) }}</td>
                   <td class="text-end">{{ formatearMoneda(d.pVenta) }}</td>
                   <td class="text-end">{{ formatearMoneda(d.total) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <h6 class="mt-4">Entregas parciales</h6>
+          <div class="row g-2 mb-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label small">Ítem</label>
+              <select class="form-select form-select-sm" [(ngModel)]="entregaForm.idDetalle">
+                <option [ngValue]="0">-- Seleccione --</option>
+                <option *ngFor="let it of itemsConPendiente()" [ngValue]="it.idDetalle">{{ it.label }}</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small">Cantidad</label>
+              <input type="number" class="form-control form-control-sm" min="0.001" step="0.001" [(ngModel)]="entregaForm.cantidad" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Notas</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="entregaForm.notas" placeholder="Opcional" />
+            </div>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-primary btn-sm" (click)="registrarEntrega()" [disabled]="guardandoEntrega">
+                <span *ngIf="guardandoEntrega" class="spinner-border spinner-border-sm me-1"></span>Registrar entrega
+              </button>
+            </div>
+          </div>
+          <p class="text-danger small mb-2" *ngIf="errorEntrega">{{ errorEntrega }}</p>
+          <div class="table-responsive" *ngIf="entregas.length > 0">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Producto</th>
+                  <th class="text-end">Cantidad</th>
+                  <th>Usuario</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let e of entregas">
+                  <td>{{ formatearFecha(e.fEntrega) }}</td>
+                  <td>{{ e.productoDescripcion || e.productoCodigo || '—' }}</td>
+                  <td class="text-end">{{ e.cantidad }}</td>
+                  <td>{{ e.usuarioNombre || '—' }}</td>
+                  <td>{{ e.notas || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p *ngIf="!loading && data && entregas.length === 0" class="text-muted small mb-0">No hay entregas registradas.</p>
         </ng-container>
       </div>
     </div>

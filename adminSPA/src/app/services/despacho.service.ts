@@ -24,11 +24,12 @@ export class DespachoService {
     });
   }
 
-  // Crear nuevo despacho
+  // Crear nuevo despacho. Opcional: detalles con cantidad a despachar por línea.
   crearDespacho(data: {
     idVenta: string;
     idTipoDespacho: number;
     observaciones?: string;
+    detalles?: Array<{ idDetalle: number; idProducto: string; cantidadADespachar: number }>;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'despachos/', data, {
@@ -76,6 +77,26 @@ export class DespachoService {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'despachos/estado', {
       headers: headers,
+      withCredentials: true
+    });
+  }
+
+  /** Buscar venta por número de comprobante o idVenta. Devuelve venta + despachos + entregadoMismoDia */
+  buscarVentaDespachos(params: { compVenta?: string; idVenta?: string | number }): Observable<any> {
+    const q = new URLSearchParams();
+    if (params.compVenta) q.set('compVenta', params.compVenta);
+    if (params.idVenta != null && params.idVenta !== '') q.set('idVenta', String(params.idVenta));
+    const query = q.toString();
+    const url = this.url + 'despachos/buscar' + (query ? '?' + query : '');
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get(url, { headers, withCredentials: true });
+  }
+
+  /** Obtener detalle de un despacho (líneas DetalleDespachos) */
+  obtenerDetalleDespacho(idDespacho: string): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get(this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/detalle', {
+      headers,
       withCredentials: true
     });
   }

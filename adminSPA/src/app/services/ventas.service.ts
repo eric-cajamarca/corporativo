@@ -83,6 +83,84 @@ export class VentasService {
       { withCredentials: true }
     );
   }
+
+  /** Lista entregas parciales de una venta (DetalleVentaEntrega). */
+  getEntregas(idVenta: number): Observable<{ data: EntregaItem[] }> {
+    return this._http.get<{ data: EntregaItem[] }>(
+      this.url + 'ventas/' + idVenta + '/entregas',
+      { withCredentials: true }
+    );
+  }
+
+  /** Registra una entrega parcial. Body: idVenta, idDetalle, cantidad, notas? */
+  crearEntrega(body: { idVenta: number; idDetalle: number; cantidad: number; notas?: string }): Observable<{ data: { idEntrega: number } }> {
+    return this._http.post<{ data: { idEntrega: number } }>(
+      this.url + 'ventas/entregas',
+      body,
+      { withCredentials: true }
+    );
+  }
+
+  /** Config por defecto para nueva venta (estado pedido, estado pago). */
+  getConfigDefaults(): Observable<{ data: { idEstadoPedidoPorDefecto: number; idEstadoPagoPorDefecto: number } }> {
+    return this._http.get<{ data: { idEstadoPedidoPorDefecto: number; idEstadoPagoPorDefecto: number } }>(
+      this.url + 'ventas/config-defaults',
+      { withCredentials: true }
+    );
+  }
+
+  putConfigDefaults(body: { idEstadoPedidoPorDefecto?: number; idEstadoPagoPorDefecto?: number }): Observable<{ message: string }> {
+    return this._http.put<{ message: string }>(
+      this.url + 'ventas/config-defaults',
+      body,
+      { withCredentials: true }
+    );
+  }
+
+  /** Ventas pendientes de pago (idEstadoPago = 1). Params: idVenta?, cliente? */
+  getPendientesPago(params?: { idVenta?: string; cliente?: string }): Observable<{ data: VentaPendientePago[] }> {
+    const q = new URLSearchParams();
+    if (params?.idVenta) q.set('idVenta', params.idVenta);
+    if (params?.cliente) q.set('cliente', params.cliente);
+    const query = q.toString();
+    return this._http.get<{ data: VentaPendientePago[] }>(
+      this.url + 'ventas/pendientes-pago' + (query ? '?' + query : ''),
+      { withCredentials: true }
+    );
+  }
+
+  /** Registrar cobro de una venta pendiente. */
+  cobrarVenta(idVenta: number, body: { detallePago: Array<{ idMediosPago: number; monto: number }>; idApertura?: string }): Observable<{ message: string }> {
+    return this._http.post<{ message: string }>(
+      this.url + 'ventas/' + idVenta + '/cobrar',
+      body,
+      { withCredentials: true }
+    );
+  }
+}
+
+export interface VentaPendientePago {
+  idVenta: number;
+  compVenta: string;
+  serie: string;
+  numero: string;
+  fEmision: string;
+  total: number;
+  idEstadoPago: number;
+  clienteRazonSocial: string;
+  clienteRuc: string;
+}
+
+export interface EntregaItem {
+  idEntrega: number;
+  idVenta: number;
+  idDetalle: number;
+  cantidad: number;
+  fEntrega: string;
+  usuarioNombre: string;
+  notas: string | null;
+  productoCodigo?: string;
+  productoDescripcion?: string;
 }
 
 export interface VentaEdicionPayload {
@@ -133,6 +211,7 @@ export interface ComprobantePdfData {
     codigo?: string;
     descripcion: string;
     cantidad: number;
+    cantEntregada?: number;
     pVenta: number;
     subtotal?: number;
     total: number;

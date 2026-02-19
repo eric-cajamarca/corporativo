@@ -42,6 +42,9 @@ export class CreateClientesComponent {
   public regiones: any = [];
   public provincias: any = [];
   public distritos: any = [];
+  /** Listas completas para resolver nombre→ID al guardar establecimientos (provincias/distritos se filtran por región). */
+  public fullProvincias: any[] = [];
+  public fullDistritos: any[] = [];
   public token: any = "";
   public contBuscar = 0;
   public btn_registrar = false;
@@ -60,6 +63,14 @@ export class CreateClientesComponent {
     urbanizacion: '',
   };
   public data: any = {};
+  /** Establecimientos RUC (Factiliza): lista mostrada en modal */
+  public listEstablecimientos: any[] = [];
+  public showModalEstablecimientos = false;
+  public loadingEstablecimientos = false;
+  /** Índices seleccionados en el modal (para guardar en DireccionClientes) */
+  public selectedEstablecimientoIndices: Set<number> = new Set();
+  /** Establecimientos elegidos en modal que se guardarán tras crear el cliente (resto además del primero que rellena el form) */
+  public establecimientosPendientes: any[] = [];
 
   constructor(
     private _adminService: AdminService,
@@ -84,14 +95,14 @@ export class CreateClientesComponent {
     this._adminService.get_Procincias().subscribe(
       response => {
         this.provincias = response;
-        console.log('this.provincias', this.provincias);
+        this.fullProvincias = response || [];
       }
     );
 
     this._adminService.get_Distritos().subscribe(
       response => {
         this.distritos = response;
-        console.log('this.distritos', this.distritos);
+        this.fullDistritos = response || [];
       }
     );
 
@@ -253,16 +264,17 @@ export class CreateClientesComponent {
   try {
     if (this.clientes.ruc.length === 11 && this.clientes.idDocumento === '6') {
       await this.handleRucSearch();
-      this.busqueda=false;
+      this.busqueda = false;
     } else if (this.clientes.ruc.length === 8 && this.clientes.idDocumento === '1') {
       await this.handleDniSearch();
-      this.busqueda=false;
+      this.busqueda = false;
+    } else if ((this.clientes.idDocumento === '4') && this.filtro.length >= 8 && this.filtro.length <= 15) {
+      await this.handleCeeSearch();
+      this.busqueda = false;
     } else {
-      this.busqueda=false;
-      this.showError('Formato de documento incorrecto');
+      this.busqueda = false;
+      this.showError('Formato de documento incorrecto (RUC 11 dígitos, DNI 8 dígitos, CEE 8-15 caracteres)');
     }
-
- 
   } catch (error) {
     console.error('Error en búsqueda:', error);
     this.showError(error instanceof Error ? error.message : 'Error desconocido');
@@ -273,75 +285,78 @@ export class CreateClientesComponent {
 private async handleRucSearch(): Promise<void> {
   try {
     const response = await this._apiperuService.getRucInfo(this.filtro).toPromise();
-    
-    if (!response) {
-      throw new Error('No se recibieron datos del servicio');
+    if (!response) throw new Error('No se recibieron datos del servicio');
+    const data = response.data ?? response;
+    if (response.error) {
+      this.showError(response.error);
+      this.busqueda = false;
+      return;
     }
-
-    // Asignación de datos básicos
-    this.clienteruc = response;
-    this.clientes.rSocial = response.razonSocial;
-    this.clientes.condicion = response.estado;
-    this.direccionClientes.codpais = "PEN";
-    this.direccionClientes.ubigeo = response.ubigeo;
-    this.direccionClientes.direccion = response.direccion;
-
-    // Búsqueda de ubicación geográfica
-    this.direccionClientes.region = this.findLocationId(
-      this.regiones, 
-      response.departamento, 
-      'departamento'
-    );
-    
-    this.direccionClientes.provincia = this.findLocationId(
-      this.provincias, 
-      response.provincia, 
-      'provincia'
-    );
-    
-    this.direccionClientes.distrito = this.findLocationId(
-      this.distritos, 
-      response.distrito, 
-      'distrito'
-    );
-    
-    if (response.success === false) {
-      iziToast.show({
-        title: 'ERROR',
-        titleColor: '#FF0000',
-        color: '#FFF',
-        class: 'text-danger',
-        position: 'topRight',
-        message: response.message || 'Error al consultar RUC'
-      });
-
-      this.busqueda=false;
-    }
-    console.log('Datos RUC obtenidos:', this.clienteruc);
+    this.clienteruc = data;
+    this.clientes.rSocial = data.razonSocial ?? '';
+    this.clientes.condicion = data.estado ?? 'ACTIVO';
+    this.direccionClientes.codpais = 'PEN';
+    this.direccionClientes.ubigeo = data.ubigeo ?? '';
+    this.direccionClientes.direccion = data.direccion ?? '';
+    const dep = (data.departamento ?? '').trim();
+    const prov = (data.provincia ?? '').trim();
+    const dist = (data.distrito ?? '').trim();
+    this.direccionClientes.region = dep ? this.findLocationId(this.regiones, dep, 'departamento') : undefined;
+    this.direccionClientes.provincia = prov ? this.findLocationId(this.provincias, prov, 'provincia') : undefined;
+    this.direccionClientes.distrito = dist ? this.findLocationId(this.distritos, dist, 'distrito') : undefined;
   } catch (error) {
     console.error('Error en búsqueda RUC:', error);
-    throw new Error( 'Error al consultar RUC');
-    this.busqueda=false;
+    this.showError(error instanceof Error ? error.message : 'Error al consultar RUC');
+  } finally {
+    this.busqueda = false;
   }
 }
 
 private async handleDniSearch(): Promise<void> {
   try {
     const response = await this._apiperuService.getDniInfo(this.filtro).toPromise();
-    
-    if (!response) {
-      throw new Error('No se recibieron datos del servicio');
+    if (!response) throw new Error('No se recibieron datos del servicio');
+    const data = response.data ?? response;
+    if (response.error) {
+      this.showError(response.error);
+      this.busqueda = false;
+      return;
     }
-
-    this.clienteruc = response;
-    this.clientes.rSocial = `${response.apellidoPaterno} ${response.apellidoMaterno}, ${response.nombres}`;
-    
-    console.log('Datos DNI obtenidos:', this.clienteruc);
-    
+    this.clienteruc = data;
+    const ap = (data.apellidoPaterno ?? '').trim();
+    const am = (data.apellidoMaterno ?? '').trim();
+    const nom = (data.nombres ?? '').trim();
+    const partes = [ap, am, nom].filter(Boolean);
+    this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
   } catch (error) {
     console.error('Error en búsqueda DNI:', error);
-    throw new Error('Error al consultar DNI');
-    this.busqueda=false;
+    this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
+  } finally {
+    this.busqueda = false;
+  }
+}
+
+private async handleCeeSearch(): Promise<void> {
+  try {
+    const response = await this._apiperuService.getCeeInfo(this.filtro).toPromise();
+    if (!response) throw new Error('No se recibieron datos del servicio');
+    const data = response.data ?? response;
+    if (response.error) {
+      this.showError(response.error);
+      this.busqueda = false;
+      return;
+    }
+    this.clienteruc = data;
+    const ap = (data.apellidoPaterno ?? '').trim();
+    const am = (data.apellidoMaterno ?? '').trim();
+    const nom = (data.nombres ?? '').trim();
+    const partes = [ap, am, nom].filter(Boolean);
+    this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
+  } catch (error) {
+    console.error('Error en búsqueda CEE:', error);
+    this.showError(error instanceof Error ? error.message : 'Error al consultar Carnet de extranjería');
+  } finally {
+    this.busqueda = false;
   }
 }
 
@@ -400,6 +415,104 @@ private showError(message: string): void {
     message: message
   });
 }
+
+  /** Abre modal de establecimientos RUC (solo Factiliza). RUC debe tener 11 dígitos. */
+  openModalEstablecimientos(): void {
+    const ruc = (this.clientes.ruc || '').trim();
+    if (ruc.length !== 11) {
+      this.showError('Ingrese un RUC de 11 dígitos antes de consultar establecimientos');
+      return;
+    }
+    this.loadingEstablecimientos = true;
+    this._apiperuService.getRucAnexo(ruc).subscribe({
+      next: (res) => {
+        this.loadingEstablecimientos = false;
+        if (res && res.error) {
+          this.showError(res.error);
+          return;
+        }
+        this.listEstablecimientos = Array.isArray(res?.data) ? res.data : [];
+        this.selectedEstablecimientoIndices = new Set();
+        this.showModalEstablecimientos = true;
+        if (this.listEstablecimientos.length === 0) {
+          this.showError('No se encontraron establecimientos para este RUC');
+        }
+      },
+      error: (err) => {
+        this.loadingEstablecimientos = false;
+        this.showError(err?.error?.message || 'Error al obtener establecimientos');
+      }
+    });
+  }
+
+  closeModalEstablecimientos(): void {
+    this.showModalEstablecimientos = false;
+    this.listEstablecimientos = [];
+    this.selectedEstablecimientoIndices = new Set();
+  }
+
+  toggleEstablecimiento(i: number): void {
+    if (this.selectedEstablecimientoIndices.has(i)) {
+      this.selectedEstablecimientoIndices.delete(i);
+    } else {
+      this.selectedEstablecimientoIndices.add(i);
+    }
+    this.selectedEstablecimientoIndices = new Set(this.selectedEstablecimientoIndices);
+  }
+
+  toggleAllEstablecimientos(checked: boolean): void {
+    if (checked) {
+      this.listEstablecimientos.forEach((_, i) => this.selectedEstablecimientoIndices.add(i));
+    } else {
+      this.selectedEstablecimientoIndices.clear();
+    }
+    this.selectedEstablecimientoIndices = new Set(this.selectedEstablecimientoIndices);
+  }
+
+  /** Aplica la selección: primero rellena el formulario de dirección, el resto a establecimientosPendientes. */
+  applyEstablecimientos(): void {
+    const selected = Array.from(this.selectedEstablecimientoIndices)
+      .sort((a, b) => a - b)
+      .map(i => this.listEstablecimientos[i]);
+    if (selected.length === 0) {
+      this.showError('Seleccione al menos un establecimiento');
+      return;
+    }
+    const [first, ...rest] = selected;
+    this.establecimientosPendientes = rest;
+    this.direccionClientes.codpais = 'PEN';
+    this.direccionClientes.ubigeo = first.ubigeo ?? '';
+    this.direccionClientes.direccion = first.direccion ?? first.direccionCompleta ?? '';
+    this.direccionClientes.referencia = first.tipoEstablecimiento ?? '';
+    this.direccionClientes.codLocal = first.codigo ?? '0';
+    const dep = (first.departamento ?? '').trim();
+    const prov = (first.provincia ?? '').trim();
+    const dist = (first.distrito ?? '').trim();
+    this.direccionClientes.region = dep ? this.findLocationId(this.regiones, dep, 'departamento') : '';
+    this.direccionClientes.provincia = prov ? this.findLocationId(this.provincias, prov, 'provincia') : '';
+    this.direccionClientes.distrito = dist ? this.findLocationId(this.distritos, dist, 'distrito') : '';
+    this.closeModalEstablecimientos();
+  }
+
+  /** Construye payload para POST direccionClientes a partir de un establecimiento normalizado (region/provincia/distrito como IDs). */
+  private buildDireccionFromEstablecimiento(e: any, idCliente: number): any {
+    const dep = (e.departamento ?? '').trim();
+    const prov = (e.provincia ?? '').trim();
+    const dist = (e.distrito ?? '').trim();
+    return {
+      idCliente,
+      ubigeo: e.ubigeo ?? '',
+      codpais: 'PEN',
+      region: dep ? (this.findLocationId(this.regiones, dep, 'departamento') ?? '') : '',
+      provincia: prov ? (this.findLocationId(this.fullProvincias.length ? this.fullProvincias : this.provincias, prov, 'provincia') ?? '') : '',
+      distrito: dist ? (this.findLocationId(this.fullDistritos.length ? this.fullDistritos : this.distritos, dist, 'distrito') ?? '') : '',
+      urbanizacion: '',
+      direccion: e.direccion ?? e.direccionCompleta ?? '',
+      referencia: e.tipoEstablecimiento ?? '',
+      codLocal: e.codigo ?? '0',
+      principal: false
+    };
+  }
 
   
   select_pais() {
@@ -523,48 +636,72 @@ private showError(message: string): void {
                   return;
                 }
                 this.direccionClientes.idCliente = row.idCliente;
-                if (this.desdeVenta) {
-                  const payload = {
-                    idCliente: row.idCliente,
-                    idDocumento: row.idDocumento ?? this.clientes.idDocumento,
-                    ruc: row.ruc ?? this.clientes.ruc,
-                    rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? this.clientes.rSocial ?? '').toString().trim(),
-                    direccion: (this.direccionClientes.direccion ?? '').toString().trim(),
-                    correo: row.correo ?? this.clientes.correo ?? '',
-                    celular: row.celular ?? this.clientes.celular ?? '',
-                    condicion: row.condicion ?? this.clientes.condicion ?? 'ACTIVO'
-                  };
-                  this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe({
-                    next: () => {
-                      payload.direccion = (this.direccionClientes.direccion ?? '').toString().trim();
+                const idCliente = row.idCliente;
+                const pendientes = this.establecimientosPendientes || [];
+                const crearSiguienteDireccion = (idx: number) => {
+                  if (idx === 0) {
+                    this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe({
+                      next: () => { crearSiguienteDireccion(1); },
+                      error: () => { crearSiguienteDireccion(1); }
+                    });
+                    return;
+                  }
+                  if (idx > pendientes.length) {
+                    if (this.desdeVenta) {
+                      const payload = {
+                        idCliente,
+                        idDocumento: row.idDocumento ?? this.clientes.idDocumento,
+                        ruc: row.ruc ?? this.clientes.ruc,
+                        rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? this.clientes.rSocial ?? '').toString().trim(),
+                        direccion: (this.direccionClientes.direccion ?? '').toString().trim(),
+                        correo: row.correo ?? this.clientes.correo ?? '',
+                        celular: row.celular ?? this.clientes.celular ?? '',
+                        condicion: row.condicion ?? this.clientes.condicion ?? 'ACTIVO'
+                      };
                       this.btn_registrar = false;
                       if (typeof iziToast !== 'undefined') {
                         iziToast.success({ title: 'OK', message: 'Cliente registrado.', position: 'topRight' });
                       }
                       this.clienteCreado.emit(payload);
+                    } else {
+                      this.btn_registrar = false;
+                      if (typeof iziToast !== 'undefined') {
+                        iziToast.success({ title: 'OK', message: 'Cliente creado correctamente', position: 'topRight' });
+                      }
+                      this._router.navigate(['/cliente']);
+                    }
+                    return;
+                  }
+                  const e = pendientes[idx - 1];
+                  const body = this.buildDireccionFromEstablecimiento(e, idCliente);
+                  this._clientesService.crear_direccionCliente(body).subscribe({
+                    next: () => { crearSiguienteDireccion(idx + 1); },
+                    error: () => { crearSiguienteDireccion(idx + 1); }
+                  });
+                };
+                if (this.desdeVenta) {
+                  this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe({
+                    next: () => {
+                      crearSiguienteDireccion(1);
                     },
                     error: () => {
+                      const payload = {
+                        idCliente,
+                        idDocumento: row.idDocumento ?? this.clientes.idDocumento,
+                        ruc: row.ruc ?? this.clientes.ruc,
+                        rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? this.clientes.rSocial ?? '').toString().trim(),
+                        direccion: (this.direccionClientes.direccion ?? '').toString().trim(),
+                        correo: row.correo ?? this.clientes.correo ?? '',
+                        celular: row.celular ?? this.clientes.celular ?? '',
+                        condicion: row.condicion ?? this.clientes.condicion ?? 'ACTIVO'
+                      };
                       this.btn_registrar = false;
                       this.clienteCreado.emit(payload);
                     }
                   });
                   return;
                 }
-                this._clientesService.crear_direccionCliente(this.direccionClientes).subscribe(
-                  response => {
-                    if(response.data != undefined){
-                      if (typeof iziToast !== 'undefined') {
-                        iziToast.success({ title: 'OK', message: 'Cliente creado correctamente', position: 'topRight' });
-                      }
-                      this.btn_registrar = false;
-                      this._router.navigate(['/cliente']);
-                    }
-                  },
-                  error => {
-                    console.error('Error al crear el cliente:', error);
-                    this.btn_registrar = false;
-                  }
-                );
+                crearSiguienteDireccion(0);
               },
               () => { this.btn_registrar = false; }
             );

@@ -8,19 +8,16 @@ const ventasRepository = require('../repositories/ventas.repository');
 const facturacionRepository = require('../repositories/facturacion.repository');
 const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
+const { getNowLocal, getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 
-/** Devuelve fecha de emisión con hora actual (HH:mm:ss) para ComprobantesElectronicos. */
+/** Fecha de emisión en formato SQL local (YYYY-MM-DD HH:mm:ss.sss) para guardar sin conversión UTC.
+ *  Devuelve string para que el driver mssql no convierta el Date a UTC al insertar. */
 function fechaEmisionConHoraActual(fEmision) {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2, '0');
-  const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  const hora = `${h}:${m}:${s}`;
-  if (!fEmision) return now;
+  if (!fEmision) return getNowLocalSQLString();
   const str = typeof fEmision === 'string' ? fEmision.trim() : (fEmision instanceof Date ? fEmision.toISOString().slice(0, 19).replace('T', ' ') : '');
   const parteFecha = str.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(parteFecha)) return now;
-  return new Date(`${parteFecha}T${hora}`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(parteFecha)) return getNowLocalSQLString();
+  return getFechaEmisionSQLString(parteFecha);
 }
 
 const crearVenta = async function (req, res) {
@@ -253,13 +250,26 @@ const crearVentaCompleta = async (req, res) => {
     }
 
     const fechaEmisionConHora = fechaEmisionConHoraActual(venta.fEmision);
-    const ventaConHora = { ...venta, fEmision: fechaEmisionConHora };
+    const fVencimientoSQL = getFechaSoloSQLString(venta.fVencimiento) || fechaEmisionConHora;
+    const ventaConHora = { ...venta, fEmision: fechaEmisionConHora, fVencimiento: fVencimientoSQL };
+    const idEstadoPago = venta.idEstadoPago != null ? parseInt(venta.idEstadoPago, 10) : 1;
+    if (idEstadoPago === 1) {
+      const medPago = ventaConHora.idMediosPago != null && String(ventaConHora.idMediosPago).trim() !== '';
+      if (!medPago) {
+        const rMp = await transaction.request().query('SELECT TOP 1 idMediosPago FROM MediosPago');
+        const firstId = rMp.recordset?.[0]?.idMediosPago;
+        ventaConHora.idMediosPago = firstId != null ? String(firstId) : '1';
+      }
+    }
     const ventaResult = await ventasRepository.insertar(transaction, ventaConHora, req.user.empresa, req.user.sub);
     const idVenta = ventaResult.recordset[0].idVenta;
 
     const idSucursalParaStock = idSucursalStock || venta.idSucursal || null;
+    const idEstadoPedidoVenta = venta.idEstadoPedido != null ? parseInt(venta.idEstadoPedido, 10) : 1;
+    const esEstadoPendiente = (idEstadoPedidoVenta === 1);
     for (const det of detalles) {
-      await detalleVentaService.crearDetalle(transaction, { ...det, idVenta });
+      const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
+      await detalleVentaService.crearDetalle(transaction, { ...det, idVenta, cantEntregada, idEstadoPedido: idEstadoPedidoVenta, hVenta: getNowLocalSQLString() });
       await stockService.descontarDesdeLotes(transaction, {
         idEmpresa: req.user.empresa,
         idSucursal: idSucursalParaStock,
@@ -357,6 +367,7 @@ const crearDetalleVenta_DescontarStock = async function (req, res) {
         cantEntregada,
         idEstadoPedido
     } = req.body;
+    const hVentaSQL = hVenta ? (getFechaEmisionSQLString(String(hVenta).trim().slice(0, 10)) || getNowLocalSQLString()) : getNowLocalSQLString();
     if (req.user) {
         try {
             let pool = await sql.connect(dbConfig);
@@ -382,7 +393,7 @@ const crearDetalleVenta_DescontarStock = async function (req, res) {
                 .input('igv', sql.Bit, igv)
                 .input('isc', sql.Bit, isc)
                 .input('total', sql.Decimal(18, 2), total)
-                .input('hVenta', sql.DateTime, hVenta)
+                .input('hVenta', sql.VarChar(23), hVentaSQL)
                 .input('cantEntregada', sql.Decimal(18, 3), cantEntregada)
                 .input('idEstadoPedido', sql.Int, idEstadoPedido)
                 .query(`INSERT INTO DetalleVenta 
@@ -404,18 +415,15 @@ const crearDetalleVenta_DescontarStock = async function (req, res) {
 // para actualizar DetalleVentas quiero modificar la cantidad entregada, cantPendiente, fUltEntrega y EstadoPedido
 const actualizarDetalleVenta = async function (req, res) {
   const { id, CantEntregado, FUltEntrega, EstadoPedido } = req.body;
-  // const id = req.params.id;
-    console.log('CantEntregado', CantEntregado);
-    console.log('FUltEntrega', FUltEntrega);
-    console.log('EstadoPedido', EstadoPedido);
-    if(req.user) {
+  const FUltEntregaSQL = FUltEntrega ? (getFechaSoloSQLString(FUltEntrega) || getFechaEmisionSQLString(String(FUltEntrega).trim().slice(0, 10)) || String(FUltEntrega).trim().slice(0, 19).replace('T', ' ') + '.000') : null;
+  if(req.user) {
         try {
         let pool = await sql.connect(dbConfig);
             let result = await pool
             .request()
             .input('id', sql.Int, id)
             .input('CantEntregado', sql.Decimal, CantEntregado)
-            .input('FUltEntrega', sql.DateTime2, FUltEntrega)
+            .input('FUltEntrega', sql.VarChar(23), FUltEntregaSQL)
             .input('EstadoPedido', sql.Int, EstadoPedido)
             .query('UPDATE DetalleVentas SET CantEntregado = @CantEntregado, FUltEntrega = @FUltEntrega, idEstadoPedido = @EstadoPedido WHERE Id = @id');
             res.status(200).json({ message: 'Registro actualizado correctamente' });
@@ -494,29 +502,26 @@ const obtenerVenta_idDetalle = async function (req, res) {
 // GO
 
 const eliminarDetalleVenta = async function (req, res) {
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!req.user || !idEmpresa) {
+        return res.status(403).json({ message: 'No Access' });
+    }
     const idDetalle = req.params.id;
-    const { idEmpresa, idSucursal, idProducto, cantidad } = req.body;
-    if(req.user) {
-        try {
-        let pool = await sql.connect(dbConfig);
-            let result = await pool
-            .request()
-            .input('idDetalle', sql.Int, idDetalle)
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-            .input('idProducto', sql.UniqueIdentifier, idProducto)
-            .input('cantidad', sql.Decimal(18,2), cantidad)
-            // primero restauras el stock
-            .execute('sp_RestaurarStock')
-            // luego eliminas el detalle de venta
-            .query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle');
-            res.status(200).json({ message: 'Detalle de venta eliminado correctamente' });
-        }catch (error) {
+    const { idSucursal, idProducto, cantidad } = req.body;
+    try {
+        const pool = await sql.connect(dbConfig);
+        const request = pool.request();
+        request.input('idDetalle', sql.Int, idDetalle);
+        request.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+        request.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+        request.input('idProducto', sql.UniqueIdentifier, idProducto);
+        request.input('cantidad', sql.Decimal(18, 2), cantidad);
+        await request.execute('sp_RestaurarStock');
+        await pool.request().input('idDetalle', sql.Int, idDetalle).query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle');
+        res.status(200).json({ message: 'Detalle de venta eliminado correctamente' });
+    } catch (error) {
         console.error('Error al eliminar el detalle de venta:', error);
-        res.status(500).send('Error al eliminar el detalle de venta');
-        }
-    }else {
-      res.status(500).send({ message: 'No Access' });
+        res.status(500).json({ message: 'Error al eliminar el detalle de venta' });
     }
 };
 
@@ -563,6 +568,149 @@ const actualizarVentaEdicion = async (req, res) => {
   }
 };
 
+/** GET /ventas/config-defaults - Valores por defecto para nueva venta (estado pedido, estado pago) desde ConfiguracionEmpresa. */
+const getConfigDefaults = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const gestoresRepository = require('../repositories/gestores.repository');
+    const rows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, req.user.empresa);
+    const getVal = (clave) => {
+      const r = (rows || []).find((x) => x.clave === clave);
+      return r && r.valor != null ? r.valor.trim() : null;
+    };
+    const idEstadoPedido = getVal('venta_idEstadoPedidoPorDefecto');
+    const idEstadoPago = getVal('venta_idEstadoPagoPorDefecto');
+    res.json({
+      data: {
+        idEstadoPedidoPorDefecto: idEstadoPedido != null ? parseInt(idEstadoPedido, 10) : 1,
+        idEstadoPagoPorDefecto: idEstadoPago != null ? parseInt(idEstadoPago, 10) : 2
+      }
+    });
+  } catch (error) {
+    console.error('Error getConfigDefaults:', error);
+    res.status(500).json({ error: error.message || 'Error al obtener configuración' });
+  }
+};
+
+/** PUT /ventas/config-defaults - Guarda valores por defecto para nueva venta. Body: { idEstadoPedidoPorDefecto, idEstadoPagoPorDefecto }. */
+const putConfigDefaults = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const { idEstadoPedidoPorDefecto, idEstadoPagoPorDefecto } = req.body || {};
+  try {
+    const pool = await sql.connect(dbConfig);
+    const gestoresRepository = require('../repositories/gestores.repository');
+    const idEmpresa = req.user.empresa;
+    if (idEstadoPedidoPorDefecto != null) {
+      await gestoresRepository.guardarConfiguracion(
+        pool,
+        idEmpresa,
+        'venta_idEstadoPedidoPorDefecto',
+        String(idEstadoPedidoPorDefecto),
+        'Estado pedido por defecto en nueva venta (1=Pendiente, 2=Entregado)',
+        'INT'
+      );
+    }
+    if (idEstadoPagoPorDefecto != null) {
+      await gestoresRepository.guardarConfiguracion(
+        pool,
+        idEmpresa,
+        'venta_idEstadoPagoPorDefecto',
+        String(idEstadoPagoPorDefecto),
+        'Estado de pago por defecto en nueva venta (1=Pendiente, 2=Pagado)',
+        'INT'
+      );
+    }
+    res.json({ message: 'Configuración guardada' });
+  } catch (error) {
+    console.error('Error putConfigDefaults:', error);
+    res.status(500).json({ error: error.message || 'Error al guardar configuración' });
+  }
+};
+
+/** GET /ventas/pendientes-pago - Lista ventas con idEstadoPago = 1. Query: idVenta, cliente (nombre o RUC). */
+const getPendientesPago = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const list = await ventasRepository.listarPendientesPago(pool, req.user.empresa, req.query);
+    res.json({ data: list });
+  } catch (error) {
+    console.error('Error getPendientesPago:', error);
+    res.status(500).json({ error: error.message || 'Error al listar ventas pendientes de pago' });
+  }
+};
+
+/** POST /ventas/:idVenta/cobrar - Registra cobro de una venta pendiente. Body: { detallePago: [{ idMediosPago, monto }], idApertura? }. */
+const postCobrarVenta = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVenta = parseInt(req.params.idVenta, 10);
+  const { detallePago, idApertura } = req.body || {};
+  if (!idVenta || !Number.isFinite(idVenta)) {
+    return res.status(400).json({ message: 'idVenta inválido' });
+  }
+  if (!detallePago || !Array.isArray(detallePago) || detallePago.length === 0) {
+    return res.status(400).json({ message: 'detallePago es requerido y debe tener al menos un pago' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const CajaRepository = require('../repositories/caja.repository');
+    const ventaRow = await pool
+      .request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+      .query(`
+        SELECT idVenta, compVenta, idSucursal, idEstadoPago
+        FROM Ventas WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+      `);
+    const venta = ventaRow.recordset && ventaRow.recordset[0];
+    if (!venta) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+    if (venta.idEstadoPago !== 1) {
+      return res.status(400).json({ message: 'La venta ya está pagada o no está pendiente de pago' });
+    }
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+      await ventasRepository.actualizarEstadoPagoVenta(transaction, idVenta, req.user.empresa, 2);
+      await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);
+      let idAperturaActual = idApertura || null;
+      if (!idAperturaActual && venta.idSucursal) {
+        const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, venta.idSucursal);
+        idAperturaActual = apertura?.idApertura;
+      }
+      if (idAperturaActual) {
+        await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
+          idApertura: idAperturaActual,
+          idEmpresa: req.user.empresa,
+          idSucursal: venta.idSucursal,
+          idUsuario: req.user.sub,
+          idVenta,
+          compVenta: venta.compVenta || '',
+          detallePago
+        });
+      }
+      await transaction.commit();
+      res.json({ message: 'Cobro registrado correctamente' });
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  } catch (error) {
+    console.error('Error postCobrarVenta:', error);
+    res.status(500).json({ error: error.message || 'Error al registrar cobro' });
+  }
+};
+
 module.exports = {
     crearVenta,
     crearVentaCompleta,
@@ -571,6 +719,10 @@ module.exports = {
     obtenerComprobanteParaPdf,
     actualizarVenta,
     actualizarVentaEdicion,
+    getConfigDefaults,
+    putConfigDefaults,
+    getPendientesPago,
+    postCobrarVenta,
     // detalle venta (crearDetalleVenta está comentado; se usa crearVentaCompleta)
     crearDetalleVenta_DescontarStock,
     actualizarDetalleVenta,

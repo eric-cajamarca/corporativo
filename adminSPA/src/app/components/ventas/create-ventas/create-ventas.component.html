@@ -18,6 +18,7 @@
               <i class="bi bi-person-lines-fill me-2"></i>Cliente
             </button>
             <button type="button" class="btn btn-outline-warning rounded-pill"
+                    *ngIf="ventas.idEstadoPago !== 1"
                     data-bs-toggle="modal" data-bs-target="#modalPago"
                     [disabled]="!tieneClienteParaVenta()"
                     (click)="abrirModalPago()">
@@ -321,6 +322,13 @@
               <option *ngFor="let m of moneda" [value]="m.idMoneda">{{ m.descripcion }}</option>
             </select>
           </div>
+          <!-- Estado pedido -->
+          <div class="col-md-4">
+            <label class="form-label">Estado pedido</label>
+            <select class="form-select" [(ngModel)]="ventas.idEstadoPedido">
+              <option *ngFor="let ep of estadosPedidos" [value]="ep.idEstadoPedido">{{ ep.descripcion }}</option>
+            </select>
+          </div>
           <!-- Estado pago -->
           <div class="col-md-4">
             <label class="form-label">Estado de pago</label>
@@ -328,8 +336,8 @@
               <option *ngFor="let e of estadoPago" [value]="e.idEstadoPago">{{ e.descripcion }}</option>
             </select>
           </div>
-          <!-- Medio pago -->
-          <div class="col-md-4">
+          <!-- Medio pago (no obligatorio si estado de pago es Pendiente) -->
+          <div class="col-md-4" *ngIf="ventas.idEstadoPago !== 1">
             <label class="form-label">Medio de pago</label>
             <select class="form-select" [(ngModel)]="ventas.idMediosPago">
               <option *ngFor="let m of mediosPago" [value]="m.idMediosPago">{{ m.descripcion }}</option>

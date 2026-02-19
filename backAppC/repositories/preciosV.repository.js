@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 
 /** Convierte valor a GUID válido o null (para idSucursal opcional). Evita string 'null' que falla en sql.UniqueIdentifier */
 function toGuidOrNull(val) {
@@ -56,7 +57,7 @@ exports.actualizarPrecioProducto = async (pool, precioData) => {
             .input('idProducto', sql.UniqueIdentifier, idProducto)
             .input('precio', sql.Decimal(18, 4), precio)
             .input('idMoneda', sql.Int, idMoneda)
-            .input('fActualizacion', sql.DateTime2, new Date())
+            .input('fActualizacion', sql.VarChar(23), getNowLocalSQLString())
             .input('idUsuario', sql.UniqueIdentifier, idUsuario)
             .query(` update PreciosProducto 
                      set idLista = @idLista,

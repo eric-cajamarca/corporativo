@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const { v4: uuidv4 } = require('uuid');
+const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 
 
 
@@ -157,7 +158,8 @@ const crear_compra = async (req, res) => {
     }
 
     const idCompra = uuidv4();
-    const fVencimientoVal = fVencimiento || null;
+    const fEmisionSQL = getFechaSoloSQLString(fEmision) || getNowLocalSQLString();
+    const fVencimientoSQL = getFechaSoloSQLString(fVencimiento) || fEmisionSQL;
     const compRelacionadoVal = compRelacionado || null;
 
     try {
@@ -179,8 +181,8 @@ const crear_compra = async (req, res) => {
             .input('idComprobante', sql.Int, idComprobante)
             .input('serie', sql.VarChar(4), (serie || '').toString().substring(0, 4))
             .input('numero', sql.VarChar(8), (numero || '').toString().substring(0, 8))
-            .input('fEmision', sql.DateTime, fEmision)
-            .input('fVencimiento', sql.DateTime, fVencimientoVal)
+            .input('fEmision', sql.VarChar(23), fEmisionSQL)
+            .input('fVencimiento', sql.VarChar(23), fVencimientoSQL)
             .input('idProveedor', sql.Int, idProveedor)
             .input('idMoneda', sql.Int, idMoneda)
             .input('idEstadoPago', sql.Int, idEstadoPagoFinal)
@@ -222,20 +224,8 @@ const editar_compra = async function (req, res) {
         return res.status(400).send({ message: 'idProveedor inválido', data: undefined });
     }
 
-    let fEmision = null;
-    let fVencimiento = null;
-    if (req.body.fEmision) {
-        const fechaObjetoE = new Date(req.body.fEmision);
-        if (!isNaN(fechaObjetoE.getTime())) {
-            fEmision = fechaObjetoE.toISOString().slice(0, 19).replace('T', ' ') + '.000';
-        }
-    }
-    if (req.body.fVencimiento) {
-        const fechaObjetoV = new Date(req.body.fVencimiento);
-        if (!isNaN(fechaObjetoV.getTime())) {
-            fVencimiento = fechaObjetoV.toISOString().slice(0, 19).replace('T', ' ') + '.000';
-        }
-    }
+    const fEmision = req.body.fEmision ? getFechaSoloSQLString(req.body.fEmision) : null;
+    const fVencimiento = req.body.fVencimiento ? getFechaSoloSQLString(req.body.fVencimiento) : null;
 
     if (req.user) {
         if (req.user.rol == 'Administrador' || req.user.rol == 'Almacenero') {
@@ -261,8 +251,8 @@ const editar_compra = async function (req, res) {
                     .input("compRelacionado", sql.VarChar, compRelacionado ?? '')
                     .input("idUsuario", sql.UniqueIdentifier, idUsuario);
 
-                request.input("fEmision", sql.DateTime, fEmision);
-                request.input("fVencimiento", sql.DateTime, fVencimiento);
+                request.input("fEmision", sql.VarChar(23), fEmision);
+                request.input("fVencimiento", sql.VarChar(23), fVencimiento);
 
                 let editarCompra = await request.query("UPDATE Compras SET compCompra=@compCompra, serie=@serie, numero=@numero, fEmision=ISNULL(@fEmision, fEmision), fVencimiento=@fVencimiento, idProveedor=@idProveedor, idMoneda=@idMoneda, idEstadoPago=@idEstadoPago, subTotal=@subTotal, igv=@igv, exonerado=@exonerado, gratuito=@gratuito, otrosCargos=@otrosCargos, descuentos=@descuentos, total=@total, idMediosPago=@idMediosPago, compRelacionado=@compRelacionado, idUsuario=@idUsuario WHERE idEmpresa=@idEmpresa AND idCompra=@idcompra");
 

@@ -23,6 +23,21 @@ const obtener_estado_pago = async (req, res) => {
     }
 }
 
+const obtener_estados_pedidos = async (req, res) => {
+    if (req.user) {
+        try {
+            let pool = await sql.connect(dbConfig);
+            let estadosPedidos = await pool.request().query("SELECT idEstadoPedido, descripcion, color FROM EstadosPedidos ORDER BY idEstadoPedido");
+            res.status(200).send({ data: estadosPedidos.recordset });
+        } catch (error) {
+            console.error('obtener estadosPedidos error:', error);
+            res.status(500).send({ message: 'Error al obtener los estados de pedido', data: undefined });
+        }
+    } else {
+        res.status(401).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+};
+
 /////////////////////////////////////////
 // create table MediosPago
 // (
@@ -349,6 +364,7 @@ const obtener_estado_sunat = async (req, res) => {
 
 module.exports = {
     obtener_estado_pago,
+    obtener_estados_pedidos,
     obtener_medios_pago,
     obtener_estado_sunat,
     obtener_moneda,

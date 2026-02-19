@@ -3,6 +3,11 @@ const reportRoutes = require('./src/routes/report.routes');
 
 const app = createApp();
 
+// Health para Kubernetes/Ambassador (sin auth)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'pdf-backend' });
+});
+
 // Rutas
 app.use('/api/reports', reportRoutes);
 

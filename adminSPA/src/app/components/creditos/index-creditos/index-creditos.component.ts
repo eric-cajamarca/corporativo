@@ -56,7 +56,7 @@ export class IndexCreditosComponent implements OnInit {
 
   public nuevaCobranza = {
     numeroDoc: '',
-    fechaEmision: new Date().toISOString().split('T')[0],
+    fechaEmision: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })(),
     idCliente: '',
     nombreCliente: '',
     direccion: '',
@@ -297,7 +297,7 @@ export class IndexCreditosComponent implements OnInit {
   abrirModalNuevaCobranza() {
     this.nuevaCobranza = {
       numeroDoc: '',
-      fechaEmision: new Date().toISOString().split('T')[0],
+      fechaEmision: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })(),
       idCliente: '',
       nombreCliente: '',
       direccion: '',
