@@ -268,16 +268,18 @@ function generarDPA() {
 }
 
 /**
- * Genera contenido PAG (medio de pago). Estructura muestra: Contado|-|-|
+ * Genera contenido PAG (medio de pago).
+ * Boleta (03): debe ser -|-|-| (sin forma de pago).
+ * Factura (01): debe ser Contado|-|-| o Credito|-|-| según condición de pago.
  */
-function generarPAG(payload) {
-  console.log("generarPAG", payload);
-  if (!payload.venta.tipoComprobante == "03") {
+function generarPAG(payload, tipoComprobante) {
+  const tipo = String(tipoComprobante || payload.venta?.codigoComprobante || "01").trim();
+  if (tipo === "03") {
     return "-|-|-" + SEP;
-  }else{
-  const medio = toStr(payload.venta && payload.venta.medioPago) || "Contado";
-  return `${escPipe(medio)}|-|-` + SEP;
   }
+  const medio = toStr(payload.venta?.medioPago || payload.venta?.condicionPago) || "Contado";
+  const valor = (medio.toLowerCase().indexOf("credito") >= 0 || medio.toLowerCase().indexOf("crédito") >= 0) ? "Credito" : "Contado";
+  return `${valor}|-|-` + SEP;
 }
 
 /**
@@ -295,7 +297,7 @@ function generarArchivosPlanosFacturaBoleta(payload, tipoComprobante) {
     ley: generarLEY(payload),
     aca: generarACA(payload),
     dpa: generarDPA(),
-    pag: generarPAG(payload)
+    pag: generarPAG(payload, tipoComprobante)
   };
 }
 
@@ -365,7 +367,7 @@ function generarArchivosPlanosNota(payload, tipoComprobante) {
     ley: generarLEY(payload),
     aca: generarACA(payload),
     dpa: generarDPA(),
-    pag: generarPAG(payload)
+    pag: generarPAG(payload, tipoComprobante)
   };
 }
 

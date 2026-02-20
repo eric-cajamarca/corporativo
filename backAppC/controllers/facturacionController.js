@@ -1,6 +1,7 @@
 const dbConfig = require('../dbconfig');
 const sql = require('mssql');
 const FacturacionServices = require('../services/facturacion.service');
+const debugSunatLog = require('../utils/debugSunatLog.util');
 
 // Obtener configuración de facturación electrónica
 const obtenerConfiguracionFacturacion = async (req, res) => {
@@ -190,13 +191,22 @@ const generarComprobanteElectronico = async (req, res) => {
 
 // Enviar comprobante a SUNAT. Body opcional: { usarXmlUbl: true } para generar XML UBL y enviar sin archivos planos.
 const enviarComprobanteSunat = async (req, res) => {
+  const { idComprobanteElectronico } = req.params;
+  const opciones = { usarXmlUbl: req.body?.usarXmlUbl === true };
+  // #region agent log
+  const entryData = { idComprobanteElectronico, opciones, idEmpresa: req.user?.empresa };
+  console.error("[SUNAT] enviarComprobanteSunat: entry", entryData);
+  debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:entry", message: "entry", data: entryData });
+  // #endregion
   try {
-    const { idComprobanteElectronico } = req.params;
-    const opciones = { usarXmlUbl: req.body?.usarXmlUbl === true };
-
     const pool = await sql.connect(dbConfig);
     const result = await FacturacionServices.enviarComprobanteSunatService(pool, req.user, idComprobanteElectronico, opciones);
 
+    // #region agent log
+    const resultData = { ok: result?.ok, idEstadoSunat: result?.idEstadoSunat, mensaje: result?.mensaje };
+    console.error("[SUNAT] enviarComprobanteSunat: result", resultData);
+    debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:result", message: "result", data: resultData });
+    // #endregion
     if (result && !result.ok) {
       return res.status(400).send({
         message: result.mensaje || "Error al enviar a SUNAT",
@@ -226,6 +236,10 @@ const enviarComprobanteSunat = async (req, res) => {
     if (error.message === "CDR_NO_ENCONTRADO" || error.message === "XML no encontrado") {
       return res.status(404).send({ message: error.message, data: undefined });
     }
+    // #region agent log
+    console.error("[SUNAT] enviarComprobanteSunat: error", error.message);
+    debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:error", message: "error", data: { error: error.message } });
+    // #endregion
     console.error("Error enviar comprobante SUNAT:", error);
     res.status(500).send({
       message: error.message || "Error al enviar el comprobante a SUNAT",
@@ -305,14 +319,28 @@ const obtenerEstadosSunat = async (req, res) => {
 
 // Envío por lotes (manual): envía todos los comprobantes pendientes de la empresa del usuario
 const enviarLoteSunat = async (req, res) => {
+  // #region agent log
+  const loteEntry = { idEmpresa: req.user?.empresa };
+  console.error("[SUNAT] enviarLoteSunat: entry", loteEntry);
+  debugSunatLog.write({ location: "facturacionController.enviarLoteSunat:entry", message: "entry", data: loteEntry });
+  // #endregion
   try {
     const pool = await sql.connect(dbConfig);
     const result = await FacturacionServices.enviarLotePendientesService(pool, req.user.empresa);
+    // #region agent log
+    const loteResult = { enviados: result?.enviados, errores: result?.errores, total: result?.total, mensaje: result?.mensaje };
+    console.error("[SUNAT] enviarLoteSunat: result", loteResult);
+    debugSunatLog.write({ location: "facturacionController.enviarLoteSunat:result", message: "result", data: loteResult });
+  // #endregion
     res.status(200).send({
       message: `Envío por lotes: ${result.enviados} enviados, ${result.errores} errores`,
       data: result
     });
   } catch (error) {
+    // #region agent log
+    console.error("[SUNAT] enviarLoteSunat: error", error.message);
+    debugSunatLog.write({ location: "facturacionController.enviarLoteSunat:error", message: "error", data: { error: error.message } });
+    // #endregion
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }

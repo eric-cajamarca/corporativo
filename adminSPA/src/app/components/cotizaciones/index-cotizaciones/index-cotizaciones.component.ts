@@ -178,7 +178,8 @@ export class IndexCotizacionesComponent implements OnInit {
           cliente: d.cliente,
           items: d.items,
           cantidadLetras,
-          nombreArchivo
+          nombreArchivo,
+          esCotizacion: true
         };
         this.datosParaWhatsapp = { datos, nombreArchivo };
         this.whatsappNumber = (d.cliente as { celular?: string })?.celular ?? '';
@@ -265,7 +266,8 @@ export class IndexCotizacionesComponent implements OnInit {
           cliente: d.cliente,
           items: d.items,
           cantidadLetras,
-          nombreArchivo
+          nombreArchivo,
+          esCotizacion: true
         };
         this.pdfService.generarPdfComprobanteVenta(datos, formato, nombreArchivo).subscribe({
           next: (blob) => {

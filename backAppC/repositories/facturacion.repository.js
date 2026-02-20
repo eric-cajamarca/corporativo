@@ -1,6 +1,7 @@
 const sql = require("mssql");
 const ventasRepository = require("../repositories/ventas.repository");
 const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
+const debugSunatLog = require("../utils/debugSunatLog.util");
 const { escribirArchivosPlanos, escribirXmlFirma, nombreArchivoComprobante } = require("../utils/facturadorSunat.util");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
 const archivoPlanoFacturador = require("../services/archivoPlanoFacturador.service");
@@ -525,13 +526,24 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
 };
 
 /**
- * Envía el comprobante a SUNAT.
- * - Si config.envioDirectoSunat es true y hay urlEnvio + usuarioSunat + claveSunat + certificado: envío directo SOAP (BillService).
- * - Si no: usa Facturador SFS (archivos planos o UBL según opciones). usarXmlUbl: true → UBL en Firma; si no → archivos planos en DATA.
+ * Envía el comprobante a SUNAT. Dos flujos según otros/manual_programador.pdf (RS 097-2012/SUNAT):
+ *
+ * 1) ENVÍO DIRECTO (config.envioDirectoSunat + urlEnvio + usuarioSunat + claveSunat + certificado):
+ *    No archivos planos. Se genera XML UBL, se firma, se envía a BillService sendBill (§2.5). Se guarda CDR en BD.
+ *
+ * 2) FACTURADOR SFS (envío directo no activo; rutaCarpetaFacturadorSunat obligatoria):
+ *    Archivos planos en DATA → actualizar bandeja → generar/firmar XML (Facturador) → actualizar bandeja
+ *    → enviar a SUNAT → recepcionar CDR y guardar en BD → actualizar bandeja.
+ *    Opción usarXmlUbl: true → XML UBL firmado en Firma, solo envío (sin planos).
  */
 exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico, facturadorSunatService, config, opciones = {}) => {
   const comp = await exports.obtenerComprobanteParaEnvioRepo(pool, idComprobanteElectronico, user.empresa);
   if (!comp) return null;
+  // #region agent log
+  const compData = { idComprobanteElectronico, ruc: comp.rucEmpresa, tipo: comp.tipoComprobante, serie: comp.serie, numero: comp.numero };
+  console.error("[SUNAT] enviarComprobanteSunatRepo: comprobante", compData);
+  debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:comprobante", message: "comprobante", data: compData });
+  // #endregion
 
   const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, user.empresa);
   if (!payload) {
@@ -552,6 +564,10 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
 
   // Envío directo a SUNAT (SOAP BillService): requiere UBL firmado, urlEnvio, usuarioSunat, claveSunat
   if (config.envioDirectoSunat && config.urlEnvio && config.usuarioSunat && config.claveSunat) {
+    // #region agent log
+    console.error("[SUNAT] enviarComprobanteSunatRepo: rama ENVÍO DIRECTO SUNAT", { idComprobanteElectronico });
+    debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:rama", message: "rama ENVÍO DIRECTO", data: { idComprobanteElectronico } });
+    // #endregion
     const configFirma = await exports.obtenerConfiguracionParaFirmaRepo(pool, user.empresa);
     const certBase64 = configFirma?.certificadoDigital;
     const claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
@@ -586,6 +602,11 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
       cdr: resultado.cdr,
       idEstadoSunat: resultado.idEstadoSunat ?? 6
     });
+    // #region agent log
+    const resDir = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
+    console.error("[SUNAT] enviarComprobanteSunatRepo: resultado envío directo", resDir);
+    debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoDirecto", message: "resultado", data: resDir });
+    // #endregion
     return {
       ok: resultado.ok,
       mensaje: resultado.ok ? "Comprobante enviado a SUNAT (directo)" : (resultado.error || "Error en envío directo"),
@@ -602,6 +623,11 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
       mensaje: "Configure la carpeta del Facturador SUNAT o active Envío directo con URL, usuario y clave SOL"
     };
   }
+  // #region agent log
+  const ramaData = { idComprobanteElectronico, usarXmlUbl, urlFacturador: config.urlFacturadorSunat || "(default)" };
+  console.error("[SUNAT] enviarComprobanteSunatRepo: rama FACTURADOR SFS", ramaData);
+  debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:rama", message: "rama FACTURADOR SFS", data: ramaData });
+  // #endregion
 
   if (usarXmlUbl) {
     const numeroComprobante = `${comp.serie}-${String(comp.numero).replace(/\D/g, "").padStart(8, "0")}`;
@@ -660,6 +686,11 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     idEstadoSunat: resultado.idEstadoSunat ?? 6
   });
 
+  // #region agent log
+  const resFac = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
+  console.error("[SUNAT] enviarComprobanteSunatRepo: resultado Facturador", resFac);
+  debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoFacturador", message: "resultado", data: resFac });
+  // #endregion
   return {
     ok: resultado.ok,
     mensaje: resultado.ok ? "Comprobante enviado a SUNAT" : (resultado.error || "Error en envío"),

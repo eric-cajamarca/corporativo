@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const axios = require("axios");
 const JSZip = require("jszip");
 const { getRutaRptaFacturador } = require("../utils/facturadorSunat.util");
+const debugSunatLog = require("../utils/debugSunatLog.util");
 
 const URL_FACTURADOR_DEFAULT = "http://localhost:9000";
 
@@ -79,7 +80,8 @@ function ejecutarFacturadorBat(rutaCarpetaFacturadorSunat) {
 }
 
 /**
- * Actualiza la bandeja del Facturador.
+ * Actualiza la bandeja del Facturador. Devuelve la respuesta para inspeccionar errores (ej. Error al firma).
+ * @returns {Promise<{ listaBandejaFacturador?: Array }>}
  */
 async function actualizarBandeja(baseUrl) {
   const url = getUrlFacturador(baseUrl, "00", "A");
@@ -87,6 +89,7 @@ async function actualizarBandeja(baseUrl) {
   if (res.status !== 200) {
     console.error("facturadorSunat.service: actualizarBandeja status", res.status, res.data);
   }
+  return res.data || {};
 }
 
 /**
@@ -125,13 +128,29 @@ async function enviarXml(baseUrl, ruc, tipoDoc, serie, numero) {
 
 /**
  * Lee el CDR desde la carpeta RPTA (archivo R{base}.zip).
+ * Prueba primero RPTA y luego RPTA/cdr/ (Facturador SFS v1.4 escribe en subcarpeta cdr).
  * @returns {Promise<{ codigo: string, descripcion: string, xml?: string } | null>}
  */
 async function leerCDR(rutaCarpetaFacturadorSunat, base) {
   const rptaDir = getRutaRptaFacturador(rutaCarpetaFacturadorSunat);
   if (!rptaDir) return null;
-  const zipPath = path.join(rptaDir, `R${base}.zip`);
-  if (!fs.existsSync(zipPath)) return null;
+  const partes = base.split("-");
+  const ultimo = partes[partes.length - 1];
+  const baseCorto = ultimo ? partes.slice(0, -1).join("-") + "-" + String(Number(ultimo) || ultimo) : base;
+  const candidatos = [
+    path.join(rptaDir, `R${base}.zip`),
+    path.join(rptaDir, "cdr", `R${base}.zip`),
+    path.join(rptaDir, `R${baseCorto}.zip`),
+    path.join(rptaDir, "cdr", `R${baseCorto}.zip`)
+  ];
+  let zipPath = null;
+  for (const p of candidatos) {
+    if (fs.existsSync(p)) {
+      zipPath = p;
+      break;
+    }
+  }
+  if (!zipPath) return null;
 
   try {
     const buffer = fs.readFileSync(zipPath);
@@ -158,6 +177,28 @@ async function leerCDR(rutaCarpetaFacturadorSunat, base) {
  * @param {object} opts - { baseUrl, rutaCarpetaFacturadorSunat, ruc, tipoComprobante, serie, numero }
  * @returns {Promise<{ ok: boolean, idEstadoSunat?: number, codigoRespuesta?: string, descripcionRespuesta?: string, cdr?: string, error?: string }>}
  */
+/**
+ * Si la bandeja indica "Error al firma" para el comprobante (base), devuelve mensaje explicando causa y alternativas.
+ * El error lo reporta la aplicación Facturador SFS (local): no tiene certificado configurado o la clave es incorrecta.
+ * @param {{ listaBandejaFacturador?: Array }} bandeja - Respuesta de actualizarBandeja
+ * @param {string} base - Nombre base del comprobante (ej: 20614636930-03-B001-00000030)
+ * @returns {string|null} Mensaje de error o null si no aplica
+ */
+function mensajeErrorFirmaFacturador(bandeja, base) {
+  const lista = bandeja?.listaBandejaFacturador;
+  if (!Array.isArray(lista)) return null;
+  const item = lista.find((i) => (i.nom_arch || "").trim() === base);
+  const desObs = (item?.des_obse || "").trim();
+  if (!desObs || (!desObs.toLowerCase().includes("firma") && !desObs.includes("Error al firma"))) return null;
+  return (
+    "El Facturador SFS (aplicación local) no pudo firmar el XML (" +
+    desObs +
+    "). Suele deberse a que el certificado digital no está configurado en el Facturador o la contraseña es incorrecta. " +
+    "Solución 1: Abra el programa Facturador SFS, vaya a su configuración y asigne el certificado digital (.pfx) y su clave. " +
+    "Solución 2: Cargue el certificado en esta aplicación (Configuración > Facturación) y use la opción 'Enviar con XML firmado por la aplicación' si está disponible en la pantalla de envío."
+  );
+}
+
 function esErrorConexionFacturador(err) {
   const code = err.code || "";
   const msg = (err.message || "").toLowerCase();
@@ -183,10 +224,16 @@ async function ejecutarFlujoEnvio(baseUrl, rutaCarpetaFacturadorSunat, ruc, tipo
   }
   await actualizarBandeja(baseUrl);
   await generarXml(baseUrl, rucStr, tipoStr, serieStr, numeroStr);
-  await actualizarBandeja(baseUrl);
+  const bandejaDespuesGenerar = await actualizarBandeja(baseUrl);
+  const errorFirma = mensajeErrorFirmaFacturador(bandejaDespuesGenerar, base);
+  if (errorFirma) {
+    return { ok: false, error: errorFirma, idEstadoSunat: 6 };
+  }
   await enviarXml(baseUrl, rucStr, tipoStr, serieStr, numeroStr);
   await actualizarBandeja(baseUrl);
-  return await leerYDevolverCDR(rutaCarpetaFacturadorSunat, base);
+  const resultado = await leerYDevolverCDR(rutaCarpetaFacturadorSunat, base);
+  if (resultado.ok) await actualizarBandeja(baseUrl);
+  return resultado;
 }
 
 /**
@@ -205,7 +252,9 @@ async function ejecutarFlujoSoloEnvio(baseUrl, rutaCarpetaFacturadorSunat, ruc, 
   await actualizarBandeja(baseUrl);
   await enviarXml(baseUrl, rucStr, tipoStr, serieStr, numeroStr);
   await actualizarBandeja(baseUrl);
-  return await leerYDevolverCDR(rutaCarpetaFacturadorSunat, base);
+  const resultado = await leerYDevolverCDR(rutaCarpetaFacturadorSunat, base);
+  if (resultado.ok) await actualizarBandeja(baseUrl);
+  return resultado;
 }
 
 async function leerYDevolverCDR(rutaCarpetaFacturadorSunat, base) {
@@ -219,10 +268,28 @@ async function leerYDevolverCDR(rutaCarpetaFacturadorSunat, base) {
   }
   if (!cdr) {
     const zipPath = rptaDir ? path.join(rptaDir, zipNombre) : zipNombre;
-    console.error("facturadorSunat.service: CDR no encontrado. Ruta esperada:", zipPath);
+    let contenidoRpta = [];
+    if (rptaDir && fs.existsSync(rptaDir)) {
+      try {
+        contenidoRpta = fs.readdirSync(rptaDir);
+      } catch (_) {
+        contenidoRpta = ["(error al listar)"];
+      }
+    } else {
+      contenidoRpta = ["(carpeta RPTA no existe)"];
+    }
+    console.error("facturadorSunat.service: CDR no encontrado. Ruta esperada:", zipPath, "| Contenido RPTA:", contenidoRpta.slice(0, 20));
+    // #region agent log
+    debugSunatLog.write({
+      location: "facturadorSunat.service.leerYDevolverCDR",
+      message: "CDR no encontrado",
+      data: { zipPath, rptaDir, contenidoRpta: contenidoRpta.slice(0, 30), base }
+    });
+    // #endregion
+    const errorDetalle = `No se encontró CDR después del envío. Ruta esperada: ${zipPath}. Carpeta RPTA: ${(contenidoRpta.length > 0 ? contenidoRpta.slice(0, 10).join(", ") : "vacía o inaccesible")}.`;
     return {
       ok: false,
-      error: "No se encontró CDR después del envío. Compruebe la carpeta RPTA del Facturador.",
+      error: errorDetalle,
       idEstadoSunat: 6
     };
   }

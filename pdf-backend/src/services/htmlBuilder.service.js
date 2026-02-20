@@ -369,11 +369,12 @@ class HtmlBuilderService {
     ${lineasTotales}
   </table>
   <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  ${data.tablaCuotasHtml || ''}
   <div class="ticket-final">
-    <div class="txt">${textoRepresentacion}</div>
-    <div class="txt">Visite https://mifacturasunat.com</div>
+    ${textoRepresentacion ? '<div class="txt">' + textoRepresentacion + '</div>' : ''}
+    ${qrDataUri ? '<div class="txt">Visite https://mifacturasunat.com</div>' : ''}
     ${resumenHash ? '<div class="txt">Resumen: ' + resumenHash + '</div>' : ''}
-    <div class="qr-wrap"><img src="${qrDataUri}" alt="QR"/></div>
+    ${qrDataUri ? '<div class="qr-wrap"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
     ${barcodeIdVentaUrl ? '<div class="barcode-venta">Venta: ' + idVenta + '<br><img src="' + barcodeIdVentaUrl + '" alt="' + idVenta + '"/></div>' : ''}
   </div>
 </body>
@@ -392,7 +393,8 @@ class HtmlBuilderService {
       cliente = {},
       items = [],
       cantidadLetras = '',
-      formato = 'A4'
+      formato = 'A4',
+      esCotizacion = false
     } = params;
 
     const titulo = venta.nombreComprobante || 'Comprobante';
@@ -409,15 +411,17 @@ class HtmlBuilderService {
     const otrosCargos = Number(venta.otrosCargos) || 0;
     const descuentos = Number(venta.descuentos) || 0;
     const total = Number(venta.total) || 0;
-    const resumenHash = (venta.resumenHash && String(venta.resumenHash).trim()) || '';
+    const resumenHash = esCotizacion ? '' : ((venta.resumenHash && String(venta.resumenHash).trim()) || '');
 
     const logoSrc = await this._resolveLogoToDataUri(empresa.logo);
-    const qrString = this._buildQrString(empresa, venta, cliente);
     let qrDataUri = '';
-    try {
-      qrDataUri = await QRCode.toDataURL(qrString, { width: formato === 'ticket' ? 80 : 120, margin: 1 });
-    } catch (e) {
-      qrDataUri = this._defaultLogoDataUri();
+    if (!esCotizacion) {
+      const qrString = this._buildQrString(empresa, venta, cliente);
+      try {
+        qrDataUri = await QRCode.toDataURL(qrString, { width: formato === 'ticket' ? 80 : 120, margin: 1 });
+      } catch (e) {
+        qrDataUri = this._defaultLogoDataUri();
+      }
     }
 
     const filas = items.map(it => {
@@ -444,13 +448,27 @@ class HtmlBuilderService {
       <tr${l.total ? ' class="total-row"' : ''}><td>${l.label}</td><td class="text-end">${Number(l.value).toFixed(2)}</td></tr>`).join('');
 
     const esFactura = (venta.codigoComprobante || '01') === '01';
-    const textoRepresentacion = esFactura ? 'Representación impresa de la FACTURA ELECTRÓNICA' : 'Representación impresa de la BOLETA DE VENTA ELECTRÓNICA';
+    const textoRepresentacion = esCotizacion ? '' : (esFactura ? 'Representación impresa de la FACTURA ELECTRÓNICA' : 'Representación impresa de la BOLETA DE VENTA ELECTRÓNICA');
+
+    const cuotas = Array.isArray(venta.cuotas) ? venta.cuotas : [];
+    const tablaCuotasHtml = cuotas.length > 0 && esFactura
+      ? `<div class="cuotas-section" style="margin-top:16px; page-break-inside:avoid;">
+          <strong>Detalle de cuotas a pagar</strong>
+          <table class="detalle" style="margin-top:6px;">
+            <thead><tr><th>Fecha de pago</th><th>Nro. cuota</th><th class="text-end">Total (S/)</th></tr></thead>
+            <tbody>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td class="text-center">${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="text-end">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>`
+      : '';
 
     if (formato === 'ticket') {
       const rucCliente = cliente.ruc != null && String(cliente.ruc).trim() !== '' ? String(cliente.ruc).trim() : '';
       const ticketTotalesHtml = lineasTotales.map(l =>
         `<tr${l.total ? ' class="total-final"' : ''}><td>${l.label}</td><td class="num" style="text-align:right">${Number(l.value).toFixed(2)}</td></tr>`
       ).join('');
+      const ticketCuotasHtml = cuotas.length > 0 && esFactura
+        ? `<hr class="ticket-sep"><div style="font-size:7px;"><strong>Cuotas a pagar</strong><table style="width:100%;font-size:6px;border-collapse:collapse;"><tr><th>F.Pago</th><th>Nro</th><th class="num">Total</th></tr>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td>${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="num">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</table></div>`
+        : '';
       return this._buildTicketComprobanteHtml({
         empresa,
         venta,
@@ -468,7 +486,8 @@ class HtmlBuilderService {
         resumenHash,
         qrDataUri,
         idVenta,
-        barcodeIdVentaUrl
+        barcodeIdVentaUrl,
+        tablaCuotasHtml: ticketCuotasHtml
       });
     }
 
@@ -553,13 +572,10 @@ class HtmlBuilderService {
     <table>${filasTotales}</table>
   </div>
   <div class="son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  ${tablaCuotasHtml}
   <div class="bloque-final">
-    <div class="texto">
-      ${textoRepresentacion}<br>
-      Visite https://mifacturasunat.com<br>
-      ${resumenHash ? 'Resumen: ' + resumenHash : ''}
-    </div>
-    <div class="qr"><img src="${qrDataUri}" alt="QR"/></div>
+    ${(textoRepresentacion || resumenHash) ? `<div class="texto">${textoRepresentacion ? textoRepresentacion + '<br>' : ''}${qrDataUri ? 'Visite https://mifacturasunat.com<br>' : ''}${resumenHash ? 'Resumen: ' + resumenHash : ''}</div>` : ''}
+    ${qrDataUri ? '<div class="qr"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
     ${barcodeIdVentaUrl ? '<div class="barcode-venta">Código venta (despachos): <img src="' + barcodeIdVentaUrl + '" alt="' + idVenta + '"/><br><span>' + idVenta + '</span></div>' : ''}
   </div>
 </body>

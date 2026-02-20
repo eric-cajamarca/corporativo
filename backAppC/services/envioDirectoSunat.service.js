@@ -1,7 +1,7 @@
 /**
- * Envío directo a SUNAT vía servicio SOAP BillService (sendBill).
- * No usa el Facturador SFS. Requiere: XML firmado, usuario secundario y contraseña del usuario secundario (no Clave SOL).
- * Referencia: Manual de Servicios REST SUNAT, Greenter FE Primer.
+ * Envío directo a SUNAT vía WebService SOAP BillService (método sendBill).
+ * No usa el Facturador SFS. Requiere: XML UBL firmado, UsernameToken (Clave SOL).
+ * Referencia: otros/manual_programador.pdf (RS 097-2012/SUNAT) — §2.1 URLs, §2.3 Beta, §2.5 sendBill, §2.6 CDR.
  */
 
 const axios = require("axios");
@@ -12,7 +12,7 @@ const NS_WS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurit
 const NS_WSU = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd";
 const NS_BILL = "http://service.gem.factura.comppago.registro.servicio.sunat.gob.pe/";
 
-/** URL BillService BETA (pruebas). Producción: https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService */
+/** URLs BillService SUNAT según manual programador §2.1 (Factura, Notas vinculadas, Resumen, etc.). */
 const URL_BETA = "https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService";
 const URL_PRODUCCION = "https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService";
 

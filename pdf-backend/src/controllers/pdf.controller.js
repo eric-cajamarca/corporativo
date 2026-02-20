@@ -96,7 +96,8 @@ async function generatePdf(req, res) {
           cliente: datos.cliente,
           items: datos.items || [],
           cantidadLetras: datos.cantidadLetras || '',
-          formato: formatoPdf
+          formato: formatoPdf,
+          esCotizacion: datos.esCotizacion === true
         });
         break;
 

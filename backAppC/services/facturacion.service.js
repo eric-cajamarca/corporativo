@@ -1,6 +1,7 @@
 const FacturacionRepository = require('../repositories/facturacion.repository');
 const facturadorSunatService = require('./facturadorSunat.service');
 const { nombreArchivoComprobante, leerXmlComprobante } = require('../utils/facturadorSunat.util');
+const debugSunatLog = require('../utils/debugSunatLog.util');
 
 exports.obtenerConfiguracionFacturacionService = async (pool, user) => {
   if (!user) {
@@ -95,6 +96,11 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
 
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
   const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
+  // #region agent log
+  const configData = { usaDirecto: !!usaDirecto, tieneRutaFacturador: !!config?.rutaCarpetaFacturadorSunat, urlFacturadorSunat: config?.urlFacturadorSunat || "(default)", urlEnvio: config?.urlEnvio ? "(definida)" : "(no)", idEmpresa: user.empresa };
+  console.error("[SUNAT] enviarComprobanteSunatService: config", configData);
+  debugSunatLog.write({ location: "facturacion.service.enviarComprobanteSunatService:config", message: "config", data: configData });
+  // #endregion
   if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
     throw new Error("CONFIG_FACTURADOR_INCOMPLETA");
   }
@@ -182,11 +188,21 @@ exports.obtenerEstadosSunatService = async (pool, user) => {
  */
 exports.enviarLotePendientesService = async (pool, idEmpresa) => {
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
+  // #region agent log
+  const entryData = { idEmpresa, tieneRutaFacturador: !!config?.rutaCarpetaFacturadorSunat, envioDirectoSunat: !!config?.envioDirectoSunat };
+  console.error("[SUNAT] enviarLotePendientesService: entry", entryData);
+  debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:entry", message: "entry", data: entryData });
+  // #endregion
   if (!config?.rutaCarpetaFacturadorSunat) {
     return { enviados: 0, errores: 0, mensaje: "Ruta del Facturador no configurada" };
   }
 
   const pendientes = await FacturacionRepository.listarPendientesEnvioRepo(pool, idEmpresa, 100);
+  // #region agent log
+  const pendData = { count: pendientes.length, idEmpresa };
+  console.error("[SUNAT] enviarLotePendientesService: pendientes", pendData);
+  debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:pendientes", message: "pendientes", data: pendData });
+  // #endregion
   let enviados = 0;
   let errores = 0;
 
@@ -214,6 +230,11 @@ exports.enviarLotePendientesService = async (pool, idEmpresa) => {
     }
   }
 
+  // #region agent log
+  const resData = { enviados, errores, total: pendientes.length, idEmpresa };
+  console.error("[SUNAT] enviarLotePendientesService: result", resData);
+  debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:result", message: "result", data: resData });
+  // #endregion
   return { enviados, errores, total: pendientes.length };
 };
 
@@ -223,6 +244,11 @@ exports.enviarLotePendientesService = async (pool, idEmpresa) => {
  */
 exports.ejecutarEnvioAutomaticoService = async (pool) => {
   const empresas = await FacturacionRepository.listarEmpresasConEnvioAutomaticoRepo(pool);
+  // #region agent log
+  const empData = { count: empresas.length, ids: empresas.map(e => e.idEmpresa) };
+  console.error("[SUNAT] ejecutarEnvioAutomaticoService: empresas con envío automático", empData);
+  debugSunatLog.write({ location: "facturacion.service.ejecutarEnvioAutomaticoService:empresas", message: "empresas", data: empData });
+  // #endregion
   const resultados = [];
   for (const emp of empresas) {
     try {
@@ -233,5 +259,9 @@ exports.ejecutarEnvioAutomaticoService = async (pool) => {
       resultados.push({ idEmpresa: emp.idEmpresa, enviados: 0, errores: 0, mensaje: err.message });
     }
   }
+  // #region agent log
+  console.error("[SUNAT] ejecutarEnvioAutomaticoService: resultados", resultados);
+  debugSunatLog.write({ location: "facturacion.service.ejecutarEnvioAutomaticoService:resultados", message: "resultados", data: resultados });
+  // #endregion
   return resultados;
 };

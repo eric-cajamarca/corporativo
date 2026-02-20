@@ -6,6 +6,7 @@
 const sql = require("mssql");
 const dbConfig = require("../dbconfig");
 const FacturacionServices = require("../services/facturacion.service");
+const debugSunatLog = require("../utils/debugSunatLog.util");
 
 const INTERVALO_MS = 10 * 60 * 1000; // 10 minutos
 
@@ -13,10 +14,19 @@ let intervaloId = null;
 
 async function ejecutarEnvio() {
   let pool;
+  // #region agent log
+  console.error("[SUNAT] envioSunat.job: ejecutarEnvio inicio");
+  debugSunatLog.write({ location: "envioSunat.job.ejecutarEnvio", message: "inicio", data: {} });
+  // #endregion
   try {
     pool = await sql.connect(dbConfig);
     const resultados = await FacturacionServices.ejecutarEnvioAutomaticoService(pool);
     const conEnvio = resultados.filter((r) => r.enviados > 0 || r.errores > 0);
+    // #region agent log
+    const jobData = { total: resultados.length, conEnvio: conEnvio.length, resultados };
+    console.error("[SUNAT] envioSunat.job: resultados", jobData);
+    debugSunatLog.write({ location: "envioSunat.job.ejecutarEnvio", message: "resultados", data: jobData });
+    // #endregion
     if (conEnvio.length > 0) {
       console.error("Envío automático SUNAT:", JSON.stringify(conEnvio));
     }

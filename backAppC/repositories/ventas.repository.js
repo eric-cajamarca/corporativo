@@ -203,26 +203,30 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           ISNULL(v.otrosCargos, 0) AS otrosCargos,
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
+          ISNULL(mp.descripcion, 'Contado') AS condicionPago,
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
           (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
       `);
   } catch (err) {
-    cabecera = await pool
-      .request()
-      .input('idVenta', sql.Int, idVenta)
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    if (err.message && (err.message.includes('MediosPago') || err.message.includes('Invalid object'))) {
+      cabecera = await pool
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
         SELECT
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
+          'Contado' AS condicionPago,
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
@@ -232,6 +236,9 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
       `);
+    } else {
+      throw err;
+    }
   }
 
   let empresaResult;
@@ -278,6 +285,33 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       SELECT TOP 1 hash AS resumenHash FROM ComprobantesElectronicos
       WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
     `);
+
+  let cuotasVenta = [];
+  const codigoComprobante = (cabecera.recordset && cabecera.recordset[0]) ? String((cabecera.recordset[0].codigoComprobante || '01').trim()) : '01';
+  if (codigoComprobante === '01') {
+    try {
+      const cuotasResult = await pool
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT cu.numeroCuota,
+            CONVERT(VARCHAR(10), cu.fechaVencimiento, 120) AS fechaPago,
+            cu.montoCuota AS total
+          FROM CuotasCredito cu
+          INNER JOIN CreditosClientes cc ON cc.idCredito = cu.idCredito AND cc.idEmpresa = cu.idEmpresa
+          WHERE cc.idVenta = @idVenta AND cc.idEmpresa = @idEmpresa
+          ORDER BY cu.numeroCuota
+        `);
+      cuotasVenta = (cuotasResult.recordset || []).map(r => ({
+        numeroCuota: r.numeroCuota,
+        fechaPago: r.fechaPago ? String(r.fechaPago).trim().slice(0, 10) : '',
+        total: r.total != null ? Number(r.total) : 0
+      }));
+    } catch (_) {
+      cuotasVenta = [];
+    }
+  }
 
   const impuestosResult = await pool
     .request()
@@ -354,6 +388,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       compVenta: cab.compVenta,
       nombreComprobante: cab.nombreComprobante,
       codigoComprobante: cab.codigoComprobante != null ? String(cab.codigoComprobante).trim() : '01',
+      condicionPago: cab.condicionPago != null ? String(cab.condicionPago).trim() : 'Contado',
       fEmision: cab.fEmision,
       subtotal: cab.subtotal,
       igv: cab.igv,
@@ -362,7 +397,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       otrosCargos,
       descuentos: cab.descuentos,
       total: cab.total,
-      resumenHash
+      resumenHash,
+      cuotas: cuotasVenta
     },
     empresa: empresaPayload,
     cliente: {
