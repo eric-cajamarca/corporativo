@@ -8,6 +8,8 @@ import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
 import { PresentacionService } from '../../../services/presentacion.service';
 import { SucursalService } from '../../../services/sucursal.service';
+import { GestoresService } from '../../../services/gestores.service';
+import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -83,6 +85,14 @@ export class CreateProductoComponent implements OnInit {
   /** true cuando se abre como modal (desde ProductoCrearModalService) */
   esModal = false;
 
+  /** Galería: activa si la empresa tiene productos con imágenes */
+  productosConImagenes = false;
+  /** Tras crear producto, id para subir imágenes */
+  idProductoCreado: string | null = null;
+  imagenesProducto: ImagenProducto[] = [];
+  subiendoImagenes = false;
+  archivosSeleccionados: File[] = [];
+
   constructor(
     private fb: FormBuilder,
     private productoService: ProductoService,
@@ -90,6 +100,8 @@ export class CreateProductoComponent implements OnInit {
     private marcaService: MarcaService,
     private presentacionService: PresentacionService,
     private sucursalService: SucursalService,
+    private gestoresService: GestoresService,
+    private productosImagenService: ProductosImagenService,
     private router: Router,
     @Optional() public activeModal: NgbActiveModal,
     public sidebarState: SidebarStateService
@@ -100,6 +112,13 @@ export class CreateProductoComponent implements OnInit {
   ngOnInit(): void {
     this.initForm();
     this.cargarDatos();
+    this.gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
+        this.productosConImagenes = item ? (String(item.valor).toLowerCase() === 'true') : false;
+      },
+      error: () => {}
+    });
   }
 
   private initForm(): void {
@@ -234,13 +253,18 @@ export class CreateProductoComponent implements OnInit {
       next: (response) => {
         this.guardando.set(false);
         if (response.data) {
+          const idProducto = typeof response.data === 'string' ? response.data : (response.data as { idProducto?: string })?.idProducto;
           iziToast.show({
             title: 'Éxito',
             titleColor: '#28a745',
             message: 'Producto creado correctamente',
             position: 'topRight'
           });
-          if (this.activeModal) {
+          if (this.productosConImagenes && idProducto) {
+            this.idProductoCreado = idProducto;
+            this.imagenesProducto = [];
+            this.activeTab.set('galeria');
+          } else if (this.activeModal) {
             this.activeModal.close(true);
           } else {
             this.router.navigate(['/productos']);
@@ -292,5 +316,58 @@ export class CreateProductoComponent implements OnInit {
     } else {
       this.router.navigate(['/productos']);
     }
+  }
+
+  onArchivosChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files) {
+      this.archivosSeleccionados = Array.from(input.files).slice(0, 5 - this.imagenesProducto.length);
+    }
+  }
+
+  subirImagenes(): void {
+    if (!this.idProductoCreado || this.archivosSeleccionados.length === 0) return;
+    this.subiendoImagenes = true;
+    this.productosImagenService.subir(this.idProductoCreado, this.archivosSeleccionados).subscribe({
+      next: () => {
+        this.subiendoImagenes = false;
+        this.archivosSeleccionados = [];
+        this.cargarImagenesProducto();
+        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Imágenes subidas', position: 'topRight' });
+      },
+      error: () => {
+        this.subiendoImagenes = false;
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudieron subir las imágenes', position: 'topRight' });
+      }
+    });
+  }
+
+  private cargarImagenesProducto(): void {
+    if (!this.idProductoCreado) return;
+    this.productosImagenService.listar(this.idProductoCreado).subscribe({
+      next: (res) => { this.imagenesProducto = res.data || []; },
+      error: () => {}
+    });
+  }
+
+  eliminarImagen(idImagen: string): void {
+    this.productosImagenService.eliminar(idImagen).subscribe({
+      next: () => {
+        this.imagenesProducto = this.imagenesProducto.filter(i => i.idImagen !== idImagen);
+        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Imagen eliminada', position: 'topRight' });
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudo eliminar', position: 'topRight' });
+      }
+    });
+  }
+
+  finalizarCreacion(): void {
+    if (this.activeModal) this.activeModal.close(true);
+    else this.router.navigate(['/productos']);
+  }
+
+  irAEditar(): void {
+    if (this.idProductoCreado) this.router.navigate(['/productos/update', this.idProductoCreado]);
   }
 }

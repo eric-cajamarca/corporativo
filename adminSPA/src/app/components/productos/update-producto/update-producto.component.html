@@ -134,6 +134,26 @@
             <label class="form-check-label" for="estadoEdit">Activo</label>
           </div>
         </div>
+
+        @if (productosConImagenes) {
+          <div class="col-12 mt-3">
+            <hr>
+            <label class="form-label">Galería de imágenes (máx. 5)</label>
+            <input type="file" class="form-control mb-2" accept="image/jpeg,image/png,image/gif,image/webp" multiple (change)="onArchivosChange($event)">
+            <button type="button" class="btn btn-outline-primary btn-sm mb-2" (click)="subirImagenes()" [disabled]="archivosSeleccionados.length === 0 || subiendoImagenes">
+              @if (subiendoImagenes) { <span class="spinner-border spinner-border-sm me-1"></span> }
+              Subir imágenes
+            </button>
+            <div class="d-flex flex-wrap gap-2">
+              @for (img of imagenesProducto; track img.idImagen) {
+                <div class="position-relative">
+                  <img [src]="img.url" alt="Producto" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">
+                  <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0" style="padding:2px 6px;" (click)="eliminarImagen(img.idImagen)" title="Eliminar">×</button>
+                </div>
+              }
+            </div>
+          </div>
+        }
       </div>
     </form>
   }

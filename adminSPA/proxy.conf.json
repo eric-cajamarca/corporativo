@@ -1,8 +1,4 @@
 {
-  "/api/**": {
-    "target": "http://localhost:3000",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  }
+  "/api/**": {"target":"http://localhost:3000","secure":false,"changeOrigin":true,"logLevel":"debug"},
+  "/productos-img/**": {"target":"http://localhost:3000","secure":false,"changeOrigin":true}
 }

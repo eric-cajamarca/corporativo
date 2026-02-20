@@ -19,9 +19,38 @@
           Precios
         </button>
       </li>
+      @if (idProductoCreado) {
+        <li class="nav-item">
+          <button class="nav-link" [class.active]="activeTab() === 'galeria'" (click)="cambiarTab('galeria')">
+            <i class="fas fa-images me-1"></i>
+            Galería
+          </button>
+        </li>
+      }
     </ul>
   </div>
   <div class="card-body">
+    @if (activeTab() === 'galeria' && idProductoCreado) {
+      <div class="mb-3">
+        <p class="text-muted">Puede agregar hasta 5 imágenes (opcional). Máx. 2 MB por imagen.</p>
+        <input type="file" class="form-control mb-2" accept="image/jpeg,image/png,image/gif,image/webp" multiple (change)="onArchivosChange($event)">
+        <button type="button" class="btn btn-outline-primary btn-sm me-2" (click)="subirImagenes()" [disabled]="archivosSeleccionados.length === 0 || subiendoImagenes">
+          @if (subiendoImagenes) { <span class="spinner-border spinner-border-sm me-1"></span> }
+          Subir imágenes
+        </button>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          @for (img of imagenesProducto; track img.idImagen) {
+            <div class="position-relative">
+              <img [src]="img.url" alt="Producto" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">
+              <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0" style="padding:2px 6px;" (click)="eliminarImagen(img.idImagen)" title="Eliminar">×</button>
+            </div>
+          }
+        </div>
+        <hr>
+        <button type="button" class="btn btn-secondary me-2" (click)="finalizarCreacion()">Ir a listado</button>
+        <button type="button" class="btn btn-outline-primary" (click)="irAEditar()">Editar producto</button>
+      </div>
+    } @else {
     <form [formGroup]="productoForm">
       @if (activeTab() === 'basico') {
         <div class="row">
@@ -170,6 +199,7 @@
         </div>
       }
     </form>
+    }
   </div>
 </ng-template>
 
@@ -230,7 +260,7 @@
   } @else {
     <div class="card">
       <ng-container *ngTemplateOutlet="formularioProducto"></ng-container>
-      @if (!esModal) {
+      @if (!esModal && !idProductoCreado) {
         <div class="card-footer d-flex justify-content-between">
           <button class="btn btn-outline-secondary" (click)="cancelar()">
             <i class="fas fa-times me-1"></i>

@@ -69,3 +69,38 @@ exports.uploadCertificadoFacturacion = multer({
   fileFilter: certFileFilter,
   limits: { fileSize: 2 * 1024 * 1024 } // 2MB
 }).single('certificado');
+
+// Imágenes de producto: uploads/productos/{idEmpresa}/{idProducto}/
+const productosBaseDir = path.join(__dirname, '../uploads/productos');
+if (!fs.existsSync(productosBaseDir)) {
+  fs.mkdirSync(productosBaseDir, { recursive: true });
+}
+
+const imageFilter = (req, file, cb) => {
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Solo imágenes JPEG, PNG, GIF o WEBP'), false);
+};
+
+exports.uploadImagenesProducto = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const idEmpresa = req.user && req.user.empresa;
+      const idProducto = req.params && req.params.idProducto;
+      if (!idEmpresa || !idProducto) {
+        return cb(new Error('Falta idEmpresa o idProducto'));
+      }
+      const dir = path.join(productosBaseDir, idEmpresa, idProducto);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || '').toLowerCase() || '.jpg';
+      const safeExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext) ? ext : '.jpg';
+      const name = `img-${Date.now()}-${Math.round(Math.random() * 1E9)}${safeExt}`;
+      cb(null, name);
+    }
+  }),
+  fileFilter: imageFilter,
+  limits: { fileSize: 2 * 1024 * 1024 } // 2MB por archivo
+}).array('imagenes', 5);

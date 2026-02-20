@@ -19,6 +19,7 @@
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light sticky-top">
         <tr>
+          <th *ngIf="productosConImagenes">Imagen</th>
           <th>Código</th>
           <th>Categoría</th>
           <th>Producto</th>
@@ -31,6 +32,11 @@
       </thead>
       <tbody>
         <tr *ngFor="let p of productosFiltrados" role="button" class="table-row-hover" (click)="seleccionar(p)">
+          <td *ngIf="productosConImagenes" class="align-middle p-1" (click)="$event.stopPropagation()">
+            <div class="thumb-cell" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
+              <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
+            </div>
+          </td>
           <td>{{ p.codigo }}</td>
           <td>{{ p.categoria }}</td>
           <td>{{ p.descripcion }}</td>
@@ -47,4 +53,15 @@
 </div>
 <div class="modal-footer">
   <button type="button" class="btn btn-secondary" (click)="cerrar()">Cerrar</button>
+</div>
+
+<!-- Lightbox galería (solo cuando productosConImagenes y hay imágenes) -->
+<div class="visor-fullscreen-overlay" *ngIf="visorAbierto && imagenesProductoActual.length > 0" (click)="cerrarVisor()">
+  <div class="visor-fullscreen-contenido" (click)="$event.stopPropagation()">
+    <button type="button" class="visor-btn-cerrar" (click)="cerrarVisor()" aria-label="Cerrar">×</button>
+    <button type="button" class="visor-btn-nav visor-btn-ant" (click)="anteriorImagen(); $event.stopPropagation()" aria-label="Anterior">‹</button>
+    <img [src]="imagenesProductoActual[visorIndex].url" [alt]="'Imagen ' + (visorIndex + 1)" (click)="$event.stopPropagation()" />
+    <button type="button" class="visor-btn-nav visor-btn-sig" (click)="siguienteImagen(); $event.stopPropagation()" aria-label="Siguiente">›</button>
+    <span class="visor-contador">{{ visorIndex + 1 }} / {{ imagenesProductoActual.length }}</span>
+  </div>
 </div>

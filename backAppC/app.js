@@ -72,6 +72,7 @@ app.use(helmet({
 
 // Servir archivos est?ticos desde uploads
 app.use('/logos', express.static(path.join(__dirname, 'uploads/configuraciones')));
+app.use('/productos-img', express.static(path.join(__dirname, 'uploads/productos')));
 
 // Servir archivos est?ticos default
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));

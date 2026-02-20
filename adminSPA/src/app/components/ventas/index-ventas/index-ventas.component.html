@@ -97,11 +97,11 @@
                   </span>
                 </td>
                 <td class="text-center acciones-cell">
-                  
+                  <!--
                   <a [routerLink]="['/ventas/detalle', v.idVenta]" class="btn btn-sm btn-outline-info me-1" title="Ver detalle">
                     <i class="bi bi-eye"></i>
                   </a>
-                  
+                -->
                   <a *ngIf="puedeEditarVenta(v)" [routerLink]="['/ventas/editar', v.idVenta]" class="btn btn-sm btn-outline-warning me-1" title="Editar">
                     <i class="bi bi-pencil"></i>
                   </a>

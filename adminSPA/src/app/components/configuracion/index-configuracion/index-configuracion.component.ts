@@ -13,6 +13,7 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
+import { GestoresService } from '../../../services/gestores.service';
 
 declare var iziToast: any;
 
@@ -77,8 +78,10 @@ export class IndexConfiguracionComponent implements OnInit {
     permitirVentasNegativas: false,
     controlLotes: true,
     controlVencimiento: true,
-    ubicaciones: true
+    ubicaciones: true,
+    productosConImagenes: false
   };
+  public inventarioGuardando = false;
 
   // Configuración de ventas
   public ventas = {
@@ -138,6 +141,7 @@ export class IndexConfiguracionComponent implements OnInit {
     private _empresaService: EmpresaService,
     private _facturacionService: FacturacionService,
     private _ventasService: VentasService,
+    private _gestoresService: GestoresService,
     private _router: Router,
     public sidebarState: SidebarStateService
   ) {}
@@ -177,6 +181,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cargarEmpresaYDireccion();
     this.cargarConfiguracionFacturacion();
     this.cargarVentasDefaults();
+    this.cargarConfiguracionInventario();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;
@@ -378,9 +383,40 @@ export class IndexConfiguracionComponent implements OnInit {
     });
   }
 
+  cargarConfiguracionInventario(): void {
+    this._gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = res?.data ?? [];
+        const item = lista.find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
+        this.inventario.productosConImagenes = item ? (String(item.valor).toLowerCase() === 'true') : false;
+      },
+      error: () => {}
+    });
+  }
+
   guardarConfiguracionInventario(): void {
-    console.log('Guardando configuración de inventario:', this.inventario);
-    // Llamada al backend para guardar
+    this.inventarioGuardando = true;
+    this._gestoresService.guardarConfiguracion([
+      {
+        clave: 'PRODUCTOS_CON_IMAGENES',
+        valor: this.inventario.productosConImagenes ? 'true' : 'false',
+        descripcion: 'Manejar productos con imágenes (galería)',
+        tipoDato: 'BOOLEAN'
+      }
+    ]).subscribe({
+      next: () => {
+        this.inventarioGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Guardado', message: 'Configuración de inventario guardada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        this.inventarioGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración de inventario.', position: 'topRight' });
+        }
+      }
+    });
   }
 
   guardarConfiguracionVentas(): void {

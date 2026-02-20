@@ -30,6 +30,25 @@
         </div>
       </div>
 
+      @if (productosConImagenes && imagenesProducto.length > 0) {
+        <div class="col-12">
+          <label class="form-label small text-muted">Imágenes</label>
+          <div class="visor-galeria">
+            <div class="visor-principal" (click)="abrirVisorFullscreen(imagenPrincipalIndex)">
+              <img [src]="imagenesProducto[imagenPrincipalIndex].url" alt="Imagen principal" />
+              <span class="visor-fullscreen-hint">Ver pantalla completa</span>
+            </div>
+            <div class="visor-thumbnails">
+              @for (img of imagenesProducto; track img.idImagen; let i = $index) {
+                <button type="button" class="thumb" [class.active]="i === imagenPrincipalIndex" (click)="seleccionarImagenPrincipal(i)">
+                  <img [src]="img.url" [alt]="'Imagen ' + (i + 1)" />
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
       <div class="col-md-6">
         <label class="form-label small text-muted">Marca</label>
         <p class="mb-0 fw-medium">{{ producto.marca || '—' }}</p>
@@ -113,5 +132,17 @@
         } Guardar
       </button>
     }
+  </div>
+}
+
+@if (productosConImagenes && imagenesProducto.length > 0 && visorFullscreen) {
+  <div class="visor-fullscreen-overlay" (click)="cerrarVisorFullscreen()">
+    <div class="visor-fullscreen-contenido" (click)="$event.stopPropagation()">
+      <button type="button" class="visor-btn-cerrar" (click)="cerrarVisorFullscreen()" aria-label="Cerrar">×</button>
+      <button type="button" class="visor-btn-nav visor-btn-ant" (click)="anteriorImagen(); $event.stopPropagation()" aria-label="Anterior">‹</button>
+      <img [src]="imagenesProducto[visorFullscreenIndex].url" [alt]="'Imagen ' + (visorFullscreenIndex + 1)" (click)="$event.stopPropagation()" />
+      <button type="button" class="visor-btn-nav visor-btn-sig" (click)="siguienteImagen(); $event.stopPropagation()" aria-label="Siguiente">›</button>
+      <span class="visor-contador">{{ visorFullscreenIndex + 1 }} / {{ imagenesProducto.length }}</span>
+    </div>
   </div>
 }

@@ -31,6 +31,8 @@ import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { VentaSesionService } from '../../../services/venta-sesion.service';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
+import { GestoresService } from '../../../services/gestores.service';
+import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -141,6 +143,13 @@ export class CreateVentasComponent implements OnInit {
   sesionesGuardadas: VentaSesion[] = [];
   mostrarModalRecuperar = false;
 
+  /** Galería en modal Buscar productos: solo si está habilitado en Config > Inventario. */
+  productosConImagenes = false;
+  imagenesProductoActual: ImagenProducto[] = [];
+  visorAbierto = false;
+  visorIndex = 0;
+  idProductoCargandoImagenes: string | null = null;
+
   constructor(
     private _productoService: ProductoService,
     private _marcaService: variosService,
@@ -159,10 +168,25 @@ export class CreateVentasComponent implements OnInit {
     private _impuestoService: ImpuestoService,
     private ventaSesionService: VentaSesionService,
     private creditosService: CreditosService,
-    public sidebarState: SidebarStateService
+    public sidebarState: SidebarStateService,
+    private gestoresService: GestoresService,
+    private productosImagenService: ProductosImagenService
   ) {}
 
   ngOnInit(): void {
+    this.gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = Array.isArray(res?.data) ? res.data : [];
+        const item = lista.find((c: { clave?: string; Clave?: string }) =>
+          (c.clave || c.Clave || '') === 'PRODUCTOS_CON_IMAGENES'
+        );
+        const valor = item && (item as { valor?: string; Valor?: string }).valor !== undefined
+          ? (item as { valor?: string; Valor?: string }).valor
+          : (item as { valor?: string; Valor?: string }).Valor;
+        this.productosConImagenes = valor ? String(valor).toLowerCase() === 'true' : false;
+      },
+      error: () => {}
+    });
     this._documentosService.obtener_documento1().subscribe({
       next: (response) => { this.documento = response.data || []; },
       error: () => {}
@@ -496,6 +520,39 @@ export class CreateVentasComponent implements OnInit {
       document.getElementById('buscadorModal')!
     );
     buscador?.hide();
+  }
+
+  verImagenesProducto(p: any, event: Event): void {
+    event.stopPropagation();
+    const idProducto = p?.idProducto;
+    if (!idProducto) return;
+    this.idProductoCargandoImagenes = idProducto;
+    this.visorAbierto = false;
+    this.productosImagenService.listar(idProducto).subscribe({
+      next: (res) => {
+        this.imagenesProductoActual = res.data ?? [];
+        this.idProductoCargandoImagenes = null;
+        if (this.imagenesProductoActual.length > 0) {
+          this.visorIndex = 0;
+          this.visorAbierto = true;
+        }
+      },
+      error: () => { this.idProductoCargandoImagenes = null; }
+    });
+  }
+
+  cerrarVisorImagenes(): void {
+    this.visorAbierto = false;
+  }
+
+  anteriorImagenVisor(): void {
+    if (this.imagenesProductoActual.length === 0) return;
+    this.visorIndex = (this.visorIndex - 1 + this.imagenesProductoActual.length) % this.imagenesProductoActual.length;
+  }
+
+  siguienteImagenVisor(): void {
+    if (this.imagenesProductoActual.length === 0) return;
+    this.visorIndex = (this.visorIndex + 1) % this.imagenesProductoActual.length;
   }
 
   agregarAlCarrito(producto: any): void {

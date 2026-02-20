@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
+import { GestoresService } from '../../../services/gestores.service';
+import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { Producto } from '../../../models/producto.models';
 
 declare var iziToast: any;
@@ -27,12 +29,31 @@ export class ProductoDetalleModalComponent implements OnInit {
   alertaMaximo = 0;
   estado = true;
 
+  productosConImagenes = false;
+  imagenesProducto: ImagenProducto[] = [];
+  /** Índice de la imagen principal en el visor pequeño */
+  imagenPrincipalIndex = 0;
+  /** true = visor fullscreen abierto */
+  visorFullscreen = false;
+  /** Índice de la imagen mostrada en fullscreen */
+  visorFullscreenIndex = 0;
+
   constructor(
     public activeModal: NgbActiveModal,
-    private productoService: ProductoService
+    private productoService: ProductoService,
+    private gestoresService: GestoresService,
+    private productosImagenService: ProductosImagenService
   ) {}
 
   ngOnInit(): void {
+    this.gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
+        this.productosConImagenes = item ? (String(item.valor).toLowerCase() === 'true') : false;
+        if (this.idProducto) this.cargarImagenes();
+      },
+      error: () => {}
+    });
     if (this.idProducto) {
       this.cargarProducto();
     }
@@ -50,6 +71,7 @@ export class ProductoDetalleModalComponent implements OnInit {
           this.estado = !!this.producto.estado;
         }
         this.cargando = false;
+        if (this.productosConImagenes && this.idProducto) this.cargarImagenes();
       },
       error: (error) => {
         console.error('Error al cargar producto:', error);
@@ -129,5 +151,36 @@ export class ProductoDetalleModalComponent implements OnInit {
   get tipoProductoLabel(): string {
     if (!this.producto?.tipoProducto) return '—';
     return this.producto.tipoProducto === 'S' ? 'Simple' : this.producto.tipoProducto === 'C' ? 'Compuesto (Kit)' : this.producto.tipoProducto;
+  }
+
+  private cargarImagenes(): void {
+    if (!this.idProducto || !this.productosConImagenes) return;
+    this.productosImagenService.listar(this.idProducto).subscribe({
+      next: (res) => { this.imagenesProducto = res.data || []; this.imagenPrincipalIndex = 0; },
+      error: () => {}
+    });
+  }
+
+  seleccionarImagenPrincipal(index: number): void {
+    this.imagenPrincipalIndex = index;
+  }
+
+  abrirVisorFullscreen(index: number): void {
+    this.visorFullscreenIndex = index;
+    this.visorFullscreen = true;
+  }
+
+  cerrarVisorFullscreen(): void {
+    this.visorFullscreen = false;
+  }
+
+  anteriorImagen(): void {
+    if (this.imagenesProducto.length === 0) return;
+    this.visorFullscreenIndex = (this.visorFullscreenIndex - 1 + this.imagenesProducto.length) % this.imagenesProducto.length;
+  }
+
+  siguienteImagen(): void {
+    if (this.imagenesProducto.length === 0) return;
+    this.visorFullscreenIndex = (this.visorFullscreenIndex + 1) % this.imagenesProducto.length;
   }
 }

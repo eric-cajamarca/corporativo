@@ -388,10 +388,18 @@
                       </label>
                     </div>
                   </div>
+                  <div class="col-12 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="productosConImagenes" [(ngModel)]="inventario.productosConImagenes" name="productosConImagenes">
+                      <label class="form-check-label" for="productosConImagenes">
+                        Manejar productos con imágenes (galería)
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <div class="mt-3">
-                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionInventario()">
-                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionInventario()" [disabled]="inventarioGuardando">
+                    <i class="fas fa-save me-2"></i>{{ inventarioGuardando ? 'Guardando...' : 'Guardar Cambios' }}
                   </button>
                 </div>
               </form>
