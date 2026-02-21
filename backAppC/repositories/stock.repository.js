@@ -24,9 +24,42 @@ exports.ejecutarDescuento = async (transaction, stockData) => {
 };
 
 /**
- * Descuenta cantidad desde Lotes (cantidadDisponible).
- * 1) Intenta primero en la sucursal de la venta (idSucursal).
- * 2) Si no hay stock ahí o no alcanza, descuenta de otra sucursal de la misma empresa donde el producto tenga lotes.
+ * Query: filas para descontar por prioridad (Lotes + LotesUbicacion + UbicacionesPrioridad).
+ * Filtra por idEmpresa (multiempresa), idSucursal opcional, idProducto. Orden: prioridad ASC.
+ */
+const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucursalFiltro) => {
+  const req = transaction.request();
+  req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  req.input('idProducto', sql.UniqueIdentifier, idProducto);
+  const whereSucursal = idSucursalFiltro != null && idSucursalFiltro !== ''
+    ? ' AND l.idSucursal = @idSucursal'
+    : '';
+  if (idSucursalFiltro != null && idSucursalFiltro !== '') {
+    req.input('idSucursal', sql.UniqueIdentifier, idSucursalFiltro);
+  }
+  const rs = await req.query(`
+    SELECT
+      l.idLote,
+      lu.idUbicacion,
+      CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
+    FROM Lotes l
+    INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
+    INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion AND up.idSucursal = l.idSucursal
+    WHERE l.idEmpresa = @idEmpresa
+      AND l.idProducto = @idProducto
+      AND l.cantidadDisponible > 0
+      ${whereSucursal}
+    ORDER BY up.prioridad ASC, l.idLote
+  `);
+  return rs.recordset || [];
+};
+
+/**
+ * Descuenta cantidad desde Lotes y LotesUbicacion respetando prioridad de UbicacionesPrioridad.
+ * 1) Sucursal de la venta: descuenta por ubicación ordenada por prioridad (menor = primero).
+ * 2) Otras sucursales de la empresa: mismo criterio por prioridad.
+ * 3) Fallback: si queda restante y hay lotes sin ubicación o datos legacy, descuenta solo en Lotes.
+ * Multiempresa: todas las consultas filtran por idEmpresa.
  */
 exports.descontarDesdeLotes = async (transaction, stockData) => {
   const { idEmpresa, idSucursal, idProducto, cantidad } = stockData;
@@ -36,7 +69,63 @@ exports.descontarDesdeLotes = async (transaction, stockData) => {
 
   let restante = cant;
 
-  const ejecutarDescuento = async (filas) => {
+  const conSucursal = idSucursal != null && idSucursal !== '';
+
+  const descontarPorPrioridad = async (filas) => {
+    for (const row of filas) {
+      if (restante <= 0) break;
+      const disp = parseFloat(row.cantidadUbicacion) || 0;
+      if (disp <= 0) continue;
+      const tomar = Math.min(restante, disp);
+      const upLu = transaction.request();
+      upLu.input('idLote', sql.UniqueIdentifier, row.idLote);
+      upLu.input('idUbicacion', sql.Int, row.idUbicacion);
+      upLu.input('tomar', sql.Decimal(18, 2), tomar);
+      await upLu.query(`
+        UPDATE LotesUbicacion SET cantidad = cantidad - @tomar
+        WHERE idLote = @idLote AND idUbicacion = @idUbicacion
+      `);
+      const upLote = transaction.request();
+      upLote.input('idLote', sql.UniqueIdentifier, row.idLote);
+      upLote.input('tomar', sql.Decimal(18, 2), tomar);
+      await upLote.query(`
+        UPDATE Lotes SET cantidadDisponible = cantidadDisponible - @tomar
+        WHERE idLote = @idLote
+      `);
+      restante -= tomar;
+    }
+  };
+
+  if (conSucursal) {
+    const filasSuc = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, idSucursal);
+    await descontarPorPrioridad(filasSuc);
+  }
+
+  if (restante > 0) {
+    if (conSucursal) {
+      const reqOtras = transaction.request();
+      reqOtras.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+      reqOtras.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+      reqOtras.input('idProducto', sql.UniqueIdentifier, idProducto);
+      const rsOtras = await reqOtras.query(`
+        SELECT l.idLote, lu.idUbicacion, CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
+        FROM Lotes l
+        INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
+        INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion AND up.idSucursal = l.idSucursal
+        WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto
+          AND l.idSucursal <> @idSucursal AND l.cantidadDisponible > 0
+        ORDER BY up.prioridad ASC, l.idLote
+      `);
+      await descontarPorPrioridad(rsOtras.recordset || []);
+    } else {
+      const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null);
+      await descontarPorPrioridad(filasTodas);
+    }
+  }
+
+  if (restante <= 0) return;
+
+  const ejecutarDescuentoSoloLotes = async (filas) => {
     for (const row of filas) {
       if (restante <= 0) break;
       const disp = parseFloat(row.cantidadDisponible) || 0;
@@ -45,42 +134,42 @@ exports.descontarDesdeLotes = async (transaction, stockData) => {
       const nuevaCant = Math.max(0, disp - tomar);
       const upReq = transaction.request();
       upReq.input('idLote', sql.UniqueIdentifier, row.idLote);
+      upReq.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
       upReq.input('nuevaCantidad', sql.Decimal(18, 2), nuevaCant);
-      await upReq.query('UPDATE Lotes SET cantidadDisponible = @nuevaCantidad WHERE idLote = @idLote');
+      await upReq.query(`
+        UPDATE Lotes SET cantidadDisponible = @nuevaCantidad
+        WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+      `);
       restante -= tomar;
     }
   };
 
-  const conSucursal = idSucursal != null && idSucursal !== '';
-  if (conSucursal) {
-    const req = transaction.request();
-    req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-    req.input('idSucursal', sql.UniqueIdentifier, idSucursal);
-    req.input('idProducto', sql.UniqueIdentifier, idProducto);
-    const rs = await req.query(`
-      SELECT idLote, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
-      FROM Lotes
-      WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal AND idProducto = @idProducto AND cantidadDisponible > 0
-      ORDER BY idLote ASC
-    `);
-    const filas = rs.recordset || [];
-    await ejecutarDescuento(filas);
-  }
+  const reqFallback = transaction.request();
+  reqFallback.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  reqFallback.input('idProducto', sql.UniqueIdentifier, idProducto);
+  const whereSuc = conSucursal ? ' AND idSucursal = @idSucursal' : '';
+  if (conSucursal) reqFallback.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+  const rsFallback = await reqFallback.query(`
+    SELECT idLote, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
+    FROM Lotes
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${whereSuc}
+    ORDER BY idLote ASC
+  `);
+  await ejecutarDescuentoSoloLotes(rsFallback.recordset || []);
 
-  if (restante > 0) {
-    const req2 = transaction.request();
-    req2.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-    req2.input('idProducto', sql.UniqueIdentifier, idProducto);
-    const whereSucursal = conSucursal ? ' AND idSucursal <> @idSucursalExcluida' : '';
-    if (conSucursal) req2.input('idSucursalExcluida', sql.UniqueIdentifier, idSucursal);
-    const rs2 = await req2.query(`
+  if (restante > 0 && conSucursal) {
+    const reqFallback2 = transaction.request();
+    reqFallback2.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    reqFallback2.input('idProducto', sql.UniqueIdentifier, idProducto);
+    reqFallback2.input('idSucursalExcluida', sql.UniqueIdentifier, idSucursal);
+    const rsFallback2 = await reqFallback2.query(`
       SELECT idLote, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
       FROM Lotes
-      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${whereSucursal}
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0
+        AND idSucursal <> @idSucursalExcluida
       ORDER BY idLote ASC
     `);
-    const filas2 = rs2.recordset || [];
-    await ejecutarDescuento(filas2);
+    await ejecutarDescuentoSoloLotes(rsFallback2.recordset || []);
   }
 
   if (restante > 0) {
