@@ -53,6 +53,7 @@ import { UbicacionPrioridadListComponent } from './components/inventario/ubicaci
 import { MovimientoUbicacionComponent } from './components/inventario/movimiento-ubicacion/movimiento-ubicacion.component';
 import { VentaPorPrioridadComponent } from './components/inventario/venta-por-prioridad/venta-por-prioridad.component';
 import { AsignarStockUbicacionComponent } from './components/inventario/asignar-stock-ubicacion/asignar-stock-ubicacion.component';
+import { MovimientoInventarioComponent } from './components/inventario/movimiento-inventario/movimiento-inventario.component';
 import { IndexCajaComponent } from './components/caja/index-caja/index-caja.component';
 import { IndexCreditosComponent } from './components/creditos/index-creditos/index-creditos.component';
 import { ArqueoCajaComponent } from './components/caja/arqueo-caja/arqueo-caja.component';
@@ -175,6 +176,7 @@ export const routes: Routes = [
      { path: 'compras/:id', component: UpdateComprasComponent,canActivate: [AuthGuard], title: 'Actualizar Compra' },
      { path: 'detalle-compras', component: DetalleComprasComponent,canActivate: [AuthGuard], title: 'Detalle Compra' },
      { path: 'inventario', component: PrincipalInventarioComponent, canActivate: [AuthGuard], title: 'Inventario'},
+     { path: 'inventario/ingreso-salida', component: MovimientoInventarioComponent, canActivate: [AuthGuard], title: 'Movimiento de inventario' },
 
      { path: 'clientes', component: IndexClientesComponent, canActivate: [AuthGuard], title: 'Clientes'},
      { path: 'cliente/create', component: CreateClientesComponent, canActivate: [AuthGuard], title: 'Crear Cliente'},

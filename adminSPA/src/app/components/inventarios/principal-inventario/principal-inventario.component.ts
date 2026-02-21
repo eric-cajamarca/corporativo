@@ -1,5 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { LotesService } from '../../../services/lotes.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -11,7 +12,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-principal-inventario',
   standalone: true,
-  imports: [CommonModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, RouterModule, TopnavComponent, SidebarComponent],
   templateUrl: './principal-inventario.component.html',
   styleUrls: ['./principal-inventario.component.css']
 })

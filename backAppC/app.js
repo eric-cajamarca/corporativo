@@ -52,6 +52,7 @@ const cotizacionesRoutes = require('./routes/cotizaciones');
 const catalogosRoutes = require('./routes/catalogos');
 const auditoriaRoutes = require('./routes/auditoria');
 const externalRoutes = require('./routes/external');
+const inventarioRoutes = require('./routes/inventario');
 
 
 const app = express();
@@ -193,6 +194,7 @@ app.use('/api/cotizaciones', cotizacionesRoutes);
 app.use('/api/catalogos', catalogosRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/external', externalRoutes);
+app.use('/api/inventario', inventarioRoutes);
 
 // Health para Kubernetes/Ambassador (sin auth)
 app.get('/health', (req, res) => {

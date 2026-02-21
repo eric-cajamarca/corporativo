@@ -75,7 +75,14 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-4 col-sm-6">
-          <button type="button" class="btn btn-outline-primary w-100 h-100 quick-action-btn" (click)="abrirCrearLote($event)">
+          <a routerLink="/inventario/ingreso-salida" class="btn btn-outline-primary w-100 h-100 quick-action-btn text-decoration-none d-flex flex-column align-items-center justify-content-center">
+            <i class="fas fa-file-invoice fa-2x mb-2"></i>
+            <div>Ingresos y salidas</div>
+            <small class="text-muted">Movimiento de inventario (tipo factura)</small>
+          </a>
+        </div>
+        <div class="col-md-4 col-sm-6">
+          <button type="button" class="btn btn-outline-secondary w-100 h-100 quick-action-btn" (click)="abrirCrearLote($event)">
             <i class="fas fa-plus-circle fa-2x mb-2"></i>
             <div>Nuevo Lote</div>
             <small class="text-muted">Crear lote manualmente</small>
