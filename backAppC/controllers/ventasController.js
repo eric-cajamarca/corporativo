@@ -6,6 +6,7 @@ const detalleVentaService = require('../services/detalle-ventas.service');
 const stockService = require('../services/stock.service');
 const ventasRepository = require('../repositories/ventas.repository');
 const facturacionRepository = require('../repositories/facturacion.repository');
+const gestoresRepository = require('../repositories/gestores.repository');
 const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 const { getNowLocal, getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
@@ -241,6 +242,11 @@ const crearVentaCompleta = async (req, res) => {
   try {
     await transaction.begin();
 
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, req.user.empresa);
+    const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
+    const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
+    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+
     let idSucursalStock = venta.idSucursal || null;
     if (!idSucursalStock) {
       const rsSuc = await transaction.request()
@@ -267,15 +273,27 @@ const crearVentaCompleta = async (req, res) => {
     const idSucursalParaStock = idSucursalStock || venta.idSucursal || null;
     const idEstadoPedidoVenta = venta.idEstadoPedido != null ? parseInt(venta.idEstadoPedido, 10) : 1;
     const esEstadoPendiente = (idEstadoPedidoVenta === 1);
+    const avisoStockInsuficiente = [];
     for (const det of detalles) {
+      const cantPedida = parseFloat(det.cantidad) || 0;
       const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
       await detalleVentaService.crearDetalle(transaction, { ...det, idVenta, cantEntregada, idEstadoPedido: idEstadoPedidoVenta, hVenta: getNowLocalSQLString() });
-      await stockService.descontarDesdeLotes(transaction, {
-        idEmpresa: req.user.empresa,
-        idSucursal: idSucursalParaStock,
-        idProducto: det.idProducto,
-        cantidad: det.cantidad
-      });
+      const stockDisponible = await stockService.obtenerStockDisponible(transaction, req.user.empresa, det.idProducto, idSucursalParaStock);
+      if (stockDisponible < cantPedida) {
+        if (!permitirVentasNegativas) {
+          throw new Error(`Stock insuficiente para el producto. Solicitado: ${cantPedida}, disponible: ${stockDisponible}`);
+        }
+        avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
+      }
+      const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPedida, stockDisponible) : cantPedida;
+      if (cantidadADescontar > 0) {
+        await stockService.descontarDesdeLotes(transaction, {
+          idEmpresa: req.user.empresa,
+          idSucursal: idSucursalParaStock,
+          idProducto: det.idProducto,
+          cantidad: cantidadADescontar
+        }, { controlUbicaciones });
+      }
     }
 
     await ventasRepository.actualizarNumeroComprobante(transaction, req.user.empresa, venta.idComprobante, venta.numero);
@@ -342,7 +360,11 @@ const crearVentaCompleta = async (req, res) => {
       }
     }
 
-    res.json({ success: true, idVenta });
+    res.json({
+      success: true,
+      idVenta,
+      ...(avisoStockInsuficiente.length > 0 && { avisoStockInsuficiente: 'Stock insuficiente para uno o más productos. Se descontó solo el disponible.' })
+    });
   } catch (error) {
     await transaction.rollback();
     console.error('Error crearVentaCompleta:', error);

@@ -114,6 +114,8 @@ export class CreateComprasComponent {
   public detailForm = { monto: 0, referencia: '' };
   public pagaCon = 0;
   public vuelto = 0;
+  /** true = modal abierto desde "Registrar Compra" (mostrar botón Procesar compra). false = abierto desde "Forma de pago" (solo Guardar). */
+  public modalPagoParaRegistrar = false;
   public categoria: any = [];
   public presentacion: any = [];
   public nuevoProducto: any = {
@@ -1049,6 +1051,93 @@ export class CreateComprasComponent {
     this.compras.idProveedor = this.proveedores?.idProveedor ?? '';
   }
 
+  /**
+   * Al hacer clic en "Registrar Compra": si es al crédito procesa directo; si es contado abre el modal de formas de pago para completar el pago y luego procesar.
+   */
+  prepararRegistrarCompra(): void {
+    this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
+    if (!this.validarCamposObligatoriosParaAbrir()) {
+      return;
+    }
+    if (this.esCompraAlCredito()) {
+      this.registrarCompras();
+      return;
+    }
+    this.modalPagoParaRegistrar = true;
+    this.abrirModalFormaPago();
+    const modalEl = document.getElementById('modalPagoCompra');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+  }
+
+  /**
+   * Validación mínima para poder abrir el modal o procesar (no exige detalle de pago si no es crédito; eso se valida al procesar desde el modal).
+   */
+  private validarCamposObligatoriosParaAbrir(): boolean {
+    const fechaEmisionOk = !!this.compras.fEmision && String(this.compras.fEmision).trim() !== '';
+    const fechaVencOk = !!this.compras.fVencimiento && String(this.compras.fVencimiento).trim() !== '';
+    const idProveedorOk = !!this.compras.idProveedor && String(this.compras.idProveedor).trim() !== '';
+    const idSucursalOk = !!this.compras.idSucursal && String(this.compras.idSucursal).trim() !== '';
+    const idMonedaOk = !!this.compras.idMoneda;
+    const idEstadoPagoOk = !!this.compras.idEstadoPago;
+    const totalOk = !isNaN(Number(this.compras.total)) && Number(this.compras.total) > 0;
+    const detalleOk = Array.isArray(this.detalleCompras) && this.detalleCompras.length > 0;
+    const esCredito = this.esCompraAlCredito();
+    let idMediosPagoOk = true;
+    if (esCredito) {
+      idMediosPagoOk = !!this.compras.idMediosPago;
+    }
+    if (!fechaEmisionOk || !fechaVencOk || !idProveedorOk || !idSucursalOk || !idMonedaOk || !idEstadoPagoOk || !idMediosPagoOk || !totalOk || !detalleOk) {
+      this.mostrarErrorValidacion(esCredito);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Llamado desde el modal de formas de pago al hacer clic en "Procesar compra". Valida que el total del detalle de pago coincida y registra la compra (guardando idMediosPago para arqueo).
+   */
+  procesarCompraDesdeModal(): void {
+    const totalPago = this.calcularTotalTablaPago();
+    const totalCompra = Number(this.compras.total) || 0;
+    if (this.detallePago.length === 0) {
+      iziToast.show({
+        title: 'ERROR',
+        titleColor: '#FF0000',
+        color: '#FFF',
+        class: 'text-danger',
+        position: 'topRight',
+        message: 'Agregue al menos una forma de pago.',
+      });
+      return;
+    }
+    if (Math.abs(totalPago - totalCompra) > 0.01) {
+      iziToast.show({
+        title: 'ERROR',
+        titleColor: '#FF0000',
+        color: '#FFF',
+        class: 'text-danger',
+        position: 'topRight',
+        message: 'El total del detalle de pago no coincide con el total de la compra.',
+      });
+      return;
+    }
+    this.compras.idMediosPago = String(this.detallePago[0].idFormaPago);
+    this.cerrarModalPagoCompra();
+    this.modalPagoParaRegistrar = false;
+    this.registrarCompras();
+  }
+
+  cerrarModalPagoCompra(): void {
+    const modalEl = document.getElementById('modalPagoCompra');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      const inst = bootstrap.Modal.getInstance(modalEl);
+      if (inst) inst.hide();
+    }
+  }
+
   registrarCompras() {
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
     this.loadButton = true;
@@ -1670,7 +1759,7 @@ export class CreateComprasComponent {
     this.detailForm.monto = this.getSaldoPendienteCompra();
   }
 
-  /** Abre el modal de forma de pago: selecciona Efectivo y monto = saldo. */
+  /** Abre el modal de forma de pago: selecciona Efectivo y monto = saldo. No modifica modalPagoParaRegistrar (lo define quien llama). */
   abrirModalFormaPago(): void {
     const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
     if (efectivo) {
@@ -1706,9 +1795,7 @@ export class CreateComprasComponent {
   }
 
   guardarPagoCompra(): void {
-    const modalEl = document.getElementById('modalPagoCompra');
-    const inst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
-    inst?.hide();
+    this.cerrarModalPagoCompra();
     if (this.detallePago.length > 0) {
       this.compras.idMediosPago = String(this.detallePago[0].idFormaPago);
     }

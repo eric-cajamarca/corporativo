@@ -24,6 +24,29 @@ exports.ejecutarDescuento = async (transaction, stockData) => {
 };
 
 /**
+ * Obtiene el stock disponible total de un producto (suma de Lotes.cantidadDisponible).
+ * @param {object} transaction - Transacción SQL
+ * @param {string} idEmpresa - UUID empresa
+ * @param {string} idProducto - UUID producto
+ * @param {string|null} idSucursal - UUID sucursal (opcional; si null, suma todas las sucursales)
+ * @returns {Promise<number>} Cantidad disponible
+ */
+exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSucursal) => {
+  const req = transaction.request();
+  req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  req.input('idProducto', sql.UniqueIdentifier, idProducto);
+  const whereSuc = idSucursal != null && idSucursal !== '' ? ' AND idSucursal = @idSucursal' : '';
+  if (idSucursal != null && idSucursal !== '') req.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+  const rs = await req.query(`
+    SELECT ISNULL(SUM(cantidadDisponible), 0) AS total
+    FROM Lotes
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${whereSuc}
+  `);
+  const total = rs.recordset?.[0]?.total;
+  return total != null ? parseFloat(total) : 0;
+};
+
+/**
  * Query: filas para descontar por prioridad (Lotes + LotesUbicacion + UbicacionesPrioridad).
  * Filtra por idEmpresa (multiempresa), idSucursal opcional, idProducto. Orden: prioridad ASC.
  */
@@ -55,21 +78,20 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
 };
 
 /**
- * Descuenta cantidad desde Lotes y LotesUbicacion respetando prioridad de UbicacionesPrioridad.
- * 1) Sucursal de la venta: descuenta por ubicación ordenada por prioridad (menor = primero).
- * 2) Otras sucursales de la empresa: mismo criterio por prioridad.
- * 3) Fallback: si queda restante y hay lotes sin ubicación o datos legacy, descuenta solo en Lotes.
+ * Descuenta cantidad desde Lotes y (opcional) LotesUbicacion respetando prioridad.
+ * Si opciones.controlUbicaciones es false: solo descuenta en Lotes.cantidadDisponible (sin ubicaciones).
+ * Si true: 1) por prioridad en LotesUbicacion, 2) fallback en Lotes.
  * Multiempresa: todas las consultas filtran por idEmpresa.
  */
-exports.descontarDesdeLotes = async (transaction, stockData) => {
+exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const { idEmpresa, idSucursal, idProducto, cantidad } = stockData;
   const cant = parseFloat(cantidad) || 0;
   if (cant <= 0) return;
   if (!idEmpresa || !idProducto) return;
 
-  let restante = cant;
-
+  const controlUbicaciones = opciones.controlUbicaciones !== false;
   const conSucursal = idSucursal != null && idSucursal !== '';
+  let restante = cant;
 
   const descontarPorPrioridad = async (filas) => {
     for (const row of filas) {
@@ -96,30 +118,31 @@ exports.descontarDesdeLotes = async (transaction, stockData) => {
     }
   };
 
-  if (conSucursal) {
-    const filasSuc = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, idSucursal);
-    await descontarPorPrioridad(filasSuc);
-  }
-
-  if (restante > 0) {
+  if (controlUbicaciones) {
     if (conSucursal) {
-      const reqOtras = transaction.request();
-      reqOtras.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-      reqOtras.input('idSucursal', sql.UniqueIdentifier, idSucursal);
-      reqOtras.input('idProducto', sql.UniqueIdentifier, idProducto);
-      const rsOtras = await reqOtras.query(`
-        SELECT l.idLote, lu.idUbicacion, CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
-        FROM Lotes l
-        INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
-        INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion AND up.idSucursal = l.idSucursal
-        WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto
-          AND l.idSucursal <> @idSucursal AND l.cantidadDisponible > 0
-        ORDER BY up.prioridad ASC, l.idLote
-      `);
-      await descontarPorPrioridad(rsOtras.recordset || []);
-    } else {
-      const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null);
-      await descontarPorPrioridad(filasTodas);
+      const filasSuc = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, idSucursal);
+      await descontarPorPrioridad(filasSuc);
+    }
+    if (restante > 0) {
+      if (conSucursal) {
+        const reqOtras = transaction.request();
+        reqOtras.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+        reqOtras.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+        reqOtras.input('idProducto', sql.UniqueIdentifier, idProducto);
+        const rsOtras = await reqOtras.query(`
+          SELECT l.idLote, lu.idUbicacion, CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
+          FROM Lotes l
+          INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
+          INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion AND up.idSucursal = l.idSucursal
+          WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto
+            AND l.idSucursal <> @idSucursal AND l.cantidadDisponible > 0
+          ORDER BY up.prioridad ASC, l.idLote
+        `);
+        await descontarPorPrioridad(rsOtras.recordset || []);
+      } else {
+        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null);
+        await descontarPorPrioridad(filasTodas);
+      }
     }
   }
 

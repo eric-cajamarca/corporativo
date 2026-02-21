@@ -1492,9 +1492,12 @@ abrirModalPrecios(item: any) {
       detallePago: detallePago.length > 0 ? detallePago : undefined,
       idApertura
     }).subscribe({
-      next: () => {
+      next: (res) => {
         this.loading = false;
         iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
+        if (res.avisoStockInsuficiente) {
+          iziToast.warning({ title: 'Aviso', message: res.avisoStockInsuficiente, position: 'topRight' });
+        }
         this.ventaSesionService.eliminarSesionActiva();
         this.limpiarVenta();
       },

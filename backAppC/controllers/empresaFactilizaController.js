@@ -26,7 +26,7 @@ async function getServicios(req, res) {
     console.error('empresaFactilizaController getServicios:', err.message);
     res.status(500).json({ message: 'Error al listar servicios' });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 
@@ -48,7 +48,7 @@ async function getEmpresasServicios(req, res) {
     // #endregion
     res.status(500).json({ message: 'Error al cargar empresas y servicios' });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 
@@ -84,7 +84,7 @@ async function guardarEmpresasServicios(req, res) {
     // #endregion
     res.status(500).json({ message: 'Error al guardar asignaciones' });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 

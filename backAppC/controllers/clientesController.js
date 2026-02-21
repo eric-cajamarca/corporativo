@@ -79,7 +79,7 @@ const crearCliente = async function (req, res) {
 
 }
 
-//2. crea el metodo listarClientes segun los datos de la tabla (empresa del usuario + empresas gestionadas si es gestora)
+// Lista solo los clientes de la empresa del usuario logueado (idEmpresa del token).
 const listarClientes = async function (req, res) {
     if (!req.user) {
         return res.status(401).send({ message: 'No Access' });
@@ -93,16 +93,9 @@ const listarClientes = async function (req, res) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresa);
-        const idEmpresas = [idEmpresa, ...(gestionadas || []).map((g) => g.idEmpresa)];
-        const request = pool.request();
-        idEmpresas.forEach((id, i) => {
-            request.input('id' + i, sql.UniqueIdentifier, id);
-        });
-        const placeholders = idEmpresas.map((_, i) => '@id' + i).join(', ');
-        const result = await request.query(
-            'SELECT * FROM Clientes WHERE idEmpresa IN (' + placeholders + ') ORDER BY rSocial'
-        );
+        const result = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('SELECT * FROM Clientes WHERE idEmpresa = @idEmpresa ORDER BY rSocial');
         res.status(200).send({ message: 'Lista de clientes', data: result.recordset });
     } catch (error) {
         console.error('listarClientes:', error);

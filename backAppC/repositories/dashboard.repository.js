@@ -8,6 +8,7 @@ const sql = require("mssql");
  * @param {string} fechaFin - Fecha fin período (YYYY-MM-DD)
  * @param {string} fechaInicioAnterior - Fecha inicio período anterior (para variaciones)
  * @param {string} fechaFinAnterior - Fecha fin período anterior
+ * @param {object} configInventario - { stockMinimoGeneral, stockMaximoGeneral, controlVencimiento }
  */
 exports.obtenerResumenDashboardRepo = async (
   pool,
@@ -15,8 +16,11 @@ exports.obtenerResumenDashboardRepo = async (
   fechaInicio,
   fechaFin,
   fechaInicioAnterior,
-  fechaFinAnterior
+  fechaFinAnterior,
+  configInventario = {}
 ) => {
+  const stockMinimoGeneral = configInventario.stockMinimoGeneral != null ? Number(configInventario.stockMinimoGeneral) : 10;
+  const controlVencimiento = configInventario.controlVencimiento !== false;
   const req = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
@@ -170,10 +174,11 @@ exports.obtenerResumenDashboardRepo = async (
     ORDER BY anio, mes
   `);
 
-  // Alertas: stock bajo (productos con suma de lotes < 50)
+  // Alertas: stock bajo (umbral = alertaMinimo del producto, o stockMinimoGeneral si el producto no tiene)
   const stockBajo = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("stockMinimoGeneral", sql.Decimal(18, 2), stockMinimoGeneral)
     .query(`
     SELECT
       p.descripcion AS nombreProducto,
@@ -181,8 +186,9 @@ exports.obtenerResumenDashboardRepo = async (
     FROM Lotes l
     INNER JOIN Productos p ON l.idProducto = p.idProducto AND p.idEmpresa = l.idEmpresa
     WHERE l.idEmpresa = @idEmpresa
-    GROUP BY l.idEmpresa, l.idProducto, p.descripcion
-    HAVING SUM(l.cantidadDisponible) < 50 AND SUM(l.cantidadDisponible) >= 0
+    GROUP BY l.idEmpresa, l.idProducto, p.descripcion, p.alertaMinimo
+    HAVING SUM(l.cantidadDisponible) < COALESCE(NULLIF(ISNULL(p.alertaMinimo, 0), 0), @stockMinimoGeneral)
+       AND SUM(l.cantidadDisponible) >= 0
   `);
 
   // Alertas: cuotas pendientes/vencidas (opcional: si no existe tabla CuotasCredito no se rompe el dashboard)
@@ -267,6 +273,41 @@ exports.obtenerResumenDashboardRepo = async (
       tiempo: "Actual"
     });
   });
+
+  if (controlVencimiento) {
+    let lotesProximosVencer = { recordset: [] };
+    try {
+      lotesProximosVencer = await pool
+        .request()
+        .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+        .query(`
+        SELECT TOP 10
+          p.descripcion AS nombreProducto,
+          l.fechaVencimiento,
+          l.cantidadDisponible
+        FROM Lotes l
+        INNER JOIN Productos p ON l.idProducto = p.idProducto AND p.idEmpresa = l.idEmpresa
+        WHERE l.idEmpresa = @idEmpresa
+          AND l.fechaVencimiento IS NOT NULL
+          AND (l.fechaVencimiento <= DATEADD(DAY, 30, GETDATE()))
+        ORDER BY l.fechaVencimiento ASC
+        `);
+    } catch (err) {
+      // Si la columna no existe en Lotes, ignorar
+    }
+    (lotesProximosVencer.recordset || []).forEach((r) => {
+      const fechaVenc = r.fechaVencimiento ? new Date(r.fechaVencimiento) : null;
+      const dias = fechaVenc ? Math.ceil((fechaVenc - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+      const texto = dias < 0 ? "Vencido" : dias === 0 ? "Vence hoy" : `Vence en ${dias} días`;
+      alertas.push({
+        titulo: "Producto próximo a vencer",
+        mensaje: `${r.nombreProducto} - ${Math.round(Number(r.cantidadDisponible || 0))} uds. - ${texto}`,
+        icono: "fa-calendar-times",
+        tipo: "warning",
+        tiempo: "Actual"
+      });
+    });
+  }
 
   // Construir array de 12 meses para el gráfico (meses con 0 si no hay ventas) y etiquetas
   const mesesMap = {};

@@ -68,6 +68,9 @@ const obtener_productos_compras = async (req, res) => {
   try {
 
     const pool = await sql.connect(dbConfig);
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productosController.js:obtener_productos_compras',message:'pool after connect',data:{poolConnected:pool.connected,poolId:pool?.id},timestamp:Date.now(),hypothesisId:'H1,H4,H5'})}).catch(()=>{});
+    // #endregion
 
     const productos = await ProductosServices.obtenerProductosComprasService(pool, req.user);
 

@@ -160,13 +160,8 @@
                                                         item.descripcion }}
                                                     </option>
                                                 </select>
-                                                <button *ngIf="!esCompraAlCredito()" type="button" class="btn btn-outline-warning btn-sm"
-                                                    data-bs-toggle="modal" data-bs-target="#modalPagoCompra"
-                                                    (click)="abrirModalFormaPago()">
-                                                    <i class="bi bi-cash-coin me-1"></i>Forma de pago
-                                                </button>
+                                               
                                             </div>
-
                                         </div>
 
 
@@ -1351,7 +1346,7 @@
                                     </div>
                                     <div>
                                         <button *ngIf="!loadButton" type="button" class="btn btn-success"
-                                            (click)="registrarCompras()">Registrar Compra</button>
+                                            (click)="prepararRegistrarCompra()">Registrar Compra</button>
                                         <button *ngIf="loadButton" type="button" class="btn btn-success" disabled>
                                             <span class="spinner-border spinner-border-sm" role="status"
                                                 aria-hidden="true"></span>
@@ -1464,7 +1459,12 @@
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                                 <i class="bi bi-x-circle me-2"></i>Cancelar
                             </button>
-                            <button type="button" class="btn btn-primary" (click)="guardarPagoCompra()">
+                            <ng-container *ngIf="modalPagoParaRegistrar">
+                                <button type="button" class="btn btn-success" (click)="procesarCompraDesdeModal()">
+                                    <i class="bi bi-check2-circle me-2"></i>Procesar compra
+                                </button>
+                            </ng-container>
+                            <button *ngIf="!modalPagoParaRegistrar" type="button" class="btn btn-primary" (click)="guardarPagoCompra()">
                                 <i class="bi bi-check-circle me-2"></i>Guardar pago
                             </button>
                         </div>

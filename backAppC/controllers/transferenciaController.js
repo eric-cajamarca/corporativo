@@ -80,7 +80,10 @@ const crear_transferencia = async function (req, res) {
                 return res.status(500).send({ message: 'Error interno del servidor', data: undefined });
         }
     } finally {
-        if (pool) await pool.close();
+        // #region agent log
+        if (pool) fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'transferenciaController.js:finally:closePool',message:'about to close pool',data:{hasPool:!!pool},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        // No cerrar el pool: sql.connect(dbConfig) devuelve el pool global; cerrarlo rompe otras peticiones (ej. obtener productos).
     }
 };
 
@@ -122,7 +125,7 @@ const obtener_transferencias = async function (req, res) {
         
         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
     } finally {
-        if (pool) await pool.close();
+        // No cerrar pool global (ver crear_transferencia).
     }
 };
 
@@ -162,7 +165,7 @@ const obtener_transferencia_por_id = async function (req, res) {
         
         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
     } finally {
-        if (pool) await pool.close();
+        // No cerrar pool global (ver crear_transferencia).
     }
 };
 
@@ -217,7 +220,7 @@ const revertir_transferencia = async function (req, res) {
                 return res.status(500).send({ message: 'Error interno del servidor', data: undefined });
         }
     } finally {
-        if (pool) await pool.close();
+        // No cerrar pool global (ver crear_transferencia).
     }
 };
 
@@ -259,7 +262,7 @@ const verificar_stock_transferencia = async function (req, res) {
         console.error('Error al verificar stock:', error);
         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
     } finally {
-        if (pool) await pool.close();
+        // No cerrar pool global (ver crear_transferencia).
     }
 };
 

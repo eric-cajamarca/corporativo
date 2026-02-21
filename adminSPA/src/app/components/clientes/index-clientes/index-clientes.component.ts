@@ -91,13 +91,13 @@ export class IndexClientesComponent {
 
 
   filtrar() {
-    if (this.filtro) {
-      //
-      var term = new RegExp(this.filtro, 'i');
-      this.clientes = this.clientes_const.filter(item => term.test(item.rSocial) || term.test(item.apellidos) || term.test(item.correo) || term.test(item.ruc));
-      
+    if (this.filtro && this.filtro.trim()) {
+      const term = new RegExp(this.filtro.trim(), 'i');
+      this.clientes = this.clientes_const.filter(item =>
+        term.test(item.rSocial || '') || term.test(item.apellidos || '') || term.test(item.correo || '') || term.test(item.ruc || '')
+      );
     } else {
-      this.clienteSearch = this.clientes_const;
+      this.clientes = this.clientes_const;
     }
   }
 

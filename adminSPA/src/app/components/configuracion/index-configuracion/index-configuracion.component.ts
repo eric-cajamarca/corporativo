@@ -387,6 +387,13 @@ export class IndexConfiguracionComponent implements OnInit {
     this._gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const lista = res?.data ?? [];
+        const getVal = (clave: string, def: string) => (lista.find((c: { clave: string; valor: string }) => c.clave === clave)?.valor ?? def);
+        this.inventario.alertaStockMinimo = parseInt(getVal('INVENTARIO_ALERTA_STOCK_MINIMO', '10'), 10) || 10;
+        this.inventario.alertaStockMaximo = parseInt(getVal('INVENTARIO_ALERTA_STOCK_MAXIMO', '1000'), 10) || 1000;
+        this.inventario.permitirVentasNegativas = String(getVal('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
+        this.inventario.controlLotes = true;
+        this.inventario.controlVencimiento = String(getVal('INVENTARIO_CONTROL_VENCIMIENTO', 'true')).toLowerCase() === 'true';
+        this.inventario.ubicaciones = String(getVal('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() === 'true';
         const item = lista.find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
         this.inventario.productosConImagenes = item ? (String(item.valor).toLowerCase() === 'true') : false;
       },
@@ -396,14 +403,15 @@ export class IndexConfiguracionComponent implements OnInit {
 
   guardarConfiguracionInventario(): void {
     this.inventarioGuardando = true;
-    this._gestoresService.guardarConfiguracion([
-      {
-        clave: 'PRODUCTOS_CON_IMAGENES',
-        valor: this.inventario.productosConImagenes ? 'true' : 'false',
-        descripcion: 'Manejar productos con imágenes (galería)',
-        tipoDato: 'BOOLEAN'
-      }
-    ]).subscribe({
+    const configs: Array<{ clave: string; valor: string; descripcion: string; tipoDato: string }> = [
+      { clave: 'INVENTARIO_ALERTA_STOCK_MINIMO', valor: String(this.inventario.alertaStockMinimo ?? 10), descripcion: 'Alerta stock mínimo general (productos sin umbral propio)', tipoDato: 'NUMBER' },
+      { clave: 'INVENTARIO_ALERTA_STOCK_MAXIMO', valor: String(this.inventario.alertaStockMaximo ?? 1000), descripcion: 'Alerta stock máximo general (productos sin umbral propio)', tipoDato: 'NUMBER' },
+      { clave: 'INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', valor: this.inventario.permitirVentasNegativas ? 'true' : 'false', descripcion: 'Permitir ventas con stock negativo (mostrar aviso)', tipoDato: 'BOOLEAN' },
+      { clave: 'INVENTARIO_CONTROL_VENCIMIENTO', valor: this.inventario.controlVencimiento ? 'true' : 'false', descripcion: 'Mostrar productos próximos a vencer en dashboard', tipoDato: 'BOOLEAN' },
+      { clave: 'INVENTARIO_CONTROL_UBICACIONES', valor: this.inventario.ubicaciones ? 'true' : 'false', descripcion: 'Gestionar stock por ubicación (LotesUbicacion); si no, solo Lotes', tipoDato: 'BOOLEAN' },
+      { clave: 'PRODUCTOS_CON_IMAGENES', valor: this.inventario.productosConImagenes ? 'true' : 'false', descripcion: 'Manejar productos con imágenes (galería)', tipoDato: 'BOOLEAN' }
+    ];
+    this._gestoresService.guardarConfiguracion(configs).subscribe({
       next: () => {
         this.inventarioGuardando = false;
         if (typeof iziToast !== 'undefined') {

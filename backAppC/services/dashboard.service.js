@@ -1,4 +1,5 @@
 const DashboardRepository = require("../repositories/dashboard.repository");
+const gestoresRepository = require("../repositories/gestores.repository");
 
 /**
  * Calcula fecha inicio y fin para el período y el período anterior (mismo tamaño).
@@ -65,12 +66,20 @@ exports.obtenerResumenDashboardService = async (pool, user, periodo) => {
   const idEmpresa = user.empresa;
   const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
     obtenerRangoFechas(periodo || "Este Mes");
+  const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+  const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
+  const configInventario = {
+    stockMinimoGeneral: Math.max(0, parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MINIMO", "10"), 10) || 10),
+    stockMaximoGeneral: Math.max(0, parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MAXIMO", "1000"), 10) || 1000),
+    controlVencimiento: String(getConfig("INVENTARIO_CONTROL_VENCIMIENTO", "true")).toLowerCase() === "true"
+  };
   return DashboardRepository.obtenerResumenDashboardRepo(
     pool,
     idEmpresa,
     fechaInicio,
     fechaFin,
     fechaInicioAnterior,
-    fechaFinAnterior
+    fechaFinAnterior,
+    configInventario
   );
 };

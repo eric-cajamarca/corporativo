@@ -34,7 +34,7 @@ async function sendText(req, res) {
     const msg = err.message || 'Error al enviar mensaje';
     return res.status(400).json({ status: 400, success: false, message: msg });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 
@@ -67,7 +67,7 @@ async function sendMedia(req, res) {
     const msg = err.message || 'Error al enviar archivo';
     return res.status(400).json({ status: 400, success: false, message: msg });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 

@@ -254,7 +254,10 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
 
 exports.obtenerProductosCompras = async (pool, idEmpresa) => {
   try {
-    // Primero, obtener productos básicos
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productos.repository.js:obtenerProductosCompras:entry',message:'pool at entry',data:{poolConnected:pool?.connected},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    // Primero, obtener productos básicos (obtenerProductosCompras)
     const result = await pool
       .request()
       .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
@@ -285,6 +288,9 @@ exports.obtenerProductosCompras = async (pool, idEmpresa) => {
         WHERE ss.idEmpresa = @idEmpresa
       `);
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productos.repository.js:obtenerProductosCompras:beforeSecondRequest',message:'pool before second request',data:{poolConnected:pool?.connected},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     // Obtener precios por separado
     const preciosResult = await pool
       .request()

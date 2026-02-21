@@ -53,9 +53,9 @@ export class VentasService {
     this.url = global.url;
   }
 
-  crearVentaCompleta(payload: VentaCompletaPayload): Observable<{ success: boolean; idVenta?: number }> {
+  crearVentaCompleta(payload: VentaCompletaPayload): Observable<{ success: boolean; idVenta?: number; avisoStockInsuficiente?: string }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    return this._http.post<{ success: boolean; idVenta?: number }>(
+    return this._http.post<{ success: boolean; idVenta?: number; avisoStockInsuficiente?: string }>(
       this.url + 'ventas/completa',
       payload,
       { headers, withCredentials: true }

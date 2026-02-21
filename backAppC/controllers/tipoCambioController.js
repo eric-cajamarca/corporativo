@@ -84,7 +84,7 @@ async function getTipoCambioDia(req, res) {
     console.error('tipoCambioController getTipoCambioDia:', err.message);
     res.status(500).json({ status: 500, success: false, message: 'Error al consultar tipo de cambio' });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool: sql.connect() devuelve el pool global; cerrarlo rompe otras peticiones.
   }
 }
 
@@ -159,7 +159,7 @@ async function getTipoCambioMes(req, res) {
     console.error('tipoCambioController getTipoCambioMes:', err.message);
     res.status(500).json({ status: 500, success: false, message: 'Error al consultar tipo de cambio del mes' });
   } finally {
-    if (pool) try { pool.close(); } catch (_) {}
+    // No cerrar pool global (ver getTipoCambioDia).
   }
 }
 
