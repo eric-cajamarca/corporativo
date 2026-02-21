@@ -2,18 +2,28 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 
 
-async function getAll() {
+async function getAll(idEmpresa) {
     const pool = await sql.connect(dbConfig);
-
-    const result = await pool.request().query('SELECT * FROM UbicacionesPrioridad ORDER BY idSucursal, prioridad');
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`SELECT up.idUbicacion, up.idSucursal, up.codigoUbicacion, up.prioridad
+                FROM UbicacionesPrioridad up
+                INNER JOIN Sucursal s ON s.idSucursal = up.idSucursal
+                WHERE s.idEmpresa = @idEmpresa
+                ORDER BY up.idSucursal, up.prioridad`);
     return result.recordset;
 }
 
-async function getBySucursal(idSucursal) {
+async function getBySucursal(idSucursal, idEmpresa) {
     const pool = await sql.connect(dbConfig);
     const result = await pool.request()
         .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-        .query('SELECT * FROM UbicacionesPrioridad WHERE idSucursal = @idSucursal ORDER BY prioridad');
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`SELECT up.idUbicacion, up.idSucursal, up.codigoUbicacion, up.prioridad
+                FROM UbicacionesPrioridad up
+                INNER JOIN Sucursal s ON s.idSucursal = up.idSucursal AND s.idEmpresa = @idEmpresa
+                WHERE up.idSucursal = @idSucursal
+                ORDER BY up.prioridad`);
     return result.recordset;
 }
 

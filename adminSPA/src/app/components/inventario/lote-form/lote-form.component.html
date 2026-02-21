@@ -1,6 +1,6 @@
 <div class="modal-header bg-primary text-white">
   <h5 class="modal-title">
-    <i class="fas fa-box me-2"></i>
+    <i class="bi bi-box me-2"></i>
     {{ isEditMode ? 'Editar' : 'Nuevo' }} Lote
   </h5>
   <button type="button" class="btn-close btn-close-white" (click)="cancelar()"></button>
@@ -95,7 +95,7 @@
 
       @if (isEditMode) {
         <div class="alert alert-info">
-          <i class="fas fa-info-circle me-2"></i>
+          <i class="bi bi-info-circle me-2"></i>
           <small>Al editar un lote, la cantidad disponible se ajustará automáticamente.</small>
         </div>
       }
@@ -109,7 +109,7 @@
     class="btn btn-secondary" 
     (click)="cancelar()"
     [disabled]="guardando">
-    <i class="fas fa-times me-1"></i>Cancelar
+    <i class="bi bi-x-times me-1"></i>Cancelar
   </button>
   <button 
     type="button" 
@@ -120,7 +120,7 @@
       <span class="spinner-border spinner-border-sm me-1"></span>
       {{ isEditMode ? 'Actualizando...' : 'Guardando...' }}
     } @else {
-      <i class="fas fa-save me-1"></i>
+      <i class="bi bi-save me-1"></i>
       {{ isEditMode ? 'Actualizar' : 'Guardar' }}
     }
   </button>

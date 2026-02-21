@@ -1,11 +1,11 @@
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 
-async function getAll() {
-    return await ubicacionesPrioridadRepository.getAll();
+async function getAll(idEmpresa) {
+    return await ubicacionesPrioridadRepository.getAll(idEmpresa);
 }
 
-async function getBySucursal(idSucursal) {
-    return await ubicacionesPrioridadRepository.getBySucursal(idSucursal);
+async function getBySucursal(idSucursal, idEmpresa) {
+    return await ubicacionesPrioridadRepository.getBySucursal(idSucursal, idEmpresa);
 }
 
 async function create(ubicacionData) {

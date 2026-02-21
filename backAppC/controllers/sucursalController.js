@@ -43,22 +43,25 @@ const obtener_sucursal_idempresa = async function (req, res) {
 }
 
 const obtener_sucursal_todos = async function (req, res) {
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            try {
-                let pool = await sql.connect(dbConfig);
-                let sucursal = await pool.request().query("SELECT * FROM Sucursal");
-                res.status(200).send({ data: sucursal.recordset });
-            } catch (error) {
-                console.log('obterner sucursal error: ' + error);
-                res.status(500).send({ message: 'Error al obtener los sucursal', data: undefined });
-            }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    if (!req.user) {
+        return res.status(401).send({ message: 'No Access', data: undefined });
     }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
+    const idEmpresa = req.user.empresa || req.user.idEmpresa;
+    if (!idEmpresa) {
+        return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: undefined });
+    }
+    if (req.user.rol !== 'Administrador') {
+        return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa ORDER BY nombre');
+        res.status(200).send({ data: result.recordset });
+    } catch (error) {
+        console.error('obtener_sucursal_todos:', error);
+        res.status(500).send({ message: 'Error al obtener las sucursales', data: undefined });
     }
 }
 

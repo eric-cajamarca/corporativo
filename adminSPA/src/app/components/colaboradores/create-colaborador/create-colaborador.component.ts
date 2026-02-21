@@ -1,21 +1,25 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { Router, RouterModule } from '@angular/router';
 import { RolService } from '../../../services/rol.service';
 import { FormsModule } from '@angular/forms';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { CommonModule } from '@angular/common';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast:any;
 declare var $:any;
 
 @Component({
   selector: 'app-create-colaborador',
-  imports: [FormsModule, RouterModule, TopnavComponent, CommonModule],
+  standalone: true,
+  imports: [FormsModule, RouterModule, TopnavComponent, CommonModule, SidebarComponent],
   templateUrl: './create-colaborador.component.html',
   styleUrl: './create-colaborador.component.css'
 })
 export class CreateColaboradorComponent {
+  public sidebarState = inject(SidebarStateService);
 
   public colaborador:any = {
     estado : false
@@ -63,6 +67,10 @@ export class CreateColaboradorComponent {
       }
     )
 
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 
   registrar(registroForm:any){

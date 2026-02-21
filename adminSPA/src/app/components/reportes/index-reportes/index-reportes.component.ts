@@ -1,19 +1,23 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var Chart: any;
 
 @Component({
   selector: 'app-index-reportes',
-  imports: [FormsModule, CommonModule, TopnavComponent],
+  standalone: true,
+  imports: [FormsModule, CommonModule, TopnavComponent, SidebarComponent],
   templateUrl: './index-reportes.component.html',
   styleUrl: './index-reportes.component.css'
 })
 export class IndexReportesComponent implements OnInit {
+  public sidebarState = inject(SidebarStateService);
 
   // Filtros de fecha
   fechaInicio: string = '';
@@ -98,6 +102,10 @@ export class IndexReportesComponent implements OnInit {
   ngOnInit(): void {
     this.inicializarFechas();
     this.cargarReportesPrincipales();
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 
   inicializarFechas(): void {

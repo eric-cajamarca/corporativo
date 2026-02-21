@@ -1,5 +1,11 @@
-<main class="py-3">
-  <div class="container-fluid">
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav> 
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    
+    <div class="container-fluid">
       <div class="row justify-content-center">
         <div class="col-12 col-lg-11 col-xl-11">
           <div class="card table-card">
@@ -172,7 +178,7 @@
                                 <th>Despachada</th>
                                 <th>Pendiente</th>
                                 <th>Ubicación</th>
-                                <th>Cant. a despachar</th>
+                                <!-- <th>Cant. a despachar</th> -->
                                 <th>Estado</th>
                                 <th></th>
                               </tr>
@@ -185,13 +191,15 @@
                                 <td>{{ lin.cantidadDespachada }}</td>
                                 <td>{{ pendienteLinea(lin) }}</td>
                                 <td class="small">{{ lin.ubicacionOrigen || lin.ubicacionDestino || '—' }}</td>
-                                <td>
+                                <!-- <td>
                                   <input type="number" class="form-control form-control-sm" style="width:5rem"
                                     [(ngModel)]="cantADespacharEdicion[lin.idDetalleDespacho]"
                                     [max]="lin.cantidadSolicitada" min="0" step="0.001"
                                     placeholder="0">
                                 </td>
+                                -->
                                 <td><span class="badge" [ngClass]="lin.estado === 'DESPACHADO' ? 'bg-success' : 'bg-warning'">{{ lin.estado }}</span></td>
+                                <!--
                                 <td>
                                   <button type="button" class="btn btn-sm btn-outline-primary"
                                     [disabled]="guardandoCantidad[lin.idDetalleDespacho]"
@@ -199,6 +207,7 @@
                                     {{ guardandoCantidad[lin.idDetalleDespacho] ? '...' : 'Guardar' }}
                                   </button>
                                 </td>
+                                -->
                               </tr>
                             </tbody>
                           </table>
@@ -220,6 +229,7 @@
         </div>
       </div>
     </div>
+  </div>
 </main>
 
 <!-- Modal Crear despacho -->

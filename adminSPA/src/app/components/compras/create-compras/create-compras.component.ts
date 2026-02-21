@@ -6,6 +6,7 @@ import { ProductoCreate } from '../../../models/producto.models';
 import { SucursalService } from '../../../services/sucursal.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
+import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { CategoriaService } from '../../../services/categoria.service';
 import { PresentacionService } from '../../../services/presentacion.service';
 import { variosService } from '../../../services/varios.service';
@@ -95,6 +96,24 @@ export class CreateComprasComponent {
   public moneda: any = [];
   public estadoPago: any = [];
   public mediosPago: any = [];
+  /** Formas de pago (catálogo) para el modal; solo se usa cuando la compra no es al crédito. */
+  public formasPago: FormaPago[] = [];
+  public formaPagoSeleccionada: FormaPago = {
+    idFormaPago: 0,
+    descripcion: '',
+    tipo: 0,
+    requiereReferencia: 0,
+    activo: 0,
+    recibido: 0,
+    vuelto: 0,
+    referencia: '',
+  };
+  /** Detalle de formas de pago agregadas en el modal (solo cuando compra no es al crédito). */
+  public detallePago: Array<{ item: number; idFormaPago: number; descripcion: string; monto: number; referencia: string }> = [];
+  /** Formulario del modal: monto y referencia al agregar una forma de pago. */
+  public detailForm = { monto: 0, referencia: '' };
+  public pagaCon = 0;
+  public vuelto = 0;
   public categoria: any = [];
   public presentacion: any = [];
   public nuevoProducto: any = {
@@ -411,6 +430,19 @@ export class CreateComprasComponent {
         console.log(error);
       }
     );
+
+    this._documentoService.getFormasPago().subscribe({
+      next: (response) => {
+        this.formasPago = response.data || [];
+        const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+        if (efectivo) {
+          this.formaPagoSeleccionada = { ...efectivo };
+        }
+      },
+      error: () => {
+        this.formasPago = [];
+      },
+    });
 
     this._marcaService.obtenerMarcas().subscribe(
       (response) => {
@@ -1025,6 +1057,10 @@ export class CreateComprasComponent {
       return;
     }
 
+    if (!this.esCompraAlCredito() && this.detallePago.length > 0) {
+      this.compras.idMediosPago = String(this.detallePago[0].idFormaPago);
+    }
+
     const idSucursalCompra = this.compras.idSucursal;
     this._comprasService.crear_compra(this.compras).pipe(
       switchMap((response) => {
@@ -1274,18 +1310,43 @@ export class CreateComprasComponent {
     const idSucursalOk = !!this.compras.idSucursal && String(this.compras.idSucursal).trim() !== '';
     const idMonedaOk = !!this.compras.idMoneda;
     const idEstadoPagoOk = !!this.compras.idEstadoPago;
-    const idMediosPagoOk = !!this.compras.idMediosPago;
     const totalOk = !isNaN(Number(this.compras.total)) && Number(this.compras.total) > 0;
     const detalleOk = Array.isArray(this.detalleCompras) && this.detalleCompras.length > 0;
 
+    const esCredito = this.esCompraAlCredito();
+    let idMediosPagoOk = !!this.compras.idMediosPago;
+    if (!esCredito) {
+      if (this.detallePago.length > 0) {
+        const totalPago = this.calcularTotalTablaPago();
+        const totalCompra = Number(this.compras.total) || 0;
+        if (Math.abs(totalPago - totalCompra) > 0.01) {
+          iziToast.show({
+            title: 'ERROR',
+            titleColor: '#FF0000',
+            color: '#FFF',
+            class: 'text-danger',
+            position: 'topRight',
+            message: 'El total del detalle de pago no coincide con el total de la compra.',
+          });
+          this.loadButton = false;
+          return false;
+        }
+        idMediosPagoOk = true;
+      } else {
+        idMediosPagoOk = !!this.compras.idMediosPago;
+      }
+    } else {
+      idMediosPagoOk = !!this.compras.idMediosPago;
+    }
+
     if (!fechaEmisionOk || !fechaVencOk || !idProveedorOk || !idSucursalOk || !idMonedaOk || !idEstadoPagoOk || !idMediosPagoOk || !totalOk || !detalleOk) {
-      this.mostrarErrorValidacion();
+      this.mostrarErrorValidacion(esCredito);
       return false;
     }
     return true;
   }
 
-  private mostrarErrorValidacion(): void {
+  private mostrarErrorValidacion(esCredito?: boolean): void {
     const faltan: string[] = [];
     if (!this.compras.fEmision?.trim()) faltan.push('Fecha emisión');
     if (!this.compras.fVencimiento?.trim()) faltan.push('Fecha vencimiento');
@@ -1293,7 +1354,11 @@ export class CreateComprasComponent {
     if (!this.compras.idSucursal) faltan.push('Sucursal');
     if (!this.compras.idMoneda) faltan.push('Moneda');
     if (!this.compras.idEstadoPago) faltan.push('Estado de pago');
-    if (!this.compras.idMediosPago) faltan.push('Medio de pago');
+    if (esCredito === false && this.detallePago.length === 0 && !this.compras.idMediosPago) {
+      faltan.push('Formas de pago (abra el modal "Forma de pago" y agregue al menos un pago)');
+    } else if (esCredito !== false && !this.compras.idMediosPago) {
+      faltan.push('Medio de pago');
+    }
     if (!this.compras.total || Number(this.compras.total) <= 0) faltan.push('Total mayor a 0');
     if (!this.detalleCompras?.length) faltan.push('Al menos un producto en el detalle');
     const msg = faltan.length ? `Faltan: ${faltan.join(', ')}.` : 'Debe llenar todos los campos obligatorios (*) y agregar al menos un producto.';
@@ -1579,6 +1644,73 @@ export class CreateComprasComponent {
     if (el) {
       const modal = new bootstrap.Modal(el);
       modal.show();
+    }
+  }
+
+  /** True si la compra es al crédito (no se muestra el modal de formas de pago). */
+  esCompraAlCredito(): boolean {
+    const id = this.compras.idEstadoPago;
+    if (id == null || id === '') return false;
+    const estado = this.estadoPago?.find((e: any) => String(e.idEstadoPago) === String(id));
+    const desc = (estado?.descripcion ?? '').toLowerCase();
+    return desc.includes('credito') || desc.includes('crédito');
+  }
+
+  calcularTotalTablaPago(): number {
+    return this.detallePago.reduce((sum, item) => sum + (Number(item.monto) || 0), 0);
+  }
+
+  getSaldoPendienteCompra(): number {
+    const total = Number(this.compras.total) || 0;
+    const pendiente = Math.max(0, total - this.calcularTotalTablaPago());
+    return Math.round(pendiente * 100) / 100;
+  }
+
+  actualizarMontoSaldoCompra(): void {
+    this.detailForm.monto = this.getSaldoPendienteCompra();
+  }
+
+  /** Abre el modal de forma de pago: selecciona Efectivo y monto = saldo. */
+  abrirModalFormaPago(): void {
+    const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+    if (efectivo) {
+      this.formaPagoSeleccionada = { ...efectivo };
+    }
+    this.actualizarMontoSaldoCompra();
+    const total = Number(this.compras.total) || 0;
+    this.pagaCon = total;
+    this.vuelto = 0;
+  }
+
+  agregarDetallePago(): void {
+    const monto = Math.round((Number(this.detailForm.monto) || 0) * 100) / 100;
+    const idForma = this.formaPagoSeleccionada?.idFormaPago != null ? Number(this.formaPagoSeleccionada.idFormaPago) : 0;
+    if (monto > 0 && idForma) {
+      const desc = this.formasPago.find((f: FormaPago) => f.idFormaPago === idForma)?.descripcion || 'Pago';
+      this.detallePago.push({
+        item: this.detallePago.length + 1,
+        idFormaPago: idForma,
+        descripcion: desc,
+        monto,
+        referencia: this.detailForm.referencia || 'N/A',
+      });
+      this.detailForm.referencia = '';
+      this.actualizarMontoSaldoCompra();
+    }
+  }
+
+  eliminarDetallePago(index: number): void {
+    this.detallePago.splice(index, 1);
+    this.detallePago.forEach((item, idx) => (item.item = idx + 1));
+    this.actualizarMontoSaldoCompra();
+  }
+
+  guardarPagoCompra(): void {
+    const modalEl = document.getElementById('modalPagoCompra');
+    const inst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
+    inst?.hide();
+    if (this.detallePago.length > 0) {
+      this.compras.idMediosPago = String(this.detallePago[0].idFormaPago);
     }
   }
 }

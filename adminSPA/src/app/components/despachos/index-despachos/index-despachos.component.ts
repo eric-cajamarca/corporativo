@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { DespachoService } from '../../../services/despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -6,6 +6,9 @@ import { WhatsappService } from '../../../services/whatsapp.service';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare const iziToast: any;
 
@@ -53,12 +56,13 @@ export interface VentaDespachosResult {
 @Component({
   selector: 'app-index-despachos',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule],
+  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent],
   templateUrl: './index-despachos.component.html',
   styleUrl: './index-despachos.component.css'
 })
 export class IndexDespachosComponent {
-
+  public sidebarState = inject(SidebarStateService);
+  
   /** Criterio de búsqueda: número de comprobante o idVenta (puede escanearse del código de barras del comprobante) */
   criterioBusqueda = '';
   loading = false;
@@ -113,6 +117,11 @@ export class IndexDespachosComponent {
 
   ngOnInit(): void {}
 
+  onToggleSidebar(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
+  }
+
+  // #region buscar
   buscar(): void {
     const c = (this.criterioBusqueda || '').trim();
     if (!c) {

@@ -1,6 +1,6 @@
 <div class="modal-header bg-warning text-dark">
   <h5 class="modal-title">
-    <i class="fas fa-exchange-alt me-2"></i>
+    <i class="bi bi-arrow-repeat me-2"></i>
     Traslado entre Ubicaciones
   </h5>
   <button type="button" class="btn-close" (click)="cancelar()"></button>
@@ -69,7 +69,7 @@
     <!-- Stock disponible en origen -->
     @if (stockDisponibleOrigen > 0) {
       <div class="alert alert-info mb-3">
-        <i class="fas fa-info-circle me-2"></i>
+        <i class="bi bi-info-circle me-2"></i>
         <strong>Stock disponible en origen:</strong> {{ stockDisponibleOrigen }} unidades
       </div>
     }
@@ -121,7 +121,7 @@
     <!-- Resumen del movimiento -->
     @if (movimientoForm.get('cantidad')?.value > 0 && movimientoForm.get('idUbicacionOrigen')?.value && movimientoForm.get('idUbicacionDestino')?.value) {
       <div class="alert alert-success">
-        <i class="fas fa-check-circle me-2"></i>
+        <i class="bi bi-check-circle me-2"></i>
         <strong>Resumen:</strong> Mover 
         <strong>{{ movimientoForm.get('cantidad')?.value }}</strong> unidades desde 
         <strong>{{ codigoUbicacionOrigen }}</strong> 
@@ -138,7 +138,7 @@
     class="btn btn-secondary" 
     (click)="cancelar()"
     [disabled]="ejecutando">
-    <i class="fas fa-times me-1"></i>Cancelar
+    <i class="bi bi-x-times me-1"></i>Cancelar
   </button>
   <button 
     type="button" 
@@ -149,7 +149,7 @@
       <span class="spinner-border spinner-border-sm me-1"></span>
       Ejecutando...
     } @else {
-      <i class="fas fa-exchange-alt me-1"></i>
+      <i class="bi bi-arrow-repeat me-1"></i>
       Ejecutar Movimiento
     }
   </button>

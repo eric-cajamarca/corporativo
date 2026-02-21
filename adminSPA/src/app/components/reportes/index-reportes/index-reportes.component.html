@@ -1,128 +1,13 @@
-<!-- Navbar principal -->
-<app-topnav></app-topnav>
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
 
-<!-- Layout principal con sidebar -->
-<div class="dashboard-layout">
-  <!-- Sidebar -->
-  <nav class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <i class="fas fa-building text-primary me-2"></i>
-        <span class="fw-bold">CRM</span>
-      </div>
-      <button class="sidebar-close d-lg-none" type="button" id="sidebarClose">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-    <div class="sidebar-body">
-      <!-- Usuario info -->
-      <div class="user-info">
-        <div class="user-avatar">
-          <i class="fas fa-user-circle"></i>
-        </div>
-        <div class="user-details">
-          <div class="user-name fw-semibold">Administrador</div>
-          <div class="user-role text-muted small">Administrador</div>
-        </div>
-      </div>
-
-      <!-- Navegación principal -->
-      <ul class="sidebar-nav">
-        <!-- Dashboard -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('dashboard'); $event.preventDefault()">
-            <i class="nav-icon fas fa-tachometer-alt"></i>
-            <span class="nav-text">Dashboard</span>
-          </a>
-        </li>
-
-        <!-- Módulo Caja -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('caja'); $event.preventDefault()">
-            <i class="nav-icon fas fa-cash-register"></i>
-            <span class="nav-text">Caja</span>
-          </a>
-        </li>
-
-        <!-- Módulo Créditos -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('creditos'); $event.preventDefault()">
-            <i class="nav-icon fas fa-hand-holding-usd"></i>
-            <span class="nav-text">Créditos</span>
-          </a>
-        </li>
-
-        <!-- Módulo Análisis -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('analisis'); $event.preventDefault()">
-            <i class="nav-icon fas fa-chart-line"></i>
-            <span class="nav-text">Análisis</span>
-          </a>
-        </li>
-
-        <!-- Separador -->
-        <li class="nav-divider"></li>
-
-        <!-- Módulo Ventas -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('ventas'); $event.preventDefault()">
-            <i class="nav-icon fas fa-shopping-cart"></i>
-            <span class="nav-text">Ventas</span>
-          </a>
-        </li>
-
-        <!-- Módulo Compras -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('compras'); $event.preventDefault()">
-            <i class="nav-icon fas fa-shopping-bag"></i>
-            <span class="nav-text">Compras</span>
-          </a>
-        </li>
-
-        <!-- Módulo Inventario -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('inventario'); $event.preventDefault()">
-            <i class="nav-icon fas fa-boxes"></i>
-            <span class="nav-text">Inventario</span>
-          </a>
-        </li>
-
-        <!-- Módulo Clientes -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('clientes'); $event.preventDefault()">
-            <i class="nav-icon fas fa-users"></i>
-            <span class="nav-text">Clientes</span>
-          </a>
-        </li>
-
-        <!-- Separador -->
-        <li class="nav-divider"></li>
-
-        <!-- Configuración -->
-        <li class="nav-item">
-          <a href="#" class="nav-link" (click)="navigateTo('configuracion'); $event.preventDefault()">
-            <i class="nav-icon fas fa-cog"></i>
-            <span class="nav-text">Configuración</span>
-          </a>
-        </li>
-
-        <!-- Reportes -->
-        <li class="nav-item">
-          <a href="#" class="nav-link active" (click)="navigateTo('reportes'); $event.preventDefault()">
-            <i class="nav-icon fas fa-file-alt"></i>
-            <span class="nav-text">Reportes</span>
-          </a>
-        </li>
-      </ul>
-    </div>
-  </nav>
-
-  <!-- Overlay para móviles -->
-  <div class="sidebar-overlay d-lg-none" id="sidebarOverlay"></div>
 
   <!-- Contenido principal -->
-  <main class="main-content">
+  
+  <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
     <!-- Header del contenido -->
     <div class="content-header">
       <div class="d-flex justify-content-between align-items-center">
@@ -342,4 +227,3 @@
       </div>
     </div>
   </main>
-</div>

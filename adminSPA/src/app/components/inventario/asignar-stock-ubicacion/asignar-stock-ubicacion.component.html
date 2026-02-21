@@ -1,6 +1,6 @@
 <div class="modal-header bg-primary text-white">
   <h5 class="modal-title">
-    <i class="fas fa-map-marker-alt me-2"></i>
+    <i class="bi bi-map me-2"></i>
     Asignar Stock a Ubicaciones
   </h5>
   <button type="button" class="btn-close btn-close-white" (click)="cancelar()"></button>
@@ -27,7 +27,7 @@
           class="btn btn-sm btn-outline-primary" 
           (click)="distribuirAutomatico()"
           [disabled]="cantidadRestante === 0 || ubicaciones.length === 0">
-          <i class="fas fa-magic me-1"></i>Distribuir Automático
+          <i class="bi bi-magic me-1"></i>Distribuir Automático
         </button>
       </div>
     </div>
@@ -36,14 +36,14 @@
     <div class="alert" [ngClass]="cantidadRestante === 0 ? 'alert-success' : 'alert-warning'" role="alert">
       <div class="d-flex justify-content-between align-items-center">
         <span>
-          <i class="fas" [ngClass]="cantidadRestante === 0 ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+          <i class="bi" [ngClass]="cantidadRestante === 0 ? 'bi-check-circle' : 'bi-exclamation-triangle'"></i>
           <strong>Unidades restantes por asignar:</strong> 
           <span class="badge" [ngClass]="cantidadRestante === 0 ? 'bg-success' : 'bg-warning'">
             {{ cantidadRestante }}
           </span>
         </span>
         <small *ngIf="cantidadRestante === 0" class="text-success">
-          <i class="fas fa-check me-1"></i>Listo para guardar
+          <i class="bi bi-check me-1"></i>Listo para guardar
         </small>
       </div>
     </div>
@@ -56,13 +56,13 @@
 
     <!-- Sin ubicaciones -->
     <div *ngIf="!cargandoUbicaciones && ubicaciones.length === 0" class="alert alert-warning">
-      <i class="fas fa-exclamation-triangle me-2"></i>
+      <i class="bi bi-exclamation-triangle me-2"></i>
       No hay ubicaciones configuradas para esta sucursal.
       <br>
       <small>Cree una desde Inventario &gt; Ubicaciones (prioridades), luego vuelva aquí y pulse Refrescar.</small>
       <div class="mt-2">
         <button type="button" class="btn btn-sm btn-outline-primary" (click)="cargarUbicaciones()">
-          <i class="fas fa-sync-alt me-1"></i>Refrescar ubicaciones
+          <i class="bi bi-arrow-repeat me-1"></i>Refrescar ubicaciones
         </button>
       </div>
     </div>
@@ -128,14 +128,14 @@
     class="btn btn-secondary" 
     (click)="cancelar()"
     [disabled]="guardando">
-    <i class="fas fa-times me-1"></i>Cancelar
+    <i class="bi bi-x-times me-1"></i>Cancelar
   </button>
   <button 
     class="btn btn-success" 
     (click)="guardarAsignacion()" 
     [disabled]="cantidadRestante !== 0 || guardando || ubicaciones.length === 0">
     <span *ngIf="guardando" class="spinner-border spinner-border-sm me-1"></span>
-    <i *ngIf="!guardando" class="fas fa-save me-1"></i>
+    <i *ngIf="!guardando" class="bi bi-save me-1"></i>
     {{ guardando ? 'Guardando...' : 'Guardar Asignación' }}
   </button>
 </div>

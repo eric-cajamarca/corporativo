@@ -150,21 +150,26 @@
                                     </div>
                                     <div class="col-sm-6 col-lg-3 col-md-6">
                                         <div>
-        
+
                                             <label style="width: 300px;">Medios de pago (*)</label>
-                                            <div class="col-lg-9 col-xl-9">
-                                                <select required name="idMediosPago" [(ngModel)]="compras.idMediosPago"
-                                                    class="form-control">
+                                            <div class="col-lg-9 col-xl-9 d-flex align-items-center gap-2">
+                                                <select [required]="esCompraAlCredito()" name="idMediosPago" [(ngModel)]="compras.idMediosPago"
+                                                    class="form-control" [class.flex-grow-1]="!esCompraAlCredito()">
                                                     <option value="" selected disabled>Seleccionar...</option>
                                                     <option *ngFor="let item of mediosPago" [value]="item.idMediosPago">{{
                                                         item.descripcion }}
                                                     </option>
                                                 </select>
+                                                <button *ngIf="!esCompraAlCredito()" type="button" class="btn btn-outline-warning btn-sm"
+                                                    data-bs-toggle="modal" data-bs-target="#modalPagoCompra"
+                                                    (click)="abrirModalFormaPago()">
+                                                    <i class="bi bi-cash-coin me-1"></i>Forma de pago
+                                                </button>
                                             </div>
-        
+
                                         </div>
-        
-        
+
+
                                         <div class="form-group">
                                             <label for="idSucursal">Sucursal (*)</label>
                                             <select required name="idSucursal" [(ngModel)]="compras.idSucursal" class="form-control">
@@ -1354,14 +1359,118 @@
                                         </button>
                                     </div>
                                 </div>
-        
+
                             </div>
-        
+
                         </div>
-        
+
                     </div>
                 </div>
             </ng-container>
+
+            <!-- Modal Forma de pago (se abre solo cuando la compra no es al crédito, desde el botón Forma de pago) -->
+            <div class="modal fade" id="modalPagoCompra" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content shadow rounded">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title fw-600">
+                                <i class="bi bi-cash-coin me-2"></i>Forma de pago
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="row g-3 justify-content-center mb-4">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Total a pagar</label>
+                                    <input type="text" class="form-control text-center bg-light fw-bold"
+                                        [value]="(compras.total | number:'1.2-2') || '0.00'" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Saldo pendiente</label>
+                                    <input type="text" class="form-control text-center fw-bold bg-light"
+                                        [value]="(getSaldoPendienteCompra() | number:'1.2-2')" readonly>
+                                </div>
+                            </div>
+                            <hr class="my-4">
+                            <h6 class="fw-bold text-primary mb-3">Detalle de pago</h6>
+                            <div class="row g-2 mb-4 align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Forma de pago</label>
+                                    <select class="form-select form-select-sm" [(ngModel)]="formaPagoSeleccionada.idFormaPago">
+                                        <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Monto</label>
+                                    <input type="number" class="form-control form-control-sm"
+                                        [(ngModel)]="detailForm.monto"
+                                        [placeholder]="(compras.total | number:'1.2-2') || '0.00'"
+                                        step="0.01" min="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Referencia</label>
+                                    <input type="text" class="form-control form-control-sm"
+                                        [(ngModel)]="detailForm.referencia"
+                                        placeholder="N° operación">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end pb-1">
+                                    <button type="button" class="btn btn-success btn-sm w-100" (click)="agregarDetallePago()" title="Agregar">
+                                        <i class="bi bi-plus-circle me-1"></i>Agregar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center" style="width: 5%">#</th>
+                                            <th style="width: 25%">Forma de pago</th>
+                                            <th style="width: 20%">Monto</th>
+                                            <th style="width: 35%">Referencia</th>
+                                            <th class="text-center" style="width: 15%">Quitar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr *ngFor="let detalle of detallePago; let i = index">
+                                            <td class="text-center">{{ detalle.item }}</td>
+                                            <td>{{ detalle.descripcion }}</td>
+                                            <td class="text-end">{{ detalle.monto | number:'1.2-2' }}</td>
+                                            <td>{{ detalle.referencia }}</td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarDetallePago(i)" title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr *ngIf="detallePago.length === 0">
+                                            <td colspan="5" class="text-center text-muted py-3">
+                                                <i class="bi bi-inbox me-1"></i>No se han agregado formas de pago
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot class="table-info">
+                                        <tr>
+                                            <td colspan="2" class="fw-bold text-end">TOTAL</td>
+                                            <td class="fw-bold text-end">{{ calcularTotalTablaPago() | number:'1.2-2' }}</td>
+                                            <td colspan="2" class="fw-bold">
+                                                Saldo: {{ (compras.total - calcularTotalTablaPago()) | number:'1.2-2' }}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle me-2"></i>Cancelar
+                            </button>
+                            <button type="button" class="btn btn-primary" (click)="guardarPagoCompra()">
+                                <i class="bi bi-check-circle me-2"></i>Guardar pago
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         
         
         </div>

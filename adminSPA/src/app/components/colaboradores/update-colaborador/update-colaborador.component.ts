@@ -1,23 +1,26 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RolService } from '../../../services/rol.service';
 import { FormsModule } from '@angular/forms';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { CommonModule } from '@angular/common';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast:any;
 
 
 @Component({
   selector: 'app-update-colaborador',
-  imports: [FormsModule, RouterModule, TopnavComponent, CommonModule],
+  standalone: true,
+  imports: [FormsModule, RouterModule, TopnavComponent, CommonModule, SidebarComponent],
   templateUrl: './update-colaborador.component.html',
   styleUrl: './update-colaborador.component.css'
 })
 export class UpdateColaboradorComponent {
 
-  
+  public sidebarState = inject(SidebarStateService);
   public colaborador: any = {};
   // public colaborador_const: any = {};
   // public colaborador: Array<any> = [];
@@ -108,6 +111,11 @@ export class UpdateColaboradorComponent {
 
       }
     );
+  }
+
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 
   actualizar(updateForm: any) {

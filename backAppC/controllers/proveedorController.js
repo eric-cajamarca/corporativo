@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
+const gestoresRepository = require('../repositories/gestores.repository');
 
 
 //1. crea el metodo crearCliente segun los datos de la tabla
@@ -61,164 +62,163 @@ const crearProveedor = async function (req, res) {
 
 }
 
-//2. crea el metodo listarClientes segun los datos de la tabla
+//2. Lista proveedores de la empresa del usuario + empresas gestionadas si es gestora
 const listarProveedores = async function (req, res) {
-    if (req.user) {
-        if (req.user.rol == 'Administrador'|| req.user.rol=='Vendedor') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let proveedores = await pool.request().query('select * from Proveedores');
-                res.status(200).send({ message: 'Lista de proveedores', data: proveedores.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    if (!req.user) {
+        return res.status(401).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    const idEmpresa = req.user.empresa || req.user.idEmpresa;
+    if (!idEmpresa) {
+        return res.status(403).send({ message: 'No autorizado: falta empresa en token' });
+    }
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Vendedor') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
+    }
+    try {
+        const pool = await sql.connect(dbConfig);
+        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresa);
+        const idEmpresas = [idEmpresa, ...(gestionadas || []).map((g) => g.idEmpresa)];
+        const request = pool.request();
+        idEmpresas.forEach((id, i) => {
+            request.input('id' + i, sql.UniqueIdentifier, id);
+        });
+        const placeholders = idEmpresas.map((_, i) => '@id' + i).join(', ');
+        const result = await request.query(
+            'SELECT * FROM Proveedores WHERE idEmpresa IN (' + placeholders + ') ORDER BY rSocial'
+        );
+        res.status(200).send({ message: 'Lista de proveedores', data: result.recordset });
+    } catch (error) {
+        console.error('listarProveedores:', error);
+        res.status(500).send({ message: error.message, data: undefined });
     }
 }
 
-//2. crea el metodo listarClientes_id segun los datos de la tabla
+// Lista proveedores por RUC en empresa del usuario o gestionadas
 const listarProveedores_ruc = async function (req, res) {
     const ruc = req.params.id;
-
-    console.log('listarProveedores_ruc - req.data', req.body);
-    console.log('listarProveedores_ruc - req.params', req.params);
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador'|| req.user.rol=='Vendedor') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let proveedores = await pool.request()
-                    .input('ruc', sql.VarChar, ruc)
-                    .query('select * from Proveedores where ruc = @ruc');
-                res.status(200).send({ message: 'Lista de Proveedores', data: proveedores.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!req.user || !idEmpresa) {
+        return res.status(401).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Vendedor') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
+    }
+    try {
+        const pool = await sql.connect(dbConfig);
+        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresa);
+        const idEmpresas = [idEmpresa, ...(gestionadas || []).map((g) => g.idEmpresa)];
+        const request = pool.request().input('ruc', sql.VarChar, ruc);
+        idEmpresas.forEach((id, i) => {
+            request.input('id' + i, sql.UniqueIdentifier, id);
+        });
+        const placeholders = idEmpresas.map((_, i) => '@id' + i).join(', ');
+        const result = await request.query(
+            'SELECT * FROM Proveedores WHERE ruc = @ruc AND idEmpresa IN (' + placeholders + ')'
+        );
+        res.status(200).send({ message: 'Lista de Proveedores', data: result.recordset });
+    } catch (error) {
+        console.error('listarProveedores_ruc:', error);
+        res.status(500).send({ message: error.message, data: undefined });
     }
 }
 
 const listarProveedores_id = async function (req, res) {
     const idProveedor = req.params.id;
-
-    console.log('listarProveedores_idCliente - req.data', req.body);
-    console.log('listarProveedores_idCliente - req.params', req.params);
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador'|| req.user.rol=='Almacenero') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let proveedores = await pool.request()
-                    .input('idProveedor', sql.VarChar, idProveedor)
-                    .query('select * from Proveedores where idProveedor = @idProveedor');
-                res.status(200).send({ message: 'Lista de proveedores', data: proveedores.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!req.user || !idEmpresa) {
+        return res.status(401).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
+    }
+    try {
+        const pool = await sql.connect(dbConfig);
+        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresa);
+        const idEmpresas = [idEmpresa, ...(gestionadas || []).map((g) => g.idEmpresa)];
+        const request = pool.request().input('idProveedor', sql.Int, idProveedor);
+        idEmpresas.forEach((id, i) => {
+            request.input('id' + i, sql.UniqueIdentifier, id);
+        });
+        const placeholders = idEmpresas.map((_, i) => '@id' + i).join(', ');
+        const result = await request.query(
+            'SELECT * FROM Proveedores WHERE idProveedor = @idProveedor AND idEmpresa IN (' + placeholders + ')'
+        );
+        res.status(200).send({ message: 'Lista de proveedores', data: result.recordset });
+    } catch (error) {
+        console.error('listarProveedores_id:', error);
+        res.status(500).send({ message: error.message, data: undefined });
     }
 }
 
-//3. crea el metodo actualizarCliente segun los datos de la tabla
+//3. actualizarProveedor: solo si pertenece a la empresa del usuario o a una gestionada
 const actualizarProveedor = async function (req, res) {
-    const { idDocumento, ruc, rSocial, correo, celular, condicion, } = req.body;
-    const idProveedor = req.params.idProveedor;
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador'|| req.user.rol=='Vendedor') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let updateProveedor = await pool.request()
-                    .input('idProveedor', sql.Int, idProveedor)
-                    .input('idDocumento', sql.VarChar, idDocumento)
-                    .input('ruc', sql.VarChar, ruc)
-                    .input('rSocial', sql.VarChar, rSocial)
-                    .input('correo', sql.VarChar, correo)
-                    .input('celular', sql.VarChar, celular)
-                    .input('condicion', sql.VarChar, condicion)
-                    .query('update Proveedores set idDocumento = @idDocumento, ruc = @ruc, rSocial = @rSocial, correo = @correo, celular = @celular, condicion = @condicion where idCliente = @idCliente');
-                res.status(200).send({ message: 'Proveedor actualizado', data: updateProveedor.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const { idDocumento, ruc, rSocial, correo, celular, condicion } = req.body;
+    const idProveedor = req.params.idProveedor || req.params.id;
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!req.user || !idEmpresa) {
+        return res.status(401).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Vendedor') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
-
+    try {
+        const pool = await sql.connect(dbConfig);
+        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresa);
+        const idEmpresas = [idEmpresa, ...(gestionadas || []).map((g) => g.idEmpresa)];
+        const request = pool.request()
+            .input('idProveedor', sql.Int, idProveedor)
+            .input('idDocumento', sql.VarChar, idDocumento)
+            .input('ruc', sql.VarChar, ruc)
+            .input('rSocial', sql.VarChar, rSocial)
+            .input('correo', sql.VarChar, correo)
+            .input('celular', sql.VarChar, celular)
+            .input('condicion', sql.VarChar, condicion);
+        idEmpresas.forEach((id, i) => { request.input('id' + i, sql.UniqueIdentifier, id); });
+        const placeholders = idEmpresas.map((_, i) => '@id' + i).join(', ');
+        const updateResult = await request.query(
+            'UPDATE Proveedores SET idDocumento = @idDocumento, ruc = @ruc, rSocial = @rSocial, correo = @correo, celular = @celular, condicion = @condicion WHERE idProveedor = @idProveedor AND idEmpresa IN (' + placeholders + ')'
+        );
+        if (updateResult.rowsAffected[0] === 0) {
+            return res.status(404).send({ message: 'Proveedor no encontrado o no pertenece a su empresa', data: undefined });
+        }
+        res.status(200).send({ message: 'Proveedor actualizado', data: updateResult.rowsAffected });
+    } catch (error) {
+        console.error('actualizarProveedor:', error);
+        res.status(500).send({ message: error.message, data: undefined });
+    }
 }
 
-//4. crea el metodo eliminarCliente segun los datos de la tabla
-
+//4. eliminarProveedor: solo si pertenece a la empresa del usuario o a una gestionada
 const eliminarProveedor = async function (req, res) {
     const idProveedor = req.params.id;
-
-    console.log('eliminarProveedor - req.params', idProveedor);
-
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            //antes de eliminar el cliente, verificar si tiene ventas asociadas
-            let pool = await sql.connect(dbConfig);
-            let existeVenta = await pool.request()
-                .input('idProveedor', sql.Int, idProveedor)
-                .query('select * from Compras where idProveedor = @idProveedor');
-
-            if (existeVenta.recordset.length > 0) {
-                res.status(200).send({ message: 'El proveedor tiene compras asociadas, no se puede eliminar', data: undefined });
-                return;
-            } else {
-
-                try {
-                    let pool = await sql.connect(dbConfig);
-                    let deleteProveedor = await pool.request()
-                        .input('idProveedor', sql.Int, idProveedor)
-                        .query('delete from Proveedores where idProveedor = @idProveedor');
-                    res.status(200).send({ message: 'Proveedor eliminado', data: deleteProveedor.rowsAffected });
-                } catch (error) {
-                    console.log('eliminarProveedor - error', error);
-                    res.status(500).send({ message: error.message, data: undefined });
-                }
-            }
-
-
-           
-
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+    if (!req.user || !idEmpresa) {
+        return res.status(401).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (req.user.rol !== 'Administrador') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
-
+    try {
+        const pool = await sql.connect(dbConfig);
+        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresa);
+        const idEmpresas = [idEmpresa, ...(gestionadas || []).map((g) => g.idEmpresa)];
+        const existeVenta = await pool.request()
+            .input('idProveedor', sql.Int, idProveedor)
+            .query('SELECT 1 FROM Compras WHERE idProveedor = @idProveedor');
+        if (existeVenta.recordset.length > 0) {
+            return res.status(400).send({ message: 'El proveedor tiene compras asociadas, no se puede eliminar', data: undefined });
+        }
+        const request = pool.request().input('idProveedor', sql.Int, idProveedor);
+        idEmpresas.forEach((id, i) => { request.input('id' + i, sql.UniqueIdentifier, id); });
+        const placeholders = idEmpresas.map((_, i) => '@id' + i).join(', ');
+        const deleteResult = await request.query(
+            'DELETE FROM Proveedores WHERE idProveedor = @idProveedor AND idEmpresa IN (' + placeholders + ')'
+        );
+        res.status(200).send({ message: 'Proveedor eliminado', data: deleteResult.rowsAffected[0] });
+    } catch (error) {
+        console.error('eliminarProveedor:', error);
+        res.status(500).send({ message: error.message, data: undefined });
+    }
 }
 
 

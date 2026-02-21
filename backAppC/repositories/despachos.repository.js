@@ -319,7 +319,7 @@ exports.obtenerTiposDespachoRepo = async (pool) => {
   return result.recordset;
 };
 
-/** Detalle de venta por idVenta para despacho: cantidad, cantEntregada, cantPendiente y ubicaciones (almacén). */
+/** Detalle de venta por idVenta para despacho: cantidad, cantEntregada, cantPendiente y ubicaciones con cantidad disponible por almacén. */
 exports.obtenerDetalleVentaParaDespachoRepo = async (pool, idEmpresa, idVenta) => {
   const req = pool.request();
   req.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
@@ -332,7 +332,8 @@ exports.obtenerDetalleVentaParaDespachoRepo = async (pool, idEmpresa, idVenta) =
       p.descripcion AS productoDescripcion,
       dv.cantidad,
       ISNULL(dv.cantEntregada, 0) AS cantEntregada,
-      (dv.cantidad - ISNULL(dv.cantEntregada, 0)) AS cantPendiente
+      (dv.cantidad - ISNULL(dv.cantEntregada, 0)) AS cantPendiente,
+      v.idSucursal
     FROM DetalleVenta dv
     INNER JOIN Productos p ON p.idProducto = dv.idProducto
     INNER JOIN Ventas v ON v.idVenta = dv.idVenta AND v.idEmpresa = @idEmpresa
@@ -342,32 +343,84 @@ exports.obtenerDetalleVentaParaDespachoRepo = async (pool, idEmpresa, idVenta) =
   const filas = result.recordset || [];
   if (filas.length === 0) return filas;
   const idsProducto = [...new Set(filas.map((f) => f.idProducto))];
+  const idSucursal = filas[0] && filas[0].idSucursal ? filas[0].idSucursal : null;
   let ubicacionesPorProducto = {};
-  try {
-    const placeholders = idsProducto.map((_, i) => `@p${i}`).join(",");
-    const uReq = pool.request();
-    uReq.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
-    idsProducto.forEach((id, i) => uReq.input(`p${i}`, sql.UniqueIdentifier, id));
-    const uRes = await uReq.query(`
-      SELECT l.idProducto, up.codigoUbicacion
-      FROM Lotes l
-      INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote
-      INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion
-      WHERE l.idEmpresa = @idEmpresa AND l.idProducto IN (${placeholders}) AND l.cantidadDisponible > 0
-    `);
-    const uRows = uRes.recordset || [];
-    for (const r of uRows) {
-      const k = r.idProducto;
-      if (!ubicacionesPorProducto[k]) ubicacionesPorProducto[k] = [];
-      if (r.codigoUbicacion) ubicacionesPorProducto[k].push(r.codigoUbicacion);
+  if (idSucursal && idsProducto.length > 0) {
+    try {
+      const placeholders = idsProducto.map((_, i) => `@p${i}`).join(",");
+      const uReq = pool.request();
+      uReq.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+      uReq.input("idSucursal", sql.UniqueIdentifier, idSucursal);
+      idsProducto.forEach((id, i) => uReq.input(`p${i}`, sql.UniqueIdentifier, id));
+      const uRes = await uReq.query(`
+        SELECT
+          l.idProducto,
+          up.codigoUbicacion,
+          SUM(CAST(lu.cantidad AS DECIMAL(18,2))) AS cantidad
+        FROM Lotes l
+        INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
+        INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion
+        WHERE l.idEmpresa = @idEmpresa
+          AND l.idSucursal = @idSucursal
+          AND l.idProducto IN (${placeholders})
+          AND l.cantidadDisponible > 0
+        GROUP BY l.idProducto, up.codigoUbicacion, up.prioridad
+        ORDER BY l.idProducto, up.prioridad
+      `);
+      const uRows = uRes.recordset || [];
+      for (const r of uRows) {
+        const k = r.idProducto;
+        if (!ubicacionesPorProducto[k]) ubicacionesPorProducto[k] = [];
+        const cant = r.cantidad != null ? Number(r.cantidad) : 0;
+        const cod = (r.codigoUbicacion || "").trim();
+        if (cod) ubicacionesPorProducto[k].push(`${cod}: ${cant}`);
+      }
+      for (const k of Object.keys(ubicacionesPorProducto)) {
+        ubicacionesPorProducto[k] = ubicacionesPorProducto[k].join(", ");
+      }
+    } catch (e) {
+      ubicacionesPorProducto = {};
     }
-    for (const k of Object.keys(ubicacionesPorProducto)) {
-      ubicacionesPorProducto[k] = [...new Set(ubicacionesPorProducto[k])].join(", ");
+  } else {
+    try {
+      const placeholders = idsProducto.map((_, i) => `@p${i}`).join(",");
+      const uReq = pool.request();
+      uReq.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+      idsProducto.forEach((id, i) => uReq.input(`p${i}`, sql.UniqueIdentifier, id));
+      const uRes = await uReq.query(`
+        SELECT
+          l.idProducto,
+          up.codigoUbicacion,
+          SUM(CAST(lu.cantidad AS DECIMAL(18,2))) AS cantidad
+        FROM Lotes l
+        INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
+        INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion
+        WHERE l.idEmpresa = @idEmpresa
+          AND l.idProducto IN (${placeholders})
+          AND l.cantidadDisponible > 0
+        GROUP BY l.idProducto, up.codigoUbicacion, up.prioridad
+        ORDER BY l.idProducto, up.prioridad
+      `);
+      const uRows = uRes.recordset || [];
+      for (const r of uRows) {
+        const k = r.idProducto;
+        if (!ubicacionesPorProducto[k]) ubicacionesPorProducto[k] = [];
+        const cant = r.cantidad != null ? Number(r.cantidad) : 0;
+        const cod = (r.codigoUbicacion || "").trim();
+        if (cod) ubicacionesPorProducto[k].push(`${cod}: ${cant}`);
+      }
+      for (const k of Object.keys(ubicacionesPorProducto)) {
+        ubicacionesPorProducto[k] = ubicacionesPorProducto[k].join(", ");
+      }
+    } catch (e) {
+      ubicacionesPorProducto = {};
     }
-  } catch (e) {
-    ubicacionesPorProducto = {};
   }
-  return filas.map((f) => ({
+  const filasSinSucursal = filas.map((f) => {
+    const { idSucursal: _s, ...rest } = f;
+    return rest;
+  });
+  return filasSinSucursal.map((f) => ({
     ...f,
     ubicaciones: ubicacionesPorProducto[f.idProducto] || ""
   }));

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { FormsModule } from '@angular/forms';
@@ -6,6 +6,8 @@ import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
 import { RouterModule } from '@angular/router';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var iziToast: any;
 declare var $: any;
@@ -14,11 +16,13 @@ declare var $: any;
 @Component({
   selector: 'app-index-proveedor',
   standalone: true,
-  imports: [FormsModule, CommonModule, TopnavComponent, NgbPaginationModule, RouterModule],
+  imports: [FormsModule, CommonModule, TopnavComponent, NgbPaginationModule, RouterModule, SidebarComponent],
   templateUrl: './index-proveedor.component.html',
   styleUrl: './index-proveedor.component.css'
 })
 export class IndexProveedorComponent {
+  public sidebarState = inject(SidebarStateService);
+
   public proveedores: Array<any> = [];
     public proveedores_const: Array<any> = [];
     public token: any = "";
@@ -49,6 +53,10 @@ export class IndexProveedorComponent {
   
   
   
+    }
+  
+    onToggleSidebar(collapsed: boolean): void {
+      this.sidebarState.setCollapsed(collapsed);
     }
   
     init_data() {
