@@ -74,4 +74,60 @@ export class MovimientoInventarioService {
       withCredentials: true
     });
   }
+
+  /** Kardex: compras, ventas y movimientos de un producto en un rango de fechas */
+  obtenerKardex(idProducto: string, fechaDesde: string, fechaHasta: string): Observable<KardexResponse> {
+    let params = new HttpParams().set('idProducto', idProducto);
+    if (fechaDesde) params = params.set('fechaDesde', fechaDesde);
+    if (fechaHasta) params = params.set('fechaHasta', fechaHasta);
+    return this.http.get<KardexResponse>(this.baseUrl + 'kardex', {
+      params,
+      withCredentials: true
+    });
+  }
+}
+
+export interface KardexProducto {
+  idProducto: string;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface KardexSaldoInicial {
+  cantidad: number;
+  pUnitario: number;
+  importe: number;
+}
+
+export interface KardexFila {
+  fecha: string;
+  tipoMov: string;
+  nroDocum: string;
+  idRef: string;
+  tipoRef: 'COMPRA' | 'VENTA' | 'MOVIMIENTO';
+  cantidadEntrada: number;
+  pUnitarioEntrada: number;
+  importeEntrada: number;
+  cantidadSalida: number;
+  pUnitarioSalida: number;
+  importeSalida: number;
+  saldoCantidad: number;
+  saldoPUnitario: number;
+  saldoImporte: number;
+}
+
+export interface KardexTotales {
+  totalEntradaCantidad: number;
+  totalEntradaImporte: number;
+  totalSalidaCantidad: number;
+  totalSalidaImporte: number;
+  saldoFinalCantidad: number;
+  saldoFinalImporte: number;
+}
+
+export interface KardexResponse {
+  producto: KardexProducto | null;
+  saldoInicial: KardexSaldoInicial | null;
+  filas: KardexFila[];
+  totales: KardexTotales | null;
 }

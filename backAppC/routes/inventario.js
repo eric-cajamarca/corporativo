@@ -8,5 +8,6 @@ router.use(auth.auth);
 router.post('/movimientos', inventarioController.registrarMovimiento);
 router.get('/movimientos', inventarioController.listarMovimientos);
 router.get('/tipos-movimiento', inventarioController.tiposMovimiento);
+router.get('/kardex', inventarioController.kardex);
 
 module.exports = router;

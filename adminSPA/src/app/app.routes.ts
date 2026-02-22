@@ -54,6 +54,7 @@ import { MovimientoUbicacionComponent } from './components/inventario/movimiento
 import { VentaPorPrioridadComponent } from './components/inventario/venta-por-prioridad/venta-por-prioridad.component';
 import { AsignarStockUbicacionComponent } from './components/inventario/asignar-stock-ubicacion/asignar-stock-ubicacion.component';
 import { MovimientoInventarioComponent } from './components/inventario/movimiento-inventario/movimiento-inventario.component';
+import { KardexComponent } from './components/inventario/kardex/kardex.component';
 import { IndexCajaComponent } from './components/caja/index-caja/index-caja.component';
 import { IndexCreditosComponent } from './components/creditos/index-creditos/index-creditos.component';
 import { ArqueoCajaComponent } from './components/caja/arqueo-caja/arqueo-caja.component';
@@ -210,6 +211,7 @@ export const routes: Routes = [
      { path: 'inventario/lotes/editar/:id', component: LoteFormComponent, canActivate: [AuthGuard], title: 'Editar Lote de Inventario' },
      { path: 'inventario/ubicaciones', component: UbicacionPrioridadListComponent, canActivate: [AuthGuard], title: 'Ubicaciones con Prioridad' },
      { path: 'inventario/movimientos', component: MovimientoUbicacionComponent, canActivate: [AuthGuard], title: 'Movimiento entre Ubicaciones' },
+     { path: 'inventario/kardex', component: KardexComponent, canActivate: [AuthGuard], title: 'Kardex' },
      { path: 'inventario/venta-rapida', component: VentaPorPrioridadComponent, canActivate: [AuthGuard], title: 'Venta por Prioridad' },
      { path: 'inventario/asignaciones', component: AsignarStockUbicacionComponent, canActivate: [AuthGuard], title: 'Asignaciones de Stock' },
 

@@ -297,7 +297,8 @@ const obtenerNavegacionSidebar = async (pool, user) => {
                 { nombre: 'Ingresos y salidas', ruta: '/inventario/ingreso-salida', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Lotes', ruta: '/inventario/lotes', permiso: 'GESTIONAR_LOTES', visible: esAdmin || permisos.includes('GESTIONAR_LOTES') },
                 { nombre: 'Ubicaciones', ruta: '/inventario/ubicaciones', permiso: 'GESTIONAR_LOTES', visible: esAdmin || permisos.includes('GESTIONAR_LOTES') },
-                { nombre: 'Movimientos', ruta: '/inventario/movimientos', permiso: 'TRANSFERIR_STOCK', visible: esAdmin || permisos.includes('TRANSFERIR_STOCK') }
+                { nombre: 'Movimientos', ruta: '/inventario/movimientos', permiso: 'TRANSFERIR_STOCK', visible: esAdmin || permisos.includes('TRANSFERIR_STOCK') },
+                { nombre: 'Kardex', ruta: '/inventario/kardex', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') }
             ]
         },
         {

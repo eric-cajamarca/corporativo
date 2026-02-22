@@ -1,5 +1,6 @@
 // controllers/inventarioController.js
 const inventarioService = require('../services/inventario.service');
+const kardexService = require('../services/kardex.service');
 
 /**
  * POST /api/inventario/movimientos
@@ -54,5 +55,28 @@ exports.tiposMovimiento = (req, res) => {
   } catch (error) {
     console.error('inventarioController tiposMovimiento:', error);
     return res.status(500).json({ message: 'Error al obtener tipos' });
+  }
+};
+
+/**
+ * GET /api/inventario/kardex?idProducto=...&fechaDesde=...&fechaHasta=...
+ * Reporte kardex: compras, ventas y movimientos de un producto ordenados por fecha.
+ */
+exports.kardex = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const idProducto = req.query.idProducto || null;
+    const fechaDesde = req.query.fechaDesde || null;
+    const fechaHasta = req.query.fechaHasta || null;
+    if (!idProducto) {
+      return res.status(400).json({ message: 'idProducto es obligatorio' });
+    }
+    const resultado = await kardexService.obtenerKardex(req.user.empresa, idProducto, fechaDesde, fechaHasta);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('inventarioController kardex:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener kardex' });
   }
 };
