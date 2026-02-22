@@ -38,6 +38,22 @@ export interface MovimientoListItem {
   totalCantidad: number;
 }
 
+export interface MovimientoDetalle {
+  idMovimiento: number;
+  idSucursal: string;
+  sucursal: string;
+  tipoMovimiento: string;
+  docRelacionado: string | null;
+  fMovimiento: string;
+  observaciones: string | null;
+  usuario: string;
+  idProducto?: string;
+  cantidad?: number;
+  costoUnitario?: number;
+  productoCodigo?: string;
+  productoDescripcion?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -71,6 +87,13 @@ export class MovimientoInventarioService {
     if (filtros.tipoMovimiento) params = params.set('tipoMovimiento', filtros.tipoMovimiento);
     return this.http.get<MovimientoListItem[]>(this.baseUrl + 'movimientos', {
       params,
+      withCredentials: true
+    });
+  }
+
+  /** Obtiene un movimiento por id (para modal detalle). */
+  obtenerMovimientoPorId(idMovimiento: number): Observable<MovimientoDetalle> {
+    return this.http.get<MovimientoDetalle>(this.baseUrl + 'movimientos/' + idMovimiento, {
       withCredentials: true
     });
   }

@@ -45,6 +45,30 @@ exports.listarMovimientos = async (req, res) => {
 };
 
 /**
+ * GET /api/inventario/movimientos/:id
+ * Obtiene un movimiento por id (detalle para modal).
+ */
+exports.obtenerMovimientoPorId = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: 'Id de movimiento inválido' });
+    }
+    const movimiento = await inventarioService.obtenerMovimientoPorId(req.user.empresa, id);
+    if (!movimiento) {
+      return res.status(404).json({ message: 'Movimiento no encontrado' });
+    }
+    return res.status(200).json(movimiento);
+  } catch (error) {
+    console.error('inventarioController obtenerMovimientoPorId:', error);
+    return res.status(500).json({ message: 'Error al obtener movimiento' });
+  }
+};
+
+/**
  * GET /api/inventario/tipos-movimiento
  * Devuelve opciones para el dropdown Tipo de movimiento.
  */

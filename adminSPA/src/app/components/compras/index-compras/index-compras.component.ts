@@ -221,11 +221,10 @@ export class IndexComprasComponent {
   }
 
 
+  /** Carga solo las compras de la empresa del usuario logueado (GET /api/compras-por-empresa). */
   initData() {
-    this._comprasService.obtener_compras_todos().subscribe(
-      response => {
-        console.log('response.data');
-        console.log(response.data);
+    this._comprasService.obtener_compras_todos_idEmpresa().subscribe({
+      next: (response) => {
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -239,12 +238,13 @@ export class IndexComprasComponent {
         } else {
           this.compras = response.data;
           this.compras_const = response.data;
+          console.log('this.compras', this.compras);
         }
       },
-      error => {
-        console.log(error);
+      error: (err) => {
+        console.error('initData compras:', err);
       }
-    );
+    });
   }
 
   aplicarFiltros(): void {
@@ -463,7 +463,7 @@ export class IndexComprasComponent {
             telefono: item.telefono ?? '—'
           },
           comprobante: {
-            numero: item.compCompra ?? item.serie + '-' + item.numero ?? '—',
+            numero: item.compCompra ?? (item.serie != null && item.numero != null ? item.serie + '-' + item.numero : '—'),
             serie: item.serie ?? '—',
             numeroDoc: item.numero ?? '—',
             fEmision: item.fEmision ?? '—',

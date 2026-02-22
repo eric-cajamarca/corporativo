@@ -7,6 +7,7 @@ router.use(auth.auth);
 
 router.post('/movimientos', inventarioController.registrarMovimiento);
 router.get('/movimientos', inventarioController.listarMovimientos);
+router.get('/movimientos/:id', inventarioController.obtenerMovimientoPorId);
 router.get('/tipos-movimiento', inventarioController.tiposMovimiento);
 router.get('/kardex', inventarioController.kardex);
 

@@ -3,13 +3,15 @@ var api = express.Router();
 var comprasController = require('../controllers/comprasController');
 var auth  = require('../middlewares/autenticate');
 
-// Rutas para el CRUD de compras
+// Listado de compras de la empresa logueada (ruta única para evitar que otra ruta capture la petición)
+api.get('/compras-por-empresa', auth.auth, comprasController.obtener_compras_todos_idEmpresa);
 
-api.get('/compras',auth.auth, comprasController.obtener_compras_todos);
-api.get('/compras/:id',auth.auth, comprasController.obtener_compras_id);
+// Rutas para el CRUD de compras (rutas más específicas primero)
+//api.get('/comprasempresa', auth.auth, comprasController.obtener_compras_todos_idEmpresa);
+api.get('/comprasempresa/:id', auth.auth, comprasController.obtener_compras_idCompra_idEmpresa);
 
-api.get('/comprasempresa/:id',auth.auth, comprasController.obtener_compras_idCompra_idEmpresa);
-api.get('/comprasempresa',auth.auth, comprasController.obtener_compras_todos_idEmpresa);
+api.get('/compras', auth.auth, comprasController.obtener_compras_todos);
+api.get('/compras/:id', auth.auth, comprasController.obtener_compras_id);
 
 api.post('/compras', auth.auth, comprasController.crear_compra);
 api.put('/compras/:id',auth.auth, comprasController.editar_compra);

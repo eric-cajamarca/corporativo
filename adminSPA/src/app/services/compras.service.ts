@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
+import { environment } from '../../environments/environment';
 import { Observable } from 'rxjs/internal/Observable';
 
 @Injectable({
@@ -61,10 +62,12 @@ export class ComprasService {
     });
   }
 
+  /** Lista solo las compras de la empresa del usuario logueado. Siempre usa GET /api/compras-por-empresa. */
   obtener_compras_todos_idEmpresa(): Observable<any> {
-    let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    return this._http.get(this.url + 'comprasempresa', { 
-      headers:headers,
+    const url = environment.API_URL + 'compras-por-empresa';
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get(url, {
+      headers,
       withCredentials: true
     });
   }

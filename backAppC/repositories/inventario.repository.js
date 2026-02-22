@@ -140,3 +140,23 @@ exports.listarMovimientos = async (pool, filtros) => {
   `);
   return result.recordset || [];
 };
+
+/**
+ * Obtiene un movimiento por id (para detalle en modal). Incluye producto si existe.
+ */
+exports.obtenerMovimientoPorId = async (pool, idEmpresa, idMovimiento) => {
+  const result = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idMovimiento', sql.Int, idMovimiento)
+    .query(`
+      SELECT m.idMovimiento, m.idSucursal, s.nombre AS sucursal, m.tipoMovimiento, m.docRelacionado,
+             CONVERT(VARCHAR(19), m.fMovimiento, 120) AS fMovimiento, m.observaciones, u.nombre AS usuario,
+             m.idProducto, m.cantidad, m.costoUnitario, p.codigo AS productoCodigo, p.descripcion AS productoDescripcion
+      FROM MovimientosInventario m
+      INNER JOIN Sucursal s ON m.idSucursal = s.idSucursal
+      INNER JOIN UsuarioWeb u ON m.idUsuario = u.idUsuario
+      LEFT JOIN Productos p ON m.idProducto = p.idProducto
+      WHERE m.idEmpresa = @idEmpresa AND m.idMovimiento = @idMovimiento
+    `);
+  return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+};

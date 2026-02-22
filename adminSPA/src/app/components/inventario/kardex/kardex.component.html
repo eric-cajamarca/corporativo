@@ -50,6 +50,18 @@
         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="buscar()" title="Actualizar">
           <i class="bi bi-arrow-repeat"></i>
         </button>
+        @if (data?.producto) {
+          <span class="vr d-none d-md-inline"></span>
+          <button class="btn btn-sm btn-outline-primary" (click)="imprimir()" title="Imprimir">
+            <i class="bi bi-printer"></i> Imprimir
+          </button>
+          <button class="btn btn-sm btn-outline-danger" (click)="exportarPdf()" title="Exportar PDF">
+            <i class="bi bi-file-pdf"></i> PDF
+          </button>
+          <button class="btn btn-sm btn-outline-success" (click)="exportarExcel()" title="Exportar a Excel">
+            <i class="bi bi-file-excel"></i> Excel
+          </button>
+        }
       </div>
 
       @if (data?.producto) {
@@ -149,6 +161,127 @@
       @if (!data && !cargando) {
         <p class="text-muted mb-0">Seleccione un producto y pulse Buscar para ver el kardex.</p>
       }
+    </div>
+  </div>
+
+  <!-- Modal detalle comprobante / movimiento -->
+  <div #modalDetalle class="modal fade" tabindex="-1" aria-labelledby="modalDetalleLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalDetalleLabel">
+            @if (modalTipo === 'COMPRA') { Detalle de compra }
+            @else if (modalTipo === 'VENTA') { Detalle de venta }
+            @else if (modalTipo === 'MOVIMIENTO') { Detalle de movimiento }
+            @else { Detalle }
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          @if (modalCargando) {
+            <p class="text-muted mb-0"><span class="spinner-border spinner-border-sm me-2"></span>Cargando...</p>
+          }
+          @if (modalError) {
+            <div class="alert alert-warning mb-0">{{ modalError }}</div>
+          }
+          @if (!modalCargando && !modalError && modalTipo === 'COMPRA' && modalDataCompra) {
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <p class="mb-1"><strong>Documento:</strong> {{ modalDataCompra.compra?.serie }} - {{ modalDataCompra.compra?.numero }}</p>
+                <p class="mb-1"><strong>Fecha:</strong> {{ formatearFecha(modalDataCompra.compra?.fEmision) }}</p>
+              </div>
+              <div class="col-md-6">
+                <p class="mb-1"><strong>Total:</strong> {{ formatearMoneda(modalDataCompra.compra?.total) }}</p>
+              </div>
+            </div>
+            <h6>Detalle</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Cantidad</th>
+                    <th class="text-end">P. unit.</th>
+                    <th class="text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of modalDataCompra.detalle; track $index) {
+                    <tr>
+                      <td>{{ d.cantidad }}</td>
+                      <td class="text-end">{{ formatearMoneda(d.pUnitario) }}</td>
+                      <td class="text-end">{{ formatearMoneda(d.total) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          @if (!modalCargando && !modalError && modalTipo === 'VENTA' && modalDataVenta) {
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <p class="mb-1"><strong>Comprobante:</strong> {{ modalDataVenta.venta.compVenta }}</p>
+                <p class="mb-1"><strong>Fecha:</strong> {{ formatearFecha(modalDataVenta.venta.fEmision) }}</p>
+              </div>
+              <div class="col-md-6">
+                <p class="mb-1"><strong>Cliente:</strong> {{ modalDataVenta.cliente.razonSocial || modalDataVenta.cliente.rSocial || '—' }}</p>
+                <p class="mb-1"><strong>Total:</strong> {{ formatearMoneda(modalDataVenta.venta.total) }}</p>
+              </div>
+            </div>
+            <h6>Detalle</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Código</th>
+                    <th>Descripción</th>
+                    <th class="text-end">Cant.</th>
+                    <th class="text-end">P. venta</th>
+                    <th class="text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of modalDataVenta.items || []; track $index) {
+                    <tr>
+                      <td>{{ d.codigo || '—' }}</td>
+                      <td>{{ d.descripcion || '—' }}</td>
+                      <td class="text-end">{{ d.cantidad }}</td>
+                      <td class="text-end">{{ formatearMoneda(d.pVenta) }}</td>
+                      <td class="text-end">{{ formatearMoneda(d.total) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          @if (!modalCargando && !modalError && modalTipo === 'MOVIMIENTO' && modalDataMovimiento) {
+            <dl class="row mb-0">
+              <dt class="col-sm-3">Fecha</dt>
+              <dd class="col-sm-9">{{ formatearFecha(modalDataMovimiento.fMovimiento) }}</dd>
+              <dt class="col-sm-3">Tipo</dt>
+              <dd class="col-sm-9">{{ modalDataMovimiento.tipoMovimiento }}</dd>
+              <dt class="col-sm-3">Sucursal</dt>
+              <dd class="col-sm-9">{{ modalDataMovimiento.sucursal }}</dd>
+              <dt class="col-sm-3">Documento</dt>
+              <dd class="col-sm-9">{{ modalDataMovimiento.docRelacionado || '—' }}</dd>
+              <dt class="col-sm-3">Usuario</dt>
+              <dd class="col-sm-9">{{ modalDataMovimiento.usuario }}</dd>
+              <dt class="col-sm-3">Producto</dt>
+              <dd class="col-sm-9">{{ modalDataMovimiento.productoDescripcion || modalDataMovimiento.productoCodigo || '—' }}</dd>
+              <dt class="col-sm-3">Cantidad</dt>
+              <dd class="col-sm-9">{{ modalDataMovimiento.cantidad }}</dd>
+              <dt class="col-sm-3">Costo unit.</dt>
+              <dd class="col-sm-9">{{ formatearMoneda(modalDataMovimiento.costoUnitario ?? 0) }}</dd>
+              @if (modalDataMovimiento.observaciones) {
+                <dt class="col-sm-3">Observaciones</dt>
+                <dd class="col-sm-9">{{ modalDataMovimiento.observaciones }}</dd>
+              }
+            </dl>
+          }
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" (click)="cerrarModal()">Cerrar</button>
+        </div>
+      </div>
     </div>
   </div>
 </main>

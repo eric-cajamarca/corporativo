@@ -38,3 +38,20 @@
   white-space: nowrap;
   vertical-align: middle;
 }
+
+@media print {
+  app-sidebar,
+  app-topnav,
+  .btn,
+  .content-header a,
+  .input-group input,
+  .form-select,
+  .d-flex.gap-2.mb-2,
+  .modal {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+  }
+}

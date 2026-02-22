@@ -118,6 +118,18 @@ exports.listarMovimientos = async (idEmpresa, filtros) => {
 };
 
 /**
+ * Obtiene un movimiento por id (para detalle en modal).
+ */
+exports.obtenerMovimientoPorId = async (idEmpresa, idMovimiento) => {
+  const pool = await sql.connect(dbConfig);
+  try {
+    return await inventarioRepository.obtenerMovimientoPorId(pool, idEmpresa, idMovimiento);
+  } finally {
+    pool.close && pool.close().catch(() => {});
+  }
+};
+
+/**
  * Tipos de movimiento para el dropdown (frontend).
  */
 exports.obtenerTiposMovimiento = () => {

@@ -1,0 +1,3 @@
+{"sessionId":"08e109","location":"productos.repository.js:obtenerProductosCompras:entry","message":"pool at entry","data":{"poolConnected":true},"timestamp":1771731439434,"hypothesisId":"H1"}
+{"sessionId":"08e109","location":"productosController.js:obtener_productos_compras","message":"pool after connect","data":{"poolConnected":true},"timestamp":1771731439429,"hypothesisId":"H1,H4,H5"}
+{"sessionId":"08e109","location":"productos.repository.js:obtenerProductosCompras:beforeSecondRequest","message":"pool before second request","data":{"poolConnected":true},"timestamp":1771731439566,"hypothesisId":"H3"}
