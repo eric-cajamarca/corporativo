@@ -273,6 +273,7 @@ export class CreateEmpresaComponent implements OnInit {
         }
 
         this.empresaEncontrada = data;
+        console.log('empresaEncontrada:', this.empresaEncontrada);
         this.encontrado.set(true);
         this.empresaForm.patchValue({
           razonSocial: data.razonSocial || '',

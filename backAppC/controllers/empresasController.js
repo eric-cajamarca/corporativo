@@ -540,7 +540,7 @@ const createSucursalEmpresa = async function (req, res) {
         if (req.body.nombre) {
             nombre = req.body.nombre;
         } else {
-            nombre = 'Mi sucursal';
+            nombre = 'Sucursal Principal';
         }
 
         let idSucursal = uuidv4();

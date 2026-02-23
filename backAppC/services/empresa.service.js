@@ -75,11 +75,21 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
     const sql = require('mssql');
     
     const comprobantesPredeterminados = [
-        { codigo: '01', nombre: 'Factura Electrónica', serie: 'F001', numero: 0, activo: 1 },
-        { codigo: '03', nombre: 'Boleta de Venta Electrónica', serie: 'B001', numero: 0, activo: 1 },
+        { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1 },
+        { codigo: '03', nombre: 'Boleta Electrónica', serie: 'B001', numero: 0, activo: 1 },
         { codigo: '07', nombre: 'Nota de Crédito Electrónica', serie: 'FC01', numero: 0, activo: 1 },
         { codigo: '08', nombre: 'Nota de Débito Electrónica', serie: 'FD01', numero: 0, activo: 1 },
-        { codigo: '09', nombre: 'Guía de Remisión Electrónica', serie: 'T001', numero: 0, activo: 1 }
+        { codigo: '09', nombre: 'Guía de Remisión Electrónica', serie: 'T001', numero: 0, activo: 1 },
+        { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1 },
+        { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1 },
+        { codigo: 'NV', nombre: 'Nota de venta', serie: 'NV01', numero: 0, activo: 1 },
+        { codigo: 'CT', nombre: 'Cotización', serie: 'CT01', numero: 0, activo: 1 },
+        { codigo: 'RE', nombre: 'Recibo de Egreso', serie: 'RE01', numero: 0, activo: 1 },
+        { codigo: 'RI', nombre: 'Recibo de Ingreso', serie: 'RI01', numero: 0, activo: 1 },
+        { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
+        { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
+        { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 }
+
     ];
 
     const comprobantesCreados = [];
@@ -200,9 +210,10 @@ exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
     const sql = require('mssql');
     
     const ubicacionesPredeterminadas = [
-        { codigoUbicacion: 'MOSTRADOR', prioridad: 1 },
-        { codigoUbicacion: 'ANDAMIO-1', prioridad: 2 },
-        { codigoUbicacion: 'ANDAMIO-2', prioridad: 3 }
+        
+        { codigoUbicacion: 'ANDAMIO-1', prioridad: 1},
+        { codigoUbicacion: 'ANDAMIO-2', prioridad: 2 },
+        { codigoUbicacion: 'MOSTRADOR', prioridad: 3 },
     ];
 
     const ubicacionesCreadas = [];
@@ -246,7 +257,8 @@ exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) 
     // Estructura: idLista, idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, fechaFin, activo, fCreacion
     const listasPredeterminadas = [
         { nombre: 'Precio Normal', principal: true, conIgv: true, idMoneda: 1 },
-        { nombre: 'Precio Verano', principal: false, conIgv: true, idMoneda: 1 }
+        { nombre: 'Precio Cliente', principal: true, conIgv: true, idMoneda: 1 },
+        { nombre: 'Precio Mayorista', principal: true, conIgv: true, idMoneda: 1 },
     ];
 
     const listasCreadas = [];
@@ -312,6 +324,45 @@ exports.crearCorrelativoInicial = async (pool, idEmpresa, numeroInicial = NUMERO
 };
 
 /**
+ * Crea los conceptos predeterminados para una empresa
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @returns {Array} Conceptos creados
+ */
+
+exports.crearConceptosPredeterminados = async (pool, idEmpresa) => {
+    console.log('Creando conceptos predeterminados para empresa:', idEmpresa);
+    const sql = require('mssql');
+    const conceptosPredeterminados = [
+        { descripcion: 'PAGO DE CLIENTES', tipo: 'INGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 3 },
+        { descripcion: 'PAGO DE PROVEEDORES', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 5 },
+        { descripcion: 'PAGO DE SERVICIOS', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 8 },
+        { descripcion: 'PAGO DE PERSONAL', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 7 },
+        { descripcion: 'OTROS PAGOS', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 7 },
+        { descripcion: 'RETIRO DE DINERO', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 9 },
+        { descripcion: 'SALDO ANTERIOR', tipo: 'INGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 10 },
+        { descripcion: 'OTROS INGRESOS', tipo: 'INGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 4 },
+       
+    ];
+    const conceptosCreados = [];
+    try {
+        for (const concepto of conceptosPredeterminados) {
+    }
+    } catch (error) {
+        console.error('Error creando conceptos predeterminados:', error);
+        throw new Error('Error al crear conceptos predeterminados: ' + error.message);
+    }
+    return conceptosCreados;
+};
+
+
+
+
+
+
+
+
+/**
  * Inicializa todos los datos maestros para una nueva empresa
  * @param {Object} pool - Conexión a la base de datos
  * @param {String} idEmpresa - ID de la empresa
@@ -324,10 +375,10 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
     const resultado = {
         roles: [],
         comprobantes: [],
-        sucursal: null,
         secuencias: [],
         ubicaciones: [],
         listasPrecios: [],
+        conceptos: [],
         correlativo: null,
         errores: []
     };
@@ -350,12 +401,14 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         }
 
         // 3. Crear sucursal principal
+        /**
         try {
             resultado.sucursal = await exports.crearSucursalPrincipal(pool, idEmpresa, datosEmpresa);
         } catch (error) {
             console.error('⚠️ Error creando sucursal:', error.message);
             resultado.errores.push({ tipo: 'sucursal', mensaje: error.message });
         }
+        */
 
         // 4. Crear secuencias solo si tenemos comprobantes y sucursal
         if (resultado.comprobantes.length > 0 && resultado.sucursal) {
@@ -407,14 +460,24 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'correlativo', mensaje: error.message });
         }
 
+        // 8. Crear conceptos predeterminados
+        try {
+            resultado.conceptos = await exports.crearConceptosPredeterminados(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando conceptos predeterminados:', error.message);
+            resultado.errores.push({ tipo: 'conceptos', mensaje: error.message });
+        }
+
+
         console.log('✅ Inicialización completada:', {
             roles: resultado.roles.length,
             comprobantes: resultado.comprobantes.length,
-            sucursal: resultado.sucursal ? 'OK' : 'ERROR',
+            //sucursal: resultado.sucursal ? 'OK' : 'ERROR',
             secuencias: resultado.secuencias.length,
             ubicaciones: resultado.ubicaciones.length,
             listasPrecios: resultado.listasPrecios.length,
             correlativo: resultado.correlativo ? 'OK' : 'ERROR',
+            conceptos: resultado.conceptos.length,
             errores: resultado.errores.length
         });
 

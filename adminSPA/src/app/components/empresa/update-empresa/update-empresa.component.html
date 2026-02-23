@@ -1,445 +1,450 @@
 <!-- <p>update-empresa works!</p>
 <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 50px; height: 50px;" onerror="this.src='assets/01.jpg'"> -->
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-<app-topnav></app-topnav>
-<div class="container">
-    <form id="kt_form" #registroForm="ngForm" (ngSubmit)="registrar(registroForm)">
-        <div class="cabecera d-flex flex-column flex-md-row">
-            <div class="card col-12 col-md-3">
-                <div class="card-body" style="align-content: center;">
-                    <label for="logo" class="form-label">Logo de la empresa</label>
-                    <div class="input-group">
-                        <input type="file" class="form-control" name="logo" (change)="onLogoChange($event)"
-                            accept="image/png, image/jpeg, image/gif, image/webp" #fileInput>
-                    </div>
-                    <div>
-                        @if (!imgSelect) {
-                        <!-- <label for="logoPreview" class="form-label">Vista previa del logo actual</label> -->
-                        <hr>
-                        <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 100%" class="img-fluid">
-                        }
-                        @if (imgSelect) {
-                        <!-- <label for="newLogoPreview" class="form-label">Vista previa del nuevo logo</label> -->
-                        <hr>
-                        <img [src]="imgSelect" class="img-fluid" style="width: 100%;">
-                        }
-                    </div>
-                    <small class="text-muted">Formatos permitidos: PNG, JPG, GIF, WEBP (Máx. 4MB)</small>
-                </div>
-            </div>
-
-            <div class="col-12 col-md-9">
-                <div class="card" style="margin-bottom: 20px;">
-                    <div class="card-body">
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container">
+        <form id="kt_form" #registroForm="ngForm" (ngSubmit)="registrar(registroForm)">
+            <div class="cabecera d-flex flex-column flex-md-row">
+                <div class="card col-12 col-md-3">
+                    <div class="card-body" style="align-content: center;">
+                        <label for="logo" class="form-label">Logo de la empresa</label>
+                        <div class="input-group">
+                            <input type="file" class="form-control" name="logo" (change)="onLogoChange($event)"
+                                accept="image/png, image/jpeg, image/gif, image/webp" #fileInput>
+                        </div>
                         <div>
-                            <div class="form-group row" style="margin-bottom: 20px;">
-                                <label class="col-xl-3 col-lg-3 col-form-label">Tipo de documento</label>
-                                <div class="col-lg-9 col-xl-9">
-                                    <select required name="idDocumento" [(ngModel)]="empresas.idDocumento"
-                                        class="form-control">
-                                        <option value="" selected disabled>Seleccionar documento...</option>
-                                        @for (item of documento; track item.idDocumento) {
-                                        <option [value]="item.idDocumento">{{ item.nombre }}</option>
-                                        }
-                                    </select>
+                            @if (!imgSelect) {
+                            <!-- <label for="logoPreview" class="form-label">Vista previa del logo actual</label> -->
+                            <hr>
+                            <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 100%" class="img-fluid">
+                            }
+                            @if (imgSelect) {
+                            <!-- <label for="newLogoPreview" class="form-label">Vista previa del nuevo logo</label> -->
+                            <hr>
+                            <img [src]="imgSelect" class="img-fluid" style="width: 100%;">
+                            }
+                        </div>
+                        <small class="text-muted">Formatos permitidos: PNG, JPG, GIF, WEBP (Máx. 4MB)</small>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-9">
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-body">
+                            <div>
+                                <div class="form-group row" style="margin-bottom: 20px;">
+                                    <label class="col-xl-3 col-lg-3 col-form-label">Tipo de documento</label>
+                                    <div class="col-lg-9 col-xl-9">
+                                        <select required name="idDocumento" [(ngModel)]="empresas.idDocumento"
+                                            class="form-control">
+                                            <option value="" selected disabled>Seleccionar documento...</option>
+                                            @for (item of documento; track item.idDocumento) {
+                                            <option [value]="item.idDocumento">{{ item.nombre }}</option>
+                                            }
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
 
-                            @if (empresas.idDocumento == 6) {
-                            <div class="input-group input-group-merge">
-                                <input type="text" class="form-control form-control-appended"
-                                    placeholder="ingrese el número de RUC" name="ruc" [(ngModel)]="empresas.ruc">
-                            </div>
-                            }
+                                @if (empresas.idDocumento == 6) {
+                                <div class="input-group input-group-merge">
+                                    <input type="text" class="form-control form-control-appended"
+                                        placeholder="ingrese el número de RUC" name="ruc" [(ngModel)]="empresas.ruc">
+                                </div>
+                                }
 
-                            @if (empresas.idDocumento == 1) {
-                            <div class="input-group input-group-merge">
-                                <input type="text" class="form-control form-control-appended"
-                                    placeholder="ingrese el número de DNI" name="ruc" [(ngModel)]="empresas.ruc">
-                            </div>
-                            }
+                                @if (empresas.idDocumento == 1) {
+                                <div class="input-group input-group-merge">
+                                    <input type="text" class="form-control form-control-appended"
+                                        placeholder="ingrese el número de DNI" name="ruc" [(ngModel)]="empresas.ruc">
+                                </div>
+                                }
 
-                            <div class="mb-3">
-                                <label for="razon_Social" class="form-label">Razón Social</label>
-                                <input type="text" class="form-control" name="razon_Social"
-                                    [(ngModel)]="empresas.razon_Social" placeholder="Ingrese la razón social">
-                            </div>
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" name="correo" [(ngModel)]="empresas.correo"
-                                    placeholder="Ingrese el email" appValidateEmail>
-                            </div>
-                            <div class="mb-3">
-                                <label for="celular" class="form-label">Celular</label>
-                                <input type="tel" class="form-control" name="celular" [(ngModel)]="empresas.celular"
-                                    placeholder="El número de celular debe empezar con el 9 y tener 9 dígitos."
-                                    appValidatePhone>
+                                <div class="mb-3">
+                                    <label for="razon_Social" class="form-label">Razón Social</label>
+                                    <input type="text" class="form-control" name="razon_Social"
+                                        [(ngModel)]="empresas.razon_Social" placeholder="Ingrese la razón social">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" name="correo" [(ngModel)]="empresas.correo"
+                                        placeholder="Ingrese el email" appValidateEmail>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="celular" class="form-label">Celular</label>
+                                    <input type="tel" class="form-control" name="celular" [(ngModel)]="empresas.celular"
+                                        placeholder="El número de celular debe empezar con el 9 y tener 9 dígitos."
+                                        appValidatePhone>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <!-- aqui muestro la información adicional de la empresa -->
-        @switch (empresas.idDocumento) {
-        @case ("6") {
+            <!-- aqui muestro la información adicional de la empresa -->
+            @switch (empresas.idDocumento) {
+            @case ("6") {
 
-        <div class="card" style="margin-bottom: 20px; margin-top: 0px !important;">
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="nombreComercial" class="form-label">Nombre Comercial</label>
-                    <input type="text" class="form-control" name="nombreComercial"
-                        [(ngModel)]="empresas.nombreComercial" placeholder="Ingrese nombre comercial (opcional)"
-                        appConvertToUpper>
-                </div>
-                <div class="mb-3">
-                    <label for="alias" class="form-label">Alias</label>
-                    <input type="text" class="form-control" name="alias" [(ngModel)]="empresas.alias"
-                        placeholder="Crea un corto alias para tu negocio" maxlength="10" appFormatSentence>
-                </div>
-                <div class="mb-3">
-                    <label for="rubro" class="form-label">Giro del negocio</label>
-                    <textarea type="text" class="form-control" name="rubro" [(ngModel)]="empresas.rubro"
-                        placeholder="Descripcion del giro del negocio" appFormatSentence></textarea>
-                </div>
-            </div>
-
-            <div style="margin-bottom: 20px; text-align: left; margin-left: 20px;">
-                @if (!btn_registrar) {
-                <button type="submit" class="btn btn-success">Actualizar</button>
-                }
-                @if (btn_registrar) {
-                <button type="button" class="btn btn-success font-weight-bolder px-9 py-4" disabled>
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    Actualizando...
-                </button>
-                }
-            </div>
-        </div>
-        }
-
-        @case ("1") {
-
-
-        <div class="card" style="margin-bottom: 20px;">
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="rSocial" class="form-label">Razón Social</label>
-                    <input type="text" class="form-control" name="rSocial" [(ngModel)]="empresas.rSocial"
-                        placeholder="Ingrese la razón social">
-                </div>
-                <div class="mb-3">
-                    <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control" name="correo" [(ngModel)]="empresas.correo"
-                        placeholder="Ingrese el email (opcional)">
-                </div>
-                <div class="mb-3">
-                    <label for="celular" class="form-label">Teléfono</label>
-                    <input type="tel" class="form-control" name="celular" [(ngModel)]="empresas.celular"
-                        placeholder="Ingrese el teléfono (opcional)">
-                </div>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label style="color: #742f0f;">
-                <input type="checkbox" name="mostrarDireccion" [(ngModel)]="mostrarDireccion"
-                    (change)="onCheckboxChange()"> Registrar dirección
-            </label>
-
-            @if (mostrarDireccion) {
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="card-header-title">Registrar dirección</h4>
-                </div>
+            <div class="card" style="margin-bottom: 20px; margin-top: 0px !important;">
                 <div class="card-body">
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn">Región (opcional)</label>
-                        <select id="sl-region" name="region" [(ngModel)]="direccionEmpresas.region" class="form-control"
-                            (change)="select_region()">
-                            <option value="" selected disabled>Seleccionar</option>
-                            @for (item of regiones; track item.id) {
-                            <option [value]="item.id">{{ item.name }}</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn">Provincia (opcional)</label>
-                        <select id="sl-provincia" name="provincia" [(ngModel)]="direccionEmpresas.provincia"
-                            class="form-control" disabled (change)="select_provincia()">
-                            <option value="" selected disabled>Seleccionar</option>
-                            @for (item of provincias; track item.id) {
-                            <option [value]="item.id">{{ item.name }}</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-sm-6 form-group">
-                        <label for="ac-fn">Distrito (opcional)</label>
-                        <select id="sl-distrito" name="distrito" [(ngModel)]="direccionEmpresas.distrito"
-                            class="form-control" disabled (change)="select_distrito($event)">
-                            <option value="" selected disabled>Seleccionar</option>
-                            @for (item of distritos; track item.id) {
-                            <option [value]="item.id">{{ item.name }}</option>
-                            }
-                        </select>
+                    <div class="mb-3">
+                        <label for="nombreComercial" class="form-label">Nombre Comercial</label>
+                        <input type="text" class="form-control" name="nombreComercial"
+                            [(ngModel)]="empresas.nombreComercial" placeholder="Ingrese nombre comercial (opcional)"
+                            appConvertToUpper>
                     </div>
                     <div class="mb-3">
-                        <label for="ubigeo" class="form-label">Ubigeo</label>
-                        <input type="text" class="form-control" name="ubigeo" [(ngModel)]="direccionEmpresas.ubigeo"
-                            placeholder="Ingrese el ubigeo (opcional)">
+                        <label for="alias" class="form-label">Alias</label>
+                        <input type="text" class="form-control" name="alias" [(ngModel)]="empresas.alias"
+                            placeholder="Crea un corto alias para tu negocio" maxlength="10" appFormatSentence>
                     </div>
                     <div class="mb-3">
-                        <label for="direccion" class="form-label">Dirección</label>
-                        <input type="text" class="form-control" name="direccion"
-                            [(ngModel)]="direccionEmpresas.direccion" placeholder="Ingrese la dirección (opcional)">
+                        <label for="rubro" class="form-label">Giro del negocio</label>
+                        <textarea type="text" class="form-control" name="rubro" [(ngModel)]="empresas.rubro"
+                            placeholder="Descripcion del giro del negocio" appFormatSentence></textarea>
                     </div>
-                    <div class="mb-3">
-                        <label for="referencia" class="form-label">Referencia</label>
-                        <input type="text" class="form-control" name="referencia"
-                            [(ngModel)]="direccionEmpresas.referencia" placeholder="Ingrese la referencia (opcional)">
-                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px; text-align: left; margin-left: 20px;">
+                    @if (!btn_registrar) {
+                    <button type="submit" class="btn btn-success">Actualizar</button>
+                    }
+                    @if (btn_registrar) {
+                    <button type="button" class="btn btn-success font-weight-bolder px-9 py-4" disabled>
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Actualizando...
+                    </button>
+                    }
                 </div>
             </div>
             }
-        </div>
-        }
-        }
-    </form>
 
-    <!-- aqui empieza las direcciones de la empresa -->
+            @case ("1") {
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">Direcciones de la empresa</h4>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crearDireccionModal"
-                (click)="modalCrearDireccion()">
-                <i class="fas fa-plus me-2"></i>Nueva dirección
-            </button>
-        </div>
 
-        <div class="card-body">
-            @if (direccionEmpresas_const.length > 0) {
-            <div class="table-responsive">
-                <table class="table table-hover table-striped">
-                    <thead>
-                        <tr>
-                            <th>Principal</th>
-                            <th>Ubigeo</th>
-                            <th>Región</th>
-                            <th>Provincia</th>
-                            <th>Distrito</th>
-                            <th>Dirección</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (item of direccionEmpresas_const; track item.idDireccionEmpresa) {
-                        <tr>
-                            <td>
-                                @if (item.principal) {
-                                <span class="badge bg-success">Principal</span>
-                                } @else {
-                                <button class="btn btn-sm btn-outline-primary"
-                                    (click)="updatePrincipal(item.idDireccionEmpresa)" title="Convertir en principal">
-                                    <i class="fas fa-star"></i>
-                                </button>
+            <div class="card" style="margin-bottom: 20px;">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="rSocial" class="form-label">Razón Social</label>
+                        <input type="text" class="form-control" name="rSocial" [(ngModel)]="empresas.rSocial"
+                            placeholder="Ingrese la razón social">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" name="correo" [(ngModel)]="empresas.correo"
+                            placeholder="Ingrese el email (opcional)">
+                    </div>
+                    <div class="mb-3">
+                        <label for="celular" class="form-label">Teléfono</label>
+                        <input type="tel" class="form-control" name="celular" [(ngModel)]="empresas.celular"
+                            placeholder="Ingrese el teléfono (opcional)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label style="color: #742f0f;">
+                    <input type="checkbox" name="mostrarDireccion" [(ngModel)]="mostrarDireccion"
+                        (change)="onCheckboxChange()"> Registrar dirección
+                </label>
+
+                @if (mostrarDireccion) {
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-header-title">Registrar dirección</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="col-sm-6 form-group">
+                            <label for="ac-fn">Región (opcional)</label>
+                            <select id="sl-region" name="region" [(ngModel)]="direccionEmpresas.region" class="form-control"
+                                (change)="select_region()">
+                                <option value="" selected disabled>Seleccionar</option>
+                                @for (item of regiones; track item.id) {
+                                <option [value]="item.id">{{ item.name }}</option>
                                 }
-                            </td>
-                            <td>{{item.ubigeo || '-'}}</td>
-                            <td>{{item.nregion || '-'}}</td>
-                            <td>{{item.nprovincia || '-'}}</td>
-                            <td>{{item.ndistrito || '-'}}</td>
-                            <td>{{item.direccion || '-'}}</td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <button class="btn btn-sm btn-warning me-2" data-bs-toggle="modal"
-                                        [attr.data-bs-target]="'#editar-' + item.idDireccionEmpresa"
-                                        (click)="editarDireccion(item.idDireccionEmpresa)" title="Editar">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
-                                        data-bs-target="#confirmarEliminarModal"
-                                        (click)="seleccionarDireccionAEliminar(item.idDireccionEmpresa)"
-                                        title="Eliminar">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                            </select>
+                        </div>
+                        <div class="col-sm-6 form-group">
+                            <label for="ac-fn">Provincia (opcional)</label>
+                            <select id="sl-provincia" name="provincia" [(ngModel)]="direccionEmpresas.provincia"
+                                class="form-control" disabled (change)="select_provincia()">
+                                <option value="" selected disabled>Seleccionar</option>
+                                @for (item of provincias; track item.id) {
+                                <option [value]="item.id">{{ item.name }}</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-sm-6 form-group">
+                            <label for="ac-fn">Distrito (opcional)</label>
+                            <select id="sl-distrito" name="distrito" [(ngModel)]="direccionEmpresas.distrito"
+                                class="form-control" disabled (change)="select_distrito($event)">
+                                <option value="" selected disabled>Seleccionar</option>
+                                @for (item of distritos; track item.id) {
+                                <option [value]="item.id">{{ item.name }}</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ubigeo" class="form-label">Ubigeo</label>
+                            <input type="text" class="form-control" name="ubigeo" [(ngModel)]="direccionEmpresas.ubigeo"
+                                placeholder="Ingrese el ubigeo (opcional)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="direccion" class="form-label">Dirección</label>
+                            <input type="text" class="form-control" name="direccion"
+                                [(ngModel)]="direccionEmpresas.direccion" placeholder="Ingrese la dirección (opcional)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="referencia" class="form-label">Referencia</label>
+                            <input type="text" class="form-control" name="referencia"
+                                [(ngModel)]="direccionEmpresas.referencia" placeholder="Ingrese la referencia (opcional)">
+                        </div>
+                    </div>
+                </div>
+                }
+            </div>
+            }
+            }
+        </form>
 
-                        <!-- Modal de Actualización de la dirección -->
-                        <div class="modal fade" [attr.id]="'editar-' + item.idDireccionEmpresa" tabindex="-1"
-                            role="dialog" aria-labelledby="editarDireccionModalLabel" aria-hidden="true">
-                            <div class="modal-dialog" role="document">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-warning">
-                                        <h5 class="modal-title" id="editarDireccionModalLabel">Editar dirección:
-                                            {{direccionEmpresas.direccion}}</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                            aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="col-sm-6 form-group">
-                                            <label for="ac-fn">Región (opcional)</label>
-                                            <select id="sl-region" name="region" [(ngModel)]="direccionEmpresas.region"
-                                                class="form-control" (change)="select_region()">
-                                                <option value="" selected disabled>Seleccionar</option>
-                                                @for (item of regiones; track item.id) {
-                                                <option [value]="item.id">{{item.name}}</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-6 form-group">
-                                            <label for="ac-fn">Provincia (opcional)</label>
-                                            <select id="sl-provincia" name="provincia"
-                                                [(ngModel)]="direccionEmpresas.provincia" class="form-control" disabled
-                                                (change)="select_provincia()">
-                                                <option value="" selected disabled>Seleccionar</option>
-                                                @for (item of provincias; track item.id) {
-                                                <option [value]="item.id">{{item.name}}</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-6 form-group">
-                                            <label for="ac-fn">Distrito (opcional)</label>
-                                            <select id="sl-distrito" name="distrito"
-                                                [(ngModel)]="direccionEmpresas.distrito" class="form-control" disabled
-                                                (change)="select_distrito($event)">
-                                                <option value="" selected disabled>Seleccionar</option>
-                                                @for (item of distritos; track item.id) {
-                                                <option [value]="item.id">{{item.name}}</option>
-                                                }
-                                            </select>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="ubigeo" class="form-label">Ubigeo</label>
-                                            <input type="text" class="form-control" name="ubigeo"
-                                                [(ngModel)]="direccionEmpresas.ubigeo"
-                                                placeholder="Ingrese el ubigeo (opcional)">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="direccion" class="form-label">Dirección</label>
-                                            <input type="text" class="form-control" name="direccion"
-                                                [(ngModel)]="direccionEmpresas.direccion"
-                                                placeholder="Ingrese la dirección (opcional)">
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary"
-                                            data-bs-dismiss="modal">Cerrar</button>
-                                        <button type="button" class="btn btn-warning" (click)="actualizarDireccion()"
-                                            data-bs-dismiss="modal">
-                                            Guardar cambios
+        <!-- aqui empieza las direcciones de la empresa -->
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Direcciones de la empresa</h4>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crearDireccionModal"
+                    (click)="modalCrearDireccion()">
+                    <i class="fas fa-plus me-2"></i>Nueva dirección
+                </button>
+            </div>
+
+            <div class="card-body">
+                @if (direccionEmpresas_const.length > 0) {
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>Principal</th>
+                                <th>Ubigeo</th>
+                                <th>Región</th>
+                                <th>Provincia</th>
+                                <th>Distrito</th>
+                                <th>Dirección</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (item of direccionEmpresas_const; track item.idDireccionEmpresa) {
+                            <tr>
+                                <td>
+                                    @if (item.principal) {
+                                    <span class="badge bg-success">Principal</span>
+                                    } @else {
+                                    <button class="btn btn-sm btn-outline-primary"
+                                        (click)="updatePrincipal(item.idDireccionEmpresa)" title="Convertir en principal">
+                                        <i class="fas fa-star"></i>
+                                    </button>
+                                    }
+                                </td>
+                                <td>{{item.ubigeo || '-'}}</td>
+                                <td>{{item.nregion || '-'}}</td>
+                                <td>{{item.nprovincia || '-'}}</td>
+                                <td>{{item.ndistrito || '-'}}</td>
+                                <td>{{item.direccion || '-'}}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-warning me-2" data-bs-toggle="modal"
+                                            [attr.data-bs-target]="'#editar-' + item.idDireccionEmpresa"
+                                            (click)="editarDireccion(item.idDireccionEmpresa)" title="Editar">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                                            data-bs-target="#confirmarEliminarModal"
+                                            (click)="seleccionarDireccionAEliminar(item.idDireccionEmpresa)"
+                                            title="Eliminar">
+                                            <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
+                                </td>
+                            </tr>
 
-                        <!-- Modal de Creación de la dirección -->
-                        <div class="modal fade" id="crearDireccionModal" tabindex="-1" role="dialog"
-                            aria-labelledby="crearDireccionModalLabel" aria-hidden="true">
-                            <div class="modal-dialog" role="document">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-primary text-white ">
-                                        <h5 class="modal-title" id="crearDireccionModalLabel">Crear nueva dirección</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                            aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="col-sm-6 form-group">
-                                            <label for="ac-fn">Región (opcional)</label>
-                                            <select id="sl-region" name="region" [(ngModel)]="direccionEmpresas.region"
-                                                class="form-control" (change)="select_region()">
-                                                <option value="" selected disabled>Seleccionar</option>
-                                                @for (item of regiones; track item.id) {
-                                                <option [value]="item.id">{{item.name}}</option>
-                                                }
-                                            </select>
+                            <!-- Modal de Actualización de la dirección -->
+                            <div class="modal fade" [attr.id]="'editar-' + item.idDireccionEmpresa" tabindex="-1"
+                                role="dialog" aria-labelledby="editarDireccionModalLabel" aria-hidden="true">
+                                <div class="modal-dialog" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-warning">
+                                            <h5 class="modal-title" id="editarDireccionModalLabel">Editar dirección:
+                                                {{direccionEmpresas.direccion}}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="Close"></button>
                                         </div>
-                                        <div class="col-sm-6 form-group">
-                                            <label for="ac-fn">Provincia (opcional)</label>
-                                            <select id="sl-provincia" name="provincia"
-                                                [(ngModel)]="direccionEmpresas.provincia" class="form-control"
-                                                (change)="select_provincia()">
-                                                <option value="" selected disabled>Seleccionar</option>
-                                                @for (item of provincias; track item.id) {
-                                                <option [value]="item.id">{{item.name}}</option>
-                                                }
-                                            </select>
+                                        <div class="modal-body">
+                                            <div class="col-sm-6 form-group">
+                                                <label for="ac-fn">Región (opcional)</label>
+                                                <select id="sl-region" name="region" [(ngModel)]="direccionEmpresas.region"
+                                                    class="form-control" (change)="select_region()">
+                                                    <option value="" selected disabled>Seleccionar</option>
+                                                    @for (item of regiones; track item.id) {
+                                                    <option [value]="item.id">{{item.name}}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6 form-group">
+                                                <label for="ac-fn">Provincia (opcional)</label>
+                                                <select id="sl-provincia" name="provincia"
+                                                    [(ngModel)]="direccionEmpresas.provincia" class="form-control" disabled
+                                                    (change)="select_provincia()">
+                                                    <option value="" selected disabled>Seleccionar</option>
+                                                    @for (item of provincias; track item.id) {
+                                                    <option [value]="item.id">{{item.name}}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6 form-group">
+                                                <label for="ac-fn">Distrito (opcional)</label>
+                                                <select id="sl-distrito" name="distrito"
+                                                    [(ngModel)]="direccionEmpresas.distrito" class="form-control" disabled
+                                                    (change)="select_distrito($event)">
+                                                    <option value="" selected disabled>Seleccionar</option>
+                                                    @for (item of distritos; track item.id) {
+                                                    <option [value]="item.id">{{item.name}}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="ubigeo" class="form-label">Ubigeo</label>
+                                                <input type="text" class="form-control" name="ubigeo"
+                                                    [(ngModel)]="direccionEmpresas.ubigeo"
+                                                    placeholder="Ingrese el ubigeo (opcional)">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="direccion" class="form-label">Dirección</label>
+                                                <input type="text" class="form-control" name="direccion"
+                                                    [(ngModel)]="direccionEmpresas.direccion"
+                                                    placeholder="Ingrese la dirección (opcional)">
+                                            </div>
                                         </div>
-                                        <div class="col-sm-6 form-group">
-                                            <label for="ac-fn">Distrito (opcional)</label>
-                                            <select id="sl-distrito" name="distrito"
-                                                [(ngModel)]="direccionEmpresas.distrito" class="form-control"
-                                                (change)="select_distrito($event)">
-                                                <option value="" selected disabled>Seleccionar</option>
-                                                @for (item of distritos; track item.id) {
-                                                <option [value]="item.id">{{item.name}}</option>
-                                                }
-                                            </select>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-bs-dismiss="modal">Cerrar</button>
+                                            <button type="button" class="btn btn-warning" (click)="actualizarDireccion()"
+                                                data-bs-dismiss="modal">
+                                                Guardar cambios
+                                            </button>
                                         </div>
-                                        <div class="mb-3">
-                                            <label for="ubigeo" class="form-label">Ubigeo</label>
-                                            <input type="text" class="form-control" name="ubigeo"
-                                                [(ngModel)]="direccionEmpresas.ubigeo"
-                                                placeholder="Ingrese el ubigeo (opcional)">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="direccion" class="form-label">Dirección</label>
-                                            <input type="text" class="form-control" name="direccion"
-                                                [(ngModel)]="direccionEmpresas.direccion"
-                                                placeholder="Ingrese la dirección (opcional)">
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary"
-                                            data-bs-dismiss="modal">Cerrar</button>
-                                        <button type="button" class="btn btn-primary" (click)="crearDireccion()"
-                                            data-bs-dismiss="modal">Guardar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Modal de eliminacion de una direccion -->
-                        <!-- Modal de Confirmación para Eliminar -->
-                        <div class="modal fade" id="confirmarEliminarModal" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-danger text-white">
-                                        <h5 class="modal-title">Confirmar eliminación</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                                            aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <p>¿Estás seguro que deseas eliminar esta dirección?</p>
-                                        <p class="fw-bold">Esta acción no se puede deshacer.</p>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary"
-                                            data-bs-dismiss="modal">Cancelar</button>
-                                        <button type="button" class="btn btn-danger" (click)="confirmarEliminar()">Sí,
-                                            eliminar</button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        }
-                    </tbody>
-                </table>
+                            <!-- Modal de Creación de la dirección -->
+                            <div class="modal fade" id="crearDireccionModal" tabindex="-1" role="dialog"
+                                aria-labelledby="crearDireccionModalLabel" aria-hidden="true">
+                                <div class="modal-dialog" role="document">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-primary text-white ">
+                                            <h5 class="modal-title" id="crearDireccionModalLabel">Crear nueva dirección</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="col-sm-6 form-group">
+                                                <label for="ac-fn">Región (opcional)</label>
+                                                <select id="sl-region" name="region" [(ngModel)]="direccionEmpresas.region"
+                                                    class="form-control" (change)="select_region()">
+                                                    <option value="" selected disabled>Seleccionar</option>
+                                                    @for (item of regiones; track item.id) {
+                                                    <option [value]="item.id">{{item.name}}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6 form-group">
+                                                <label for="ac-fn">Provincia (opcional)</label>
+                                                <select id="sl-provincia" name="provincia"
+                                                    [(ngModel)]="direccionEmpresas.provincia" class="form-control"
+                                                    (change)="select_provincia()">
+                                                    <option value="" selected disabled>Seleccionar</option>
+                                                    @for (item of provincias; track item.id) {
+                                                    <option [value]="item.id">{{item.name}}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6 form-group">
+                                                <label for="ac-fn">Distrito (opcional)</label>
+                                                <select id="sl-distrito" name="distrito"
+                                                    [(ngModel)]="direccionEmpresas.distrito" class="form-control"
+                                                    (change)="select_distrito($event)">
+                                                    <option value="" selected disabled>Seleccionar</option>
+                                                    @for (item of distritos; track item.id) {
+                                                    <option [value]="item.id">{{item.name}}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="ubigeo" class="form-label">Ubigeo</label>
+                                                <input type="text" class="form-control" name="ubigeo"
+                                                    [(ngModel)]="direccionEmpresas.ubigeo"
+                                                    placeholder="Ingrese el ubigeo (opcional)">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="direccion" class="form-label">Dirección</label>
+                                                <input type="text" class="form-control" name="direccion"
+                                                    [(ngModel)]="direccionEmpresas.direccion"
+                                                    placeholder="Ingrese la dirección (opcional)">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-bs-dismiss="modal">Cerrar</button>
+                                            <button type="button" class="btn btn-primary" (click)="crearDireccion()"
+                                                data-bs-dismiss="modal">Guardar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modal de eliminacion de una direccion -->
+                            <!-- Modal de Confirmación para Eliminar -->
+                            <div class="modal fade" id="confirmarEliminarModal" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-danger text-white">
+                                            <h5 class="modal-title">Confirmar eliminación</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                                                aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p>¿Estás seguro que deseas eliminar esta dirección?</p>
+                                            <p class="fw-bold">Esta acción no se puede deshacer.</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="button" class="btn btn-danger" (click)="confirmarEliminar()">Sí,
+                                                eliminar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                } @else {
+                <div class="alert alert-info">
+                    No hay direcciones registradas para esta empresa.
+                </div>
+                }
             </div>
-            } @else {
-            <div class="alert alert-info">
-                No hay direcciones registradas para esta empresa.
-            </div>
-            }
         </div>
+
+
+
+
+
     </div>
-
-
-
-
-
-</div>
+  </div>
+</main>

@@ -1,5 +1,6 @@
 const DashboardRepository = require("../repositories/dashboard.repository");
 const gestoresRepository = require("../repositories/gestores.repository");
+const cache = require("../cache/redis.client");
 
 /**
  * Calcula fecha inicio y fin para el período y el período anterior (mismo tamaño).
@@ -61,25 +62,57 @@ function obtenerRangoFechas(periodo) {
   };
 }
 
+const PERIODOS_VALIDOS = ["Hoy", "Esta Semana", "Este Mes", "Este Año"];
+
+function normalizarPeriodo(periodo) {
+  const p = (periodo || "Este Mes").toString().trim();
+  const match = PERIODOS_VALIDOS.find(
+    (v) => v.toLowerCase() === p.toLowerCase()
+  );
+  return match || "Este Mes";
+}
+
 exports.obtenerResumenDashboardService = async (pool, user, periodo) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
   const idEmpresa = user.empresa;
-  const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
-    obtenerRangoFechas(periodo || "Este Mes");
-  const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
-  const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
-  const configInventario = {
-    stockMinimoGeneral: Math.max(0, parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MINIMO", "10"), 10) || 10),
-    stockMaximoGeneral: Math.max(0, parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MAXIMO", "1000"), 10) || 1000),
-    controlVencimiento: String(getConfig("INVENTARIO_CONTROL_VENCIMIENTO", "true")).toLowerCase() === "true"
+  const periodoNorm = normalizarPeriodo(periodo);
+  const cacheKey = `dashboard:resumen:${idEmpresa}:${periodoNorm}`;
+  const ttlRaw = parseInt(process.env.REDIS_DASHBOARD_TTL_SECONDS || "180", 10);
+  const ttlSeconds = Number.isNaN(ttlRaw) ? 180 : Math.max(60, ttlRaw);
+
+  const fetchDashboard = async () => {
+    const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
+      obtenerRangoFechas(periodoNorm);
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(
+      pool,
+      idEmpresa
+    );
+    const getConfig = (clave, def) =>
+      configRows.find((c) => c.clave === clave)?.valor ?? def;
+    const configInventario = {
+      stockMinimoGeneral: Math.max(
+        0,
+        parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MINIMO", "10"), 10) || 10
+      ),
+      stockMaximoGeneral: Math.max(
+        0,
+        parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MAXIMO", "1000"), 10) ||
+          1000
+      ),
+      controlVencimiento:
+        String(getConfig("INVENTARIO_CONTROL_VENCIMIENTO", "true")).toLowerCase() ===
+        "true"
+    };
+    return DashboardRepository.obtenerResumenDashboardRepo(
+      pool,
+      idEmpresa,
+      fechaInicio,
+      fechaFin,
+      fechaInicioAnterior,
+      fechaFinAnterior,
+      configInventario
+    );
   };
-  return DashboardRepository.obtenerResumenDashboardRepo(
-    pool,
-    idEmpresa,
-    fechaInicio,
-    fechaFin,
-    fechaInicioAnterior,
-    fechaFinAnterior,
-    configInventario
-  );
+
+  return cache.getCached(cacheKey, fetchDashboard, ttlSeconds);
 };

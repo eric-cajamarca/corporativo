@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
@@ -9,6 +9,8 @@ import { global } from '../../../services/global';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { AuthService } from '../../../services/auth.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var $: any;
 declare var iziToast: any;
@@ -17,11 +19,13 @@ declare var bootstrap: any;
 @Component({
   selector: 'app-update-empresa',
   standalone: true,
-  imports: [FormsModule, RouterModule,CommonModule, TopnavComponent],
+  imports: [FormsModule, RouterModule,CommonModule, TopnavComponent,SidebarComponent],
   templateUrl: './update-empresa.component.html',
   styleUrl: './update-empresa.component.css'
 })
 export class UpdateEmpresaComponent {
+
+  public sidebarState = inject(SidebarStateService);
   public url: any;
   public empresa: any = {};
   // Variable para guardar el ID a eliminar
@@ -125,6 +129,11 @@ export class UpdateEmpresaComponent {
 
     this.select_pais();
   }
+
+  onSidebarToggle(collapsed: boolean) {
+    this.sidebarState.setCollapsed(collapsed);
+  }
+
 
   removeAccents(str: string) {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
