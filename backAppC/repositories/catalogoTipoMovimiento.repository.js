@@ -1,81 +1,67 @@
 const sql = require('mssql');
 
-async function listar(pool, { idEmpresa, buscar, pagina = 1, porPagina = 20 }) {
-    const offset = (pagina - 1) * porPagina;
-    const countResult = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('buscar', sql.VarChar(100), buscar ? `%${buscar}%` : null)
-        .query(`
-            SELECT COUNT(*) AS total FROM CatalogoTipoMovimiento
-            WHERE idEmpresa = @idEmpresa
-            AND (@buscar IS NULL OR descripcion LIKE @buscar OR descripcionCorta LIKE @buscar)
-        `);
-    const total = countResult.recordset[0]?.total ?? 0;
-
-    const dataResult = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('buscar', sql.VarChar(100), buscar ? `%${buscar}%` : null)
-        .input('offset', sql.Int, offset)
-        .input('porPagina', sql.Int, porPagina)
-        .query(`
-            SELECT idTipoMovimiento, idEmpresa, descripcion, tipo, descripcionCorta
-            FROM CatalogoTipoMovimiento
-            WHERE idEmpresa = @idEmpresa
-            AND (@buscar IS NULL OR descripcion LIKE @buscar OR descripcionCorta LIKE @buscar)
-            ORDER BY descripcion
-            OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
-        `);
-
-    return { items: dataResult.recordset, total };
+/**
+ * Catálogo universal TiposMovimientoCaja (todas las empresas).
+ * Sin paginación, sin filtro por idEmpresa.
+ */
+async function listar(pool, { buscar } = {}) {
+    const request = pool.request();
+    if (buscar) request.input('buscar', sql.VarChar(100), `%${buscar}%`);
+    const query = buscar
+        ? `SELECT idTipoMovimientoCaja, nombre, descripcion, tipo
+           FROM TiposMovimientoCaja
+           WHERE nombre LIKE @buscar OR ISNULL(descripcion,'') LIKE @buscar
+           ORDER BY nombre`
+        : `SELECT idTipoMovimientoCaja, nombre, descripcion, tipo
+           FROM TiposMovimientoCaja
+           ORDER BY nombre`;
+    const result = await request.query(query);
+    return result.recordset;
 }
 
-async function obtenerPorId(pool, idTipoMovimiento, idEmpresa) {
+async function obtenerPorId(pool, idTipoMovimientoCaja) {
     const result = await pool.request()
-        .input('idTipoMovimiento', sql.UniqueIdentifier, idTipoMovimiento)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idTipoMovimientoCaja', sql.Int, idTipoMovimientoCaja)
         .query(`
-            SELECT idTipoMovimiento, idEmpresa, descripcion, tipo, descripcionCorta
-            FROM CatalogoTipoMovimiento
-            WHERE idTipoMovimiento = @idTipoMovimiento AND idEmpresa = @idEmpresa
+            SELECT idTipoMovimientoCaja, nombre, descripcion, tipo
+            FROM TiposMovimientoCaja
+            WHERE idTipoMovimientoCaja = @idTipoMovimientoCaja
         `);
     return result.recordset[0] || null;
 }
 
-async function crear(pool, { idEmpresa, descripcion, tipo, descripcionCorta }) {
+async function crear(pool, { nombre, descripcion, tipo }) {
     const result = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('descripcion', sql.VarChar(100), descripcion)
-        .input('tipo', sql.VarChar(20), tipo)
-        .input('descripcionCorta', sql.VarChar(30), descripcionCorta || null)
+        .input('nombre', sql.VarChar(30), nombre)
+        .input('descripcion', sql.VarChar(100), descripcion || null)
+        .input('tipo', sql.Char(1), tipo)
         .query(`
-            INSERT INTO CatalogoTipoMovimiento (idEmpresa, descripcion, tipo, descripcionCorta)
-            OUTPUT INSERTED.idTipoMovimiento, INSERTED.descripcion, INSERTED.tipo, INSERTED.descripcionCorta
-            VALUES (@idEmpresa, @descripcion, @tipo, @descripcionCorta)
+            INSERT INTO TiposMovimientoCaja (nombre, descripcion, tipo)
+            OUTPUT INSERTED.idTipoMovimientoCaja, INSERTED.nombre, INSERTED.descripcion, INSERTED.tipo
+            VALUES (@nombre, @descripcion, @tipo)
         `);
     return result.recordset[0];
 }
 
-async function actualizar(pool, { idTipoMovimiento, idEmpresa, descripcion, tipo, descripcionCorta }) {
+async function actualizar(pool, { idTipoMovimientoCaja, nombre, descripcion, tipo }) {
     await pool.request()
-        .input('idTipoMovimiento', sql.UniqueIdentifier, idTipoMovimiento)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('descripcion', sql.VarChar(100), descripcion)
-        .input('tipo', sql.VarChar(20), tipo)
-        .input('descripcionCorta', sql.VarChar(30), descripcionCorta || null)
+        .input('idTipoMovimientoCaja', sql.Int, idTipoMovimientoCaja)
+        .input('nombre', sql.VarChar(30), nombre)
+        .input('descripcion', sql.VarChar(100), descripcion || null)
+        .input('tipo', sql.Char(1), tipo)
         .query(`
-            UPDATE CatalogoTipoMovimiento
-            SET descripcion = @descripcion, tipo = @tipo, descripcionCorta = @descripcionCorta
-            WHERE idTipoMovimiento = @idTipoMovimiento AND idEmpresa = @idEmpresa
+            UPDATE TiposMovimientoCaja
+            SET nombre = @nombre, descripcion = @descripcion, tipo = @tipo
+            WHERE idTipoMovimientoCaja = @idTipoMovimientoCaja
         `);
 }
 
-async function eliminar(pool, idTipoMovimiento, idEmpresa) {
+async function eliminar(pool, idTipoMovimientoCaja) {
     await pool.request()
-        .input('idTipoMovimiento', sql.UniqueIdentifier, idTipoMovimiento)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idTipoMovimientoCaja', sql.Int, idTipoMovimientoCaja)
         .query(`
-            DELETE FROM CatalogoTipoMovimiento
-            WHERE idTipoMovimiento = @idTipoMovimiento AND idEmpresa = @idEmpresa
+            DELETE FROM TiposMovimientoCaja
+            WHERE idTipoMovimientoCaja = @idTipoMovimientoCaja
         `);
 }
 

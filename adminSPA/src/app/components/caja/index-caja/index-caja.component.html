@@ -121,11 +121,11 @@
                                  (change)="cargarMovimientos()"
                                  placeholder="Hasta">
                           <select class="form-select form-select-sm"
-                                  [(ngModel)]="filtrosMovimientos.idTipoMovimiento"
+                                  [(ngModel)]="filtrosMovimientos.idTipoMovimientoCaja"
                                   (change)="cargarMovimientos()">
                             <option value="0">Todos los tipos</option>
                             <option *ngFor="let tipo of tiposMovimiento"
-                                    [value]="tipo.idTipoMovimiento">
+                                    [value]="tipo.idTipoMovimientoCaja">
                               {{tipo.nombre}}
                             </option>
                           </select>
@@ -149,16 +149,16 @@
                               <td>{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</td>
                               <td>
                                 <span class="badge"
-                                      [ngClass]="{'bg-success': movimiento.tipoMovimiento === 'INGRESO',
-                                                 'bg-danger': movimiento.tipoMovimiento === 'EGRESO'}">
-                                  {{getTipoMovimientoNombre(movimiento.idTipoMovimiento)}}
+                                      [ngClass]="{'bg-success': movimiento.tipoOperacion === 'I',
+                                                 'bg-danger': movimiento.tipoOperacion === 'E'}">
+                                  {{movimiento.tipoMovimiento || getTipoMovimientoNombre(movimiento.idTipoMovimientoCaja)}}
                                 </span>
                               </td>
-                              <td>{{movimiento.descripcion}}</td>
+                              <td>{{movimiento.concepto || movimiento.conceptoCatalogoDescripcion || movimiento.descripcion}}</td>
                               <td class="text-end">
-                                <span [ngClass]="{'text-success': movimiento.tipoMovimiento === 'INGRESO',
-                                               'text-danger': movimiento.tipoMovimiento === 'EGRESO'}">
-                                  {{movimiento.tipoMovimiento === 'INGRESO' ? '+' : '-'}}
+                                <span [ngClass]="{'text-success': movimiento.tipoOperacion === 'I',
+                                               'text-danger': movimiento.tipoOperacion === 'E'}">
+                                  {{movimiento.tipoOperacion === 'I' ? '+' : '-'}}
                                   S/ {{movimiento.monto | number:'1.2-2'}}
                                 </span>
                               </td>
@@ -243,10 +243,10 @@
               <div class="mb-3">
                 <label for="tipoMovimiento" class="form-label">Tipo de Movimiento *</label>
                 <select class="form-select" id="tipoMovimiento"
-                        [(ngModel)]="movimiento.idTipoMovimiento" name="idTipoMovimiento" required>
+                        [(ngModel)]="movimiento.idTipoMovimientoCaja" name="idTipoMovimientoCaja" required>
                   <option value="0">Seleccionar tipo</option>
                   <option *ngFor="let tipo of tiposMovimiento"
-                          [value]="tipo.idTipoMovimiento">
+                          [value]="tipo.idTipoMovimientoCaja">
                     {{tipo.nombre}}
                   </option>
                 </select>

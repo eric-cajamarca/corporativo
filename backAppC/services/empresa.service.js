@@ -324,35 +324,128 @@ exports.crearCorrelativoInicial = async (pool, idEmpresa, numeroInicial = NUMERO
 };
 
 /**
- * Crea los conceptos predeterminados para una empresa
+ * Crea las clasificaciones de concepto predeterminadas para una nueva empresa.
+ * Cada empresa tiene su propia copia; puede editarlas o agregar más.
  * @param {Object} pool - Conexión a la base de datos
  * @param {String} idEmpresa - ID de la empresa
+ * @returns {Object} Map descripcion -> idClasificacionConcepto (para enlazar conceptos)
+ */
+exports.crearClasificacionesConceptoPredeterminadas = async (pool, idEmpresa) => {
+    console.log('Creando clasificaciones de concepto predeterminadas para empresa:', idEmpresa);
+    const sql = require('mssql');
+    const clasificaciones = [
+        'Ventas',
+        'Compras',
+        'Cobranzas',
+        'Pagos a proveedores',
+        'Gastos operativos',
+        'Otros ingresos',
+        'Otros egresos'
+    ];
+    const mapDescripcionToId = {};
+    try {
+        for (const descripcion of clasificaciones) {
+            const result = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('descripcion', sql.VarChar(100), descripcion)
+                .query(`
+                    INSERT INTO ClasificacionConcepto (idEmpresa, descripcion)
+                    OUTPUT INSERTED.idClasificacionConcepto
+                    VALUES (@idEmpresa, @descripcion)
+                `);
+            const idClasificacionConcepto = result.recordset[0].idClasificacionConcepto;
+            mapDescripcionToId[descripcion] = idClasificacionConcepto;
+        }
+        console.log('✓', clasificaciones.length, 'clasificaciones de concepto creadas');
+        return mapDescripcionToId;
+    } catch (error) {
+        console.error('Error creando clasificaciones de concepto:', error);
+        throw new Error('Error al crear clasificaciones de concepto: ' + error.message);
+    }
+};
+
+/**
+ * Obtiene un map nombre -> idTipoMovimientoCaja desde la tabla universal TiposMovimientoCaja.
+ * @param {Object} pool
+ * @returns {Object} Map nombre (uppercase) -> idTipoMovimientoCaja
+ */
+async function obtenerMapTiposMovimientoCaja(pool) {
+    const sql = require('mssql');
+    const result = await pool.request().query(`
+        SELECT idTipoMovimientoCaja, UPPER(LTRIM(RTRIM(nombre))) AS nombre
+        FROM TiposMovimientoCaja
+    `);
+    const map = {};
+    for (const row of result.recordset) {
+        map[row.nombre] = row.idTipoMovimientoCaja;
+    }
+    return map;
+}
+
+/**
+ * Crea los conceptos predeterminados para una nueva empresa.
+ * Usa las clasificaciones creadas y opcionalmente TiposMovimientoCaja (por nombre).
+ * @param {Object} pool - Conexión a la base de datos
+ * @param {String} idEmpresa - ID de la empresa
+ * @param {Object} mapClasificacionDescripcionToId - Map descripcion -> idClasificacionConcepto (de crearClasificacionesConceptoPredeterminadas)
  * @returns {Array} Conceptos creados
  */
-
-exports.crearConceptosPredeterminados = async (pool, idEmpresa) => {
+exports.crearConceptosPredeterminados = async (pool, idEmpresa, mapClasificacionDescripcionToId) => {
     console.log('Creando conceptos predeterminados para empresa:', idEmpresa);
     const sql = require('mssql');
+    const mapTipoMov = await obtenerMapTiposMovimientoCaja(pool);
+    const getTipoId = (nombre) => (nombre && mapTipoMov[nombre.toUpperCase()]) || null;
+    const getClasifId = (desc) => (desc && mapClasificacionDescripcionToId[desc]) || null;
+
     const conceptosPredeterminados = [
-        { descripcion: 'PAGO DE CLIENTES', tipo: 'INGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 3 },
-        { descripcion: 'PAGO DE PROVEEDORES', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 5 },
-        { descripcion: 'PAGO DE SERVICIOS', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 8 },
-        { descripcion: 'PAGO DE PERSONAL', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 7 },
-        { descripcion: 'OTROS PAGOS', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 7 },
-        { descripcion: 'RETIRO DE DINERO', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 9 },
-        { descripcion: 'SALDO ANTERIOR', tipo: 'INGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 10 },
-        { descripcion: 'OTROS INGRESOS', tipo: 'INGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: 4 },
-       
+        { descripcion: 'Venta contado', tipo: 'INGRESO', clasificacion: 'Ventas', tipoMovNombre: 'VENTA_CONTADO' },
+        { descripcion: 'Venta crédito', tipo: 'INGRESO', clasificacion: 'Ventas', tipoMovNombre: 'VENTA_CREDITO' },
+        { descripcion: 'Devolución venta', tipo: 'EGRESO', clasificacion: 'Ventas', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Compra contado', tipo: 'EGRESO', clasificacion: 'Compras', tipoMovNombre: 'COMPRA_CONTADO' },
+        { descripcion: 'Compra crédito', tipo: 'EGRESO', clasificacion: 'Compras', tipoMovNombre: 'COMPRA_CREDITO' },
+        { descripcion: 'Devolución compra', tipo: 'INGRESO', clasificacion: 'Compras', tipoMovNombre: 'INGRESOS' },
+        { descripcion: 'Cobro factura cliente', tipo: 'INGRESO', clasificacion: 'Cobranzas', tipoMovNombre: 'COBRANZA_CREDITO' },
+        { descripcion: 'Cobro letra', tipo: 'INGRESO', clasificacion: 'Cobranzas', tipoMovNombre: 'COBRANZA_CREDITO' },
+        { descripcion: 'Interés cobranza', tipo: 'INGRESO', clasificacion: 'Cobranzas', tipoMovNombre: 'INGRESOS' },
+        { descripcion: 'Pago factura', tipo: 'EGRESO', clasificacion: 'Pagos a proveedores', tipoMovNombre: 'PAGO_CREDITO' },
+        { descripcion: 'Pago letra', tipo: 'EGRESO', clasificacion: 'Pagos a proveedores', tipoMovNombre: 'PAGO_CREDITO' },
+        { descripcion: 'Anticipo proveedor', tipo: 'EGRESO', clasificacion: 'Pagos a proveedores', tipoMovNombre: 'PAGO_CREDITO' },
+        { descripcion: 'Alquiler', tipo: 'EGRESO', clasificacion: 'Gastos operativos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Luz', tipo: 'EGRESO', clasificacion: 'Gastos operativos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Sueldo', tipo: 'EGRESO', clasificacion: 'Gastos operativos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Combustible', tipo: 'EGRESO', clasificacion: 'Gastos operativos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Donación', tipo: 'INGRESO', clasificacion: 'Otros ingresos', tipoMovNombre: 'INGRESOS' },
+        { descripcion: 'Interés ganado', tipo: 'INGRESO', clasificacion: 'Otros ingresos', tipoMovNombre: 'INGRESOS' },
+        { descripcion: 'Venta de activo', tipo: 'INGRESO', clasificacion: 'Otros ingresos', tipoMovNombre: 'INGRESOS' },
+        { descripcion: 'Multa', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Pérdida', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Retiro de socio', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' }
     ];
+
     const conceptosCreados = [];
     try {
-        for (const concepto of conceptosPredeterminados) {
-    }
+        for (const c of conceptosPredeterminados) {
+            const idClasificacionConcepto = getClasifId(c.clasificacion);
+            const idTipoMovimientoCaja = getTipoId(c.tipoMovNombre);
+            const result = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('descripcion', sql.VarChar(100), c.descripcion)
+                .input('tipo', sql.VarChar(20), c.tipo)
+                .input('idClasificacionConcepto', sql.UniqueIdentifier, idClasificacionConcepto || null)
+                .input('idTipoMovimientoCaja', sql.Int, idTipoMovimientoCaja)
+                .query(`
+                    INSERT INTO Concepto (idEmpresa, descripcion, tipo, idClasificacionConcepto, idTipoMovimientoCaja)
+                    OUTPUT INSERTED.idConcepto, INSERTED.descripcion
+                    VALUES (@idEmpresa, @descripcion, @tipo, @idClasificacionConcepto, @idTipoMovimientoCaja)
+                `);
+            conceptosCreados.push(result.recordset[0]);
+        }
+        console.log('✓', conceptosCreados.length, 'conceptos predeterminados creados');
+        return conceptosCreados;
     } catch (error) {
         console.error('Error creando conceptos predeterminados:', error);
         throw new Error('Error al crear conceptos predeterminados: ' + error.message);
     }
-    return conceptosCreados;
 };
 
 
@@ -378,6 +471,7 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         secuencias: [],
         ubicaciones: [],
         listasPrecios: [],
+        clasificacionesConcepto: null,
         conceptos: [],
         correlativo: null,
         errores: []
@@ -460,9 +554,18 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'correlativo', mensaje: error.message });
         }
 
-        // 8. Crear conceptos predeterminados
+        // 8. Clasificaciones de concepto (Ventas, Compras, Cobranzas, etc.)
         try {
-            resultado.conceptos = await exports.crearConceptosPredeterminados(pool, idEmpresa);
+            resultado.clasificacionesConcepto = await exports.crearClasificacionesConceptoPredeterminadas(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando clasificaciones de concepto:', error.message);
+            resultado.errores.push({ tipo: 'clasificacionesConcepto', mensaje: error.message });
+        }
+
+        // 9. Conceptos predeterminados (vinculados a clasificaciones y TiposMovimientoCaja)
+        try {
+            const mapClasif = resultado.clasificacionesConcepto || {};
+            resultado.conceptos = await exports.crearConceptosPredeterminados(pool, idEmpresa, mapClasif);
         } catch (error) {
             console.error('⚠️ Error creando conceptos predeterminados:', error.message);
             resultado.errores.push({ tipo: 'conceptos', mensaje: error.message });
@@ -472,11 +575,11 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         console.log('✅ Inicialización completada:', {
             roles: resultado.roles.length,
             comprobantes: resultado.comprobantes.length,
-            //sucursal: resultado.sucursal ? 'OK' : 'ERROR',
             secuencias: resultado.secuencias.length,
             ubicaciones: resultado.ubicaciones.length,
             listasPrecios: resultado.listasPrecios.length,
             correlativo: resultado.correlativo ? 'OK' : 'ERROR',
+            clasificacionesConcepto: resultado.clasificacionesConcepto ? Object.keys(resultado.clasificacionesConcepto).length : 0,
             conceptos: resultado.conceptos.length,
             errores: resultado.errores.length
         });

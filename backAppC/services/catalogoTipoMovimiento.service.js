@@ -1,49 +1,53 @@
 const catalogoTipoMovimientoRepository = require('../repositories/catalogoTipoMovimiento.repository');
 
-async function listar(pool, idEmpresa, query) {
-    const buscar = query.buscar || null;
-    const pagina = Math.max(1, parseInt(query.pagina, 10) || 1);
-    const porPagina = Math.min(100, Math.max(1, parseInt(query.porPagina, 10) || 20));
-    return catalogoTipoMovimientoRepository.listar(pool, { idEmpresa, buscar, pagina, porPagina });
+async function listar(pool, query = {}) {
+    const buscar = (query.buscar || '').trim() || null;
+    return catalogoTipoMovimientoRepository.listar(pool, { buscar });
 }
 
-async function obtenerPorId(pool, idTipoMovimiento, idEmpresa) {
-    return catalogoTipoMovimientoRepository.obtenerPorId(pool, idTipoMovimiento, idEmpresa);
+async function obtenerPorId(pool, idTipoMovimientoCaja) {
+    const id = parseInt(idTipoMovimientoCaja, 10);
+    if (Number.isNaN(id)) throw new Error('ID de tipo de movimiento inválido.');
+    return catalogoTipoMovimientoRepository.obtenerPorId(pool, id);
 }
 
-async function crear(pool, idEmpresa, body) {
-    const descripcion = (body.descripcion || '').trim();
-    if (!descripcion) throw new Error('La descripción es obligatoria.');
-    const tipo = (body.tipo || '').toUpperCase();
-    if (tipo !== 'INGRESO' && tipo !== 'SALIDA') throw new Error('El tipo debe ser INGRESO o SALIDA.');
+async function crear(pool, body) {
+    const nombre = (body.nombre || '').trim();
+    if (!nombre) throw new Error('El nombre es obligatorio.');
+    if (nombre.length > 30) throw new Error('El nombre no puede superar 30 caracteres.');
+    const tipo = (body.tipo || '').toUpperCase().substring(0, 1);
+    if (tipo !== 'I' && tipo !== 'E') throw new Error('El tipo debe ser I (Ingreso) o E (Egreso).');
     return catalogoTipoMovimientoRepository.crear(pool, {
-        idEmpresa,
-        descripcion,
-        tipo,
-        descripcionCorta: (body.descripcionCorta || '').trim() || null
+        nombre,
+        descripcion: (body.descripcion || '').trim() || null,
+        tipo
     });
 }
 
-async function actualizar(pool, idTipoMovimiento, idEmpresa, body) {
-    const registro = await catalogoTipoMovimientoRepository.obtenerPorId(pool, idTipoMovimiento, idEmpresa);
+async function actualizar(pool, idTipoMovimientoCaja, body) {
+    const id = parseInt(idTipoMovimientoCaja, 10);
+    if (Number.isNaN(id)) throw new Error('ID de tipo de movimiento inválido.');
+    const registro = await catalogoTipoMovimientoRepository.obtenerPorId(pool, id);
     if (!registro) throw new Error('Tipo de movimiento no encontrado.');
-    const descripcion = (body.descripcion || '').trim();
-    if (!descripcion) throw new Error('La descripción es obligatoria.');
-    const tipo = (body.tipo || '').toUpperCase();
-    if (tipo !== 'INGRESO' && tipo !== 'SALIDA') throw new Error('El tipo debe ser INGRESO o SALIDA.');
+    const nombre = (body.nombre || '').trim();
+    if (!nombre) throw new Error('El nombre es obligatorio.');
+    if (nombre.length > 30) throw new Error('El nombre no puede superar 30 caracteres.');
+    const tipo = (body.tipo || '').toUpperCase().substring(0, 1);
+    if (tipo !== 'I' && tipo !== 'E') throw new Error('El tipo debe ser I (Ingreso) o E (Egreso).');
     await catalogoTipoMovimientoRepository.actualizar(pool, {
-        idTipoMovimiento,
-        idEmpresa,
-        descripcion,
-        tipo,
-        descripcionCorta: (body.descripcionCorta || '').trim() || null
+        idTipoMovimientoCaja: id,
+        nombre,
+        descripcion: (body.descripcion || '').trim() || null,
+        tipo
     });
 }
 
-async function eliminar(pool, idTipoMovimiento, idEmpresa) {
-    const registro = await catalogoTipoMovimientoRepository.obtenerPorId(pool, idTipoMovimiento, idEmpresa);
+async function eliminar(pool, idTipoMovimientoCaja) {
+    const id = parseInt(idTipoMovimientoCaja, 10);
+    if (Number.isNaN(id)) throw new Error('ID de tipo de movimiento inválido.');
+    const registro = await catalogoTipoMovimientoRepository.obtenerPorId(pool, id);
     if (!registro) throw new Error('Tipo de movimiento no encontrado.');
-    await catalogoTipoMovimientoRepository.eliminar(pool, idTipoMovimiento, idEmpresa);
+    await catalogoTipoMovimientoRepository.eliminar(pool, id);
 }
 
 module.exports = { listar, obtenerPorId, crear, actualizar, eliminar };

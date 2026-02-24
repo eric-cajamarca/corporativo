@@ -8,8 +8,8 @@ async function listar(req, res) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        const resultado = await catalogoTipoMovimientoService.listar(pool, req.user.empresa, req.query);
-        res.status(200).json({ data: resultado.items, total: resultado.total });
+        const data = await catalogoTipoMovimientoService.listar(pool, req.query);
+        res.status(200).json({ data: data || [] });
     } catch (error) {
         console.error('catalogoTipoMovimiento.listar:', error);
         res.status(500).json({ message: error.message || 'Error al listar', data: undefined });
@@ -22,7 +22,7 @@ async function obtenerPorId(req, res) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        const item = await catalogoTipoMovimientoService.obtenerPorId(pool, req.params.id, req.user.empresa);
+        const item = await catalogoTipoMovimientoService.obtenerPorId(pool, req.params.id);
         if (!item) return res.status(404).json({ message: 'No encontrado', data: undefined });
         res.status(200).json({ data: item });
     } catch (error) {
@@ -37,7 +37,7 @@ async function crear(req, res) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        const creado = await catalogoTipoMovimientoService.crear(pool, req.user.empresa, req.body);
+        const creado = await catalogoTipoMovimientoService.crear(pool, req.body);
         res.status(201).json({ data: creado });
     } catch (error) {
         console.error('catalogoTipoMovimiento.crear:', error);
@@ -51,7 +51,7 @@ async function actualizar(req, res) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        await catalogoTipoMovimientoService.actualizar(pool, req.params.id, req.user.empresa, req.body);
+        await catalogoTipoMovimientoService.actualizar(pool, req.params.id, req.body);
         res.status(200).json({ data: { ok: true } });
     } catch (error) {
         console.error('catalogoTipoMovimiento.actualizar:', error);
@@ -65,7 +65,7 @@ async function eliminar(req, res) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        await catalogoTipoMovimientoService.eliminar(pool, req.params.id, req.user.empresa);
+        await catalogoTipoMovimientoService.eliminar(pool, req.params.id);
         res.status(200).json({ data: { ok: true } });
     } catch (error) {
         console.error('catalogoTipoMovimiento.eliminar:', error);

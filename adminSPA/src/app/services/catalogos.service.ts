@@ -47,24 +47,22 @@ export class CatalogosService {
     return this.delete<{ data: any }>('forma-pago/' + id);
   }
 
-  // Tipo Movimientos
-  listarTipoMovimientos(buscar?: string, pagina?: number, porPagina?: number): Observable<{ data: any[]; total: number }> {
-    const params: any = {};
-    if (buscar != null) params.buscar = buscar;
-    if (pagina != null) params.pagina = String(pagina);
-    if (porPagina != null) params.porPagina = String(porPagina);
-    return this.get<{ data: any[]; total: number }>('tipo-movimientos', params);
+  // Tipo Movimientos (TiposMovimientoCaja - catálogo universal, sin paginación)
+  listarTipoMovimientos(buscar?: string): Observable<{ data: any[] }> {
+    const params: { [key: string]: string } = {};
+    if (buscar != null && buscar !== '') params['buscar'] = buscar;
+    return this.get<{ data: any[] }>('tipo-movimientos', params);
   }
-  obtenerTipoMovimiento(id: string): Observable<{ data: any }> {
+  obtenerTipoMovimiento(id: number | string): Observable<{ data: any }> {
     return this.get<{ data: any }>('tipo-movimientos/' + id);
   }
-  crearTipoMovimiento(body: { descripcion: string; tipo: string; descripcionCorta?: string }): Observable<{ data: any }> {
+  crearTipoMovimiento(body: { nombre: string; descripcion?: string; tipo: 'I' | 'E' }): Observable<{ data: any }> {
     return this.post<{ data: any }>('tipo-movimientos', body);
   }
-  actualizarTipoMovimiento(id: string, body: { descripcion: string; tipo: string; descripcionCorta?: string }): Observable<{ data: any }> {
+  actualizarTipoMovimiento(id: number | string, body: { nombre: string; descripcion?: string; tipo: 'I' | 'E' }): Observable<{ data: any }> {
     return this.put<{ data: any }>('tipo-movimientos/' + id, body);
   }
-  eliminarTipoMovimiento(id: string): Observable<{ data: any }> {
+  eliminarTipoMovimiento(id: number | string): Observable<{ data: any }> {
     return this.delete<{ data: any }>('tipo-movimientos/' + id);
   }
 

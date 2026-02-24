@@ -52,7 +52,7 @@ export class CajaService {
   // Registrar movimiento de caja
   registrarMovimiento(data: {
     idCaja: string;
-    idTipoMovimiento: number;
+    idTipoMovimientoCaja: number;
     descripcion: string;
     monto: number;
     idMedioPago?: string;
@@ -67,10 +67,13 @@ export class CajaService {
 
   // Obtener movimientos de caja
   obtenerMovimientos(filtros?: {
+    idApertura?: string;
     idCaja?: string;
     fechaDesde?: string;
     fechaHasta?: string;
-    idTipoMovimiento?: number;
+    idTipoMovimientoCaja?: number;
+    tipoMovimiento?: string;
+    soloRecibos?: boolean;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     let params = '';

@@ -22,26 +22,31 @@ export interface AperturaCaja {
 }
 
 export interface MovimientoCaja {
-  idMovimiento: string;
-  idCaja: string;
-  idUsuario: string;
-  idTipoMovimiento: number;
+  idMovimientoCaja?: string;
+  idMovimiento?: string;
+  idApertura?: string;
+  idTipoMovimientoCaja?: number;
+  idCaja?: string;
+  idUsuario?: string;
   fechaMovimiento: string;
-  descripcion: string;
+  concepto?: string;
+  conceptoCatalogoDescripcion?: string;
+  descripcion?: string;
   monto: number;
   idMedioPago?: string;
   referencia?: string;
   tipoMovimiento?: string;
+  tipoOperacion?: string;
   medioPago?: string;
+  moneda?: string;
   usuario?: string;
 }
 
 export interface TipoMovimientoCaja {
-  idTipoMovimiento: number;
+  idTipoMovimientoCaja: number;
   nombre: string;
   descripcion?: string;
-  tipo: 'INGRESO' | 'EGRESO';
-  requiereReferencia: boolean;
+  tipo: string;
 }
 
 export interface ResumenCajaDiario {

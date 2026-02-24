@@ -421,6 +421,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
       SELECT
         mc.idMovimientoCaja,
         mc.idApertura,
+        mc.idTipoMovimientoCaja,
         mc.fechaMovimiento,
         mc.concepto,
         mc.idConcepto,

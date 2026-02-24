@@ -5,9 +5,9 @@
   <div class="content-wrap container">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
-      <h4 class="card-header-title mb-0">Tipo Movimientos</h4>
+      <h4 class="card-header-title mb-0">Tipo Movimientos Caja</h4>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="text-muted" *ngIf="total >= 0">{{ total }} registro(s)</span>
+        <span class="text-muted" *ngIf="items.length >= 0">{{ items.length }} registro(s)</span>
         <div class="input-group" style="max-width: 260px;">
           <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="buscar" (keyup.enter)="filtrar()" />
           <button class="btn btn-primary" type="button" (click)="filtrar()"><i class="bi bi-search"></i></button>
@@ -21,9 +21,9 @@
         <thead>
           <tr>
             <th>Acciones</th>
-            <th>Descripción</th>
+            <th>Nombre</th>
             <th>Tipo</th>
-            <th>Descripción corta</th>
+            <th>Descripción</th>
           </tr>
         </thead>
         <tbody>
@@ -33,22 +33,13 @@
               <button class="btn btn-sm btn-outline-danger me-1" (click)="confirmarEliminar(item)" title="Eliminar"><i class="bi bi-trash"></i></button>
               <button class="btn btn-sm btn-outline-secondary" (click)="abrirVer(item)" title="Ver"><i class="bi bi-search"></i></button>
             </td>
-            <td>{{ item.descripcion }}</td>
-            <td>{{ item.tipo }}</td>
-            <td>{{ item.descripcionCorta || '-' }}</td>
+            <td>{{ item.nombre }}</td>
+            <td>{{ tipoLabel(item.tipo) }}</td>
+            <td>{{ item.descripcion || '-' }}</td>
           </tr>
         </tbody>
       </table>
       <div *ngIf="!loading && items.length === 0" class="alert alert-info mb-0">No hay registros.</div>
-      <ngb-pagination
-        *ngIf="!loading && total > pageSize"
-        [(page)]="page"
-        [pageSize]="pageSize"
-        [collectionSize]="total"
-        [maxSize]="maxSize"
-        (pageChange)="onPageChange($event)"
-        class="d-flex justify-content-end mt-3">
-      </ngb-pagination>
     </div>
   </div>
   </div>
@@ -58,24 +49,23 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">{{ itemEditar.idTipoMovimiento ? 'Editar' : 'Nuevo' }} tipo de movimiento</h5>
+        <h5 class="modal-title">{{ itemEditar.idTipoMovimientoCaja ? 'Editar' : 'Nuevo' }} tipo de movimiento</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label">Descripción</label>
-          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: COMPRA" />
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.nombre" placeholder="Ej: VENTA" maxlength="30" />
         </div>
         <div class="mb-3">
           <label class="form-label">Tipo</label>
           <select class="form-select" [(ngModel)]="itemEditar.tipo">
-            <option value="INGRESO">INGRESO</option>
-            <option value="SALIDA">SALIDA</option>
+            <option *ngFor="let t of tipos" [ngValue]="t.value">{{ t.label }}</option>
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label">Descripción corta</label>
-          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcionCorta" placeholder="Ej: COMPRA" />
+          <label class="form-label">Descripción</label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Opcional" />
         </div>
       </div>
       <div class="modal-footer">
@@ -96,9 +86,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" *ngIf="itemVer">
-        <p><strong>Descripción:</strong> {{ itemVer.descripcion }}</p>
-        <p><strong>Tipo:</strong> {{ itemVer.tipo }}</p>
-        <p><strong>Descripción corta:</strong> {{ itemVer.descripcionCorta || '-' }}</p>
+        <p><strong>Nombre:</strong> {{ itemVer.nombre }}</p>
+        <p><strong>Tipo:</strong> {{ tipoLabel(itemVer.tipo) }}</p>
+        <p><strong>Descripción:</strong> {{ itemVer.descripcion || '-' }}</p>
       </div>
     </div>
   </div>

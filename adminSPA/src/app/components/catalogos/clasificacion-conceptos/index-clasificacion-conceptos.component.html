@@ -5,25 +5,26 @@
   <div class="content-wrap container">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
-      <h4 class="card-header-title mb-0">Tipos de movimiento de caja (TiposMovimientoCaja)</h4>
+      <h4 class="card-header-title mb-0">Clasificación de conceptos</h4>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="text-muted" *ngIf="total >= 0">{{ total }} registro(s)</span>
         <div class="input-group" style="max-width: 260px;">
           <input type="text" class="form-control" placeholder="Buscar..." [(ngModel)]="buscar" (keyup.enter)="filtrar()" />
           <button class="btn btn-primary" type="button" (click)="filtrar()"><i class="bi bi-search"></i></button>
         </div>
-        <button class="btn btn-success" (click)="abrirCrear()"><i class="bi bi-plus-lg"></i> Nuevo tipo</button>
+        <button class="btn btn-success" (click)="abrirCrear()"><i class="bi bi-plus-lg"></i> Nueva clasificación</button>
       </div>
     </div>
     <div class="card-body">
+      <p class="text-muted small mb-3">
+        Agrupe conceptos por categoría (ej: Ventas, Compras, Gastos). Cada concepto puede tener una clasificación y un <strong>Tipo movimiento caja</strong> (en Conceptos) para el arqueo.
+      </p>
       <div *ngIf="loading" class="text-center py-4"><span class="spinner-border"></span></div>
       <table *ngIf="!loading && items.length > 0" class="table table-striped table-hover">
         <thead>
           <tr>
             <th>Acciones</th>
-            <th>Nombre</th>
             <th>Descripción</th>
-            <th>Tipo</th>
           </tr>
         </thead>
         <tbody>
@@ -33,9 +34,7 @@
               <button class="btn btn-sm btn-outline-danger me-1" (click)="confirmarEliminar(item)" title="Eliminar"><i class="bi bi-trash"></i></button>
               <button class="btn btn-sm btn-outline-secondary" (click)="abrirVer(item)" title="Ver"><i class="bi bi-search"></i></button>
             </td>
-            <td>{{ item.nombre }}</td>
-            <td>{{ item.descripcion || '-' }}</td>
-            <td><span [class]="item.tipo === 'I' ? 'badge bg-success' : 'badge bg-danger'">{{ etiquetaTipo(item.tipo) }}</span></td>
+            <td>{{ item.descripcion }}</td>
           </tr>
         </tbody>
       </table>
@@ -58,24 +57,13 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">{{ itemEditar.idTipoMovimientoCaja ? 'Editar' : 'Nuevo' }} tipo de movimiento</h5>
+        <h5 class="modal-title">{{ itemEditar.idClasificacionConcepto ? 'Editar' : 'Nueva' }} clasificación</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label">Nombre <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" [(ngModel)]="itemEditar.nombre" placeholder="Ej: GASTO_ADMINISTRATIVO" maxlength="30" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Descripción</label>
-          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: Gastos administrativos" maxlength="100" />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Tipo <span class="text-danger">*</span></label>
-          <select class="form-select" [(ngModel)]="itemEditar.tipo">
-            <option value="I">Ingreso (I)</option>
-            <option value="E">Egreso (E)</option>
-          </select>
+          <label class="form-label">Descripción <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: Ventas, Compras, Gastos" maxlength="100" />
         </div>
       </div>
       <div class="modal-footer">
@@ -92,13 +80,11 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detalle tipo de movimiento</h5>
+        <h5 class="modal-title">Detalle clasificación</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" *ngIf="itemVer">
-        <p><strong>Nombre:</strong> {{ itemVer.nombre }}</p>
-        <p><strong>Descripción:</strong> {{ itemVer.descripcion || '-' }}</p>
-        <p><strong>Tipo:</strong> <span [class]="itemVer.tipo === 'I' ? 'badge bg-success' : 'badge bg-danger'">{{ etiquetaTipo(itemVer.tipo) }}</span></p>
+        <p><strong>Descripción:</strong> {{ itemVer.descripcion }}</p>
       </div>
     </div>
   </div>

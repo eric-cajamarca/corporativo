@@ -39,7 +39,7 @@ export class IndexCajaComponent implements OnInit {
 
   public montoInicial = 0;
   public movimiento = {
-    idTipoMovimiento: 0,
+    idTipoMovimientoCaja: 0,
     descripcion: '',
     monto: 0,
     idMedioPago: '',
@@ -50,7 +50,7 @@ export class IndexCajaComponent implements OnInit {
     idCaja: '',
     fechaDesde: '',
     fechaHasta: '',
-    idTipoMovimiento: 0
+    idTipoMovimientoCaja: 0
   };
 
   public loading = false;
@@ -114,8 +114,19 @@ export class IndexCajaComponent implements OnInit {
   cargarMovimientos() {
     if (!this.filtrosMovimientos.idCaja) return;
 
+    const idTipo = this.filtrosMovimientos.idTipoMovimientoCaja;
+    const tipoMovimiento = idTipo && this.tiposMovimiento.length
+      ? (this.tiposMovimiento.find(t => t.idTipoMovimientoCaja === idTipo)?.tipo || undefined)
+      : undefined;
+    const filtros: any = {
+      idCaja: this.filtrosMovimientos.idCaja,
+      fechaDesde: this.filtrosMovimientos.fechaDesde || undefined,
+      fechaHasta: this.filtrosMovimientos.fechaHasta || undefined
+    };
+    if (tipoMovimiento) filtros.tipoMovimiento = tipoMovimiento;
+
     this.loading = true;
-    this.cajaService.obtenerMovimientos(this.filtrosMovimientos).subscribe({
+    this.cajaService.obtenerMovimientos(filtros).subscribe({
       next: (response) => {
         if (response.data) {
           this.movimientos = response.data;
@@ -148,7 +159,7 @@ export class IndexCajaComponent implements OnInit {
   abrirModalMovimiento(caja: Caja) {
     this.cajaSeleccionada = caja;
     this.movimiento = {
-      idTipoMovimiento: 0,
+      idTipoMovimientoCaja: 0,
       descripcion: '',
       monto: 0,
       idMedioPago: '',
@@ -240,7 +251,7 @@ export class IndexCajaComponent implements OnInit {
   }
 
   registrarMovimiento() {
-    if (!this.cajaSeleccionada || !this.movimiento.idTipoMovimiento ||
+    if (!this.cajaSeleccionada || !this.movimiento.idTipoMovimientoCaja ||
         !this.movimiento.descripcion || this.movimiento.monto <= 0) {
       iziToast.warning({
         title: 'Advertencia',
@@ -252,7 +263,7 @@ export class IndexCajaComponent implements OnInit {
     this.loading = true;
     this.cajaService.registrarMovimiento({
       idCaja: this.cajaSeleccionada.idCaja,
-      idTipoMovimiento: this.movimiento.idTipoMovimiento,
+      idTipoMovimientoCaja: this.movimiento.idTipoMovimientoCaja,
       descripcion: this.movimiento.descripcion,
       monto: this.movimiento.monto,
       idMedioPago: this.movimiento.idMedioPago || undefined,
@@ -305,8 +316,9 @@ export class IndexCajaComponent implements OnInit {
     });
   }
 
-  getTipoMovimientoNombre(idTipo: number): string {
-    const tipo = this.tiposMovimiento.find(t => t.idTipoMovimiento === idTipo);
+  getTipoMovimientoNombre(idTipo: number | undefined): string {
+    if (idTipo == null) return 'Desconocido';
+    const tipo = this.tiposMovimiento.find(t => t.idTipoMovimientoCaja === idTipo);
     return tipo ? tipo.nombre : 'Desconocido';
   }
 }
