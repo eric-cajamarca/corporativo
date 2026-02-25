@@ -315,7 +315,12 @@ const crearVentaCompleta = async (req, res) => {
         const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, venta.idSucursal);
         idAperturaActual = apertura?.idApertura;
       }
-      if (idAperturaActual) {
+      const rComp = await transaction.request()
+        .input('idComprobante', sql.Int, venta.idComprobante)
+        .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+        .query('SELECT codigo FROM Comprobantes WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa');
+      const esCotizacion = (rComp.recordset?.[0]?.codigo || '').trim().toUpperCase() === 'CT';
+      if (idAperturaActual && !esCotizacion) {
         await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
           idApertura: idAperturaActual,
           idEmpresa: req.user.empresa,
@@ -710,7 +715,12 @@ const postCobrarVenta = async (req, res) => {
         const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, venta.idSucursal);
         idAperturaActual = apertura?.idApertura;
       }
-      if (idAperturaActual) {
+      const rComp = await transaction.request()
+        .input('idComprobante', sql.Int, venta.idComprobante)
+        .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
+        .query('SELECT codigo FROM Comprobantes WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa');
+      const esCotizacion = (rComp.recordset?.[0]?.codigo || '').trim().toUpperCase() === 'CT';
+      if (idAperturaActual && !esCotizacion) {
         await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
           idApertura: idAperturaActual,
           idEmpresa: req.user.empresa,

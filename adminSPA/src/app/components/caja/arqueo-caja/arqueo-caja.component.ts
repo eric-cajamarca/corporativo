@@ -35,6 +35,9 @@ export class ArqueoCajaComponent implements OnInit {
   /** Resumen por concepto (dinámico desde API: APERTURA_CAJA, VENTA_CONTADO, etc.) */
   public resumenConceptos: FilaArqueoConcepto[] = [];
 
+  /** Filas del primer recuadro (calculadas una vez para evitar getter en cada change detection). */
+  public filasPrimeraTabla: { clave: string; etiqueta: string; importe: number; icono: string; tipo: string }[] = [];
+
   /** Total ventas al crédito del período (informativo, no efectivo en caja). */
   public ventasCreditoImporte: number = 0;
 
@@ -89,6 +92,7 @@ export class ArqueoCajaComponent implements OnInit {
   ngOnInit(): void {
     this.fecha = ArqueoCajaComponent.fechaLocalHoy();
     this.cargarCajas();
+    this.actualizarFilasPrimeraTabla();
   }
 
   cargarCajas(): void {
@@ -193,6 +197,7 @@ export class ArqueoCajaComponent implements OnInit {
         this.totalEgresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'E').reduce((acc, c) => acc + Math.abs(c.importe), 0);
         this.ventasCreditoImporte = Number((response as any).ventasCredito?.importe) || 0;
         this.cobroCreditosImporte = Number((response as any).cobroCreditos?.importe) || 0;
+        this.actualizarFilasPrimeraTabla();
         this.loading = false;
       },
       error: (error) => {
@@ -210,12 +215,12 @@ export class ArqueoCajaComponent implements OnInit {
     return this.resumenConceptos.reduce((acc, f) => acc + f.importe, 0);
   }
 
-  /** Filas del primer recuadro: conceptos con su importe. Incluye total ventas al crédito, cobro de créditos y pago a proveedores. */
-  get filasPrimeraTabla(): { clave: string; etiqueta: string; importe: number; icono: string; tipo: string }[] {
+  /** Actualiza filasPrimeraTabla con los totales actuales (evita getter en template que colgaba la página). */
+  private actualizarFilasPrimeraTabla(): void {
     const ventaContado = this.importePorConcepto('VENTA CONTADO');
-    return [
+    this.filasPrimeraTabla = [
       { clave: 'VENTA_CONTADO', etiqueta: 'Venta contado', importe: ventaContado, icono: 'fas fa-shopping-cart', tipo: 'VENTA' },
-      { clave: 'VENTA_CREDITO', etiqueta: 'Total ventas al crédito (por cobrar)', importe: this.totalVentasCredito, icono: 'fas fa-credit-card', tipo: 'INFO' },
+      { clave: 'VENTA_CREDITO', etiqueta: 'Venta crédito', importe: this.totalVentasCredito, icono: 'fas fa-credit-card', tipo: 'INFO' },
       { clave: 'PAGO_CUOTA', etiqueta: 'Total cobro de créditos', importe: this.totalCobroCreditos, icono: 'fas fa-hand-holding-usd', tipo: 'COBRO' },
       { clave: 'INGRESOS', etiqueta: 'Ingresos', importe: this.totalIngresos, icono: 'fas fa-arrow-down', tipo: 'I' },
       { clave: 'EGRESOS', etiqueta: 'Egresos', importe: -this.totalEgresos, icono: 'fas fa-arrow-up', tipo: 'E' },

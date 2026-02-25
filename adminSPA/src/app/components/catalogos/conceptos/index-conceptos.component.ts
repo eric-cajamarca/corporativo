@@ -29,7 +29,9 @@ export class IndexConceptosComponent implements OnInit {
   itemEditar: any = {};
   itemVer: any = null;
   loadSave = false;
-  /** Tipos de movimiento de caja (TiposMovimientoCaja) para clasificación en recibos */
+  /** Clasificación de conceptos (ClasificacionConcepto) por empresa */
+  clasificaciones: any[] = [];
+  /** Tipos de movimiento de caja (TiposMovimientoCaja) para arqueo */
   tiposMovimientoCaja: any[] = [];
   tipos = ['INGRESO', 'EGRESO'];
 
@@ -40,8 +42,17 @@ export class IndexConceptosComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.cargarClasificaciones();
     this.cargarTiposMovimientoCaja();
     this.cargar();
+  }
+
+  cargarClasificaciones(): void {
+    this.catalogosService.listarClasificacionConceptos(undefined, 1, 500).subscribe({
+      next: (res) => {
+        this.clasificaciones = res.data || [];
+      }
+    });
   }
 
   cargarTiposMovimientoCaja(): void {
@@ -78,7 +89,7 @@ export class IndexConceptosComponent implements OnInit {
   }
 
   abrirCrear(): void {
-    this.itemEditar = { descripcion: '', tipo: 'EGRESO', idTipoMovimientoCaja: null };
+    this.itemEditar = { descripcion: '', tipo: 'EGRESO', idClasificacionConcepto: null, idTipoMovimientoCaja: null };
     this.loadSave = false;
     const modal = document.getElementById('modalFormConcepto');
     if (modal && (window as any).bootstrap) new (window as any).bootstrap.Modal(modal).show();
@@ -89,6 +100,7 @@ export class IndexConceptosComponent implements OnInit {
       idConcepto: item.idConcepto,
       descripcion: item.descripcion,
       tipo: item.tipo || 'EGRESO',
+      idClasificacionConcepto: item.idClasificacionConcepto ?? null,
       idTipoMovimientoCaja: item.idTipoMovimientoCaja ?? null
     };
     this.loadSave = false;
@@ -117,6 +129,7 @@ export class IndexConceptosComponent implements OnInit {
     const body = {
       descripcion: desc,
       tipo: this.itemEditar.tipo,
+      idClasificacionConcepto: this.itemEditar.idClasificacionConcepto ?? null,
       idTipoMovimientoCaja: this.itemEditar.idTipoMovimientoCaja ?? null
     };
     const req = esNuevo

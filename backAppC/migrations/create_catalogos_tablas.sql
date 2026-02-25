@@ -30,7 +30,8 @@ BEGIN
 END
 GO
 
--- 4. Conceptos (por empresa: descripción, tipo INGRESO/EGRESO, clasificación)
+-- 4. Conceptos (por empresa: descripción, tipo INGRESO/EGRESO, clasificación, tipo movimiento caja para arqueo)
+-- Requiere: TiposMovimientoCaja existente (tabla universal).
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Concepto')
 BEGIN
     CREATE TABLE Concepto (
@@ -39,10 +40,13 @@ BEGIN
         descripcion VARCHAR(100) NOT NULL,
         tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('INGRESO','EGRESO')),
         idClasificacionConcepto UNIQUEIDENTIFIER NULL,
+        idTipoMovimientoCaja INT NULL,
         CONSTRAINT FK_Concepto_idEmpresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-        CONSTRAINT FK_Concepto_idClasificacion FOREIGN KEY (idClasificacionConcepto) REFERENCES ClasificacionConcepto(idClasificacionConcepto)
+        CONSTRAINT FK_Concepto_idClasificacion FOREIGN KEY (idClasificacionConcepto) REFERENCES ClasificacionConcepto(idClasificacionConcepto),
+        CONSTRAINT FK_Concepto_idTipoMovimientoCaja FOREIGN KEY (idTipoMovimientoCaja) REFERENCES TiposMovimientoCaja(idTipoMovimientoCaja)
     );
     CREATE INDEX IX_Concepto_idEmpresa ON Concepto(idEmpresa);
+    CREATE INDEX IX_Concepto_idTipoMovimientoCaja ON Concepto(idTipoMovimientoCaja);
 END
 GO
 

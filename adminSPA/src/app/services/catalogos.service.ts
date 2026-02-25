@@ -102,10 +102,10 @@ export class CatalogosService {
   obtenerConcepto(id: string): Observable<{ data: any }> {
     return this.get<{ data: any }>('conceptos/' + id);
   }
-  crearConcepto(body: { descripcion: string; tipo: string; idClasificacionConcepto?: string | null }): Observable<{ data: any }> {
+  crearConcepto(body: { descripcion: string; tipo: string; idClasificacionConcepto?: string | null; idTipoMovimientoCaja?: number | null }): Observable<{ data: any }> {
     return this.post<{ data: any }>('conceptos', body);
   }
-  actualizarConcepto(id: string, body: { descripcion: string; tipo: string; idClasificacionConcepto?: string | null }): Observable<{ data: any }> {
+  actualizarConcepto(id: string, body: { descripcion: string; tipo: string; idClasificacionConcepto?: string | null; idTipoMovimientoCaja?: number | null }): Observable<{ data: any }> {
     return this.put<{ data: any }>('conceptos/' + id, body);
   }
   eliminarConcepto(id: string): Observable<{ data: any }> {

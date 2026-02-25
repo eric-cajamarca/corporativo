@@ -657,6 +657,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     ? "AND CONVERT(DATE, mc.fechaMovimiento) >= @fechaInicial AND CONVERT(DATE, mc.fechaMovimiento) <= @fechaFinal"
     : "AND CONVERT(DATE, mc.fechaMovimiento) = @fecha";
 
+  /* Excluir cotizaciones: solo ventas con comprobante distinto de CT (Cotización). */
   const sqlVentas = `
     SELECT
       tmc.nombre AS concepto,
@@ -666,6 +667,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
+    INNER JOIN Ventas v ON v.idVenta = mc.idVenta AND v.idEmpresa = mc.idEmpresa
+    INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
     INNER JOIN DetallePagoVenta dpv ON dpv.idVenta = mc.idVenta
     LEFT JOIN FormasPago fp ON fp.idFormaPago = dpv.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
@@ -710,6 +713,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
     INNER JOIN Ventas v ON v.idVenta = mc.idVenta AND v.idEmpresa = mc.idEmpresa
+    INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
     LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
@@ -750,7 +754,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     console.error("Error obtener detalle arqueo (comprobante/cliente/proveedor):", err);
   }
 
-  let ventasCredito = { concepto: 'VENTA CREDITO', importe: 0 };
+  let ventasCredito = { concepto: 'VENTA_CREDITO', importe: 0 };
   try {
     const reqCredito = pool.request()
       .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
@@ -762,9 +766,11 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     const condicionFechaVentas = usaRango
       ? "AND CONVERT(DATE, v.fEmision) >= @fechaInicial AND CONVERT(DATE, v.fEmision) <= @fechaFinal"
       : "AND CONVERT(DATE, v.fEmision) = @fecha";
+    /* Excluir cotizaciones: solo ventas con comprobante distinto de CT. */
     const rCredito = await reqCredito.query(`
       SELECT ISNULL(SUM(v.total), 0) AS total
       FROM Ventas v
+      INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
       INNER JOIN MediosPago mp ON (mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT) OR CAST(mp.idMediosPago AS VARCHAR(20)) = RTRIM(LTRIM(ISNULL(v.idMediosPago, ''))))
         AND (mp.descripcion LIKE '%credito%' OR mp.descripcion LIKE '%crédito%' OR LOWER(REPLACE(mp.descripcion, 'í', 'i')) LIKE '%credito%')
       WHERE v.idEmpresa = @idEmpresa ${condicionFechaVentas}

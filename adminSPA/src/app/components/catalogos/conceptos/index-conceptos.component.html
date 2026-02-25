@@ -24,6 +24,7 @@
             <th>Descripción</th>
             <th>Tipo</th>
             <th>Clasificación</th>
+            <th>Tipo mov. caja</th>
           </tr>
         </thead>
         <tbody>
@@ -35,7 +36,8 @@
             </td>
             <td>{{ item.descripcion }}</td>
             <td>{{ item.tipo }}</td>
-            <td>{{ item.clasificacionTipoMovimientoNombre || item.clasificacionDescripcion || '-' }}</td>
+            <td>{{ item.clasificacionDescripcion || '-' }}</td>
+            <td>{{ item.clasificacionTipoMovimientoNombre || '-' }}</td>
           </tr>
         </tbody>
       </table>
@@ -63,23 +65,31 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label">Descripción</label>
-          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: CAJA CHICA" />
+          <label class="form-label">Descripción <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="itemEditar.descripcion" placeholder="Ej: PAGO DE CLIENTES" maxlength="100" />
         </div>
         <div class="mb-3">
-          <label class="form-label">Tipo</label>
+          <label class="form-label">Tipo <span class="text-danger">*</span></label>
           <select class="form-select" [(ngModel)]="itemEditar.tipo">
             <option value="INGRESO">INGRESO</option>
             <option value="EGRESO">EGRESO</option>
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label">Clasificación (tipo movimiento caja)</label>
-          <select class="form-select" [(ngModel)]="itemEditar.idTipoMovimientoCaja">
+          <label class="form-label">Clasificación</label>
+          <select class="form-select" [(ngModel)]="itemEditar.idClasificacionConcepto">
             <option [ngValue]="null">-- Sin clasificación --</option>
+            <option *ngFor="let c of clasificaciones" [ngValue]="c.idClasificacionConcepto">{{ c.descripcion }}</option>
+          </select>
+          <small class="text-muted">Agrupa conceptos (Ventas, Compras, etc.)</small>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo movimiento caja</label>
+          <select class="form-select" [(ngModel)]="itemEditar.idTipoMovimientoCaja">
+            <option [ngValue]="null">-- Sin asignar --</option>
             <option *ngFor="let t of tiposMovimientoCaja" [ngValue]="t.idTipoMovimientoCaja">{{ t.nombre }} ({{ t.tipo === 'I' ? 'Ingreso' : 'Egreso' }})</option>
           </select>
-          <small class="text-muted">Para usar en recibos de ingreso y egreso.</small>
+          <small class="text-muted">Define cómo se agrupa en el arqueo de caja.</small>
         </div>
       </div>
       <div class="modal-footer">
@@ -96,13 +106,14 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detalle</h5>
+        <h5 class="modal-title">Detalle concepto</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" *ngIf="itemVer">
         <p><strong>Descripción:</strong> {{ itemVer.descripcion }}</p>
         <p><strong>Tipo:</strong> {{ itemVer.tipo }}</p>
-        <p><strong>Clasificación (tipo movimiento):</strong> {{ itemVer.clasificacionTipoMovimientoNombre || '-' }}</p>
+        <p><strong>Clasificación:</strong> {{ itemVer.clasificacionDescripcion || '-' }}</p>
+        <p><strong>Tipo movimiento caja:</strong> {{ itemVer.clasificacionTipoMovimientoNombre || '-' }}</p>
       </div>
     </div>
   </div>
