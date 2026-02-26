@@ -48,7 +48,7 @@
             <tr *ngIf="loading">
               <td colspan="9" class="text-center py-3">Cargando...</td>
             </tr>
-            <tr *ngFor="let item of list">
+            <tr *ngFor="let item of listPaginated">
               <td>
                 <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar">
                   <i class="bi bi-pencil"></i>
@@ -77,6 +77,22 @@
             </tr>
           </tbody>
         </table>
+        <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+          <small class="text-muted">
+            Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
+          </small>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" [class.disabled]="page <= 1">
+              <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page - 1)" aria-label="Anterior">&laquo;</a>
+            </li>
+            <li *ngFor="let p of paginas" class="page-item" [class.active]="page === p">
+              <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(p)">{{ p }}</a>
+            </li>
+            <li class="page-item" [class.disabled]="page >= totalPaginas">
+              <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page + 1)" aria-label="Siguiente">&raquo;</a>
+            </li>
+          </ul>
+        </nav>
       </div>
     </div>
   </div>

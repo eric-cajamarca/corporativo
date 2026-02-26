@@ -55,6 +55,32 @@ export class IndexCajaComponent implements OnInit {
 
   public loading = false;
 
+  page = 1;
+  pageSize = 10;
+  get totalItems(): number {
+    return this.movimientos.length;
+  }
+  get movimientosPaginated(): MovimientoCaja[] {
+    const start = (this.page - 1) * this.pageSize;
+    return this.movimientos.slice(start, start + this.pageSize);
+  }
+  get totalPaginas(): number {
+    return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
+  }
+  get paginas(): number[] {
+    return Array.from({ length: this.totalPaginas }, (_, i) => i + 1);
+  }
+  desdePagina(): number {
+    return (this.page - 1) * this.pageSize + 1;
+  }
+  hastaPagina(): number {
+    return Math.min(this.page * this.pageSize, this.totalItems);
+  }
+  cambiarPagina(p: number): void {
+    if (p < 1 || p > this.totalPaginas) return;
+    this.page = p;
+  }
+
   constructor(
     private cajaService: CajaService,
     private sucursalService: SucursalService,
@@ -131,6 +157,7 @@ export class IndexCajaComponent implements OnInit {
         if (response.data) {
           this.movimientos = response.data;
         }
+        this.page = 1;
         this.loading = false;
       },
       error: (error) => {

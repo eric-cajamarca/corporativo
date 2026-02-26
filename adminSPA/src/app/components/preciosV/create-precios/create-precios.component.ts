@@ -30,7 +30,33 @@ export class CreatePreciosComponent implements OnInit {
   monedas: any[] = [];
   productosFiltrados: any[] = [];
   sucursales: any[] = [];
-  
+
+  page = 1;
+  pageSize = 10;
+  get totalItems(): number {
+    return this.productosFiltrados.length;
+  }
+  get productosPaginated(): any[] {
+    const start = (this.page - 1) * this.pageSize;
+    return this.productosFiltrados.slice(start, start + this.pageSize);
+  }
+  get totalPaginas(): number {
+    return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
+  }
+  get paginas(): number[] {
+    return Array.from({ length: this.totalPaginas }, (_, i) => i + 1);
+  }
+  desdePagina(): number {
+    return (this.page - 1) * this.pageSize + 1;
+  }
+  hastaPagina(): number {
+    return Math.min(this.page * this.pageSize, this.totalItems);
+  }
+  cambiarPagina(p: number): void {
+    if (p < 1 || p > this.totalPaginas) return;
+    this.page = p;
+  }
+
   // Estado
   listaSeleccionadaId: number | null = null;
   listaSeleccionada: any = null;
@@ -99,6 +125,7 @@ export class CreatePreciosComponent implements OnInit {
       next: (response: any) => {
         this.productos = response.data || [];
         this.productosFiltrados = [...this.productos];
+        this.page = 1;
       },
       error: (error) => {
         console.error('Error al cargar productos:', error);
@@ -328,17 +355,18 @@ export class CreatePreciosComponent implements OnInit {
 
   // Funciones auxiliares
   filtrarProductos(): void {
-    console.log('Filtro de búsqueda:', this.filtroBusqueda);
     if (!this.filtroBusqueda.trim()) {
       this.productosFiltrados = [...this.productos];
+      this.page = 1;
       return;
     }
-    
+
     const termino = this.filtroBusqueda.toLowerCase();
     this.productosFiltrados = this.productos.filter(producto =>
-      producto.descripcion.toLowerCase().includes(termino) ||
-      producto.codigo.toLowerCase().includes(termino)
+      (producto.descripcion || '').toLowerCase().includes(termino) ||
+      (producto.codigo || '').toLowerCase().includes(termino)
     );
+    this.page = 1;
   }
 
   validarPrecio(producto: any): void {

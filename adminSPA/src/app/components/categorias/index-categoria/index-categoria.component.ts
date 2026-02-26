@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
 import { CategoriaService } from '../../../services/categoria.service';
@@ -6,17 +6,21 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 declare var bootstrap: any;
 
 @Component({
   selector: 'app-index-categoria',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, NgbPagination],
+  standalone: true,
+  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent,SidebarComponent, NgbPagination],
   templateUrl: './index-categoria.component.html',
   styleUrl: './index-categoria.component.css'
 })
 export class IndexCategoriaComponent {
+  public sidebarState = inject(SidebarStateService);
 
   public categorias: Array<any> = [];
   public categorias_const: Array<any> = [];
@@ -210,5 +214,7 @@ export class IndexCategoriaComponent {
     // cargar más datos cuando cambia la página
   }
 
-  
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
+  }
 }

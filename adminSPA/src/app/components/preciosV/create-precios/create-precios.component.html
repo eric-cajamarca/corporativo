@@ -104,34 +104,30 @@
                 </div>
             </div>
             
-            <div class="table-responsive" *ngIf="productosFiltrados.length > 0">
-                <table class="table table-hover align-middle mb-0">
+            <div class="table-responsive table-precios-wrap" *ngIf="productosFiltrados.length > 0">
+                <table class="table table-hover align-middle mb-0 table-precios-productos">
                     <thead class="table-light">
-                        <tr >
-                            <th scope="col" width="120">SKU / codigo</th>
+                        <tr>
+                            <th scope="col">SKU / código</th>
                             <th scope="col">Producto</th>
-                            <th scope="col" width="120" class="text-end">Costo Ref.</th>
-                            <th scope="col" width="140" class="text-end">Precio Actual</th>
-                            <th scope="col" width="200" class="text-center">Nuevo Precio 
-                                <span class="badge bg-light text-dark ms-1">
-                                    {{simboloMoneda}}
-                                </span>
-                            </th>
-                            <th scope="col" width="120" class="text-center">Última Act.</th>
+                            <th scope="col" class="text-end">C. Unit.</th>
+                            <th scope="col" class="text-end">P. Actual</th>
+                            <th scope="col" class="text-center col-n-precio">N. Precio</th>
+                            <th scope="col" class="text-center">Última Act.</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr *ngFor="let producto of productosFiltrados">
-                            <td class="fw-semibold">{{producto.sku || producto.codigo}}</td>
-                            <td>
-                                <div class="fw-bold">{{producto.descripcion}}</div>
-                                <small class="text-muted">{{producto.descripcionPres || 'Sin categoría'}}</small>
+                        <tr *ngFor="let producto of productosPaginated">
+                            <td class="sku-cell">{{producto.sku || producto.codigo}}</td>
+                            <td class="descripcion-cell">
+                                <div class="producto-descripcion">{{producto.descripcion}}</div>
+                                <small class="text-muted producto-sub">{{producto.descripcionPres || 'Sin categoría'}}</small>
                             </td>
                             <td class="text-end text-muted">{{simboloMoneda}} {{producto.cUnitario || '0.00'}}</td>
                             <td class="text-end">
                                 <span class="fw-semibold">{{simboloMoneda}} {{producto.precioActual || '0.00'}}</span>
                             </td>
-                            <td class="text-center">
+                            <td class="text-center col-n-precio">
                                 <div class="input-group input-group-sm justify-content-center">
                                     <span class="input-group-text bg-light">{{simboloMoneda}}</span>
                                     <input type="number" 
@@ -160,6 +156,22 @@
                         </tr>
                     </tbody>
                 </table>
+                <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2 px-2">
+                    <small class="text-muted">
+                        Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
+                    </small>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item" [class.disabled]="page <= 1">
+                            <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page - 1)" aria-label="Anterior">&laquo;</a>
+                        </li>
+                        <li *ngFor="let p of paginas" class="page-item" [class.active]="page === p">
+                            <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(p)">{{ p }}</a>
+                        </li>
+                        <li class="page-item" [class.disabled]="page >= totalPaginas">
+                            <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page + 1)" aria-label="Siguiente">&raquo;</a>
+                        </li>
+                    </ul>
+                </nav>
             </div>
     
             <!-- Estado vacío -->

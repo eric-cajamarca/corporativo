@@ -81,6 +81,32 @@ export class PagoProveedoresComponent implements OnInit {
   private readonly ESTADO_PENDIENTE = 1;
   private readonly ESTADO_PAGADO = 2;
 
+  page = 1;
+  pageSize = 10;
+  get totalItems(): number {
+    return this.list.length;
+  }
+  get listPaginated(): CompraProveedorItem[] {
+    const start = (this.page - 1) * this.pageSize;
+    return this.list.slice(start, start + this.pageSize);
+  }
+  get totalPaginas(): number {
+    return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
+  }
+  get paginas(): number[] {
+    return Array.from({ length: this.totalPaginas }, (_, i) => i + 1);
+  }
+  desdePagina(): number {
+    return (this.page - 1) * this.pageSize + 1;
+  }
+  hastaPagina(): number {
+    return Math.min(this.page * this.pageSize, this.totalItems);
+  }
+  cambiarPagina(p: number): void {
+    if (p < 1 || p > this.totalPaginas) return;
+    this.page = p;
+  }
+
   constructor(
     private cajaService: CajaService,
     private comprasService: ComprasService,
@@ -149,6 +175,7 @@ export class PagoProveedoresComponent implements OnInit {
         if (this.filtros.numero) {
           this.list = this.list.filter(x => (x.documento || '').includes(this.filtros.numero));
         }
+        this.page = 1;
         this.loading = false;
       },
       error: () => {

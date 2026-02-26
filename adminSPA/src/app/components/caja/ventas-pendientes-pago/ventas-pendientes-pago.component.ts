@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { VentasService, VentaPendientePago } from '../../../services/ventas.service';
@@ -21,6 +21,7 @@ declare var iziToast: any;
   styleUrl: './ventas-pendientes-pago.component.css'
 })
 export class VentasPendientesPagoComponent implements OnInit {
+  sidebarState = inject(SidebarStateService);
   list: VentaPendientePago[] = [];
   loading = false;
   /** Filtro: idVenta (incluye escaneo código de barras) o nombre/RUC cliente */
@@ -37,12 +38,38 @@ export class VentasPendientesPagoComponent implements OnInit {
   guardandoPago = false;
   cajas: Array<{ idCaja: string; idSucursal: string; idApertura: string; nombre: string }> = [];
 
+  page = 1;
+  pageSize = 10;
+  get totalItems(): number {
+    return this.list.length;
+  }
+  get listPaginated(): VentaPendientePago[] {
+    const start = (this.page - 1) * this.pageSize;
+    return this.list.slice(start, start + this.pageSize);
+  }
+  get totalPaginas(): number {
+    return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
+  }
+  get paginas(): number[] {
+    return Array.from({ length: this.totalPaginas }, (_, i) => i + 1);
+  }
+  desdePagina(): number {
+    return (this.page - 1) * this.pageSize + 1;
+  }
+  hastaPagina(): number {
+    return Math.min(this.page * this.pageSize, this.totalItems);
+  }
+  cambiarPagina(p: number): void {
+    if (p < 1 || p > this.totalPaginas) return;
+    this.page = p;
+  }
+
   constructor(
     private ventasService: VentasService,
     private cajaService: CajaService,
     private documentoService: DocumentoService,
     private router: Router,
-    public sidebarState: SidebarStateService
+    //public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -82,6 +109,7 @@ export class VentasPendientesPagoComponent implements OnInit {
     this.ventasService.getPendientesPago(params).subscribe({
       next: (res) => {
         this.list = res.data || [];
+        this.page = 1;
         this.loading = false;
       },
       error: () => {
@@ -182,5 +210,9 @@ export class VentasPendientesPagoComponent implements OnInit {
 
   formatNumber(value: number): string {
     return (value ?? 0).toFixed(2);
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

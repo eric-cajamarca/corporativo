@@ -60,6 +60,77 @@
     padding: 1rem 0.75rem;
 }
 
+/* Tabla listado productos: sin negrita en descripción, fuente más pequeña, adaptable */
+.table-precios-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-precios-productos {
+    font-size: 0.875rem;
+    min-width: 640px;
+}
+
+.table-precios-productos th {
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.table-precios-productos td {
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.5rem;
+}
+
+.descripcion-cell {
+    max-width: 220px;
+    min-width: 120px;
+}
+
+.producto-descripcion {
+    font-weight: normal;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.producto-sub {
+    font-size: 0.75rem;
+    display: block;
+    margin-top: 0.15rem;
+}
+
+.sku-cell {
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+/* Columna N. Precio: ancho fijo 100px */
+.table-precios-productos th.col-n-precio,
+.table-precios-productos td.col-n-precio {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+}
+
+@media (max-width: 991.98px) {
+    .table-precios-productos {
+        font-size: 0.8125rem;
+    }
+    .table-precios-productos td {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.35rem;
+    }
+    .producto-descripcion {
+        font-size: 0.75rem;
+    }
+    .producto-sub {
+        font-size: 0.7rem;
+    }
+    .descripcion-cell {
+        max-width: 180px;
+    }
+}
+
 .table tbody tr:hover {
     background-color: rgba(13, 110, 253, 0.02);
 }

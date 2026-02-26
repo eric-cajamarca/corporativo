@@ -47,7 +47,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let v of list">
+                <tr *ngFor="let v of listPaginated">
                   <td>{{ v.compVenta || v.serie + '-' + v.numero }}</td>
                   <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
                   <td>{{ v.clienteRazonSocial }}</td>
@@ -55,10 +55,10 @@
                   <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
                   <td class="text-center">
                     <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
-                      <i class="bi bi-cash-coin"></i> Cobrar
+                      <i class="bi bi-cash-coin"></i>
                     </button>
                     <button type="button" class="btn btn-outline-primary btn-sm" (click)="editarVenta(v.idVenta)" title="Editar venta">
-                      <i class="bi bi-pencil"></i> Editar
+                      <i class="bi bi-pencil"></i>
                     </button>
                   </td>
                 </tr>
@@ -67,6 +67,22 @@
                 </tr>
               </tbody>
             </table>
+            <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+              <small class="text-muted">
+                Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
+              </small>
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item" [class.disabled]="page <= 1">
+                  <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page - 1)" aria-label="Anterior">&laquo;</a>
+                </li>
+                <li *ngFor="let p of paginas" class="page-item" [class.active]="page === p">
+                  <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(p)">{{ p }}</a>
+                </li>
+                <li class="page-item" [class.disabled]="page >= totalPaginas">
+                  <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page + 1)" aria-label="Siguiente">&raquo;</a>
+                </li>
+              </ul>
+            </nav>
           </div>
           <div *ngIf="loading" class="text-center py-3">
             <span class="spinner-border spinner-border-sm me-2"></span>Cargando...

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { AdminService } from '../../../services/admin.service';
 import { variosService } from '../../../services/varios.service';
@@ -6,17 +6,21 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 declare var boostrap: any;
 
 @Component({
   selector: 'app-index-marca',
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, NgbPagination],
+  standalone: true,
+  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent,SidebarComponent, NgbPagination],
   templateUrl: './index-marca.component.html',
   styleUrl: './index-marca.component.css'
 })
 export class IndexMarcaComponent {
+  public sidebarState = inject(SidebarStateService);
 
   public marcas: Array<any> = [];
   public marcas_const: Array<any> = [];
@@ -187,5 +191,9 @@ export class IndexMarcaComponent {
     this.page = newPage;
     // Puedes agregar lógica adicional aquí si necesitas
     // cargar más datos cuando cambia la página
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }
