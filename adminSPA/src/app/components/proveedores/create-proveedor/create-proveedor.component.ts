@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { CommonModule } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 
 declare var iziToast: any;
 
@@ -270,7 +271,7 @@ export class CreateProveedorComponent {
 
 private async handleRucSearch(): Promise<void> {
   try {
-    const response = await this._apiperuService.getRucInfo(this.filtro).toPromise();
+    const response = await firstValueFrom(this._apiperuService.getRucInfo(this.filtro));
     if (!response) {
       throw new Error('No se recibieron datos del servicio');
     }
@@ -308,7 +309,7 @@ private async handleRucSearch(): Promise<void> {
 
 private async handleDniSearch(): Promise<void> {
   try {
-    const response = await this._apiperuService.getDniInfo(this.filtro).toPromise();
+    const response = await firstValueFrom(this._apiperuService.getDniInfo(this.filtro));
     if (!response) {
       throw new Error('No se recibieron datos del servicio');
     }

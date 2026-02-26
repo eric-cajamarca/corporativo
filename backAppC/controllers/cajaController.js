@@ -174,6 +174,7 @@ const registrarMovimiento = async (req, res) => {
     const {
       idApertura,
       idTipoMovimientoCaja,
+      fechaMovimiento,
       concepto,
       idConcepto,
       monto,
@@ -195,6 +196,7 @@ const registrarMovimiento = async (req, res) => {
     const result = await CajaServices.registrarMovimientoService(pool, req.user, {
       idApertura,
       idTipoMovimientoCaja,
+      fechaMovimiento: fechaMovimiento || null,
       concepto,
       idConcepto: idConcepto || null,
       monto,

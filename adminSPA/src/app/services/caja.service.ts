@@ -163,10 +163,11 @@ export class CajaService {
     return this._http.get(this.url + 'caja/movimientos?' + q.toString(), { headers, withCredentials: true });
   }
 
-  // Registrar movimiento (egreso): backend espera idApertura. documentoRelacionado lo genera el backend (RE).
+  // Registrar movimiento (egreso): backend espera idApertura. fechaMovimiento = fecha del formulario (Fecha Emisión).
   registrarMovimientoEgreso(data: {
     idApertura: string;
     idTipoMovimientoCaja: number;
+    fechaMovimiento?: string;
     concepto: string;
     idConcepto?: string;
     monto: number;
@@ -177,6 +178,7 @@ export class CajaService {
     return this._http.post(this.url + 'caja/movimiento', {
       idApertura: data.idApertura,
       idTipoMovimientoCaja: data.idTipoMovimientoCaja,
+      fechaMovimiento: data.fechaMovimiento ?? null,
       concepto: data.concepto,
       idConcepto: data.idConcepto ?? null,
       monto: data.monto,
@@ -186,10 +188,11 @@ export class CajaService {
     }, { headers, withCredentials: true });
   }
 
-  // Registrar movimiento (ingreso): mismo endpoint que egreso, con idTipoMovimientoCaja tipo I. documentoRelacionado lo genera el backend (RI).
+  // Registrar movimiento (ingreso): mismo endpoint que egreso. fechaMovimiento = fecha del formulario (Fecha Emisión).
   registrarMovimientoIngreso(data: {
     idApertura: string;
     idTipoMovimientoCaja: number;
+    fechaMovimiento?: string;
     concepto: string;
     idConcepto?: string;
     monto: number;
@@ -200,6 +203,7 @@ export class CajaService {
     return this._http.post(this.url + 'caja/movimiento', {
       idApertura: data.idApertura,
       idTipoMovimientoCaja: data.idTipoMovimientoCaja,
+      fechaMovimiento: data.fechaMovimiento ?? null,
       concepto: data.concepto,
       idConcepto: data.idConcepto ?? null,
       monto: data.monto,

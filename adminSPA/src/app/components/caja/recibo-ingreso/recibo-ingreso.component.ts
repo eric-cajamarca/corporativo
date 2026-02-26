@@ -221,9 +221,15 @@ export class ReciboIngresoComponent implements OnInit {
   }
 
   onConceptoChange(idConcepto: string): void {
-    if (!idConcepto) return;
+    if (!idConcepto) {
+      return;
+    }
     const c = this.conceptos.find((x: any) => x.idConcepto === idConcepto);
-    if (c && c.descripcion) this.form.concepto = c.descripcion;
+    if (!c) return;
+    if (c.descripcion) this.form.concepto = c.descripcion;
+    if (c.idTipoMovimientoCaja != null && this.tiposMovimiento.some((t: any) => t.idTipoMovimientoCaja === c.idTipoMovimientoCaja)) {
+      this.form.idTipoMovimientoCaja = c.idTipoMovimientoCaja;
+    }
   }
 
   cerrarForm(): void {
@@ -275,6 +281,7 @@ export class ReciboIngresoComponent implements OnInit {
     this.cajaService.registrarMovimientoIngreso({
       idApertura: this.form.idApertura,
       idTipoMovimientoCaja: this.form.idTipoMovimientoCaja,
+      fechaMovimiento: this.form.fechaEmision || undefined,
       concepto: this.form.concepto,
       idConcepto: this.form.idConcepto || undefined,
       monto: this.form.importe,

@@ -353,7 +353,7 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
   if (!idSucursal) {
     throw new Error("No se pudo determinar la sucursal para el movimiento. Verifique la apertura de caja o el usuario.");
   }
-
+  console.log('datos en el repositorio de movimientoscaja', datos);
   const result = await poolOrTransaction
     .request()
     .input("idApertura", sql.UniqueIdentifier, datos.idApertura)
@@ -361,6 +361,7 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
     .input("idSucursal", sql.UniqueIdentifier, idSucursal)
     .input("idUsuario", sql.UniqueIdentifier, user.sub)
     .input("idTipoMovimientoCaja", sql.Int, datos.idTipoMovimientoCaja)
+    .input("fechaMovimiento", sql.DateTime, datos.fechaMovimiento || null)
     .input("concepto", sql.VarChar, datos.concepto)
     .input("idConcepto", sql.UniqueIdentifier, datos.idConcepto || null)
     .input("monto", sql.Decimal(18, 2), datos.monto)
@@ -377,7 +378,7 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
       OUTPUT INSERTED.idMovimientoCaja
       VALUES (
         @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
-        GETDATE(), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
+        ISNULL(TRY_CONVERT(DATETIME, @fechaMovimiento, 23), GETDATE()), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
         @documentoRelacionado, @observaciones
       )
     `);
