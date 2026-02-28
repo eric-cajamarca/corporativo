@@ -12,7 +12,11 @@
         <h1 class="content-title mb-1">Gestión de Empresas</h1>
         <p class="content-subtitle text-muted mb-0">Administra las empresas del sistema</p>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-secondary" [routerLink]="['/rubros']">
+          <i class="fas fa-cogs me-1"></i>
+          Configuración de rubros
+        </button>
         <button class="btn btn-outline-primary" (click)="abrirModalGestores()">
           <i class="fas fa-users-cog me-1"></i>
           Gestores y Config.

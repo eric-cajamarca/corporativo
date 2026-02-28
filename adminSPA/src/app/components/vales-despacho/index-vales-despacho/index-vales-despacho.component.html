@@ -1,0 +1,43 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="content-title">Vales de despacho</h1>
+      <p class="text-muted mb-0">Listado de vales emitidos. El stock se descuenta al emitir el vale.</p>
+    </div>
+    <span class="btn btn-primary disabled" title="Próximamente">Nuevo vale</span>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      @if (loading) {
+        <p class="text-muted">Cargando...</p>
+      } @else if (vales.length === 0) {
+        <p class="text-muted mb-0">No hay vales de despacho. Use "Nuevo vale" para emitir uno.</p>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead>
+              <tr>
+                <th>Comprobante</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (v of vales; track v.idValeDespacho) {
+                <tr>
+                  <td>{{ v.compVale }}</td>
+                  <td>{{ v.fEmision }}</td>
+                  <td>{{ v.clienteRazonSocial || v.nombreCliente || v.idCliente }}</td>
+                  <td><span class="badge" [class.bg-success]="v.estado === 'EMITIDO'" [class.bg-secondary]="v.estado === 'LIQUIDADO'" [class.bg-danger]="v.estado === 'ANULADO'">{{ v.estado }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</main>

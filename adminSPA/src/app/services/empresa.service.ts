@@ -18,6 +18,10 @@ export class EmpresaService {
     'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png',
     'Mi Empresa S.A.C.',
     '00000000000',
+    '',
+    null,
+    null,
+    '',
     'Av. Principal 123, Lima',
     '(01) 456-7890'
   );
@@ -59,6 +63,30 @@ export class EmpresaService {
   // Para obtener valor actual síncrono
   getEmpresaActual(): Empresa {
     return this.empresaSubject.value;
+  }
+
+  /** Refresca la empresa desde la API (empresas_id) y actualiza el subject. Útil para tener idRubro/codigoRubro al día. */
+  refreshEmpresaFromApi(): Observable<Empresa | null> {
+    return new Observable(observer => {
+      this.getEmpresasPdf().subscribe({
+        next: (response) => {
+          const empresaData = response?.data?.[0];
+          if (empresaData) {
+            if (empresaData.logo && !String(empresaData.logo).startsWith('http')) {
+              empresaData.logo = this.url + 'obtener_logo/' + empresaData.logo;
+            }
+            this.empresaSubject.next(empresaData);
+            observer.next(empresaData);
+          } else {
+            observer.next(null);
+          }
+          observer.complete();
+        },
+        error: (err) => {
+          observer.error(err);
+        }
+      });
+    });
   }
 
  

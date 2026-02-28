@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
@@ -24,6 +24,9 @@ import { Empresa as EmpresaModel } from '../../../models/empresa.model';
   styleUrl: './index-ventas.component.css'
 })
 export class IndexVentasComponent implements OnInit {
+  /** Si es true, no se muestran sidebar ni topnav (para incrustar en ventas-hoteles u otro contenedor). */
+  @Input() noShell = false;
+
   ventas: VentaListado[] = [];
   ventasConst: VentaListado[] = [];
   loading = true;

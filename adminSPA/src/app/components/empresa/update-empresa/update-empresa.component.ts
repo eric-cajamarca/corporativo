@@ -5,6 +5,7 @@ import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
 import { EmpresaService } from '../../../services/empresa.service';
+import { RubrosService, Rubro } from '../../../services/rubros.service';
 import { global } from '../../../services/global';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -72,6 +73,7 @@ export class UpdateEmpresaComponent {
   // public direccionModificada: any = {};
 
   public data: any = {};
+  public rubros: Rubro[] = [];
 
 
   constructor(
@@ -79,6 +81,7 @@ export class UpdateEmpresaComponent {
     private _documentosService: DocumentoService,
     private _apiperuService: ApiperuService,
     private _empresasService: EmpresaService,
+    private _rubrosService: RubrosService,
     private _router: Router,
     private _route: ActivatedRoute,
     public authService: AuthService
@@ -147,10 +150,10 @@ export class UpdateEmpresaComponent {
         console.log('response', response);
         //convetir el array response.data a un objeto this.empresas
         this.empresas = response.data[0];
-        
         console.log('this.empresas', this.empresas);
       }
-    )
+    );
+    this._rubrosService.listar({ activo: true }).subscribe(res => { this.rubros = res.data || []; });
 
     this._empresasService.getDireccionEmpresa_id().subscribe(
       response => {

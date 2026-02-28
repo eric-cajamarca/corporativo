@@ -1,0 +1,148 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content hotel-main" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <!-- Cabecera módulo hotelería -->
+  <header class="hotel-header">
+    <div class="hotel-header-inner">
+      <div class="hotel-header-brand">
+        <span class="hotel-icon" aria-hidden="true"></span>
+        <div>
+          <h1 class="hotel-title">Módulo de Hotelería</h1>
+          <p class="hotel-subtitle">Reservas, habitaciones y consumo</p>
+        </div>
+      </div>
+      <div class="hotel-header-stats">
+        <div class="hotel-stat">
+          <span class="hotel-stat-value">{{ reservas.length }}</span>
+          <span class="hotel-stat-label">Reservas</span>
+        </div>
+        <div class="hotel-stat">
+          <span class="hotel-stat-value">{{ ocupadasCount }}</span>
+          <span class="hotel-stat-label">Ocupadas</span>
+        </div>
+        <div class="hotel-stat">
+          <span class="hotel-stat-value">{{ disponiblesCount }}</span>
+          <span class="hotel-stat-label">Disponibles</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Pestañas -->
+  <nav class="hotel-tabs">
+    <button
+      type="button"
+      class="hotel-tab"
+      [class.hotel-tab-active]="activeTab() === 'reservas'"
+      (click)="setTab('reservas')">
+      <i class="fas fa-calendar-check me-2"></i>
+      Reservas
+    </button>
+    <button
+      type="button"
+      class="hotel-tab"
+      [class.hotel-tab-active]="activeTab() === 'habitaciones'"
+      (click)="setTab('habitaciones')">
+      <i class="fas fa-door-open me-2"></i>
+      Habitaciones
+    </button>
+    <button
+      type="button"
+      class="hotel-tab"
+      [class.hotel-tab-active]="activeTab() === 'consumo'"
+      (click)="setTab('consumo')">
+      <i class="fas fa-receipt me-2"></i>
+      Consumo / Ventas
+    </button>
+  </nav>
+
+  <div class="hotel-content">
+    <!-- Tab Reservas -->
+    @if (activeTab() === 'reservas') {
+      <section class="hotel-section">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Reservas</h2>
+          <button type="button" class="btn btn-hotel-primary" disabled title="Próximamente">
+            <i class="fas fa-plus me-1"></i>
+            Nueva reserva
+          </button>
+        </div>
+        <div class="hotel-card">
+          <div class="table-responsive">
+            <table class="table hotel-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Huésped</th>
+                  <th>Habitación</th>
+                  <th>Entrada</th>
+                  <th>Salida</th>
+                  <th>Estado</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of reservas; track r.id) {
+                  <tr>
+                    <td><span class="fw-medium">{{ r.codigo }}</span></td>
+                    <td>{{ r.huesped }}</td>
+                    <td><span class="hotel-room-tag">{{ r.habitacion }}</span></td>
+                    <td>{{ r.entrada }}</td>
+                    <td>{{ r.salida }}</td>
+                    <td>
+                      <span class="hotel-badge" [ngClass]="estadoReservaClass(r.estado)">
+                        {{ estadoReservaLabels[r.estado] }}
+                      </span>
+                    </td>
+                    <td class="text-end fw-semibold">{{ formatearMoneda(r.total) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (reservas.length === 0) {
+            <div class="hotel-empty">
+              <i class="fas fa-calendar-times hotel-empty-icon"></i>
+              <p class="mb-0 text-muted">No hay reservas registradas. Use "Nueva reserva" para crear una.</p>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Tab Habitaciones -->
+    @if (activeTab() === 'habitaciones') {
+      <section class="hotel-section">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Estado de habitaciones</h2>
+        </div>
+        <div class="hotel-rooms-grid">
+          @for (h of habitaciones; track h.numero) {
+            <div class="hotel-room-card" [ngClass]="estadoHabitacionClass(h.estado)">
+              <div class="hotel-room-numero">{{ h.numero }}</div>
+              <div class="hotel-room-tipo">{{ h.tipo }}</div>
+              <span class="hotel-room-estado" [ngClass]="estadoHabitacionClass(h.estado)">
+                {{ estadoHabitacionLabels[h.estado] }}
+              </span>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Tab Consumo (misma lógica que ventas habitual) -->
+    @if (activeTab() === 'consumo') {
+      <section class="hotel-section hotel-section-consumo">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Consumo y facturación</h2>
+          <a [routerLink]="['/ventas/create']" class="btn btn-hotel-primary">
+            <i class="fas fa-plus me-1"></i>
+            Nueva venta / Consumo
+          </a>
+        </div>
+        <app-index-ventas [noShell]="true"></app-index-ventas>
+      </section>
+    }
+  </div>
+</main>

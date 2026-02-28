@@ -88,7 +88,8 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
         { codigo: 'RI', nombre: 'Recibo de Ingreso', serie: 'RI01', numero: 0, activo: 1 },
         { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
         { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
-        { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 }
+        { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 },
+        { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 }
 
     ];
 

@@ -33,6 +33,7 @@ import { CreateDespachosComponent } from './components/despachos/create-despacho
 import { IndexProgramacionComponent } from './components/programaciones/index-programacion/index-programacion.component';
 import { CreateProgramacionComponent } from './components/programaciones/create-programacion/create-programacion.component';
 import { UpdateProgramacionComponent } from './components/programaciones/update-programacion/update-programacion.component';
+import { VentasContainerComponent } from './components/ventas/ventas-container/ventas-container.component';
 import { IndexVentasComponent } from './components/ventas/index-ventas/index-ventas.component';
 import { CreateVentasComponent } from './components/ventas/create-ventas/create-ventas.component';
 import { DetalleVentaComponent } from './components/ventas/detalle-venta/detalle-venta.component';
@@ -73,6 +74,8 @@ import { IndexConceptosComponent } from './components/catalogos/conceptos/index-
 import { IndexMotivoTrasladoComponent } from './components/catalogos/motivo-traslado/index-motivo-traslado.component';
 import { IndexMotivoNotaCreditoComponent } from './components/catalogos/motivo-nota-credito/index-motivo-nota-credito.component';
 import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-auditoria.component';
+import { IndexRubrosComponent } from './components/rubros/index-rubros/index-rubros.component';
+import { IndexValesDespachoComponent } from './components/vales-despacho/index-vales-despacho/index-vales-despacho.component';
 
 export const routes: Routes = [
     {
@@ -191,10 +194,18 @@ export const routes: Routes = [
      { path: 'programacion/create',component: CreateProgramacionComponent, canActivate: [AuthGuard], title: 'Crear Programacion'},
      { path: 'programacion/:id', component: UpdateProgramacionComponent, canActivate: [AuthGuard], title: 'Actualizar Programacion'},
 
-     { path: 'ventas', component: IndexVentasComponent, canActivate: [AuthGuard], title: 'Resumen de ventas'},
-     { path: 'ventas/create', component: CreateVentasComponent, canActivate: [AuthGuard], title: 'Crear nueva venta'},
-     { path: 'ventas/detalle/:id', component: DetalleVentaComponent, canActivate: [AuthGuard], title: 'Detalle de venta' },
-     { path: 'ventas/editar/:id', component: UpdateVentaComponent, canActivate: [AuthGuard], title: 'Editar venta' },
+     {
+      path: 'ventas',
+      component: VentasContainerComponent,
+      canActivate: [AuthGuard],
+      title: 'Ventas',
+      children: [
+        { path: '', component: IndexVentasComponent, title: 'Resumen de ventas' },
+        { path: 'create', component: CreateVentasComponent, title: 'Crear nueva venta' },
+        { path: 'detalle/:id', component: DetalleVentaComponent, title: 'Detalle de venta' },
+        { path: 'editar/:id', component: UpdateVentaComponent, title: 'Editar venta' },
+      ]
+    },
 
      { path: 'cotizaciones', component: IndexCotizacionesComponent, canActivate: [AuthGuard], title: 'Cotizaciones' },
      { path: 'cotizaciones/editar/:id', component: UpdateCotizacionComponent, canActivate: [AuthGuard], title: 'Editar cotización' },
@@ -226,6 +237,8 @@ export const routes: Routes = [
      { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard], title: 'Créditos y Cuotas' },
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },
+     { path: 'rubros', component: IndexRubrosComponent, canActivate: [AuthGuard], title: 'Configuración por rubro' },
+     { path: 'vales-despacho', component: IndexValesDespachoComponent, canActivate: [AuthGuard], title: 'Vales de despacho' },
      { path: 'reportes', component: IndexReportesComponent, canActivate: [AuthGuard], title: 'Reportes y Análisis' },
 
      // Catálogos

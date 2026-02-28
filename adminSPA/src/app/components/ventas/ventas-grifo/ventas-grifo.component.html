@@ -1,0 +1,15 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <h1 class="content-title">Ventas – Grifo</h1>
+    <p class="text-muted mb-0">Vales de despacho, liquidación y anticipo.</p>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <p class="mb-3">Módulo adaptado para grifo: emisión de vales de despacho por entrega (galones), liquidación mensual y anticipos.</p>
+      <a routerLink="/vales-despacho" class="btn btn-primary me-2">Vales de despacho</a>
+      <span class="text-muted small">(Liquidación y anticipos en próximas entregas)</span>
+    </div>
+  </div>
+</main>

@@ -1,7 +1,8 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+@if (!noShell) {
+  <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+  <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+}
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()" [class.ventas-embedded]="noShell">
   <div class="content-wrap ventas-container">
     <div class="table-card card">
       <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">

@@ -1,0 +1,13 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <h1 class="content-title">Ventas – Venta de ropa</h1>
+    <p class="text-muted mb-0">Módulo adaptado para tallas y variantes.</p>
+  </div>
+  <div class="card">
+    <div class="card-body text-muted">
+      Componente de ventas para ropa (tallas, colores, variantes). En desarrollo.
+    </div>
+  </div>
+</main>

@@ -1,0 +1,78 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <h1 class="content-title">Configuración por rubro</h1>
+    <p class="text-muted mb-0">Rubros del sistema y parámetros por rubro (independiente de empresa y cliente).</p>
+  </div>
+
+  <div class="row">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Rubros</h5>
+        </div>
+        <div class="card-body">
+          @if (loading) {
+            <p class="text-muted">Cargando...</p>
+          } @else {
+            <ul class="list-group list-group-flush">
+              @for (r of rubros; track r.idRubro) {
+                <li class="list-group-item list-group-item-action" [class.active]="rubroSeleccionado?.idRubro === r.idRubro" (click)="seleccionarRubro(r)">
+                  <strong>{{ r.codigo }}</strong> – {{ r.nombre }}
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      @if (rubroSeleccionado) {
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Configuración: {{ rubroSeleccionado.nombre }}</h5>
+          </div>
+          <div class="card-body">
+            @if (configCargando) {
+              <p class="text-muted">Cargando configuración...</p>
+            } @else {
+              <p class="small text-muted mb-3">Clave/valor por rubro (ej. componenteVentas, usaValeDespacho, maxLineasPorFactura, codigoUnidadPrincipal).</p>
+              <div class="table-responsive mb-3">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Clave</th>
+                      <th>Valor</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of configuracion; track $index) {
+                      <tr>
+                        <td><input type="text" class="form-control form-control-sm" [(ngModel)]="c.clave" placeholder="clave"></td>
+                        <td><input type="text" class="form-control form-control-sm" [(ngModel)]="c.valor" placeholder="valor"></td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarFilaConfig($index)">Quitar</button></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm me-2" (click)="agregarFilaConfig()">+ Agregar fila</button>
+              <button type="button" class="btn btn-primary btn-sm" (click)="guardarConfiguracion()" [disabled]="configGuardando">
+                {{ configGuardando ? 'Guardando...' : 'Guardar configuración' }}
+              </button>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="card">
+          <div class="card-body text-muted text-center py-5">
+            Seleccione un rubro para ver o editar su configuración.
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</main>

@@ -101,7 +101,17 @@
                             placeholder="Crea un corto alias para tu negocio" maxlength="10" appFormatSentence>
                     </div>
                     <div class="mb-3">
-                        <label for="rubro" class="form-label">Giro del negocio</label>
+                        <label for="idRubro" class="form-label">Rubro del sistema</label>
+                        <select class="form-select" name="idRubro" [(ngModel)]="empresas.idRubro">
+                            <option [ngValue]="null">— Sin rubro (General) —</option>
+                            @for (r of rubros; track r.idRubro) {
+                            <option [ngValue]="r.idRubro">{{ r.codigo }} – {{ r.nombre }}</option>
+                            }
+                        </select>
+                        <small class="text-muted">Define el tipo de negocio para ventas (grifo, ferretería, hoteles, etc.).</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="rubro" class="form-label">Giro del negocio (texto)</label>
                         <textarea type="text" class="form-control" name="rubro" [(ngModel)]="empresas.rubro"
                             placeholder="Descripcion del giro del negocio" appFormatSentence></textarea>
                     </div>

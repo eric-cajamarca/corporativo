@@ -17,6 +17,15 @@
   margin-left: 70px;
 }
 
+/* Incrustado en ventas-hoteles (noShell): sin márgenes ni padding extra */
+.main-content.ventas-embedded {
+  margin-left: 0;
+  margin-top: 0;
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+}
+
 @media (max-width: 991.98px) {
   .main-content {
     margin-left: 0;

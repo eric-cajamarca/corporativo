@@ -93,39 +93,26 @@ const getEmpresasById = async function (req, res) {
 };
 
 const getEmpresa_id = async function (req, res) {
-
     const id = req.user.empresa;
-
-    if (req.user) {
-        if(req.user.rol=='Administrador'){
-            console.log('req.user.rol:');
-            try {
-                const pool = await sql.connect(dbConfig);
-                let result = await pool
-                    .request()
-                    .input('idEmpresa', sql.UniqueIdentifier, id)
-                    .query(
-                        'SELECT e.logo, e.razon_Social AS nombre, e.ruc, e.rubro, e.correo, e.celular AS telefono, de.direccion ' +
-                        'FROM Empresas e ' +
-                        'LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1 ' +
-                        'WHERE e.idEmpresa = @idEmpresa'
-                    );
-
-
-                console.log('result:', result.recordset);
-                //res.json(result.recordset);
-                res.status(200).send({ data: result.recordset });
-            } catch (error) {
-                console.error('Error al obtener los usuarios:', error);
-                res.status(500).send({ data: undefined });
-            }
-        }else{
-            res.status(500).send({ message: 'No Autorizado' });
-
-        }
+    if (!req.user) {
+        return res.status(401).send({ message: 'No autorizado' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool
+            .request()
+            .input('idEmpresa', sql.UniqueIdentifier, id)
+            .query(
+                'SELECT e.logo, e.razon_Social AS nombre, e.ruc, e.rubro, e.correo, e.celular AS telefono, de.direccion, e.idRubro, r.codigo AS codigoRubro ' +
+                'FROM Empresas e ' +
+                'LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1 ' +
+                'LEFT JOIN Rubros r ON e.idRubro = r.idRubro ' +
+                'WHERE e.idEmpresa = @idEmpresa'
+            );
+        res.status(200).send({ data: result.recordset });
+    } catch (error) {
+        console.error('Error al obtener empresa (getEmpresa_id):', error);
+        res.status(500).send({ data: undefined });
     }
 };
 
@@ -168,6 +155,7 @@ const createEmpresa = async function (req, res) {
                 .input('razon_Social', sql.VarChar, razon_Social)
                 .input('nombreComercial', sql.VarChar, nombre_Comercial)
                 .input('rubro', sql.VarChar, rubro)
+                .input('idRubro', sql.Int, req.body.idRubro || null)
                 .input('celular', sql.VarChar, celular)
                 .input('correo', sql.VarChar, correo)
                 .input('password', sql.Text, hashedPassword)
@@ -177,7 +165,7 @@ const createEmpresa = async function (req, res) {
                 .input('estSunat', sql.VarChar, estSunat)
                 .input('estado', sql.Bit, 1)
                 .input('fregistro', sql.DateTime, fregistro)
-                .query('INSERT INTO Empresas (idEmpresa, idDocumento, ruc, razon_Social, nombreComercial, rubro, celular, correo, password, logo, alias, condicion, estSunat, estado, fregistro) VALUES (@idEmpresa, @idDocumento, @ruc, @razon_Social, @nombreComercial, @rubro, @celular, @correo, @password, @logo, @alias, @condicion, @estSunat, @estado, @fregistro)');
+                .query('INSERT INTO Empresas (idEmpresa, idDocumento, ruc, razon_Social, nombreComercial, rubro, idRubro, celular, correo, password, logo, alias, condicion, estSunat, estado, fregistro) VALUES (@idEmpresa, @idDocumento, @ruc, @razon_Social, @nombreComercial, @rubro, @idRubro, @celular, @correo, @password, @logo, @alias, @condicion, @estSunat, @estado, @fregistro)');
 
 
             console.log('✓ Empresa creada con ID:', idEmpresa);
@@ -233,7 +221,7 @@ const updateEmpresa = async function (req, res) {
         const idEmpresa = req.user.empresa;
         const {
             ruc, correo, celular, nombreComercial, 
-            alias, rubro, logoAnterior
+            alias, rubro, idRubro, logoAnterior
         } = req.body;
 
         // Validación básica
@@ -245,6 +233,7 @@ const updateEmpresa = async function (req, res) {
         let query = `
             UPDATE Empresas SET 
                 Rubro = @Rubro,
+                idRubro = @idRubro,
                 Celular = @Celular,
                 nombreComercial = @nombreComercial,
                 Correo = @Correo,
@@ -255,6 +244,7 @@ const updateEmpresa = async function (req, res) {
         const request = pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .input('Rubro', sql.VarChar, rubro || '')
+            .input('idRubro', sql.Int, idRubro != null && idRubro !== '' ? (typeof idRubro === 'string' ? parseInt(idRubro, 10) : idRubro) : null)
             .input('Celular', sql.VarChar, celular || '')
             .input('nombreComercial', sql.VarChar, nombreComercial || '')
             .input('Correo', sql.VarChar, correo || '')
