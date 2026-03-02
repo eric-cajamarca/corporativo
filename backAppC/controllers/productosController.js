@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
 const ProductosServices = require('../services/productos.service');
 const preciosVRepository = require('../repositories/preciosV.repository');
+const ProductosRepository = require('../repositories/productos.repository');
 
 
 
@@ -806,9 +807,22 @@ function formatearFecha(date) {
 // };
 
 
+const obtener_productos_habitacion = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) return res.status(401).json({ message: 'No autorizado' });
+    const pool = await sql.connect(dbConfig);
+    const items = await ProductosRepository.obtenerProductosHabitacionRepo(pool, req.user.empresa);
+    res.status(200).json({ data: items });
+  } catch (error) {
+    console.error('productos.obtener_productos_habitacion:', error);
+    res.status(500).json({ message: error.message || 'Error al listar productos habitación' });
+  }
+};
+
 module.exports = {
   obtener_productos_todos,
   obtener_productos_compras,
+  obtener_productos_habitacion,
   match_productos_descripcion,
   obtener_productos_id,
   crear_producto,

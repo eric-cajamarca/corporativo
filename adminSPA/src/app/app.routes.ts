@@ -76,6 +76,7 @@ import { IndexMotivoNotaCreditoComponent } from './components/catalogos/motivo-n
 import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-auditoria.component';
 import { IndexRubrosComponent } from './components/rubros/index-rubros/index-rubros.component';
 import { IndexValesDespachoComponent } from './components/vales-despacho/index-vales-despacho/index-vales-despacho.component';
+import { CreateValeDespachoComponent } from './components/vales-despacho/create-vale-despacho/create-vale-despacho.component';
 
 export const routes: Routes = [
     {
@@ -239,6 +240,7 @@ export const routes: Routes = [
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },
      { path: 'rubros', component: IndexRubrosComponent, canActivate: [AuthGuard], title: 'Configuración por rubro' },
      { path: 'vales-despacho', component: IndexValesDespachoComponent, canActivate: [AuthGuard], title: 'Vales de despacho' },
+    { path: 'vales-despacho/nuevo', component: CreateValeDespachoComponent, canActivate: [AuthGuard], title: 'Nuevo vale de despacho' },
      { path: 'reportes', component: IndexReportesComponent, canActivate: [AuthGuard], title: 'Reportes y Análisis' },
 
      // Catálogos

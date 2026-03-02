@@ -1,15 +1,204 @@
 <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
 <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
-  <div class="content-header">
-    <h1 class="content-title">Ventas – Grifo</h1>
-    <p class="text-muted mb-0">Vales de despacho, liquidación y anticipo.</p>
-  </div>
-  <div class="card">
-    <div class="card-body">
-      <p class="mb-3">Módulo adaptado para grifo: emisión de vales de despacho por entrega (galones), liquidación mensual y anticipos.</p>
-      <a routerLink="/vales-despacho" class="btn btn-primary me-2">Vales de despacho</a>
-      <span class="text-muted small">(Liquidación y anticipos en próximas entregas)</span>
+
+<main class="main-content grifo-main" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <header class="grifo-header">
+    <div class="grifo-header-inner">
+      <div class="grifo-header-brand">
+        <span class="grifo-icon" aria-hidden="true"></span>
+        <div>
+          <h1 class="grifo-title">Ventas – Grifo</h1>
+          <p class="grifo-subtitle">Estado de tanques, vales de despacho, anticipos y facturado</p>
+        </div>
+      </div>
+      <div class="grifo-header-actions">
+        <a routerLink="/vales-despacho" class="btn btn-outline-light btn-sm me-2">
+          <i class="bi bi-ticket-perforated me-1"></i> Vales de despacho
+        </a>
+        <a routerLink="/vales-despacho/nuevo" class="btn btn-light btn-sm">
+          <i class="bi bi-plus-lg me-1"></i> Nuevo vale
+        </a>
+      </div>
     </div>
+  </header>
+
+  <div class="grifo-content">
+    @if (errorMessage()) {
+      <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
+    }
+
+    <!-- Resumen: vales, anticipos, facturado -->
+    <section class="grifo-section">
+      <h2 class="grifo-section-title">Resumen del mes</h2>
+      <div class="grifo-cards">
+        <div class="grifo-card grifo-card-vales">
+          <div class="grifo-card-body">
+            <span class="grifo-card-value">{{ formatearMoneda(resumen?.totalVales ?? 0) }}</span>
+            <span class="grifo-card-label">En vales</span>
+            <span class="grifo-card-meta">{{ resumen?.cantidadVales ?? 0 }} vale(s)</span>
+          </div>
+        </div>
+        <div class="grifo-card grifo-card-anticipos">
+          <div class="grifo-card-body">
+            <span class="grifo-card-value">{{ formatearMoneda(resumen?.totalAnticipos ?? 0) }}</span>
+            <span class="grifo-card-label">Anticipos (saldo)</span>
+          </div>
+        </div>
+        <div class="grifo-card grifo-card-facturado">
+          <div class="grifo-card-body">
+            <span class="grifo-card-value">{{ formatearMoneda(resumen?.totalFacturado ?? 0) }}</span>
+            <span class="grifo-card-label">Facturado</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Configurar tanque -->
+    <section class="grifo-section">
+      <h2 class="grifo-section-title">Configurar tanque</h2>
+      <p class="text-muted small mb-3">Solo los productos con categoría <strong>Combustibles</strong> pueden tener un tanque. Agregue un tanque para ver su estado más arriba.</p>
+      <div class="grifo-config-tanque">
+        <div class="grifo-combustibles-list">
+          @if (productosCombustibles.length === 0 && !showModalNuevoTanque()) {
+            <p class="text-muted small mb-2">No hay productos con categoría Combustibles en el catálogo. Cree la categoría y asígnela a sus productos de combustible.</p>
+          }
+          @if (tanques.length > 0) {
+            <p class="small mb-2">Productos con tanque configurado: <strong>{{ tanques.length }}</strong></p>
+          }
+        </div>
+        <button type="button" class="btn btn-outline-primary" (click)="abrirModalNuevoTanque()">
+          <i class="bi bi-plus-lg me-1"></i> Agregar tanque
+        </button>
+      </div>
+    </section>
+
+    <!-- Estado tanques por combustible -->
+    <section class="grifo-section">
+      <h2 class="grifo-section-title">Estado de tanques</h2>
+      @if (loading()) {
+        <p class="text-muted">Cargando tanques…</p>
+      } @else if (tanques.length === 0) {
+        <div class="grifo-empty">
+          <i class="bi bi-droplet-half grifo-empty-icon"></i>
+          <p class="mb-2">No hay tanques configurados.</p>
+          <p class="text-muted small mb-0">Use la sección <strong>Configurar tanque</strong> para agregar un tanque a un producto combustible.</p>
+        </div>
+      } @else {
+        <div class="grifo-tanques">
+          @for (t of tanques; track t.idTanque) {
+            <div class="grifo-tanque-card">
+              <div class="grifo-tanque-header">
+                <span class="grifo-tanque-nombre">{{ t.nombreProducto }}</span>
+                <span class="grifo-tanque-unidad">{{ t.cantidadActual | number:'1.2-2' }} / {{ t.capacidad | number:'1.2-2' }} {{ t.unidad }}</span>
+              </div>
+              <div class="grifo-tanque-bar-wrap">
+                <div class="grifo-tanque-bar" [style.width.%]="porcentajeTanque(t)" [class.grifo-tanque-bar-bajo]="porcentajeTanque(t) < 25" [class.grifo-tanque-bar-ok]="porcentajeTanque(t) >= 25 && porcentajeTanque(t) < 70" [class.grifo-tanque-bar-alto]="porcentajeTanque(t) >= 70"></div>
+              </div>
+              <div class="grifo-tanque-footer">
+                <span class="grifo-tanque-porc">{{ porcentajeTanque(t) }}%</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalTanque(t)">Actualizar lectura</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Accesos rápidos -->
+    <section class="grifo-section">
+      <h2 class="grifo-section-title">Acciones</h2>
+      <div class="d-flex flex-wrap gap-2">
+        <a routerLink="/vales-despacho/nuevo" class="btn btn-success">
+          <i class="bi bi-plus-lg me-1"></i> Nuevo vale de despacho
+        </a>
+        <a routerLink="/vales-despacho" class="btn btn-outline-secondary">
+          <i class="bi bi-list-ul me-1"></i> Ver listado de vales
+        </a>
+      </div>
+    </section>
   </div>
 </main>
+
+<!-- Modal nuevo tanque -->
+@if (showModalNuevoTanque()) {
+  <div class="grifo-modal-backdrop" (click)="cerrarModalNuevoTanque()"></div>
+  <div class="grifo-modal" role="dialog">
+    <div class="grifo-modal-content">
+      <div class="grifo-modal-header">
+        <h3 class="grifo-modal-title">Agregar tanque</h3>
+        <button type="button" class="grifo-modal-close" (click)="cerrarModalNuevoTanque()" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="grifo-modal-body">
+        @if (errorMessage()) {
+          <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
+        }
+        <div class="mb-3">
+          <label class="form-label">Producto combustible <span class="text-danger">*</span></label>
+          <select class="form-select" [(ngModel)]="formNuevoTanque.idProducto">
+            <option value="">Seleccione...</option>
+            @for (p of productosCombustibles; track p.idProducto) {
+              <option [value]="p.idProducto">{{ p.descripcion }} ({{ p.codigo }}) {{ tieneTanque(p.idProducto) ? "— ya tiene tanque" : "" }}</option>
+            }
+          </select>
+          @if (loadingCombustibles) {
+            <span class="small text-muted">Cargando productos...</span>
+          }
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Sucursal (opcional)</label>
+          <select class="form-select" [(ngModel)]="formNuevoTanque.idSucursal">
+            <option value="">Sin sucursal específica</option>
+            @for (s of sucursales; track s.idSucursal) {
+              <option [value]="s.idSucursal">{{ s.nombre || s.codigo || s.idSucursal }}</option>
+            }
+          </select>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Capacidad (GL)</label>
+            <input type="number" class="form-control" [(ngModel)]="formNuevoTanque.capacidad" min="0" step="0.001" placeholder="0" />
+          </div>
+          <div class="col-6">
+            <label class="form-label">Cantidad actual (GL)</label>
+            <input type="number" class="form-control" [(ngModel)]="formNuevoTanque.cantidadActual" min="0" step="0.001" placeholder="0" />
+          </div>
+        </div>
+      </div>
+      <div class="grifo-modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalNuevoTanque()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="guardarNuevoTanque()" [disabled]="guardandoNuevoTanque">
+          {{ guardandoNuevoTanque ? "Guardando…" : "Crear tanque" }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal actualizar lectura tanque -->
+@if (showModalTanque() && tanqueEditando) {
+  <div class="grifo-modal-backdrop" (click)="cerrarModalTanque()"></div>
+  <div class="grifo-modal" role="dialog">
+    <div class="grifo-modal-content">
+      <div class="grifo-modal-header">
+        <h3 class="grifo-modal-title">Actualizar tanque — {{ tanqueEditando.nombreProducto }}</h3>
+        <button type="button" class="grifo-modal-close" (click)="cerrarModalTanque()" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="grifo-modal-body">
+        <div class="mb-3">
+          <label class="form-label">Capacidad ({{ tanqueEditando.unidad }})</label>
+          <input type="number" class="form-control" [(ngModel)]="formTanque.capacidad" min="0" step="0.001" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Cantidad actual ({{ tanqueEditando.unidad }})</label>
+          <input type="number" class="form-control" [(ngModel)]="formTanque.cantidadActual" min="0" step="0.001" />
+        </div>
+      </div>
+      <div class="grifo-modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalTanque()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="guardarTanque()" [disabled]="guardandoTanque">
+          {{ guardandoTanque ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

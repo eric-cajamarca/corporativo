@@ -1,3 +1,319 @@
-.main-content { padding: 1rem; }
-.content-header { margin-bottom: 1.5rem; }
-.content-title { font-size: 1.5rem; }
+/* Layout: espacio para sidebar y topnav (igual que ventas-hoteles) */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 0;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+/* Tema grifo */
+.grifo-main {
+  background: var(--grifo-bg, #f0f4f8);
+  min-height: 100vh;
+}
+
+.grifo-header {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%);
+  color: #fff;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.25);
+}
+
+.grifo-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.grifo-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.grifo-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+.grifo-icon::before {
+  content: "⛽";
+  font-style: normal;
+}
+
+.grifo-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.15rem 0;
+  letter-spacing: -0.02em;
+}
+
+.grifo-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.9;
+}
+
+.grifo-header-actions .btn {
+  border-radius: 8px;
+}
+
+.grifo-content {
+  padding: 1.5rem;
+}
+
+.grifo-section {
+  margin-bottom: 2rem;
+}
+
+.grifo-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+}
+
+/* Cards resumen */
+.grifo-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.grifo-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.grifo-card-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.grifo-card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.grifo-card-label {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.grifo-card-meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.grifo-card-vales {
+  background: linear-gradient(145deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+}
+
+.grifo-card-anticipos {
+  background: linear-gradient(145deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fcd34d;
+}
+
+.grifo-card-facturado {
+  background: linear-gradient(145deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #93c5fd;
+}
+
+/* Configurar tanque */
+.grifo-config-tanque {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.grifo-combustibles-list {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* Tanques */
+.grifo-tanques {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.grifo-tanque-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.grifo-tanque-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.grifo-tanque-nombre {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.95rem;
+}
+
+.grifo-tanque-unidad {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.grifo-tanque-bar-wrap {
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.grifo-tanque-bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.grifo-tanque-bar-bajo {
+  background: #ef4444;
+}
+
+.grifo-tanque-bar-ok {
+  background: #eab308;
+}
+
+.grifo-tanque-bar-alto {
+  background: #22c55e;
+}
+
+.grifo-tanque-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.grifo-tanque-porc {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.grifo-empty {
+  text-align: center;
+  padding: 2rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+}
+
+.grifo-empty-icon {
+  font-size: 3rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+/* Modal */
+.grifo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1040;
+}
+
+.grifo-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  pointer-events: none;
+}
+
+.grifo-modal .grifo-modal-content {
+  pointer-events: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 420px;
+}
+
+.grifo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.grifo-modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.grifo-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.grifo-modal-close:hover {
+  color: #1e293b;
+}
+
+.grifo-modal-body {
+  padding: 1.25rem;
+}
+
+.grifo-modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #e2e8f0;
+}

@@ -1,3 +1,36 @@
+/* Layout: espacio para sidebar (260px) y topnav (64px) */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+.card-header .card-title i {
+  font-size: 1rem;
+}
+
+
+
+
+
 /* ========== Tema hotelería ========== */
 .hotel-main {
   padding: 0;
@@ -253,10 +286,83 @@
   margin-bottom: 1rem;
 }
 
-/* Grid habitaciones */
+/* Grid habitaciones compacto (muchas habitaciones, poco scroll) */
+.hotel-rooms-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.hotel-room-card-compact {
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.6rem 0.5rem;
+  border: 2px solid #e2e8f0;
+  text-align: center;
+  transition: box-shadow 0.2s;
+}
+.hotel-room-card-compact:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.hotel-card-compact-numero {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.2rem;
+}
+.hotel-card-compact-fechas {
+  font-size: 0.7rem;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-bottom: 0.25rem;
+}
+.hotel-card-compact-total {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.4rem;
+}
+.hotel-card-compact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  justify-content: center;
+}
+.hotel-card-compact-actions .btn {
+  padding: 0.15rem 0.35rem;
+  font-size: 0.7rem;
+}
+
+/* Estado por color: ocupada rojo, reservada amarillo, disponible verde */
+.hotel-card-ocupada {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+.hotel-card-ocupada .hotel-card-compact-numero { color: #b91c1c; }
+
+.hotel-card-reservada {
+  border-color: #ca8a04;
+  background: #fefce8;
+}
+.hotel-card-reservada .hotel-card-compact-numero { color: #a16207; }
+
+.hotel-card-disponible {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+.hotel-card-disponible .hotel-card-compact-numero { color: #15803d; }
+
+.hotel-detalle-huesped {
+  font-size: 0.9rem;
+}
+
+/* Grid habitaciones (vista anterior, por si se usa en otro lado) */
 .hotel-rooms-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 1rem;
 }
 
@@ -334,6 +440,78 @@
   border-color: #e2e8f0;
 }
 
+/* Habitación con consumo (recuadro) */
+.hotel-room-con-consumo {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+}
+.hotel-room-con-consumo .hotel-room-numero {
+  text-align: center;
+}
+.hotel-room-con-consumo .hotel-room-tipo {
+  font-size: 0.75rem;
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+.hotel-consumo-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.8125rem;
+  flex: 1;
+  min-height: 2rem;
+}
+.hotel-consumo-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.hotel-consumo-desc {
+  flex: 1 1 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hotel-consumo-cant {
+  color: #64748b;
+}
+.hotel-consumo-precio {
+  margin-left: auto;
+  font-weight: 600;
+  color: #1e293b;
+}
+.hotel-consumo-empty {
+  margin-bottom: 0.5rem;
+  min-height: 1.5rem;
+}
+.hotel-room-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+.hotel-room-actions .btn {
+  flex: 1;
+  min-width: 0;
+}
+.btn-hotel-outline {
+  background: #fff;
+  border: 1px solid #1e3a5f;
+  color: #1e3a5f;
+}
+.btn-hotel-outline:hover {
+  background: #f1f5f9;
+  color: #1e3a5f;
+}
+
 /* Sección consumo (ventas incrustadas) */
 .hotel-section-consumo {
   padding-bottom: 2rem;
@@ -357,4 +535,79 @@
 
 .hotel-section-consumo .ventas-container .card-header.bg-gradient-success {
   background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%) !important;
+}
+
+/* Modal nueva reserva */
+.hotel-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+}
+.hotel-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  pointer-events: none;
+}
+.hotel-modal .hotel-modal-content {
+  pointer-events: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 480px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+}
+.hotel-modal-lg .hotel-modal-content {
+  max-width: 900px;
+  max-height: 85vh;
+}
+.hotel-modal-xl .hotel-modal-content {
+  max-width: 1100px;
+  max-height: 85vh;
+}
+.hotel-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.hotel-modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.hotel-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0 0.25rem;
+}
+.hotel-modal-close:hover {
+  color: #1e293b;
+}
+.hotel-modal-body {
+  padding: 1.25rem;
+}
+.hotel-modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #e2e8f0;
+}
+.table-row-hover {
+  cursor: pointer;
+}
+.table-row-hover:hover {
+  background-color: rgba(32, 201, 151, 0.12);
 }

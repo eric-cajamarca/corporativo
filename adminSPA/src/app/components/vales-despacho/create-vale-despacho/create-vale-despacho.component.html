@@ -1,0 +1,119 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="content-title">Nuevo vale de despacho</h1>
+      <p class="text-muted mb-0">Cliente, sucursal y detalle de productos. El stock se descuenta al emitir.</p>
+    </div>
+    <button type="button" class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      @if (errorMessage) {
+        <div class="alert alert-danger">{{ errorMessage }}</div>
+      }
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <label class="form-label">Sucursal</label>
+          <select class="form-select" [(ngModel)]="form.idSucursal">
+            <option value="">Seleccione...</option>
+            @for (s of sucursales; track s.idSucursal) {
+              <option [value]="s.idSucursal">{{ s.nombre || s.codigo || s.idSucursal }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Cliente</label>
+          <div class="d-flex gap-2">
+            <select class="form-select" [(ngModel)]="form.idCliente" (ngModelChange)="onIdClienteChange($event)">
+              <option [ngValue]="null">Seleccione...</option>
+              @for (c of clientes; track c.idCliente) {
+                <option [ngValue]="c.idCliente">{{ c.rSocial || c.nombre || "Cliente " + c.idCliente }}</option>
+              }
+            </select>
+            <button type="button" class="btn btn-outline-primary" (click)="abrirModalCliente()" title="Información del cliente / Elegir">
+              <i class="bi bi-person-lines-fill"></i>
+            </button>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Observaciones</label>
+          <input type="text" class="form-control" [(ngModel)]="form.observaciones" placeholder="Opcional" />
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0">Detalle</h6>
+        <button type="button" class="btn btn-success btn-sm" (click)="abrirModalProducto()">Agregar producto</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Producto</th>
+              <th>Presentación</th>
+              <th>Cantidad</th>
+              <th>P. unit.</th>
+              <th>Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (l of lineas; track $index) {
+              <tr>
+                <td>{{ l.codigo }}</td>
+                <td>{{ l.descripcion }}</td>
+                <td>{{ l.codigoPresentacion || "-" }}</td>
+                <td><input type="number" class="form-control form-control-sm" style="width:90px" [(ngModel)]="l.cantidad" min="0.001" step="0.001" (ngModelChange)="actualizarTotal(l)" /></td>
+                <td><input type="number" class="form-control form-control-sm" style="width:100px" [(ngModel)]="l.pUnitario" min="0" step="0.01" (ngModelChange)="actualizarTotal(l)" /></td>
+                <td>{{ l.total | number:"1.2-2" }}</td>
+                <td><button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="quitarLinea($index)">Quitar</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (lineas.length > 0) {
+        <div class="text-end mt-2"><strong>Total: S/ {{ totalGeneral() | number:"1.2-2" }}</strong></div>
+      }
+      <div class="mt-4">
+        <button type="button" class="btn btn-primary" (click)="guardar()" [disabled]="guardando">{{ guardando ? "Guardando..." : "Emitir vale" }}</button>
+        <button type="button" class="btn btn-outline-secondary ms-2" (click)="cancelar()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal información del cliente / elegir cliente -->
+@if (showModalCliente) {
+  <div class="modal-backdrop" (click)="cerrarModalCliente()"></div>
+  <div class="modal-vale">
+    <div class="modal-vale-content modal-vale-lg">
+      <div class="modal-vale-header">
+        <h5 class="modal-vale-title">Información del cliente</h5>
+        <button type="button" class="btn-close" (click)="cerrarModalCliente()"></button>
+      </div>
+      <div class="modal-vale-body">
+        @if (clienteSeleccionado) {
+          <div class="card mb-3">
+            <div class="card-body py-2">
+              <p class="mb-1"><strong>Cliente seleccionado:</strong> {{ clienteSeleccionado.rSocial || clienteSeleccionado.nombre }}</p>
+              @if (clienteSeleccionado.ruc) {
+                <p class="mb-0 small text-muted">RUC/DNI: {{ clienteSeleccionado.ruc }}</p>
+              }
+            </div>
+          </div>
+        }
+        <p class="small text-muted mb-2">Haga clic en un cliente de la lista para elegirlo.</p>
+        <app-index-clientes [modoSelector]="true" (clienteElegido)="onClienteElegido($event)"></app-index-clientes>
+      </div>
+      <div class="modal-vale-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalCliente()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+}

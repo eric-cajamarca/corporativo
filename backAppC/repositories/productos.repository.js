@@ -439,3 +439,19 @@ exports.obtenerProductosPorDescripcionRepo = async (pool, idEmpresa) => {
     `);
   return result.recordset || [];
 };
+
+/** Productos con presentación Servicios código ZZ (habitaciones para hotel). */
+exports.obtenerProductosHabitacionRepo = async (pool, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("codigoPresentacion", sql.VarChar(10), "ZZ")
+    .query(`
+      SELECT p.idProducto, p.codigo, p.descripcion, pr.codigo AS codigoPresentacion
+      FROM Productos p
+      INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+      WHERE p.idEmpresa = @idEmpresa AND pr.codigo = @codigoPresentacion
+      ORDER BY p.codigo
+    `);
+  return result.recordset || [];
+};

@@ -33,6 +33,7 @@ import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
+import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -170,7 +171,8 @@ export class CreateVentasComponent implements OnInit {
     private creditosService: CreditosService,
     public sidebarState: SidebarStateService,
     private gestoresService: GestoresService,
-    private productosImagenService: ProductosImagenService
+    private productosImagenService: ProductosImagenService,
+    private hotelPreloadVentaService: HotelPreloadVentaService
   ) {}
 
   ngOnInit(): void {
@@ -216,7 +218,26 @@ export class CreateVentasComponent implements OnInit {
     // fVencimiento no es obligatorio; no se asigna por defecto
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
-    this.revisarVentasProvisionales();
+    if (this.hotelPreloadVentaService.hasPreload()) {
+      this.aplicarPreloadDesdeHabitacion();
+    } else {
+      this.revisarVentasProvisionales();
+    }
+  }
+
+  /** Rellena el carrito desde consumo habitación (hotel → Generar venta). */
+  aplicarPreloadDesdeHabitacion(): void {
+    const preload = this.hotelPreloadVentaService.getAndClearPreload();
+    if (!preload?.lineas?.length) return;
+    this.carrito = preload.lineas.map((lin: { idProducto: string; codigo: string; descripcion: string; codigoPresentacion?: string; cantidad: number; pVenta: number }) => ({
+      idProducto: lin.idProducto,
+      codigo: lin.codigo,
+      descripcion: lin.descripcion,
+      codigoPresentacion: lin.codigoPresentacion ?? '',
+      cantidad: lin.cantidad,
+      pVenta: lin.pVenta
+    }));
+    this.actualizaTotales();
   }
 
   /** Carga estado pedido y estado pago por defecto desde configuración y los aplica a la venta actual. */
