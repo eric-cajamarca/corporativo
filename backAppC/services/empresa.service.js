@@ -495,15 +495,13 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'comprobantes', mensaje: error.message });
         }
 
-        // 3. Crear sucursal principal
-        /**
+        // 3. Crear sucursal principal (dirección principal de la empresa)
         try {
             resultado.sucursal = await exports.crearSucursalPrincipal(pool, idEmpresa, datosEmpresa);
         } catch (error) {
             console.error('⚠️ Error creando sucursal:', error.message);
             resultado.errores.push({ tipo: 'sucursal', mensaje: error.message });
         }
-        */
 
         // 4. Crear secuencias solo si tenemos comprobantes y sucursal
         if (resultado.comprobantes.length > 0 && resultado.sucursal) {

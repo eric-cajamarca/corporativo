@@ -524,11 +524,14 @@ const createSucursalEmpresa = async function (req, res) {
     console.log('crearSucursalEmpresa req.body', req.body);
     //console.log('req.user', req.user);
 
-    try {
+        try {
         let nombre = '';
 
         if (req.body.nombre) {
             nombre = req.body.nombre;
+        } else if (req.body.direccion) {
+            // Si no se especifica un nombre, usar la dirección como nombre de la sucursal
+            nombre = req.body.direccion;
         } else {
             nombre = 'Sucursal Principal';
         }
