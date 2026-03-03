@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+const sql = require('mssql');
 
 /**
  * Obtiene datos de empresa/usuario para la respuesta de getEmpresa_login (verificación de token).
@@ -25,7 +26,7 @@ exports.getDatosEmpresaLogin = async (pool, user) => {
 exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
     console.log('Creando roles predeterminados para empresa:', idEmpresa);
     
-    const sql = require('mssql');
+    // sql ya importado arriba
     
     const rolesPredeterminados = [
         { descripcion: 'Administrador', estado: 1 },
@@ -72,7 +73,7 @@ exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
 exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
     console.log('Creando comprobantes predeterminados para empresa:', idEmpresa);
     
-    const sql = require('mssql');
+    // sql ya importado arriba
     
     const comprobantesPredeterminados = [
         { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1 },
@@ -134,7 +135,7 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
 exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
     console.log('Creando sucursal principal para empresa:', idEmpresa);
     
-    const sql = require('mssql');
+    // sql ya importado arriba
     const idSucursal = uuidv4();
 
     try {
@@ -170,7 +171,7 @@ exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
 exports.crearSecuenciasIniciales = async (pool, idEmpresa, idSucursal, comprobantes) => {
     console.log('Creando secuencias iniciales para sucursal:', idSucursal);
     
-    const sql = require('mssql');
+    // sql ya importado arriba
     const secuenciasCreadas = [];
 
     try {
@@ -208,7 +209,7 @@ exports.crearSecuenciasIniciales = async (pool, idEmpresa, idSucursal, comproban
 exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
     console.log('Creando ubicaciones predeterminadas para sucursal:', idSucursal);
     
-    const sql = require('mssql');
+    // sql ya importado arriba
     
     const ubicacionesPredeterminadas = [
         
@@ -253,7 +254,7 @@ exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
 exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) => {
     console.log('Creando listas de precios predeterminadas para empresa:', idEmpresa);
     
-    const sql = require('mssql');
+    // sql ya importado arriba
     
     // Estructura: idLista, idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, fechaFin, activo, fCreacion
     const listasPredeterminadas = [
@@ -291,6 +292,102 @@ exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) 
     } catch (error) {
         console.error('Error creando listas de precios predeterminadas:', error);
         throw new Error('Error al crear listas de precios predeterminadas: ' + error.message);
+    }
+};
+
+/**
+ * Genera y almacena un código de verificación para una empresa recién creada.
+ * Devuelve el registro creado (idVerificacion, codigo, telefono).
+ */
+exports.crearRegistroVerificacionEmpresa = async (pool, idEmpresa, telefono) => {
+    const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('telefono', sql.VarChar(20), telefono || '')
+        .input('codigo', sql.VarChar(10), codigo)
+        .query(`
+            INSERT INTO EmpresaVerificacion (idEmpresa, telefono, codigo, estado, intentos)
+            OUTPUT INSERTED.idVerificacion, INSERTED.idEmpresa, INSERTED.telefono, INSERTED.codigo
+            VALUES (@idEmpresa, @telefono, @codigo, 'PENDIENTE', 0)
+        `);
+    return { ...(result.recordset[0] || {}), codigo };
+};
+
+/**
+ * Verifica un código de verificación para una empresa. Si es correcto, habilita la empresa.
+ */
+exports.verificarEmpresaPorCodigo = async (pool, idEmpresa, codigo) => {
+    const req = pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('codigo', sql.VarChar(10), codigo);
+
+    const resSel = await req.query(`
+        SELECT TOP 1 * FROM EmpresaVerificacion
+        WHERE idEmpresa = @idEmpresa AND codigo = @codigo AND estado = 'PENDIENTE'
+        ORDER BY fCreacion DESC
+    `);
+    const row = resSel.recordset[0];
+    if (!row) {
+        // Incrementar intentos en el registro más reciente
+        await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query(`
+                UPDATE TOP (1) EmpresaVerificacion
+                SET intentos = intentos + 1
+                WHERE idEmpresa = @idEmpresa
+                ORDER BY fCreacion DESC
+            `);
+        return { ok: false, message: 'Código inválido o ya utilizado.' };
+    }
+
+    // Marcar verificación y habilitar empresa
+    await pool.request()
+        .input('idVerificacion', sql.UniqueIdentifier, row.idVerificacion)
+        .query(`
+            UPDATE EmpresaVerificacion
+            SET estado = 'VERIFICADO', fVerificacion = GETDATE()
+            WHERE idVerificacion = @idVerificacion
+        `);
+
+    await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            UPDATE Empresas SET estado = 1 WHERE idEmpresa = @idEmpresa
+        `);
+
+    return { ok: true };
+};
+
+/**
+ * Crea el registro en EmpresaIntegraciones para una empresa nueva (todos los flags en 0).
+ */
+exports.insertarEmpresaIntegraciones = async (pool, idEmpresa) => {
+    try {
+        await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query(`
+                INSERT INTO EmpresaIntegraciones (idEmpresa, twilioHabilitado, izipayHabilitado, culqiHabilitado, apisPeruHabilitado, factilizaHabilitado, fActualizacion)
+                VALUES (@idEmpresa, 0, 0, 0, 0, 0, GETDATE())
+            `);
+    } catch (err) {
+        console.error('Error insertando EmpresaIntegraciones:', err?.message || err);
+    }
+};
+
+/**
+ * Si es la única empresa en el sistema, la marca como principal (esPrincipal = 1).
+ */
+exports.marcarEmpresaPrincipalSiEsPrimera = async (pool, idEmpresa) => {
+    try {
+        const count = await pool.request().query('SELECT COUNT(*) AS total FROM Empresas');
+        const total = count.recordset[0]?.total ?? 0;
+        if (total === 1) {
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query(`UPDATE Empresas SET esPrincipal = 1 WHERE idEmpresa = @idEmpresa`);
+        }
+    } catch (err) {
+        console.error('Error marcando empresa principal:', err?.message || err);
     }
 };
 

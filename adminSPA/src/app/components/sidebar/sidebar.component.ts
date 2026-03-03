@@ -161,6 +161,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { nombre: 'Proveedores', icono: 'bi bi-truck', ruta: '/proveedores', visible: true },
       { tipo: 'separador' },
       { nombre: 'Configuración', icono: 'bi bi-gear', ruta: '/configuracion', visible: true },
+      { nombre: 'Integraciones / APIs de pago', icono: 'bi bi-credit-card', ruta: '/configuracion/integraciones', visible: true },
     ];
 
     this.menuItems.set(navegacionCompleta);

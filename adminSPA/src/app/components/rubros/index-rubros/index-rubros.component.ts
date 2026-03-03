@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -15,6 +15,7 @@ import { RubrosService, Rubro, ConfiguracionRubroItem } from '../../../services/
   styleUrl: './index-rubros.component.css'
 })
 export class IndexRubrosComponent implements OnInit {
+  public sidebarState = inject(SidebarStateService);
   rubros: Rubro[] = [];
   loading = true;
   rubroSeleccionado: Rubro | null = null;
@@ -23,7 +24,7 @@ export class IndexRubrosComponent implements OnInit {
   configGuardando = false;
 
   constructor(
-    public sidebarState: SidebarStateService,
+    //public sidebarState: SidebarStateService,
     private rubrosService: RubrosService
   ) {}
 
@@ -78,5 +79,9 @@ export class IndexRubrosComponent implements OnInit {
 
   quitarFilaConfig(i: number): void {
     this.configuracion.splice(i, 1);
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

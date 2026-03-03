@@ -117,6 +117,8 @@ const getEmpresa_id = async function (req, res) {
 };
 
 const empresaService = require('../services/empresa.service');
+const { enviarCodigoVerificacionWhatsApp } = require('../services/whatsapp.service');
+const { obtenerCredencialesProveedor } = require('../services/integraciones.service');
 
 const createEmpresa = async function (req, res) {
     console.log('entro a createEmpresa', req.body);
@@ -163,14 +165,14 @@ const createEmpresa = async function (req, res) {
                 .input('alias', sql.VarChar, alias)
                 .input('condicion', sql.VarChar, condicion)
                 .input('estSunat', sql.VarChar, estSunat)
-                .input('estado', sql.Bit, 1)
+                .input('estado', sql.Bit, 0) // Empresa deshabilitada hasta verificar código
                 .input('fregistro', sql.DateTime, fregistro)
                 .query('INSERT INTO Empresas (idEmpresa, idDocumento, ruc, razon_Social, nombreComercial, rubro, idRubro, celular, correo, password, logo, alias, condicion, estSunat, estado, fregistro) VALUES (@idEmpresa, @idDocumento, @ruc, @razon_Social, @nombreComercial, @rubro, @idRubro, @celular, @correo, @password, @logo, @alias, @condicion, @estSunat, @estado, @fregistro)');
 
 
             console.log('✓ Empresa creada con ID:', idEmpresa);
 
-            // Inicializar datos maestros de la empresa
+            // Inicializar datos maestros de la empresa (roles, comprobantes, sucursal, etc.)
             try {
                 const datosEmpresa = {
                     razon_Social,
@@ -189,18 +191,29 @@ const createEmpresa = async function (req, res) {
                     errores: resultadoInicializacion.errores.length
                 });
 
-                // Devolver el ID de la empresa junto con el ID de la sucursal principal
+                await empresaService.insertarEmpresaIntegraciones(pool, idEmpresa);
+                await empresaService.marcarEmpresaPrincipalSiEsPrimera(pool, idEmpresa);
+
+                // Crear registro de verificación y enviar código por WhatsApp
+                const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
+                try {
+                    const credsTwilio = await obtenerCredencialesProveedor(pool, idEmpresa, 'twilio');
+                    await enviarCodigoVerificacionWhatsApp(celular, verificacion.codigo, idEmpresa, credsTwilio);
+                } catch (e) {
+                    console.error('Error al enviar código de verificación por WhatsApp:', e?.message || e);
+                }
+
+                // Devolver el ID de la empresa y sucursal principal, indicando que falta verificación
                 res.status(200).send({ 
                     data: idEmpresa,
                     sucursalPrincipal: resultadoInicializacion.sucursal?.idSucursal,
-                    mensaje: 'Empresa creada exitosamente con datos maestros inicializados'
+                    mensaje: 'Empresa creada. Se envió un código de verificación por WhatsApp para activar la cuenta.'
                 });
             } catch (errorInicializacion) {
                 console.error('⚠️ Error inicializando datos maestros:', errorInicializacion);
-                // La empresa se creó pero falló la inicialización - devolver el ID de todas formas
                 res.status(200).send({ 
                     data: idEmpresa,
-                    warning: 'Empresa creada pero algunos datos maestros no se inicializaron correctamente'
+                    warning: 'Empresa creada pero algunos datos maestros no se inicializaron correctamente. Se enviará el código de verificación igualmente.'
                 });
             }
         }
@@ -210,6 +223,124 @@ const createEmpresa = async function (req, res) {
         }
     }
 }
+
+// Integraciones y APIs de pago (empresa del usuario logueado)
+const getIntegraciones = async function (req, res) {
+    try {
+        const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+        if (!idEmpresa) {
+            return res.status(401).send({ message: 'No autorizado', data: undefined });
+        }
+        const pool = await sql.connect(dbConfig);
+        const [integracionesRes, credencialesRes] = await Promise.all([
+            pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('SELECT * FROM EmpresaIntegraciones WHERE idEmpresa = @idEmpresa'),
+            pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('SELECT proveedor, clave, valor, idCredencial FROM EmpresaApiCredenciales WHERE idEmpresa = @idEmpresa AND activo = 1')
+        ]);
+        const integraciones = integracionesRes.recordset[0] || null;
+        const credencialesList = credencialesRes.recordset || [];
+        const credencialesPorProveedor = {};
+        for (const row of credencialesList) {
+            if (!credencialesPorProveedor[row.proveedor]) credencialesPorProveedor[row.proveedor] = [];
+            credencialesPorProveedor[row.proveedor].push({ idCredencial: row.idCredencial, clave: row.clave, valor: row.valor });
+        }
+        res.status(200).send({
+            data: {
+                integraciones,
+                credenciales: credencialesPorProveedor
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener integraciones:', error);
+        res.status(500).send({ message: 'Error al obtener integraciones', data: undefined });
+    }
+};
+
+const putIntegraciones = async function (req, res) {
+    try {
+        const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+        if (!idEmpresa) {
+            return res.status(401).send({ message: 'No autorizado', data: undefined });
+        }
+        const { twilioHabilitado, izipayHabilitado, culqiHabilitado, apisPeruHabilitado, factilizaHabilitado } = req.body || {};
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('twilio', sql.Bit, twilioHabilitado ? 1 : 0)
+            .input('izipay', sql.Bit, izipayHabilitado ? 1 : 0)
+            .input('culqi', sql.Bit, culqiHabilitado ? 1 : 0)
+            .input('apisPeru', sql.Bit, apisPeruHabilitado ? 1 : 0)
+            .input('factiliza', sql.Bit, factilizaHabilitado ? 1 : 0)
+            .query(`
+                MERGE EmpresaIntegraciones AS t
+                USING (SELECT @idEmpresa AS idEmpresa) AS s ON t.idEmpresa = s.idEmpresa
+                WHEN MATCHED THEN
+                    UPDATE SET twilioHabilitado = @twilio, izipayHabilitado = @izipay, culqiHabilitado = @culqi,
+                        apisPeruHabilitado = @apisPeru, factilizaHabilitado = @factiliza, fActualizacion = GETDATE()
+                WHEN NOT MATCHED THEN
+                    INSERT (idEmpresa, twilioHabilitado, izipayHabilitado, culqiHabilitado, apisPeruHabilitado, factilizaHabilitado, fActualizacion)
+                    VALUES (@idEmpresa, @twilio, @izipay, @culqi, @apisPeru, @factiliza, GETDATE());
+            `);
+        res.status(200).send({ data: { ok: true }, message: 'Integraciones actualizadas.' });
+    } catch (error) {
+        console.error('Error al actualizar integraciones:', error);
+        res.status(500).send({ message: 'Error al actualizar integraciones', data: undefined });
+    }
+};
+
+const putCredencialesProveedor = async function (req, res) {
+    try {
+        const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+        if (!idEmpresa) {
+            return res.status(401).send({ message: 'No autorizado', data: undefined });
+        }
+        const { proveedor, credenciales } = req.body || {};
+        if (!proveedor || !Array.isArray(credenciales)) {
+            return res.status(400).send({ message: 'proveedor y credenciales (array) son requeridos', data: undefined });
+        }
+        const pool = await sql.connect(dbConfig);
+        const proveedorNorm = String(proveedor).toLowerCase().trim();
+        await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('proveedor', sql.VarChar(50), proveedorNorm)
+            .query('DELETE FROM EmpresaApiCredenciales WHERE idEmpresa = @idEmpresa AND proveedor = @proveedor');
+        for (const item of credenciales) {
+            const clave = String(item.clave || '').trim();
+            const valor = String(item.valor ?? '').trim();
+            if (!clave) continue;
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('proveedor', sql.VarChar(50), proveedorNorm)
+                .input('clave', sql.VarChar(100), clave)
+                .input('valor', sql.NVarChar(500), valor)
+                .query('INSERT INTO EmpresaApiCredenciales (idEmpresa, proveedor, clave, valor, activo) VALUES (@idEmpresa, @proveedor, @clave, @valor, 1)');
+        }
+        res.status(200).send({ data: { ok: true }, message: 'Credenciales guardadas.' });
+    } catch (error) {
+        console.error('Error al guardar credenciales:', error);
+        res.status(500).send({ message: 'Error al guardar credenciales', data: undefined });
+    }
+};
+
+// Verificar empresa con código enviado por WhatsApp
+const verificarEmpresaCodigo = async function (req, res) {
+    try {
+        const { idEmpresa, codigo } = req.body || {};
+        if (!idEmpresa || !codigo) {
+            return res.status(400).send({ message: 'idEmpresa y código son requeridos', data: undefined });
+        }
+        const pool = await sql.connect(dbConfig);
+        const resultado = await empresaService.verificarEmpresaPorCodigo(pool, idEmpresa, String(codigo).trim());
+        if (!resultado.ok) {
+            return res.status(400).send({ message: resultado.message || 'Código inválido', data: undefined });
+        }
+        res.status(200).send({ data: { ok: true }, message: 'Empresa verificada y habilitada correctamente.' });
+    } catch (error) {
+        console.error('Error al verificar empresa por código:', error);
+        res.status(500).send({ message: 'Error al verificar empresa', data: undefined });
+    }
+};
 
 
 
@@ -740,6 +871,10 @@ module.exports = {
     updateDireccionEmpresa,
     deleteDireccion_id,
     cambiar_principal_direccion,
+    verificarEmpresaCodigo,
+    getIntegraciones,
+    putIntegraciones,
+    putCredencialesProveedor,
 
     //logo,
     obtener_logo,

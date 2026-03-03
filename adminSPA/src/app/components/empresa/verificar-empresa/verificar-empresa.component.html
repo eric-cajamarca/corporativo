@@ -1,0 +1,28 @@
+<div class="verificar-container">
+  <div class="verificar-card">
+    <div class="verificar-header">
+      <i class="fas fa-check-double fa-3x text-primary mb-3"></i>
+      <h1>Activar tu cuenta</h1>
+      <p class="text-muted">Ingresa el código de 6 dígitos que te enviamos por WhatsApp.</p>
+    </div>
+    <form (ngSubmit)="verificar()" class="verificar-form">
+      <div class="mb-3">
+        <label for="idEmpresa" class="form-label">ID de empresa</label>
+        <input type="text" id="idEmpresa" class="form-control"
+          [value]="idEmpresa()" (input)="idEmpresa.set($any($event.target).value)"
+          placeholder="UUID de la empresa" />
+      </div>
+      <div class="mb-3">
+        <label for="codigo" class="form-label">Código de verificación</label>
+        <input type="text" id="codigo" class="form-control form-control-lg text-center"
+          [value]="codigo()" (input)="codigo.set($any($event.target).value)"
+          placeholder="123456" maxlength="6" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg w-100 mb-2" [disabled]="enviando()">
+        @if (enviando()) { <span class="spinner-border spinner-border-sm me-2"></span> }
+        Activar cuenta
+      </button>
+      <button type="button" class="btn btn-outline-secondary w-100" (click)="irALogin()">Ir a Iniciar sesión</button>
+    </form>
+  </div>
+</div>

@@ -6,7 +6,7 @@ import { ComprobanteService } from '../../../services/comprobante.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { VentasService } from '../../../services/ventas.service';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -19,7 +19,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-index-configuracion',
-  imports: [FormsModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, CommonModule, RouterModule, TopnavComponent, SidebarComponent],
   templateUrl: './index-configuracion.component.html',
   styleUrl: './index-configuracion.component.css'
 })

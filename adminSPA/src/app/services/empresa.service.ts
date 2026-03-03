@@ -132,6 +132,17 @@ export class EmpresaService {
     });
   }
 
+  /** Verificar empresa con código enviado por WhatsApp (ruta pública). */
+  verificarEmpresa(idEmpresa: string, codigo: string): Observable<{ data?: { ok: boolean }; message?: string }> {
+    const body = JSON.stringify({ idEmpresa, codigo });
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this._http.post<{ data?: { ok: boolean }; message?: string }>(
+      this.url + 'empresa/verificar',
+      body,
+      { headers, withCredentials: true }
+    );
+  }
+
   // updateEmpresa(empresa:any):Observable<any>{
   //   let params = JSON.stringify(empresa);
   //   let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':token});
@@ -323,6 +334,21 @@ export class EmpresaService {
       headers: headers,
       withCredentials: true
     });
+  }
+
+  /** Integraciones y APIs de pago: flags + credenciales por proveedor */
+  getIntegraciones(): Observable<{ data: { integraciones: any; credenciales: Record<string, { idCredencial: string; clave: string; valor: string }[]> } }> {
+    return this._http.get(this.url + 'empresa/integraciones', { withCredentials: true }) as Observable<{ data: { integraciones: any; credenciales: Record<string, { idCredencial: string; clave: string; valor: string }[]> } }>;
+  }
+
+  /** Actualizar flags de integraciones (twilio, izipay, culqi, etc.) */
+  putIntegraciones(flags: { twilioHabilitado?: boolean; izipayHabilitado?: boolean; culqiHabilitado?: boolean; apisPeruHabilitado?: boolean; factilizaHabilitado?: boolean }): Observable<{ data: { ok: boolean }; message?: string }> {
+    return this._http.put(this.url + 'empresa/integraciones', flags, { withCredentials: true }) as Observable<{ data: { ok: boolean }; message?: string }>;
+  }
+
+  /** Guardar credenciales de un proveedor (reemplaza las existentes para ese proveedor) */
+  putCredencialesProveedor(proveedor: string, credenciales: { clave: string; valor: string }[]): Observable<{ data: { ok: boolean }; message?: string }> {
+    return this._http.put(this.url + 'empresa/integraciones/credenciales', { proveedor, credenciales }, { withCredentials: true }) as Observable<{ data: { ok: boolean }; message?: string }>;
   }
 
 }

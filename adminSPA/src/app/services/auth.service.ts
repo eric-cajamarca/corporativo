@@ -22,7 +22,8 @@ export class AuthService {
   // Rutas públicas que NO requieren autenticación
   private readonly publicRoutes = [
     '/login-empresa',
-    '/crear-empresa'
+    '/crear-empresa',
+    '/verificar-empresa'
   ];
 
   // Exponer datos reactivos

@@ -14,7 +14,10 @@ api.get('/empresa', auth.auth, empresasController.getEmpresas);
 api.get('/empresaid',auth.auth, empresasController.getEmpresasById);
 api.get('/empresas_id',auth.auth, empresasController.getEmpresa_id);
 api.get('/obtener_logo/:img', empresasController.obtener_logo);
+// Ruta pública para crear empresa (registro SaaS). No requiere auth.
 api.post('/empresa', empresasController.createEmpresa);
+// Ruta pública para verificar empresa con código enviado por WhatsApp.
+api.post('/empresa/verificar', empresasController.verificarEmpresaCodigo);
 //api.put('/empresa/:id',[auth.auth,path], empresasController.updateEmpresa);
 api.put('/empresa/:id', auth.auth,uploadLogo, empresasController.updateEmpresa); // Cambia 'archivo' por el nombre del campo del formulario
 api.put('/cambiar_estado_empresa/:id',auth.auth, empresasController.cambiar_estado_empresa);
@@ -29,5 +32,10 @@ api.put('/cambiar_principal/:id',auth.auth, empresasController.cambiar_principal
 
 // Estado de configuración de la empresa
 api.get('/estado_configuracion',auth.auth, empresasController.getEstadoConfiguracion);
+
+// Integraciones y APIs de pago (empresa del usuario logueado)
+api.get('/empresa/integraciones', auth.auth, empresasController.getIntegraciones);
+api.put('/empresa/integraciones', auth.auth, empresasController.putIntegraciones);
+api.put('/empresa/integraciones/credenciales', auth.auth, empresasController.putCredencialesProveedor);
 
 module.exports = api;

@@ -63,6 +63,7 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
   const rs = await req.query(`
     SELECT
       l.idLote,
+      l.costoUnitario,
       lu.idUbicacion,
       CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
     FROM Lotes l
@@ -86,12 +87,13 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
 exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const { idEmpresa, idSucursal, idProducto, cantidad } = stockData;
   const cant = parseFloat(cantidad) || 0;
-  if (cant <= 0) return;
-  if (!idEmpresa || !idProducto) return;
+  if (cant <= 0) return { consumosPorLote: [] };
+  if (!idEmpresa || !idProducto) return { consumosPorLote: [] };
 
   const controlUbicaciones = opciones.controlUbicaciones !== false;
   const conSucursal = idSucursal != null && idSucursal !== '';
   let restante = cant;
+  const consumos = [];
 
   const descontarPorPrioridad = async (filas) => {
     for (const row of filas) {
@@ -114,6 +116,12 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         UPDATE Lotes SET cantidadDisponible = cantidadDisponible - @tomar
         WHERE idLote = @idLote
       `);
+      const costoLote = row.costoUnitario != null ? parseFloat(row.costoUnitario) : 0;
+      consumos.push({
+        idLote: row.idLote,
+        cantidadTomada: tomar,
+        costoUnitario: costoLote
+      });
       restante -= tomar;
     }
   };
@@ -146,7 +154,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
     }
   }
 
-  if (restante <= 0) return;
+  if (restante <= 0) return { consumosPorLote: consumos };
 
   const ejecutarDescuentoSoloLotes = async (filas) => {
     for (const row of filas) {
@@ -163,6 +171,12 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         UPDATE Lotes SET cantidadDisponible = @nuevaCantidad
         WHERE idLote = @idLote AND idEmpresa = @idEmpresa
       `);
+      const costoLote = row.costoUnitario != null ? parseFloat(row.costoUnitario) : 0;
+      consumos.push({
+        idLote: row.idLote,
+        cantidadTomada: tomar,
+        costoUnitario: costoLote
+      });
       restante -= tomar;
     }
   };
@@ -173,7 +187,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const whereSuc = conSucursal ? ' AND idSucursal = @idSucursal' : '';
   if (conSucursal) reqFallback.input('idSucursal', sql.UniqueIdentifier, idSucursal);
   const rsFallback = await reqFallback.query(`
-    SELECT idLote, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
+    SELECT idLote, costoUnitario, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
     FROM Lotes
     WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${whereSuc}
     ORDER BY idLote ASC
@@ -186,7 +200,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
     reqFallback2.input('idProducto', sql.UniqueIdentifier, idProducto);
     reqFallback2.input('idSucursalExcluida', sql.UniqueIdentifier, idSucursal);
     const rsFallback2 = await reqFallback2.query(`
-      SELECT idLote, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
+      SELECT idLote, costoUnitario, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
       FROM Lotes
       WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0
         AND idSucursal <> @idSucursalExcluida
@@ -198,4 +212,5 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   if (restante > 0) {
     throw new Error('Stock insuficiente para el producto en la empresa');
   }
+  return { consumosPorLote: consumos };
 };

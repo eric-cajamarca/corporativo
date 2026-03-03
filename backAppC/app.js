@@ -56,6 +56,8 @@ const externalRoutes = require('./routes/external');
 const inventarioRoutes = require('./routes/inventario');
 const reservasRoutes = require('./routes/reservas');
 const consumoHabitacionRoutes = require('./routes/consumoHabitacion');
+const webhooksRoutes = require('./routes/webhooks');
+const suscripcionRoutes = require('./routes/suscripcion');
 
 
 const app = express();
@@ -202,6 +204,9 @@ app.use('/api/external', externalRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api', reservasRoutes);
 app.use('/api', consumoHabitacionRoutes);
+// Webhooks de pasarelas de pago (públicos, identifican empresa por orderNumber = idEmpresa-uuid)
+app.use('/api', webhooksRoutes);
+app.use('/api', suscripcionRoutes);
 const grifoRoutes = require('./routes/grifo');
 app.use('/api', grifoRoutes);
 

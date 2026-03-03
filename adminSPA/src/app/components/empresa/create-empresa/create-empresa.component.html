@@ -56,16 +56,21 @@
           <p>Tu empresa ha sido registrada correctamente.</p>
           <div class="success-details">
             <div class="detail-item">
-              <i class="fas fa-envelope"></i>
-              <span>Se ha enviado un correo de confirmación a:</span>
-              <strong>{{ empresaForm.get('email')?.value }}</strong>
+              <i class="fas fa-comment-alt"></i>
+              <span>Revisa tu WhatsApp: te enviamos un código de 6 dígitos para activar tu cuenta.</span>
             </div>
             <div class="detail-item">
-              <i class="fas fa-clock"></i>
-              <span>El proceso de activación puede tardar de 12 a 24 horas.</span>
+              <i class="fas fa-key"></i>
+              <span>Ingresa el código en el siguiente paso para activar e iniciar sesión.</span>
             </div>
           </div>
-          <button class="btn btn-primary btn-lg" (click)="irALogin()">
+          @if (idEmpresaCreada()) {
+            <a [routerLink]="['/verificar-empresa']" [queryParams]="{ idEmpresa: idEmpresaCreada() }" class="btn btn-primary btn-lg me-2">
+              <i class="fas fa-check-double me-2"></i>
+              Activar con código
+            </a>
+          }
+          <button class="btn btn-outline-primary btn-lg" (click)="irALogin()">
             <i class="fas fa-sign-in-alt me-2"></i>
             Ir a Iniciar Sesión
           </button>

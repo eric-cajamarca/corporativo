@@ -26,12 +26,12 @@
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-secondary btn-sm" (click)="refreshData()">
-          <i class="fas fa-sync-alt me-1"></i>
+          <i class="bi bi-arrow-repeat me-1"></i>
           Actualizar
         </button>
         <div class="dropdown">
           <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-            <i class="fas fa-calendar me-1"></i>
+            <i class="bi bi-calendar-date me-1"></i>
             {{periodoSeleccionado}}
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
@@ -48,27 +48,27 @@
   <!-- Accesos rápidos -->
   <div class="quick-actions mb-4">
     <button class="quick-action-btn" (click)="navigateTo('ventas-create')">
-      <i class="fas fa-plus-circle"></i>
+      <i class="bi bi-plus-circle"></i>
       <span>Nueva Venta</span>
     </button>
     <button class="quick-action-btn" (click)="navigateTo('compras-create')">
-      <i class="fas fa-shopping-cart"></i>
+      <i class="bi bi-shopping-cart"></i>
       <span>Nueva Compra</span>
     </button>
     <button class="quick-action-btn" (click)="navigateTo('clientes')">
-      <i class="fas fa-users"></i>
+      <i class="bi bi-people"></i>
       <span>Clientes</span>
     </button>
     <button class="quick-action-btn" (click)="navigateTo('productos')">
-      <i class="fas fa-box"></i>
+      <i class="bi bi-box"></i>
       <span>Productos</span>
     </button>
     <button class="quick-action-btn" (click)="navigateTo('caja')">
-      <i class="fas fa-cash-register"></i>
+      <i class="bi bi-cash-register"></i>
       <span>Caja</span>
     </button>
     <button class="quick-action-btn" (click)="navigateTo('reportes')">
-      <i class="fas fa-chart-bar"></i>
+      <i class="bi bi-bar-chart"></i>
       <span>Reportes</span>
     </button>
   </div>
@@ -79,13 +79,13 @@
     <div class="col-xl-3 col-md-6">
       <div class="kpi-card">
         <div class="kpi-icon sales-icon">
-          <i class="fas fa-chart-line"></i>
+          <i class="bi bi-graph-up"></i>
         </div>
         <div class="kpi-content">
           <div class="kpi-value">{{ ventasTotales | currency:'PEN':'S/ ':'1.0-0'}}</div>
           <div class="kpi-label">Ventas Totales</div>
           <div class="kpi-change" [class.positive]="ventasVariacion >= 0" [class.negative]="ventasVariacion < 0">
-            <i class="fas" [class.fa-arrow-up]="ventasVariacion >= 0" [class.fa-arrow-down]="ventasVariacion < 0"></i>
+            <i class="bi" [class.bi-arrow-up]="ventasVariacion >= 0" [class.bi-arrow-down]="ventasVariacion < 0"></i>
             {{ventasVariacion >= 0 ? '+' : ''}}{{ventasVariacion}}%
           </div>
         </div>
@@ -96,13 +96,13 @@
     <div class="col-xl-3 col-md-6">
       <div class="kpi-card">
         <div class="kpi-icon profit-icon">
-          <i class="fas fa-coins"></i>
+          <i class="bi bi-cash-coin"></i>
         </div>
         <div class="kpi-content">
           <div class="kpi-value">{{utilidadNeta | currency:'PEN':'S/ ':'1.0-0'}}</div>
           <div class="kpi-label">Utilidad Neta</div>
           <div class="kpi-change" [class.positive]="utilidadVariacion >= 0" [class.negative]="utilidadVariacion < 0">
-            <i class="fas" [class.fa-arrow-up]="utilidadVariacion >= 0" [class.fa-arrow-down]="utilidadVariacion < 0"></i>
+            <i class="bi" [class.bi-arrow-up]="utilidadVariacion >= 0" [class.bi-arrow-down]="utilidadVariacion < 0"></i>
             {{utilidadVariacion >= 0 ? '+' : ''}}{{utilidadVariacion}}%
           </div>
         </div>
@@ -113,13 +113,13 @@
     <div class="col-xl-3 col-md-6">
       <div class="kpi-card">
         <div class="kpi-icon clients-icon">
-          <i class="fas fa-users"></i>
+          <i class="bi bi-people"></i>
         </div>
         <div class="kpi-content">
           <div class="kpi-value">{{clientesActivos}}</div>
           <div class="kpi-label">Clientes Activos</div>
           <div class="kpi-change" [class.positive]="clientesVariacion >= 0" [class.negative]="clientesVariacion < 0">
-            <i class="fas" [class.fa-arrow-up]="clientesVariacion >= 0" [class.fa-arrow-down]="clientesVariacion < 0"></i>
+            <i class="bi" [class.bi-arrow-up]="clientesVariacion >= 0" [class.bi-arrow-down]="clientesVariacion < 0"></i>
             {{clientesVariacion >= 0 ? '+' : ''}}{{clientesVariacion}}%
           </div>
         </div>
@@ -130,13 +130,13 @@
     <div class="col-xl-3 col-md-6">
       <div class="kpi-card">
         <div class="kpi-icon roi-icon">
-          <i class="fas fa-percentage"></i>
+          <i class="bi bi-percent"></i>
         </div>
         <div class="kpi-content">
           <div class="kpi-value">{{roi}}%</div>
           <div class="kpi-label">ROI</div>
           <div class="kpi-change" [class.positive]="roi >= 15" [class.negative]="roi < 15">
-            <i class="fas" [class.fa-arrow-up]="roi >= 15" [class.fa-arrow-down]="roi < 15"></i>
+            <i class="bi" [class.bi-arrow-up]="roi >= 15" [class.bi-arrow-down]="roi < 15"></i>
             {{roi >= 15 ? 'Excelente' : 'Regular'}}
           </div>
         </div>
@@ -151,7 +151,7 @@
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="card-title mb-0">
-            <i class="fas fa-chart-bar me-2 text-primary"></i>
+            <i class="bi bi-graph-up me-2 text-primary"></i>
             Tendencia de Ventas
           </h5>
           <div class="dropdown">
@@ -179,7 +179,7 @@
       <div class="card h-100">
         <div class="card-header">
           <h5 class="card-title mb-0">
-            <i class="fas fa-balance-scale me-2 text-success"></i>
+            <i class="bi bi-balance-scale me-2 text-success"></i>
             Resumen Financiero
           </h5>
         </div>
@@ -187,14 +187,14 @@
           <div class="financial-summary">
             <div class="summary-item">
               <div class="summary-label">
-                <i class="fas fa-arrow-up text-success me-2"></i>
+                <i class="bi bi-arrow-up text-success me-2"></i>
                 Ingresos
               </div>
               <div class="summary-value text-success">{{ingresos | currency:'PEN':'S/ ':'1.0-0'}}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">
-                <i class="fas fa-arrow-down text-danger me-2"></i>
+                <i class="bi bi-arrow-down text-danger me-2"></i>
                 Costos
               </div>
               <div class="summary-value text-danger">{{costos | currency:'PEN':'S/ ':'1.0-0'}}</div>
@@ -202,14 +202,14 @@
             <div class="summary-divider"></div>
             <div class="summary-item">
               <div class="summary-label">
-                <i class="fas fa-calculator text-info me-2"></i>
+                <i class="bi bi-calculator text-info me-2"></i>
                 Utilidad Bruta
               </div>
               <div class="summary-value text-info">{{utilidadBruta | currency:'PEN':'S/ ':'1.0-0'}}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">
-                <i class="fas fa-minus-circle text-warning me-2"></i>
+                <i class="bi bi-minus-circle text-warning me-2"></i>
                 Gastos Operativos
               </div>
               <div class="summary-value text-warning">{{gastosOperativos | currency:'PEN':'S/ ':'1.0-0'}}</div>
@@ -217,7 +217,7 @@
             <div class="summary-divider"></div>
             <div class="summary-item total">
               <div class="summary-label fw-bold">
-                <i class="fas fa-money-bill-wave text-primary me-2"></i>
+                <i class="bi bi-money-bill-wave text-primary me-2"></i>
                 Utilidad Neta
               </div>
               <div class="summary-value fw-bold text-primary">{{utilidadNeta | currency:'PEN':'S/ ':'1.0-0'}}</div>
@@ -235,7 +235,7 @@
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="card-title mb-0">
-            <i class="fas fa-star me-2 text-warning"></i>
+            <i class="bi bi-star me-2 text-warning"></i>
             Productos Más Vendidos
           </h5>
           <a href="#" class="btn btn-sm btn-link" (click)="navigateTo('productos'); $event.preventDefault()">
@@ -268,7 +268,7 @@
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="card-title mb-0">
-            <i class="fas fa-bell me-2 text-danger"></i>
+            <i class="bi bi-bell me-2 text-danger"></i>
             Alertas y Notificaciones
           </h5>
           <span class="badge bg-danger" *ngIf="alertas.length > 0">{{alertas.length}}</span>
@@ -280,7 +280,7 @@
               *ngFor="let alerta of alertas"
               [ngClass]="getAlertClass(alerta.tipo)">
               <div class="alert-icon" [ngClass]="getAlertIconColor(alerta.tipo)">
-                <i class="fas" [ngClass]="alerta.icono"></i>
+                <i class="bi" [ngClass]="alerta.icono"></i>
               </div>
               <div class="alert-content">
                 <div class="alert-title">{{alerta.titulo}}</div>
@@ -289,7 +289,7 @@
               <div class="alert-time">{{alerta.tiempo}}</div>
             </div>
             <div class="alert-item empty" *ngIf="alertas.length === 0">
-              <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+              <i class="bi bi-check-circle text-success bi-2x mb-2"></i>
               <p class="text-muted mb-0">No hay alertas pendientes</p>
             </div>
           </div>

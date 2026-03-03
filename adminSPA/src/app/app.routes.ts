@@ -3,6 +3,7 @@ import { LoginEmpresaComponent } from './components/login-empresa/login-empresa.
 import { RecuperarPasswordComponent } from './components/recuperar-password/recuperar-password.component';
 import { IndexEmpresaComponent } from './components/empresa/index-empresa/index-empresa.component';
 import { CreateEmpresaComponent } from './components/empresa/create-empresa/create-empresa.component';
+import { VerificarEmpresaComponent } from './components/empresa/verificar-empresa/verificar-empresa.component';
 import { UpdateEmpresaComponent } from './components/empresa/update-empresa/update-empresa.component';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { InicioComponent } from './components/inicio/inicio.component';
@@ -61,6 +62,7 @@ import { IndexCreditosComponent } from './components/creditos/index-creditos/ind
 import { ArqueoCajaComponent } from './components/caja/arqueo-caja/arqueo-caja.component';
 import { DashboardAnalisisComponent } from './components/analisis/dashboard-analisis/dashboard-analisis.component';
 import { IndexConfiguracionComponent } from './components/configuracion/index-configuracion/index-configuracion.component';
+import { IntegracionesComponent } from './components/configuracion/integraciones/integraciones.component';
 import { IndexReportesComponent } from './components/reportes/index-reportes/index-reportes.component';
 import { PagoProveedoresComponent } from './components/caja/pago-proveedores/pago-proveedores.component';
 import { ReciboIngresoComponent } from './components/caja/recibo-ingreso/recibo-ingreso.component';
@@ -103,6 +105,11 @@ export const routes: Routes = [
         path:'crear-empresa',
         component: CreateEmpresaComponent,
         title: 'Crear Empresa',
+     },
+     {
+        path: 'verificar-empresa',
+        component: VerificarEmpresaComponent,
+        title: 'Verificar Empresa',
      },
      {
         path: 'editar-empresa',
@@ -238,6 +245,7 @@ export const routes: Routes = [
      { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard], title: 'Créditos y Cuotas' },
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard], title: 'Análisis Financiero' },
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración del Sistema' },
+     { path: 'configuracion/integraciones', component: IntegracionesComponent, canActivate: [AuthGuard], title: 'Integraciones y APIs de pago' },
      { path: 'rubros', component: IndexRubrosComponent, canActivate: [AuthGuard], title: 'Configuración por rubro' },
      { path: 'vales-despacho', component: IndexValesDespachoComponent, canActivate: [AuthGuard], title: 'Vales de despacho' },
     { path: 'vales-despacho/nuevo', component: CreateValeDespachoComponent, canActivate: [AuthGuard], title: 'Nuevo vale de despacho' },

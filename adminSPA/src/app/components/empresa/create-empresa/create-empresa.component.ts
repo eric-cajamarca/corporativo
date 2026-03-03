@@ -28,7 +28,8 @@ export class CreateEmpresaComponent implements OnInit {
   showPassword = signal<boolean>(false);
   showConfirmPassword = signal<boolean>(false);
   currentStep = signal<number>(1);
-  
+  idEmpresaCreada = signal<string | null>(null);
+
   // Datos de la empresa encontrada
   empresaEncontrada: any = null;
   
@@ -483,6 +484,7 @@ export class CreateEmpresaComponent implements OnInit {
     this.empresaService.createEmpresa(empresaData).subscribe({
       next: (response) => {
         if (response.data) {
+          this.idEmpresaCreada.set(response.data);
           // Crear dirección
           const direccionData = {
             idEmpresa: response.data,
@@ -500,14 +502,14 @@ export class CreateEmpresaComponent implements OnInit {
             next: () => {
               this.registrando.set(false);
               this.loadCreate.set(true);
-              
+              const msg = (response as any).mensaje || (response as any).message;
               iziToast.show({
-                title: 'Éxito',
+                title: 'Empresa creada',
                 titleColor: '#28a745',
                 color: '#FFF',
                 class: 'text-success',
                 position: 'topRight',
-                message: 'Empresa registrada correctamente'
+                message: msg || 'Revisa tu WhatsApp: te enviamos un código para activar tu cuenta. Luego inicia sesión.'
               });
             },
             error: (error) => {

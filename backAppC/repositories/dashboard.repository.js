@@ -235,9 +235,29 @@ exports.obtenerResumenDashboardRepo = async (
       ? ((clientesActualCount - clientesAnteriorCount) / clientesAnteriorCount) * 100
       : (clientesActualCount > 0 ? 100 : 0);
 
-  // Utilidad: usar ventas como ingresos; sin costo detallado usamos 0 (o se puede integrar con vw_EstadoResultados)
+  // Costos de ventas: suma de costoTotal en DetalleVenta del período
+  let costos = 0;
+  try {
+    const costoVentasRs = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("fechaInicio", sql.Date, fechaInicio)
+      .input("fechaFin", sql.Date, fechaFin)
+      .query(`
+        SELECT ISNULL(SUM(dv.costoTotal), 0) AS costoVentas
+        FROM DetalleVenta dv
+        INNER JOIN Ventas v ON dv.idVenta = v.idVenta
+        WHERE v.idEmpresa = @idEmpresa
+          AND CONVERT(DATE, v.fEmision) >= @fechaInicio
+          AND CONVERT(DATE, v.fEmision) <= @fechaFin
+      `);
+    const costoRow = row(costoVentasRs);
+    costos = toNum(costoRow.costoVentas ?? costoRow.costo_ventas);
+  } catch (err) {
+    costos = 0;
+  }
+
   const ingresos = ventasTotales;
-  const costos = 0;
   const utilidadBruta = ingresos - costos;
   const gastosOperativos = 0;
   const utilidadNeta = utilidadBruta - gastosOperativos;

@@ -18,7 +18,7 @@ export class AuthGuard implements CanActivate {
     return this.authService.verifyToken().pipe(
       map(isValid => {
         const isLoginRoute = state.url.includes('/login-empresa');
-        const isPublicRoute = state.url.includes('/crear-empresa');
+        const isPublicRoute = state.url.includes('/crear-empresa') || state.url.includes('/verificar-empresa');
 
         console.log('AuthGuard - Ruta:', state.url, 'Token válido:', isValid);
 

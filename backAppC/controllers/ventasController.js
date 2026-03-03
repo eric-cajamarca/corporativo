@@ -10,6 +10,7 @@ const gestoresRepository = require('../repositories/gestores.repository');
 const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 const { getNowLocal, getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const inventarioRepository = require('../repositories/inventario.repository');
 
 /** Fecha de emisión en formato SQL local (YYYY-MM-DD HH:mm:ss.sss) para guardar sin conversión UTC.
  *  Devuelve string para que el driver mssql no convierta el Date a UTC al insertar. */
@@ -277,7 +278,7 @@ const crearVentaCompleta = async (req, res) => {
     for (const det of detalles) {
       const cantPedida = parseFloat(det.cantidad) || 0;
       const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
-      await detalleVentaService.crearDetalle(transaction, { ...det, idVenta, cantEntregada, idEstadoPedido: idEstadoPedidoVenta, hVenta: getNowLocalSQLString() });
+
       const stockDisponible = await stockService.obtenerStockDisponible(transaction, req.user.empresa, det.idProducto, idSucursalParaStock);
       if (stockDisponible < cantPedida) {
         if (!permitirVentasNegativas) {
@@ -285,14 +286,47 @@ const crearVentaCompleta = async (req, res) => {
         }
         avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
       }
+
       const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPedida, stockDisponible) : cantPedida;
+      let consumosPorLote = [];
       if (cantidadADescontar > 0) {
-        await stockService.descontarDesdeLotes(transaction, {
+        const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
           idEmpresa: req.user.empresa,
           idSucursal: idSucursalParaStock,
           idProducto: det.idProducto,
           cantidad: cantidadADescontar
         }, { controlUbicaciones });
+        consumosPorLote = resultadoDescuento?.consumosPorLote || [];
+      }
+
+      const costoTotalLinea = Array.isArray(consumosPorLote)
+        ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
+        : 0;
+      const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
+
+      await detalleVentaService.crearDetalle(transaction, {
+        ...det,
+        idVenta,
+        cantEntregada,
+        idEstadoPedido: idEstadoPedidoVenta,
+        hVenta: getNowLocalSQLString(),
+        costoUnitario: costoUnitarioProm,
+        costoTotal: costoTotalLinea
+      });
+
+      if (cantidadADescontar > 0) {
+        await inventarioRepository.insertarFilaMovimiento(transaction, {
+          idEmpresa: req.user.empresa,
+          idSucursal: idSucursalParaStock,
+          idProducto: det.idProducto,
+          tipoMovimiento: 'SA',
+          cantidad: cantidadADescontar,
+          docRelacionado: venta.compVenta || (venta.serie + '-' + venta.numero),
+          idUsuario: req.user.sub,
+          observaciones: 'Venta',
+          costoUnitario: costoUnitarioProm,
+          idLote: null
+        });
       }
     }
 
