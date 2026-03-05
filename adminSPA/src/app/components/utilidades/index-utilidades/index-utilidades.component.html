@@ -1,0 +1,201 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h1 class="content-title mb-1">Reporte de Utilidades</h1>
+        <p class="content-subtitle text-muted mb-0">Detalle por producto: precio de venta, costo y utilidad bruta</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-danger" (click)="exportarPdf()" [disabled]="cargando || datos.length === 0">
+          <i class="fas fa-file-pdf me-1"></i>PDF
+        </button>
+        <button type="button" class="btn btn-outline-success" (click)="exportarExcel()" [disabled]="cargando || datos.length === 0">
+          <i class="fas fa-file-excel me-1"></i>Excel
+        </button>
+        <button type="button" class="btn btn-outline-success" (click)="abrirModalWhatsapp()" [disabled]="cargando || datos.length === 0">
+          <i class="fab fa-whatsapp me-1"></i>Enviar PDF por WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filters-section">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-2">
+        <label for="tipoPeriodo" class="form-label">Período</label>
+        <select id="tipoPeriodo" class="form-select" [(ngModel)]="tipoPeriodo" (ngModelChange)="aplicarPeriodo()">
+          <option value="dia">Por día</option>
+          <option value="mes">Por mes</option>
+          <option value="anio">Por año</option>
+          <option value="rango">Rango</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="fechaInicio" class="form-label">Fecha inicio</label>
+        <input type="date" class="form-control" id="fechaInicio" [(ngModel)]="fechaInicio" />
+      </div>
+      <div class="col-md-2">
+        <label for="fechaFin" class="form-label">Fecha fin</label>
+        <input type="date" class="form-control" id="fechaFin" [(ngModel)]="fechaFin" />
+      </div>
+      <div class="col-md-2">
+        <button type="button" class="btn btn-primary" (click)="cargar()" [disabled]="cargando">
+          <i class="fas fa-search me-1"></i>Filtrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-section">
+    @if (error) {
+      <div class="alert alert-warning mb-3">{{ error }}</div>
+    }
+    @if (cargando) {
+      <p class="text-muted">Cargando...</p>
+    } @else {
+      <div class="table-responsive">
+        <table class="table table-hover table-utilidades">
+          <thead>
+            <tr>
+              <th>Nombre producto</th>
+              <th>Fecha venta</th>
+              <th>Comprobante</th>
+              <th class="text-end">Precio venta</th>
+              <th class="text-end">Costo</th>
+              <th class="text-end">Utilidad bruta</th>
+              <th class="text-center">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (fila of datos; track fila.idVenta + fila.nombreProducto + $index) {
+              <tr>
+                <td>{{ fila.nombreProducto }}</td>
+                <td>{{ fila.fechaVenta }}</td>
+                <td>{{ fila.comprobante }}</td>
+                <td class="text-end">{{ formatearMoneda(fila.precioVenta) }}</td>
+                <td class="text-end">{{ formatearMoneda(fila.costo) }}</td>
+                <td class="text-end utilidad">{{ formatearMoneda(fila.utilidadBruta) }}</td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleComprobante(fila)" title="Ver detalle del comprobante">
+                    <i class="fas fa-file-invoice"></i> Ver detalle
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="table-totals">
+              <th colspan="3" class="text-end">Total</th>
+              <th class="text-end">{{ formatearMoneda(totalPrecioVenta) }}</th>
+              <th class="text-end">{{ formatearMoneda(totalCosto) }}</th>
+              <th class="text-end utilidad">{{ formatearMoneda(totalUtilidadBruta) }}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      @if (datos.length === 0 && !error) {
+        <p class="text-muted">No hay datos para el período seleccionado.</p>
+      }
+    }
+  </div>
+</main>
+
+<!-- Modal WhatsApp -->
+@if (mostrarModalWhatsapp) {
+  <div class="modal-backdrop" (click)="cerrarModalWhatsapp()"></div>
+  <div class="modal-whatsapp">
+    <div class="modal-header">
+      <h5 class="modal-title"><i class="fab fa-whatsapp me-2"></i>Enviar PDF por WhatsApp</h5>
+      <button type="button" class="btn-close" (click)="cerrarModalWhatsapp()" aria-label="Cerrar"></button>
+    </div>
+    <div class="modal-body">
+      <label class="form-label">Número (ej. 51999999999)</label>
+      <input
+        type="text"
+        class="form-control"
+        [(ngModel)]="whatsappNumero"
+        placeholder="51999999999"
+        maxlength="15"
+      />
+      @if (whatsappMensaje) {
+        <div class="mt-2 small" [class.text-success]="!whatsappMensaje.startsWith('Error')" [class.text-danger]="whatsappMensaje.startsWith('Error')">
+          {{ whatsappMensaje }}
+        </div>
+      }
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="cerrarModalWhatsapp()">Cancelar</button>
+      <button type="button" class="btn btn-success" (click)="enviarPorWhatsapp()" [disabled]="enviandoWhatsapp || !whatsappNumero.trim()">
+        @if (enviandoWhatsapp) {
+          <span class="spinner-border spinner-border-sm me-1"></span>
+        }
+        Enviar
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Modal detalle comprobante -->
+@if (mostrarModalComprobante) {
+  <div class="modal-backdrop" (click)="cerrarModalComprobante()"></div>
+  <div class="modal-comprobante" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h5 class="modal-title"><i class="fas fa-file-invoice me-2"></i>Detalle del comprobante</h5>
+      <button type="button" class="btn-close" (click)="cerrarModalComprobante()" aria-label="Cerrar"></button>
+    </div>
+    <div class="modal-body">
+      @if (cargandoComprobante) {
+        <p class="text-muted mb-0">Cargando...</p>
+      }
+      @if (!cargandoComprobante && !comprobanteData) {
+        <div class="alert alert-warning mb-0">No se pudo cargar el comprobante.</div>
+      }
+      @if (!cargandoComprobante && comprobanteData) {
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Comprobante:</strong> {{ comprobanteData.venta.compVenta }}</p>
+            <p class="mb-1"><strong>Tipo:</strong> {{ comprobanteData.venta.nombreComprobante || '—' }}</p>
+            <p class="mb-1"><strong>Fecha emisión:</strong> {{ formatearFecha(comprobanteData.venta.fEmision) }}</p>
+          </div>
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Cliente:</strong> {{ comprobanteData.cliente.razonSocial || comprobanteData.cliente.rSocial || '—' }}</p>
+            <p class="mb-1"><strong>RUC:</strong> {{ comprobanteData.cliente.ruc || '—' }}</p>
+            <p class="mb-1"><strong>Total:</strong> {{ formatearMoneda(comprobanteData.venta.total) }}</p>
+          </div>
+        </div>
+        <h6 class="mt-3">Detalle</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th class="text-end">Cantidad</th>
+                <th class="text-end">P. venta</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (d of comprobanteData.items; track d.descripcion + $index) {
+                <tr>
+                  <td>{{ d.codigo || '—' }}</td>
+                  <td>{{ d.descripcion || '—' }}</td>
+                  <td class="text-end">{{ d.cantidad }}</td>
+                  <td class="text-end">{{ formatearMoneda(d.pVenta) }}</td>
+                  <td class="text-end">{{ formatearMoneda(d.total) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="cerrarModalComprobante()">Cerrar</button>
+    </div>
+  </div>
+}

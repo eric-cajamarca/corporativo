@@ -89,6 +89,14 @@ async function generatePdf(req, res) {
         });
         break;
 
+      case 'reporte':
+        html = htmlBuilder.construirHtmlReporte({
+          titulo: datos.titulo || 'Reporte',
+          empresa: datos.empresa,
+          tablaHtml: htmlBuilder.construirTablaHtml(datos.columnas || [], datos.filas || [])
+        });
+        break;
+
       case 'comprobante-venta':
         html = await htmlBuilder.construirHtmlComprobanteVenta({
           empresa: datos.empresa,

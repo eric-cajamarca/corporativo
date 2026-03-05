@@ -64,6 +64,7 @@ import { DashboardAnalisisComponent } from './components/analisis/dashboard-anal
 import { IndexConfiguracionComponent } from './components/configuracion/index-configuracion/index-configuracion.component';
 import { IntegracionesComponent } from './components/configuracion/integraciones/integraciones.component';
 import { IndexReportesComponent } from './components/reportes/index-reportes/index-reportes.component';
+import { IndexUtilidadesComponent } from './components/utilidades/index-utilidades/index-utilidades.component';
 import { PagoProveedoresComponent } from './components/caja/pago-proveedores/pago-proveedores.component';
 import { ReciboIngresoComponent } from './components/caja/recibo-ingreso/recibo-ingreso.component';
 import { ReciboEgresoComponent } from './components/caja/recibo-egreso/recibo-egreso.component';
@@ -250,6 +251,7 @@ export const routes: Routes = [
      { path: 'vales-despacho', component: IndexValesDespachoComponent, canActivate: [AuthGuard], title: 'Vales de despacho' },
     { path: 'vales-despacho/nuevo', component: CreateValeDespachoComponent, canActivate: [AuthGuard], title: 'Nuevo vale de despacho' },
      { path: 'reportes', component: IndexReportesComponent, canActivate: [AuthGuard], title: 'Reportes y Análisis' },
+    { path: 'utilidades', component: IndexUtilidadesComponent, canActivate: [AuthGuard, AdminGuard], title: 'Utilidades' },
 
      // Catálogos
      { path: 'catalogos/forma-pago', component: IndexFormaPagoComponent, canActivate: [AuthGuard], title: 'Forma Pago' },

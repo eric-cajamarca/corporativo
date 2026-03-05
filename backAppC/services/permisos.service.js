@@ -378,6 +378,14 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             visible: esAdmin || permisos.includes('VER_REPORTES')
         },
         {
+            modulo: 'UTILIDADES',
+            nombre: 'Utilidades',
+            icono: 'bi bi-graph-up-arrow',
+            ruta: '/utilidades',
+            permiso: 'VER_UTILIDADES',
+            visible: esAdmin
+        },
+        {
             modulo: 'EMPRESA',
             nombre: 'Empresa',
             icono: 'bi bi-building',
