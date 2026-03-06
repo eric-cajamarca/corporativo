@@ -1,6 +1,7 @@
 const dbConfig = require('../dbconfig');
 const sql = require('mssql');
 const AnalisisServices = require('../services/analisis.service');
+const GastosService = require('../services/gastos.service');
 
 // Obtener dashboard ejecutivo
 const obtenerDashboardEjecutivo = async (req, res) => {
@@ -45,12 +46,16 @@ const obtenerBalanceGeneral = async (req, res) => {
 // Obtener estado de resultados
 const obtenerEstadoResultados = async (req, res) => {
   try {
-    const { periodoInicio, periodoFin } = req.query;
+    const { periodoInicio, periodoFin, fechaDesde, fechaHasta } = req.query;
+    const periodoInicioRes = periodoInicio || (fechaDesde ? String(fechaDesde).substring(0, 7) : null);
+    const periodoFinRes = periodoFin || (fechaHasta ? String(fechaHasta).substring(0, 7) : null);
 
     const pool = await sql.connect(dbConfig);
     const estadoResultados = await AnalisisServices.obtenerEstadoResultadosService(pool, req.user, {
-      periodoInicio,
-      periodoFin
+      periodoInicio: periodoInicioRes,
+      periodoFin: periodoFinRes,
+      fechaDesde: fechaDesde || null,
+      fechaHasta: fechaHasta || null
     });
 
     res.status(200).send({ data: estadoResultados });
@@ -201,6 +206,54 @@ const obtenerDiagnosticoFinanciero = async (req, res) => {
   }
 };
 
+// Gastos (para análisis financiero: gastos operativos por período)
+const listarGastos = async (req, res) => {
+  try {
+    const { fechaDesde, fechaHasta } = req.query;
+    const pool = await sql.connect(dbConfig);
+    const list = await GastosService.listarPorPeriodo(pool, req.user, fechaDesde, fechaHasta);
+    res.status(200).send({ data: list });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    console.error('Error listar gastos:', error);
+    res.status(500).send({ message: 'Error al listar gastos', data: undefined });
+  }
+};
+
+const crearGasto = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const row = await GastosService.crear(pool, req.user, req.body);
+    res.status(201).send({ data: row });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    if (error.message && error.message.includes('monto')) {
+      return res.status(400).send({ message: error.message, data: undefined });
+    }
+    console.error('Error crear gasto:', error);
+    res.status(500).send({ message: 'Error al registrar gasto', data: undefined });
+  }
+};
+
+const eliminarGasto = async (req, res) => {
+  try {
+    const { idGasto } = req.params;
+    const pool = await sql.connect(dbConfig);
+    await GastosService.eliminar(pool, req.user, idGasto);
+    res.status(200).send({ message: 'Gasto eliminado' });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    console.error('Error eliminar gasto:', error);
+    res.status(500).send({ message: 'Error al eliminar gasto', data: undefined });
+  }
+};
+
 module.exports = {
   obtenerDashboardEjecutivo,
   obtenerBalanceGeneral,
@@ -211,5 +264,8 @@ module.exports = {
   obtenerEficienciaOperativa,
   obtenerProyeccionVentas,
   obtenerPuntoEquilibrio,
-  obtenerDiagnosticoFinanciero
+  obtenerDiagnosticoFinanciero,
+  listarGastos,
+  crearGasto,
+  eliminarGasto
 };

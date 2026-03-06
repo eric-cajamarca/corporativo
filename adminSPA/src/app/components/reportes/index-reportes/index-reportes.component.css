@@ -223,6 +223,21 @@
   padding: 1.5rem;
 }
 
+/* Contenedores para Chart.js: tamaño explícito para que los canvas se dibujen */
+.chart-container {
+  position: relative;
+  width: 100%;
+}
+
+.chart-container--ventas {
+  height: 300px;
+}
+
+.chart-container--compras,
+.chart-container--productos {
+  height: 250px;
+}
+
 /* Buttons */
 .btn {
   border-radius: 8px;

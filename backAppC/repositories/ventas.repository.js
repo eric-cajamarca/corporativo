@@ -481,6 +481,23 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       const descuento = Number(d.descuento) || 0;
       const igv = d.igv != null ? (d.igv ? 1 : 0) : 0;
       const isc = d.isc != null ? (d.isc ? 1 : 0) : 0;
+      let costoUnitario = Number(d.costoUnitario) || 0;
+      let costoTotal = Number(d.costoTotal) || 0;
+      if (costoTotal === 0 && cantidad > 0) {
+        const rLote = await transaction.request()
+          .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+          .input('idProducto', sql.UniqueIdentifier, idProducto)
+          .query(`
+            SELECT TOP 1 ISNULL(costoUnitario, 0) AS costoUnitario
+            FROM Lotes
+            WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0
+            ORDER BY fechaIngreso DESC
+          `);
+        costoUnitario = Number((rLote.recordset[0] || {}).costoUnitario || 0);
+        costoTotal = cantidad * costoUnitario;
+      } else if (costoTotal > 0 && costoUnitario === 0 && cantidad > 0) {
+        costoUnitario = costoTotal / cantidad;
+      }
       await transaction.request()
         .input('idVenta', sql.Int, idVenta)
         .input('idProducto', sql.UniqueIdentifier, idProducto)
@@ -493,9 +510,11 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         .input('total', sql.Decimal(18, 2), totalItem)
         .input('cantEntregada', sql.Decimal(18, 3), 0)
         .input('idEstadoPedido', sql.Int, 1)
+        .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
+        .input('costoTotal', sql.Decimal(18, 6), costoTotal)
         .query(`
-          INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido)
-          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @cantEntregada, @idEstadoPedido)
+          INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido, costoUnitario, costoTotal)
+          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal)
         `);
     }
     await transaction.commit();

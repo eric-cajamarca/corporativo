@@ -580,13 +580,42 @@ exports.obtenerAperturaAbiertaPorSucursalRepo = async (pool, idEmpresa, idSucurs
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("idSucursal", sql.UniqueIdentifier, idSucursal)
     .query(`
-      SELECT TOP 1 ac.idApertura, ac.idCaja
+      SELECT TOP 1 ac.idApertura, ac.idCaja, ac.idSucursal
       FROM AperturasCaja ac
       INNER JOIN Cajas c ON ac.idCaja = c.idCaja
       WHERE ac.idEmpresa = @idEmpresa AND ac.idSucursal = @idSucursal AND ac.estado = 1
       ORDER BY ac.fechaApertura DESC
     `);
   return result.recordset[0] || null;
+};
+
+/** Obtiene cualquier apertura abierta (estado=1) de la empresa, para registrar egresos cuando no hay sucursal (ej. compra al contado). */
+exports.obtenerCualquierAperturaAbiertaRepo = async (pool, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1 ac.idApertura, ac.idCaja, ac.idSucursal
+      FROM AperturasCaja ac
+      INNER JOIN Cajas c ON ac.idCaja = c.idCaja
+      WHERE ac.idEmpresa = @idEmpresa AND ac.estado = 1
+      ORDER BY ac.fechaApertura DESC
+    `);
+  return result.recordset[0] || null;
+};
+
+/** Obtiene idTipoMovimientoCaja por nombre (ej. COMPRA_CONTADO) o el primer tipo de operación E (egreso). */
+exports.obtenerIdTipoMovimientoEgresoRepo = async (pool, nombrePreferido) => {
+  if (nombrePreferido) {
+    const r = await pool.request()
+      .input("nombre", sql.VarChar(50), nombrePreferido)
+      .query("SELECT idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'E' AND nombre = @nombre");
+    if (r.recordset && r.recordset[0]) return r.recordset[0].idTipoMovimientoCaja;
+  }
+  const r = await pool.request().query(
+    "SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'E' ORDER BY idTipoMovimientoCaja"
+  );
+  return r.recordset && r.recordset[0] ? r.recordset[0].idTipoMovimientoCaja : null;
 };
 
 /** Registra en caja los movimientos de venta al contado por cada forma de pago. Si ya existían movimientos para idVenta, los elimina y reemplaza (para reflejar cambios de desglose).

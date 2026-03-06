@@ -1,93 +1,142 @@
 const sql = require("mssql");
+const AnalisisOperativo = require("./analisisOperativo.repository");
 
 exports.obtenerDashboardEjecutivoRepo = async (pool, idEmpresa) => {
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT * FROM vw_DashboardFinanciero
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY periodo DESC
-    `);
-
-  return result.recordset;
+  try {
+    const result = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT * FROM vw_DashboardFinanciero
+        WHERE idEmpresa = @idEmpresa
+        ORDER BY periodo DESC
+      `);
+    const row = result.recordset && result.recordset[0];
+    if (row) return [row];
+  } catch (err) {
+    if (err.number === 208 || /Invalid object name|vw_DashboardFinanciero/.test(String(err.message))) {
+      const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa);
+      return [data];
+    }
+    throw err;
+  }
+  const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa);
+  return [data];
 };
 
 exports.obtenerBalanceGeneralRepo = async (pool, idEmpresa, periodo) => {
-  let query = "SELECT * FROM vw_BalanceGeneral WHERE idEmpresa = @idEmpresa";
-
-  if (periodo) {
-    query += " AND periodo = @periodo";
+  try {
+    let query = "SELECT * FROM vw_BalanceGeneral WHERE idEmpresa = @idEmpresa";
+    if (periodo) query += " AND periodo = @periodo";
+    query += " ORDER BY periodo DESC";
+    const result = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("periodo", sql.VarChar, periodo || null)
+      .query(query);
+    if (result.recordset && result.recordset.length > 0) {
+      const row = result.recordset[0];
+      return [{
+        periodo: row.periodo,
+        activoCorriente: Number(row.activoCorriente || 0),
+        activoFijo: Number(row.activoNoCorriente || row.activoFijo || 0),
+        activoTotal: Number(row.totalActivo || row.activoTotal || 0),
+        pasivoCorriente: Number(row.pasivoCorriente || 0),
+        pasivoLargoPlazo: Number(row.pasivoNoCorriente || row.pasivoLargoPlazo || 0),
+        pasivoTotal: Number(row.totalPasivo || row.pasivoTotal || 0),
+        patrimonio: Number(row.patrimonio || 0),
+        ratioLiquidez: row.ratioLiquidez != null ? Number(row.ratioLiquidez) : 0,
+        ratioEndeudamiento: row.ratioEndeudamiento != null ? Number(row.ratioEndeudamiento) : 0
+      }];
+    }
+  } catch (err) {
+    if (err.number === 208 || /Invalid object name|vw_BalanceGeneral/.test(String(err.message))) {
+      return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, periodo);
+    }
+    throw err;
   }
-
-  query += " ORDER BY periodo DESC";
-
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("periodo", sql.VarChar, periodo || null)
-    .query(query);
-
-  return result.recordset;
+  return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, periodo);
 };
 
 exports.obtenerEstadoResultadosRepo = async (pool, idEmpresa, filtros) => {
-  let query = "SELECT * FROM vw_EstadoResultados WHERE idEmpresa = @idEmpresa";
-
-  if (filtros.periodoInicio) {
-    query += " AND periodo >= @periodoInicio";
+  try {
+    let query = "SELECT * FROM vw_EstadoResultados WHERE idEmpresa = @idEmpresa";
+    if (filtros.periodoInicio) query += " AND periodo >= @periodoInicio";
+    if (filtros.periodoFin) query += " AND periodo <= @periodoFin";
+    query += " ORDER BY periodo DESC";
+    const result = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("periodoInicio", sql.VarChar, filtros.periodoInicio || null)
+      .input("periodoFin", sql.VarChar, filtros.periodoFin || null)
+      .query(query);
+    if (result.recordset && result.recordset.length > 0) {
+      return result.recordset.map((r) => ({
+        periodo: r.periodo,
+        ingresos: Number(r.totalIngresos || r.ingresos || 0),
+        costoVentas: Number(r.costoVentas || 0),
+        utilidadBruta: Number(r.utilidadBruta != null ? r.utilidadBruta : (r.totalIngresos || r.ingresos || 0) - (r.costoVentas || 0)),
+        gastosOperacion: Number(r.gastosAdministracion || 0) + Number(r.gastosVentas || 0),
+        utilidadOperacion: Number(r.utilidadOperacional != null ? r.utilidadOperacional : r.utilidadBruta),
+        gastosFinancieros: Number(r.gastosFinancieros || 0),
+        utilidadAntesImpuestos: Number(r.utilidadNeta != null ? r.utilidadNeta : r.utilidadBruta),
+        impuestos: 0,
+        utilidadNeta: Number(r.utilidadNeta != null ? r.utilidadNeta : r.utilidadBruta)
+      }));
+    }
+  } catch (err) {
+    if (err.number === 208 || /Invalid object name|vw_EstadoResultados/.test(String(err.message))) {
+      return AnalisisOperativo.obtenerEstadoResultadosRepo(pool, idEmpresa, filtros);
+    }
+    throw err;
   }
-
-  if (filtros.periodoFin) {
-    query += " AND periodo <= @periodoFin";
-  }
-
-  query += " ORDER BY periodo DESC";
-
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("periodoInicio", sql.VarChar, filtros.periodoInicio || null)
-    .input("periodoFin", sql.VarChar, filtros.periodoFin || null)
-    .query(query);
-
-  return result.recordset;
+  return AnalisisOperativo.obtenerEstadoResultadosRepo(pool, idEmpresa, filtros);
 };
 
 exports.obtenerRatiosFinancierosRepo = async (pool, idEmpresa) => {
-  // Obtener tanto ratios de liquidez como rentabilidad
-  const liquidezResult = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT * FROM vw_RatiosLiquidez
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY periodo DESC
-    `);
-
-  const rentabilidadResult = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT * FROM vw_RatiosRentabilidad
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY periodo DESC
-    `);
-
-  const rotacionResult = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT * FROM vw_RatiosRotacion
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY periodo DESC
-    `);
-
-  return {
-    liquidez: liquidezResult.recordset,
-    rentabilidad: rentabilidadResult.recordset,
-    rotacion: rotacionResult.recordset
-  };
+  try {
+    const [liquidezResult, rentabilidadResult, rotacionResult] = await Promise.all([
+      pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa).query(`
+        SELECT TOP 1 * FROM vw_RatiosLiquidez WHERE idEmpresa = @idEmpresa ORDER BY periodo DESC
+      `),
+      pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa).query(`
+        SELECT TOP 1 * FROM vw_RatiosRentabilidad WHERE idEmpresa = @idEmpresa ORDER BY periodo DESC
+      `),
+      pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa).query(`
+        SELECT TOP 1 * FROM vw_RatiosRotacion WHERE idEmpresa = @idEmpresa ORDER BY periodo DESC
+      `)
+    ]);
+    const rl = liquidezResult.recordset[0];
+    const rr = rentabilidadResult.recordset[0];
+    const rot = rotacionResult.recordset[0];
+    if (rl && rr) {
+      return {
+        ratioLiquidezCorriente: Number(rl.liquidezCorriente || 0),
+        ratioLiquidezAcida: Number(rl.liquidezAcida || 0),
+        ratioLiquidezInmediata: Number(rl.liquidezInmediata || 0),
+        ratioDeudaTotal: Number(rl.endeudamientoTotal || 0),
+        ratioDeudaPatrimonio: Number(rl.endeudamientoPatrimonial || 0),
+        nivelEndeudamiento: Number(rl.endeudamientoTotal || 0),
+        coberturaIntereses: Number(rr.coberturaIntereses || 0),
+        margenBruto: Number(rr.margenBruto || 0),
+        margenOperativo: Number(rr.margenOperativo || 0),
+        margenNeto: Number(rr.margenNeto || 0),
+        ROA: Number(rr.ROA || 0),
+        ROE: Number(rr.ROE || 0),
+        ROI: Number(rr.ROI || rr.ROE || 0),
+        rotacionInventario: Number(rot && rot.rotacionInventario != null ? rot.rotacionInventario : 0),
+        rotacionCuentasCobrar: Number(rot && rot.rotacionCuentasCobrar != null ? rot.rotacionCuentasCobrar : 0),
+        rotacionCuentasPagar: Number(rot && rot.rotacionCuentasPagar != null ? rot.rotacionCuentasPagar : 0),
+        cicloConversionEfectivo: Number(rot && rot.cicloConversionEfectivo != null ? rot.cicloConversionEfectivo : 0)
+      };
+    }
+  } catch (err) {
+    if (err.number === 208 || /Invalid object name|vw_Ratios/.test(String(err.message))) {
+      return AnalisisOperativo.obtenerRatiosFinancierosRepo(pool, idEmpresa);
+    }
+    throw err;
+  }
+  return AnalisisOperativo.obtenerRatiosFinancierosRepo(pool, idEmpresa);
 };
 
 exports.obtenerAnalisisRentabilidadRepo = async (pool, idEmpresa, tipo) => {
@@ -189,73 +238,66 @@ exports.obtenerPuntoEquilibrioRepo = async (pool, idEmpresa) => {
 };
 
 exports.obtenerDiagnosticoFinancieroRepo = async (pool, idEmpresa) => {
-  // Obtener el último período disponible
-  const ultimoPeriodoResult = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT TOP 1 periodo
-      FROM vw_EstadoResultados
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY periodo DESC
-    `);
-
-  if (ultimoPeriodoResult.recordset.length === 0) {
-    return { mensaje: "No hay datos financieros disponibles" };
+  try {
+    const ultimoPeriodoResult = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT TOP 1 periodo FROM vw_EstadoResultados WHERE idEmpresa = @idEmpresa ORDER BY periodo DESC
+      `);
+    if (ultimoPeriodoResult.recordset.length === 0) {
+      return AnalisisOperativo.obtenerDiagnosticoFinancieroRepo(pool, idEmpresa);
+    }
+    const ultimoPeriodo = ultimoPeriodoResult.recordset[0].periodo;
+    const ratiosResult = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("periodo", sql.VarChar, ultimoPeriodo)
+      .query(`
+        SELECT TOP 1 rl.liquidezCorriente, rl.endeudamientoTotal, rr.margenNeto, rr.ROE, rot.cicloConversionEfectivo
+        FROM vw_RatiosLiquidez rl
+        LEFT JOIN vw_RatiosRentabilidad rr ON rl.idEmpresa = rr.idEmpresa AND rl.periodo = rr.periodo
+        LEFT JOIN vw_RatiosRotacion rot ON rl.idEmpresa = rot.idEmpresa AND rl.periodo = rot.periodo
+        WHERE rl.idEmpresa = @idEmpresa AND rl.periodo = @periodo
+      `);
+    const ratios = ratiosResult.recordset[0] || {};
+    const saludFinanciera = calcularSaludFinanciera(ratios);
+    const recomendaciones = generarRecomendaciones(ratios);
+    const fortalezas = [];
+    const debilidades = [];
+    if ((ratios.liquidezCorriente || 0) >= 1.5) fortalezas.push(evaluarLiquidez(ratios.liquidezCorriente || 0));
+    else debilidades.push(evaluarLiquidez(ratios.liquidezCorriente || 0));
+    if ((ratios.margenNeto || 0) >= 0.05) fortalezas.push(evaluarRentabilidad(ratios.margenNeto || 0, ratios.ROE || 0));
+    else debilidades.push(evaluarRentabilidad(ratios.margenNeto || 0, ratios.ROE || 0));
+    if ((ratios.endeudamientoTotal || 0) <= 0.6) fortalezas.push(evaluarEndeudamiento(ratios.endeudamientoTotal || 0));
+    else debilidades.push(evaluarEndeudamiento(ratios.endeudamientoTotal || 0));
+    const puntuacion = (saludFinanciera === 'EXCELENTE' ? 85 : saludFinanciera === 'BUENA' ? 65 : saludFinanciera === 'REGULAR' ? 45 : 25);
+    const ratiosCriticos = [
+      { nombre: 'Liquidez Corriente', valor: ratios.liquidezCorriente || 0, rangoOptimo: '> 1.5', estado: (ratios.liquidezCorriente || 0) >= 1.5 ? 'OPTIMO' : 'PREOCUPANTE' },
+      { nombre: 'Margen Neto', valor: (ratios.margenNeto || 0) * 100, rangoOptimo: '> 10%', estado: (ratios.margenNeto || 0) >= 0.1 ? 'OPTIMO' : 'PREOCUPANTE' },
+      { nombre: 'Endeudamiento', valor: (ratios.endeudamientoTotal || 0) * 100, rangoOptimo: '< 60%', estado: (ratios.endeudamientoTotal || 0) <= 0.6 ? 'OPTIMO' : 'CRITICO' },
+      { nombre: 'Ciclo Conversión', valor: ratios.cicloConversionEfectivo || 0, rangoOptimo: '< 60 días', estado: (ratios.cicloConversionEfectivo || 0) <= 60 ? 'OPTIMO' : 'PREOCUPANTE' }
+    ];
+    return {
+      saludFinanciera,
+      puntuacion,
+      fortalezas,
+      debilidades,
+      recomendaciones,
+      ratiosCriticos
+    };
+  } catch (err) {
+    if (err.number === 208 || /Invalid object name|vw_/.test(String(err.message))) {
+      return AnalisisOperativo.obtenerDiagnosticoFinancieroRepo(pool, idEmpresa);
+    }
+    throw err;
   }
-
-  const ultimoPeriodo = ultimoPeriodoResult.recordset[0].periodo;
-
-  // Obtener ratios del último período
-  const ratiosResult = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("periodo", sql.VarChar, ultimoPeriodo)
-    .query(`
-      SELECT TOP 1
-        rl.liquidezCorriente,
-        rl.endeudamientoTotal,
-        rr.margenNeto,
-        rr.ROE,
-        rot.cicloConversionEfectivo
-      FROM vw_RatiosLiquidez rl
-      LEFT JOIN vw_RatiosRentabilidad rr ON rl.idEmpresa = rr.idEmpresa AND rl.periodo = rr.periodo
-      LEFT JOIN vw_RatiosRotacion rot ON rl.idEmpresa = rot.idEmpresa AND rl.periodo = rot.periodo
-      WHERE rl.idEmpresa = @idEmpresa AND rl.periodo = @periodo
-    `);
-
-  const ratios = ratiosResult.recordset[0] || {};
-
-  // Generar diagnóstico
-  const diagnostico = {
-    periodoAnalizado: ultimoPeriodo,
-    saludFinanciera: calcularSaludFinanciera(ratios),
-    liquidez: {
-      corriente: ratios.liquidezCorriente || 0,
-      evaluacion: evaluarLiquidez(ratios.liquidezCorriente || 0)
-    },
-    rentabilidad: {
-      margenNeto: ratios.margenNeto || 0,
-      ROE: ratios.ROE || 0,
-      evaluacion: evaluarRentabilidad(ratios.margenNeto || 0, ratios.ROE || 0)
-    },
-    endeudamiento: {
-      total: ratios.endeudamientoTotal || 0,
-      evaluacion: evaluarEndeudamiento(ratios.endeudamientoTotal || 0)
-    },
-    eficiencia: {
-      cicloConversion: ratios.cicloConversionEfectivo || 0,
-      evaluacion: evaluarEficiencia(ratios.cicloConversionEfectivo || 0)
-    },
-    recomendaciones: generarRecomendaciones(ratios)
-  };
-
-  return diagnostico;
 };
 
 // Funciones auxiliares para evaluación
 function calcularSaludFinanciera(ratios) {
   const { liquidezCorriente = 0, margenNeto = 0, endeudamientoTotal = 0, cicloConversionEfectivo = 0 } = ratios;
+  const margenPct = margenNeto <= 1 && margenNeto >= 0 ? margenNeto * 100 : margenNeto;
 
   let puntuacion = 0;
 
@@ -263,9 +305,9 @@ function calcularSaludFinanciera(ratios) {
   else if (liquidezCorriente >= 1.5) puntuacion += 20;
   else if (liquidezCorriente >= 1) puntuacion += 10;
 
-  if (margenNeto >= 10) puntuacion += 25;
-  else if (margenNeto >= 5) puntuacion += 15;
-  else if (margenNeto >= 2) puntuacion += 5;
+  if (margenPct >= 10) puntuacion += 25;
+  else if (margenPct >= 5) puntuacion += 15;
+  else if (margenPct >= 2) puntuacion += 5;
 
   if (endeudamientoTotal <= 0.6) puntuacion += 25;
   else if (endeudamientoTotal <= 0.7) puntuacion += 15;

@@ -120,7 +120,7 @@ const actualizarPermisosRol = async (pool, idRol, permisosIds, user) => {
  * Verifica si el usuario tiene un permiso específico
  */
 const verificarPermisoUsuario = async (pool, nombrePermiso, user) => {
-    if (!user || !user.empresa || !user.usuario) {
+    if (!user || !user.empresa || !user.sub) {
         return false;
     }
 

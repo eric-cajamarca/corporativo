@@ -157,6 +157,12 @@
                   </table>
                 </div>
               </div>
+
+              <!-- Efectivo disponible: solo movimientos en efectivo afectan este saldo -->
+              <div class="alert alert-info mt-3 mb-0" role="alert">
+                <strong>Efectivo disponible en caja:</strong> {{ formatCurrency(saldoEfectivoDisponible) }}
+                <small class="d-block text-muted mt-1">Solo los movimientos con forma de pago &quot;Efectivo&quot; afectan este saldo. El resto se muestra arriba pero no resta del efectivo.</small>
+              </div>
     
             </div>
           </div>

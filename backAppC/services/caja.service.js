@@ -1,23 +1,28 @@
 const sql = require('mssql');
 const CajaRepository = require('../repositories/caja.repository');
 const conceptoRepository = require('../repositories/concepto.repository');
+const permisosService = require('./permisos.service');
+
+/** Administrador tiene todo; si no, debe tener al menos uno de los permisos indicados. */
+const tienePermisoCaja = async (pool, user, ...nombresPermiso) => {
+  if (!user) return false;
+  if (user.rol === 'Administrador') return true;
+  for (const nombre of nombresPermiso) {
+    if (await permisosService.verificarPermisoUsuario(pool, nombre, user)) return true;
+  }
+  return false;
+};
 
 exports.obtenerCajasService = async (pool, user) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
-
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const cajas = await CajaRepository.obtenerCajasRepo(pool, user.empresa);
   return cajas;
 };
 
 exports.crearCajaService = async (pool, user, datos) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   if (!datos.idSucursal || !datos.nombre || !datos.nombre.trim()) {
     throw new Error("DATOS_INVALIDOS");
   }
@@ -29,13 +34,8 @@ exports.crearCajaService = async (pool, user, datos) => {
 };
 
 exports.abrirCajaService = async (pool, user, datos) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'ABRIR_CAJA', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
 
   // Validar que la caja pertenezca a la empresa del usuario
   const cajaValida = await CajaRepository.validarCajaEmpresaRepo(pool, datos.idCaja, user.empresa);
@@ -54,13 +54,8 @@ exports.abrirCajaService = async (pool, user, datos) => {
 };
 
 exports.cerrarCajaService = async (pool, user, datos) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'CERRAR_CAJA', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
 
   // Verificar que la apertura pertenezca a la empresa del usuario y esté abierta
   const aperturaValida = await CajaRepository.validarAperturaEmpresaRepo(pool, datos.idApertura, user.empresa);
@@ -73,13 +68,8 @@ exports.cerrarCajaService = async (pool, user, datos) => {
 };
 
 exports.registrarMovimientoService = async (pool, user, datos) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'REGISTRAR_MOVIMIENTOS', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
 
   // Verificar que la apertura esté abierta y pertenezca a la empresa
   const aperturaAbierta = await CajaRepository.verificarAperturaAbiertaRepo(pool, datos.idApertura, user.empresa);
@@ -130,42 +120,34 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
 };
 
 exports.obtenerMovimientosCajaService = async (pool, user, filtros) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
-
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const movimientos = await CajaRepository.obtenerMovimientosCajaRepo(pool, user.empresa, filtros);
   return movimientos;
 };
 
 exports.obtenerRecibosEgresoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const params = { ...filtros, tipoMovimiento: "E", soloRecibos: true };
   return CajaRepository.obtenerMovimientosCajaRepo(pool, user.empresa, params);
 };
 
 exports.eliminarMovimientoCajaService = async (pool, user, idMovimientoCaja) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
+  if (!(await tienePermisoCaja(pool, user, 'REGISTRAR_MOVIMIENTOS', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   return CajaRepository.eliminarMovimientoCajaRepo(pool, idMovimientoCaja, user.empresa);
 };
 
 exports.actualizarMovimientoCajaService = async (pool, user, datos) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
+  if (!(await tienePermisoCaja(pool, user, 'REGISTRAR_MOVIMIENTOS', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   return CajaRepository.actualizarMovimientoCajaRepo(pool, user.empresa, datos);
 };
 
 exports.obtenerTiposMovimientoCajaService = async (pool, user) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const tipos = await CajaRepository.obtenerTiposMovimientoCajaRepo(pool);
   return tipos;
 };
@@ -196,20 +178,14 @@ exports.eliminarTipoMovimientoCajaService = async (pool, user, id) => {
 };
 
 exports.obtenerResumenCajaDiarioService = async (pool, user, fecha) => {
-  if (!user) {
-    throw new Error("NO_ACCESS");
-  }
-
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
-
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_ARQUEO', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const resumen = await CajaRepository.obtenerResumenCajaDiarioRepo(pool, user.empresa, fecha);
   return resumen;
 };
 
 exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") throw new Error("NO_PERMISSIONS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_ARQUEO', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   return CajaRepository.obtenerArqueoDinamicoRepo(pool, user.empresa, filtros);
 };

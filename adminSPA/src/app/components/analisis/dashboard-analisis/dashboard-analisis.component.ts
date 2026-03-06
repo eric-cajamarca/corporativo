@@ -29,32 +29,46 @@ export class DashboardAnalisisComponent implements OnInit {
   public diagnosticoFinanciero: DiagnosticoFinanciero | null = null;
 
   public periodoSeleccionado = 'MES_ACTUAL';
-  public vistaActiva: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' = 'dashboard';
+  public vistaActiva: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' | 'gastos' = 'dashboard';
 
   public loading = {
     dashboard: false,
     balance: false,
     resultados: false,
     ratios: false,
-    diagnostico: false
+    diagnostico: false,
+    gastos: false
   };
 
+  public listGastos: { idGasto: string; fecha: string; tipo: string; monto: number; descripcion?: string }[] = [];
+  public nuevoGasto = { fecha: '', tipo: 'ADMINISTRACION', monto: 0, descripcion: '' };
+
   public filtros = {
-    periodo: '',
+    periodo: 'MES_ACTUAL',
     fechaDesde: '',
     fechaHasta: ''
   };
+
+  /** Estado de resultados puede venir como array (varios meses); mostramos el primero o el seleccionado */
+  public estadoResultadosList: EstadoResultados[] = [];
+  public estadoResultadosIndex = 0;
 
   constructor(
     private analisisService: AnalisisService
   ) {}
 
   ngOnInit(): void {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+    if (!this.filtros.fechaDesde) this.filtros.fechaDesde = `${y}-${m}-01`;
+    if (!this.filtros.fechaHasta) this.filtros.fechaHasta = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
     this.cargarDashboard();
     this.cargarDiagnosticoFinanciero();
   }
 
-  cambiarVista(vista: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico') {
+  cambiarVista(vista: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' | 'gastos') {
     this.vistaActiva = vista;
 
     switch (vista) {
@@ -70,7 +84,61 @@ export class DashboardAnalisisComponent implements OnInit {
       case 'diagnostico':
         if (!this.diagnosticoFinanciero) this.cargarDiagnosticoFinanciero();
         break;
+      case 'gastos':
+        this.cargarGastos();
+        break;
     }
+  }
+
+  cargarGastos() {
+    this.loading.gastos = true;
+    this.analisisService.listarGastos(this.filtros.fechaDesde, this.filtros.fechaHasta).subscribe({
+      next: (res) => {
+        this.listGastos = Array.isArray(res.data) ? res.data : [];
+        this.loading.gastos = false;
+      },
+      error: () => {
+        this.listGastos = [];
+        this.loading.gastos = false;
+      }
+    });
+  }
+
+  registrarGasto() {
+    const m = Number(this.nuevoGasto.monto);
+    if (!this.nuevoGasto.fecha || m <= 0) {
+      iziToast.warning({ title: 'Datos incompletos', message: 'Indique fecha y monto mayor a 0.' });
+      return;
+    }
+    this.analisisService.crearGasto({
+      fecha: this.nuevoGasto.fecha,
+      tipo: this.nuevoGasto.tipo,
+      monto: m,
+      descripcion: this.nuevoGasto.descripcion || undefined
+    }).subscribe({
+      next: () => {
+        iziToast.success({ title: 'Gasto registrado', message: 'Se usará en el estado de resultados.' });
+        this.nuevoGasto = { fecha: '', tipo: 'ADMINISTRACION', monto: 0, descripcion: '' };
+        this.cargarGastos();
+        this.cargarEstadoResultados();
+        this.cargarDashboard();
+      },
+      error: (err) => {
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo registrar el gasto.' });
+      }
+    });
+  }
+
+  eliminarGasto(idGasto: string) {
+    if (!confirm('¿Eliminar este gasto?')) return;
+    this.analisisService.eliminarGasto(idGasto).subscribe({
+      next: () => {
+        this.cargarGastos();
+        this.cargarEstadoResultados();
+        this.cargarDashboard();
+      },
+      error: () => iziToast.error({ title: 'Error', message: 'No se pudo eliminar.' })
+    });
   }
 
   cargarDashboard() {
@@ -95,10 +163,13 @@ export class DashboardAnalisisComponent implements OnInit {
 
   cargarBalanceGeneral() {
     this.loading.balance = true;
-    this.analisisService.obtenerBalanceGeneral(this.filtros.periodo).subscribe({
+    const periodo = this.filtros.periodo || 'MES_ACTUAL';
+    this.analisisService.obtenerBalanceGeneral(periodo).subscribe({
       next: (response) => {
         if (response.data) {
-          this.balanceGeneral = response.data;
+          this.balanceGeneral = Array.isArray(response.data) ? response.data[0] : response.data;
+        } else {
+          this.balanceGeneral = null;
         }
         this.loading.balance = false;
       },
@@ -121,8 +192,20 @@ export class DashboardAnalisisComponent implements OnInit {
       agruparPor: 'MES'
     }).subscribe({
       next: (response) => {
-        if (response.data) {
-          this.estadoResultados = response.data;
+        if (response.data && (Array.isArray(response.data) ? response.data.length > 0 : true)) {
+          const data = response.data;
+          if (Array.isArray(data)) {
+            this.estadoResultadosList = data;
+            this.estadoResultadosIndex = 0;
+            this.estadoResultados = data[0];
+          } else {
+            this.estadoResultadosList = [data];
+            this.estadoResultadosIndex = 0;
+            this.estadoResultados = data;
+          }
+        } else {
+          this.estadoResultadosList = [];
+          this.estadoResultados = null;
         }
         this.loading.resultados = false;
       },
@@ -141,8 +224,10 @@ export class DashboardAnalisisComponent implements OnInit {
     this.loading.ratios = true;
     this.analisisService.obtenerRatiosFinancieros().subscribe({
       next: (response) => {
-        if (response.data) {
+        if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
           this.ratiosFinancieros = response.data;
+        } else {
+          this.ratiosFinancieros = null;
         }
         this.loading.ratios = false;
       },
@@ -161,8 +246,12 @@ export class DashboardAnalisisComponent implements OnInit {
     this.loading.diagnostico = true;
     this.analisisService.obtenerDiagnosticoFinanciero().subscribe({
       next: (response) => {
-        if (response.data) {
+        if (response.data && typeof response.data === 'object' && response.data.saludFinanciera !== undefined) {
           this.diagnosticoFinanciero = response.data;
+        } else if (response.data && (response.data as any).mensaje) {
+          this.diagnosticoFinanciero = null;
+        } else {
+          this.diagnosticoFinanciero = response.data || null;
         }
         this.loading.diagnostico = false;
       },
@@ -198,8 +287,10 @@ export class DashboardAnalisisComponent implements OnInit {
     switch (salud) {
       case 'EXCELENTE': return 'success';
       case 'BUENA': return 'primary';
-      case 'REGULAR': return 'warning';
-      case 'DEFICIENTE': return 'danger';
+      case 'REGULAR':
+      case 'ACEPTABLE': return 'info';
+      case 'DEFICIENTE':
+      case 'REQUIERE ATENCIÓN': return 'danger';
       default: return 'secondary';
     }
   }
@@ -222,7 +313,21 @@ export class DashboardAnalisisComponent implements OnInit {
   }
 
   formatPercent(value: number): string {
+    if (value == null || isNaN(value)) return '0.00%';
     return (value * 100).toFixed(2) + '%';
+  }
+
+  /** Para ratios tipo liquidez (ej. 1.5 = 1.50x), no porcentaje */
+  formatRatio(value: number): string {
+    if (value == null || isNaN(value)) return '0.00';
+    return Number(value).toFixed(2);
+  }
+
+  seleccionarPeriodoResultados(index: number) {
+    if (this.estadoResultadosList[index]) {
+      this.estadoResultadosIndex = index;
+      this.estadoResultados = this.estadoResultadosList[index];
+    }
   }
 
   isPositive(value: number): boolean {

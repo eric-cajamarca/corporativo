@@ -6,11 +6,11 @@
         <div class="card-header bg-dark text-white">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
-              <i class="fas fa-chart-line me-2"></i>
+              <i class="bi bi-graph-up-arrow me-2"></i>
               Análisis Financiero
             </h5>
             <button class="btn btn-light btn-sm" (click)="refrescarDatos()" [disabled]="loading.dashboard">
-              <i class="fas fa-sync-alt me-1" [class.fa-spin]="loading.dashboard"></i>
+              <i class="bi bi-arrow-repeat me-1" [class.fa-spin]="loading.dashboard"></i>
               Actualizar
             </button>
           </div>
@@ -21,36 +21,43 @@
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'dashboard'"
                  (click)="cambiarVista('dashboard')" href="javascript:void(0)">
-                <i class="fas fa-tachometer-alt me-1"></i>
+                <i class="bi bi-speedometer2 me-1"></i>
                 Dashboard
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'balance'"
                  (click)="cambiarVista('balance')" href="javascript:void(0)">
-                <i class="fas fa-balance-scale me-1"></i>
+                <i class="bi bi-balance-scale me-1"></i>
                 Balance General
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'resultados'"
                  (click)="cambiarVista('resultados')" href="javascript:void(0)">
-                <i class="fas fa-chart-bar me-1"></i>
+                <i class="bi bi-graph-up-arrow me-1"></i>
                 Estado de Resultados
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'ratios'"
                  (click)="cambiarVista('ratios')" href="javascript:void(0)">
-                <i class="fas fa-calculator me-1"></i>
+                <i class="bi bi-calculator me-1"></i>
                 Ratios Financieros
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'diagnostico'"
                  (click)="cambiarVista('diagnostico')" href="javascript:void(0)">
-                <i class="fas fa-stethoscope me-1"></i>
+                <i class="bi bi-stethoscope me-1"></i>
                 Diagnóstico
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" [class.active]="vistaActiva === 'gastos'"
+                 (click)="cambiarVista('gastos')" href="javascript:void(0)">
+                <i class="bi bi-cash-stack me-1"></i>
+                Gastos
               </a>
             </li>
           </ul>
@@ -82,7 +89,7 @@
                     <div class="col-md-3">
                       <label class="form-label">&nbsp;</label>
                       <button class="btn btn-primary btn-sm w-100" (click)="aplicarFiltros()">
-                        <i class="fas fa-filter me-1"></i>
+                        <i class="bi bi-filter me-1"></i>
                         Aplicar
                       </button>
                     </div>
@@ -99,7 +106,7 @@
 
         <!-- DASHBOARD EJECUTIVO -->
         <div *ngSwitchCase="'dashboard'">
-          <div class="row" *ngIf="dashboard; else loadingDashboard">
+          <div class="row" *ngIf="!loading.dashboard && dashboard">
             <!-- KPIs Principales -->
             <div class="col-12 mb-4">
               <div class="row">
@@ -107,13 +114,13 @@
                   <div class="card border-primary h-100">
                     <div class="card-body text-center">
                       <div class="text-primary mb-2">
-                        <i class="fas fa-dollar-sign fa-2x"></i>
+                        <i class="bi bi-currency-dollar fa-2x"></i>
                       </div>
                       <h4 class="mb-1">{{formatCurrency(dashboard.ventasTotales)}}</h4>
                       <small class="text-muted">Ventas Totales</small>
                       <div class="mt-2">
                         <span class="badge" [class]="isPositive(dashboard.crecimientoVentas) ? 'bg-success' : 'bg-danger'">
-                          <i class="fas" [class]="isPositive(dashboard.crecimientoVentas) ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+                          <i class="bi bi-arrow-up-right" [class]="isPositive(dashboard.crecimientoVentas) ? 'bi-arrow-up' : 'bi-arrow-down'"></i>
                           {{formatPercent(dashboard.crecimientoVentas)}}
                         </span>
                       </div>
@@ -124,7 +131,7 @@
                   <div class="card border-success h-100">
                     <div class="card-body text-center">
                       <div class="text-success mb-2">
-                        <i class="fas fa-chart-line fa-2x"></i>
+                        <i class="bi bi-graph-up-arrow fa-2x"></i>
                       </div>
                       <h4 class="mb-1">{{formatCurrency(dashboard.utilidadNeta)}}</h4>
                       <small class="text-muted">Utilidad Neta</small>
@@ -140,7 +147,7 @@
                   <div class="card border-info h-100">
                     <div class="card-body text-center">
                       <div class="text-info mb-2">
-                        <i class="fas fa-piggy-bank fa-2x"></i>
+                        <i class="bi bi-piggy-bank fa-2x"></i>
                       </div>
                       <h4 class="mb-1">{{formatCurrency(dashboard.flujoCaja)}}</h4>
                       <small class="text-muted">Flujo de Caja</small>
@@ -156,7 +163,7 @@
                   <div class="card border-warning h-100">
                     <div class="card-body text-center">
                       <div class="text-warning mb-2">
-                        <i class="fas fa-percentage fa-2x"></i>
+                        <i class="bi bi-percent fa-2x"></i>
                       </div>
                       <h4 class="mb-1">{{formatPercent(dashboard.roi)}}</h4>
                       <small class="text-muted">ROI</small>
@@ -178,7 +185,7 @@
                   <div class="card h-100">
                     <div class="card-header">
                       <h6 class="mb-0">
-                        <i class="fas fa-chart-pie me-2"></i>
+                        <i class="bi bi-pie-chart me-2"></i>
                         Composición de Utilidades
                       </h6>
                     </div>
@@ -220,7 +227,7 @@
                   <div class="card h-100">
                     <div class="card-header">
                       <h6 class="mb-0">
-                        <i class="fas fa-balance-scale me-2"></i>
+                        <i class="bi bi-balance-scale me-2"></i>
                         Saldos Importantes
                       </h6>
                     </div>
@@ -258,22 +265,26 @@
             </div>
           </div>
 
-          <ng-template #loadingDashboard>
-            <div class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-2 text-muted">Cargando dashboard ejecutivo...</p>
+          <div *ngIf="loading.dashboard" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
             </div>
-          </ng-template>
+            <p class="mt-2 text-muted">Cargando dashboard ejecutivo...</p>
+          </div>
+          <div *ngIf="!loading.dashboard && !dashboard" class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-speedometer2 fa-3x mb-3"></i>
+              <p class="mb-0">No hay datos para el dashboard. Verifique que existan ventas en el período.</p>
+            </div>
+          </div>
         </div>
 
         <!-- BALANCE GENERAL -->
         <div *ngSwitchCase="'balance'">
-          <div class="card" *ngIf="balanceGeneral; else loadingBalance">
+          <div class="card" *ngIf="!loading.balance && balanceGeneral">
             <div class="card-header">
               <h6 class="mb-0">
-                <i class="fas fa-balance-scale me-2"></i>
+                <i class="bi bi-balance-scale me-2"></i>
                 Balance General - {{balanceGeneral.periodo}}
               </h6>
             </div>
@@ -330,39 +341,46 @@
 
               <div class="row mt-4">
                 <div class="col-md-6">
-                  <div class="alert" [class]="balanceGeneral.ratioLiquidez > 1 ? 'alert-success' : 'alert-warning'">
-                    <h6>Ratio de Liquidez: {{formatPercent(balanceGeneral.ratioLiquidez)}}</h6>
-                    <small>{{balanceGeneral.ratioLiquidez > 1 ? 'Buena liquidez' : 'Liquidez baja'}}</small>
+                  <div class="alert" [class]="(balanceGeneral.ratioLiquidez || 0) > 1 ? 'alert-success' : 'alert-warning'">
+                    <h6>Ratio de Liquidez: {{formatRatio(balanceGeneral.ratioLiquidez)}}x</h6>
+                    <small>{{(balanceGeneral.ratioLiquidez || 0) > 1 ? 'Buena liquidez' : 'Liquidez baja'}}</small>
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <div class="alert" [class]="balanceGeneral.ratioEndeudamiento < 0.5 ? 'alert-success' : 'alert-warning'">
+                  <div class="alert" [class]="(balanceGeneral.ratioEndeudamiento || 0) < 0.5 ? 'alert-success' : 'alert-warning'">
                     <h6>Ratio de Endeudamiento: {{formatPercent(balanceGeneral.ratioEndeudamiento)}}</h6>
-                    <small>{{balanceGeneral.ratioEndeudamiento < 0.5 ? 'Bajo endeudamiento' : 'Alto endeudamiento'}}</small>
+                    <small>{{(balanceGeneral.ratioEndeudamiento || 0) < 0.5 ? 'Bajo endeudamiento' : 'Alto endeudamiento'}}</small>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <ng-template #loadingBalance>
-            <div class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-2 text-muted">Cargando balance general...</p>
+          <div *ngIf="loading.balance" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
             </div>
-          </ng-template>
+            <p class="mt-2 text-muted">Cargando balance general...</p>
+          </div>
+          <div *ngIf="!loading.balance && !balanceGeneral" class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-balance-scale fa-3x mb-3"></i>
+              <p class="mb-0">No hay datos de balance para el período seleccionado.</p>
+            </div>
+          </div>
         </div>
 
         <!-- ESTADO DE RESULTADOS -->
         <div *ngSwitchCase="'resultados'">
-          <div class="card" *ngIf="estadoResultados; else loadingResultados">
-            <div class="card-header">
+          <div class="card" *ngIf="!loading.resultados && estadoResultados">
+            <div class="card-header d-flex justify-content-between align-items-center">
               <h6 class="mb-0">
-                <i class="fas fa-chart-bar me-2"></i>
+                <i class="bi bi-graph-up-arrow me-2"></i>
                 Estado de Resultados - {{estadoResultados.periodo}}
               </h6>
+              <select *ngIf="estadoResultadosList.length > 1" class="form-select form-select-sm w-auto"
+                      [ngModel]="estadoResultadosIndex" (ngModelChange)="seleccionarPeriodoResultados($event)">
+                <option *ngFor="let er of estadoResultadosList; let i = index" [value]="i">{{er.periodo}}</option>
+              </select>
             </div>
             <div class="card-body">
               <div class="mb-4">
@@ -413,25 +431,29 @@
             </div>
           </div>
 
-          <ng-template #loadingResultados>
-            <div class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-2 text-muted">Cargando estado de resultados...</p>
+          <div *ngIf="loading.resultados" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
             </div>
-          </ng-template>
+            <p class="mt-2 text-muted">Cargando estado de resultados...</p>
+          </div>
+          <div *ngIf="!loading.resultados && !estadoResultados && estadoResultadosList.length === 0" class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-inbox fa-3x mb-3"></i>
+              <p class="mb-0">No hay datos de estado de resultados para el período seleccionado.</p>
+            </div>
+          </div>
         </div>
 
         <!-- RATIOS FINANCIEROS -->
         <div *ngSwitchCase="'ratios'">
-          <div *ngIf="ratiosFinancieros; else loadingRatios">
+          <div *ngIf="!loading.ratios && ratiosFinancieros">
             <div class="row">
               <div class="col-md-6 mb-4">
                 <div class="card h-100">
                   <div class="card-header">
                     <h6 class="mb-0">
-                      <i class="fas fa-water me-2"></i>
+                      <i class="bi bi-water me-2"></i>
                       Liquidez
                     </h6>
                   </div>
@@ -440,7 +462,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ratio Corriente</span>
                         <span class="badge" [class]="getRatioEstadoColor('OPTIMO')">
-                          {{formatPercent(ratiosFinancieros.ratioLiquidezCorriente)}}
+                          {{formatRatio(ratiosFinancieros.ratioLiquidezCorriente)}}x
                         </span>
                       </div>
                       <small class="text-muted">> 1.0 = Óptimo</small>
@@ -449,7 +471,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ratio Ácido</span>
                         <span class="badge" [class]="getRatioEstadoColor('ACEPTABLE')">
-                          {{formatPercent(ratiosFinancieros.ratioLiquidezAcida)}}
+                          {{formatRatio(ratiosFinancieros.ratioLiquidezAcida)}}x
                         </span>
                       </div>
                       <small class="text-muted">> 0.8 = Aceptable</small>
@@ -458,7 +480,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ratio Inmediato</span>
                         <span class="badge" [class]="getRatioEstadoColor('ACEPTABLE')">
-                          {{formatPercent(ratiosFinancieros.ratioLiquidezInmediata)}}
+                          {{formatRatio(ratiosFinancieros.ratioLiquidezInmediata)}}x
                         </span>
                       </div>
                       <small class="text-muted">> 0.5 = Aceptable</small>
@@ -471,7 +493,7 @@
                 <div class="card h-100">
                   <div class="card-header">
                     <h6 class="mb-0">
-                      <i class="fas fa-balance-scale me-2"></i>
+                      <i class="bi bi-balance-scale me-2"></i>
                       Solvencia
                     </h6>
                   </div>
@@ -498,7 +520,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Cobertura Intereses</span>
                         <span class="badge" [class]="getRatioEstadoColor('OPTIMO')">
-                          {{ratiosFinancieros.coberturaIntereses.toFixed(2)}}
+                          {{(ratiosFinancieros.coberturaIntereses ?? 0) | number:'1.2-2'}}
                         </span>
                       </div>
                       <small class="text-muted">> 3.0 = Óptimo</small>
@@ -511,7 +533,7 @@
                 <div class="card h-100">
                   <div class="card-header">
                     <h6 class="mb-0">
-                      <i class="fas fa-chart-line me-2"></i>
+                      <i class="bi bi-graph-up-arrow me-2"></i>
                       Rentabilidad
                     </h6>
                   </div>
@@ -564,7 +586,7 @@
                 <div class="card h-100">
                   <div class="card-header">
                     <h6 class="mb-0">
-                      <i class="fas fa-cogs me-2"></i>
+                      <i class="bi bi-cogs me-2"></i>
                       Eficiencia
                     </h6>
                   </div>
@@ -573,7 +595,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Rotación Inventario</span>
                         <span class="badge bg-secondary">
-                          {{ratiosFinancieros.rotacionInventario.toFixed(2)}}
+                          {{(ratiosFinancieros.rotacionInventario ?? 0) | number:'1.2-2'}}
                         </span>
                       </div>
                       <small class="text-muted">Veces por año</small>
@@ -582,7 +604,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Rotación Cuentas x Cobrar</span>
                         <span class="badge bg-secondary">
-                          {{ratiosFinancieros.rotacionCuentasCobrar.toFixed(2)}}
+                          {{(ratiosFinancieros.rotacionCuentasCobrar ?? 0) | number:'1.2-2'}}
                         </span>
                       </div>
                       <small class="text-muted">Veces por año</small>
@@ -590,8 +612,8 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ciclo Conversión Efectivo</span>
-                        <span class="badge" [class]="ratiosFinancieros.cicloConversionEfectivo < 60 ? 'bg-success' : 'bg-warning'">
-                          {{ratiosFinancieros.cicloConversionEfectivo.toFixed(0)}} días
+                        <span class="badge" [class]="(ratiosFinancieros.cicloConversionEfectivo ?? 0) < 60 ? 'bg-success' : 'bg-warning'">
+                          {{(ratiosFinancieros.cicloConversionEfectivo ?? 0) | number:'1.0-0'}} días
                         </span>
                       </div>
                       <small class="text-muted">< 60 días = Óptimo</small>
@@ -602,25 +624,29 @@
             </div>
           </div>
 
-          <ng-template #loadingRatios>
-            <div class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-2 text-muted">Cargando ratios financieros...</p>
+          <div *ngIf="loading.ratios" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
             </div>
-          </ng-template>
+            <p class="mt-2 text-muted">Cargando ratios financieros...</p>
+          </div>
+          <div *ngIf="!loading.ratios && !ratiosFinancieros" class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-calculator fa-3x mb-3"></i>
+              <p class="mb-0">No hay datos para calcular ratios.</p>
+            </div>
+          </div>
         </div>
 
         <!-- DIAGNÓSTICO FINANCIERO -->
         <div *ngSwitchCase="'diagnostico'">
-          <div *ngIf="diagnosticoFinanciero; else loadingDiagnostico">
+          <div *ngIf="!loading.diagnostico && diagnosticoFinanciero">
             <div class="row">
               <div class="col-md-8 mb-4">
                 <div class="card">
                   <div class="card-header">
                     <h6 class="mb-0">
-                      <i class="fas fa-stethoscope me-2"></i>
+                      <i class="bi bi-stethoscope me-2"></i>
                       Diagnóstico Financiero
                     </h6>
                   </div>
@@ -632,7 +658,7 @@
                             <div class="rounded-circle d-inline-flex align-items-center justify-content-center"
                                  [class]="'bg-' + getSaludFinancieraColor(diagnosticoFinanciero.saludFinanciera)"
                                  style="width: 100px; height: 100px;">
-                              <i class="fas fa-heartbeat fa-2x text-white"></i>
+                              <i class="bi bi-heartbeat fa-2x text-white"></i>
                             </div>
                           </div>
                           <h4 [class]="'text-' + getSaludFinancieraColor(diagnosticoFinanciero.saludFinanciera)">
@@ -644,11 +670,12 @@
                       <div class="col-md-6">
                         <h6>Fortalezas</h6>
                         <ul class="list-unstyled">
-                          <li *ngFor="let fortaleza of diagnosticoFinanciero.fortalezas"
+                          <li *ngFor="let fortaleza of (diagnosticoFinanciero.fortalezas || [])"
                               class="mb-2">
-                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <i class="bi bi-check-circle text-success me-2"></i>
                             {{fortaleza}}
                           </li>
+                          <li *ngIf="!(diagnosticoFinanciero.fortalezas?.length)" class="text-muted">Ninguna detectada.</li>
                         </ul>
                       </div>
                     </div>
@@ -657,12 +684,33 @@
                       <div class="col-12">
                         <h6>Debilidades</h6>
                         <ul class="list-unstyled">
-                          <li *ngFor="let debilidad of diagnosticoFinanciero.debilidades"
+                          <li *ngFor="let debilidad of (diagnosticoFinanciero.debilidades || [])"
                               class="mb-2">
-                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            <i class="bi bi-exclamation-triangle text-warning me-2"></i>
                             {{debilidad}}
                           </li>
+                          <li *ngIf="!(diagnosticoFinanciero.debilidades?.length)">Ninguna detectada.</li>
                         </ul>
+                      </div>
+                    </div>
+                    <div class="row mt-3" *ngIf="diagnosticoFinanciero.ratiosCriticos?.length">
+                      <div class="col-12">
+                        <h6>Ratios Críticos</h6>
+                        <div class="table-responsive">
+                          <table class="table table-sm">
+                            <thead>
+                              <tr><th>Indicador</th><th>Valor</th><th>Rango óptimo</th><th>Estado</th></tr>
+                            </thead>
+                            <tbody>
+                              <tr *ngFor="let rc of diagnosticoFinanciero.ratiosCriticos">
+                                <td>{{rc.nombre}}</td>
+                                <td>{{rc.nombre?.includes('Liquidez') ? (rc.valor | number:'1.2-2') + 'x' : (rc.valor | number:'1.2-2') + '%'}}</td>
+                                <td>{{rc.rangoOptimo}}</td>
+                                <td><span class="badge" [class]="'bg-' + getRatioEstadoColor(rc.estado)">{{rc.estado}}</span></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -673,7 +721,7 @@
                 <div class="card">
                   <div class="card-header">
                     <h6 class="mb-0">
-                      <i class="fas fa-lightbulb me-2"></i>
+                      <i class="bi bi-lightbulb me-2"></i>
                       Recomendaciones
                     </h6>
                   </div>
@@ -681,7 +729,7 @@
                     <ul class="list-unstyled">
                       <li *ngFor="let recomendacion of diagnosticoFinanciero.recomendaciones"
                           class="mb-3">
-                        <i class="fas fa-arrow-right text-primary me-2"></i>
+                        <i class="bi bi-arrow-right text-primary me-2"></i>
                         {{recomendacion}}
                       </li>
                     </ul>
@@ -691,14 +739,80 @@
             </div>
           </div>
 
-          <ng-template #loadingDiagnostico>
-            <div class="text-center py-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-2 text-muted">Cargando diagnóstico financiero...</p>
+          <div *ngIf="loading.diagnostico" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
             </div>
-          </ng-template>
+            <p class="mt-2 text-muted">Cargando diagnóstico financiero...</p>
+          </div>
+          <div *ngIf="!loading.diagnostico && !diagnosticoFinanciero" class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <i class="bi bi-stethoscope fa-3x mb-3"></i>
+              <p class="mb-0">No hay datos suficientes para generar el diagnóstico financiero.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- GASTOS OPERATIVOS -->
+        <div *ngSwitchCase="'gastos'">
+          <div class="row">
+            <div class="col-md-5 mb-4">
+              <div class="card">
+                <div class="card-header">
+                  <h6 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Registrar gasto</h6>
+                </div>
+                <div class="card-body">
+                  <div class="mb-2">
+                    <label class="form-label">Fecha</label>
+                    <input type="date" class="form-control form-control-sm" [(ngModel)]="nuevoGasto.fecha">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select form-select-sm" [(ngModel)]="nuevoGasto.tipo">
+                      <option value="ADMINISTRACION">Administración</option>
+                      <option value="VENTAS">Ventas</option>
+                      <option value="FINANCIERO">Financiero</option>
+                    </select>
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label">Monto (S/)</label>
+                    <input type="number" step="0.01" min="0" class="form-control form-control-sm" [(ngModel)]="nuevoGasto.monto">
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Descripción (opcional)</label>
+                    <input type="text" class="form-control form-control-sm" [(ngModel)]="nuevoGasto.descripcion" placeholder="Ej: Alquiler, servicios">
+                  </div>
+                  <button type="button" class="btn btn-primary btn-sm" (click)="registrarGasto()">Registrar</button>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0"><i class="bi bi-list me-2"></i>Gastos del período</h6>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarGastos()" [disabled]="loading.gastos">Actualizar</button>
+                </div>
+                <div class="card-body">
+                  <div *ngIf="loading.gastos" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>
+                  <div *ngIf="!loading.gastos && listGastos.length === 0" class="text-muted text-center py-3">No hay gastos registrados en el período. Use el formulario o los egresos de caja se considerarán en el análisis.</div>
+                  <div *ngIf="!loading.gastos && listGastos.length > 0" class="table-responsive">
+                    <table class="table table-sm">
+                      <thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Descripción</th><th></th></tr></thead>
+                      <tbody>
+                        <tr *ngFor="let g of listGastos">
+                          <td>{{g.fecha}}</td>
+                          <td>{{g.tipo}}</td>
+                          <td>{{formatCurrency(g.monto)}}</td>
+                          <td>{{g.descripcion || '-'}}</td>
+                          <td><button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarGasto(g.idGasto)"><i class="bi bi-trash"></i></button></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

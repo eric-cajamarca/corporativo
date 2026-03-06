@@ -22,9 +22,10 @@ import { SucursalService } from '../../../services/sucursal.service';
   styleUrl: './ventas-grifo.component.css'
 })
 export class VentasGrifoComponent implements OnInit {
+  constructor(public sidebarState: SidebarStateService) {}
   private grifoService = inject(GrifoService);
   private sucursalService = inject(SucursalService);
-  sidebarState = inject(SidebarStateService);
+  //sidebarState = inject(SidebarStateService);
 
   tanques: TanqueGrifo[] = [];
   resumen: ResumenGrifo | null = null;
@@ -167,5 +168,9 @@ export class VentasGrifoComponent implements OnInit {
         this.guardandoNuevoTanque = false;
       }
     });
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

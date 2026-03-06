@@ -15,7 +15,7 @@ exports.obtenerBalanceGeneralService = async (pool, user, periodo) => {
   }
 
   const balance = await AnalisisRepository.obtenerBalanceGeneralRepo(pool, user.empresa, periodo);
-  return balance;
+  return Array.isArray(balance) && balance.length > 0 ? balance[0] : balance;
 };
 
 exports.obtenerEstadoResultadosService = async (pool, user, filtros) => {

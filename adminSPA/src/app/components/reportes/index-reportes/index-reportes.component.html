@@ -18,7 +18,7 @@
         <div class="d-flex gap-2">
           <div class="dropdown">
             <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              <i class="fas fa-calendar me-1"></i>
+              <i class="bi bi-calendar3 me-1"></i>
               {{periodoSeleccionado}}
             </button>
             <ul class="dropdown-menu">
@@ -30,13 +30,13 @@
           </div>
           <div class="btn-group">
             <button class="btn btn-outline-success" (click)="exportarReporte('pdf')">
-              <i class="fas fa-file-pdf me-1"></i>PDF
+              <i class="bi bi-file-earmark-pdf me-1"></i>PDF
             </button>
             <button class="btn btn-outline-success" (click)="exportarReporte('excel')">
-              <i class="fas fa-file-excel me-1"></i>Excel
+              <i class="bi bi-file-earmark-excel me-1"></i>Excel
             </button>
             <button class="btn btn-outline-secondary" (click)="imprimirReporte()">
-              <i class="fas fa-print me-1"></i>Imprimir
+              <i class="bi bi-printer me-1"></i>Imprimir
             </button>
           </div>
         </div>
@@ -56,7 +56,7 @@
         </div>
         <div class="col-md-3">
           <button class="btn btn-primary" (click)="cargarReportesPrincipales()">
-            <i class="fas fa-search me-1"></i>Filtrar
+            <i class="bi bi-search me-1"></i>Filtrar
           </button>
         </div>
       </div>
@@ -76,7 +76,7 @@
           </span>
         </div>
         <div class="report-arrow">
-          <i class="fas fa-chevron-right"></i>
+          <i class="bi bi-chevron-right"></i>
         </div>
       </div>
     </div>
@@ -89,12 +89,14 @@
           <div class="card h-100">
             <div class="card-header">
               <h5 class="card-title mb-0">
-                <i class="fas fa-chart-line me-2"></i>
+                <i class="bi bi-graph-up-arrow me-2"></i>
                 Tendencia de Ventas
               </h5>
             </div>
             <div class="card-body">
-              <canvas id="chartVentas" height="300"></canvas>
+              <div class="chart-container chart-container--ventas">
+                <canvas id="chartVentas"></canvas>
+              </div>
             </div>
           </div>
         </div>
@@ -105,10 +107,12 @@
             <div class="col-12">
               <div class="kpi-card summary-card">
                 <div class="kpi-icon">
-                  <i class="fas fa-chart-line"></i>
+                  <i class="bi bi-graph-up-arrow"></i>
                 </div>
                 <div class="kpi-content">
-                  <div class="kpi-value">S/ 402,000</div>
+                  <div class="kpi-value">
+                    S/ {{resumenDashboard?.ventasTotales | number:'1.0-0'}}
+                  </div>
                   <div class="kpi-label">Ventas Totales</div>
                 </div>
               </div>
@@ -116,21 +120,29 @@
             <div class="col-12">
               <div class="kpi-card summary-card">
                 <div class="kpi-icon">
-                  <i class="fas fa-shopping-bag"></i>
+                  <i class="bi bi-cart-check"></i>
                 </div>
                 <div class="kpi-content">
-                  <div class="kpi-value">S/ 275,000</div>
-                  <div class="kpi-label">Compras Totales</div>
+                  <div class="kpi-value">
+                    S/ {{
+                      ((resumenDashboard?.ingresos || 0) -
+                        (resumenDashboard?.utilidadBruta || 0))
+                        | number:'1.0-0'
+                    }}
+                  </div>
+                  <div class="kpi-label">Costos Asociados</div>
                 </div>
               </div>
             </div>
             <div class="col-12">
               <div class="kpi-card summary-card">
                 <div class="kpi-icon">
-                  <i class="fas fa-coins"></i>
+                  <i class="bi bi-coin"></i>
                 </div>
                 <div class="kpi-content">
-                  <div class="kpi-value">S/ 127,000</div>
+                  <div class="kpi-value">
+                    S/ {{resumenDashboard?.utilidadNeta | number:'1.0-0'}}
+                  </div>
                   <div class="kpi-label">Utilidad Neta</div>
                 </div>
               </div>
@@ -146,12 +158,14 @@
           <div class="card h-100">
             <div class="card-header">
               <h5 class="card-title mb-0">
-                <i class="fas fa-building me-2"></i>
+                <i class="bi bi-building me-2"></i>
                 Compras por Proveedor
               </h5>
             </div>
             <div class="card-body">
-              <canvas id="chartCompras" height="250"></canvas>
+              <div class="chart-container chart-container--compras">
+                <canvas id="chartCompras"></canvas>
+              </div>
             </div>
           </div>
         </div>
@@ -161,12 +175,14 @@
           <div class="card h-100">
             <div class="card-header">
               <h5 class="card-title mb-0">
-                <i class="fas fa-star me-2"></i>
+                <i class="bi bi-star-fill me-2"></i>
                 Distribución de Ventas por Producto
               </h5>
             </div>
             <div class="card-body">
-              <canvas id="chartProductos" height="250"></canvas>
+              <div class="chart-container chart-container--productos">
+                <canvas id="chartProductos"></canvas>
+              </div>
             </div>
           </div>
         </div>
@@ -182,7 +198,7 @@
             {{reporteActual.nombre}}
           </h5>
           <button class="btn btn-outline-secondary btn-sm" (click)="reporteActual = null">
-            <i class="fas fa-times me-1"></i>Cerrar
+            <i class="bi bi-x-lg me-1"></i>Cerrar
           </button>
         </div>
         <div class="card-body">
@@ -206,7 +222,7 @@
                 <tr *ngFor="let item of datosReporte">
                   <td *ngFor="let key of getObjectKeys(item)">
                     <span *ngIf="isCurrencyField(key)" class="fw-semibold text-success">
-                      S/ {{item[key] | number:'1.0-0'}}
+                      S/ {{getNumericValue(item, key) | number:'1.0-0'}}
                     </span>
                     <span *ngIf="!isCurrencyField(key)">
                       {{item[key]}}
@@ -219,7 +235,7 @@
 
           <!-- Mensaje cuando no hay datos -->
           <div class="text-center py-4" *ngIf="!cargando && datosReporte.length === 0">
-            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <i class="bi bi-inbox-fill fa-3x text-muted mb-3"></i>
             <h5 class="text-muted">No hay datos disponibles</h5>
             <p class="text-muted">No se encontraron registros para el período seleccionado.</p>
           </div>

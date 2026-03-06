@@ -7,46 +7,40 @@ const gestoresRepository = require('../repositories/gestores.repository');
 const crearProveedor = async function (req, res) {
     const { idDocumento, ruc, rSocial, correo, celular, condicion, } = req.body;
 
-    //quiero extaer data del req para poder crear el registro
-
-    console.log('crearProveedor - req.data', req.data);
- 
-
     if (req.user) {
         if (req.user.rol == 'Administrador' || req.user.rol=='Almacenero') {
 
-            //antes de registrar el cliente, verificar si existe el ruc
+            const idEmpresa = req.user.empresa;
+            if (!idEmpresa) {
+                return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: undefined });
+            }
+
+            // Verificar si el RUC ya existe solo en la empresa del usuario (multiempresa)
             let pool = await sql.connect(dbConfig);
             let existeProveedor = await pool.request()
                 .input('ruc', sql.VarChar, ruc)
-                .query('select * from Proveedores where ruc = @ruc');
-
-            
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('SELECT 1 FROM Proveedores WHERE ruc = @ruc AND idEmpresa = @idEmpresa');
 
             if (existeProveedor.recordset.length > 0) {
-                res.status(200).send({ message: 'El ruc ya existe', data: undefined });
-                return;
-            }else{
-                try {
-                    let idEmpresa = req.user.empresa;
-    
-                    let pool = await sql.connect(dbConfig);
-                    let insertProveedor = await pool.request()
-                        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                        .input('idDocumento', sql.VarChar, idDocumento)
-                        .input('ruc', sql.VarChar, ruc)
-                        .input('rSocial', sql.VarChar, rSocial)
-                        .input('correo', sql.VarChar, correo)
-                        .input('celular', sql.VarChar, celular)
-                        .input('condicion', sql.VarChar, condicion)
-                        .query('insert into Proveedores (idEmpresa,idDocumento,ruc,rSocial,correo,celular,condicion,estado) values (@idEmpresa,@idDocumento,@ruc,@rSocial,@correo,@celular,@condicion,1)');
-    
-    
-                    res.status(200).send({ message: 'Proveedor creado', data: insertProveedor.rowsAffected });
-    
-                } catch (error) {
-                    res.status(500).send({ message: error.message, data: undefined });
-                }
+                return res.status(409).send({ message: 'El RUC ya existe en su empresa', data: undefined });
+            }
+
+            try {
+                const insertProveedor = await pool.request()
+                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                    .input('idDocumento', sql.VarChar, idDocumento)
+                    .input('ruc', sql.VarChar, ruc)
+                    .input('rSocial', sql.VarChar, rSocial)
+                    .input('correo', sql.VarChar, correo)
+                    .input('celular', sql.VarChar, celular)
+                    .input('condicion', sql.VarChar, condicion)
+                    .query('INSERT INTO Proveedores (idEmpresa,idDocumento,ruc,rSocial,correo,celular,condicion,estado) VALUES (@idEmpresa,@idDocumento,@ruc,@rSocial,@correo,@celular,@condicion,1)');
+
+                res.status(200).send({ message: 'Proveedor creado', data: insertProveedor.rowsAffected });
+            } catch (error) {
+                console.error('crearProveedor:', error);
+                res.status(500).send({ message: error.message, data: undefined });
             }
 
             

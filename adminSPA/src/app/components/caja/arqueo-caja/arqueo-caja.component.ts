@@ -328,6 +328,25 @@ export class ArqueoCajaComponent implements OnInit {
     return this.movimientosEgresos.reduce((acc, m) => acc + m.importe, 0);
   }
 
+  /** Solo movimientos con forma de pago Efectivo (restan del efectivo disponible en caja). */
+  get totalIngresosEfectivo(): number {
+    return this.movimientosIngresos
+      .filter(m => (m.formaPago || '').toUpperCase() === 'EFECTIVO')
+      .reduce((acc, m) => acc + m.importe, 0);
+  }
+
+  /** Solo movimientos con forma de pago Efectivo (restan del efectivo disponible en caja). */
+  get totalEgresosEfectivo(): number {
+    return this.movimientosEgresos
+      .filter(m => (m.formaPago || '').toUpperCase() === 'EFECTIVO')
+      .reduce((acc, m) => acc + m.importe, 0);
+  }
+
+  /** Efectivo disponible en caja: solo considera movimientos en efectivo; el resto se muestra pero no afecta este saldo. */
+  get saldoEfectivoDisponible(): number {
+    return this.totalIngresosEfectivo - this.totalEgresosEfectivo;
+  }
+
   formatCurrency(valor: number): string {
     return (valor || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }

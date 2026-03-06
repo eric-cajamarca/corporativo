@@ -82,6 +82,17 @@ exports.obtenerDescripcionMedioPago = async (pool, idMediosPago) => {
 };
 
 /**
+ * Obtiene el código del comprobante (ej. '01' Factura, '03' Boleta) por idComprobante e idEmpresa.
+ */
+exports.obtenerCodigoComprobante = async (pool, idEmpresa, idComprobante) => {
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idComprobante', sql.Int, idComprobante)
+        .query("SELECT RTRIM(LTRIM(ISNULL(codigo, ''))) AS codigo FROM Comprobantes WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante");
+    return result.recordset?.[0]?.codigo || '';
+};
+
+/**
  * Inserta una compra. No retorna filas.
  */
 exports.crearCompra = async (pool, params) => {

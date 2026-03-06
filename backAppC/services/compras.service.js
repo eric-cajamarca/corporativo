@@ -4,6 +4,7 @@ const dbConfig = require('../dbconfig');
 const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 const comprasRepository = require('../repositories/compras.repository');
+const CajaRepository = require('../repositories/caja.repository');
 
 /**
  * Formatea fechas fEmision/fVencimiento en un recordset a YYYY-MM-DD.
@@ -107,6 +108,38 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
         compRelacionado: compRelacionadoVal,
         idUsuario
     });
+
+    // Registrar egreso en caja solo si: comprobante es Boleta (03) o Factura (01) y compra está pagada.
+    // Solo el pago en efectivo resta del efectivo disponible; otras formas de pago se muestran pero no afectan el saldo efectivo (se calcula en arqueo).
+    const totalNum = Number(total) || 0;
+    if (idEstadoPagoFinal === 2 && totalNum > 0) {
+        try {
+            const codigoComp = await comprasRepository.obtenerCodigoComprobante(pool, idEmpresa, idComprobante);
+            const codigo = (codigoComp || '').trim();
+            const esBoletaOFactura = codigo === '01' || codigo === '03';
+            if (!esBoletaOFactura) return { idCompra };
+
+            const apertura = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(pool, idEmpresa);
+            if (apertura && apertura.idApertura) {
+                const idTipoEgreso = await CajaRepository.obtenerIdTipoMovimientoEgresoRepo(pool, 'COMPRA_CONTADO');
+                if (idTipoEgreso) {
+                    const serieNum = [serie, numero].filter(Boolean).join('-') || compCompra || 'Compra';
+                    const userMin = { empresa: idEmpresa, sub: idUsuario, sucursal: apertura.idSucursal || undefined };
+                    await CajaRepository.registrarMovimientoRepo(pool, userMin, {
+                        idApertura: apertura.idApertura,
+                        idTipoMovimientoCaja: idTipoEgreso,
+                        concepto: 'Compra al contado ' + serieNum,
+                        monto: totalNum,
+                        idMediosPago: idMediosPago != null ? Number(idMediosPago) : null,
+                        documentoRelacionado: serieNum
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('compras.service crearCompra: no se pudo registrar egreso en caja:', err);
+        }
+    }
+
     return { idCompra };
 };
 

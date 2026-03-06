@@ -133,4 +133,25 @@ export class AnalisisService {
       withCredentials: true
     });
   }
+
+  // Gastos operativos (para estado de resultados)
+  listarGastos(fechaDesde?: string, fechaHasta?: string): Observable<any> {
+    let params = '';
+    if (fechaDesde || fechaHasta) {
+      const q = new URLSearchParams();
+      if (fechaDesde) q.append('fechaDesde', fechaDesde);
+      if (fechaHasta) q.append('fechaHasta', fechaHasta);
+      params = '?' + q.toString();
+    }
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url + 'analisis/gastos' + params, { headers, withCredentials: true });
+  }
+  crearGasto(datos: { fecha: string; tipo: string; monto: number; descripcion?: string }): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url + 'analisis/gastos', datos, { headers, withCredentials: true });
+  }
+  eliminarGasto(idGasto: string): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.delete(this.url + 'analisis/gastos/' + encodeURIComponent(idGasto), { headers, withCredentials: true });
+  }
 }
