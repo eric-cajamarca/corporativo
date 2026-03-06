@@ -1417,3 +1417,7 @@
 {"sessionId":"39a89e","timestamp":1772719660386,"location":"facturacion.service.ejecutarEnvioAutomaticoService:empresas","message":"empresas","data":{"count":0,"ids":[]}}
 {"sessionId":"39a89e","timestamp":1772719660402,"location":"facturacion.service.ejecutarEnvioAutomaticoService:resultados","message":"resultados","data":[]}
 {"sessionId":"39a89e","timestamp":1772719660424,"location":"envioSunat.job.ejecutarEnvio","message":"resultados","data":{"total":0,"conEnvio":0,"resultados":[]}}
+{"sessionId":"39a89e","timestamp":1772720258046,"location":"envioSunat.job.ejecutarEnvio","message":"inicio","data":{}}
+{"sessionId":"39a89e","timestamp":1772720258145,"location":"facturacion.service.ejecutarEnvioAutomaticoService:empresas","message":"empresas","data":{"count":0,"ids":[]}}
+{"sessionId":"39a89e","timestamp":1772720258155,"location":"facturacion.service.ejecutarEnvioAutomaticoService:resultados","message":"resultados","data":[]}
+{"sessionId":"39a89e","timestamp":1772720258178,"location":"envioSunat.job.ejecutarEnvio","message":"resultados","data":{"total":0,"conEnvio":0,"resultados":[]}}
