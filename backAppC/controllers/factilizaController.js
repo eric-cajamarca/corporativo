@@ -6,6 +6,8 @@ const dbConfig = require('../dbconfig');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const { normalizeData } = require('../helpers/normalizeXmlComprobante');
 
+const NOMBRE_SERVICIO_FACTILIZA_PDF = 'Factiliza SUNAT PDF';
+
 const getAnexo = async function(req, res) {
   try {
     const ruc = req.params.ruc;
@@ -426,6 +428,99 @@ const consultarComprobanteSunat = async function (req, res) {
   }
 };
 
+/**
+ * Consulta el PDF del comprobante en SUNAT vía Factiliza.
+ * Usa las mismas credenciales que la consulta de XML y respeta servicios habilitados por empresa.
+ * Devuelve el ZIP en base64; el frontend se encarga de extraer y descargar el PDF.
+ */
+const consultarComprobantePdf = async function (req, res) {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const idEmpresa = req.user.empresa;
+    const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = req.body;
+
+    if (!proveedor || !tipo_doc || !serie || !correlativo) {
+      return res.status(400).json({ message: 'Faltan datos: proveedor, tipo_doc, serie, correlativo' });
+    }
+
+    const pool = await sql.connect(dbConfig);
+
+    const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_FACTILIZA_PDF);
+    if (!puedeUsar) {
+      return res.status(403).json({ message: 'Servicio Factiliza PDF no habilitado para su empresa' });
+    }
+
+    const acceso = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
+
+    const rucFinal = ruc || acceso.rucEmpresa;
+    const usuarioFinal = usuario || acceso.usuarioSol;
+    const passwordFinal = password || acceso.passwordSol;
+
+    if (!rucFinal || !usuarioFinal || !passwordFinal) {
+      return res.status(400).json({
+        message: 'Configure Factiliza para su empresa (ruc, usuario, contraseña SOL) o envíelos en el body'
+      });
+    }
+
+    const token = acceso.token || process.env.FACTILIZA_TOKEN;
+    if (!token) {
+      return res.status(403).json({ message: 'No hay token Factiliza configurado para su empresa' });
+    }
+
+    const apiBody = {
+      ruc: rucFinal,
+      usuario: usuarioFinal,
+      password: passwordFinal,
+      proveedor,
+      tipo_doc,
+      serie,
+      correlativo
+    };
+
+    const response = await fetch('https://api.factiliza.com/v1/sunat/reporte', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(apiBody)
+    });
+
+    const raw = await response.text();
+    let respuesta;
+    try {
+      respuesta = JSON.parse(raw);
+    } catch {
+      return res.status(500).json({ message: 'Respuesta no válida de Factiliza', raw: raw.substring(0, 200) });
+    }
+
+    if (!response.ok || (respuesta.status && respuesta.status !== 200) || respuesta.success === false) {
+      const status = respuesta.status || response.status || 500;
+      const msg = respuesta.message || respuesta.msg || 'Error al obtener PDF';
+      return res.status(status).json({
+        success: false,
+        status,
+        message: status === 404 ? 'No se encontró PDF para este comprobante en SUNAT. Verifique tipo de documento, serie y número.' : msg,
+        data: null
+      });
+    }
+
+    const zipBase64 = respuesta.data;
+    if (!zipBase64) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: 'No se encontró PDF para este comprobante. Verifique tipo, serie y número.',
+        data: null
+      });
+    }
+
+    return res.status(200).json({ message: 'Consulta exitosa', data: zipBase64 });
+  } catch (e) {
+    console.error('consultarComprobantePdf:', e);
+    return res.status(500).json({ message: e.message || 'Error al obtener PDF del comprobante' });
+  }
+};
+
 module.exports = { 
   getAnexo,
   getDni,
@@ -436,5 +531,6 @@ module.exports = {
   getSoat,
   getLicencia,
   getXmlSunat,
-  consultarComprobanteSunat
+  consultarComprobanteSunat,
+  consultarComprobantePdf
 };

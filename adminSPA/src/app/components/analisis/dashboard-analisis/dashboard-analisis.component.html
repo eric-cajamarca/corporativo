@@ -520,7 +520,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Cobertura Intereses</span>
                         <span class="badge" [class]="getRatioEstadoColor('OPTIMO')">
-                          {{(ratiosFinancieros.coberturaIntereses ?? 0) | number:'1.2-2'}}
+                          {{(ratiosFinancieros.coberturaIntereses) | number:'1.2-2'}}
                         </span>
                       </div>
                       <small class="text-muted">> 3.0 = Óptimo</small>
@@ -595,7 +595,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Rotación Inventario</span>
                         <span class="badge bg-secondary">
-                          {{(ratiosFinancieros.rotacionInventario ?? 0) | number:'1.2-2'}}
+                          {{(ratiosFinancieros.rotacionInventario) | number:'1.2-2'}}
                         </span>
                       </div>
                       <small class="text-muted">Veces por año</small>
@@ -604,7 +604,7 @@
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Rotación Cuentas x Cobrar</span>
                         <span class="badge bg-secondary">
-                          {{(ratiosFinancieros.rotacionCuentasCobrar ?? 0) | number:'1.2-2'}}
+                          {{(ratiosFinancieros.rotacionCuentasCobrar) | number:'1.2-2'}}
                         </span>
                       </div>
                       <small class="text-muted">Veces por año</small>
@@ -612,8 +612,8 @@
                     <div class="mb-3">
                       <div class="d-flex justify-content-between align-items-center">
                         <span>Ciclo Conversión Efectivo</span>
-                        <span class="badge" [class]="(ratiosFinancieros.cicloConversionEfectivo ?? 0) < 60 ? 'bg-success' : 'bg-warning'">
-                          {{(ratiosFinancieros.cicloConversionEfectivo ?? 0) | number:'1.0-0'}} días
+                        <span class="badge" [class]="(ratiosFinancieros.cicloConversionEfectivo) < 60 ? 'bg-success' : 'bg-warning'">
+                          {{(ratiosFinancieros.cicloConversionEfectivo) | number:'1.0-0'}} días
                         </span>
                       </div>
                       <small class="text-muted">< 60 días = Óptimo</small>
@@ -704,7 +704,7 @@
                             <tbody>
                               <tr *ngFor="let rc of diagnosticoFinanciero.ratiosCriticos">
                                 <td>{{rc.nombre}}</td>
-                                <td>{{rc.nombre?.includes('Liquidez') ? (rc.valor | number:'1.2-2') + 'x' : (rc.valor | number:'1.2-2') + '%'}}</td>
+                                <td>{{rc.nombre.includes('Liquidez') ? (rc.valor | number:'1.2-2') + 'x' : (rc.valor | number:'1.2-2') + '%'}}</td>
                                 <td>{{rc.rangoOptimo}}</td>
                                 <td><span class="badge" [class]="'bg-' + getRatioEstadoColor(rc.estado)">{{rc.estado}}</span></td>
                               </tr>

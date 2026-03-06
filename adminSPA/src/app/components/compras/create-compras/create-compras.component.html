@@ -1530,6 +1530,10 @@
                                     <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
                                     {{ loading ? 'Consultando...' : 'Consultar SUNAT' }}
                                 </button>
+                                <button type="button" class="btn btn-outline-danger" (click)="consultarYDescargarPdf()" [disabled]="consultaForm.invalid || loadingPdf" title="Descargar solo el PDF del comprobante (independiente de la consulta XML)">
+                                    <span *ngIf="loadingPdf" class="spinner-border spinner-border-sm me-1"></span>
+                                    {{ loadingPdf ? 'Descargando...' : 'Descargar PDF' }}
+                                </button>
                                 <button type="button" class="btn btn-outline-secondary" (click)="consultarManual()">
                                     Registro manual
                                 </button>

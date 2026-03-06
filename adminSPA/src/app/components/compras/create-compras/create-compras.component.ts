@@ -146,6 +146,7 @@ export class CreateComprasComponent {
   consultaForm: FormGroup;
   comprobante: any = null;
   loading = false;
+  loadingPdf = false;
   error = '';
   xmlContent = '';
 
@@ -314,6 +315,33 @@ export class CreateComprasComponent {
         this.error = err?.error?.message || err?.message || 'Error al consultar el comprobante';
         iziToast.error({ title: 'Error', message: this.error, position: 'topRight' });
       },
+    });
+  }
+
+  /** Consulta y descarga solo el PDF del comprobante (independiente de la consulta XML). */
+  consultarYDescargarPdf() {
+    if (this.consultaForm.invalid) return;
+
+    const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = this.consultaForm.value;
+    const body: any = { proveedor, tipo_doc, serie, correlativo };
+    if (ruc) body.ruc = ruc;
+    if (usuario) body.usuario = usuario;
+    if (password) body.password = password;
+
+    this.loadingPdf = true;
+    this.sunatService.consultarComprobantePdf(body).subscribe({
+      next: (resp) => {
+        this.loadingPdf = false;
+        this.sunatService.descargarPdfDesdeRespuesta(resp).catch(err => {
+          console.error('Error al descargar PDF:', err);
+          iziToast.error({ title: 'Error', message: 'No se pudo descargar el PDF del comprobante', position: 'topRight' });
+        });
+      },
+      error: (err) => {
+        this.loadingPdf = false;
+        const msg = err?.error?.message || err?.message || 'Error al consultar PDF en SUNAT';
+        iziToast.error({ title: 'PDF no disponible', message: msg, position: 'topRight' });
+      }
     });
   }
 

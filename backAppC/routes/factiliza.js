@@ -22,5 +22,6 @@ api.get('/placa/:placa', auth.auth, factilizaController.getPlaca);
 api.get('/soat/:placa', auth.auth, factilizaController.getSoat);
 api.get('/licencia/:dni', auth.auth, factilizaController.getLicencia);
 api.post('/xml', auth.auth, factilizaController.getXmlSunat);
+api.post('/factiliza/pdf', auth.auth, factilizaController.consultarComprobantePdf);
 
 module.exports = api;

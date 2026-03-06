@@ -77,6 +77,20 @@ export class ConsultaXMLService {
     );
   }
 
+  /**
+   * Consulta el PDF del comprobante vía backend (Factiliza). El backend devuelve el ZIP en base64.
+   */
+  consultarComprobantePdf(
+    body: { ruc?: string; usuario?: string; password?: string; proveedor: string; tipo_doc: string; serie: string; correlativo: string }
+  ): Observable<{ message: string; data: string }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this.http.post<{ message: string; data: string }>(
+      this.url + 'factiliza/pdf',
+      body,
+      { headers, withCredentials: true }
+    );
+  }
+
   getComprobante(
     ruc: string,
     usuario: string,
@@ -241,6 +255,34 @@ export class ConsultaXMLService {
       console.warn('No se pudo descargar el XML:', error);
       // No lanzamos error porque esto no debería detener el flujo principal
     }
+  }
+
+  /**
+   * Descarga el PDF desde la respuesta del backend.
+   * Acepta: (1) PDF en base64 directo (API sunat/reporte) o (2) ZIP en base64 que contiene un PDF (API sunat/pdf).
+   */
+  async descargarPdfDesdeRespuesta(respuesta: { data?: string }): Promise<void> {
+    const base64 = respuesta?.data;
+    if (!base64) {
+      throw new Error('No se recibió PDF en la respuesta');
+    }
+    const bytes = this.base64ToUint8Array(base64);
+    const isPdf = bytes.length >= 5 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46; // %PDF
+    if (isPdf) {
+      const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      const blob = new Blob([buffer], { type: 'application/pdf' });
+      saveAs(blob, `comprobante_${Date.now()}.pdf`);
+      return;
+    }
+    const zip = await JSZip.loadAsync(bytes);
+    const pdfEntryName = Object.keys(zip.files).find(name => name.toLowerCase().endsWith('.pdf'));
+    if (!pdfEntryName) {
+      throw new Error('No se encontró archivo PDF en el ZIP descargado');
+    }
+    const pdfData = await zip.files[pdfEntryName].async('uint8array');
+    const buffer = pdfData.buffer.slice(pdfData.byteOffset, pdfData.byteOffset + pdfData.byteLength) as ArrayBuffer;
+    const blob = new Blob([buffer], { type: 'application/pdf' });
+    saveAs(blob, pdfEntryName || `comprobante_${Date.now()}.pdf`);
   }
 
   /**
