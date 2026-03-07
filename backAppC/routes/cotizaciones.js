@@ -7,6 +7,7 @@ const auth = require('../middlewares/autenticate');
 api.post('/', auth.auth, cotizacionesController.crear);
 api.get('/', auth.auth, cotizacionesController.listar);
 api.get('/:id/pdf', auth.auth, cotizacionesController.obtenerParaPdf);
+api.get('/:id/para-venta', auth.auth, cotizacionesController.obtenerParaVenta);
 api.get('/:id', auth.auth, cotizacionesController.obtenerPorId);
 api.put('/:id', auth.auth, cotizacionesController.actualizar);
 api.delete('/:id', auth.auth, cotizacionesController.eliminar);

@@ -78,6 +78,23 @@ exports.actualizarNumeroComprobante = async (transaction, idEmpresa, idComproban
     .query('UPDATE Comprobantes SET numero = @numero WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante');
 };
 
+/** Obtiene y reserva el siguiente número para el comprobante (incrementa en BD). Debe ejecutarse dentro de una transacción. */
+exports.obtenerSiguienteNumeroComprobante = async (transaction, idEmpresa, idComprobante) => {
+  const result = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idComprobante', sql.Int, idComprobante)
+    .query(`
+      UPDATE Comprobantes
+      SET numero = ISNULL(numero, 0) + 1
+      OUTPUT INSERTED.numero, INSERTED.serie
+      WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
+    `);
+  const row = result.recordset && result.recordset[0];
+  const num = row && row.numero != null ? Number(row.numero) : 1;
+  const serie = (row && row.serie != null ? String(row.serie) : '0000').substring(0, 4);
+  return { numero: String(num).padStart(8, '0'), serie };
+};
+
 /** Inserta el desglose de pagos de una venta (ej: 40 efectivo + 40 yape). Requiere tabla DetallePagoVenta.
  *  FK DetallePagoVenta.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago (otra tabla),
  *  el id puede no existir en MediosPago; se valida y se usa un idMediosPago válido como fallback.

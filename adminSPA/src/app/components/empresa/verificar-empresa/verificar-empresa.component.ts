@@ -17,6 +17,7 @@ export class VerificarEmpresaComponent implements OnInit {
   idEmpresa = signal('');
   codigo = signal('');
   enviando = signal(false);
+  reenviando = signal(false);
 
   constructor(
     private empresaService: EmpresaService,
@@ -53,6 +54,35 @@ export class VerificarEmpresaComponent implements OnInit {
         iziToast.error({ title: 'Error', message: msg });
       }
     });
+  }
+
+  reenviarCodigo(): void {
+    const id = this.idEmpresa().trim();
+    if (!id) {
+      iziToast.warning({ title: 'Falta ID de empresa', message: 'Ingresa el ID de empresa para reenviar el código.' });
+      return;
+    }
+    this.reenviando.set(true);
+    this.empresaService.enviarCodigoActivacion(id).subscribe({
+      next: (res) => {
+        this.reenviando.set(false);
+        iziToast.success({ title: 'Código enviado', message: res.message || 'Revisa tu WhatsApp.' });
+      },
+      error: (err) => {
+        this.reenviando.set(false);
+        const msg = err?.error?.message || err?.message || 'No se pudo enviar el código.';
+        iziToast.error({ title: 'Error', message: msg });
+      }
+    });
+  }
+
+  /** Muestra solo los últimos 8 caracteres del idEmpresa; el resto como puntos. */
+  idEmpresaMasked(): string {
+    const id = this.idEmpresa().trim();
+    if (!id) return '';
+    const visible = 8;
+    if (id.length <= visible) return id;
+    return '•'.repeat(id.length - visible) + id.slice(-visible);
   }
 
   irALogin(): void {

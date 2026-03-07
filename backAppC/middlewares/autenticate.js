@@ -10,6 +10,9 @@ exports.auth = function(req, res, next) {
     //const token = req.headers.authorization.replace(/['"]+/g, '');
     const token = req.cookies.token; // Cambiado a cookies
     if (!token) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'autenticate.js:403',message:'NoTokenError',data:{path:req.path,method:req.method,url:req.originalUrl},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         return res.status(403).send({ message: 'NoTokenError' });
     }
 

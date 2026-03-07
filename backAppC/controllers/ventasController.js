@@ -282,6 +282,15 @@ const crearVentaCompleta = async (req, res) => {
       const stockDisponible = await stockService.obtenerStockDisponible(transaction, req.user.empresa, det.idProducto, idSucursalParaStock);
       if (stockDisponible < cantPedida) {
         if (!permitirVentasNegativas) {
+          console.error('crearVentaCompleta stock insuficiente:', {
+            idEmpresa: req.user.empresa,
+            idSucursalParaStock,
+            idSucursalVenta: venta.idSucursal,
+            idProducto: det.idProducto,
+            idProductoTipo: typeof det.idProducto,
+            cantPedida,
+            stockDisponible
+          });
           throw new Error(`Stock insuficiente para el producto. Solicitado: ${cantPedida}, disponible: ${stockDisponible}`);
         }
         avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
@@ -777,9 +786,38 @@ const postCobrarVenta = async (req, res) => {
   }
 };
 
+const crearVentaDesdeVale = async (req, res) => {
+  if (!req.user || !req.user.empresa || !req.user.sub) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const { idValeDespacho, idComprobante } = req.body || {};
+  if (!idValeDespacho || idComprobante == null) {
+    return res.status(400).json({ error: 'Se requieren idValeDespacho e idComprobante (Factura o Boleta).' });
+  }
+  const pool = await sql.connect(dbConfig);
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+    const resultado = await ventasService.crearVentaDesdeVale(
+      transaction,
+      pool,
+      req.user.empresa,
+      req.user.sub,
+      { idValeDespacho, idComprobante: Number(idComprobante) }
+    );
+    await transaction.commit();
+    res.status(201).json({ success: true, data: resultado });
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error crearVentaDesdeVale:', error);
+    res.status(500).json({ error: error.message || 'Error al liquidar vale.' });
+  }
+};
+
 module.exports = {
     crearVenta,
     crearVentaCompleta,
+    crearVentaDesdeVale,
     obtenerVentaPorId,
     obtenerVentas,
     obtenerComprobanteParaPdf,

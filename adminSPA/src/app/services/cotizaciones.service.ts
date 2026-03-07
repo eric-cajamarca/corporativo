@@ -86,6 +86,27 @@ export interface CotizacionDetalleResponse {
   }>;
 }
 
+export interface CotizacionParaVentaResponse {
+  cabecera: {
+    idCotizacion: number;
+    idCliente: number;
+    clienteRazonSocial?: string;
+    clienteRuc?: string;
+    total: number;
+  };
+  detalles: Array<{
+    idProducto: string | null;
+    codigo: string;
+    descripcion: string;
+    codigoPresentacion: string;
+    idPresentacion: number;
+    cantidad: number;
+    pVenta: number;
+    idSucursal?: string;
+    nombreSucursal?: string;
+  }>;
+}
+
 export interface ComprobantePdfData {
   venta: {
     compVenta: string;
@@ -140,6 +161,11 @@ export class CotizacionesService {
 
   obtenerPorId(id: number): Observable<{ data: CotizacionDetalleResponse }> {
     return this.http.get<{ data: CotizacionDetalleResponse }>(this.url + 'cotizaciones/' + id, { withCredentials: true });
+  }
+
+  /** Cotización con líneas listas para cargar en venta (idProducto resuelto por código). */
+  obtenerParaVenta(id: number): Observable<{ data: CotizacionParaVentaResponse }> {
+    return this.http.get<{ data: CotizacionParaVentaResponse }>(this.url + 'cotizaciones/' + id + '/para-venta', { withCredentials: true });
   }
 
   actualizar(id: number, payload: CrearCotizacionPayload): Observable<{ success: boolean; idCotizacion?: number }> {

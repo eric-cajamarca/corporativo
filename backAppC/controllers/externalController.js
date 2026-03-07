@@ -3,14 +3,20 @@
  * - Primera opción: Factiliza (FACTILIZA_TOKEN, servicio de pago) = Servicio 1.
  * - Fallback: ApisPeru (APISPERU_TOKEN) = Servicio 2.
  *
+ * Ruta pública /ruc-publico (crear-empresa): solo Factiliza, token desde FactilizaConfig (nombre 'Factiliza RUC Sunat') o env.
  * Respuesta unificada: { _source: 'factiliza'|'apisperu', data: { ... campos normalizados } }
  */
 const axios = require('axios');
+const sql = require('mssql');
+const dbConfig = require('../dbconfig');
+const factilizaRepository = require('../repositories/factiliza.repository');
 
 const FACTILIZA_BASE = 'https://api.factiliza.com/v1';
 const APISPERU_BASE = 'https://dniruc.apisperu.com/api/v1';
 const FACTILIZA_TIMEOUT_MS = 5000;
 const APISPERU_TIMEOUT_MS = 8000;
+/** Nombre del servicio en FactilizaConfig para la ruta pública RUC (solo crear-empresa). Token en BD. */
+const NOMBRE_SERVICIO_RUC_SUNAT = 'Factiliza SUNAT';
 
 function pick(obj, ...keys) {
   if (!obj || typeof obj !== 'object') return undefined;
@@ -69,6 +75,14 @@ async function tryFactiliza(path) {
   const token = process.env.FACTILIZA_TOKEN;
   if (!token) {
     return { ok: false, reason: 'FACTILIZA_TOKEN_not_configured' };
+  }
+  return tryFactilizaWithToken(path, token);
+}
+
+/** Llama a la API Factiliza con un token explícito (p. ej. desde FactilizaConfig). */
+async function tryFactilizaWithToken(path, token) {
+  if (!token) {
+    return { ok: false, reason: 'token_required' };
   }
   try {
     const response = await axios.get(`${FACTILIZA_BASE}${path}`, {
@@ -145,6 +159,10 @@ async function getDni(req, res) {
 }
 
 async function getRuc(req, res) {
+  // #region agent log
+  const isPublicRoute = req.originalUrl && req.originalUrl.includes('ruc-publico');
+  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'externalController.js:getRuc',message:'getRuc called',data:{hasUser:!!req.user,isPublicRoute,ruc:req.params?.ruc},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
   if (!idEmpresa) {
     return res.status(403).json({ error: 'No autorizado' });
@@ -174,6 +192,67 @@ async function getRuc(req, res) {
   }
   const data = normalizeRuc(raw);
   return res.status(200).json({ _source: sourceLabel, data });
+}
+
+/**
+ * Consulta RUC pública (crear-empresa, sin sesión). Solo Factiliza; token desde FactilizaConfig ('Factiliza SUNAT') o env.
+ * No requiere idEmpresa. No expone token en frontend.
+ */
+async function getRucPublico(req, res) {
+  const ruc = (req.params.ruc || '').trim();
+  // #region agent log
+  const logIngest = (message, data) => { fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'externalController.js:getRucPublico',message,data:{ruc,...data},timestamp:Date.now()})}).catch(()=>{}); };
+  logIngest('getRucPublico entry', {});
+  // #endregion
+  if (!ruc) {
+    return res.status(400).json({ error: 'RUC requerido' });
+  }
+
+  let token = null;
+  let hasConfig = false;
+  try {
+    const pool = await sql.connect(dbConfig);
+    const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_RUC_SUNAT);
+    hasConfig = !!(config && config.tokenDefault);
+    token = (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null;
+    // #region agent log
+    logIngest('getRucPublico after DB', { hasConfig, hasToken: !!token });
+    // #endregion
+  } catch (err) {
+    console.error('externalController getRucPublico DB:', err.message);
+    // #region agent log
+    logIngest('getRucPublico DB error', { errMessage: err.message });
+    // #endregion
+    token = process.env.FACTILIZA_TOKEN || null;
+  }
+
+  if (!token) {
+    // #region agent log
+    logIngest('getRucPublico no token', {});
+    // #endregion
+    return res.status(503).json({
+      _source: 'factiliza',
+      error: 'Servicio de validación RUC no configurado. Configure Factiliza SUNAT en la base de datos o FACTILIZA_TOKEN.'
+    });
+  }
+
+  const factilizaResult = await tryFactilizaWithToken(`/ruc/info/${ruc}`, token);
+  // #region agent log
+  logIngest('getRucPublico Factiliza result', {
+    ok: factilizaResult.ok,
+    status: factilizaResult.status,
+    reason: factilizaResult.reason,
+    rawMessage: factilizaResult.raw && factilizaResult.raw.message,
+    hasInner: !!factilizaResult.inner
+  });
+  // #endregion
+  if (factilizaResult.ok && factilizaResult.inner) {
+    const data = normalizeRuc(factilizaResult.raw);
+    return res.status(200).json({ _source: 'factiliza', data });
+  }
+
+  const msg = (factilizaResult.raw && factilizaResult.raw.message) || 'Error al consultar RUC en Sunat';
+  return res.status(200).json({ _source: 'factiliza', error: msg });
 }
 
 /** Carnet de extranjería (CEE): solo Factiliza (ApisPeru no ofrece este servicio). GET /v1/cee/info/{cee} */
@@ -237,4 +316,4 @@ async function getRucAnexo(req, res) {
   return res.status(200).json({ _source: 'factiliza', error: errorMsg });
 }
 
-module.exports = { getDni, getRuc, getCee, getRucAnexo };
+module.exports = { getDni, getRuc, getRucPublico, getCee, getRucAnexo };

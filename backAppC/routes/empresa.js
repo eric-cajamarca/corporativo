@@ -18,6 +18,8 @@ api.get('/obtener_logo/:img', empresasController.obtener_logo);
 api.post('/empresa', empresasController.createEmpresa);
 // Ruta pública para verificar empresa con código enviado por WhatsApp.
 api.post('/empresa/verificar', empresasController.verificarEmpresaCodigo);
+// Ruta pública para enviar/reenviar código de activación por WhatsApp (sin sesión). Usa TWILIO_* env.
+api.post('/empresa/enviar-codigo-activacion', empresasController.enviarCodigoActivacion);
 //api.put('/empresa/:id',[auth.auth,path], empresasController.updateEmpresa);
 api.put('/empresa/:id', auth.auth,uploadLogo, empresasController.updateEmpresa); // Cambia 'archivo' por el nombre del campo del formulario
 api.put('/cambiar_estado_empresa/:id',auth.auth, empresasController.cambiar_estado_empresa);

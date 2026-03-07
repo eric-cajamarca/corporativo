@@ -23,6 +23,17 @@ export class ApiperuService {
     );
   }
 
+  /** Consulta RUC sin autenticación (para crear-empresa / registro público). */
+  getRucInfoPublic(filtro: string): Observable<any> {
+    const url = `${this.baseUrl}ruc-publico/${encodeURIComponent(filtro.trim())}`;
+    return this._http.get(url, {
+      headers: new HttpHeaders().set('Content-Type', 'application/json'),
+      withCredentials: true
+    }).pipe(
+      catchError(err => throwError(() => err))
+    );
+  }
+
   getDniInfo(filtro: string): Observable<any> {
     const url = `${this.baseUrl}dni/${encodeURIComponent(filtro.trim())}`;
     return this._http.get(url, {

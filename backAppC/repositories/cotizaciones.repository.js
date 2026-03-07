@@ -196,6 +196,61 @@ exports.obtenerPorId = async (pool, idCotizacion, idEmpresa) => {
   };
 };
 
+/**
+ * Cotización con detalles listos para cargar en venta: cada línea incluye idProducto resuelto por codigo (JOIN Productos).
+ * Líneas sin producto coincidente tendrán idProducto null (el front puede omitirlas o advertir).
+ */
+exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
+  const cab = await pool.request()
+    .input('idCotizacion', sql.Int, idCotizacion)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        c.idCotizacion, c.serieNumero, c.idComprobante, c.serie, c.numero,
+        c.fEmision, c.fVencimiento, c.idDocumento, c.idCliente, c.moneda, c.idCondicionPago, c.total,
+        cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc,
+        comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
+      FROM Cotizaciones c
+      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente AND cl.idEmpresa = c.idEmpresa
+      LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
+      WHERE c.idCotizacion = @idCotizacion AND c.idEmpresa = @idEmpresa
+    `);
+  const cabecera = cab.recordset && cab.recordset[0] ? cab.recordset[0] : null;
+  if (!cabecera) return null;
+  const det = await pool.request()
+    .input('idCotizacion', sql.Int, idCotizacion)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT d.idDetalleCotizacion, d.cantidad, d.codigo, d.descripcion, d.idPresentacion, d.pVenta, d.descuentos, d.igv, d.ISC, d.total, d.idSucursal,
+             ISNULL(s.nombre, '') AS nombreSucursal,
+             p.idProducto,
+             ISNULL(pr.codigo, '') AS codigoPresentacion
+      FROM DetalleCotizacion d
+      LEFT JOIN Sucursal s ON s.idSucursal = d.idSucursal AND s.idEmpresa = @idEmpresa
+      LEFT JOIN Productos p ON p.idEmpresa = @idEmpresa AND RTRIM(LTRIM(ISNULL(p.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
+      LEFT JOIN Presentacion pr ON pr.idPresentacion = d.idPresentacion
+      WHERE d.idCotizacion = @idCotizacion
+      ORDER BY d.idDetalleCotizacion
+    `);
+  const detalles = (det.recordset || []).map(row => ({
+    idDetalleCotizacion: row.idDetalleCotizacion,
+    idProducto: row.idProducto,
+    codigo: row.codigo,
+    descripcion: row.descripcion,
+    codigoPresentacion: row.codigoPresentacion || '',
+    idPresentacion: row.idPresentacion,
+    cantidad: row.cantidad,
+    pVenta: row.pVenta,
+    descuentos: row.descuentos,
+    igv: row.igv,
+    ISC: row.ISC,
+    total: row.total,
+    idSucursal: row.idSucursal,
+    nombreSucursal: row.nombreSucursal != null ? String(row.nombreSucursal).trim() : ''
+  }));
+  return { cabecera, detalles };
+};
+
 exports.actualizar = async (transaction, idCotizacion, datosCabecera, idEmpresa) => {
   const {
     serie,

@@ -142,19 +142,11 @@ app.get('/database', async (req, res) => {
   }
 });
 
-app.use('/api',querySafeMiddleware); // Agrega req.querySafe
-// Middleware XSS (opcional, descomentar si lo necesitas)
-/*
-app.use((req, res, next) => {
-  if (req.body) {
-    Object.keys(req.body).forEach(key => {
-      req.body[key] = xss(req.body[key]);
-    });
-  }
-  next();
-});
-*/
-
+app.use('/api', querySafeMiddleware); // Agrega req.querySafe
+// Rutas públicas sin auth (ANTES del resto para que no exijan token)
+app.use('/api/external', externalRoutes);
+app.use('/api/empresa', require('./routes/empresaPublic'));
+app.use('/api/activacion', require('./routes/activacionPublic')); // Solo activación por código WhatsApp
 // Montar rutas
 app.use('/api', detalleVentasRoutes);
 app.use('/api', adminRoutes);
@@ -204,7 +196,6 @@ app.use('/api/catalogos', catalogosRoutes);
 app.use('/api', rubrosRoutes);
 app.use('/api', require('./routes/valesDespacho'));
 app.use('/api/auditoria', auditoriaRoutes);
-app.use('/api/external', externalRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api', reservasRoutes);
 app.use('/api', consumoHabitacionRoutes);

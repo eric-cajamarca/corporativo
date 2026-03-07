@@ -21,7 +21,10 @@ import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
 import { VentasService } from '../../../services/ventas.service';
-import { CotizacionesService } from '../../../services/cotizaciones.service';
+import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
+import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { RubrosService } from '../../../services/rubros.service';
 import { CajaService } from '../../../services/caja.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -151,6 +154,27 @@ export class CreateVentasComponent implements OnInit {
   visorIndex = 0;
   idProductoCargandoImagenes: string | null = null;
 
+  /** Modal Cargar desde cotización */
+  cotizacionesParaCargar: CotizacionListado[] = [];
+  loadingCotizaciones = false;
+
+  /** Modal Convertir vale en venta (liquidación). Solo visible si la empresa tiene habilitado vales de despacho (config rubro usaValeDespacho). */
+  usaValeDespachoHabilitado = false;
+  valesParaLiquidar: ValeDespachoListItem[] = [];
+  valeSeleccionadoLiquidar: ValeDespachoListItem | null = null;
+  idComprobanteLiquidacion: number | null = null;
+  loadingVales = false;
+  loadingLiquidar = false;
+
+  /** Comprobantes Factura (01) y Boleta (03) para elegir al liquidar vale */
+  get comprobantesFacturaBoleta(): any[] {
+    const list = this.comprobantes || [];
+    return list.filter((c: any) => {
+      const cod = String(c?.codigo ?? '').trim();
+      return cod === '01' || cod === '03';
+    });
+  }
+
   constructor(
     private _productoService: ProductoService,
     private _marcaService: variosService,
@@ -172,7 +196,10 @@ export class CreateVentasComponent implements OnInit {
     public sidebarState: SidebarStateService,
     private gestoresService: GestoresService,
     private productosImagenService: ProductosImagenService,
-    private hotelPreloadVentaService: HotelPreloadVentaService
+    private hotelPreloadVentaService: HotelPreloadVentaService,
+    private valesDespachoService: ValesDespachoService,
+    private empresaService: EmpresaService,
+    private rubrosService: RubrosService
   ) {}
 
   ngOnInit(): void {
@@ -223,6 +250,32 @@ export class CreateVentasComponent implements OnInit {
     } else {
       this.revisarVentasProvisionales();
     }
+    this.cargarUsaValeDespacho();
+  }
+
+  /** Determina si la empresa tiene habilitado vales de despacho (config del rubro usaValeDespacho = true). */
+  cargarUsaValeDespacho(): void {
+    this.empresaService.refreshEmpresaFromApi().subscribe({
+      next: (emp) => {
+        const idRubro = emp?.idRubro != null ? Number(emp.idRubro) : null;
+        if (idRubro == null) {
+          this.usaValeDespachoHabilitado = false;
+          return;
+        }
+        this.rubrosService.listarConfiguracion(idRubro).subscribe({
+          next: (res) => {
+            const items = res.data ?? [];
+            this.usaValeDespachoHabilitado = items.some(
+              (c: { clave: string; valor: string }) =>
+                (c.clave || '').trim().toLowerCase() === 'usavaledespacho' &&
+                String(c.valor || '').trim().toLowerCase() === 'true'
+            );
+          },
+          error: () => { this.usaValeDespachoHabilitado = false; }
+        });
+      },
+      error: () => { this.usaValeDespachoHabilitado = false; }
+    });
   }
 
   /** Rellena el carrito desde consumo habitación (hotel → Generar venta). */
@@ -1527,6 +1580,121 @@ abrirModalPrecios(item: any) {
         iziToast.error({
           title: 'Error',
           message: err.error?.error || err.error?.message || 'Error al registrar la venta.'
+        });
+      }
+    });
+  }
+
+  abrirModalCotizacion(): void {
+    this.cotizacionesParaCargar = [];
+    this.loadingCotizaciones = true;
+    this.cotizacionesService.listar().subscribe({
+      next: (res) => {
+        this.cotizacionesParaCargar = res.data ?? [];
+        this.loadingCotizaciones = false;
+      },
+      error: () => {
+        this.loadingCotizaciones = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar las cotizaciones.' });
+      }
+    });
+  }
+
+  cargarCotizacion(idCotizacion: number): void {
+    this.cotizacionesService.obtenerParaVenta(idCotizacion).subscribe({
+      next: (res) => {
+        const data = res.data;
+        if (!data?.cabecera || !data?.detalles?.length) {
+          iziToast.warning({ title: 'Aviso', message: 'Cotización sin detalle válido.' });
+          return;
+        }
+        const lineas = data.detalles.filter((d: { idProducto: string | null }) => d.idProducto != null) as Array<{ idProducto: string; codigo: string; descripcion: string; codigoPresentacion: string; idPresentacion: number; cantidad: number; pVenta: number; idSucursal?: string; nombreSucursal?: string }>;
+        if (lineas.length === 0) {
+          iziToast.warning({ title: 'Aviso', message: 'No se encontraron productos por código en esta cotización.' });
+          return;
+        }
+        this.carrito = lineas.map((d) => ({
+          idProducto: d.idProducto,
+          codigo: d.codigo,
+          descripcion: d.descripcion,
+          codigoPresentacion: d.codigoPresentacion ?? '',
+          cantidad: Number(d.cantidad) || 0,
+          pVenta: Number(d.pVenta) || 0,
+          idSucursal: d.idSucursal,
+          sucursal: (d.nombreSucursal ?? '').trim() || undefined
+        }));
+        const primeraSucursal = lineas[0]?.idSucursal;
+        if (primeraSucursal) {
+          this.ventas.idSucursal = primeraSucursal;
+        }
+        const cab = data.cabecera;
+        if (cab.idCliente != null) {
+          this.cliente.idCliente = cab.idCliente;
+          this.cliente.rSocial = cab.clienteRazonSocial ?? '';
+          this.cliente.ruc = cab.clienteRuc ?? '';
+        }
+        this.actualizaTotales();
+        const modalEl = document.getElementById('modalCotizacion');
+        if (modalEl) {
+          const modal = bootstrap.Modal.getInstance(modalEl);
+          modal?.hide();
+        }
+        iziToast.success({ title: 'Éxito', message: 'Cotización cargada en la venta.' });
+      },
+      error: (err) => {
+        iziToast.error({ title: 'Error', message: err?.error?.error || err?.error?.message || 'Error al cargar la cotización.' });
+      }
+    });
+  }
+
+  abrirModalValeLiquidar(): void {
+    this.valesParaLiquidar = [];
+    this.valeSeleccionadoLiquidar = null;
+    this.idComprobanteLiquidacion = null;
+    this.loadingVales = true;
+    this.valesDespachoService.listar().subscribe({
+      next: (res) => {
+        const todos = res.data ?? [];
+        this.valesParaLiquidar = todos.filter((v: ValeDespachoListItem) =>
+          String(v?.estado || '').toUpperCase() !== 'ANULADO' && (v.idVentaLiquidacion == null || v.idVentaLiquidacion === undefined)
+        );
+        this.loadingVales = false;
+      },
+      error: () => {
+        this.loadingVales = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar los vales.' });
+      }
+    });
+  }
+
+  seleccionarValeParaLiquidar(v: ValeDespachoListItem): void {
+    this.valeSeleccionadoLiquidar = v;
+    this.idComprobanteLiquidacion = this.comprobantesFacturaBoleta.length > 0 ? this.comprobantesFacturaBoleta[0].idComprobante : null;
+  }
+
+  confirmarLiquidarVale(): void {
+    if (!this.valeSeleccionadoLiquidar || this.idComprobanteLiquidacion == null) return;
+    this.loadingLiquidar = true;
+    this.valesDespachoService.liquidar(this.valeSeleccionadoLiquidar.idValeDespacho, this.idComprobanteLiquidacion).subscribe({
+      next: (res) => {
+        this.loadingLiquidar = false;
+        const modalEl = document.getElementById('modalValeLiquidar');
+        if (modalEl) {
+          const modal = bootstrap.Modal.getInstance(modalEl);
+          modal?.hide();
+        }
+        this.valeSeleccionadoLiquidar = null;
+        this.idComprobanteLiquidacion = null;
+        iziToast.success({
+          title: 'Éxito',
+          message: `Venta ${res.data?.compVenta ?? ''} generada. Vale liquidado.`
+        });
+      },
+      error: (err) => {
+        this.loadingLiquidar = false;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.error || err?.error?.message || 'Error al liquidar el vale.'
         });
       }
     });

@@ -6,7 +6,8 @@ const axios = require('axios');
  *  - TWILIO_ACCOUNT_SID / creds.accountSid
  *  - TWILIO_AUTH_TOKEN / creds.authToken
  *  - TWILIO_WHATSAPP_FROM / creds.whatsappFrom o creds.from
- * @param {object} [creds] - Opcional. { accountSid, authToken, whatsappFrom } desde EmpresaApiCredenciales.
+ * @param {object} [creds] - Opcional. { accountSid, authToken, whatsappFrom } desde EmpresaApiCredenciales. Para activación sin sesión usar {} para usar solo env.
+ * @returns {{ sent: boolean, error?: string }}
  */
 async function enviarCodigoVerificacionWhatsApp(telefonoDestino, codigo, idEmpresa, creds = {}) {
   const accountSid = creds.accountSid || process.env.TWILIO_ACCOUNT_SID;
@@ -14,18 +15,16 @@ async function enviarCodigoVerificacionWhatsApp(telefonoDestino, codigo, idEmpre
   const from = creds.whatsappFrom || creds.from || process.env.TWILIO_WHATSAPP_FROM;
 
   if (!accountSid || !authToken || !from) {
-    console.error('Twilio WhatsApp no configurado (credenciales por empresa o variables de entorno).');
-    return;
+    console.error('Twilio WhatsApp no configurado (credenciales por empresa o variables de entorno TWILIO_*).');
+    return { sent: false, error: 'WhatsApp no configurado. Configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN y TWILIO_WHATSAPP_FROM.' };
   }
 
-  // Normalizar número: el frontend debe enviar en formato internacional (+51...), aquí solo validamos no vacío.
-  if (!telefonoDestino) {
+  if (!telefonoDestino || !String(telefonoDestino).trim()) {
     console.error('Número de WhatsApp destino vacío, no se envía código.');
-    return;
+    return { sent: false, error: 'Número de WhatsApp destino vacío.' };
   }
 
   const body = `Tu código de verificación para activar tu empresa es: ${codigo}`;
-
   const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
   const params = new URLSearchParams();
   params.append('From', from);
@@ -34,13 +33,13 @@ async function enviarCodigoVerificacionWhatsApp(telefonoDestino, codigo, idEmpre
 
   try {
     await axios.post(url, params, {
-      auth: {
-        username: accountSid,
-        password: authToken
-      }
+      auth: { username: accountSid, password: authToken }
     });
+    return { sent: true };
   } catch (error) {
+    const msg = error?.response?.data?.message || error.message;
     console.error('Error enviando WhatsApp de verificación:', error?.response?.data || error.message);
+    return { sent: false, error: msg || 'Error al enviar por WhatsApp.' };
   }
 }
 

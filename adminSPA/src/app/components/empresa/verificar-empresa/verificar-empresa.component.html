@@ -7,10 +7,15 @@
     </div>
     <form (ngSubmit)="verificar()" class="verificar-form">
       <div class="mb-3">
-        <label for="idEmpresa" class="form-label">ID de empresa</label>
-        <input type="text" id="idEmpresa" class="form-control"
-          [value]="idEmpresa()" (input)="idEmpresa.set($any($event.target).value)"
-          placeholder="UUID de la empresa" />
+        <label class="form-label">ID de empresa</label>
+        @if (idEmpresa()) {
+          <p class="form-control-plaintext text-muted mb-0" style="font-family: monospace; letter-spacing: 0.05em;">{{ idEmpresaMasked() }}</p>
+          <small class="text-muted">Solo se muestran los últimos dígitos por seguridad.</small>
+        } @else {
+          <input type="text" id="idEmpresa" class="form-control"
+            [value]="idEmpresa()" (input)="idEmpresa.set($any($event.target).value)"
+            placeholder="Pega el ID de empresa que te enviamos" />
+        }
       </div>
       <div class="mb-3">
         <label for="codigo" class="form-label">Código de verificación</label>
@@ -21,6 +26,10 @@
       <button type="submit" class="btn btn-primary btn-lg w-100 mb-2" [disabled]="enviando()">
         @if (enviando()) { <span class="spinner-border spinner-border-sm me-2"></span> }
         Activar cuenta
+      </button>
+      <button type="button" class="btn btn-outline-primary w-100 mb-2" (click)="reenviarCodigo()" [disabled]="reenviando() || !idEmpresa()">
+        @if (reenviando()) { <span class="spinner-border spinner-border-sm me-2"></span> }
+        Reenviar código por WhatsApp
       </button>
       <button type="button" class="btn btn-outline-secondary w-100" (click)="irALogin()">Ir a Iniciar sesión</button>
     </form>

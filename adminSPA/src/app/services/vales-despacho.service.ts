@@ -51,4 +51,13 @@ export class ValesDespachoService {
   anular(id: string): Observable<{ data: { ok: boolean } }> {
     return this.http.put<{ data: { ok: boolean } }>(this.url + 'vales-despacho/' + id + '/anular', {}, { withCredentials: true });
   }
+
+  /** Convierte un vale en venta (liquidación). No descuenta stock. idComprobante = Factura o Boleta. */
+  liquidar(idValeDespacho: string, idComprobante: number): Observable<{ success: boolean; data: { idVenta: number; compVenta: string } }> {
+    return this.http.post<{ success: boolean; data: { idVenta: number; compVenta: string } }>(
+      this.url + 'ventas/desde-vale',
+      { idValeDespacho, idComprobante },
+      { withCredentials: true }
+    );
+  }
 }

@@ -20,6 +20,7 @@ api.put('/ventas/editar/:idVenta', auth.auth, ventasController.actualizarVentaEd
 api.post('/ventas/:idVenta/cobrar', auth.auth, ventasController.postCobrarVenta);
 api.get('/ventas/:id/:idempresa', auth.auth, dventasController.obtenerDetalleVentaPorId_empresa);
 api.post('/ventas/completa', auth.auth, ventasController.crearVentaCompleta);
+api.post('/ventas/desde-vale', auth.auth, ventasController.crearVentaDesdeVale);
 api.put('/ventas/:id', auth.auth, dventasController.actualizarDetalleVenta);
 api.delete('/ventas/:id', auth.auth, dventasController.eliminarDetalleVenta);
 

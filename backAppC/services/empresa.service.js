@@ -314,6 +314,46 @@ exports.crearRegistroVerificacionEmpresa = async (pool, idEmpresa, telefono) => 
 };
 
 /**
+ * Obtiene o actualiza el código de verificación para reenvío.
+ * Si existe un registro PENDIENTE para la empresa: actualiza codigo e incrementa intentos.
+ * Si no existe: crea uno nuevo (mismo flujo que crearRegistroVerificacionEmpresa).
+ * @returns {{ codigo: string }}
+ */
+exports.obtenerOActualizarCodigoVerificacion = async (pool, idEmpresa, telefono) => {
+    const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+    const sel = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT TOP 1 idVerificacion FROM EmpresaVerificacion
+            WHERE idEmpresa = @idEmpresa AND estado = 'PENDIENTE'
+            ORDER BY fCreacion DESC
+        `);
+    const pendiente = sel.recordset[0];
+    if (pendiente) {
+        await pool.request()
+            .input('idVerificacion', sql.UniqueIdentifier, pendiente.idVerificacion)
+            .input('codigo', sql.VarChar(10), codigo)
+            .input('telefono', sql.VarChar(20), telefono || '')
+            .query(`
+                UPDATE EmpresaVerificacion
+                SET codigo = @codigo, telefono = @telefono, intentos = intentos + 1
+                WHERE idVerificacion = @idVerificacion
+            `);
+        return { codigo };
+    }
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('telefono', sql.VarChar(20), telefono || '')
+        .input('codigo', sql.VarChar(10), codigo)
+        .query(`
+            INSERT INTO EmpresaVerificacion (idEmpresa, telefono, codigo, estado, intentos)
+            OUTPUT INSERTED.codigo
+            VALUES (@idEmpresa, @telefono, @codigo, 'PENDIENTE', 0)
+        `);
+    return { codigo: (result.recordset[0] && result.recordset[0].codigo) || codigo };
+};
+
+/**
  * Verifica un código de verificación para una empresa. Si es correcto, habilita la empresa.
  */
 exports.verificarEmpresaPorCodigo = async (pool, idEmpresa, codigo) => {

@@ -44,15 +44,19 @@
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
               <h5 class="mb-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
 
-              <div class="align-items-center" style="display: inline-flex; ">
-                
-                <input type="text" class="form-control" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()" style="width: 150px; height: 40px;" 
-                placeholder="Buscar Código">
-
-                <!-- BOTÓN VERDE QUE ABRE EL MODAL -->
+              <div class="align-items-center flex-wrap gap-2" style="display: inline-flex;">
+                <input type="text" class="form-control" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()" style="width: 150px; height: 40px;"
+                  placeholder="Buscar Código">
                 <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#buscadorModal">
                   <i class="bi bi-search"></i> Buscar
                 </button>
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalCotizacion" (click)="abrirModalCotizacion()">
+                  <i class="bi bi-file-text me-1" title="Cargar desde cotización"></i> 
+                </button>
+                @if (usaValeDespachoHabilitado) {
+                  <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalValeLiquidar" (click)="abrirModalValeLiquidar()">
+                    <i class="bi bi-ticket-perforated me-1" title="Convertir vale en venta"></i>                   </button>
+                }
               </div>
 
               
@@ -708,3 +712,121 @@
     </div>
   </div>
 </div> -->
+
+<!-- Modal: Cargar desde cotización -->
+<div class="modal fade" id="modalCotizacion" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="bi bi-file-text me-2"></i>Cargar desde cotización</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Seleccione una cotización para cargar sus ítems y cliente en la venta.</p>
+        <div class="table-responsive" style="max-height: 320px;">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Serie-Número</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of cotizacionesParaCargar; track c.idCotizacion) {
+                <tr role="button" (click)="cargarCotizacion(c.idCotizacion)">
+                  <td>{{ c.serieNumero }}</td>
+                  <td>{{ c.fEmision | date:'shortDate' }}</td>
+                  <td>{{ c.clienteRazonSocial }}</td>
+                  <td>S/ {{ c.total | number:'1.2-2' }}</td>
+                  <td><i class="bi bi-arrow-right-circle text-success"></i></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (cotizacionesParaCargar.length === 0 && !loadingCotizaciones) {
+          <p class="text-muted mb-0">No hay cotizaciones o aún no se han cargado.</p>
+        }
+        @if (loadingCotizaciones) {
+          <p class="mb-0"><span class="spinner-border spinner-border-sm me-2"></span>Cargando cotizaciones...</p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Convertir vale en venta (liquidación) -->
+<div class="modal fade" id="modalValeLiquidar" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-ticket-perforated me-2"></i>Convertir vale en venta</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Elija un vale sin liquidar y el tipo de comprobante (Boleta o Factura) a emitir.</p>
+        @if (!valeSeleccionadoLiquidar) {
+          <div class="table-responsive" style="max-height: 280px;">
+            <table class="table table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Vale</th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (v of valesParaLiquidar; track v.idValeDespacho) {
+                  <tr role="button" (click)="seleccionarValeParaLiquidar(v)">
+                    <td>{{ v.compVale }}</td>
+                    <td>{{ v.fEmision | date:'shortDate' }}</td>
+                    <td>{{ v.clienteRazonSocial || v.nombreCliente }}</td>
+                    <td><i class="bi bi-arrow-right-circle text-primary"></i></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="mb-3">
+            <strong>Vale:</strong> {{ valeSeleccionadoLiquidar.compVale }}
+            <button type="button" class="btn btn-sm btn-link" (click)="valeSeleccionadoLiquidar = null; idComprobanteLiquidacion = null">Cambiar</button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Emitir como</label>
+            <select class="form-select" [(ngModel)]="idComprobanteLiquidacion">
+              <option [ngValue]="null" disabled>Seleccione Boleta o Factura...</option>
+              @for (comp of comprobantesFacturaBoleta; track comp.idComprobante) {
+                <option [ngValue]="comp.idComprobante">{{ comp.codigo }} - {{ comp.nombre }}</option>
+              }
+            </select>
+          </div>
+          @if (loadingLiquidar) {
+            <p class="mb-0"><span class="spinner-border spinner-border-sm me-2"></span>Generando venta...</p>
+          }
+        }
+        @if (valesParaLiquidar.length === 0 && !valeSeleccionadoLiquidar && !loadingVales) {
+          <p class="text-muted mb-0">No hay vales pendientes de liquidar.</p>
+        }
+        @if (loadingVales) {
+          <p class="mb-0"><span class="spinner-border spinner-border-sm me-2"></span>Cargando vales...</p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        @if (valeSeleccionadoLiquidar && idComprobanteLiquidacion != null && !loadingLiquidar) {
+          <button type="button" class="btn btn-primary" (click)="confirmarLiquidarVale()">
+            <i class="bi bi-check-circle me-1"></i> Emitir y liquidar
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+</div>

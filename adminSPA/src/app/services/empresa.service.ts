@@ -143,6 +143,16 @@ export class EmpresaService {
     );
   }
 
+  /** Envía o reenvía el código de activación por WhatsApp (ruta pública /api/activacion, sin sesión). */
+  enviarCodigoActivacion(idEmpresa: string, celular?: string): Observable<{ message?: string }> {
+    const body = celular ? { idEmpresa, celular } : { idEmpresa };
+    return this._http.post<{ message?: string }>(
+      this.url + 'activacion/enviar-codigo',
+      body,
+      { withCredentials: true }
+    );
+  }
+
   // updateEmpresa(empresa:any):Observable<any>{
   //   let params = JSON.stringify(empresa);
   //   let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':token});

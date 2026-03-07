@@ -117,8 +117,48 @@ const getEmpresa_id = async function (req, res) {
 };
 
 const empresaService = require('../services/empresa.service');
-const { enviarCodigoVerificacionWhatsApp } = require('../services/whatsapp.service');
-const { obtenerCredencialesProveedor } = require('../services/integraciones.service');
+const factilizaRepository = require('../repositories/factiliza.repository');
+const whatsappFactilizaService = require('../services/whatsappFactiliza.service');
+
+const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
+
+/** Envía código de activación por WhatsApp vía Factiliza (FactilizaConfig 'Factiliza WHATSAPP'). Sin sesión. */
+async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
+  const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'enviarCodigoActivacionFactiliza:config',message:'config loaded',data:{hasConfig:!!config,hasToken:!!(config&&config.tokenDefault),hasParametroRuta:!!(config&&config.parametroRuta)},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+  if (!config || !config.tokenDefault) {
+    console.error('Factiliza WHATSAPP no configurado en FactilizaConfig (tokenDefault).');
+    return { sent: false, error: 'Servicio WhatsApp no configurado. Configure Factiliza WHATSAPP en la base de datos.' };
+  }
+  if (!config.parametroRuta || String(config.parametroRuta).trim() === '') {
+    console.error('Factiliza WHATSAPP requiere parametroRuta (nombre-instancia).');
+    return { sent: false, error: 'Servicio WhatsApp: falta parametroRuta (nombre de instancia).' };
+  }
+  if (!telefono || String(telefono).trim() === '') {
+    return { sent: false, error: 'Número de WhatsApp destino vacío.' };
+  }
+  // Normalizar: quitar prefijo whatsapp: y + para enviar solo dígitos (ej. 51999999999)
+  const numeroNormalizado = String(telefono).trim().replace(/^whatsapp:/i, '').replace(/^\+/, '');
+  const text = `Tu código de verificación para activar tu empresa es: ${codigo}`;
+  try {
+    const resultado = await whatsappFactilizaService.sendText(config, numeroNormalizado, text);
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'enviarCodigoActivacionFactiliza:result',message:'sendText result',data:{success:resultado.success,message:resultado.message},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    if (resultado.success) {
+      return { sent: true };
+    }
+    return { sent: false, error: resultado.message || 'Error al enviar por WhatsApp.' };
+  } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'enviarCodigoActivacionFactiliza:catch',message:'catch',data:{message:err?.message},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    console.error('Error enviando código activación Factiliza WHATSAPP:', err.message);
+    return { sent: false, error: err.message || 'Error al enviar por WhatsApp.' };
+  }
+}
 
 const createEmpresa = async function (req, res) {
     console.log('entro a createEmpresa', req.body);
@@ -194,20 +234,19 @@ const createEmpresa = async function (req, res) {
                 await empresaService.insertarEmpresaIntegraciones(pool, idEmpresa);
                 await empresaService.marcarEmpresaPrincipalSiEsPrimera(pool, idEmpresa);
 
-                // Crear registro de verificación y enviar código por WhatsApp
+                // Crear registro de verificación y enviar código por WhatsApp (Factiliza WHATSAPP desde FactilizaConfig)
                 const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
-                try {
-                    const credsTwilio = await obtenerCredencialesProveedor(pool, idEmpresa, 'twilio');
-                    await enviarCodigoVerificacionWhatsApp(celular, verificacion.codigo, idEmpresa, credsTwilio);
-                } catch (e) {
-                    console.error('Error al enviar código de verificación por WhatsApp:', e?.message || e);
-                }
+                const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, celular, verificacion.codigo);
 
-                // Devolver el ID de la empresa y sucursal principal, indicando que falta verificación
-                res.status(200).send({ 
+                const mensaje = resultadoWhatsApp.sent
+                    ? 'Empresa creada. Se envió un código de verificación por WhatsApp para activar la cuenta.'
+                    : 'Empresa creada. ' + (resultadoWhatsApp.error || 'No se pudo enviar el código por WhatsApp; puede usar "Reenviar código" más tarde.');
+
+                res.status(200).send({
                     data: idEmpresa,
                     sucursalPrincipal: resultadoInicializacion.sucursal?.idSucursal,
-                    mensaje: 'Empresa creada. Se envió un código de verificación por WhatsApp para activar la cuenta.'
+                    mensaje,
+                    codigoEnviado: resultadoWhatsApp.sent
                 });
             } catch (errorInicializacion) {
                 console.error('⚠️ Error inicializando datos maestros:', errorInicializacion);
@@ -320,6 +359,56 @@ const putCredencialesProveedor = async function (req, res) {
     } catch (error) {
         console.error('Error al guardar credenciales:', error);
         res.status(500).send({ message: 'Error al guardar credenciales', data: undefined });
+    }
+};
+
+// Ruta pública: enviar código de activación por WhatsApp (sin sesión). Usa Factiliza WHATSAPP desde FactilizaConfig.
+const enviarCodigoActivacion = async function (req, res) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:entry',message:'enviarCodigoActivacion entered',data:{hasBody:!!req.body,idEmpresa:req.body?.idEmpresa!=null},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    try {
+        const { idEmpresa, celular } = req.body || {};
+        const idEmpresaTrim = idEmpresa != null ? String(idEmpresa).trim() : '';
+        if (!idEmpresaTrim) {
+            return res.status(400).json({ message: 'idEmpresa es requerido' });
+        }
+        const pool = await sql.connect(dbConfig);
+        const emp = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresaTrim)
+            .query('SELECT idEmpresa, celular, estado FROM Empresas WHERE idEmpresa = @idEmpresa');
+        const empresa = emp.recordset[0];
+        if (!empresa) {
+            return res.status(404).json({ message: 'Empresa no encontrada' });
+        }
+        // estado en BD es bit: puede llegar como 0/1 o false/true desde mssql
+        if (empresa.estado === 1 || empresa.estado === true) {
+            return res.status(400).json({ message: 'La cuenta ya está activada' });
+        }
+        const telefono = (celular && String(celular).trim()) || (empresa.celular && String(empresa.celular).trim());
+        if (!telefono) {
+            return res.status(400).json({ message: 'Celular es requerido para enviar el código' });
+        }
+        const verificacion = await empresaService.obtenerOActualizarCodigoVerificacion(pool, idEmpresaTrim, telefono);
+        const codigoEnviar = verificacion && (verificacion.codigo != null) ? String(verificacion.codigo) : null;
+        if (!codigoEnviar) {
+            console.error('enviarCodigoActivacion: no se generó código de verificación');
+            return res.status(500).json({ message: 'Error al generar código de verificación' });
+        }
+        const resultado = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
+        if (!resultado.sent) {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:503',message:'returning 503',data:{error:resultado.error},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            return res.status(503).json({ message: resultado.error || 'No se pudo enviar el código por WhatsApp' });
+        }
+        res.status(200).json({ message: 'Código enviado por WhatsApp' });
+    } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:catch',message:'catch',data:{message:error?.message},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        console.error('Error en enviarCodigoActivacion:', error);
+        res.status(500).json({ message: error.message || 'Error al enviar código' });
     }
 };
 
@@ -872,6 +961,7 @@ module.exports = {
     deleteDireccion_id,
     cambiar_principal_direccion,
     verificarEmpresaCodigo,
+    enviarCodigoActivacion,
     getIntegraciones,
     putIntegraciones,
     putCredencialesProveedor,

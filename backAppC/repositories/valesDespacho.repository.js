@@ -151,6 +151,16 @@ async function anularVale(transaction, idValeDespacho, idEmpresa) {
     return result.rowsAffected[0];
 }
 
+async function actualizarVentaLiquidacion(transaction, idValeDespacho, idEmpresa, idVenta) {
+    await transaction.request()
+        .input('idValeDespacho', sql.UniqueIdentifier, idValeDespacho)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idVenta', sql.Int, idVenta)
+        .query(`
+            UPDATE ValesDespacho SET idVentaLiquidacion = @idVenta WHERE idValeDespacho = @idValeDespacho AND idEmpresa = @idEmpresa
+        `);
+}
+
 module.exports = {
     obtenerIdComprobanteVD,
     obtenerSiguienteNumero,
@@ -160,5 +170,6 @@ module.exports = {
     insertarDetalle,
     listarDetalle,
     insertarMovimientoInventario,
-    anularVale
+    anularVale,
+    actualizarVentaLiquidacion
 };

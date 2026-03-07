@@ -344,6 +344,26 @@
               </div>
 
               <div class="form-group">
+                <label for="celular" class="form-label">
+                  <i class="fas fa-phone-alt me-1"></i>
+                  Celular (WhatsApp)
+                </label>
+                <input 
+                  type="tel" 
+                  id="celular"
+                  class="form-control form-control-lg" 
+                  formControlName="celular"
+                  placeholder="+51987654321 o 987654321"
+                  [class.is-invalid]="hasError('celular')">
+                @if (hasError('celular')) {
+                  <div class="invalid-feedback">{{ getError('celular') }}</div>
+                }
+                <small class="form-text text-muted">
+                  A este número se enviará el código de activación por WhatsApp.
+                </small>
+              </div>
+
+              <div class="form-group">
                 <label for="password" class="form-label">
                   <i class="fas fa-lock me-1"></i>
                   Contraseña
@@ -467,7 +487,7 @@
                 <ul class="mb-0">
                   <li><strong>Formulario válido:</strong> {{ empresaForm.valid }}</li>
                   <li><strong>Formulario inválido:</strong> {{ empresaForm.invalid }}</li>
-                  @for (campo of ['ruc','razonSocial','email','password','confirmPassword','acceptTerms']; track campo) {
+                  @for (campo of ['ruc','razonSocial','email','celular','password','confirmPassword','acceptTerms']; track campo) {
                     <li>
                       <strong>{{ campo }}:</strong>
                       Valor: {{ empresaForm.get(campo)?.value | json }} |

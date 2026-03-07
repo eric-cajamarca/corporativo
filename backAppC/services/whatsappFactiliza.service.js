@@ -1,9 +1,12 @@
 /**
  * Servicio para enviar mensajes y archivos vía API WhatsApp de Factiliza.
  * config: { urlApi, tokenDefault, parametroRuta } desde FactilizaConfig (nombre = 'Factiliza WHATSAPP').
+ * Documentación: https://docs.factiliza.com/api-whatsapp/endpoint/send-text
  */
 
+const axios = require('axios');
 const NOMBRE_INSTANCIA_REQUERIDO = 'Factiliza WHATSAPP requiere parametroRuta (nombre-instancia) configurado';
+const CONNECT_TIMEOUT_MS = 30000; // 30s para conexión lenta a apiwsp.factiliza.com
 
 /**
  * Envía mensaje de texto.
@@ -27,21 +30,35 @@ async function sendText(config, number, text) {
     throw new Error(NOMBRE_INSTANCIA_REQUERIDO);
   }
   const baseUrl = (config.urlApi || 'https://apiwsp.factiliza.com/v1').replace(/\/$/, '');
-  const url = `${baseUrl}/message/sendtext/${encodeURIComponent(nombreInstancia)}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.tokenDefault}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ number: String(number).trim(), text: String(text).trim() })
-  });
-  const data = await response.json().catch(() => ({}));
-  return {
-    status: data.status != null ? data.status : response.status,
-    success: data.success === true,
-    message: data.message != null ? String(data.message) : (response.ok ? 'OK' : 'Error en API WhatsApp')
-  };
+  // parametroRuta va tal cual (ej. NTE5OTMyODk0NDA=); no usar encodeURIComponent para no convertir = en %3D
+  const url = `${baseUrl}/message/sendtext/${nombreInstancia}`;
+  const body = { number: String(number).trim(), text: String(text).trim() };
+  try {
+    const response = await axios.post(url, body, {
+      headers: {
+        Authorization: `Bearer ${config.tokenDefault}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: CONNECT_TIMEOUT_MS,
+      validateStatus: () => true
+    });
+    const data = response.data || {};
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'whatsappFactiliza.service.sendText',message:'API response',data:{status:response.status,ok:response.status>=200&&response.status<300,dataStatus:data.status,dataSuccess:data.success,dataMessage:data.message},timestamp:Date.now(),hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
+    return {
+      status: data.status != null ? data.status : response.status,
+      success: data.success === true,
+      message: data.message != null ? String(data.message) : (response.status >= 200 && response.status < 300 ? 'OK' : 'Error en API WhatsApp')
+    };
+  } catch (err) {
+    // #region agent log
+    const errData = { message: err?.message, code: err?.code, cause: err?.cause?.message || err?.cause?.code, url };
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'whatsappFactiliza.service.sendText:axios failed',message:'axios failed',data:errData,timestamp:Date.now(),hypothesisId:'fetch'})}).catch(()=>{});
+    // #endregion
+    console.error('whatsappFactiliza sendText failed:', errData);
+    throw err;
+  }
 }
 
 /**
@@ -73,7 +90,7 @@ async function sendMedia(config, number, mediatype, media, filename, caption) {
     throw new Error(NOMBRE_INSTANCIA_REQUERIDO);
   }
   const baseUrl = (config.urlApi || 'https://apiwsp.factiliza.com/v1').replace(/\/$/, '');
-  const url = `${baseUrl}/message/sendmedia/${encodeURIComponent(nombreInstancia)}`;
+  const url = `${baseUrl}/message/sendmedia/${nombreInstancia}`;
   const body = {
     number: String(number).trim(),
     mediatype: mt,

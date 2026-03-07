@@ -150,6 +150,29 @@ const eliminar = async (req, res) => {
   }
 };
 
+const obtenerParaVenta = async (req, res) => {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idRaw = req.params.id;
+  const idCotizacion = parseInt(idRaw, 10);
+  if (Number.isNaN(idCotizacion) || idCotizacion < 1) {
+    return res.status(400).json({ error: 'idCotizacion inválido' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const resultado = await cotizacionesRepository.obtenerParaVenta(pool, idCotizacion, idEmpresa);
+    if (!resultado) {
+      return res.status(404).json({ error: 'Cotización no encontrada' });
+    }
+    res.json({ data: resultado });
+  } catch (error) {
+    console.error('Error obtener cotización para venta:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 const obtenerParaPdf = async (req, res) => {
   const idEmpresa = req.user?.empresa;
   if (!req.user || !idEmpresa) {
@@ -178,6 +201,7 @@ module.exports = {
   crear,
   listar,
   obtenerPorId,
+  obtenerParaVenta,
   actualizar,
   eliminar,
   obtenerParaPdf
