@@ -34,7 +34,11 @@ export class IndexVentasComponent implements OnInit {
   generandoPdf = false;
   exportandoLista = false;
   enviandoSunatId: string | null = null;
+  consultandoEstadoId: string | null = null;
+  consultandoValidezId: string | null = null;
   empresa: EmpresaModel | null = null;
+  /** Si es true, las boletas se envían por resumen diario; no se muestra el botón Enviar a SUNAT para boletas. */
+  useResumenDiarioBoletas = false;
 
   archivoModalId: string | null = null;
   archivoModalTipo: 'xml' | 'cdr' | null = null;
@@ -74,6 +78,14 @@ export class IndexVentasComponent implements OnInit {
   ngOnInit(): void {
     this.empresaService.getEmpresa$().subscribe((emp) => {
       this.empresa = emp;
+    });
+    this.facturacionService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        this.useResumenDiarioBoletas = res?.data?.useResumenDiarioBoletas === true;
+      },
+      error: () => {
+        this.useResumenDiarioBoletas = false;
+      }
     });
     this.cargarVentas();
   }
@@ -157,9 +169,11 @@ export class IndexVentasComponent implements OnInit {
     return id != null ? String(id).trim() : '';
   }
 
-  /** True si la venta tiene comprobante electrónico (muestra botón Enviar a SUNAT). */
+  /** True si se debe mostrar el botón Enviar a SUNAT. Si resumen diario está habilitado, no se muestra para boletas (03). */
   puedeEnviarSunat(v: VentaListado): boolean {
-    return this.idComprobanteStr(v) !== '';
+    if (this.idComprobanteStr(v) === '') return false;
+    if (this.useResumenDiarioBoletas && (v.tipoComprobante === '03' || (v.nombreComprobante || '').toLowerCase().includes('boleta'))) return false;
+    return true;
   }
 
   /** True si la venta se puede editar (comprobante no enviado ni aceptado en SUNAT). */
@@ -183,10 +197,62 @@ export class IndexVentasComponent implements OnInit {
       },
       error: (err) => {
         this.enviandoSunatId = null;
-        const msg = err?.error?.message || err?.message || 'Error al enviar a SUNAT';
+        const body = err?.error;
+        let msg = typeof body === 'object' && body !== null && typeof body.message === 'string'
+          ? body.message
+          : err?.message || 'Error al enviar a SUNAT';
+        if (typeof body === 'string' && (body.includes('<') || body.includes('faultstring'))) {
+          msg = 'SUNAT no pudo procesar el envío. Intente nuevamente o comuníquese con su Administrador.';
+        }
         alert(msg);
       }
     });
+  }
+
+  /** Consulta estado/CDR en SUNAT sin reenviar. Útil cuando SUNAT devolvió "documento en proceso" (0140). */
+  consultarEstadoEnSunat(v: VentaListado): void {
+    console.log('consultarEstadoEnSunat', v);
+    console.log('idComprobanteStr', this.idComprobanteStr(v));
+    const id = this.idComprobanteStr(v);
+    if (!id) return;
+    this.consultandoEstadoId = id;
+    this.facturacionService.consultarEstadoSunat(id).subscribe({
+      next: (res) => {
+        this.consultandoEstadoId = null;
+        this.cargarVentas();
+        const msg = res?.message || 'Estado actualizado';
+        const det = res?.data ? `\n${res.data.estadoSunat || ''}${res.data.codigoRespuesta ? ' - ' + res.data.codigoRespuesta : ''}` : '';
+        alert(msg + det);
+        console.log('res', res);
+      },
+      error: (err) => {
+        this.consultandoEstadoId = null;
+        alert(err?.error?.message || err?.message || 'Error al consultar estado');
+      }
+    });
+  }
+
+  /** Consulta validez del comprobante en SUNAT (billValidService). */
+  consultarValidezEnSunat(v: VentaListado): void {
+    console.log('consultarValidezEnSunat', v);
+    console.log('idComprobanteStr', this.idComprobanteStr(v));
+    const id = this.idComprobanteStr(v);
+    if (!id) return;
+    this.consultandoValidezId = id;
+    this.facturacionService.consultarValidezComprobante({ idComprobanteElectronico: id }).subscribe({
+      next: (res) => {
+        this.consultandoValidezId = null;
+        const d = res?.data;
+        const msg = d?.valido ? `Válido: ${d.mensaje || 'Comprobante aceptado'}` : `No válido: ${d?.mensaje || d?.error || 'Verifique en SUNAT'}`;
+        alert(msg);
+        console.log('res', res);
+      },
+      error: (err) => {
+        this.consultandoValidezId = null;
+        alert(err?.error?.message || err?.message || 'Error al consultar validez');
+      }
+    });
+
   }
 
   estadoSunatClass(idEstadoSunat: number | undefined): string {
@@ -386,7 +452,23 @@ export class IndexVentasComponent implements OnInit {
       },
       error: (err) => {
         this.enviandoWhatsapp = false;
-        this.whatsappMensaje = err?.error?.error || err?.message || 'Error al generar el PDF.';
+        const e = err?.error;
+        if (e instanceof Blob) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            try {
+              const json = JSON.parse(reader.result as string);
+              this.whatsappMensaje = json?.error || 'Error al generar el PDF.';
+            } catch {
+              this.whatsappMensaje = 'Error al generar el PDF.';
+            }
+          };
+          reader.readAsText(e);
+        } else {
+          this.whatsappMensaje = (e && typeof e === 'object' && typeof (e as { error?: string }).error === 'string')
+            ? (e as { error: string }).error
+            : err?.message || 'Error al generar el PDF.';
+        }
       }
     });
   }

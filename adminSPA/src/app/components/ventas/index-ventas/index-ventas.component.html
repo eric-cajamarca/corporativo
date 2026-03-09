@@ -113,6 +113,14 @@
                     <span *ngIf="enviandoSunatId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i> Enviando...</span>
                     <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i> SUNAT</span>
                   </button>
+                  <button *ngIf="idComprobanteStr(v)" type="button" class="btn btn-sm btn-outline-info me-1" title="Consultar estado / CDR en SUNAT (sin reenviar)" (click)="consultarEstadoEnSunat(v)" [disabled]="consultandoEstadoId === idComprobanteStr(v)">
+                    <span *ngIf="consultandoEstadoId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i></span>
+                    <span *ngIf="consultandoEstadoId !== idComprobanteStr(v)" title="Actualizar estado y CDR"><i class="bi bi-arrow-repeat"></i> Estado</span>
+                  </button>
+                  <button *ngIf="idComprobanteStr(v)" type="button" class="btn btn-sm btn-outline-secondary me-1" title="Consultar validez del comprobante en SUNAT" (click)="consultarValidezEnSunat(v)" [disabled]="consultandoValidezId === idComprobanteStr(v)">
+                    <span *ngIf="consultandoValidezId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i></span>
+                    <span *ngIf="consultandoValidezId !== idComprobanteStr(v)">Validez</span>
+                  </button>
                   <button type="button" class="btn btn-sm ms-1" [class.btn-primary]="v.tieneXml" [class.btn-outline-secondary]="!v.tieneXml" title="XML" (click)="abrirModalArchivo(v, 'xml')" [disabled]="!idComprobanteStr(v)">
                     XML
                   </button>

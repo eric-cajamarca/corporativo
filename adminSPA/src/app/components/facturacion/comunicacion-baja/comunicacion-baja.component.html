@@ -1,0 +1,150 @@
+<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="content-header">
+      <h1 class="content-title">Comunicación de baja (RA)</h1>
+      <p class="content-subtitle text-muted mb-0">Comunique a SUNAT la baja de facturas o notas de crédito/débito aceptadas. Solo comprobantes en estado Aceptado (01, 07, 08).</p>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-light">
+        <h6 class="mb-0">Comprobantes aceptados a dar de baja</h6>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-2">Seleccione los comprobantes y el motivo; luego pulse "Enviar comunicación de baja".</p>
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <label class="form-label small">Motivo por defecto</label>
+            <select class="form-select form-select-sm" [(ngModel)]="motivoDefault">
+              @for (m of motivos; track m.idMotivoBaja) {
+                <option [value]="m.codigoSunat">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarComprobantes()" [disabled]="loadingComprobantes">
+              <i class="bi bi-arrow-clockwise"></i> Actualizar
+            </button>
+          </div>
+        </div>
+        @if (loadingComprobantes) {
+          <p class="small text-muted"><i class="bi bi-hourglass-split"></i> Cargando comprobantes...</p>
+        } @else if (comprobantes.length === 0) {
+          <p class="small text-muted">No hay facturas o notas (01/07/08) en estado Aceptado para dar de baja.</p>
+        } @else {
+          <div class="table-responsive">
+            <table class="table table-sm table-hover table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:2.5rem"></th>
+                  <th>Tipo</th>
+                  <th>Serie-Número</th>
+                  <th>Fecha emisión</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of comprobantes; track c.idComprobanteElectronico) {
+                  <tr>
+                    <td>
+                      <input type="checkbox" class="form-check-input" [checked]="estaSeleccionado(c.idComprobanteElectronico)"
+                             (change)="toggleSeleccion(c.idComprobanteElectronico)">
+                    </td>
+                    <td>{{ tipoDocLabel(c.tipoComprobante) }}</td>
+                    <td>{{ c.serie }}-{{ c.numero }}</td>
+                    <td>{{ c.fechaEmision }}</td>
+                    <td>
+                      @if (estaSeleccionado(c.idComprobanteElectronico)) {
+                        <select class="form-select form-select-sm" style="max-width:220px"
+                                [ngModel]="motivoPorComprobante[c.idComprobanteElectronico]"
+                                (ngModelChange)="motivoPorComprobante[c.idComprobanteElectronico]=$event">
+                          @for (m of motivos; track m.idMotivoBaja) {
+                            <option [value]="m.descripcion">{{ m.codigoSunat }} - {{ m.descripcion }}</option>
+                          }
+                        </select>
+                      } @else {
+                        <span class="text-muted">—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="enviarBaja()" [disabled]="enviando || seleccionados.size === 0">
+            @if (enviando) { Enviando... } @else { Enviar comunicación de baja ({{ seleccionados.size }} comprobante(s)) }
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <h6 class="mb-0">Historial de comunicaciones de baja</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-auto">
+            <label class="form-label mb-0 small">Desde</label>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaDesde" (change)="cargarListado()">
+          </div>
+          <div class="col-auto">
+            <label class="form-label mb-0 small">Hasta</label>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="cargarListado()">
+          </div>
+          <div class="col-auto">
+            <label class="form-label mb-0 small">Estado</label>
+            <select class="form-select form-select-sm" [(ngModel)]="idEstadoSunat" (change)="cargarListado()">
+              <option [ngValue]="null">Todos</option>
+              <option [ngValue]="7">Pendiente</option>
+              <option [ngValue]="1">Aceptado</option>
+              <option [ngValue]="4">Rechazado</option>
+              <option [ngValue]="8">Baja aceptada</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarListado()">Buscar</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Correlativo</th>
+                <th>Ticket</th>
+                <th>Estado</th>
+                <th>Descripción</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of listado; track item.idComunicacionBaja) {
+                <tr>
+                  <td>{{ item.fechaComunicacion }}</td>
+                  <td>{{ item.numeroCorrelativo }}</td>
+                  <td class="small">{{ item.ticketSunat || '—' }}</td>
+                  <td>{{ descripcionEstado(item) }}</td>
+                  <td class="small">{{ item.descripcionRespuesta || '—' }}</td>
+                  <td>
+                    @if (item.idEstadoSunat == null || item.idEstadoSunat === 7) {
+                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="consultarEstado(item)"
+                              [disabled]="consultandoId === item.idComunicacionBaja">
+                        @if (consultandoId === item.idComunicacionBaja) { Consultando... } @else { Consultar estado }
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (listado.length === 0 && totalListado === 0) {
+          <p class="small text-muted mb-0">No hay comunicaciones de baja en el rango indicado.</p>
+        }
+      </div>
+    </div>
+  </div>
+</main>

@@ -159,6 +159,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { nombre: 'Productos', icono: 'bi bi-box', ruta: '/productos', visible: true },
       { nombre: 'Clientes', icono: 'bi bi-people', ruta: '/clientes', visible: true },
       { nombre: 'Proveedores', icono: 'bi bi-truck', ruta: '/proveedores', visible: true },
+      {
+        nombre: 'Facturación',
+        icono: 'bi bi-file-earmark-text',
+        modulo: 'facturacion',
+        visible: true,
+        submenu: [
+          { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
+          { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
+          { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true }
+        ]
+      },
       { tipo: 'separador' },
       { nombre: 'Configuración', icono: 'bi bi-gear', ruta: '/configuracion', visible: true },
       { nombre: 'Integraciones / APIs de pago', icono: 'bi bi-credit-card', ruta: '/configuracion/integraciones', visible: true },
@@ -216,6 +227,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { nombre: 'Ventas', icono: 'bi bi-cart', ruta: '/ventas', visible: true },
       { nombre: 'Compras', icono: 'bi bi-bag', ruta: '/compras', visible: true },
       { nombre: 'Inventario', icono: 'bi bi-box-seam', ruta: '/inventario', visible: true },
+      {
+        nombre: 'Facturación',
+        icono: 'bi bi-file-earmark-text',
+        modulo: 'facturacion',
+        visible: true,
+        submenu: [
+          { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
+          { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
+          { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true }
+        ]
+      },
     ];
     this.menuItems.set(navegacionDefecto);
   }

@@ -219,6 +219,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           ISNULL(v.gratuito, 0) AS gratuito,
           ISNULL(v.otrosCargos, 0) AS otrosCargos,
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          v.compRelacionado, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           ISNULL(mp.descripcion, 'Contado') AS condicionPago,
           cl.idCliente AS idCliente,
@@ -242,6 +243,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          v.compRelacionado, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           'Contado' AS condicionPago,
           cl.idCliente AS idCliente,
@@ -415,7 +417,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       descuentos: cab.descuentos,
       total: cab.total,
       resumenHash,
-      cuotas: cuotasVenta
+      cuotas: cuotasVenta,
+      compRelacionado: cab.compRelacionado != null ? String(cab.compRelacionado).trim() : '',
+      tipoComprobanteRef: cab.tipoComprobanteRef != null ? String(cab.tipoComprobanteRef).trim() : '',
+      codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : ''
     },
     empresa: empresaPayload,
     cliente: {

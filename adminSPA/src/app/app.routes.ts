@@ -76,6 +76,9 @@ import { IndexClasificacionConceptosComponent } from './components/catalogos/cla
 import { IndexConceptosComponent } from './components/catalogos/conceptos/index-conceptos.component';
 import { IndexMotivoTrasladoComponent } from './components/catalogos/motivo-traslado/index-motivo-traslado.component';
 import { IndexMotivoNotaCreditoComponent } from './components/catalogos/motivo-nota-credito/index-motivo-nota-credito.component';
+import { ResumenesDiariosComponent } from './components/facturacion/resumenes-diarios/resumenes-diarios.component';
+import { NotasCreditoDebitoComponent } from './components/facturacion/notas-credito-debito/notas-credito-debito.component';
+import { ComunicacionBajaComponent } from './components/facturacion/comunicacion-baja/comunicacion-baja.component';
 import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-auditoria.component';
 import { IndexRubrosComponent } from './components/rubros/index-rubros/index-rubros.component';
 import { IndexValesDespachoComponent } from './components/vales-despacho/index-vales-despacho/index-vales-despacho.component';
@@ -260,5 +263,8 @@ export const routes: Routes = [
      { path: 'catalogos/clasificacion-conceptos', component: IndexClasificacionConceptosComponent, canActivate: [AuthGuard], title: 'Clasificación Conceptos' },
      { path: 'catalogos/motivo-traslado', component: IndexMotivoTrasladoComponent, canActivate: [AuthGuard], title: 'Motivo Traslado' },
      { path: 'catalogos/motivo-nota-credito', component: IndexMotivoNotaCreditoComponent, canActivate: [AuthGuard], title: 'Motivo Nota Credito' },
+     { path: 'facturacion/resumenes-diarios', component: ResumenesDiariosComponent, canActivate: [AuthGuard], title: 'Resúmenes diarios SUNAT' },
+    { path: 'facturacion/notas-credito-debito', component: NotasCreditoDebitoComponent, canActivate: [AuthGuard], title: 'Notas de crédito / débito' },
+    { path: 'facturacion/comunicacion-baja', component: ComunicacionBajaComponent, canActivate: [AuthGuard], title: 'Comunicación de baja' },
   { path: 'auditoria', component: LogAuditoriaComponent, canActivate: [AuthGuard], title: 'Log de auditoría' },
 ];

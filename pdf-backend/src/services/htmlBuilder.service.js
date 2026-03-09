@@ -387,6 +387,7 @@ class HtmlBuilderService {
    */
   async construirHtmlComprobanteVenta(params) {
     const QRCode = require('qrcode');
+    const safeParams = params && typeof params === 'object' ? params : {};
     const {
       empresa = {},
       venta = {},
@@ -395,7 +396,7 @@ class HtmlBuilderService {
       cantidadLetras = '',
       formato = 'A4',
       esCotizacion = false
-    } = params;
+    } = safeParams;
 
     const titulo = venta.nombreComprobante || 'Comprobante';
     const compVenta = venta.compVenta || '';

@@ -53,3 +53,5 @@
 {"sessionId":"e8165b","location":"whatsappFactiliza.service.sendText:axios failed","message":"axios failed","data":{"message":"timeout of 30000ms exceeded","code":"ECONNABORTED","url":"https://apiwsp.factiliza.com/v1/message/sendtext/NTE5OTMyODk0NDA="},"timestamp":1772862719202,"hypothesisId":"fetch"}
 {"sessionId":"e8165b","location":"enviarCodigoActivacionFactiliza:catch","message":"catch","data":{"message":"timeout of 30000ms exceeded"},"timestamp":1772862719216,"hypothesisId":"G"}
 {"sessionId":"e8165b","location":"empresasController.enviarCodigoActivacion:503","message":"returning 503","data":{"error":"timeout of 30000ms exceeded"},"timestamp":1772862719218,"hypothesisId":"C"}
+{"sessionId":"e8165b","location":"externalController.js:getRuc","message":"getRuc called","data":{"hasUser":true,"isPublicRoute":false,"ruc":"20603027613"},"timestamp":1772985918872,"hypothesisId":"A"}
+{"sessionId":"e8165b","location":"externalController.js:getRuc","message":"getRuc called","data":{"hasUser":true,"isPublicRoute":false,"ruc":"20603181680"},"timestamp":1773032110227,"hypothesisId":"A"}

@@ -175,6 +175,24 @@
                       </div>
                     </div>
                   </div>
+                  <!-- Envío de boletas: resumen diario (RC) o individual (sendBill). Siempre visible. -->
+                  <div class="col-12 mt-3 pt-3 border-top">
+                    <h6 class="text-muted mb-2">Envío de boletas a SUNAT</h6>
+                    <p class="small text-muted mb-2">Elija cómo enviar las boletas (y notas 07/08 vinculadas a boletas). Requiere tener activado «Usar envío directo» más arriba.</p>
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" id="useResumenDiarioBoletas" [(ngModel)]="facturacion.useResumenDiarioBoletas" name="useResumenDiarioBoletas">
+                      <label class="form-check-label" for="useResumenDiarioBoletas">
+                        <strong>Usar resumen diario (RC).</strong> Las boletas del día se envían en un solo resumen a SUNAT. Debe generar y enviar el resumen desde Facturación &gt; Resumen diario.
+                      </label>
+                    </div>
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" id="envioIndividualBoletas" [checked]="!facturacion.useResumenDiarioBoletas" (change)="facturacion.useResumenDiarioBoletas = false" name="envioIndividualBoletas">
+                      <label class="form-check-label" for="envioIndividualBoletas">
+                        <strong>Envío individual (sendBill).</strong> Cada boleta se envía por separado a SUNAT (manual o en el lote automático).
+                      </label>
+                    </div>
+                    <a routerLink="/facturacion/resumenes-diarios" class="small d-block mt-1"><i class="bi bi-link-45deg"></i> Ir a Resumen diario</a>
+                  </div>
                   <div class="col-12 mt-3 pt-3 border-top">
                     <h6 class="text-muted mb-2">Opciones de envío a SUNAT</h6>
                     <div class="row g-2">

@@ -1,6 +1,8 @@
 const dbConfig = require('../dbconfig');
 const sql = require('mssql');
 const FacturacionServices = require('../services/facturacion.service');
+const ResumenDiarioSunatService = require('../services/resumenDiarioSunat.service');
+const ComunicacionBajaService = require('../services/comunicacionBaja.service');
 const debugSunatLog = require('../utils/debugSunatLog.util');
 
 // Obtener configuración de facturación electrónica
@@ -32,6 +34,7 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       claveSunat,
       urlEnvio,
       envioDirectoSunat,
+      useResumenDiarioBoletas,
       modoPrueba,
       serieFactura,
       serieBoleta,
@@ -53,6 +56,7 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       claveSunat,
       urlEnvio,
       envioDirectoSunat,
+      useResumenDiarioBoletas,
       modoPrueba,
       serieFactura,
       serieBoleta,
@@ -208,47 +212,55 @@ const enviarComprobanteSunat = async (req, res) => {
     debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:result", message: "result", data: resultData });
     // #endregion
     if (result && !result.ok) {
-      return res.status(400).send({
-        message: result.mensaje || "Error al enviar a SUNAT",
-        data: result
+      const rawMsg = result.mensaje || "Error al enviar a SUNAT";
+      const message = typeof rawMsg === "string" && (rawMsg.includes("<") || rawMsg.length > 500)
+        ? "SUNAT rechazó el envío. El sistema no puede responder su solicitud. Intente nuevamente o comuníquese con su Administrador."
+        : rawMsg;
+      return res.status(400).json({
+        message,
+        data: { ok: result.ok, idEstadoSunat: result.idEstadoSunat, codigoRespuesta: result.codigoRespuesta, descripcionRespuesta: result.descripcionRespuesta }
       });
     }
-    res.status(200).send({
+    res.status(200).json({
       message: result?.mensaje || "Comprobante enviado a SUNAT exitosamente",
       data: result
     });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
-      return res.status(401).send({ message: "No autorizado", data: undefined });
+      return res.status(401).json({ message: "No autorizado", data: undefined });
     }
     if (error.message === "COMPROBANTE_NO_ENCONTRADO") {
-      return res.status(404).send({
+      return res.status(404).json({
         message: "Comprobante electrónico no encontrado",
         data: undefined
       });
     }
     if (error.message === "CONFIG_FACTURADOR_INCOMPLETA") {
-      return res.status(400).send({
+      return res.status(400).json({
         message: "Configure la carpeta del Facturador SUNAT en Configuración > Facturación",
         data: undefined
       });
     }
     if (error.message === "CDR_NO_ENCONTRADO" || error.message === "XML no encontrado") {
-      return res.status(404).send({ message: error.message, data: undefined });
+      return res.status(404).json({ message: error.message, data: undefined });
     }
     // #region agent log
     console.error("[SUNAT] enviarComprobanteSunat: error", error.message);
     debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:error", message: "error", data: { error: error.message } });
     // #endregion
     console.error("Error enviar comprobante SUNAT:", error);
-    res.status(500).send({
-      message: error.message || "Error al enviar el comprobante a SUNAT",
+    const errMsg = error.message || "Error al enviar el comprobante a SUNAT";
+    const message = typeof errMsg === "string" && (errMsg.includes("<") || errMsg.length > 500)
+      ? "Error al enviar el comprobante a SUNAT. Revise la consola del servidor."
+      : errMsg;
+    res.status(500).json({
+      message,
       data: undefined
     });
   }
 };
 
-// Consultar estado en SUNAT
+// Consultar estado en SUNAT (y opcionalmente consultar CDR en SUNAT si urlConsulta está configurada)
 const consultarEstadoSunat = async (req, res) => {
   try {
     const { idComprobanteElectronico } = req.params;
@@ -275,6 +287,27 @@ const consultarEstadoSunat = async (req, res) => {
       message: "Error al consultar el estado en SUNAT",
       data: undefined
     });
+  }
+};
+
+// Consultar validez de un comprobante en SUNAT (billValidService). Query: idComprobanteElectronico O (ruc, tipoComprobante, serie, numero)
+const consultarValidezComprobante = async (req, res) => {
+  try {
+    const { idComprobanteElectronico, ruc, tipoComprobante, serie, numero } = req.query;
+    const pool = await sql.connect(dbConfig);
+    const result = await FacturacionServices.consultarValidezComprobanteService(pool, req.user, {
+      idComprobanteElectronico: idComprobanteElectronico || undefined,
+      ruc: ruc || undefined,
+      tipoComprobante: tipoComprobante || undefined,
+      serie: serie || undefined,
+      numero: numero !== undefined && numero !== "" ? numero : undefined
+    });
+    res.status(200).send({ message: result.mensaje || (result.valido ? "Comprobante válido" : "Comprobante no válido"), data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "COMPROBANTE_NO_ENCONTRADO") return res.status(404).send({ message: "Comprobante no encontrado", data: undefined });
+    console.error("Error consultar validez comprobante:", error);
+    res.status(500).send({ message: error.message || "Error al consultar validez", data: undefined });
   }
 };
 
@@ -312,6 +345,31 @@ const obtenerEstadosSunat = async (req, res) => {
     console.error("Error obtener estados SUNAT:", error);
     res.status(500).send({
       message: "Error al obtener los estados de SUNAT",
+      data: undefined
+    });
+  }
+};
+
+/** Valida credenciales SOL: descifrado de claves y apertura del certificado PFX. */
+const validarCredencialesSol = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await FacturacionServices.validarCredencialesSolService(pool, req.user);
+    res.status(200).send({
+      message: result.mensaje,
+      data: {
+        ok: result.ok,
+        certificadoOk: result.certificadoOk,
+        claveSolOk: result.claveSolOk
+      }
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    console.error("Error validar credenciales SOL:", error);
+    res.status(500).send({
+      message: error.message || "Error al validar credenciales",
       data: undefined
     });
   }
@@ -369,6 +427,25 @@ const obtenerXmlComprobante = async (req, res) => {
   }
 };
 
+// Descargar XML firmado listo para SUNAT (genera + firma y devuelve como archivo)
+const obtenerXmlComprobanteDescarga = async (req, res) => {
+  try {
+    const { idComprobanteElectronico } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const { xml, nombreBase } = await FacturacionServices.obtenerXmlFirmadoParaDescargaService(pool, req.user, idComprobanteElectronico);
+    const filename = `${nombreBase}.xml`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.type("application/xml");
+    res.status(200).send(xml);
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "Comprobante no encontrado") return res.status(404).send({ message: error.message, data: undefined });
+    if (error.message && (error.message.includes("certificado") || error.message.includes("Configuración"))) return res.status(400).send({ message: error.message, data: undefined });
+    console.error("Error descarga XML comprobante:", error);
+    res.status(500).send({ message: error.message || "Error al generar XML para descarga", data: undefined });
+  }
+};
+
 // Obtener contenido CDR del comprobante (para ver o descargar)
 const obtenerCdrComprobante = async (req, res) => {
   try {
@@ -384,6 +461,254 @@ const obtenerCdrComprobante = async (req, res) => {
   }
 };
 
+// Resumen diario (RC): listar resúmenes con filtros
+const listarResumenesDiarios = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const { fechaDesde, fechaHasta, idEstadoSunat, pagina, porPagina } = req.query;
+    const result = await FacturacionServices.listarResumenesDiariosService(pool, req.user, {
+      fechaDesde: fechaDesde || undefined,
+      fechaHasta: fechaHasta || undefined,
+      idEstadoSunat: idEstadoSunat !== undefined && idEstadoSunat !== "" ? parseInt(idEstadoSunat, 10) : undefined,
+      pagina: pagina ? parseInt(pagina, 10) : 1,
+      porPagina: porPagina ? parseInt(porPagina, 10) : 20
+    });
+    res.status(200).send({ data: result.items, total: result.total });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    console.error("Error listar resúmenes diarios:", error);
+    res.status(500).send({ message: error.message || "Error al listar resúmenes", data: undefined });
+  }
+};
+
+// Resumen diario: enviar resumen para una fecha (POST body: fechaResumen YYYY-MM-DD)
+const enviarResumenDiario = async (req, res) => {
+  try {
+    const { fechaResumen } = req.body || {};
+    if (!fechaResumen || typeof fechaResumen !== "string") {
+      return res.status(400).send({ message: "fechaResumen (YYYY-MM-DD) es requerido", data: undefined });
+    }
+    const pool = await sql.connect(dbConfig);
+    const result = await ResumenDiarioSunatService.enviarResumenDiarioService(pool, req.user, fechaResumen.trim());
+    if (!result.ok) {
+      return res.status(400).send({ message: result.error || "Error al enviar resumen", data: result });
+    }
+    res.status(200).send({ message: result.mensaje, data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    console.error("Error enviar resumen diario:", error);
+    res.status(500).send({ message: error.message || "Error al enviar resumen", data: undefined });
+  }
+};
+
+// Resumen diario: boletas pendientes por fecha (GET ?fechaDesde=&fechaHasta=)
+const obtenerBoletasPendientesResumen = async (req, res) => {
+  try {
+    const { fechaDesde, fechaHasta } = req.query || {};
+    if (!fechaDesde || !fechaHasta) {
+      return res.status(400).send({ message: "fechaDesde y fechaHasta son requeridos (YYYY-MM-DD)", data: [] });
+    }
+    const pool = await sql.connect(dbConfig);
+    const items = await FacturacionServices.listarBoletasPendientesPorFechaService(
+      pool, req.user, String(fechaDesde).trim(), String(fechaHasta).trim()
+    );
+    res.status(200).send({ data: items || [] });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
+    console.error("Error obtener boletas pendientes resumen:", error);
+    res.status(500).send({ message: error.message || "Error al listar", data: [] });
+  }
+};
+
+// Resumen diario: consultar estado en SUNAT (getStatus) por idResumenDiarioSunat
+const consultarEstadoResumenDiario = async (req, res) => {
+  try {
+    const { idResumenDiarioSunat } = req.params;
+    if (!idResumenDiarioSunat) {
+      return res.status(400).send({ message: "idResumenDiarioSunat es requerido", data: undefined });
+    }
+    const pool = await sql.connect(dbConfig);
+    const result = await ResumenDiarioSunatService.consultarEstadoResumenDiarioService(pool, req.user, idResumenDiarioSunat);
+    if (!result.ok && result.error) {
+      return res.status(400).send({ message: result.error, data: result });
+    }
+    res.status(200).send({ data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    console.error("Error consultar estado resumen:", error);
+    res.status(500).send({ message: error.message || "Error al consultar estado", data: undefined });
+  }
+};
+
+// Obtener comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Params: idComprobanteElectronico. Query: serie, numero, tipoComprobante (01/03).
+const obtenerOrigenParaNota = async (req, res) => {
+  try {
+    const { idComprobanteElectronico } = req.params;
+    const { serie, numero, tipoComprobante } = req.query || {};
+    const pool = await sql.connect(dbConfig);
+    const id = idComprobanteElectronico || null;
+    const byQuery = serie != null && numero != null;
+    if (!id && !byQuery) {
+      return res.status(400).send({ message: "Indique idComprobanteElectronico (path) o serie, numero y tipoComprobante (query)", data: null });
+    }
+    const data = await FacturacionServices.obtenerComprobanteOrigenParaNotaService(pool, req.user, id, byQuery ? { serie, numero, tipoComprobante } : {});
+    if (!data) {
+      return res.status(404).send({ message: "Comprobante no encontrado o no está aceptado (solo Factura/Boleta aceptada)", data: null });
+    }
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: null });
+    console.error("Error obtener origen para nota:", error);
+    res.status(500).send({ message: error.message || "Error al obtener datos", data: null });
+  }
+};
+
+// Listar comprobantes origen (Factura/Boleta aceptados) por RUC o razón social del cliente. Query: rucCliente, razonSocial, tipoComprobante (01/03 opcional).
+const listarComprobantesOrigenPorCliente = async (req, res) => {
+  try {
+    const { rucCliente, razonSocial, tipoComprobante } = req.query || {};
+    const ruc = (rucCliente != null && String(rucCliente).trim() !== "") ? String(rucCliente).trim() : "";
+    const razon = (razonSocial != null && String(razonSocial).trim() !== "") ? String(razonSocial).trim() : "";
+    if (!ruc && !razon) {
+      return res.status(400).send({ message: "Indique rucCliente o razonSocial (query)", data: [] });
+    }
+    const pool = await sql.connect(dbConfig);
+    const list = await FacturacionServices.listarComprobantesOrigenPorClienteService(pool, req.user, {
+      rucCliente: ruc || undefined,
+      razonSocial: razon || undefined,
+      tipoComprobante: tipoComprobante != null ? String(tipoComprobante).trim() : undefined
+    });
+    res.status(200).send({ data: list || [] });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
+    console.error("Error listar comprobantes origen por cliente:", error);
+    res.status(500).send({ message: error.message || "Error al buscar", data: [] });
+  }
+};
+
+// Crear Nota de Crédito (07) o Débito (08)
+const crearNotaCreditoDebito = async (req, res) => {
+  try {
+    const { idComprobanteElectronicoOrigen, tipoNota, codigoMotivoNotaCredito, items } = req.body || {};
+    if (!idComprobanteElectronicoOrigen || !tipoNota || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).send({
+        message: "Se requieren: idComprobanteElectronicoOrigen, tipoNota ('07' o '08'), items (array con idProducto, cantidad, pVenta, subtotal, total)",
+        data: undefined
+      });
+    }
+    if (!["07", "08"].includes(String(tipoNota).trim())) {
+      return res.status(400).send({ message: "tipoNota debe ser '07' (Nota de Crédito) o '08' (Nota de Débito)", data: undefined });
+    }
+    const pool = await sql.connect(dbConfig);
+    const result = await FacturacionServices.crearNotaCreditoDebitoService(pool, req.user, {
+      idComprobanteElectronicoOrigen,
+      tipoNota: String(tipoNota).trim(),
+      codigoMotivoNotaCredito: tipoNota === "07" ? (codigoMotivoNotaCredito || "01") : undefined,
+      items: items.map((it) => ({
+        idProducto: it.idProducto,
+        cantidad: Number(it.cantidad) || 0,
+        pVenta: Number(it.pVenta) || 0,
+        subtotal: Number(it.subtotal) || 0,
+        total: Number(it.total) || 0
+      }))
+    });
+    if (!result) {
+      return res.status(400).send({ message: "No se pudo crear la nota. Verifique que el comprobante origen esté aceptado.", data: undefined });
+    }
+    res.status(201).send({
+      message: tipoNota === "07" ? "Nota de Crédito creada" : "Nota de Débito creada",
+      data: result
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    console.error("Error crear nota crédito/débito:", error);
+    res.status(500).send({ message: error.message || "Error al crear la nota", data: undefined });
+  }
+};
+
+// ---------- Comunicación de baja (RA) ----------
+const listarComprobantesParaBaja = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await FacturacionServices.listarComprobantesAceptadosParaBajaService(pool, req.user);
+    res.status(200).send({ data: data || [] });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
+    console.error("Error listar comprobantes para baja:", error);
+    res.status(500).send({ message: error.message || "Error al listar", data: [] });
+  }
+};
+
+const listarMotivosBaja = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await FacturacionServices.listarMotivosBajaService(pool);
+    res.status(200).send({ data: data || [] });
+  } catch (error) {
+    console.error("Error listar motivos baja:", error);
+    res.status(500).send({ message: error.message || "Error al listar", data: [] });
+  }
+};
+
+const listarComunicacionesBaja = async (req, res) => {
+  try {
+    const { fechaDesde, fechaHasta, idEstadoSunat, pagina, porPagina } = req.query || {};
+    const pool = await sql.connect(dbConfig);
+    const result = await FacturacionServices.listarComunicacionesBajaService(pool, req.user, {
+      fechaDesde: fechaDesde || undefined,
+      fechaHasta: fechaHasta || undefined,
+      idEstadoSunat: idEstadoSunat != null && idEstadoSunat !== "" ? idEstadoSunat : undefined,
+      pagina: pagina != null ? parseInt(pagina, 10) : 1,
+      porPagina: porPagina != null ? parseInt(porPagina, 10) : 20
+    });
+    res.status(200).send({ data: result.items || [], total: result.total ?? 0 });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [], total: 0 });
+    console.error("Error listar comunicaciones baja:", error);
+    res.status(500).send({ message: error.message || "Error al listar", data: [], total: 0 });
+  }
+};
+
+const enviarComunicacionBaja = async (req, res) => {
+  try {
+    const { comprobantes } = req.body || {};
+    const pool = await sql.connect(dbConfig);
+    const result = await ComunicacionBajaService.enviarComunicacionBajaService(pool, req.user, { comprobantes: comprobantes || [] });
+    if (!result.ok) {
+      return res.status(400).send({ message: result.error || "No se pudo enviar", data: undefined });
+    }
+    res.status(201).send({
+      message: result.mensaje || "Comunicación de baja enviada.",
+      data: { idComunicacionBaja: result.idComunicacionBaja, ticket: result.ticket }
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    console.error("Error enviar comunicación de baja:", error);
+    res.status(500).send({ message: error.message || "Error al enviar", data: undefined });
+  }
+};
+
+const consultarEstadoComunicacionBaja = async (req, res) => {
+  try {
+    const { idComunicacionBaja } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const result = await ComunicacionBajaService.consultarEstadoComunicacionBajaService(pool, req.user, idComunicacionBaja);
+    if (!result.ok && !result.statusCode) {
+      return res.status(400).send({ message: result.error || "Error", data: undefined });
+    }
+    res.status(200).send({
+      mensaje: result.mensaje || result.error,
+      statusCode: result.statusCode,
+      idEstadoSunat: result.idEstadoSunat,
+      data: result
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    console.error("Error consultar estado comunicación baja:", error);
+    res.status(500).send({ message: error.message || "Error al consultar", data: undefined });
+  }
+};
+
 module.exports = {
   obtenerConfiguracionFacturacion,
   actualizarConfiguracionFacturacion,
@@ -392,9 +717,24 @@ module.exports = {
   generarComprobanteElectronico,
   enviarComprobanteSunat,
   consultarEstadoSunat,
+  consultarValidezComprobante,
   enviarLoteSunat,
   obtenerEstadisticasFacturacion,
   obtenerEstadosSunat,
+  validarCredencialesSol,
   obtenerXmlComprobante,
-  obtenerCdrComprobante
+  obtenerXmlComprobanteDescarga,
+  obtenerCdrComprobante,
+  listarResumenesDiarios,
+  obtenerBoletasPendientesResumen,
+  enviarResumenDiario,
+  consultarEstadoResumenDiario,
+  obtenerOrigenParaNota,
+  listarComprobantesOrigenPorCliente,
+  crearNotaCreditoDebito,
+  listarComprobantesParaBaja,
+  listarMotivosBaja,
+  listarComunicacionesBaja,
+  enviarComunicacionBaja,
+  consultarEstadoComunicacionBaja
 };

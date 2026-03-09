@@ -97,17 +97,22 @@ async function generatePdf(req, res) {
         });
         break;
 
-      case 'comprobante-venta':
+      case 'comprobante-venta': {
+        // Asegurar objetos para evitar "Cannot read properties of undefined (reading 'attrs')" u otros en librerías
+        const empresa = datos.empresa && typeof datos.empresa === 'object' ? datos.empresa : {};
+        const venta = datos.venta && typeof datos.venta === 'object' ? datos.venta : {};
+        const cliente = datos.cliente && typeof datos.cliente === 'object' ? datos.cliente : {};
         html = await htmlBuilder.construirHtmlComprobanteVenta({
-          empresa: datos.empresa,
-          venta: datos.venta,
-          cliente: datos.cliente,
-          items: datos.items || [],
+          empresa,
+          venta,
+          cliente,
+          items: Array.isArray(datos.items) ? datos.items : [],
           cantidadLetras: datos.cantidadLetras || '',
           formato: formatoPdf,
           esCotizacion: datos.esCotizacion === true
         });
         break;
+      }
 
       case 'comprobante-despacho': {
         const columnas = datos.columnas || ['Código', 'Descripción', 'Cantidad', 'Ubicación'];
@@ -151,7 +156,8 @@ async function generatePdf(req, res) {
 
   } catch (error) {
     console.error('Error al generar el PDF:', error);
-    res.status(500).json({ error: 'Error al generar el PDF' });
+    const mensaje = error && typeof error.message === 'string' ? error.message : 'Error al generar el PDF';
+    res.status(500).json({ error: mensaje });
   }
 }
 

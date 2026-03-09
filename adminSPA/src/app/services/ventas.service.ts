@@ -227,6 +227,8 @@ export interface VentaListado {
   serie?: string;
   numero?: string;
   nombreComprobante?: string;
+  /** Código tipo comprobante electrónico: 01=Factura, 03=Boleta, 07=NC, 08=ND. */
+  tipoComprobante?: string;
   clienteRazonSocial?: string;
   clienteRuc?: string;
   condicionPago?: string;

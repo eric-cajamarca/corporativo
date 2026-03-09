@@ -12,7 +12,7 @@ const AUTH_TAG_LENGTH = 16;
 const PREFIX_ENCRYPTED = "enc:";
 
 function getEncryptionKey() {
-  const secret = process.env.CERT_ENCRYPTION_KEY || "clave-certificado-default-cambiar-en-produccion";
+  const secret = process.env.CERT_ENCRYPTION_KEY || "";
   return crypto.createHash("sha256").update(secret).digest();
 }
 
@@ -54,7 +54,9 @@ function descifrar(valor) {
     return decipher.update(ciphertext) + decipher.final("utf8");
   } catch (err) {
     console.error("cifradoClaveCertificado.descifrar:", err.message);
-    return str;
+    throw new Error(
+      "Error al descifrar la clave. CERT_ENCRYPTION_KEY no coincide con la usada al guardar. Si acaba de cambiar CERT_ENCRYPTION_KEY, vuelva a guardar el certificado y la clave en Configuración > Facturación para que se cifren con la clave actual."
+    );
   }
 }
 

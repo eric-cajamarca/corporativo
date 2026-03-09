@@ -1,5 +1,7 @@
 const FacturacionRepository = require('../repositories/facturacion.repository');
 const facturadorSunatService = require('./facturadorSunat.service');
+const firmaXmlSunat = require('./firmaXmlSunat.service');
+const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
 const { nombreArchivoComprobante, leerXmlComprobante } = require('../utils/facturadorSunat.util');
 const debugSunatLog = require('../utils/debugSunatLog.util');
 
@@ -134,9 +136,54 @@ exports.consultarEstadoSunatService = async (pool, user, idComprobanteElectronic
     throw new Error("COMPROBANTE_NO_ENCONTRADO");
   }
 
-  // Simular consulta a SUNAT (en producción se haría la llamada real)
   const result = await FacturacionRepository.consultarEstadoSunatRepo(pool, user, idComprobanteElectronico);
   return result;
+};
+
+/**
+ * Consulta en SUNAT la validez de un comprobante (billValidService getStatus).
+ * Parámetros: ruc, tipoComprobante, serie, numero (o idComprobanteElectronico para tomarlos del comprobante).
+ */
+exports.consultarValidezComprobanteService = async (pool, user, params) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
+  if (!config?.usuarioSunat || !config?.claveSunat) {
+    throw new Error("Configure usuario y clave SOL en Configuración > Facturación");
+  }
+  let rucComprobante = params.ruc;
+  let tipoComprobante = params.tipoComprobante;
+  let serie = params.serie;
+  let numero = params.numero;
+  if (!rucComprobante && params.idComprobanteElectronico) {
+    const comp = await FacturacionRepository.obtenerComprobanteParaEnvioRepo(pool, params.idComprobanteElectronico, user.empresa);
+    if (!comp) throw new Error("COMPROBANTE_NO_ENCONTRADO");
+    rucComprobante = comp.rucEmpresa;
+    tipoComprobante = comp.tipoComprobante;
+    serie = comp.serie;
+    numero = comp.numero;
+  }
+  const tieneNumero = numero !== undefined && numero !== null && String(numero).trim() !== "";
+  if (!rucComprobante || !tipoComprobante || !serie || !tieneNumero) {
+    throw new Error("Indique ruc, tipoComprobante, serie y numero, o idComprobanteElectronico");
+  }
+  const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
+  const consultaSunat = require("./consultaSunat.service");
+  const claveDec = cifradoClaveCertificado.descifrar(config.claveSunat);
+  const rucStr = String(rucComprobante).trim().replace(/\D/g, "").padStart(11, "0");
+  const usuarioSOAP = config.usuarioSunat.length >= 20 || /^\d+/.test(config.usuarioSunat)
+    ? config.usuarioSunat
+    : rucStr + String(config.usuarioSunat).trim();
+  const modoPrueba = config.modoPrueba === true || config.modoPrueba === 1 || String(config.modoPrueba || "").trim() === "1";
+  const urlValidez = modoPrueba ? consultaSunat.URL_VALIDEZ_BETA : consultaSunat.URL_VALIDEZ_PROD;
+  return consultaSunat.consultarValidezSunat(
+    rucStr,
+    tipoComprobante,
+    serie,
+    numero,
+    usuarioSOAP,
+    claveDec,
+    urlValidez
+  );
 };
 
 exports.obtenerXmlComprobanteService = async (pool, user, idComprobanteElectronico) => {
@@ -155,6 +202,14 @@ exports.obtenerXmlComprobanteService = async (pool, user, idComprobanteElectroni
   const result = leerXmlComprobante(config.rutaCarpetaFacturadorSunat, base);
   if (!result.ok) throw new Error(result.error || "XML no encontrado");
   return result.contenido;
+};
+
+/** Genera y firma el XML UBL del comprobante (envío directo) y devuelve { xml, nombreBase } para descarga. */
+exports.obtenerXmlFirmadoParaDescargaService = async (pool, user, idComprobanteElectronico) => {
+  if (!user) throw new Error("NO_ACCESS");
+  const result = await FacturacionRepository.generarYFirmarXmlComprobanteRepo(pool, user, idComprobanteElectronico);
+  if (result.ok === false) throw new Error(result.mensaje || "Error al generar XML firmado");
+  return { xml: result.xml, nombreBase: result.nombreBase };
 };
 
 exports.obtenerCdrComprobanteService = async (pool, user, idComprobanteElectronico) => {
@@ -193,11 +248,13 @@ exports.enviarLotePendientesService = async (pool, idEmpresa) => {
   console.error("[SUNAT] enviarLotePendientesService: entry", entryData);
   debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:entry", message: "entry", data: entryData });
   // #endregion
-  if (!config?.rutaCarpetaFacturadorSunat) {
-    return { enviados: 0, errores: 0, mensaje: "Ruta del Facturador no configurada" };
+  const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
+  if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
+    return { enviados: 0, errores: 0, mensaje: "Configure envío directo SUNAT o ruta del Facturador" };
   }
 
-  const pendientes = await FacturacionRepository.listarPendientesEnvioRepo(pool, idEmpresa, 100);
+  const excluirBoletas = config?.useResumenDiarioBoletas === true;
+  const pendientes = await FacturacionRepository.listarPendientesEnvioRepo(pool, idEmpresa, 100, { excluirBoletas });
   // #region agent log
   const pendData = { count: pendientes.length, idEmpresa };
   console.error("[SUNAT] enviarLotePendientesService: pendientes", pendData);
@@ -264,4 +321,127 @@ exports.ejecutarEnvioAutomaticoService = async (pool) => {
   debugSunatLog.write({ location: "facturacion.service.ejecutarEnvioAutomaticoService:resultados", message: "resultados", data: resultados });
   // #endregion
   return resultados;
+};
+
+/** Lista resúmenes diarios con filtros (fechaDesde, fechaHasta, idEstadoSunat, pagina, porPagina). */
+exports.listarResumenesDiariosService = async (pool, user, filtros) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return FacturacionRepository.listarResumenesDiariosRepo(pool, user.empresa, filtros || {});
+};
+
+/** Lista cantidad de boletas pendientes por fecha en un rango (para aviso en resúmenes diarios). */
+exports.listarBoletasPendientesPorFechaService = async (pool, user, fechaDesde, fechaHasta) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return FacturacionRepository.listarBoletasPendientesPorFechaRepo(pool, user.empresa, fechaDesde, fechaHasta);
+};
+
+/** Obtiene comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Por id o por serie/numero/tipo. */
+exports.obtenerComprobanteOrigenParaNotaService = async (pool, user, idComprobanteElectronico, opts = {}) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  let id = idComprobanteElectronico;
+  if (!id && opts.serie != null && opts.numero != null) {
+    id = await FacturacionRepository.obtenerComprobanteOrigenPorSerieNumeroRepo(
+      pool, user.empresa, opts.serie, opts.numero, opts.tipoComprobante || "01"
+    );
+    if (!id) return null;
+  }
+  return FacturacionRepository.obtenerComprobanteOrigenParaNotaRepo(pool, id, user.empresa);
+};
+
+/** Lista comprobantes Factura/Boleta aceptados por RUC o razón social del cliente (para elegir uno). */
+exports.listarComprobantesOrigenPorClienteService = async (pool, user, filtro) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return FacturacionRepository.listarComprobantesOrigenPorClienteRepo(pool, user.empresa, filtro);
+};
+
+/** Crea Nota de Crédito (07) o Débito (08) a partir de un comprobante origen aceptado. */
+exports.crearNotaCreditoDebitoService = async (pool, user, datos) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const idUsuario = user.idUsuario || user.sub || user.id;
+  return FacturacionRepository.crearNotaCreditoDebitoRepo(pool, user.empresa, idUsuario, datos);
+};
+
+/** Lista comprobantes Factura/NC/ND aceptados para comunicación de baja. */
+exports.listarComprobantesAceptadosParaBajaService = async (pool, user) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return FacturacionRepository.listarComprobantesAceptadosParaBajaRepo(pool, user.empresa);
+};
+
+/** Lista motivos de baja (catálogo global). */
+exports.listarMotivosBajaService = async (pool) => {
+  return FacturacionRepository.listarMotivosBajaRepo(pool);
+};
+
+/**
+ * Valida que las credenciales SOL (certificado + clave y opcionalmente usuario/clave SUNAT) se descifren
+ * correctamente y que el PFX se pueda abrir con la clave descifrada.
+ * Útil para detectar CERT_ENCRYPTION_KEY distinto al usado al guardar o clave incorrecta.
+ * @returns { Promise<{ ok: boolean, certificadoOk?: boolean, claveSolOk?: boolean, mensaje: string }> }
+ */
+exports.validarCredencialesSolService = async (pool, user) => {
+  if (!user || !user.empresa) {
+    return { ok: false, mensaje: "No autorizado" };
+  }
+  const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
+  if (!config) {
+    return { ok: false, mensaje: "No existe configuración de facturación para esta empresa" };
+  }
+  let claveCert = null;
+  try {
+    claveCert = config.claveCertificado
+      ? cifradoClaveCertificado.descifrar(config.claveCertificado)
+      : null;
+  } catch (err) {
+    console.error("validarCredencialesSol: descifrar clave certificado", err.message);
+    return {
+      ok: false,
+      certificadoOk: false,
+      mensaje: "Error al descifrar la clave del certificado. Verifique que CERT_ENCRYPTION_KEY sea la misma que cuando se guardó la configuración."
+    };
+  }
+  if (!config.certificadoDigital || !claveCert) {
+    return {
+      ok: false,
+      certificadoOk: false,
+      mensaje: "Configure el certificado digital y su clave en Configuración > Facturación"
+    };
+  }
+  try {
+    const certBuffer = Buffer.from(config.certificadoDigital, "base64");
+    firmaXmlSunat.extraerClavePrivadaDePfx(certBuffer, claveCert);
+  } catch (err) {
+    console.error("validarCredencialesSol: abrir PFX", err.message);
+    return {
+      ok: false,
+      certificadoOk: false,
+      mensaje: "Clave del certificado incorrecta o certificado inválido. Verifique el archivo .pfx y la contraseña."
+    };
+  }
+  let claveSolOk = false;
+  if (config.claveSunat != null && String(config.claveSunat).trim() !== "") {
+    try {
+      cifradoClaveCertificado.descifrar(config.claveSunat);
+      claveSolOk = true;
+    } catch (err) {
+      console.error("validarCredencialesSol: descifrar clave SOL", err.message);
+      return {
+        ok: false,
+        certificadoOk: true,
+        claveSolOk: false,
+        mensaje: "Error al descifrar la clave SOL. Verifique que CERT_ENCRYPTION_KEY sea la misma que cuando se guardó."
+      };
+    }
+  }
+  return {
+    ok: true,
+    certificadoOk: true,
+    claveSolOk: config.claveSunat != null && String(config.claveSunat).trim() !== "" ? claveSolOk : undefined,
+    mensaje: "Credenciales válidas. El certificado se abre correctamente y las claves se descifran."
+  };
+};
+
+/** Lista comunicaciones de baja con filtros. */
+exports.listarComunicacionesBajaService = async (pool, user, filtros) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return FacturacionRepository.listarComunicacionesBajaRepo(pool, user.empresa, filtros);
 };
