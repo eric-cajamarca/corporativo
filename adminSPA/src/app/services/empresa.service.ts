@@ -299,11 +299,23 @@ export class EmpresaService {
     });
   }
 
-  createDireccionEmpresa(direccion:any):Observable<any>{
-    let params = JSON.stringify(direccion);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.post(this.url+'direccion_empresa',params,{
-      headers: headers,
+  createDireccionEmpresa(direccion: any): Observable<any> {
+    const params = JSON.stringify(direccion);
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.post(this.url + 'direccion_empresa', params, {
+      headers,
+      withCredentials: true
+    });
+  }
+
+  /**
+   * Crea una sucursal (nombre obligatorio, dirección opcional).
+   * Usar cuando se quiera agregar una sucursal con nombre sin pasar por crear dirección.
+   */
+  createSucursal(payload: { nombre: string; direccion?: string }): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.post(this.url + 'sucursal', payload, {
+      headers,
       withCredentials: true
     });
   }

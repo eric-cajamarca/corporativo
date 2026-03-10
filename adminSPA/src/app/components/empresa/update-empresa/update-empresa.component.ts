@@ -70,6 +70,8 @@ export class UpdateEmpresaComponent {
   public str_pais = '';
   public direccionEmpresas: any = {};
   public direccionEmpresas_const: any = [];
+  public crearSucursalConDireccion = false;
+  public nombreSucursalNueva = '';
   // public direccionModificada: any = {};
 
   public data: any = {};
@@ -548,25 +550,41 @@ export class UpdateEmpresaComponent {
     this.direccionEmpresas.idUsuario = this.empresas.idUsuario;
     this.direccionEmpresas.codpais = 'PEN';
     this.direccionEmpresas.nombre = this.empresas.alias;
-    
+    this.crearSucursalConDireccion = false;
+    this.nombreSucursalNueva = '';
   }
 
   crearDireccion() {
-    console.log('Crear direccion de las Empresas:', this.direccionEmpresas);
-    this._empresasService.createDireccionEmpresa(this.direccionEmpresas).subscribe(
-      response => {
-        console.log('response', response);
+    const payload = { ...this.direccionEmpresas };
+    if (this.crearSucursalConDireccion && this.nombreSucursalNueva?.trim()) {
+      payload.crearSucursal = true;
+      payload.nombreSucursal = this.nombreSucursalNueva.trim();
+    }
+    this._empresasService.createDireccionEmpresa(payload).subscribe({
+      next: (response) => {
         iziToast.show({
-          title: 'SUCCESS',
+          title: 'Éxito',
           titleColor: '#0062cc',
           color: '#FFF',
           class: 'text-success',
           position: 'topRight',
-          message: 'Dirección creada correctamente'
+          message: this.crearSucursalConDireccion && this.nombreSucursalNueva?.trim()
+            ? 'Dirección y sucursal creadas correctamente'
+            : 'Dirección creada correctamente'
+        });
+        this.initData();
+      },
+      error: (err) => {
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          color: '#FFF',
+          class: 'text-danger',
+          position: 'topRight',
+          message: err?.error?.message || 'Error al crear la dirección'
         });
       }
-    );
-    this.initData();
+    });
   }
 
   updatePrincipal(id:any){

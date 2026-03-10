@@ -404,6 +404,19 @@
                                                     [(ngModel)]="direccionEmpresas.direccion"
                                                     placeholder="Ingrese la dirección (opcional)">
                                             </div>
+                                            <div class="mb-3 form-check">
+                                                <input type="checkbox" class="form-check-input" id="crearSucursalCheck"
+                                                    [(ngModel)]="crearSucursalConDireccion" name="crearSucursalConDireccion">
+                                                <label class="form-check-label" for="crearSucursalCheck">Crear sucursal para esta dirección</label>
+                                            </div>
+                                            @if (crearSucursalConDireccion) {
+                                                <div class="mb-3">
+                                                    <label for="nombreSucursalNueva" class="form-label">Nombre de la sucursal</label>
+                                                    <input type="text" class="form-control" id="nombreSucursalNueva" name="nombreSucursalNueva"
+                                                        [(ngModel)]="nombreSucursalNueva"
+                                                        placeholder="Ej: Sucursal Centro">
+                                                </div>
+                                            }
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary"

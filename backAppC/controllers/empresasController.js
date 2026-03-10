@@ -715,10 +715,20 @@ const createDireccionEmpresa = async function (req, res) {
             //.input('nombre', sql.VarChar, nombre)
             .query('insert into DireccionEmpresa (idEmpresa,ubigeo,codPais,region,provincia,distrito,urbanizacion,direccion,codLocal, principal) values (@idEmpresa,@ubigeo,@codPais,@region,@provincia,@distrito,@urbanizacion,@direccion,@codLocal,@principal)');
 
-        res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
+        // Crear sucursal solo si el usuario indica crearSucursal y nombreSucursal (nueva dirección = nueva sucursal con nombre elegido)
+        if (req.body.crearSucursal === true && req.body.nombreSucursal && String(req.body.nombreSucursal).trim()) {
+            const idSucursal = uuidv4();
+            await pool.request()
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('nombre', sql.VarChar, String(req.body.nombreSucursal).trim())
+                .input('direccion', sql.VarChar, direccion || '')
+                .input('fregistro', sql.DateTime, moment().format('YYYY-MM-DD'))
+                .input('estado', sql.Bit, true)
+                .query('INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, fRegistro, estado) VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @fregistro, @estado)');
+        }
 
-        // quiero ejecutar el metodo createSucursalEmpresa
-        createSucursalEmpresa(req, res);
+        res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
     } catch (error) {
         console.log('error', error);
         res.status(500).send({ message: error.message, data: undefined });
@@ -740,53 +750,38 @@ const createDireccionEmpresa = async function (req, res) {
 
 
 //crear el metodo const createSucursalEmpresa con los parametros del metodo const createDireccionEmpresa
+/**
+ * Crear sucursal (para nueva dirección con nombre elegido por el usuario).
+ * Body: idEmpresa, nombre (obligatorio), direccion (opcional).
+ */
 const createSucursalEmpresa = async function (req, res) {
-    console.log('crearSucursalEmpresa req.body', req.body);
-    //console.log('req.user', req.user);
-
-        try {
-        let nombre = '';
-
-        if (req.body.nombre) {
-            nombre = req.body.nombre;
-        } else if (req.body.direccion) {
-            // Si no se especifica un nombre, usar la dirección como nombre de la sucursal
-            nombre = req.body.direccion;
-        } else {
-            nombre = 'Sucursal Principal';
-        }
-
-        let idSucursal = uuidv4();
+    try {
         const idEmpresa = (req.user && (req.user.empresa || req.user.idEmpresa)) ? (req.user.empresa || req.user.idEmpresa) : req.body.idEmpresa;
         if (!idEmpresa) {
             return res.status(400).send({ message: 'idEmpresa requerido', data: undefined });
         }
-        let direccion = req.body.direccion;
-        // let idUsuario = req.body.idUsuario;
-        let fregistro = moment().format('YYYY-MM-DD');
-        let estado = true;
-
-        let pool = await sql.connect(dbConfig);
-        let insertSucursalEmpresa = await pool.request()
+        const nombre = req.body.nombre ? String(req.body.nombre).trim() : '';
+        if (!nombre) {
+            return res.status(400).send({ message: 'nombre de la sucursal es requerido', data: undefined });
+        }
+        const direccion = req.body.direccion != null ? String(req.body.direccion) : '';
+        const idSucursal = uuidv4();
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
             .input('idSucursal', sql.UniqueIdentifier, idSucursal)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .input('nombre', sql.VarChar, nombre)
             .input('direccion', sql.VarChar, direccion)
-            // .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-            .input('fregistro', sql.DateTime, fregistro)
-            .input('estado', sql.Bit, estado)
-            .query('insert into Sucursal (idSucursal,idEmpresa,nombre,direccion,fregistro,estado) values (@idSucursal,@idEmpresa,@nombre,@direccion,@fregistro,@estado)');
+            .input('fregistro', sql.DateTime, moment().format('YYYY-MM-DD'))
+            .input('estado', sql.Bit, true)
+            .query('INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, fRegistro, estado) VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @fregistro, @estado)');
 
-        //.query('insert into Sucursal (idEmpresa,nombre,direccion,fregistro,estado) values (@idEmpresa,@nombre,@direccion,@fregistro,@estado)');
-        //.query('insert into Sucursal (idEmpresa,nombre,direccion,idUsuario,fregistro,estado) values (@idEmpresa,@nombre,@direccion,@idUsuario,@fregistro,@estado)');
-        //res.status(200).send({ data: insertSucursalEmpresa.rowsAffected });
+        res.status(200).send({ data: { idSucursal, nombre, direccion }, message: 'Sucursal creada' });
     } catch (error) {
-        console.log('error', error);
-        res.status(500).send({ message: error.message, data: undefined });
-
+        console.error('createSucursalEmpresa:', error);
+        res.status(500).send({ message: error.message || 'Error al crear sucursal', data: undefined });
     }
-
-}
+};
 
 const updateDireccionEmpresa = async function (req, res) {
     console.log('entro a updateDireccionEmpresa', req.body);
@@ -969,6 +964,9 @@ module.exports = {
     //logo,
     obtener_logo,
     getEmpresa_id,
+
+    // sucursales
+    createSucursalEmpresa,
 
     // Estado de configuración
     getEstadoConfiguracion,

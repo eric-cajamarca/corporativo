@@ -501,7 +501,8 @@ export class CreateEmpresaComponent implements OnInit {
             distrito: formData.distrito || '',
             direccion: formData.direccion || '',
             principal: true,
-            codLocal: '0'
+            codLocal: '0',
+            crearSucursal: false
           };
 
           this.empresaService.createDireccionEmpresa(direccionData).subscribe({
