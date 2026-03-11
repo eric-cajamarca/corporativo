@@ -79,6 +79,9 @@ import { IndexMotivoNotaCreditoComponent } from './components/catalogos/motivo-n
 import { ResumenesDiariosComponent } from './components/facturacion/resumenes-diarios/resumenes-diarios.component';
 import { NotasCreditoDebitoComponent } from './components/facturacion/notas-credito-debito/notas-credito-debito.component';
 import { ComunicacionBajaComponent } from './components/facturacion/comunicacion-baja/comunicacion-baja.component';
+import { GuiasRemisionComponent } from './components/facturacion/guias-remision/guias-remision.component';
+import { GuiasConfiguracionComponent } from './components/facturacion/guias-configuracion/guias-configuracion.component';
+import { GuiasTransportistaComponent } from './components/facturacion/guias-transportista/guias-transportista.component';
 import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-auditoria.component';
 import { IndexRubrosComponent } from './components/rubros/index-rubros/index-rubros.component';
 import { IndexValesDespachoComponent } from './components/vales-despacho/index-vales-despacho/index-vales-despacho.component';
@@ -266,5 +269,8 @@ export const routes: Routes = [
      { path: 'facturacion/resumenes-diarios', component: ResumenesDiariosComponent, canActivate: [AuthGuard], title: 'Resúmenes diarios SUNAT' },
     { path: 'facturacion/notas-credito-debito', component: NotasCreditoDebitoComponent, canActivate: [AuthGuard], title: 'Notas de crédito / débito' },
     { path: 'facturacion/comunicacion-baja', component: ComunicacionBajaComponent, canActivate: [AuthGuard], title: 'Comunicación de baja' },
+    { path: 'facturacion/guias/configuracion', component: GuiasConfiguracionComponent, canActivate: [AuthGuard], title: 'Configuración de guías' },
+    { path: 'facturacion/guias-remision', component: GuiasRemisionComponent, canActivate: [AuthGuard], title: 'Guías de remisión' },
+    { path: 'facturacion/guias-transportista', component: GuiasTransportistaComponent, canActivate: [AuthGuard], title: 'Guías transportista' },
   { path: 'auditoria', component: LogAuditoriaComponent, canActivate: [AuthGuard], title: 'Log de auditoría' },
 ];

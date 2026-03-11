@@ -40,6 +40,10 @@ exports.obtenerConfiguracionFacturacionRepo = async (pool, idEmpresa) => {
         c.programacionEnvioLotes,
         c.envioDirectoSunat,
         ISNULL(c.useResumenDiarioBoletas, 0) AS useResumenDiarioBoletas,
+        ISNULL(c.usaGuiasElectronicas, 0) AS usaGuiasElectronicas,
+        c.urlBaseApiGuias,
+        c.idApiGuias,
+        c.claveApiGuias,
         e.ruc AS rucEmpresa
       FROM ConfiguracionFacturacionElectronica c
       LEFT JOIN Empresas e ON e.idEmpresa = c.idEmpresa
@@ -53,6 +57,7 @@ exports.obtenerConfiguracionFacturacionRepo = async (pool, idEmpresa) => {
     // Normalizar BIT: el driver puede devolver 0/1 (number) en lugar de boolean
     row.envioDirectoSunat = row.envioDirectoSunat === true || row.envioDirectoSunat === 1 || String(row.envioDirectoSunat || "").trim() === "1";
     row.useResumenDiarioBoletas = Boolean(row.useResumenDiarioBoletas);
+    row.usaGuiasElectronicas = Boolean(row.usaGuiasElectronicas);
   }
   return row;
 };
@@ -123,6 +128,11 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
     if (existenteClave !== undefined) return existenteClave;
     return null;
   };
+  const claveApiGuiasGuardar = (val, existenteClave) => {
+    if (val != null && String(val).trim() !== "") return cifradoClaveCertificado.cifrar(val);
+    if (existenteClave !== undefined) return existenteClave;
+    return null;
+  };
 
   if (existente) {
     const claveVal = datos.hasOwnProperty("claveCertificado")
@@ -131,11 +141,22 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
     const claveSunatVal = datos.hasOwnProperty("claveSunat")
       ? claveSunatGuardar(datos.claveSunat, existente.claveSunat)
       : existente.claveSunat;
+    const claveApiGuiasVal = datos.hasOwnProperty("claveApiGuias")
+      ? claveApiGuiasGuardar(datos.claveApiGuias, existente.claveApiGuias)
+      : existente.claveApiGuias;
     if (claveSunatVal && claveSunatVal.length > 20) {
       try {
         await pool.request().query(`
           ALTER TABLE ConfiguracionFacturacionElectronica
           ALTER COLUMN claveSunat VARCHAR(256) NULL
+        `);
+      } catch (_) {}
+    }
+    if (claveApiGuiasVal && claveApiGuiasVal.length > 20) {
+      try {
+        await pool.request().query(`
+          ALTER TABLE ConfiguracionFacturacionElectronica
+          ALTER COLUMN claveApiGuias VARCHAR(256) NULL
         `);
       } catch (_) {}
     }
@@ -161,6 +182,10 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("envioPorLotes", sql.Bit, datos.envioPorLotes !== undefined ? datos.envioPorLotes : 0)
       .input("programacionEnvioLotes", sql.VarChar, datos.programacionEnvioLotes || null)
       .input("useResumenDiarioBoletas", sql.Bit, datos.useResumenDiarioBoletas !== undefined ? datos.useResumenDiarioBoletas : 0)
+      .input("usaGuiasElectronicas", sql.Bit, datos.usaGuiasElectronicas !== undefined ? datos.usaGuiasElectronicas : 0)
+      .input("urlBaseApiGuias", sql.VarChar, datos.urlBaseApiGuias || null)
+      .input("idApiGuias", sql.VarChar, datos.idApiGuias || null)
+      .input("claveApiGuias", sql.VarChar(256), claveApiGuiasVal)
       .query(`
         UPDATE ConfiguracionFacturacionElectronica
         SET certificadoDigital = @certificadoDigital,
@@ -180,13 +205,18 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
             minutosEnvioAutomatico = @minutosEnvioAutomatico,
             envioPorLotes = @envioPorLotes,
             programacionEnvioLotes = @programacionEnvioLotes,
-            useResumenDiarioBoletas = @useResumenDiarioBoletas
+            useResumenDiarioBoletas = @useResumenDiarioBoletas,
+            usaGuiasElectronicas = @usaGuiasElectronicas,
+            urlBaseApiGuias = @urlBaseApiGuias,
+            idApiGuias = @idApiGuias,
+            claveApiGuias = @claveApiGuias
         WHERE idEmpresa = @idEmpresa
       `);
   } else {
     const claveValNueva = claveCertificadoGuardar(datos.claveCertificado, undefined);
     const claveSunatNueva = claveSunatGuardar(datos.claveSunat, undefined);
-    if ((claveValNueva && claveValNueva.length > 100) || (claveSunatNueva && claveSunatNueva.length > 20)) {
+    const claveApiGuiasNueva = claveApiGuiasGuardar(datos.claveApiGuias, undefined);
+    if ((claveValNueva && claveValNueva.length > 100) || (claveSunatNueva && claveSunatNueva.length > 20) || (claveApiGuiasNueva && claveApiGuiasNueva.length > 20)) {
       try {
         await pool.request().query(`
           ALTER TABLE ConfiguracionFacturacionElectronica
@@ -195,6 +225,10 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
         await pool.request().query(`
           ALTER TABLE ConfiguracionFacturacionElectronica
           ALTER COLUMN claveSunat VARCHAR(256) NULL
+        `);
+        await pool.request().query(`
+          ALTER TABLE ConfiguracionFacturacionElectronica
+          ALTER COLUMN claveApiGuias VARCHAR(256) NULL
         `);
       } catch (_) {}
     }
@@ -220,17 +254,23 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("envioPorLotes", sql.Bit, datos.envioPorLotes !== undefined ? datos.envioPorLotes : 0)
       .input("programacionEnvioLotes", sql.VarChar, datos.programacionEnvioLotes || null)
       .input("useResumenDiarioBoletas", sql.Bit, datos.useResumenDiarioBoletas !== undefined ? datos.useResumenDiarioBoletas : 0)
+      .input("usaGuiasElectronicas", sql.Bit, datos.usaGuiasElectronicas !== undefined ? datos.usaGuiasElectronicas : 0)
+      .input("urlBaseApiGuias", sql.VarChar, datos.urlBaseApiGuias || null)
+      .input("idApiGuias", sql.VarChar, datos.idApiGuias || null)
+      .input("claveApiGuias", sql.VarChar(256), claveApiGuiasNueva)
       .query(`
         INSERT INTO ConfiguracionFacturacionElectronica (
           idEmpresa, certificadoDigital, claveCertificado, usuarioSunat,
           claveSunat, modoPrueba, serieFactura, serieBoleta,
           serieNotaCredito, serieNotaDebito, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
-          urlEnvio, envioDirectoSunat, envioAutomatico, minutosEnvioAutomatico, envioPorLotes, programacionEnvioLotes, useResumenDiarioBoletas
+          urlEnvio, envioDirectoSunat, envioAutomatico, minutosEnvioAutomatico, envioPorLotes, programacionEnvioLotes, useResumenDiarioBoletas, usaGuiasElectronicas,
+          urlBaseApiGuias, idApiGuias, claveApiGuias
         ) VALUES (
           @idEmpresa, @certificadoDigital, @claveCertificado, @usuarioSunat,
           @claveSunat, @modoPrueba, @serieFactura, @serieBoleta,
           @serieNotaCredito, @serieNotaDebito, @rutaCarpetaFacturadorSunat, @urlFacturadorSunat,
-          @urlEnvio, @envioDirectoSunat, @envioAutomatico, @minutosEnvioAutomatico, @envioPorLotes, @programacionEnvioLotes, @useResumenDiarioBoletas
+          @urlEnvio, @envioDirectoSunat, @envioAutomatico, @minutosEnvioAutomatico, @envioPorLotes, @programacionEnvioLotes, @useResumenDiarioBoletas, @usaGuiasElectronicas,
+          @urlBaseApiGuias, @idApiGuias, @claveApiGuias
         )
       `);
   }
@@ -496,6 +536,88 @@ exports.obtenerComprobanteOrigenPorSerieNumeroRepo = async (pool, idEmpresa, ser
         AND ce.tipoComprobante IN ('01','03') AND ce.idEstadoSunat IN (1, 2, 3)
     `);
   return result.recordset && result.recordset[0] ? result.recordset[0].idComprobanteElectronico : null;
+};
+
+/**
+ * Busca comprobante por serie y número para usar como origen de guía.
+ * Busca primero en ComprobantesElectronicos (cualquier estado); si no existe, en Ventas.
+ * Devuelve un solo objeto con datos del comprobante, cliente e items para el front (guías).
+ */
+exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, numero) => {
+  const serieStr = String(serie || "").trim();
+  const numeroNorm = String(numero ?? "").replace(/\D/g, "").padStart(8, "0");
+  if (!serieStr || !numeroNorm) return null;
+
+  let idVenta = null;
+  let tipoComprobante = null;
+
+  const ceResult = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("serie", sql.VarChar, serieStr)
+    .input("numero", sql.VarChar, numeroNorm)
+    .query(`
+      SELECT TOP 1 ce.idVenta, ce.tipoComprobante, ce.serie, ce.numero, ce.idComprobanteElectronico, ce.idEstadoSunat
+      FROM ComprobantesElectronicos ce
+      WHERE ce.idEmpresa = @idEmpresa AND ce.serie = @serie AND ce.numero = @numero
+        AND ce.tipoComprobante IN ('01','03')
+    `);
+  const ce = ceResult.recordset && ceResult.recordset[0];
+  if (ce) {
+    idVenta = ce.idVenta;
+    tipoComprobante = ce.tipoComprobante;
+  } else {
+    const numeroSinCeros = numeroNorm.replace(/^0+/, "") || "0";
+    const vResult = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("serie", sql.VarChar, serieStr)
+      .input("numeroNorm", sql.VarChar, numeroNorm)
+      .input("numeroSinCeros", sql.VarChar, numeroSinCeros)
+      .query(`
+        SELECT TOP 1 v.idVenta, c.codigo AS tipoComprobante
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        WHERE v.idEmpresa = @idEmpresa AND v.serie = @serie
+          AND (RTRIM(LTRIM(CAST(v.numero AS VARCHAR(20)))) = @numeroNorm OR RTRIM(LTRIM(CAST(v.numero AS VARCHAR(20)))) = @numeroSinCeros)
+      `);
+    const vRow = vResult.recordset && vResult.recordset[0];
+    if (!vRow) return null;
+    idVenta = vRow.idVenta;
+    tipoComprobante = (vRow.tipoComprobante || "01").toString().trim();
+  }
+
+  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa);
+  if (!payload || !payload.venta || !payload.cliente) return null;
+
+  const venta = payload.venta;
+  const cliente = payload.cliente;
+  const empresa = payload.empresa || {};
+  const items = payload.items || [];
+  const itemsWithMeta = items.map((it, idx) => ({
+    ...it,
+    numeroLinea: idx + 1,
+    unidad: it.unidad || "NIU"
+  }));
+
+  return {
+    idComprobanteElectronico: ce ? ce.idComprobanteElectronico : null,
+    idVenta,
+    tipoComprobante: tipoComprobante || "01",
+    serie: venta.serie || serieStr,
+    numero: venta.numero || numeroNorm,
+    compVenta: venta.compVenta || `${serieStr}-${numeroNorm}`,
+    idEstadoSunat: venta.idEstadoSunat != null ? venta.idEstadoSunat : null,
+    cliente: cliente.rSocial || cliente.razonSocial || "",
+    razon_social: cliente.rSocial || cliente.razonSocial || "",
+    documento_cliente: cliente.ruc || "",
+    rucCliente: cliente.ruc || "",
+    total: venta.total,
+    clienteDireccion: cliente.direccion || "",
+    rucEmpresa: (empresa && empresa.ruc) ? empresa.ruc : "",
+    rucEmisor: (empresa && empresa.ruc) ? empresa.ruc : "",
+    items: itemsWithMeta
+  };
 };
 
 /** Obtiene comprobante origen (Factura/Boleta aceptado) para emitir NC/ND. Solo tipos 01 o 03 y idEstadoSunat en (1,2,3). */

@@ -1,5 +1,9 @@
 const motivoTrasladoRepository = require('../repositories/motivoTraslado.repository');
 
+async function listarCodigosSunat(pool) {
+    return motivoTrasladoRepository.listarCodigosSunat(pool);
+}
+
 async function listar(pool, idEmpresa, query) {
     const buscar = query.buscar || null;
     const pagina = Math.max(1, parseInt(query.pagina, 10) || 1);
@@ -14,7 +18,7 @@ async function obtenerPorId(pool, idMotivoTraslado, idEmpresa) {
 async function crear(pool, idEmpresa, body) {
     const descripcion = (body.descripcion || '').trim();
     if (!descripcion) throw new Error('La descripción es obligatoria.');
-    return motivoTrasladoRepository.crear(pool, { idEmpresa, descripcion });
+    return motivoTrasladoRepository.crear(pool, { idEmpresa, codigoSunat: body.codigoSunat, descripcion });
 }
 
 async function actualizar(pool, idMotivoTraslado, idEmpresa, body) {
@@ -22,7 +26,7 @@ async function actualizar(pool, idMotivoTraslado, idEmpresa, body) {
     if (!registro) throw new Error('Motivo de traslado no encontrado.');
     const descripcion = (body.descripcion || '').trim();
     if (!descripcion) throw new Error('La descripción es obligatoria.');
-    await motivoTrasladoRepository.actualizar(pool, { idMotivoTraslado, idEmpresa, descripcion });
+    await motivoTrasladoRepository.actualizar(pool, { idMotivoTraslado, idEmpresa, codigoSunat: body.codigoSunat, descripcion });
 }
 
 async function eliminar(pool, idMotivoTraslado, idEmpresa) {

@@ -17,6 +17,7 @@ router.post('/configuracion/certificado', uploadCertificadoFacturacion, facturac
 // Rutas para comprobantes electrónicos
 router.get('/comprobantes', facturacionController.obtenerComprobantesElectronicos);
 router.get('/comprobantes/validez', facturacionController.consultarValidezComprobante);
+router.get('/comprobantes/origen-para-guia', facturacionController.obtenerOrigenParaGuia);
 router.post('/comprobantes', facturacionController.generarComprobanteElectronico);
 router.get('/comprobantes/origen-para-nota', facturacionController.obtenerOrigenParaNota);
 router.get('/comprobantes/buscar-origen', facturacionController.listarComprobantesOrigenPorCliente);

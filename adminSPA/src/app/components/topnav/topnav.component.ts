@@ -5,11 +5,16 @@ import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
 import { TipoCambioService, TipoCambioData } from '../../services/tipo-cambio.service';
+import { ConsultarPlacaModalComponent } from '../facturacion/consultar-placa-modal/consultar-placa-modal.component';
+import { ConsultarSoatModalComponent } from '../facturacion/consultar-soat-modal/consultar-soat-modal.component';
+import { VehiculosService } from '../../services/vehiculos.service';
+
+declare const iziToast: any;
 
 @Component({
   selector: 'app-topnav',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule],
+  imports: [FormsModule, RouterModule, CommonModule, ConsultarPlacaModalComponent, ConsultarSoatModalComponent],
   templateUrl: './topnav.component.html',
   styleUrl: './topnav.component.css'
 })
@@ -41,11 +46,19 @@ export class TopnavComponent implements OnInit {
   public searchQuery: string = '';
   public showSearchResults: boolean = false;
 
+  // Modales de consultas Factiliza
+  public mostrarModalPlaca = false;
+  public mostrarModalSoat = false;
+  /** Cantidad de vehículos con SOAT vencido (para notificación en menú) */
+  public soatVencidoCount = 0;
+  private soatVencidoToastYaMostrado = false;
+
   constructor(
     private router: Router,
     public authService: AuthService,
     private permisosService: PermisosService,
     private tipoCambioService: TipoCambioService,
+    private vehiculosService: VehiculosService,
     private cdr: ChangeDetectorRef,
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
@@ -57,6 +70,7 @@ export class TopnavComponent implements OnInit {
         this.empresaNombre = userData.razonSocial || '';
         this.isAuthenticated = true;
         this.cargarTipoCambio();
+        this.cargarSoatVencidoCount(true);
       } else {
         this.userName = '';
         this.userRole = '';
@@ -76,6 +90,25 @@ export class TopnavComponent implements OnInit {
     }, 600);
     // Cargar notificaciones (ejemplo)
     this.cargarNotificaciones();
+  }
+
+  private cargarSoatVencidoCount(mostrarToast = false): void {
+    this.vehiculosService.listarVehiculosSoatVencido().subscribe({
+      next: (res) => {
+        const list = res?.data || [];
+        this.soatVencidoCount = list.length;
+        if (this.soatVencidoCount > 0 && mostrarToast && !this.soatVencidoToastYaMostrado && typeof iziToast !== 'undefined') {
+          this.soatVencidoToastYaMostrado = true;
+          iziToast.warning({
+            title: 'SOAT vencido',
+            message: `Tiene ${this.soatVencidoCount} vehículo(s) con SOAT vencido. Ver en Mi perfil → Consultar placa.`,
+            position: 'topRight'
+          });
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.soatVencidoCount = 0; }
+    });
   }
 
   /**
@@ -98,6 +131,19 @@ export class TopnavComponent implements OnInit {
    */
   navigateToProfile(): void {
     this.router.navigate(['/perfil']);
+  }
+
+  abrirModalPlaca(): void {
+    this.mostrarModalPlaca = true;
+  }
+
+  onCerrarModalPlaca(): void {
+    this.mostrarModalPlaca = false;
+    this.cargarSoatVencidoCount(false);
+  }
+
+  abrirModalSoat(): void {
+    this.mostrarModalSoat = true;
   }
 
   /**

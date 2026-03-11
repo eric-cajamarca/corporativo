@@ -6,7 +6,7 @@ import { PermisosService } from '../../services/permisos.service';
 import { AuthService } from '../../services/auth.service';
 import { EmpresaService } from '../../services/empresa.service';
 import { SidebarStateService } from '../../services/sidebar-state.service';
-import { MenuItem } from '../../interfaces/permisos-interface';
+import { MenuItem, SubMenuItem } from '../../interfaces/permisos-interface';
 
 @Component({
   selector: 'app-sidebar',
@@ -53,12 +53,16 @@ export class SidebarComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Efecto para actualizar navegación cuando se carguen los permisos
+    // Efecto: al cambiar navegación (API) o estado (habilitarGuiasElectronicas), mostrar menú fusionado
     effect(() => {
       const navegacion = this.permisosService.navegacion();
-      console.log('navegacion', navegacion);
+      const estado = this.estadoConfiguracion();
       if (navegacion && navegacion.length > 0) {
-        this.menuItems.set(navegacion);
+        if (estado) {
+          this.actualizarNavegacionSegunEstado(estado);
+        } else {
+          this.menuItems.set(navegacion);
+        }
       }
     });
   }
@@ -115,10 +119,24 @@ export class SidebarComponent implements OnInit, OnDestroy {
     ) ?? false;
 
     if (tieneMenuConSubmenus && navegacionDesdeApi && navegacionDesdeApi.length > 0) {
-      // Respetar el menú de la API (con submenús y flechas); solo inyectar "Crear Primer Colaborador" si aplica
+      const items: MenuItem[] = navegacionDesdeApi.map((i: MenuItem) => {
+        if (i.submenu && i.modulo === 'facturacion') {
+          const base: SubMenuItem[] = i.submenu.filter((s: SubMenuItem) =>
+            s.ruta !== '/facturacion/guias/configuracion' &&
+            s.ruta !== '/facturacion/guias-remision' &&
+            s.ruta !== '/facturacion/guias-transportista'
+          );
+          const guiasItems: SubMenuItem[] = estado.habilitarGuiasElectronicas ? [
+            { nombre: 'Emisión de guías – Configuración', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
+            { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
+            { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+          ] : [];
+          return { ...i, submenu: [...base, ...guiasItems] };
+        }
+        return i;
+      });
       if (!estado.tieneColaboradores) {
-        const items = [...navegacionDesdeApi];
-        const sepIndex = items.findIndex((i) => i.tipo === 'separador');
+        const sepIndex = items.findIndex((i: any) => i.tipo === 'separador');
         const insertIndex = sepIndex >= 0 ? sepIndex + 1 : items.length;
         items.splice(insertIndex, 0, {
           nombre: 'Crear Primer Colaborador',
@@ -126,8 +144,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
           ruta: '/colaborador/create',
           visible: true,
         });
-        this.menuItems.set(items);
       }
+      this.menuItems.set(items);
       this.abrirSubmenuSegunRutaActual();
       return;
     }
@@ -164,11 +182,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
         icono: 'bi bi-file-earmark-text',
         modulo: 'facturacion',
         visible: true,
-        submenu: [
-          { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
-          { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
-          { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true }
-        ]
+        submenu: this.buildSubmenuFacturacion(estado)
       },
       { tipo: 'separador' },
       { nombre: 'Configuración', icono: 'bi bi-gear', ruta: '/configuracion', visible: true },
@@ -176,6 +190,23 @@ export class SidebarComponent implements OnInit, OnDestroy {
     ];
 
     this.menuItems.set(navegacionCompleta);
+  }
+
+  /** Submenú Facturación: ítems base + ítems de guías solo si están habilitados. */
+  private buildSubmenuFacturacion(estado: any): SubMenuItem[] {
+    const base: SubMenuItem[] = [
+      { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
+      { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
+      { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true }
+    ];
+    if (estado?.habilitarGuiasElectronicas) {
+      base.push(
+        { nombre: 'Emisión de guías – Configuración', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
+        { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
+        { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+      );
+    }
+    return base;
   }
 
   /**
@@ -221,6 +252,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Navegación por defecto en caso de error
    */
   private cargarNavegacionDefecto(): void {
+    const submenuFacturacion: SubMenuItem[] = [
+      { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
+      { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
+      { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true },
+      { nombre: 'Emisión de guías – Configuración', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
+      { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
+      { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+    ];
     const navegacionDefecto: MenuItem[] = [
       { nombre: 'Dashboard', icono: 'bi bi-speedometer2', ruta: '/home', visible: true },
       { tipo: 'separador' },
@@ -232,11 +271,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
         icono: 'bi bi-file-earmark-text',
         modulo: 'facturacion',
         visible: true,
-        submenu: [
-          { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
-          { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
-          { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true }
-        ]
+        submenu: submenuFacturacion
       },
     ];
     this.menuItems.set(navegacionDefecto);

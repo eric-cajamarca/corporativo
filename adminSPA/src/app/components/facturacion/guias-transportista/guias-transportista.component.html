@@ -1,0 +1,25 @@
+<main class="container-fluid py-3">
+  <div class="row">
+    <div class="col-12">
+      <h1 class="h4 mb-3">
+        <i class="bi bi-truck me-2"></i> Guías transportista
+      </h1>
+    </div>
+  </div>
+
+  @if (!autorizado) {
+    <div class="alert alert-warning">
+      <p class="mb-2">La emisión de guías electrónicas no está habilitada para su empresa.</p>
+      <p class="mb-0">Active la opción en <strong>Configuración</strong> → Facturación y guarde los cambios.</p>
+      <button type="button" class="btn btn-sm btn-primary mt-2" (click)="irAConfiguracion()">
+        <i class="bi bi-gear me-1"></i> Ir a Configuración
+      </button>
+    </div>
+  } @else {
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <p class="text-muted mb-0">Pantalla de guías en modalidad transportista. Se implementará en una próxima iteración.</p>
+      </div>
+    </div>
+  }
+</main>

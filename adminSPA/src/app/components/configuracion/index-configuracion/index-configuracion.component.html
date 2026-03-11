@@ -142,6 +142,14 @@
                       </label>
                     </div>
                   </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="usaGuiasElectronicas" [(ngModel)]="facturacion.usaGuiasElectronicas" name="usaGuiasElectronicas">
+                      <label class="form-check-label" for="usaGuiasElectronicas">
+                        Habilitar emisión de guías electrónicas (remitente / transportista)
+                      </label>
+                    </div>
+                  </div>
                   <div class="col-12">
                     <label for="rutaCarpetaFacturadorSunat" class="form-label">Carpeta del Facturador SUNAT</label>
                     <input type="text" class="form-control" id="rutaCarpetaFacturadorSunat" [(ngModel)]="facturacion.rutaCarpetaFacturadorSunat" name="rutaCarpetaFacturadorSunat" placeholder="Ej: D:\SFS_v1.2 o C:\Emp_A">

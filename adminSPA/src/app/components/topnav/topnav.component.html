@@ -212,6 +212,14 @@
             <i class="fas fa-user me-2"></i>
             Mi Perfil
           </a>
+          <a class="dropdown-item d-flex align-items-center justify-content-between" (click)="abrirModalPlaca(); $event.preventDefault()">
+            <span><i class="fas fa-car-side me-2"></i>Consultar placa (Factiliza)</span>
+            <span class="badge bg-danger ms-2" *ngIf="soatVencidoCount > 0">{{ soatVencidoCount }} SOAT vencido</span>
+          </a>
+          <a class="dropdown-item" (click)="abrirModalSoat(); $event.preventDefault()">
+            <i class="fas fa-file-medical me-2"></i>
+            Consultar SOAT (Factiliza)
+          </a>
           <a class="dropdown-item" (click)="navigateToEmpresa(); $event.preventDefault()">
             <i class="fas fa-building me-2"></i>
             Mi Empresa
@@ -230,6 +238,17 @@
     </div>
   </div>
 </nav>
+
+<!-- Modales globales de consulta Factiliza (placa / SOAT) -->
+<app-consultar-placa-modal
+  [visible]="mostrarModalPlaca"
+  (closed)="onCerrarModalPlaca()">
+</app-consultar-placa-modal>
+
+<app-consultar-soat-modal
+  [visible]="mostrarModalSoat"
+  (closed)="mostrarModalSoat = false">
+</app-consultar-soat-modal>
 
 <!-- Mensaje cuando no está autenticado -->
 <nav class="topnav topnav-guest" *ngIf="!isAuthenticated">

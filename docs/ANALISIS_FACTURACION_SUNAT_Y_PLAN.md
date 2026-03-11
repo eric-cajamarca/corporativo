@@ -112,11 +112,7 @@ Conclusión: **Facturas y boletas** se emiten en crear-venta y se envían **de f
 ### 3.6 Credenciales API SUNAT (multiempresa)
 
 - **Hoy:** Una sola configuración por empresa en `ConfiguracionFacturacionElectronica`: usuario/clave SOAP y URL para **facturación** (sendBill/sendSummary de facturas, boletas, notas, RC, RA).
-- **Guías:** Misma clave SOL pero **URL distinta**. Opciones:
-  - **A)** Añadir en `ConfiguracionFacturacionElectronica`: `urlEnvioGuias` (y opcionalmente `usuarioSunatGuias`, `claveSunatGuias` si en el futuro SUNAT exigiera credenciales distintas).
-  - **B)** Crear tabla específica de “credenciales API SUNAT” por empresa y por tipo de servicio (facturación vs guías), para separar responsabilidades y permitir usuarios distintos si SUNAT lo requiere.
-
-Si no se necesita hoy usuario/clave distinto para guías, basta con **A**. Si se quiere preparar el sistema para múltiples servicios SUNAT (facturación, guías, retenciones, etc.), conviene **B**.
+- **Guías:** **No usan SOAP.** Usan **API REST**. Flujo: (1) Generar XML GRE, (2) Firmar XML, (3) Enviar vía API. Endpoint fijo: **POST /v1/contribuyente/gem**. Credenciales de la API: **ID** y **CLAVE** (distintas del usuario/clave SOL de facturación). Se añade en `ConfiguracionFacturacionElectronica`: `urlBaseApiGuias` (URL base del API, sin el path), `idApiGuias` (ID), `claveApiGuias` (CLAVE).
 
 ---
 
@@ -141,9 +137,9 @@ INSERT INTO ServiciosSunat (codigo, nombre, urlBeta, urlProduccion) VALUES
 ('FACTURACION', 'Facturación electrónica (Facturas, Boletas, Notas, RC, RA)',
  'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService',
  'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService'),
-('GUIAS', 'Guías de remisión electrónicas',
- 'https://e-beta.sunat.gob.pe/ol-ti-itemision-guia-gem-beta/billService',
- 'https://e-factura.sunat.gob.pe/ol-ti-itemision-guia-gem/billService');
+('GUIAS', 'Guías de remisión electrónicas (API REST, no SOAP). Endpoint: POST /v1/contribuyente/gem',
+ 'https://e-beta.sunat.gob.pe/',
+ 'https://e-factura.sunat.gob.pe/');
 ```
 
 ### 4.2 Credenciales por empresa y servicio
@@ -210,9 +206,11 @@ CREATE INDEX IX_CredencialesApiSunat_Empresa ON CredencialesApiSunat(idEmpresa);
 
 ### Fase 4 – Guías de remisión
 
+**Importante:** Las guías **no usan SOAP/BillService**. Usan **API REST**.
+
 1. Revisar manual SUNAT / anexos para estructura UBL de guía (09) y catálogos (motivo traslado, tipo transporte, etc.).
-2. Backend: generador UBL para guía de remisión; servicio de envío al BillService de **guías** (URL distinta, mismas credenciales o desde `CredencialesApiSunat` si se implementó).
-3. Base de datos: tabla para guías (cabecera, detalle, relación con venta/comprobantes) si no existe.
+2. **Flujo backend:** (1) Generar XML GRE, (2) Firmar XML (mismo certificado que facturación si aplica), (3) Enviar vía **API**: **POST {urlBaseApiGuias}/v1/contribuyente/gem** con credenciales **ID** y **CLAVE** (no usuario/clave SOL).
+3. Base de datos: tabla para guías (cabecera, detalle, relación con venta/comprobantes) si no existe; en configuración: `urlBaseApiGuias`, `idApiGuias`, `claveApiGuias`.
 4. Frontend: **componente “Guías de remisión”**: alta de guía, selección de venta/comprobantes relacionados, datos de traslado y transportista; emisión y estado.
 
 ### Fase 5 – Guía transportista y credenciales

@@ -789,6 +789,19 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query('SELECT COUNT(*) as total FROM Clientes WHERE idEmpresa = @idEmpresa');
 
+        // Guías electrónicas: habilitado si la empresa tiene usaGuiasElectronicas = 1
+        let habilitarGuiasElectronicas = false;
+        try {
+            const guias = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('SELECT ISNULL(usaGuiasElectronicas, 0) AS usaGuiasElectronicas FROM ConfiguracionFacturacionElectronica WHERE idEmpresa = @idEmpresa');
+            if (guias.recordset && guias.recordset[0]) {
+                habilitarGuiasElectronicas = guias.recordset[0].usaGuiasElectronicas === true || guias.recordset[0].usaGuiasElectronicas === 1;
+            }
+        } catch (_) {
+            // Columna puede no existir aún si no se ejecutó la migración
+        }
+
         return {
             tieneColaboradores: colaboradores.recordset[0].total > 0,
             cantidadColaboradores: colaboradores.recordset[0].total,
@@ -798,7 +811,8 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             cantidadProveedores: proveedores.recordset[0].total,
             tieneClientes: clientes.recordset[0].total > 0,
             cantidadClientes: clientes.recordset[0].total,
-            configuracionCompleta: 
+            habilitarGuiasElectronicas,
+            configuracionCompleta:
                 colaboradores.recordset[0].total > 0 &&
                 productos.recordset[0].total > 0 &&
                 proveedores.recordset[0].total > 0

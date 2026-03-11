@@ -60,6 +60,7 @@ export class IndexConfiguracionComponent implements OnInit {
     tieneCertificado: false,
     envioDirectoSunat: false,
     useResumenDiarioBoletas: false,
+    usaGuiasElectronicas: false,
     urlEnvio: '' as string,
     usuarioSunat: '' as string,
     claveSunat: '' as string,
@@ -279,6 +280,7 @@ export class IndexConfiguracionComponent implements OnInit {
           this.facturacion.tieneCertificado = c.tieneCertificado === true;
           this.facturacion.envioDirectoSunat = c.envioDirectoSunat === true;
           this.facturacion.useResumenDiarioBoletas = c.useResumenDiarioBoletas === true;
+          this.facturacion.usaGuiasElectronicas = c.usaGuiasElectronicas === true;
           this.facturacion.urlEnvio = c.urlEnvio ?? '';
           this.facturacion.usuarioSunat = c.usuarioSunat ?? '';
           this.facturacion.claveSunat = ''; // No se devuelve por seguridad; solo se envía al guardar si el usuario la escribe
@@ -339,6 +341,7 @@ export class IndexConfiguracionComponent implements OnInit {
       urlEnvio: this.facturacion.urlEnvio || undefined,
       envioDirectoSunat: this.facturacion.envioDirectoSunat,
       useResumenDiarioBoletas: this.facturacion.useResumenDiarioBoletas,
+      usaGuiasElectronicas: this.facturacion.usaGuiasElectronicas,
       usuarioSunat: this.facturacion.usuarioSunat || undefined,
       claveSunat: this.facturacion.claveSunat || undefined,
       envioAutomatico: this.facturacion.envioAutomatico,

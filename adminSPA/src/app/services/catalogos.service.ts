@@ -112,7 +112,10 @@ export class CatalogosService {
     return this.delete<{ data: any }>('conceptos/' + id);
   }
 
-  // Motivo Traslado
+  // Motivo Traslado (catálogo SUNAT HandlingCode para GRE)
+  codigosSunatMotivoTraslado(): Observable<{ data: { codigoSunat: string; descripcion: string }[] }> {
+    return this.get<{ data: { codigoSunat: string; descripcion: string }[] }>('motivo-traslado/codigos-sunat');
+  }
   listarMotivoTraslado(buscar?: string, pagina?: number, porPagina?: number): Observable<{ data: any[]; total: number }> {
     const params: any = {};
     if (buscar != null) params.buscar = buscar;

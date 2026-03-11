@@ -14,6 +14,7 @@ exports.obtenerConfiguracionFacturacionService = async (pool, user) => {
   if (configuracion) {
     delete configuracion.claveCertificado;
     delete configuracion.claveSunat;
+    delete configuracion.claveApiGuias;
   }
   return configuracion;
 };
@@ -333,6 +334,12 @@ exports.listarResumenesDiariosService = async (pool, user, filtros) => {
 exports.listarBoletasPendientesPorFechaService = async (pool, user, fechaDesde, fechaHasta) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
   return FacturacionRepository.listarBoletasPendientesPorFechaRepo(pool, user.empresa, fechaDesde, fechaHasta);
+};
+
+/** Obtiene comprobante por serie/numero para usar como origen de guía. Incluye cliente e items. No exige estado SUNAT aceptado. */
+exports.obtenerComprobanteOrigenParaGuiaService = async (pool, user, serie, numero) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return FacturacionRepository.obtenerComprobanteOrigenParaGuiaRepo(pool, user.empresa, serie, numero);
 };
 
 /** Obtiene comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Por id o por serie/numero/tipo. */

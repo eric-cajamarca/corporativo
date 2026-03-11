@@ -2,6 +2,20 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const motivoTrasladoService = require('../services/motivoTraslado.service');
 
+async function codigosSunat(req, res) {
+    if (!req.user || !req.user.empresa) {
+        return res.status(401).json({ message: 'No autorizado', data: undefined });
+    }
+    try {
+        const pool = await sql.connect(dbConfig);
+        const items = await motivoTrasladoService.listarCodigosSunat(pool);
+        res.status(200).json({ data: items });
+    } catch (error) {
+        console.error('motivoTraslado.codigosSunat:', error);
+        res.status(500).json({ message: error.message || 'Error al listar códigos SUNAT', data: undefined });
+    }
+}
+
 async function listar(req, res) {
     if (!req.user || !req.user.empresa) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
@@ -73,4 +87,4 @@ async function eliminar(req, res) {
     }
 }
 
-module.exports = { listar, obtenerPorId, crear, actualizar, eliminar };
+module.exports = { codigosSunat, listar, obtenerPorId, crear, actualizar, eliminar };

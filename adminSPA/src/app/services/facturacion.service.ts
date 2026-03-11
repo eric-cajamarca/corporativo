@@ -42,6 +42,10 @@ export class FacturacionService {
     urlEnvio?: string;
     envioDirectoSunat?: boolean;
     useResumenDiarioBoletas?: boolean;
+    usaGuiasElectronicas?: boolean;
+    urlBaseApiGuias?: string;
+    idApiGuias?: string;
+    claveApiGuias?: string;
     modoPrueba: boolean;
     serieFactura: string;
     serieBoleta: string;
@@ -179,6 +183,21 @@ export class FacturacionService {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'facturacion/estados-sunat', {
       headers: headers,
+      withCredentials: true
+    });
+  }
+
+  /**
+   * Busca comprobante por serie y número para origen de guía. Incluye cliente e items.
+   * No exige que el comprobante esté aceptado en SUNAT (busca en CE o en Ventas).
+   */
+  buscarComprobanteOrigenParaGuia(params: { serie: string; numero: string }): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    const q = new URLSearchParams();
+    if (params.serie) q.append('serie', params.serie);
+    if (params.numero) q.append('numero', params.numero);
+    return this._http.get(this.url + 'facturacion/comprobantes/origen-para-guia?' + q.toString(), {
+      headers,
       withCredentials: true
     });
   }

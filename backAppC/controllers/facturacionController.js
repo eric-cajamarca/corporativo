@@ -35,6 +35,10 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       urlEnvio,
       envioDirectoSunat,
       useResumenDiarioBoletas,
+      usaGuiasElectronicas,
+      urlBaseApiGuias,
+      idApiGuias,
+      claveApiGuias,
       modoPrueba,
       serieFactura,
       serieBoleta,
@@ -57,6 +61,10 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       urlEnvio,
       envioDirectoSunat,
       useResumenDiarioBoletas,
+      usaGuiasElectronicas,
+      urlBaseApiGuias,
+      idApiGuias,
+      claveApiGuias,
       modoPrueba,
       serieFactura,
       serieBoleta,
@@ -541,6 +549,26 @@ const consultarEstadoResumenDiario = async (req, res) => {
 };
 
 // Obtener comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Params: idComprobanteElectronico. Query: serie, numero, tipoComprobante (01/03).
+// Comprobante por serie/numero para origen de guía (incluye cliente e items; no exige aceptado SUNAT)
+const obtenerOrigenParaGuia = async (req, res) => {
+  try {
+    const { serie, numero } = req.query || {};
+    if (serie == null || numero == null) {
+      return res.status(400).send({ message: "Indique serie y numero (query)", data: null });
+    }
+    const pool = await sql.connect(dbConfig);
+    const data = await FacturacionServices.obtenerComprobanteOrigenParaGuiaService(pool, req.user, serie, numero);
+    if (!data) {
+      return res.status(404).send({ message: "No se encontró comprobante con esa serie y número", data: null });
+    }
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: null });
+    console.error("Error obtener origen para guía:", error);
+    res.status(500).send({ message: error.message || "Error al obtener datos", data: null });
+  }
+};
+
 const obtenerOrigenParaNota = async (req, res) => {
   try {
     const { idComprobanteElectronico } = req.params;
@@ -729,6 +757,7 @@ module.exports = {
   obtenerBoletasPendientesResumen,
   enviarResumenDiario,
   consultarEstadoResumenDiario,
+  obtenerOrigenParaGuia,
   obtenerOrigenParaNota,
   listarComprobantesOrigenPorCliente,
   crearNotaCreditoDebito,

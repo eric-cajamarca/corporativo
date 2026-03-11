@@ -38,7 +38,8 @@ api.post('/conceptos', conceptoController.crear);
 api.put('/conceptos/:id', conceptoController.actualizar);
 api.delete('/conceptos/:id', conceptoController.eliminar);
 
-// Motivo Traslado
+// Motivo Traslado (catálogo SUNAT HandlingCode GRE)
+api.get('/motivo-traslado/codigos-sunat', motivoTrasladoController.codigosSunat);
 api.get('/motivo-traslado', motivoTrasladoController.listar);
 api.get('/motivo-traslado/:id', motivoTrasladoController.obtenerPorId);
 api.post('/motivo-traslado', motivoTrasladoController.crear);

@@ -1,0 +1,58 @@
+<!-- Sidebar -->
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <h1 class="h4 mb-3">
+          <i class="bi bi-gear me-2"></i> Configuración de guías electrónicas
+        </h1>
+      </div>
+    </div>
+
+    @if (!autorizado) {
+      <div class="alert alert-warning">
+        <p class="mb-2">La emisión de guías electrónicas no está habilitada para su empresa.</p>
+        <p class="mb-0">Active la opción <strong>«Habilitar emisión de guías electrónicas (remitente / transportista)»</strong> en <strong>Configuración</strong> → pestaña <strong>Facturación</strong>, guarde los cambios y vuelva aquí.</p>
+        <button type="button" class="btn btn-sm btn-primary mt-2" (click)="irAConfiguracion()">
+          <i class="bi bi-gear me-1"></i> Ir a Configuración
+        </button>
+      </div>
+    } @else {
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h2 class="h6 mb-0">Credenciales API guías de remisión (no SOAP)</h2>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small mb-3">Flujo: generar XML GRE → firmar XML → enviar por API. Endpoint: <strong>POST /v1/contribuyente/gem</strong>.</p>
+          <div class="mb-3">
+            <label for="urlBaseApiGuias" class="form-label">URL base API guías</label>
+            <input id="urlBaseApiGuias" type="text" class="form-control"
+                  [(ngModel)]="configuracionGuias.urlBaseApiGuias"
+                  placeholder="https://e-beta.sunat.gob.pe/...">
+            <small class="text-muted">Solo la URL base (sin /v1/contribuyente/gem). El path es fijo.</small>
+          </div>
+          <div class="mb-3">
+            <label for="idApiGuias" class="form-label">ID (credencial API)</label>
+            <input id="idApiGuias" type="text" class="form-control"
+                  [(ngModel)]="configuracionGuias.idApiGuias" placeholder="ID de la API">
+          </div>
+          <div class="mb-3">
+            <label for="claveApiGuias" class="form-label">CLAVE (credencial API)</label>
+            <input id="claveApiGuias" type="password" class="form-control"
+                  [(ngModel)]="configuracionGuias.claveApiGuias" placeholder="********">
+          </div>
+        </div>
+        <div class="card-footer text-end">
+          <button class="btn btn-primary" [disabled]="guardandoConfig" (click)="guardarConfiguracionGuias()">
+            <i class="bi bi-save me-1"></i>{{ guardandoConfig ? 'Guardando...' : 'Guardar configuración' }}
+          </button>
+        </div>
+      </div>
+    }
+
+  </div>
+</main>
