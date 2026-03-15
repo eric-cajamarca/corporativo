@@ -8,6 +8,7 @@ const empresasController = require('../controllers/empresasController');
 
 router.post('/', empresasController.createEmpresa);
 router.post('/verificar', empresasController.verificarEmpresaCodigo);
-// Envío de código de activación: usar POST /api/activacion/enviar-codigo (activacionPublic.js)
+/** Envío de código de activación por WhatsApp (solo desde pantalla Verificar empresa). Ruta pública, sin auth. */
+router.post('/enviar-codigo-activacion', empresasController.enviarCodigoActivacion);
 
 module.exports = router;

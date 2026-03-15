@@ -364,6 +364,7 @@ const putCredencialesProveedor = async function (req, res) {
 
 // Ruta pública: enviar código de activación por WhatsApp (sin sesión). Usa Factiliza WHATSAPP desde FactilizaConfig.
 const enviarCodigoActivacion = async function (req, res) {
+    console.log('entro a enviarCodigoActivacion', req.body);
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:entry',message:'enviarCodigoActivacion entered',data:{hasBody:!!req.body,idEmpresa:req.body?.idEmpresa!=null},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
     // #endregion

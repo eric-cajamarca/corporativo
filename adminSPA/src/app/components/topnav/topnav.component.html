@@ -208,29 +208,31 @@
             </div>
           </div>
           <div class="dropdown-divider"></div>
+          <!--
           <a class="dropdown-item" (click)="navigateToProfile(); $event.preventDefault()">
             <i class="fas fa-user me-2"></i>
             Mi Perfil
           </a>
+          -->
           <a class="dropdown-item d-flex align-items-center justify-content-between" (click)="abrirModalPlaca(); $event.preventDefault()">
-            <span><i class="fas fa-car-side me-2"></i>Consultar placa (Factiliza)</span>
+            <span><i class="bi bi-car-front-fill me-2"></i>Consultar placa</span>
             <span class="badge bg-danger ms-2" *ngIf="soatVencidoCount > 0">{{ soatVencidoCount }} SOAT vencido</span>
           </a>
           <a class="dropdown-item" (click)="abrirModalSoat(); $event.preventDefault()">
-            <i class="fas fa-file-medical me-2"></i>
-            Consultar SOAT (Factiliza)
+            <i class="bi bi-file-medical-fill me-2"></i>
+            Consultar SOAT
           </a>
           <a class="dropdown-item" (click)="navigateToEmpresa(); $event.preventDefault()">
-            <i class="fas fa-building me-2"></i>
+            <i class="bi bi-building-fill me-2"></i>
             Mi Empresa
           </a>
           <a class="dropdown-item" (click)="navigateToSettings(); $event.preventDefault()">
-            <i class="fas fa-cog me-2"></i>
+            <i class="bi bi-gear-fill me-2"></i>
             Configuración
           </a>
           <div class="dropdown-divider"></div>
           <a class="dropdown-item text-danger" (click)="logout(); $event.preventDefault()">
-            <i class="fas fa-sign-out-alt me-2"></i>
+            <i class="bi bi-box-arrow-right me-2"></i>
             Cerrar Sesión
           </a>
         </div>
@@ -255,13 +257,13 @@
   <div class="topnav-container">
     <div class="topnav-left">
       <div class="topnav-brand">
-        <i class="fas fa-building me-2"></i>
+        <i class="bi bi-building-fill me-2"></i>
         <span>Sistema de Gestión</span>
       </div>
     </div>
     <div class="topnav-right">
       <a [routerLink]="['/login-empresa']" class="btn btn-primary btn-sm">
-        <i class="fas fa-sign-in-alt me-1"></i>
+        <i class="bi bi-box-arrow-in-right me-1"></i>
         Iniciar Sesión
       </a>
     </div>

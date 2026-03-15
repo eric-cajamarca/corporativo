@@ -1,12 +1,9 @@
 /**
  * Rutas públicas solo para activación de empresa (sin auth).
- * Usar únicamente en el flujo de verificación por código WhatsApp.
- * Montar en app.js ANTES de las rutas protegidas.
+ * El envío de código de verificación está en empresaPublic.js: POST /api/empresa/enviar-codigo-activacion
+ * (usar solo desde pantalla Verificar empresa). Se mantiene este archivo por si se agregan otras rutas de activación.
  */
 const express = require('express');
 const router = express.Router();
-const empresasController = require('../controllers/empresasController');
-
-router.post('/enviar-codigo', empresasController.enviarCodigoActivacion);
 
 module.exports = router;

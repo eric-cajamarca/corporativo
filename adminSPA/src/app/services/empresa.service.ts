@@ -143,11 +143,11 @@ export class EmpresaService {
     );
   }
 
-  /** Envía o reenvía el código de activación por WhatsApp (ruta pública /api/activacion, sin sesión). */
+  /** Envía o reenvía el código de activación por WhatsApp (ruta pública /api/empresa/enviar-codigo-activacion; solo desde Verificar empresa). */
   enviarCodigoActivacion(idEmpresa: string, celular?: string): Observable<{ message?: string }> {
     const body = celular ? { idEmpresa, celular } : { idEmpresa };
     return this._http.post<{ message?: string }>(
-      this.url + 'activacion/enviar-codigo',
+      this.url + 'empresa/enviar-codigo-activacion',
       body,
       { withCredentials: true }
     );
