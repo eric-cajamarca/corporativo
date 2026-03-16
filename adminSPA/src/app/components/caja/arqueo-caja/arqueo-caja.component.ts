@@ -231,8 +231,20 @@ export class ArqueoCajaComponent implements OnInit {
     });
   }
 
+  /** Total primera tabla: solo resta efectivo en Compra al contado; el resto de compras al contado (Yape, transferencia, etc.) se muestra pero no afecta. */
   get totalConceptos(): number {
-    return this.resumenConceptos.reduce((acc, f) => acc + f.importe, 0);
+    if (!this.filasArqueoRaw || this.filasArqueoRaw.length === 0) {
+      return this.resumenConceptos.reduce((acc, f) => acc + f.importe, 0);
+    }
+    return this.filasArqueoRaw.reduce((acc, r) => {
+      const conceptoNorm = this.normConcepto(r.concepto || '');
+      const isCompraContadoEgreso = conceptoNorm === 'COMPRA CONTADO' && r.tipoOperacion === 'E';
+      const formaNorm = this.normalizarFormaPago(r.formaPago || '');
+      const isEfectivo = formaNorm === 'EFECTIVO';
+      if (isCompraContadoEgreso && !isEfectivo) return acc;
+      const sign = r.tipoOperacion === 'E' ? -1 : 1;
+      return acc + sign * (r.importe || 0);
+    }, 0);
   }
 
   private importePorConcepto(conceptoConEspacios: string): number {

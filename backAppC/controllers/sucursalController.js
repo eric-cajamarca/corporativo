@@ -57,13 +57,41 @@ const obtener_sucursal_todos = async function (req, res) {
         const pool = await sql.connect(dbConfig);
         const result = await pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .query('SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa ORDER BY nombre');
+            .query(`SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`);
         res.status(200).send({ data: result.recordset });
     } catch (error) {
         console.error('obtener_sucursal_todos:', error);
         res.status(500).send({ message: 'Error al obtener las sucursales', data: undefined });
     }
 }
+
+/** Marca una sucursal como principal para la empresa (solo una por empresa). Usado en gestión de ubicaciones y dirección principal. */
+const establecer_sucursal_principal = async function (req, res) {
+    if (!req.user) return res.status(401).send({ message: 'No Access', data: undefined });
+    const idEmpresa = req.user.empresa || req.user.idEmpresa;
+    if (!idEmpresa) return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: undefined });
+    if (req.user.rol !== 'Administrador') return res.status(403).send({ message: 'Sin permisos', data: undefined });
+    const idSucursal = req.params.id;
+    if (!idSucursal) return res.status(400).send({ message: 'Falta id sucursal', data: undefined });
+    try {
+        const pool = await sql.connect(dbConfig);
+        const verif = await pool.request()
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('SELECT 1 FROM Sucursal WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa');
+        if (!verif.recordset || verif.recordset.length === 0) {
+            return res.status(404).send({ message: 'Sucursal no encontrada o no pertenece a su empresa', data: undefined });
+        }
+        await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query('UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa');
+        await pool.request()
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+            .query('UPDATE Sucursal SET esPrincipal = 1 WHERE idSucursal = @idSucursal');
+        res.status(200).send({ message: 'Sucursal principal actualizada', data: { idSucursal } });
+    } catch (error) {
+        console.error('establecer_sucursal_principal:', error);
+        res.status(500).send({ message: 'Error al establecer sucursal principal', data: undefined });
+    }
+};
 
 // const crear_sucursal_idEmpresa = async function (req, res) {
 
@@ -435,6 +463,7 @@ const eliminar_stock_sucursal = async function (req, res) {
 module.exports = {
     obtener_sucursal_idempresa,
     obtener_sucursal_todos,
+    establecer_sucursal_principal,
     //crear_sucursal_idEmpresa,
     editar_sucursal_idEmpresa,
     eliminar_sucursal_idempresa,

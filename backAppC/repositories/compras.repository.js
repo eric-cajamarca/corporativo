@@ -82,6 +82,16 @@ exports.obtenerDescripcionMedioPago = async (pool, idMediosPago) => {
 };
 
 /**
+ * Obtiene descripción de FormasPago por idFormaPago (para compras que envían idFormaPago en idMediosPago).
+ */
+exports.obtenerDescripcionFormaPago = async (pool, idFormaPago) => {
+    const result = await pool.request()
+        .input('idFormaPago', sql.Int, idFormaPago)
+        .query('SELECT descripcion FROM FormasPago WHERE idFormaPago = @idFormaPago');
+    return result.recordset?.[0]?.descripcion || '';
+};
+
+/**
  * Obtiene el código del comprobante (ej. '01' Factura, '03' Boleta) por idComprobante e idEmpresa.
  */
 exports.obtenerCodigoComprobante = async (pool, idEmpresa, idComprobante) => {

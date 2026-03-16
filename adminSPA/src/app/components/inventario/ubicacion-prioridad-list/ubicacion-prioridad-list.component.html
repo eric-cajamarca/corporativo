@@ -1,6 +1,6 @@
 <div class="modal-header bg-secondary text-white">
   <h5 class="modal-title">
-    <i class="fas fa-map-marker-alt me-2"></i>
+    <i class="bi bi-map me-2"></i>
     Gestión de Ubicaciones con Prioridad
   </h5>
   <button type="button" class="btn-close btn-close-white" (click)="cerrar()"></button>
@@ -8,7 +8,7 @@
 
 <div class="modal-body">
   <p class="text-muted mb-3">
-    <i class="fas fa-info-circle me-1"></i>
+    <i class="bi bi-info-circle me-1"></i>
     Define el orden en que se consume el stock (1 = Primera prioridad, menor número = mayor prioridad)
   </p>
 
@@ -16,7 +16,7 @@
   <div class="mb-3">
     @if (!mostrandoFormNuevo) {
       <button class="btn btn-primary btn-sm" (click)="mostrarFormNuevo()">
-        <i class="fas fa-plus me-1"></i>Nueva Ubicación
+        <i class="bi bi-plus-lg me-1"></i>Nueva Ubicación
       </button>
     } @else {
       <div class="card bg-light mb-3">
@@ -24,27 +24,36 @@
           <h6 class="card-title">Nueva Ubicación</h6>
           <form [formGroup]="nuevaUbicacionForm">
             <div class="row">
-              <div class="col-md-4 mb-2">
+              <div class="col-md-3 mb-2">
                 <label class="form-label small">Sucursal *</label>
                 <select formControlName="idSucursal" class="form-select form-select-sm">
                   <option value="">Seleccione...</option>
                   @for (sucursal of sucursales; track sucursal.idSucursal) {
                     <option [value]="sucursal.idSucursal">
-                      {{ sucursal.nombre || sucursal.codigo || 'Sucursal' }} - {{ sucursal.direccion || 'Sin dirección' }}
+                      {{ sucursal.nombre || sucursal.codigo || 'Sucursal' }}{{ sucursal.esPrincipal ? ' (Principal)' : '' }}
                     </option>
                   }
                 </select>
               </div>
-              <div class="col-md-4 mb-2">
+              <div class="col-md-3 mb-2">
+                <label class="form-label small">Ubicación padre (opcional)</label>
+                <select formControlName="idUbicacionPadre" class="form-select form-select-sm">
+                  <option [ngValue]="null">Ninguna (es ubicación padre)</option>
+                  @for (u of ubicacionesParaPadre; track u.idUbicacion) {
+                    <option [ngValue]="u.idUbicacion">{{ u.codigoUbicacion }} (prioridad {{ u.prioridad }})</option>
+                  }
+                </select>
+              </div>
+              <div class="col-md-2 mb-2">
                 <label class="form-label small">Código Ubicación *</label>
                 <input 
                   type="text" 
                   formControlName="codigoUbicacion" 
                   class="form-control form-control-sm"
-                  placeholder="Ej: A-01-02"
+                  placeholder="Ej: PISO-1, A-01"
                   maxlength="20">
               </div>
-              <div class="col-md-2 mb-2">
+              <div class="col-md-1 mb-2">
                 <label class="form-label small">Prioridad *</label>
                 <input 
                   type="number" 
@@ -66,7 +75,7 @@
                   class="btn btn-secondary btn-sm" 
                   (click)="cancelarNuevo()"
                   [disabled]="guardando">
-                  <i class="bi bi-x-times"></i>
+                  <i class="bi bi-x-lg"></i>
                 </button>
               </div>
             </div>
@@ -87,7 +96,7 @@
   @if (!isLoading) {
     @if (objectRef.keys(ubicacionesPorSucursal).length === 0) {
       <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
+        <i class="bi bi-info-circle me-2"></i>
         No hay ubicaciones configuradas. Cree una nueva ubicación para comenzar.
       </div>
     } @else {
@@ -111,8 +120,9 @@
                   <table class="table table-sm table-hover mb-0">
                     <thead class="table-light">
                       <tr>
-                        <th style="width: 100px;">Prioridad</th>
+                        <th style="width: 80px;">Prioridad</th>
                         <th>Código Ubicación</th>
+                        <th style="width: 140px;">Ubicación padre</th>
                         <th class="text-end" style="width: 150px;">Acciones</th>
                       </tr>
                     </thead>
@@ -126,7 +136,7 @@
                                   type="number" 
                                   formControlName="prioridad"
                                   class="form-control form-control-sm" 
-                                  style="width: 80px;"
+                                  style="width: 70px;"
                                   min="1">
                               </div>
                             } @else {
@@ -135,7 +145,7 @@
                                 class="form-control form-control-sm" 
                                 [value]="ubicacion.prioridad"
                                 (blur)="actualizarPrioridad(ubicacion.idUbicacion!, $any($event.target).value)"
-                                style="width: 80px;"
+                                style="width: 70px;"
                                 min="1">
                             }
                           </td>
@@ -152,6 +162,20 @@
                               <strong>{{ ubicacion.codigoUbicacion }}</strong>
                             }
                           </td>
+                          <td>
+                            @if (editandoId === ubicacion.idUbicacion) {
+                              <div [formGroup]="formEdicion">
+                                <select formControlName="idUbicacionPadre" class="form-select form-select-sm" style="width: 130px;">
+                                  <option [ngValue]="null">Ninguna</option>
+                                  @for (u of ubicacionesParaPadreEdicion; track u.idUbicacion) {
+                                    <option [ngValue]="u.idUbicacion">{{ u.codigoUbicacion }}</option>
+                                  }
+                                </select>
+                              </div>
+                            } @else {
+                              {{ getCodigoPadre(ubicacion.idUbicacionPadre) }}
+                            }
+                          </td>
                           <td class="text-end">
                             @if (editandoId === ubicacion.idUbicacion) {
                               <button 
@@ -164,7 +188,7 @@
                                 class="btn btn-sm btn-secondary" 
                                 (click)="cancelarEdicion()"
                                 [disabled]="guardando">
-                                <i class="bi bi-x-times"></i>
+                                <i class="bi bi-x-lg"></i>
                               </button>
                             } @else {
                               <button 
@@ -197,6 +221,6 @@
 
 <div class="modal-footer">
   <button class="btn btn-secondary" (click)="cerrar()">
-    <i class="fas fa-times me-1"></i>Cerrar
+    <i class="bi bi-x-times me-1"></i>Cerrar
   </button>
 </div>

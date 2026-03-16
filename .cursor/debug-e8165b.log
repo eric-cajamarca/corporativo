@@ -95,3 +95,7 @@
 {"sessionId":"e8165b","location":"autenticate.js:403","message":"NoTokenError","data":{"path":"/logout","method":"POST","url":"/api/logout"},"timestamp":1773546654551,"hypothesisId":"A"}
 {"sessionId":"e8165b","location":"autenticate.js:403","message":"NoTokenError","data":{"path":"/logout","method":"POST","url":"/api/logout"},"timestamp":1773546859776,"hypothesisId":"A"}
 {"sessionId":"e8165b","location":"autenticate.js:403","message":"NoTokenError","data":{"path":"/logout","method":"POST","url":"/api/logout"},"timestamp":1773546872537,"hypothesisId":"A"}
+{"sessionId":"e8165b","location":"externalController.js:getRuc","message":"getRuc called","data":{"hasUser":true,"isPublicRoute":false,"ruc":"20603027613"},"timestamp":1773613965817,"hypothesisId":"A"}
+{"sessionId":"e8165b","location":"autenticate.js:403","message":"NoTokenError","data":{"path":"/logout","method":"POST","url":"/api/logout"},"timestamp":1773622353810,"hypothesisId":"A"}
+{"sessionId":"e8165b","location":"autenticate.js:403","message":"NoTokenError","data":{"path":"/logout","method":"POST","url":"/api/logout"},"timestamp":1773622363839,"hypothesisId":"A"}
+{"sessionId":"e8165b","location":"autenticate.js:403","message":"NoTokenError","data":{"path":"/logout","method":"POST","url":"/api/logout"},"timestamp":1773622390692,"hypothesisId":"A"}

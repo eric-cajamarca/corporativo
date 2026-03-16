@@ -134,8 +134,10 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
  */
 exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
     console.log('Creando sucursal principal para empresa:', idEmpresa);
-    
-    // sql ya importado arriba
+    const direccionSucursal = datosEmpresa.direccion || 'Sin dirección';
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c0e71'},body:JSON.stringify({sessionId:'3c0e71',location:'empresa.service.crearSucursalPrincipal',message:'direccion used for sucursal',data:{datosEmpresaDireccion:datosEmpresa.direccion,direccionSucursal},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     const idSucursal = uuidv4();
 
     try {
@@ -143,7 +145,7 @@ exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
             .input('idSucursal', sql.UniqueIdentifier, idSucursal)
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .input('nombre', sql.VarChar(50), 'Sucursal Principal')
-            .input('direccion', sql.VarChar(200), datosEmpresa.direccion || 'Sin dirección')
+            .input('direccion', sql.VarChar(200), direccionSucursal)
             .input('telefono', sql.VarChar(20), datosEmpresa.celular || '')
             .input('estado', sql.Bit, 1)
             .query(`

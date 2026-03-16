@@ -430,7 +430,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
         mc.monto,
         tmc.nombre AS tipoMovimiento,
         tmc.tipo AS tipoOperacion,
-        mp.descripcion AS medioPago,
+        ISNULL(fp.descripcion, mp.descripcion) AS medioPago,
         mon.simbolo + ' ' + mon.descripcion AS moneda,
         mc.documentoRelacionado,
         mc.observaciones,
@@ -438,7 +438,8 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
       FROM MovimientosCaja mc
       INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
       LEFT JOIN Concepto conc ON mc.idConcepto = conc.idConcepto
-      LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
+      LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
+      LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
       INNER JOIN Moneda mon ON mc.idMoneda = mon.idMoneda
       INNER JOIN UsuarioWeb uw ON mc.idUsuario = uw.idUsuario
       ${whereClause}
@@ -711,17 +712,18 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(mp.descripcion, 'Sin especificar') AS formaPago,
+      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
       SUM(mc.monto) AS importe
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
-    LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
+    LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
+    LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
       ${condicionFecha}
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)
       ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
-    GROUP BY tmc.nombre, tmc.tipo, mp.descripcion
+    GROUP BY tmc.nombre, tmc.tipo, fp.descripcion, mp.descripcion
   `;
 
   const result = await request.query(`
@@ -730,12 +732,35 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     (${sqlOtros})
     ORDER BY tipoOperacion DESC, concepto, formaPago
   `);
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'X-Debug-Session-Id':'3c0e71'
+    },
+    body:JSON.stringify({
+      sessionId:'3c0e71',
+      runId:'post-fix',
+      hypothesisId:'H2-H3',
+      location:'caja.repository.js:obtenerArqueoDinamicoRepo',
+      message:'Filas arqueo dinámico por concepto/formaPago',
+      data:(result.recordset || []).map(r => ({
+        concepto:r.concepto,
+        tipoOperacion:r.tipoOperacion,
+        formaPago:r.formaPago,
+        importe:r.importe
+      })),
+      timestamp:Date.now()
+    })
+  }).catch(()=>{});
+  // #endregion
 
   const sqlDetalleVentas = `
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(mp.descripcion, 'Sin especificar') AS formaPago,
+      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
       mc.monto AS importe,
       v.serie + '-' + v.numero AS comprobante,
       ISNULL(cl.rSocial, '') AS clienteOrProveedor
@@ -745,6 +770,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     INNER JOIN Ventas v ON v.idVenta = mc.idVenta AND v.idEmpresa = mc.idEmpresa
     INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
     LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+    LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
       ${condicionFecha}
@@ -755,14 +781,15 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(mp.descripcion, 'Sin especificar') AS formaPago,
+      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
       mc.monto AS importe,
       ISNULL(mc.documentoRelacionado, '') AS comprobante,
       ISNULL(mc.concepto, '') AS clienteOrProveedor
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
-    LEFT JOIN MediosPago mp ON mc.idMediosPago = mp.idMediosPago
+    LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
+    LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE mc.idEmpresa = @idEmpresa
       ${condicionFecha}
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)

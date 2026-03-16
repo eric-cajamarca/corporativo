@@ -35,6 +35,7 @@ export class UbicacionPrioridadListComponent implements OnInit {
   
   // Modo edición
   editandoId: number | null = null;
+  editandoSucursalId: string | null = null;
   formEdicion: FormGroup;
   
   // Bandera de carga
@@ -52,13 +53,15 @@ export class UbicacionPrioridadListComponent implements OnInit {
   ) {
     this.nuevaUbicacionForm = this.fb.group({
       idSucursal: ['', Validators.required],
+      idUbicacionPadre: [null as number | null],
       codigoUbicacion: ['', [Validators.required, Validators.maxLength(20)]],
       prioridad: [999, [Validators.required, Validators.min(1)]]
     });
 
     this.formEdicion = this.fb.group({
       codigoUbicacion: ['', [Validators.required, Validators.maxLength(20)]],
-      prioridad: [999, [Validators.required, Validators.min(1)]]
+      prioridad: [999, [Validators.required, Validators.min(1)]],
+      idUbicacionPadre: [null as number | null]
     });
   }
 
@@ -76,10 +79,15 @@ export class UbicacionPrioridadListComponent implements OnInit {
         this.sucursales = response.data || [];
         if (this.sucursalFiltro) {
           this.nuevaUbicacionForm.patchValue({ idSucursal: this.sucursalFiltro });
+        } else {
+          const principal = this.sucursales.find((s: any) => s.esPrincipal === true || s.esPrincipal === 1);
+          if (principal?.idSucursal) {
+            this.nuevaUbicacionForm.patchValue({ idSucursal: principal.idSucursal });
+          }
         }
       },
       error: (error) => {
-        console.error('Error cargando sucursales:', error);
+        console.error('Error cargando sucursales', error);
       }
     });
   }
@@ -97,7 +105,8 @@ export class UbicacionPrioridadListComponent implements OnInit {
           idUbicacion: u.idUbicacion != null ? Number(u.idUbicacion) : undefined,
           idSucursal: u.idSucursal,
           codigoUbicacion: u.codigoUbicacion ?? '',
-          prioridad: u.prioridad != null ? Number(u.prioridad) : 999
+          prioridad: u.prioridad != null ? Number(u.prioridad) : 999,
+          idUbicacionPadre: u.idUbicacionPadre != null && u.idUbicacionPadre !== '' ? Number(u.idUbicacionPadre) : null
         })).filter((u: any) => u.idUbicacion != null && !isNaN(u.idUbicacion));
         if (this.sucursalFiltro) {
           this.ubicaciones = this.ubicaciones.filter((u: any) => u.idSucursal === this.sucursalFiltro);
@@ -146,9 +155,25 @@ export class UbicacionPrioridadListComponent implements OnInit {
     this.mostrandoFormNuevo = true;
     this.nuevaUbicacionForm.reset({
       idSucursal: this.sucursalFiltro || '',
+      idUbicacionPadre: null,
       codigoUbicacion: '',
       prioridad: 999
     });
+  }
+
+  /** Ubicaciones de la sucursal seleccionada para usar como padre (misma sucursal). */
+  get ubicacionesParaPadre(): UbicacionPrioridad[] {
+    const idSuc = this.nuevaUbicacionForm.get('idSucursal')?.value;
+    if (!idSuc) return [];
+    return this.ubicaciones.filter(u => u.idSucursal === idSuc);
+  }
+
+  /** Para edición: ubicaciones de la misma sucursal que la fila editada (excluye la propia). */
+  get ubicacionesParaPadreEdicion(): UbicacionPrioridad[] {
+    if (!this.editandoSucursalId) return [];
+    return this.ubicaciones.filter(u =>
+      u.idSucursal === this.editandoSucursalId && u.idUbicacion !== this.editandoId
+    );
   }
 
   /**
@@ -174,8 +199,10 @@ export class UbicacionPrioridadListComponent implements OnInit {
     }
 
     this.guardando = true;
-    const datos = this.nuevaUbicacionForm.value;
-    
+    const datos = { ...this.nuevaUbicacionForm.value };
+    if (datos.idUbicacionPadre == null || datos.idUbicacionPadre === '') {
+      (datos as any).idUbicacionPadre = null;
+    }
     this.ubicacionService.crear_ubicacionPrioridad(datos).subscribe({
       next: () => {
         this.guardando = false;
@@ -205,9 +232,11 @@ export class UbicacionPrioridadListComponent implements OnInit {
    */
   iniciarEdicion(ubicacion: UbicacionPrioridad): void {
     this.editandoId = ubicacion.idUbicacion!;
+    this.editandoSucursalId = ubicacion.idSucursal;
     this.formEdicion.patchValue({
       codigoUbicacion: ubicacion.codigoUbicacion,
-      prioridad: ubicacion.prioridad
+      prioridad: ubicacion.prioridad,
+      idUbicacionPadre: ubicacion.idUbicacionPadre ?? null
     });
   }
 
@@ -216,7 +245,8 @@ export class UbicacionPrioridadListComponent implements OnInit {
    */
   cancelarEdicion(): void {
     this.editandoId = null;
-    this.formEdicion.reset();
+    this.editandoSucursalId = null;
+    this.formEdicion.reset({ codigoUbicacion: '', prioridad: 999, idUbicacionPadre: null });
   }
 
   /**
@@ -234,12 +264,15 @@ export class UbicacionPrioridadListComponent implements OnInit {
     }
 
     this.guardando = true;
-    const datos = this.formEdicion.value;
-    
+    const datos = { ...this.formEdicion.value } as any;
+    if (datos.idUbicacionPadre == null || datos.idUbicacionPadre === '') {
+      datos.idUbicacionPadre = null;
+    }
     this.ubicacionService.actualizar_ubicacionPrioridad(idUbicacion, datos).subscribe({
       next: () => {
         this.guardando = false;
         this.editandoId = null;
+        this.editandoSucursalId = null;
         iziToast.show({
           title: 'Éxito',
           titleColor: '#28a745',
@@ -331,6 +364,12 @@ export class UbicacionPrioridadListComponent implements OnInit {
     const nombre = sucursal.nombre || sucursal.codigo || 'Sucursal';
     const direccion = sucursal.direccion || 'Sin dirección';
     return `${nombre} - ${direccion}`;
+  }
+
+  getCodigoPadre(idUbicacionPadre: number | null | undefined): string {
+    if (idUbicacionPadre == null) return '—';
+    const u = this.ubicaciones.find(x => x.idUbicacion === idUbicacionPadre);
+    return u?.codigoUbicacion ?? '—';
   }
 
   /**

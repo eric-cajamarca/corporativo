@@ -103,8 +103,10 @@ const getEmpresa_id = async function (req, res) {
             .request()
             .input('idEmpresa', sql.UniqueIdentifier, id)
             .query(
-                'SELECT e.logo, e.razon_Social AS nombre, e.ruc, e.rubro, e.correo, e.celular AS telefono, de.direccion, e.idRubro, r.codigo AS codigoRubro ' +
+                'SELECT e.logo, e.razon_Social AS nombre, e.ruc, e.rubro, e.correo, e.celular AS telefono, ' +
+                'ISNULL(s.direccion, de.direccion) AS direccion, e.idRubro, r.codigo AS codigoRubro, s.idSucursal AS idSucursalPrincipal ' +
                 'FROM Empresas e ' +
+                'LEFT JOIN Sucursal s ON s.idEmpresa = e.idEmpresa AND s.esPrincipal = 1 ' +
                 'LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1 ' +
                 'LEFT JOIN Rubros r ON e.idRubro = r.idRubro ' +
                 'WHERE e.idEmpresa = @idEmpresa'
@@ -220,7 +222,9 @@ const createEmpresa = async function (req, res) {
                     celular,
                     direccion: req.body.direccion || 'Sin dirección'
                 };
-                
+                // #region agent log
+                fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c0e71'},body:JSON.stringify({sessionId:'3c0e71',location:'empresasController.createEmpresa:datosEmpresa',message:'datosEmpresa before inicializar',data:{reqBodyDireccion:req.body.direccion,datosEmpresaDireccion:datosEmpresa.direccion},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+                // #endregion
                 const resultadoInicializacion = await empresaService.inicializarDatosEmpresa(pool, idEmpresa, datosEmpresa);
                 
                 console.log('✅ Datos maestros inicializados:', {
@@ -692,8 +696,8 @@ const createDireccionEmpresa = async function (req, res) {
         let distrito = req.body.distrito;
         let urbanizacion = req.body.urbanizacion;
         let direccion = req.body.direccion;
-        let codLocal = '0';
-        let principal = true;
+        let principal = req.body.principal !== false && req.body.principal !== 'false';
+        let codLocal = principal ? '0000' : (req.body.codLocal || '0');
 
 
         //let idUsuario = 'C654A619-B725-4C2E-9175-A3F4AC3B7845';
@@ -715,6 +719,15 @@ const createDireccionEmpresa = async function (req, res) {
             //.input('idUsuario', sql.UniqueIdentifier, idUsuario)
             //.input('nombre', sql.VarChar, nombre)
             .query('insert into DireccionEmpresa (idEmpresa,ubigeo,codPais,region,provincia,distrito,urbanizacion,direccion,codLocal, principal) values (@idEmpresa,@ubigeo,@codPais,@region,@provincia,@distrito,@urbanizacion,@direccion,@codLocal,@principal)');
+
+        // Si es dirección principal, actualizar la sucursal principal para que tenga la misma dirección (gestión de ubicaciones usa sucursal principal)
+        if (principal) {
+            const dirTexto = (direccion != null && direccion !== undefined) ? String(direccion).trim() : '';
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('direccion', sql.VarChar(200), dirTexto || null)
+                .query("UPDATE Sucursal SET direccion = @direccion WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
+        }
 
         // Crear sucursal solo si el usuario indica crearSucursal y nombreSucursal (nueva dirección = nueva sucursal con nombre elegido)
         if (req.body.crearSucursal === true && req.body.nombreSucursal && String(req.body.nombreSucursal).trim()) {
@@ -806,6 +819,16 @@ const updateDireccionEmpresa = async function (req, res) {
                     .input('codLocal', sql.VarChar, codLocal)
                     .input('principal', sql.Bit, principal)
                     .query('UPDATE DireccionEmpresa SET ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, codLocal = @codLocal, principal = @principal WHERE idDireccionEmpresa = @id');
+                if (principal) {
+                    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+                    if (idEmpresa) {
+                        const dirTexto = (direccion != null && direccion !== undefined) ? String(direccion).trim() : '';
+                        await pool.request()
+                            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                            .input('direccion', sql.VarChar(200), dirTexto || null)
+                            .query("UPDATE Sucursal SET direccion = @direccion WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
+                    }
+                }
                 res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al actualizar un DireccionEmpresa:', error);

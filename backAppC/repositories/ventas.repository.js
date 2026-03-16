@@ -137,7 +137,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
           v.idComprobante,
           v.idCliente,
           v.idMediosPago,
-          ISNULL(mp.descripcion, v.idMediosPago) AS condicionPago,
+          ISNULL(fp.descripcion, ISNULL(mp.descripcion, v.idMediosPago)) AS condicionPago,
           c.nombre AS nombreComprobante,
           c.codigo AS codigoComprobante,
           COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
@@ -150,12 +150,13 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
         LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+        LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
         WHERE v.idEmpresa = @idEmpresa
         ORDER BY v.fEmision DESC
       `);
   } catch (err) {
-    if (err.message && (err.message.includes('MediosPago') || err.message.includes('Invalid object'))) {
+    if (err.message && (err.message.includes('MediosPago') || err.message.includes('FormasPago') || err.message.includes('Invalid object'))) {
       result = await pool
         .request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -221,13 +222,14 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
           v.compRelacionado, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
-          ISNULL(mp.descripcion, 'Contado') AS condicionPago,
+          ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Contado')) AS condicionPago,
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
           (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa

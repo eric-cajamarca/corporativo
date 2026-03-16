@@ -79,10 +79,35 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
     let idEstadoPagoFinal = idEstadoPago != null ? Number(idEstadoPago) : 2;
     const pool = await sql.connect(dbConfig);
     if (idMediosPago != null) {
-        const desc = await comprasRepository.obtenerDescripcionMedioPago(pool, Number(idMediosPago));
+        const idNum = Number(idMediosPago);
+        let desc = await comprasRepository.obtenerDescripcionFormaPago(pool, idNum);
+        if (!desc) desc = await comprasRepository.obtenerDescripcionMedioPago(pool, idNum);
         if (/credito/i.test(desc)) {
             idEstadoPagoFinal = 1;
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'X-Debug-Session-Id':'3c0e71'
+          },
+          body:JSON.stringify({
+            sessionId:'3c0e71',
+            runId:'post-fix',
+            hypothesisId:'H1-H2',
+            location:'compras.service.js:crearCompra',
+            message:'Estado pago y medio pago para compra',
+            data:{
+              idMediosPago,
+              descMedioPago: desc,
+              idEstadoPagoOriginal: idEstadoPago,
+              idEstadoPagoFinal
+            },
+            timestamp:Date.now()
+          })
+        }).catch(()=>{});
+        // #endregion
     }
 
     await comprasRepository.crearCompra(pool, {
@@ -125,6 +150,30 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
                 if (idTipoEgreso) {
                     const serieNum = [serie, numero].filter(Boolean).join('-') || compCompra || 'Compra';
                     const userMin = { empresa: idEmpresa, sub: idUsuario, sucursal: apertura.idSucursal || undefined };
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{
+                      method:'POST',
+                      headers:{
+                        'Content-Type':'application/json',
+                        'X-Debug-Session-Id':'3c0e71'
+                      },
+                      body:JSON.stringify({
+                        sessionId:'3c0e71',
+                        runId:'post-fix',
+                        hypothesisId:'H1-H2',
+                        location:'compras.service.js:crearCompra',
+                        message:'Registro egreso caja por compra',
+                        data:{
+                          idCompra,
+                          idMediosPago,
+                          totalNum,
+                          serieNum,
+                          idTipoMovimientoCaja:idTipoEgreso
+                        },
+                        timestamp:Date.now()
+                      })
+                    }).catch(()=>{});
+                    // #endregion
                     await CajaRepository.registrarMovimientoRepo(pool, userMin, {
                         idApertura: apertura.idApertura,
                         idTipoMovimientoCaja: idTipoEgreso,

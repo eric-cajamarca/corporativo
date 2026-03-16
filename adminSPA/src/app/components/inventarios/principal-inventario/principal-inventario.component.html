@@ -26,7 +26,7 @@
               <h3 class="stat-value mb-0">{{ totalLotes }}</h3>
             </div>
             <div class="stat-icon">
-              <i class="fas fa-boxes fa-2x"></i>
+              <i class="bi bi-boxes fa-2x"></i>
             </div>
           </div>
         </div>
@@ -41,7 +41,7 @@
               <h3 class="stat-value mb-0">{{ totalStock }}</h3>
             </div>
             <div class="stat-icon">
-              <i class="fas fa-warehouse fa-2x"></i>
+              <i class="bi bi-warehouse fa-2x"></i>
             </div>
           </div>
         </div>
@@ -56,7 +56,7 @@
               <h3 class="stat-value mb-0">{{ lotesRecientes.length }}</h3>
             </div>
             <div class="stat-icon">
-              <i class="fas fa-clock fa-2x"></i>
+              <i class="bi bi-clock fa-2x"></i>
             </div>
           </div>
         </div>
@@ -68,7 +68,7 @@
   <div class="card mb-4">
     <div class="card-header">
       <h5 class="mb-0">
-        <i class="fas fa-bolt me-2"></i>
+        <i class="bi bi-bolt me-2"></i>
         Accesos Rápidos
       </h5>
     </div>
@@ -76,42 +76,42 @@
       <div class="row g-3">
         <div class="col-md-4 col-sm-6">
           <a routerLink="/inventario/ingreso-salida" class="btn btn-outline-primary w-100 h-100 quick-action-btn text-decoration-none d-flex flex-column align-items-center justify-content-center">
-            <i class="fas fa-file-invoice fa-2x mb-2"></i>
+            <i class="bi bi-cart-check fa-2x mb-2"></i>
             <div>Ingresos y salidas</div>
             <small class="text-muted">Movimiento de inventario (tipo factura)</small>
           </a>
         </div>
         <div class="col-md-4 col-sm-6">
           <button type="button" class="btn btn-outline-secondary w-100 h-100 quick-action-btn" (click)="abrirCrearLote($event)">
-            <i class="fas fa-plus-circle fa-2x mb-2"></i>
+            <i class="bi bi-plus-circle fa-2x mb-2"></i>
             <div>Nuevo Lote</div>
             <small class="text-muted">Crear lote manualmente</small>
           </button>
         </div>
         <div class="col-md-4 col-sm-6">
           <button type="button" class="btn btn-outline-success w-100 h-100 quick-action-btn" (click)="abrirListaLotes($event)">
-            <i class="fas fa-list fa-2x mb-2"></i>
+            <i class="bi bi-list fa-2x mb-2"></i>
             <div>Gestionar Lotes</div>
             <small class="text-muted">Ver y editar lotes</small>
           </button>
         </div>
         <div class="col-md-4 col-sm-6">
           <button type="button" class="btn btn-outline-info w-100 h-100 quick-action-btn" (click)="abrirAsignarUbicaciones($event)">
-            <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+            <i class="bi bi-map fa-2x mb-2"></i>
             <div>Asignar Ubicaciones</div>
             <small class="text-muted">Distribuir stock en ubicaciones</small>
           </button>
         </div>
         <div class="col-md-4 col-sm-6">
           <button type="button" class="btn btn-outline-warning w-100 h-100 quick-action-btn" (click)="abrirMovimientoUbicacion($event)">
-            <i class="fas fa-exchange-alt fa-2x mb-2"></i>
+            <i class="bi bi-arrow-repeat fa-2x mb-2"></i>
             <div>Mover Stock</div>
             <small class="text-muted">Trasladar entre ubicaciones</small>
           </button>
         </div>
         <div class="col-md-4 col-sm-6">
           <button type="button" class="btn btn-outline-secondary w-100 h-100 quick-action-btn" (click)="abrirUbicacionesPrioridad($event)">
-            <i class="fas fa-sort-numeric-down fa-2x mb-2"></i>
+            <i class="bi bi-sort-numeric-down fa-2x mb-2"></i>
             <div>Ubicaciones</div>
             <small class="text-muted">Configurar prioridades</small>
           </button>
@@ -124,7 +124,7 @@
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <h5 class="mb-0">
-        <i class="fas fa-history me-2"></i>
+        <i class="bi bi-history me-2"></i>
         Lotes Recientes
       </h5>
       <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirListaLotes($event)">
@@ -138,7 +138,7 @@
         </div>
       } @else if (lotesRecientes.length === 0) {
         <div class="text-center py-4 text-muted">
-          <i class="fas fa-box-open fa-3x mb-2"></i>
+          <i class="bi bi-box-open fa-3x mb-2"></i>
           <p class="mb-0">No hay lotes registrados</p>
           <button type="button" class="btn btn-primary mt-2" (click)="abrirCrearLote($event)">
             Crear Primer Lote
@@ -177,13 +177,13 @@
                         class="btn btn-outline-success" 
                         (click)="inventarioModal.abrirAsignarUbicaciones(lote.idLote, lote.cantidadDisponible)"
                         title="Asignar Ubicaciones">
-                        <i class="fas fa-map-marker-alt"></i>
+                        <i class="bi bi-map"></i>
                       </button>
                       <button 
                         class="btn btn-outline-info" 
                         (click)="inventarioModal.abrirMovimientoUbicacion(lote.idLote)"
                         title="Mover Stock">
-                        <i class="fas fa-exchange-alt"></i>
+                        <i class="bi bi-arrow-repeat"></i>
                       </button>
                     </div>
                   </td>

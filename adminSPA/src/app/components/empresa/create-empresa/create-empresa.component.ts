@@ -484,7 +484,8 @@ export class CreateEmpresaComponent implements OnInit {
       celular: (formData.celular || '').trim(),
       password: formData.password,
       condicion: formData.condicion || '',
-      estSunat: formData.estado || ''
+      estSunat: formData.estado || '',
+      direccion: (formData.direccion || '').trim()
     };
 
     this.empresaService.createEmpresa(empresaData).subscribe({
@@ -501,7 +502,7 @@ export class CreateEmpresaComponent implements OnInit {
             distrito: formData.distrito || '',
             direccion: formData.direccion || '',
             principal: true,
-            codLocal: '0',
+            codLocal: '0000',
             crearSucursal: false
           };
 
