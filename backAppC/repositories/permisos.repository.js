@@ -266,6 +266,10 @@ const inicializarPermisosDefecto = async (pool, idEmpresa) => {
         { nombre: 'CREAR_DESPACHOS', descripcion: 'Crear despachos', modulo: 'DESPACHOS' },
         { nombre: 'EDITAR_DESPACHOS', descripcion: 'Editar despachos', modulo: 'DESPACHOS' },
 
+        // Módulo Envios
+        { nombre: 'VER_ENVIOS', descripcion: 'Ver envíos programados', modulo: 'ENVIOS' },
+        { nombre: 'VER_ENVIOS_CHOFER', descripcion: 'Ver mis envíos (chofer)', modulo: 'ENVIOS' },
+
         // Módulo Reportes
         { nombre: 'VER_REPORTES', descripcion: 'Ver reportes', modulo: 'REPORTES' },
         { nombre: 'GENERAR_REPORTES', descripcion: 'Generar reportes', modulo: 'REPORTES' },

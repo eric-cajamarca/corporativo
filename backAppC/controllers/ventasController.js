@@ -240,8 +240,11 @@ const crearVentaCompleta = async (req, res) => {
   const CreditosService = require('../services/creditos.service');
 
   const transaction = new sql.Transaction(pool);
+  let txStarted = false;
+  let txCommitted = false;
   try {
     await transaction.begin();
+    txStarted = true;
 
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, req.user.empresa);
     const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
@@ -388,6 +391,7 @@ const crearVentaCompleta = async (req, res) => {
     }
 
     await transaction.commit();
+    txCommitted = true;
 
     if (condicionCredito && venta.idCliente && Number(venta.total) > 0) {
       try {
@@ -414,9 +418,20 @@ const crearVentaCompleta = async (req, res) => {
       ...(avisoStockInsuficiente.length > 0 && { avisoStockInsuficiente: 'Stock insuficiente para uno o más productos. Se descontó solo el disponible.' })
     });
   } catch (error) {
-    await transaction.rollback();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '0ab6a5' }, body: JSON.stringify({ sessionId: '0ab6a5', runId: 'pre-fix_tx_aborted', hypothesisId: 'H1', location: 'ventasController.js:crearVentaCompleta:catch', message: 'capturando error original antes de rollback', data: { txStarted, txCommitted, errorMessage: error?.message, errorCode: error?.code, errorNumber: error?.number, errorLineNumber: error?.lineNumber, errorProcedure: error?.procedure } , timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+
+    try {
+      await transaction.rollback();
+    } catch (rollbackError) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '0ab6a5' }, body: JSON.stringify({ sessionId: '0ab6a5', runId: 'pre-fix_tx_aborted', hypothesisId: 'H1', location: 'ventasController.js:crearVentaCompleta:rollback', message: 'rollback falló (posible EABORT por transaction abortada)', data: { rollbackMessage: rollbackError?.message, rollbackCode: rollbackError?.code, rollbackNumber: rollbackError?.number } , timestamp: Date.now() }) }).catch(() => {});
+      // #endregion
+    }
+
     console.error('Error crearVentaCompleta:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error?.message });
   }
 };
 

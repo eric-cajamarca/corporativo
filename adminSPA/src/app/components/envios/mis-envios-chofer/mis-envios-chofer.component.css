@@ -25,18 +25,11 @@
     }
   }
   
-  /* Contenedor para cards de envíos */
+  /* Contenedor más reducido y centrado */
   .content-wrap {
     width: 100%;
-    max-width: 1200px;
+    max-width: 640px;
     min-width: 0;
     margin: 0 auto;
-  }
+  }/* Estilos mínimos para la vista de chofer */
 
-  .envio-card {
-    transition: box-shadow 0.2s ease;
-  }
-
-  .envio-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }

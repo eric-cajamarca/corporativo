@@ -27,7 +27,7 @@ export class VehiculosService {
   guardarVehiculoYSoat(vehiculo: any, soat: any): Observable<{ message: string; data: any }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
     return this.http.post<{ message: string; data: any }>(
-      `${this.url}/vehiculos/guardar`,
+      `${this.url}vehiculos/guardar`,
       { vehiculo, soat },
       { headers, withCredentials: true }
     );
@@ -35,7 +35,7 @@ export class VehiculosService {
 
   listarVehiculos(): Observable<{ data: VehiculoRegistro[] }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.get<{ data: VehiculoRegistro[] }>(`${this.url}/vehiculos`, {
+    return this.http.get<{ data: VehiculoRegistro[] }>(`${this.url}vehiculos`, {
       headers,
       withCredentials: true
     });
@@ -43,7 +43,7 @@ export class VehiculosService {
 
   listarVehiculosSoatVencido(): Observable<{ data: VehiculoRegistro[] }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.get<{ data: VehiculoRegistro[] }>(`${this.url}/vehiculos/soat-vencido`, {
+    return this.http.get<{ data: VehiculoRegistro[] }>(`${this.url}vehiculos/soat-vencido`, {
       headers,
       withCredentials: true
     });
@@ -51,7 +51,7 @@ export class VehiculosService {
 
   eliminarVehiculo(idVehiculo: string): Observable<{ message: string }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
-    return this.http.delete<{ message: string }>(`${this.url}/vehiculos/${idVehiculo}`, {
+    return this.http.delete<{ message: string }>(`${this.url}vehiculos/${idVehiculo}`, {
       headers,
       withCredentials: true
     });

@@ -86,6 +86,8 @@ import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-
 import { IndexRubrosComponent } from './components/rubros/index-rubros/index-rubros.component';
 import { IndexValesDespachoComponent } from './components/vales-despacho/index-vales-despacho/index-vales-despacho.component';
 import { CreateValeDespachoComponent } from './components/vales-despacho/create-vale-despacho/create-vale-despacho.component';
+import { MisEnviosChoferComponent } from './components/envios/mis-envios-chofer/mis-envios-chofer.component';
+import { IndexEnviosComponent } from './components/envios/index-envios/index-envios.component';
 
 export const routes: Routes = [
     {
@@ -204,6 +206,9 @@ export const routes: Routes = [
      { path: 'despachos', component: IndexDespachosComponent, canActivate: [AuthGuard], title: 'Despachos'},
      { path: 'despachos/create', component: CreateDespachosComponent, canActivate: [AuthGuard], title: 'Crear Despacho'},
      { path: 'despachos/create/:idVenta', component: CreateDespachosComponent, canActivate: [AuthGuard], title: 'Crear Despacho'},
+
+    { path: 'envios', component: IndexEnviosComponent, canActivate: [AuthGuard], title: 'Envios programados'},
+    { path: 'envios/mis-envios', component: MisEnviosChoferComponent, canActivate: [AuthGuard], title: 'Mis envíos (Chofer)' },
 
      { path: 'programaciones', component: IndexProgramacionComponent, canActivate: [AuthGuard], title: 'Programaciones' },
      { path: 'programacion/create',component: CreateProgramacionComponent, canActivate: [AuthGuard], title: 'Crear Programacion'},

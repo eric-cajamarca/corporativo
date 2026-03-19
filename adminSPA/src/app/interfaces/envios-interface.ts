@@ -3,18 +3,22 @@ export interface Envio {
   idVenta: string;
   idTipoEnvio: number;
   idTransportista?: string;
+  idChofer?: string;
+  idVehiculoEntrega?: string;
   fechaEnvio: string;
   fechaEntregaEstimada?: string;
   fechaEntregaReal?: string;
   costoEnvio: number;
   direccionEntrega: string;
-  contactoEntrega: string;
-  telefonoContacto: string;
-  estado: 'AGENDADO' | 'EN_CAMINO' | 'ENTREGADO' | 'DEVUELTO' | 'CANCELADO';
+  contactoDestinatario?: string;
+  telefonoDestinatario?: string;
+  estado: 'AGENDADO' | 'EN_CAMINO' | 'ENTREGADO' | 'DEVUELTO' | 'NO_ENCONTRADO' | 'CANCELADO' | 'EN_PREPARACION';
   observaciones?: string;
   tipoEnvio?: string;
   transportista?: string;
   cliente?: string;
+  comprobante?: string;
+  placaVehiculo?: string;
   venta?: string;
   historialEstados?: HistorialEstadoEnvio[];
 }

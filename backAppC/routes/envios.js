@@ -9,10 +9,18 @@ router.use(auth);
 router.use(querySafeMiddleware);
 
 // Rutas para gestión de envíos
+router.get('/', enviosController.obtenerEnviosProgramados);
 router.get('/venta/:idVenta', enviosController.obtenerEnviosVenta);
 router.post('/', enviosController.crearEnvio);
+router.get('/:idEnvio/detalle', enviosController.obtenerDetalleEnvio);
+router.put('/:idEnvio', enviosController.actualizarEnvio);
+router.delete('/:idEnvio', enviosController.eliminarEnvio);
 router.put('/:idEnvio/estado', enviosController.actualizarEstadoEnvio);
 router.put('/:idEnvio/transportista', enviosController.asignarTransportista);
+router.get('/mis-envios', enviosController.obtenerEnviosMisChoferes);
+
+// Transportistas (delivery externo) - permite registrar externos cuando no hay choferes internos.
+router.post('/transportistas', enviosController.crearTransportista);
 
 // Rutas para catálogos
 router.get('/transportistas', enviosController.obtenerTransportistas);

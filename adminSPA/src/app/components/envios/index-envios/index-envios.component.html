@@ -1,47 +1,236 @@
-<app-topnav></app-topnav>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container-fluid">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-11 col-xl-11">
+          <h5 class="mb-3"><i class="bi bi-calendar-check"></i> Envíos programados</h5>
 
-<div class="container-fluid" >
-  <div class="row justify-content-center">
-    <div class="col-12 col-lg-11 col-xl-11" style="text-align: center;">
-      <!-- <h4 style="color: white; margin-top: 20px;">Envíos programados</h4> -->
-
-      <ng-container *ngIf="enviosProgramados.length === 0">
-        <div class="card-body" style="margin-top: 20px;">
-          <div class="row">
-            <div class="col-12">
-              <div class="alert alert-danger" role="alert">
-                <div class="alert-text">
-                  <p>No tienes envíos programados</p>
+          <!-- Card de filtros -->
+          <div class="card mb-4 shadow-sm">
+            <div class="card-header py-2 bg-light">
+              <i class="bi bi-funnel me-2"></i>Filtros de búsqueda
+            </div>
+            <div class="card-body py-3">
+              <div class="row g-3">
+                <div class="col-12 col-md-6 col-lg-2">
+                  <label class="form-label small">Estado</label>
+                  <select class="form-select form-select-sm" [(ngModel)]="filtros.idEstadoEnvio">
+                    <option [ngValue]="undefined">Todos</option>
+                    <option *ngFor="let ee of estadosEnvio" [ngValue]="ee.idEstadoEnvio">{{ ee.nombre }}</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6 col-lg-2">
+                  <label class="form-label small">Fecha desde</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaDesde">
+                </div>
+                <div class="col-12 col-md-6 col-lg-2">
+                  <label class="form-label small">Fecha hasta</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaHasta">
+                </div>
+                <div class="col-12 col-md-6 col-lg-2">
+                  <label class="form-label small">RUC</label>
+                  <input type="text" class="form-control form-control-sm" [(ngModel)]="filtros.ruc"
+                    placeholder="RUC del cliente">
+                </div>
+                <div class="col-12 col-md-6 col-lg-2">
+                  <label class="form-label small">Cliente (nombre)</label>
+                  <input type="text" class="form-control form-control-sm" [(ngModel)]="filtros.cliente"
+                    placeholder="Nombre o razón social">
+                </div>
+                <div class="col-12 col-md-6 col-lg-2 d-flex align-items-end gap-2">
+                  <button type="button" class="btn btn-primary btn-sm" (click)="buscar()">
+                    <i class="bi bi-search me-1"></i>Buscar
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="limpiarFiltros()">
+                    <i class="bi bi-x-lg me-1"></i>Limpiar
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-       
-      </ng-container>
 
-      <ng-container *ngIf="enviosProgramados.length === 0">
-        <div class="card-body" style="margin-top: 20px;">
-          <ol *ngFor="let item of enviosProgramados" class="list-group"
-            style="width: 50%; margin: auto; margin-bottom: 20px;">
-            <li class="list-group-item d-flex justify-content-between align-items-start">
-              <div class="ms-2 me-auto">
-                <div class="fw-bold">Fecha: {{item.FEnvio}} </div>
-                <a [routerLink]="['/envios/detalle', item.FEnvio]" class="btn btn-primary">Ver programación</a>
-  
+          <ng-container *ngIf="loading">
+            <div class="text-center py-5">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted">Cargando envíos...</p>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="!loading && enviosProgramados.length === 0">
+            <div class="alert alert-info" role="alert">
+              <i class="bi bi-info-circle me-2"></i>No tienes envíos programados
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="!loading && enviosProgramados.length > 0">
+            <div class="row g-3">
+              <div class="col-12 col-md-6 col-xl-4" *ngFor="let envio of enviosProgramados">
+                <div class="card h-100 envio-card">
+                  <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <span class="badge" [style.background-color]="envio.colorEstado || '#6c757d'">
+                      {{ envio.estadoActual }}
+                    </span>
+                    <small class="text-muted">{{ envio.FEnvio }}</small>
+                  </div>
+                  <div class="card-body py-2">
+                    <p class="mb-1 fw-semibold small">
+                      <i class="bi bi-receipt me-1"></i>{{ envio.comprobante }}
+                    </p>
+                    
+                    <p class="mb-1 text-muted small">
+                      <i class="bi bi-person me-1"></i>{{ envio.cliente }}
+                    </p>
+                    <p class="mb-1 fw-semibold small">
+                      <i class="bi bi-telephone me-1"></i>{{ envio.telefonoDestinatario }}
+                    </p>
+                    <p class="mb-1 small" title="Dirección">
+                      <i class="bi bi-geo-alt me-1"></i>
+                      <span class="text-truncate d-inline-block" style="max-width: 200px;">{{ envio.direccionEntrega }}</span>
+                    </p>
+                    <p class="mb-0 small" *ngIf="envio.chofer">
+                      <i class="bi bi-truck me-1"></i>Chofer: {{ envio.chofer }}
+                    </p>
+                    <p class="mb-0 small" *ngIf="envio.transportista && !envio.chofer">
+                      <i class="bi bi-truck me-1"></i>{{ envio.transportista }}
+                    </p>
+                  </div>
+                  <div class="card-footer bg-transparent border-0 py-2 d-flex gap-1 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalVer(envio)">
+                      <i class="bi bi-eye"></i> Ver
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirModalEditar(envio)">
+                      <i class="bi bi-pencil"></i> Editar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                      [disabled]="eliminando() === envio.idEnvio"
+                      (click)="confirmarEliminar(envio)">
+                      <span *ngIf="eliminando() !== envio.idEnvio"><i class="bi bi-trash"></i> Eliminar</span>
+                      <span *ngIf="eliminando() === envio.idEnvio">...</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <span class="badge bg-primary rounded-pill">{{item.cantidad}} </span>
-            </li>
-          </ol>
-  
+            </div>
+          </ng-container>
         </div>
-      </ng-container>
+      </div>
+    </div>
+  </div>
+</main>
 
-      
-
-    
-
+<!-- Modal: Ver programación (detalle productos) -->
+<div class="modal fade" [class.show]="modalVerVisible" [style.display]="modalVerVisible ? 'block' : 'none'"
+  tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-box-seam me-2"></i>Detalle del envío
+          <span *ngIf="envioSeleccionado" class="ms-2 badge bg-secondary">{{ envioSeleccionado.comprobante }}</span>
+        </h5>
+        <button type="button" class="btn-close" (click)="cerrarModalVer()"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="envioSeleccionado" class="mb-3">
+          <p class="mb-1"><strong>Cliente:</strong> {{ envioSeleccionado.cliente }}</p>
+          <p class="mb-1"><strong>Dirección:</strong> {{ envioSeleccionado.direccionEntrega }}</p>
+          <p class="mb-1" *ngIf="envioSeleccionado.telefonoDestinatario">
+            <strong>Teléfono:</strong> {{ envioSeleccionado.telefonoDestinatario }}
+          </p>
+        </div>
+        <h6 class="mb-2">Productos</h6>
+        <div *ngIf="loadingDetalle" class="text-center py-3">
+          <div class="spinner-border spinner-border-sm"></div>
+        </div>
+        <div *ngIf="!loadingDetalle && detalleEnvio.length === 0" class="text-muted small">
+          No hay detalle de productos
+        </div>
+        <table class="table table-sm table-bordered" *ngIf="!loadingDetalle && detalleEnvio.length > 0">
+          <thead class="table-light">
+            <tr>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th>Cant. solicitada</th>
+              <th>Cant. despachada</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of detalleEnvio">
+              <td>{{ d.productoCodigo }}</td>
+              <td>{{ d.productoDescripcion }}</td>
+              <td>{{ d.cantidadSolicitada }}</td>
+              <td>{{ d.cantidadDespachada }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarModalVer()">Cerrar</button>
+      </div>
     </div>
   </div>
 </div>
+<div class="modal-backdrop fade" [class.show]="modalVerVisible" *ngIf="modalVerVisible"></div>
+
+<!-- Modal: Editar programación -->
+<div class="modal fade" [class.show]="modalEditarVisible" [style.display]="modalEditarVisible ? 'block' : 'none'"
+  tabindex="-1" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar envío</h5>
+        <button type="button" class="btn-close" (click)="cerrarModalEditar()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label small">Fecha programada</label>
+          <input type="datetime-local" class="form-control form-control-sm" [(ngModel)]="editForm.fechaProgramada" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Dirección de entrega</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="editForm.direccionEntrega" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Contacto</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="editForm.contactoDestinatario" placeholder="Opcional" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Teléfono</label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="editForm.telefonoDestinatario" placeholder="Opcional" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Chofer interno</label>
+          <select class="form-select form-select-sm" [(ngModel)]="editForm.idChofer">
+            <option [ngValue]="null">— Ninguno —</option>
+            <option *ngFor="let c of choferes" [ngValue]="c.idChofer">
+              {{ c.nombres }} {{ c.apellidos }} {{ c.placa ? ('- ' + c.placa) : '' }}
+            </option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Transportista externo</label>
+          <select class="form-select form-select-sm" [(ngModel)]="editForm.idTransportista">
+            <option [ngValue]="null">— Ninguno —</option>
+            <option *ngFor="let t of transportistas" [ngValue]="t.idTransportista">
+              {{ t.nombres }} {{ t.apellidos }}
+            </option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Observaciones</label>
+          <textarea class="form-control form-control-sm" [(ngModel)]="editForm.observaciones" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalEditar()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="guardarEdicion()" [disabled]="guardando || !editForm.direccionEntrega">
+          {{ guardando ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade" [class.show]="modalEditarVisible" *ngIf="modalEditarVisible"></div>

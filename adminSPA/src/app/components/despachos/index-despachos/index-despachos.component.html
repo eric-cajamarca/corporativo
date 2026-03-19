@@ -280,6 +280,61 @@
               <option *ngFor="let t of tiposDespacho" [value]="t.idTipoDespacho">{{ t.nombre }}</option>
             </select>
           </div>
+
+          <div class="mb-3">
+            <label class="form-label small">Modalidad</label>
+            <select class="form-select form-select-sm" [(ngModel)]="modoEntregaPanel">
+              <option value="RECOJO">Recojo</option>
+              <option value="DELIVERY">Delivery</option>
+            </select>
+          </div>
+
+          <div *ngIf="modoEntregaPanel === 'DELIVERY'">
+            <div class="mb-3">
+              <label class="form-label small">Tipo de delivery</label>
+              <select class="form-select form-select-sm" [(ngModel)]="tipoDeliveryPanel">
+                <option value="INTERNO">Chofer interno</option>
+                <option value="EXTERNO">Delivery externo</option>
+              </select>
+              <div class="form-text" *ngIf="tipoDeliveryPanel === 'INTERNO' && choferesInternos.length === 0">
+                No hay choferes internos registrados. Registra uno para poder asignarlo al envío.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label small">Dirección de entrega</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="direccionEntregaPanel" />
+            </div>
+
+            <div class="mb-3" *ngIf="tipoDeliveryPanel === 'INTERNO'">
+              <label class="form-label small">Seleccionar chofer</label>
+              <select class="form-select form-select-sm" [(ngModel)]="idChoferSeleccionado" [disabled]="choferesInternos.length === 0">
+                <option *ngFor="let c of choferesInternos" [ngValue]="c.idChofer">
+                  {{ c.nombres }} {{ c.apellidos }} {{ c.placa ? ('- ' + c.placa) : '' }}
+                </option>
+              </select>
+              <div class="mt-2">
+                <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalRegistrarChofer()">
+                  Registrar chofer y vehículo
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3" *ngIf="tipoDeliveryPanel === 'EXTERNO'">
+              <label class="form-label small">Seleccionar transportista externo</label>
+              <select class="form-select form-select-sm" [(ngModel)]="idTransportistaSeleccionado">
+                <option *ngFor="let t of transportistasExternos" [ngValue]="t.idTransportista">
+                  {{ t.nombres }} {{ t.apellidos }} {{ t.placa ? ('- ' + t.placa) : '' }}
+                </option>
+              </select>
+              <div class="mt-2">
+                <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalRegistrarTransportista()">
+                  Registrar delivery externo
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="mb-3">
             <label class="form-label small">Observaciones (opcional)</label>
             <textarea class="form-control form-control-sm" [(ngModel)]="observacionesPanel" rows="2"></textarea>
@@ -297,3 +352,17 @@
   </div>
 </div>
 <div class="modal-backdrop fade" [class.show]="modalCrearDespachoAbierto()" *ngIf="modalCrearDespachoAbierto()"></div>
+
+<!-- Modal: registrar chofer interno + vehículo -->
+<app-registrar-chofer-vehiculo-modal
+  [visible]="modalRegistrarChoferVisible"
+  (saved)="onChoferVehiculoGuardado()"
+  (closed)="modalRegistrarChoferVisible = false">
+</app-registrar-chofer-vehiculo-modal>
+
+<!-- Modal: registrar transportista externo -->
+<app-registrar-transportista-modal
+  [visible]="modalRegistrarTransportistaVisible"
+  (saved)="onTransportistaGuardado()"
+  (closed)="modalRegistrarTransportistaVisible = false">
+</app-registrar-transportista-modal>

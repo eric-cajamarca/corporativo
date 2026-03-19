@@ -178,6 +178,10 @@ const obtenerNavegacionSidebar = async (pool, user) => {
 
     // Si es administrador, tiene acceso a todo
     const esAdmin = user.rol === 'Administrador';
+    // Chofer/Conductor: fallback para VER_ENVIOS_CHOFER si no está en permisos (p. ej. rol con otro nombre)
+    const rolNorm = (user.rol || '').toString().trim().toUpperCase();
+    const esChofer = (rolNorm === 'CHOFER' || rolNorm === 'CONDUCTOR');
+    const tieneVerEnviosChofer = permisos.includes('VER_ENVIOS_CHOFER') || esChofer;
 
     // Definir estructura de navegación
     const navegacion = [
@@ -350,9 +354,34 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             modulo: 'DESPACHOS',
             nombre: 'Despachos',
             icono: 'fas fa-truck',
-            ruta: '/despachos',
+            ruta: null,
             permiso: 'VER_DESPACHOS',
-            visible: esAdmin || permisos.includes('VER_DESPACHOS')
+            // El módulo se muestra si el usuario puede ver despachos o al menos alguno de los envíos.
+            visible:
+                esAdmin ||
+                permisos.includes('VER_DESPACHOS') ||
+                permisos.includes('VER_ENVIOS') ||
+                tieneVerEnviosChofer,
+            submenu: [
+                {
+                    nombre: 'Despachos',
+                    ruta: '/despachos',
+                    permiso: 'VER_DESPACHOS',
+                    visible: esAdmin || permisos.includes('VER_DESPACHOS')
+                },
+                {
+                    nombre: 'Envios programados',
+                    ruta: '/envios',
+                    permiso: 'VER_ENVIOS',
+                    visible: esAdmin || permisos.includes('VER_ENVIOS')
+                },
+                {
+                    nombre: 'Mis envíos (Chofer)',
+                    ruta: '/envios/mis-envios',
+                    permiso: 'VER_ENVIOS_CHOFER',
+                    visible: esAdmin || tieneVerEnviosChofer
+                }
+            ]
         },
         {
             modulo: 'FACTURACION',

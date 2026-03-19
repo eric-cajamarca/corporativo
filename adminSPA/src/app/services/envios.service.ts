@@ -15,6 +15,59 @@ export class EnviosService {
     this.url = global.url;
   }
 
+  // Obtener envíos programados (listado para pantalla Envios programados)
+  obtenerEnviosProgramados(filtros?: { idEstadoEnvio?: number; fechaDesde?: string; fechaHasta?: string; ruc?: string; cliente?: string }): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    let params: Record<string, string> = {};
+    if (filtros) {
+      if (filtros.idEstadoEnvio != null) params['idEstadoEnvio'] = String(filtros.idEstadoEnvio);
+      if (filtros.fechaDesde) params['fechaDesde'] = filtros.fechaDesde;
+      if (filtros.fechaHasta) params['fechaHasta'] = filtros.fechaHasta;
+      if (filtros.ruc) params['ruc'] = filtros.ruc;
+      if (filtros.cliente) params['cliente'] = filtros.cliente;
+    }
+    return this._http.get(this.url + 'envios/', {
+      headers,
+      params,
+      withCredentials: true
+    });
+  }
+
+  // Actualizar envío
+  actualizarEnvio(idEnvio: string, data: {
+    fechaProgramada?: string;
+    direccionEntrega?: string;
+    idChofer?: string | null;
+    idTransportista?: string | null;
+    contactoDestinatario?: string | null;
+    telefonoDestinatario?: string | null;
+    observaciones?: string | null;
+  }): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.put(this.url+'envios/' + idEnvio, data, {
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
+  // Eliminar envío
+  eliminarEnvio(idEnvio: string): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.delete(this.url+'envios/' + idEnvio, {
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
+  // Obtener detalle de un envío (productos desde DetalleDespachos)
+  obtenerDetalleEnvio(idEnvio: string): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'envios/' + idEnvio + '/detalle', {
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
   // Obtener envíos por venta
   obtenerEnviosPorVenta(idVenta: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -27,13 +80,17 @@ export class EnviosService {
   // Crear nuevo envío
   crearEnvio(data: {
     idVenta: string;
+    idDespacho?: string;
     idTipoEnvio: number;
     idTransportista?: string;
+    idChofer?: string;
+    idVehiculoEntrega?: string;
+    idEstadoEnvioInicial?: number;
     fechaEntregaEstimada?: string;
     costoEnvio: number;
     direccionEntrega: string;
-    contactoEntrega: string;
-    telefonoContacto: string;
+    contactoDestinatario?: string;
+    telefonoDestinatario?: string;
     observaciones?: string;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -46,11 +103,14 @@ export class EnviosService {
   // Actualizar estado del envío
   actualizarEstadoEnvio(data: {
     idEnvio: string;
-    idEstado: number;
+    idEstadoEnvio: number;
     observaciones?: string;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.put(this.url+'envios/' + data.idEnvio + '/estado', data, {
+    return this._http.put(this.url+'envios/' + data.idEnvio + '/estado', {
+      idEstadoEnvio: data.idEstadoEnvio,
+      observaciones: data.observaciones
+    }, {
       headers: headers,
       withCredentials: true
     });
@@ -77,6 +137,24 @@ export class EnviosService {
     });
   }
 
+  // Crear transportista (delivery externo)
+  crearTransportista(data: {
+    nombres: string;
+    apellidos: string;
+    documento: string;
+    licencia?: string | null;
+    celular: string;
+    email?: string | null;
+    vehiculo?: string | null;
+    placa?: string | null;
+  }): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.post(this.url+'envios/transportistas', data, {
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
   // Obtener tipos de envío
   obtenerTiposEnvio(): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -90,6 +168,15 @@ export class EnviosService {
   obtenerEstadosEnvio(): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'envios/estados', {
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
+  // Mis envíos (rol Chofer)
+  obtenerMisEnvios(): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url+'envios/mis-envios', {
       headers: headers,
       withCredentials: true
     });

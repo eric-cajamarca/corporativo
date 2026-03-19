@@ -42,6 +42,7 @@ const cajaRoutes = require('./routes/caja');
 const creditosRoutes = require('./routes/creditos');
 const despachosRoutes = require('./routes/despachos');
 const enviosRoutes = require('./routes/envios');
+const choferesRoutes = require('./routes/choferes');
 const facturacionRoutes = require('./routes/facturacion');
 const analisisRoutes = require('./routes/analisis');
 const dashboardRoutes = require('./routes/dashboard');
@@ -152,7 +153,6 @@ app.use('/api/activacion', require('./routes/activacionPublic')); // Solo activa
 app.use('/api', detalleVentasRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', cventasRoutes);
-app.use('/api', renviosRouters);
 app.use('/api', empresaRouters);
 app.use('/api', comprobantesRoutes);
 app.use('/api', programacionRoutes);
@@ -185,6 +185,10 @@ app.use('/api/caja', cajaRoutes);
 app.use('/api/creditos', creditosRoutes);
 app.use('/api/despachos', despachosRoutes);
 app.use('/api/envios', enviosRoutes);
+// Nota: renviosRouters contiene rutas legacy con /envios/:id y puede interceptar /api/envios/*
+// si se monta antes que enviosRoutes.
+app.use('/api', renviosRouters);
+app.use('/api/choferes', choferesRoutes);
 app.use('/api/facturacion', facturacionRoutes);
 app.use('/api/analisis', analisisRoutes);
 app.use('/api/dashboard', dashboardRoutes);

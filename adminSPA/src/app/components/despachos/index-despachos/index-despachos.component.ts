@@ -3,12 +3,16 @@ import { DespachoService } from '../../../services/despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
+import { EnviosService } from '../../../services/envios.service';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { ChoferesService, ChoferInterno } from '../../../services/choferes.service';
+import { RegistrarChoferVehiculoModalComponent } from '../registrar-chofer-vehiculo-modal/registrar-chofer-vehiculo-modal.component';
+import { RegistrarTransportistaModalComponent } from '../registrar-transportista-modal/registrar-transportista-modal.component';
 
 declare const iziToast: any;
 
@@ -56,7 +60,7 @@ export interface VentaDespachosResult {
 @Component({
   selector: 'app-index-despachos',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent, RegistrarChoferVehiculoModalComponent, RegistrarTransportistaModalComponent],
   templateUrl: './index-despachos.component.html',
   styleUrl: './index-despachos.component.css'
 })
@@ -94,6 +98,22 @@ export class IndexDespachosComponent {
   enviandoCrear = false;
   generandoPdf = false;
 
+  // Delivery desde despacho
+  modoEntregaPanel: 'RECOJO' | 'DELIVERY' = 'RECOJO';
+  tipoDeliveryPanel: 'INTERNO' | 'EXTERNO' = 'INTERNO';
+  choferesInternos: ChoferInterno[] = [];
+  transportistasExternos: Array<{ idTransportista: string; nombres: string; apellidos: string; placa?: string; estado?: boolean }> = [];
+  idChoferSeleccionado: string | null = null;
+  idTransportistaSeleccionado: string | null = null;
+  idTipoEnvioPanel: number | null = null;
+  direccionEntregaPanel = 'SIN_DIRECCION';
+
+  // Modal: registrar chofer interno + vehículo
+  modalRegistrarChoferVisible = false;
+
+  // Modal: registrar transportista externo
+  modalRegistrarTransportistaVisible = false;
+
   mostrarWhatsappForm = false;
   whatsappNumber = '';
   whatsappCaption = '';
@@ -112,7 +132,9 @@ export class IndexDespachosComponent {
     private despachoService: DespachoService,
     private empresaService: EmpresaService,
     private pdfService: PdfService,
-    private whatsappService: WhatsappService
+    private whatsappService: WhatsappService,
+    private enviosService: EnviosService,
+    private choferesService: ChoferesService
   ) {}
 
   ngOnInit(): void {}
@@ -219,7 +241,90 @@ export class IndexDespachosComponent {
       }
     });
     this.observacionesPanel = '';
+
+    // Catálogos para delivery desde despacho
+    this.modoEntregaPanel = 'RECOJO';
+    this.tipoDeliveryPanel = 'INTERNO';
+    this.idChoferSeleccionado = null;
+    this.idTransportistaSeleccionado = null;
+    this.idTipoEnvioPanel = null;
+    this.choferesInternos = [];
+    this.transportistasExternos = [];
+
+    this.enviosService.obtenerTiposEnvio().subscribe({
+      next: (res: any) => {
+        const tipos = (res?.data || []) as Array<{ idTipoEnvio: number; nombre: string; costoBase?: number; requiereTransportista?: boolean }>;
+        // Preferir delivery local; si no existe, tomar el primer tipo DELIVERY.
+        const local = tipos.find((t) => t.nombre === 'DELIVERY_LOCAL') || tipos.find((t) => t.nombre?.includes('DELIVERY'));
+        this.idTipoEnvioPanel = local?.idTipoEnvio ?? (tipos[0]?.idTipoEnvio ?? null);
+      }
+    });
+
+    // Mantener disponibles transportistas para opción EXTERNO si el usuario cambia de modalidad.
+    this.cargarTransportistasExternos();
+
+    this.choferesService.listarChoferes().subscribe({
+      next: (res: any) => {
+        this.choferesInternos = (res?.data || []) as ChoferInterno[];
+        if (this.choferesInternos.length > 0) {
+          this.tipoDeliveryPanel = 'INTERNO';
+          this.idChoferSeleccionado = this.choferesInternos[0].idChofer;
+        }
+      }
+    });
+
     this.modalCrearDespachoAbierto.set(true);
+  }
+
+  private cargarTransportistasExternos(): void {
+    this.enviosService.obtenerTransportistas().subscribe({
+      next: (res: any) => {
+        this.transportistasExternos = (res?.data || []) as Array<{ idTransportista: string; nombres: string; apellidos: string; placa?: string; estado?: boolean }>;
+        this.idTransportistaSeleccionado = this.transportistasExternos[0]?.idTransportista || null;
+      },
+      error: () => {
+        this.transportistasExternos = [];
+        this.idTransportistaSeleccionado = null;
+      }
+    });
+  }
+
+  private cargarChoferesInternosParaPanel(): void {
+    this.choferesService.listarChoferes().subscribe({
+      next: (res: any) => {
+        this.choferesInternos = (res?.data || []) as ChoferInterno[];
+        if (this.choferesInternos.length > 0) {
+          this.tipoDeliveryPanel = 'INTERNO';
+          this.idChoferSeleccionado = this.choferesInternos[0].idChofer;
+        } else {
+          this.tipoDeliveryPanel = 'EXTERNO';
+          // Si no hay choferes internos, fallback a transportistas externos
+          this.cargarTransportistasExternos();
+        }
+      },
+      error: () => {
+        this.choferesInternos = [];
+        this.tipoDeliveryPanel = 'EXTERNO';
+      }
+    });
+  }
+
+  abrirModalRegistrarChofer(): void {
+    this.modalRegistrarChoferVisible = true;
+  }
+
+  onChoferVehiculoGuardado(): void {
+    this.modalRegistrarChoferVisible = false;
+    this.cargarChoferesInternosParaPanel();
+  }
+
+  abrirModalRegistrarTransportista(): void {
+    this.modalRegistrarTransportistaVisible = true;
+  }
+
+  onTransportistaGuardado(): void {
+    this.modalRegistrarTransportistaVisible = false;
+    this.cargarTransportistasExternos();
   }
 
   cerrarModalCrearDespacho(): void {
@@ -241,6 +346,21 @@ export class IndexDespachosComponent {
         });
       }
     }
+    if (this.modoEntregaPanel === 'DELIVERY') {
+      if (this.idTipoEnvioPanel == null) {
+        iziToast.warning({ title: 'Aviso', message: 'Selecciona/valida el tipo de envío.', position: 'topRight' });
+        return;
+      }
+      if (this.tipoDeliveryPanel === 'INTERNO' && !this.idChoferSeleccionado) {
+        iziToast.warning({ title: 'Aviso', message: 'Selecciona un chofer interno.', position: 'topRight' });
+        return;
+      }
+      if (this.tipoDeliveryPanel === 'EXTERNO' && !this.idTransportistaSeleccionado) {
+        iziToast.warning({ title: 'Aviso', message: 'Selecciona un transportista externo.', position: 'topRight' });
+        return;
+      }
+    }
+
     this.enviandoCrear = true;
     this.despachoService.crearDespacho({
       idVenta: String(r.venta.idVenta),
@@ -248,15 +368,52 @@ export class IndexDespachosComponent {
       observaciones: this.observacionesPanel || undefined,
       detalles: detalles.length > 0 ? detalles : undefined
     }).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.enviandoCrear = false;
         this.cerrarModalCrearDespacho();
         if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Despacho creado', position: 'topRight' });
-        this.despachoService.buscarVentaDespachos(
-          r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
-        ).subscribe({
-          next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
-        });
+
+        if (this.modoEntregaPanel === 'DELIVERY') {
+          const payload: any = {
+            idVenta: String(r.venta.idVenta),
+            idDespacho: res?.data?.idDespacho ?? undefined,
+            idTipoEnvio: this.idTipoEnvioPanel,
+            costoEnvio: 0,
+            direccionEntrega: this.direccionEntregaPanel,
+            observaciones: undefined,
+            idEstadoEnvioInicial: 1
+          };
+
+          if (this.tipoDeliveryPanel === 'INTERNO') {
+            payload.idChofer = this.idChoferSeleccionado;
+          } else {
+            payload.idTransportista = this.idTransportistaSeleccionado;
+          }
+
+          this.enviosService.crearEnvio(payload).subscribe({
+            next: () => {
+              this.despachoService.buscarVentaDespachos(
+                r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
+              ).subscribe({
+                next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
+              });
+            },
+            error: (err: any) => {
+              iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo crear el envío', position: 'topRight' });
+              this.despachoService.buscarVentaDespachos(
+                r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
+              ).subscribe({
+                next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
+              });
+            }
+          });
+        } else {
+          this.despachoService.buscarVentaDespachos(
+            r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
+          ).subscribe({
+            next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
+          });
+        }
       },
       error: (err) => {
         this.enviandoCrear = false;

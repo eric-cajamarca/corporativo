@@ -426,7 +426,13 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
         mc.fechaMovimiento,
         mc.concepto,
         mc.idConcepto,
-        ISNULL(conc.descripcion, mc.concepto) AS conceptoCatalogoDescripcion,
+        ISNULL(
+          conc.descripcion,
+          ISNULL(
+            mc.concepto,
+            CASE WHEN tmc.nombre = 'APERTURA_CAJA' THEN 'Apertura de caja' ELSE REPLACE(tmc.nombre, '_', ' ') END
+          )
+        ) AS conceptoCatalogoDescripcion,
         mc.monto,
         tmc.nombre AS tipoMovimiento,
         tmc.tipo AS tipoOperacion,

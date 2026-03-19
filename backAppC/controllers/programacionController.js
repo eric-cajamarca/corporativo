@@ -2,37 +2,65 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 
 async function obtener_programacion(req, res) {
-    console.log('Aquí entro a obtener programación');
-    
-    if (req.user) {
-        const rol = req.user.rol;
-        const id = req.user.id;
-        let query = '';
-        let parameters = [];
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
 
-        if (rol === 'Administrador') {
-            query = 'SELECT * FROM ProgramacionPedidos';
-        } else if (rol === 'Conductor') {
-            query = 'SELECT * FROM ProgramacionPedidos WHERE idConductor = @idConductor';
-            parameters.push({ name: 'idConductor', type: sql.Int, value: id });
-        }
+    const rol = req.user.rol;
+    const id = req.user.id;
+    const { idEstado, fechaDesde, fechaHasta, ruc, cliente } = req.query;
 
-        try {
-            let pool = await sql.connect(dbConfig);
-            let request = pool.request();
+    let whereClauses = [];
+    let parameters = [];
 
-            
-            parameters.forEach(param => {
-                request.input(param.name, param.type, param.value);
-            });
+    if (rol === 'Conductor') {
+        whereClauses.push('pp.idConductor = @idConductor');
+        parameters.push({ name: 'idConductor', type: sql.Int, value: id });
+    }
+    if (idEstado != null && String(idEstado).trim() !== '') {
+        whereClauses.push('pp.idEstado = @idEstado');
+        parameters.push({ name: 'idEstado', type: sql.Int, value: parseInt(idEstado, 10) });
+    }
+    const fechaDesdeVal = fechaDesde != null && String(fechaDesde).trim() !== '' ? String(fechaDesde).trim().substring(0, 10) : null;
+    const fechaHastaVal = fechaHasta != null && String(fechaHasta).trim() !== '' ? String(fechaHasta).trim().substring(0, 10) : null;
+    if (fechaDesdeVal) {
+        whereClauses.push('(pp.FEnvio >= @fechaDesde OR CONVERT(VARCHAR(10), pp.FechaEntrega, 120) >= @fechaDesde)');
+        parameters.push({ name: 'fechaDesde', type: sql.VarChar(10), value: fechaDesdeVal });
+    }
+    if (fechaHastaVal) {
+        whereClauses.push('(pp.FEnvio <= @fechaHasta OR CONVERT(VARCHAR(10), pp.FechaEntrega, 120) <= @fechaHasta)');
+        parameters.push({ name: 'fechaHasta', type: sql.VarChar(10), value: fechaHastaVal });
+    }
+    const rucVal = ruc != null && String(ruc).trim() !== '' ? String(ruc).trim() : null;
+    const clienteVal = cliente != null && String(cliente).trim() !== '' ? String(cliente).trim() : null;
+    if (rucVal) {
+        const termRuc = '%' + rucVal + '%';
+        whereClauses.push('(pp.RSocial LIKE @termRuc OR pp.Ruc LIKE @termRuc)');
+        parameters.push({ name: 'termRuc', type: sql.VarChar(100), value: termRuc });
+    }
+    if (clienteVal) {
+        const termCliente = '%' + clienteVal + '%';
+        whereClauses.push('pp.RSocial LIKE @termCliente');
+        parameters.push({ name: 'termCliente', type: sql.VarChar(100), value: termCliente });
+    }
 
-            let result = await request.query(query);
+    const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+    const baseQuery = `
+        SELECT pp.*, ep.descripcion AS estadoDescripcion, ep.color AS estadoColor
+        FROM ProgramacionPedidos pp
+        LEFT JOIN EstadosPedidos ep ON pp.idEstado = ep.idEstadoPedido
+        ${whereSql}
+    `;
 
-            console.log('result.recordset', result.recordset);
-            res.json({ data: result.recordset });
-        } catch (error) {
-            res.status(500).send(error.message);
-        }
+    try {
+        const pool = await sql.connect(dbConfig);
+        const request = pool.request();
+        parameters.forEach(param => {
+            request.input(param.name, param.type, param.value);
+        });
+        const result = await request.query(baseQuery);
+        res.json({ data: result.recordset });
+    } catch (error) {
+        console.error('obtener_programacion error:', error);
+        res.status(500).json({ message: error.message });
     }
 }
 

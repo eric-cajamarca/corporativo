@@ -1,0 +1,75 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav> 
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container-fluid py-3">
+      <div class="row">
+        <div class="col-12">
+          <h1 class="h4 mb-3">Mis envíos (Chofer)</h1>
+        </div>
+      </div>
+
+      <div *ngIf="loading" class="alert alert-info">Cargando envíos…</div>
+
+      <div *ngIf="!loading && envios.length === 0" class="alert alert-warning">
+        No tienes envíos asignados.
+      </div>
+
+      <div *ngIf="!loading && envios.length > 0" class="row g-2">
+        <div class="col-12" *ngFor="let e of envios">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                  <div class="fw-semibold">
+                    Comprobante: {{ e.comprobante || e.idVenta }}
+                  </div>
+                  <div class="text-muted small">
+                    Estado: {{ e.estado }} | Dirección: {{ e.direccionEntrega }}
+                  </div>
+                </div>
+                <span
+                  class="badge"
+                  [class.bg-success]="e.estado === 'ENTREGADO'"
+                  [class.bg-warning]="e.estado === 'EN_CAMINO' || e.estado === 'EN_PREPARACION'"
+                  [class.bg-danger]="e.estado === 'DEVUELTO' || e.estado === 'NO_ENCONTRADO'"
+                >
+                  {{ e.estado }}
+                </span>
+              </div>
+
+              <div class="mt-3">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-4">
+                    <label class="form-label small">Observaciones (opcional)</label>
+                    <input class="form-control form-control-sm" [(ngModel)]="observacionesPorEnvio[e.idEnvio]" />
+                  </div>
+                  <div class="col-md-8 d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary btn-sm" type="button" (click)="cargar(e.idEnvio)" [disabled]="!estadoIds['EN_PREPARACION']">
+                      Cargada
+                    </button>
+                    <button class="btn btn-outline-primary btn-sm" type="button" (click)="enCamino(e.idEnvio)" [disabled]="!estadoIds['EN_CAMINO']">
+                      En camino
+                    </button>
+                    <button class="btn btn-success btn-sm" type="button" (click)="entregado(e.idEnvio)" [disabled]="!estadoIds['ENTREGADO']">
+                      Entregado
+                    </button>
+                    <button class="btn btn-danger btn-sm" type="button" (click)="devuelto(e.idEnvio)" [disabled]="!estadoIds['DEVUELTO']">
+                      Devuelto
+                    </button>
+                    <button class="btn btn-secondary btn-sm" type="button" (click)="noEncontrado(e.idEnvio)" [disabled]="!estadoIds['NO_ENCONTRADO']">
+                      No encontrado
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+

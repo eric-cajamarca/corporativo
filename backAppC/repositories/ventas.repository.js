@@ -28,6 +28,17 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     compRelacionado
   } = datosVenta;
 
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '0ab6a5' }, body: JSON.stringify({ sessionId: '0ab6a5', runId: 'prefix_compRelacionado', hypothesisId: 'HcompRelacionado', location: 'ventas.repository.js:insertar:before_compRelacionado', message: 'valor/tipo compRelacionado antes de INSERT', data: { compRelacionadoProvided: compRelacionado, typeofCompRelacionado: typeof compRelacionado, isNull: compRelacionado === null, isUndefined: compRelacionado === undefined, compRelacionadoLen: compRelacionado != null ? String(compRelacionado).length : null }, timestamp: Date.now() }) }).catch(() => {});
+  // #endregion
+
+  // Normalización crítica:
+  // mssql + tedious puede fallar con metadatos/longitud inválida si `compRelacionado` llega como `undefined` o tipo inesperado.
+  // El campo se inserta como VARCHAR(30), así que forzamos string y acotamos longitud.
+  const compRelacionadoVal = (compRelacionado == null)
+    ? ''
+    : String(compRelacionado).trim().slice(0, 30);
+
   const fVencimientoVal = fVencimiento != null ? fVencimiento : fEmision;
   const idEstadoPedidoVal = idEstadoPedido != null ? parseInt(idEstadoPedido, 10) : 1;
   const idEstadoPagoVal = idEstadoPago != null ? parseInt(idEstadoPago, 10) : 1;
@@ -56,7 +67,7 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('idEstadoPedido', sql.Int, idEstadoPedidoVal)
     .input('idEstadoPago', sql.Int, idEstadoPagoVal)
     .input('idEstadoSunat', sql.Int, idEstadoSunat)
-    .input('compRelacionado', sql.VarChar(30), compRelacionado)
+    .input('compRelacionado', sql.VarChar(30), compRelacionadoVal)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
     .query(`INSERT INTO Ventas 
       (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, idUsuario) 

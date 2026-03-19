@@ -1,0 +1,62 @@
+<div class="modal fade show" *ngIf="visible" style="display:block;">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Registrar chofer interno y vehículo</h5>
+        <button type="button" class="btn-close" (click)="cerrar()"></button>
+      </div>
+
+      <div class="modal-body">
+        <div *ngIf="cargandoUsuarios" class="text-muted">Cargando choferes…</div>
+
+        <div class="mb-3">
+          <label class="form-label small">Conductor (usuario con rol Chofer)</label>
+          <select class="form-select form-select-sm" [(ngModel)]="usuarioChoferSeleccionado">
+            <option *ngFor="let u of usuariosChofer" [ngValue]="u.idUsuario">
+              {{ u.nombres }} {{ u.apellidos }} - {{ u.email }}
+            </option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small">Vehículo (registrado en la empresa)</label>
+          <div *ngIf="cargandoVehiculos" class="text-muted small mb-2">Cargando vehículos…</div>
+          <select class="form-select form-select-sm" [(ngModel)]="idVehiculoSeleccionado" [disabled]="vehiculos.length === 0">
+            <option *ngFor="let v of vehiculos" [ngValue]="v.idVehiculo">
+              {{ v.placa }} {{ v.marca ? ('- ' + v.marca) : '' }} {{ v.modelo ? (v.marca ? ' ' : '- ' + v.modelo) : '' }}
+            </option>
+          </select>
+          <div class="form-text" *ngIf="vehiculos.length === 0">
+            No hay vehículos registrados. Registre uno por placa para poder vincularlo al chofer.
+          </div>
+          <div class="mt-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirConsultarPlaca()">
+              Buscar por placa y registrar vehículo
+            </button>
+          </div>
+        </div>
+
+        <div class="alert alert-info py-2 mb-0">
+          Se vinculará el vehículo seleccionado al usuario chofer (tabla `Choferes`).
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrar()" [disabled]="cargando">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="guardar()" [disabled]="cargando">
+          <span *ngIf="cargando" class="spinner-border spinner-border-sm me-1"></span>
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="visible"></div>
+
+<!-- Modal: consultar placa (Factiliza) y registrar Vehiculos -->
+<app-consultar-placa-modal
+  [visible]="modalConsultarPlacaVisible"
+  (closed)="onConsultarPlacaCerrado()">
+</app-consultar-placa-modal>
+

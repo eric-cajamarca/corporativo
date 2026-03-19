@@ -1,55 +1,58 @@
-<app-topnav></app-topnav>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-<!-- Contenido del listado de envíos -->
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
-            <h2 class="text-center mb-4">Listado de Envíos</h2>
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="container-fluid">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-11 col-xl-11">
+          <h5 class="mb-3"><i class="bi bi-calendar3"></i> Programaciones</h5>
 
-            <!-- Filtros para envíos de hoy y pendientes -->
-            <div class="mb-3">
-                <label for="filtroEnvios" class="form-label">Filtrar Envíos</label>
-                <select class="form-select" id="filtroEnvios">
-
-
-                    <option value="hoy">Envíos de Hoy</option>
-                    <option value="pendientes">Envíos Pendientes</option>
-                </select>
+          <ng-container *ngIf="loading">
+            <div class="text-center py-5">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted">Cargando programaciones...</p>
             </div>
+          </ng-container>
 
+          <ng-container *ngIf="!loading && programado.length === 0">
+            <div class="alert alert-info" role="alert">
+              <i class="bi bi-info-circle me-2"></i>No hay programaciones
+            </div>
+          </ng-container>
 
-
-
-            <!-- Tabla para mostrar los envíos -->
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Cliente</th>
-
-
-                        <th>Dirección de Envío</th>
-                        <th>Detalles del Envío</th>
-                        <th>Fecha de Entrega</th>
-                        <th>Estado</th>
-                    </tr>
+          <ng-container *ngIf="!loading && programado.length > 0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Comprobante</th>
+                    <th>Cliente</th>
+                    <th>Dirección</th>
+                    <th>Fecha envío</th>
+                    <th>Estado</th>
+                  </tr>
                 </thead>
                 <tbody>
-                    <!-- Ejemplo de fila de envío -->
-                    <tr>
-                        <td>1</td>
-                        <td>Cliente 1</td>
-
-
-                        <td>Dirección 123, Ciudad</td>
-                        <td>Detalles del envío</td>
-                        <td>2023-12-15</td>
-                        <td>Pendiente</td>
-
-                    </tr>
-                    <!-- Puedes repetir esta fila para más envíos -->
+                  <tr *ngFor="let p of programado">
+                    <td>{{ p.CompVentas || p.compVentas || '-' }}</td>
+                    <td>{{ p.RSocial || p.rSocial || '-' }}</td>
+                    <td class="text-truncate" style="max-width: 200px;" title="{{ p.Direccion || p.direccion || '-' }}">
+                      {{ p.Direccion || p.direccion || '-' }}
+                    </td>
+                    <td>{{ p.FEnvio || p.FechaEntrega || p.fEnvio || p.fechaEntrega || '-' }}</td>
+                    <td>
+                      <span class="badge" [style.background-color]="p.estadoColor || '#6c757d'">
+                        {{ p.estadoDescripcion || p.descripcion || 'Sin estado' }}
+                      </span>
+                    </td>
+                  </tr>
                 </tbody>
-            </table>
+              </table>
+            </div>
+          </ng-container>
         </div>
+      </div>
     </div>
-</div>
+  </div>
+</main>

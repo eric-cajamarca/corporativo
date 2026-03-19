@@ -1,37 +1,40 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { ProgramacionService } from '../../../services/programacion.service';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 @Component({
   selector: 'app-index-programacion',
-  imports: [FormsModule,RouterModule,CommonModule,TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent],
   templateUrl: './index-programacion.component.html',
   styleUrl: './index-programacion.component.css'
 })
-export class IndexProgramacionComponent {
-  public token:any = '';
-  public programado:any = [];
+export class IndexProgramacionComponent implements OnInit {
+  public sidebarState = inject(SidebarStateService);
+  public programado: any[] = [];
+  public loading = false;
 
-  constructor(
-    private _progamacionService: ProgramacionService,
-  ) {
-    //this.token = this._cookieService.get('token');
-   }
+  constructor(private _programacionService: ProgramacionService) {}
 
+  ngOnInit(): void {
+    this.cargarProgramaciones();
+  }
 
-  ngOnInit() {
-    this._progamacionService.obtener_all_programaciones().subscribe(
-      response=>{
-        
-        this.programado = response.programacion;
-        console.log('this.programado',this.programado);
+  cargarProgramaciones(): void {
+    this.loading = true;
+    this._programacionService.obtener_all_programaciones().subscribe({
+      next: (response) => {
+        this.programado = response?.data ?? response?.programacion ?? [];
       },
-      error=>{
-        console.log(<any>error);
-      }
-    )
+      error: (err) => {
+        console.error('Error al cargar programaciones:', err);
+        this.programado = [];
+      },
+      complete: () => { this.loading = false; }
+    });
   }
 }

@@ -1,0 +1,67 @@
+<div class="modal fade show" *ngIf="visible" style="display:block;">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Registrar delivery externo</h5>
+        <button type="button" class="btn-close" (click)="cerrar()"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small">Nombres</label>
+            <input class="form-control form-control-sm" [(ngModel)]="nombres" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Apellidos</label>
+            <input class="form-control form-control-sm" [(ngModel)]="apellidos" />
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label small">Documento</label>
+            <input class="form-control form-control-sm" [(ngModel)]="documento" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Celular</label>
+            <input class="form-control form-control-sm" [(ngModel)]="celular" />
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label small">Licencia (opcional)</label>
+            <input class="form-control form-control-sm" [(ngModel)]="licencia" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Email (opcional)</label>
+            <input class="form-control form-control-sm" [(ngModel)]="email" />
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label small">Vehículo</label>
+            <input class="form-control form-control-sm" [(ngModel)]="vehiculo" placeholder="Ej. Motocicleta" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Placa</label>
+            <input class="form-control form-control-sm" [(ngModel)]="placa" placeholder="ABC-123" />
+          </div>
+        </div>
+
+        <div class="alert alert-info py-2 mt-3 mb-0">
+          Se registrará el transportista para tu empresa y quedará disponible al crear el despacho (Delivery externo).
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrar()" [disabled]="cargando">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="guardar()" [disabled]="cargando">
+          <span *ngIf="cargando" class="spinner-border spinner-border-sm me-1"></span>
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="visible"></div>
+
