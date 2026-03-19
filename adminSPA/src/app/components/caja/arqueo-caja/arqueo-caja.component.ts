@@ -1,9 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
+import { PdfService } from '../../../services/pdf.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { DocumentoService } from '../../../services/documento.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
 import { Caja } from '../../../interfaces/caja-interface';
+import { Empresa } from '../../../interfaces/pdf-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -59,6 +64,15 @@ export class ArqueoCajaComponent implements OnInit {
 
   public loading: boolean = false;
 
+  mostrarModalPdf = false;
+  generandoPdf = false;
+  empresa: Empresa | null = null;
+  mostrarWhatsappForm = false;
+  whatsappNumber = '';
+  whatsappFormato: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsapp = false;
+  whatsappMensaje: string | null = null;
+
   private iconosPorConcepto: Record<string, string> = {
     APERTURA_CAJA: 'bi bi-lock-open-fill',
     VENTA_CONTADO: 'bi bi-cart-check',
@@ -75,6 +89,10 @@ export class ArqueoCajaComponent implements OnInit {
 
   constructor(
     private cajaService: CajaService,
+    private pdfService: PdfService,
+    private empresaService: EmpresaService,
+    private documentoService: DocumentoService,
+    private whatsappService: WhatsappService,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -90,6 +108,24 @@ export class ArqueoCajaComponent implements OnInit {
   ngOnInit(): void {
     this.fecha = ArqueoCajaComponent.fechaLocalHoy();
     this.cargarCajas();
+    this.consultar();
+    this.empresaService.getEmpresa$().subscribe((emp) => {
+      const e = emp as any;
+      const razonSocial = e?.razon_Social ?? e?.nombre ?? '';
+      const nombreValido = (razonSocial && razonSocial !== 'Nombre Predeterminado') ? razonSocial : '';
+      this.empresa = emp ? {
+        logo: e?.logo ?? '',
+        nombre: nombreValido,
+        ruc: e?.ruc ?? '',
+        direccion: e?.direccion ?? '',
+        telefono: e?.celular ?? e?.telefono ?? ''
+      } : null;
+    });
+  }
+
+  /** Se ejecuta al cambiar fecha inicial o final para recargar los datos. */
+  onFechaChange(): void {
+    this.consultar();
   }
 
   cargarCajas(): void {
@@ -332,6 +368,11 @@ export class ArqueoCajaComponent implements OnInit {
     return this.detalleConcepto.items.reduce((acc, item) => acc + item.total, 0);
   }
 
+  /** Indica si hay movimientos cargados (habilita PDF, Imprimir, Guardar). */
+  get tieneMovimientos(): boolean {
+    return (this.filasArqueoRaw && this.filasArqueoRaw.length > 0) || (this.resumenConceptos && this.resumenConceptos.length > 0);
+  }
+
   get totalMovimientosIngresos(): number {
     return this.movimientosIngresos.reduce((acc, m) => acc + m.importe, 0);
   }
@@ -394,6 +435,202 @@ export class ArqueoCajaComponent implements OnInit {
   subtotalDetalleFormaPago(): number {
     if (!this.detalleFormaPago || !this.detalleFormaPago.items.length) return 0;
     return this.detalleFormaPago.items.reduce((acc, item) => acc + item.importe, 0);
+  }
+
+  abrirModalPdf(): void {
+    this.mostrarWhatsappForm = false;
+    this.whatsappMensaje = null;
+    this.mostrarModalPdf = true;
+  }
+
+  cerrarModalPdf(): void {
+    this.mostrarModalPdf = false;
+    this.mostrarWhatsappForm = false;
+    this.whatsappMensaje = null;
+  }
+
+  private getDatosArqueoPdf(): Record<string, unknown> {
+    const cajaNombre = this.cajaSeleccionada === 'TODAS' ? 'Todas' : (this.cajas.find((c) => c.idCaja === this.cajaSeleccionada)?.nombre ?? '');
+    return {
+      empresa: this.empresa ?? {},
+      fecha: this.fecha,
+      fechaFinal: this.fechaFinal || undefined,
+      cajaNombre,
+      resumenConceptos: this.resumenConceptos,
+      movimientosIngresos: this.movimientosIngresos,
+      movimientosEgresos: this.movimientosEgresos,
+      totalConceptos: this.totalConceptos,
+      totalMovimientosIngresos: this.totalMovimientosIngresos,
+      totalMovimientosEgresos: this.totalMovimientosEgresos,
+      saldoEfectivoDisponible: this.saldoEfectivoDisponible,
+      nombreArchivo: `arqueo-caja-${this.fecha}${this.fechaFinal ? '-' + this.fechaFinal : ''}.pdf`
+    };
+  }
+
+  generarPdf(formato: 'A4' | 'A5' | 'ticket'): void {
+    this.generandoPdf = true;
+    const datos = this.getDatosArqueoPdf();
+    const nombreArchivo = (datos['nombreArchivo'] as string) || 'arqueo-caja.pdf';
+    this.pdfService.generarPdfArqueoCaja(datos as any, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        this.pdfService.previsualizar(blob);
+        this.generandoPdf = false;
+      },
+      error: (err) => {
+        this.generandoPdf = false;
+        iziToast.error({ title: 'Error', message: err?.error?.error || err?.message || 'Error al generar el PDF.' });
+      }
+    });
+  }
+
+  abrirFormWhatsapp(): void {
+    this.mostrarWhatsappForm = true;
+    this.whatsappMensaje = null;
+  }
+
+  enviarPdfPorWhatsapp(): void {
+    if (!this.whatsappNumber.trim()) {
+      this.whatsappMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsapp = true;
+    this.whatsappMensaje = null;
+    const datos = this.getDatosArqueoPdf();
+    const nombreArchivo = (datos['nombreArchivo'] as string) || 'arqueo-caja.pdf';
+    this.pdfService.generarPdfArqueoCaja(datos as any, this.whatsappFormato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this.whatsappService.enviarArchivo(this.whatsappNumber.trim(), base64, nombreArchivo, 'document').subscribe({
+            next: (res) => {
+              this.enviandoWhatsapp = false;
+              this.whatsappMensaje = res.message;
+              if (res.success) setTimeout(() => this.cerrarModalPdf(), 2000);
+            },
+            error: (err) => {
+              this.enviandoWhatsapp = false;
+              this.whatsappMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+            }
+          });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err) => {
+        this.enviandoWhatsapp = false;
+        this.whatsappMensaje = err?.error?.error || err?.message || 'Error al generar el PDF.';
+      }
+    });
+  }
+
+  imprimir(): void {
+    const ventana = window.open('', '_blank');
+    if (!ventana) return;
+    const cajaNombre = this.cajaSeleccionada === 'TODAS' ? 'Todas' : (this.cajas.find((c) => c.idCaja === this.cajaSeleccionada)?.nombre ?? '');
+    const rango = this.fechaFinal ? `${this.fecha} - ${this.fechaFinal}` : this.fecha;
+    const filasConceptos = this.resumenConceptos.map((r) =>
+      `<tr><td>${r.concepto}</td><td class="text-end">${r.importe >= 0 ? '+' : ''}${this.formatCurrency(r.importe)}</td></tr>`
+    ).join('');
+    const filasIngresos = this.movimientosIngresos.map((m) =>
+      `<tr><td>${m.formaPago}</td><td class="text-end">${this.formatCurrency(m.importe)}</td></tr>`
+    ).join('');
+    const filasEgresos = this.movimientosEgresos.map((m) =>
+      `<tr><td>${m.formaPago}</td><td class="text-end">${this.formatCurrency(m.importe)}</td></tr>`
+    ).join('');
+    ventana.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Arqueo de Caja</title>
+      <style>
+        body{font-family:arial,sans-serif;font-size:12px;padding:20px}
+        table{width:100%;border-collapse:collapse;margin-top:10px}
+        th,td{border:1px solid #ccc;padding:8px}
+        th{background:#f2f2f2}
+        .text-end{text-align:right}
+        h2{color:#0056b3;margin-top:20px}
+        .saldo{background:#e8f4fd;padding:12px;margin-top:15px;font-weight:bold;border:1px solid #0056b3}
+      </style></head>
+      <body>
+        <h1>Arqueo de Caja</h1>
+        <p><strong>Período:</strong> ${rango} | <strong>Caja:</strong> ${cajaNombre}</p>
+        <h2>Resumen por concepto</h2>
+        <table><thead><tr><th>Concepto</th><th class="text-end">Importe</th></tr></thead><tbody>${filasConceptos}</tbody>
+        <tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>${this.formatCurrency(this.totalConceptos)}</strong></td></tr></tfoot></table>
+        <h2>Movimientos de Ingresos</h2>
+        <table><thead><tr><th>Forma Pago</th><th class="text-end">Importe</th></tr></thead><tbody>${filasIngresos}</tbody>
+        <tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>${this.formatCurrency(this.totalMovimientosIngresos)}</strong></td></tr></tfoot></table>
+        <h2>Movimientos de Egresos</h2>
+        <table><thead><tr><th>Forma Pago</th><th class="text-end">Importe</th></tr></thead><tbody>${filasEgresos}</tbody>
+        <tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>${this.formatCurrency(this.totalMovimientosEgresos)}</strong></td></tr></tfoot></table>
+        <div class="saldo">Efectivo disponible en caja: ${this.formatCurrency(this.saldoEfectivoDisponible)}</div>
+      </body></html>
+    `);
+    ventana.document.close();
+    ventana.focus();
+    setTimeout(() => { ventana.print(); ventana.close(); }, 500);
+  }
+
+  guardarSaldoAnterior(): void {
+    const saldo = this.saldoEfectivoDisponible;
+    if (saldo <= 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'El saldo efectivo disponible debe ser mayor a 0 para generar el recibo de saldo anterior.' });
+      return;
+    }
+    const cajasAbiertas = this.cajas.filter((c: any) => c.cajaAbierta && c.idApertura);
+    if (cajasAbiertas.length === 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'No hay caja abierta. Debe abrir una caja para registrar el saldo anterior.' });
+      return;
+    }
+    const caja = this.cajaSeleccionada === 'TODAS' ? cajasAbiertas[0] : cajasAbiertas.find((c: any) => c.idCaja === this.cajaSeleccionada);
+    if (!caja) {
+      iziToast.warning({ title: 'Advertencia', message: 'La caja seleccionada no está abierta. Seleccione otra caja.' });
+      return;
+    }
+    const fechaBase = this.fechaFinal || this.fecha;
+    const [y, m, d] = fechaBase.split('-').map(Number);
+    const diaSiguiente = new Date(y, m - 1, d + 1);
+    const fechaSiguiente = `${diaSiguiente.getFullYear()}-${String(diaSiguiente.getMonth() + 1).padStart(2, '0')}-${String(diaSiguiente.getDate()).padStart(2, '0')}`;
+    this.documentoService.getFormasPago().subscribe({
+      next: (r) => {
+        const formasPago = r.data || [];
+        const efectivo = formasPago.find((f: any) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+        const idFormaPago = efectivo?.idFormaPago ?? formasPago[0]?.idFormaPago;
+        if (!idFormaPago) {
+          iziToast.error({ title: 'Error', message: 'No hay forma de pago Efectivo configurada.' });
+          return;
+        }
+        this.cajaService.obtenerTiposMovimiento().subscribe({
+          next: (tiposRes) => {
+            const tiposIngreso = (tiposRes.data || []).filter((t: any) => t.tipo === 'I');
+            const idTipo = tiposIngreso[0]?.idTipoMovimientoCaja;
+            if (!idTipo) {
+              iziToast.error({ title: 'Error', message: 'No hay tipo de movimiento Ingreso configurado.' });
+              return;
+            }
+            this.cajaService.registrarMovimientoIngreso({
+              idApertura: (caja as any).idApertura,
+              idTipoMovimientoCaja: idTipo,
+              fechaMovimiento: fechaSiguiente + 'T00:00:00',
+              concepto: 'Saldo del día anterior',
+              monto: saldo,
+              idMediosPago: idFormaPago,
+              documentoRelacionado: `SA ${fechaSiguiente}`,
+              observaciones: `Saldo anterior del día ${this.fecha}${this.fechaFinal ? ' al ' + this.fechaFinal : ''}. Generado desde arqueo.`
+            }).subscribe({
+              next: () => {
+                iziToast.success({ title: 'Éxito', message: 'Recibo de ingreso "Saldo del día anterior" registrado para el ' + fechaSiguiente + '.' });
+                this.consultar();
+              },
+              error: (e) => {
+                iziToast.error({ title: 'Error', message: e.error?.message || 'Error al guardar.' });
+              }
+            });
+          },
+          error: () => iziToast.error({ title: 'Error', message: 'No se pudieron cargar los tipos de movimiento.' })
+        });
+      },
+      error: () => iziToast.error({ title: 'Error', message: 'No se pudieron cargar las formas de pago.' })
+    });
   }
 }
 

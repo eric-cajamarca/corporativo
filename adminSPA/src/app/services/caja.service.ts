@@ -172,6 +172,7 @@ export class CajaService {
     idConcepto?: string;
     monto: number;
     idMediosPago?: number;
+    documentoRelacionado?: string;
     observaciones?: string;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -184,6 +185,7 @@ export class CajaService {
       monto: data.monto,
       idMediosPago: data.idMediosPago ?? null,
       idMoneda: 1,
+      documentoRelacionado: data.documentoRelacionado ?? null,
       observaciones: data.observaciones ?? null
     }, { headers, withCredentials: true });
   }
@@ -197,6 +199,7 @@ export class CajaService {
     idConcepto?: string;
     monto: number;
     idMediosPago?: number;
+    documentoRelacionado?: string;
     observaciones?: string;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -209,6 +212,7 @@ export class CajaService {
       monto: data.monto,
       idMediosPago: data.idMediosPago ?? null,
       idMoneda: 1,
+      documentoRelacionado: data.documentoRelacionado ?? null,
       observaciones: data.observaciones ?? null
     }, { headers, withCredentials: true });
   }

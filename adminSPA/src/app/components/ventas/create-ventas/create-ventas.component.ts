@@ -242,6 +242,7 @@ export class CreateVentasComponent implements OnInit {
     const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
     const hoy = `${y}-${m}-${d}`;
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
+    //if (!this.ventas.fVencimiento) this.ventas.fVencimiento=hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();

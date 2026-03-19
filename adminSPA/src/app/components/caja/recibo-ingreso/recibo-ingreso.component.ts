@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
 import { CatalogosService } from '../../../services/catalogos.service';
-import { TablasSunatService } from '../../../services/tablas-sunat.service';
+import { DocumentoService } from '../../../services/documento.service';
+import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -19,6 +20,7 @@ export interface ReciboIngresoItem {
   monto: number;
   tipoMovimiento?: string;
   medioPago?: string;
+  idMediosPago?: number;
   documentoRelacionado?: string;
   observaciones?: string;
   usuario?: string;
@@ -38,7 +40,9 @@ export class ReciboIngresoComponent implements OnInit {
   cajas: any[] = [];
   tiposMovimiento: any[] = [];
   conceptos: any[] = [];
-  mediosPago: any[] = [];
+  formasPago: FormaPago[] = [];
+  formaPagoSeleccionada: FormaPago = { idFormaPago: 0, descripcion: '', tipo: 0, requiereReferencia: 0 };
+  mostrarModalFormaPago = false;
   loading = false;
 
   filtros = {
@@ -61,7 +65,6 @@ export class ReciboIngresoComponent implements OnInit {
     glosa: '',
     recibidoDe: '',
     importe: 0,
-    idMediosPago: null as number | null,
     referencia: '',
     fechaEmision: ''
   };
@@ -98,7 +101,7 @@ export class ReciboIngresoComponent implements OnInit {
   constructor(
     private cajaService: CajaService,
     private catalogosService: CatalogosService,
-    private tablasSunat: TablasSunatService,
+    private documentoService: DocumentoService,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -116,9 +119,14 @@ export class ReciboIngresoComponent implements OnInit {
       next: (r) => { this.conceptos = r.data || []; },
       error: () => {}
     });
-    this.tablasSunat.obtener_medios_pago().subscribe({
-      next: (r) => { this.mediosPago = r.data || []; },
-      error: () => {}
+    this.documentoService.getFormasPago().subscribe({
+      next: (r) => {
+        this.formasPago = r.data || [];
+        const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+        if (efectivo) this.formaPagoSeleccionada = { ...efectivo };
+        else if (this.formasPago.length) this.formaPagoSeleccionada = { ...this.formasPago[0] };
+      },
+      error: () => { this.formasPago = []; }
     });
   }
 
@@ -193,6 +201,7 @@ export class ReciboIngresoComponent implements OnInit {
       concepto: m.concepto,
       monto: Number(m.monto),
       medioPago: m.medioPago,
+      idMediosPago: m.idMediosPago != null ? Number(m.idMediosPago) : undefined,
       documentoRelacionado: doc,
       observaciones: m.observaciones,
       usuario: m.usuario,
@@ -215,7 +224,6 @@ export class ReciboIngresoComponent implements OnInit {
       glosa: '',
       recibidoDe: '',
       importe: 0,
-      idMediosPago: null,
       referencia: '',
       fechaEmision: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })()
     };
@@ -234,7 +242,6 @@ export class ReciboIngresoComponent implements OnInit {
       glosa: item.glosa || '',
       recibidoDe: item.recibidoDe || '',
       importe: item.monto,
-      idMediosPago: null,
       referencia: item.documentoRelacionado || '',
       fechaEmision: item.fechaMovimiento ? item.fechaMovimiento.split('T')[0] : ''
     };
@@ -261,7 +268,52 @@ export class ReciboIngresoComponent implements OnInit {
 
   cerrarForm(): void {
     this.mostrarForm = false;
+    this.mostrarModalFormaPago = false;
     this.editandoId = null;
+  }
+
+  abrirModalFormaPago(): void {
+    if (!this.form.concepto.trim() || this.form.importe <= 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'Concepto e importe son obligatorios.' });
+      return;
+    }
+    if (!this.editandoId && !this.form.idApertura) {
+      iziToast.warning({ title: 'Advertencia', message: 'Debe haber una caja abierta para registrar el ingreso.' });
+      return;
+    }
+    if (!this.form.idTipoMovimientoCaja) {
+      iziToast.warning({ title: 'Advertencia', message: 'No hay tipo de movimiento Ingreso configurado.' });
+      return;
+    }
+    if (this.editandoId) {
+      const item = this.list.find((x) => x.idMovimientoCaja === this.editandoId);
+      const fp = item?.idMediosPago != null ? this.formasPago.find((f) => f.idFormaPago === item!.idMediosPago) : null;
+      if (fp) this.formaPagoSeleccionada = { ...fp };
+      else {
+        const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+        if (efectivo) this.formaPagoSeleccionada = { ...efectivo };
+        else if (this.formasPago.length) this.formaPagoSeleccionada = { ...this.formasPago[0] };
+      }
+    } else {
+      const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+      if (efectivo) this.formaPagoSeleccionada = { ...efectivo };
+      else if (this.formasPago.length) this.formaPagoSeleccionada = { ...this.formasPago[0] };
+    }
+    this.mostrarModalFormaPago = true;
+  }
+
+  cerrarModalFormaPago(): void {
+    this.mostrarModalFormaPago = false;
+  }
+
+  confirmarGuardarConFormaPago(): void {
+    const idForma = this.formaPagoSeleccionada?.idFormaPago != null ? Number(this.formaPagoSeleccionada.idFormaPago) : 0;
+    if (!idForma) {
+      iziToast.warning({ title: 'Advertencia', message: 'Seleccione la forma de pago.' });
+      return;
+    }
+    this.mostrarModalFormaPago = false;
+    this.guardar(idForma);
   }
 
   cerrarVer(): void {
@@ -269,11 +321,8 @@ export class ReciboIngresoComponent implements OnInit {
     this.itemVer = null;
   }
 
-  guardar(): void {
-    if (!this.form.concepto.trim() || this.form.importe <= 0) {
-      iziToast.warning({ title: 'Advertencia', message: 'Concepto e importe son obligatorios.' });
-      return;
-    }
+  guardar(idFormaPago?: number): void {
+    const idMediosPago = idFormaPago ?? (this.form as any).idMediosPago;
     const observaciones = [this.form.recibidoDe ? 'Recibido de: ' + this.form.recibidoDe : '', this.form.glosa ? 'Glosa: ' + this.form.glosa : ''].filter(Boolean).join(' | ');
 
     if (this.editandoId) {
@@ -281,7 +330,7 @@ export class ReciboIngresoComponent implements OnInit {
         concepto: this.form.concepto,
         idConcepto: this.form.idConcepto || undefined,
         monto: this.form.importe,
-        idMediosPago: this.form.idMediosPago ?? undefined,
+        idMediosPago: idMediosPago ?? undefined,
         documentoRelacionado: this.form.referencia || undefined,
         observaciones: observaciones || undefined
       }).subscribe({
@@ -312,7 +361,8 @@ export class ReciboIngresoComponent implements OnInit {
       concepto: this.form.concepto,
       idConcepto: this.form.idConcepto || undefined,
       monto: this.form.importe,
-      idMediosPago: this.form.idMediosPago ?? undefined,
+      idMediosPago: idMediosPago ?? undefined,
+      documentoRelacionado: this.form.referencia?.trim() || undefined,
       observaciones: observaciones || undefined
     }).subscribe({
       next: () => {

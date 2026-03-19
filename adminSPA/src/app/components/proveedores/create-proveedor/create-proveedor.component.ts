@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { ApiperuService } from '../../../services/apiperu.service';
 import { DocumentoService } from '../../../services/documento.service';
@@ -8,17 +8,20 @@ import { FormsModule } from '@angular/forms';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
 
 
 @Component({
   selector: 'app-create-proveedor',
-  imports: [FormsModule,CommonModule ,TopnavComponent],
+  imports: [FormsModule,CommonModule ,TopnavComponent,SidebarComponent],
   templateUrl: './create-proveedor.component.html',
   styleUrl: './create-proveedor.component.css'
 })
 export class CreateProveedorComponent {
+  public sidebarState = inject(SidebarStateService);
   public busqueda = false;
   public filtro: any = "";
   public proveedores: any = {
@@ -693,5 +696,9 @@ private async handleDniSearch(): Promise<void> {
       // Realiza acciones cuando el checkbox está desmarcado
     }
     
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

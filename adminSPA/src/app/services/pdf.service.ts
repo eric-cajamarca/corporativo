@@ -41,6 +41,15 @@ export class PdfService {
   }
 
   /** Genera PDF de comprobante de despacho (lista para almacenero: venta, items con ubicaciones). */
+  /** Genera PDF de arqueo de caja (ticket, A5, A4). */
+  generarPdfArqueoCaja(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos, tipo: 'arqueo-caja', fontSize: formato === 'ticket' ? 8 : 10, formato },
+      { responseType: 'blob' }
+    );
+  }
+
   generarPdfComprobanteDespacho(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;

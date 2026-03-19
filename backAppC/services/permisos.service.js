@@ -292,7 +292,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'INVENTARIO',
             nombre: 'Inventario',
-            icono: 'bi bi-box-seam',
+            icono: 'bi bi-boxes',
             ruta: null,
             permiso: 'VER_INVENTARIO',
             visible: esAdmin || permisos.includes('VER_INVENTARIO'),
@@ -308,7 +308,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'PRODUCTOS',
             nombre: 'Productos',
-            icono: 'fas fa-box-open',
+            icono: 'bi bi-box',
             ruta: null,
             permiso: 'VER_PRODUCTOS',
             visible: esAdmin || permisos.includes('VER_PRODUCTOS'),
@@ -353,7 +353,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'DESPACHOS',
             nombre: 'Despachos',
-            icono: 'fas fa-truck',
+            icono: 'bi bi-truck',
             ruta: null,
             permiso: 'VER_DESPACHOS',
             // El módulo se muestra si el usuario puede ver despachos o al menos alguno de los envíos.
@@ -414,7 +414,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'REPORTES',
             nombre: 'Reportes',
-            icono: 'fas fa-file-alt',
+            icono: 'bi bi-bar-chart',
             ruta: '/reportes',
             permiso: 'VER_REPORTES',
             visible: esAdmin || permisos.includes('VER_REPORTES')
@@ -430,7 +430,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         {
             modulo: 'EMPRESA',
             nombre: 'Empresa',
-            icono: 'bi bi-building',
+            icono: 'bi bi-building-check',
             ruta: '/editar-empresa',
             permiso: 'VER_EMPRESA',
             visible: esAdmin || permisos.includes('VER_EMPRESA')

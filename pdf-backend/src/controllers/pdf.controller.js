@@ -114,6 +114,48 @@ async function generatePdf(req, res) {
         break;
       }
 
+      case 'arqueo-caja': {
+        const fc = (n) => (n ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const emp = datos.empresa || {};
+        const razonSocial = (emp.razon_Social || emp.nombre || '').replace(/Nombre Predeterminado/i, '').trim() || '';
+        const ruc = emp.ruc || '';
+        const headerLine = [razonSocial, ruc ? `RUC: ${ruc}` : ''].filter(Boolean).join(' | ');
+        const filasConceptos = (datos.resumenConceptos || []).map((r) =>
+          `<tr><td>${(r.concepto || '').replace(/</g, '&lt;')}</td><td class="text-end">${r.importe >= 0 ? '+' : ''}${fc(r.importe)}</td></tr>`
+        ).join('');
+        const filasIngresos = (datos.movimientosIngresos || []).map((m) =>
+          `<tr><td>${(m.formaPago || '').replace(/</g, '&lt;')}</td><td class="text-end">${fc(m.importe)}</td></tr>`
+        ).join('');
+        const filasEgresos = (datos.movimientosEgresos || []).map((m) =>
+          `<tr><td>${(m.formaPago || '').replace(/</g, '&lt;')}</td><td class="text-end">${fc(m.importe)}</td></tr>`
+        ).join('');
+        const rango = datos.fechaFinal ? `${datos.fecha || ''} - ${datos.fechaFinal}` : (datos.fecha || '');
+        html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Arqueo de Caja</title>
+<style>body{font-family:Arial,sans-serif;font-size:10px;margin:0;padding:20px;color:#333}
+.header{border-bottom:2px solid #0056b3;padding-bottom:8px;margin-bottom:15px;font-size:11px;font-weight:bold}
+h2{color:#0056b3;margin:20px 0 10px 0;font-size:14px}
+.fecha-reporte{color:#666;margin-bottom:15px;font-size:9px;font-style:italic}
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:9px}
+th,td{border:1px solid #ccc;padding:6px;text-align:left}
+th{background:#f2f2f2;font-weight:bold;text-align:center}
+.text-end{text-align:right}
+.bloque-totales{margin-top:15px;padding:10px;background:#e8f4fd;border:1px solid #0056b3}</style>
+</head><body>
+  <div class="header">${headerLine || 'Arqueo de Caja'}</div>
+  <h2>Arqueo de Caja</h2>
+  <div class="fecha-reporte">Período: ${rango} | Caja: ${datos.cajaNombre || 'Todas'}</div>
+  <h3>Resumen por concepto</h3>
+  <table><thead><tr><th>Concepto</th><th class="text-end">Importe</th></tr></thead><tbody>${filasConceptos}</tbody><tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>${fc(datos.totalConceptos)}</strong></td></tr></tfoot></table>
+  <h3>Movimientos de Ingresos</h3>
+  <table><thead><tr><th>Forma Pago</th><th class="text-end">Importe</th></tr></thead><tbody>${filasIngresos}</tbody><tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>${fc(datos.totalMovimientosIngresos)}</strong></td></tr></tfoot></table>
+  <h3>Movimientos de Egresos</h3>
+  <table><thead><tr><th>Forma Pago</th><th class="text-end">Importe</th></tr></thead><tbody>${filasEgresos}</tbody><tfoot><tr><td><strong>Total</strong></td><td class="text-end"><strong>${fc(datos.totalMovimientosEgresos)}</strong></td></tr></tfoot></table>
+  <div class="bloque-totales"><strong>Efectivo disponible en caja:</strong> ${fc(datos.saldoEfectivoDisponible)}</div>
+</body></html>`;
+        break;
+      }
+
       case 'comprobante-despacho': {
         const columnas = datos.columnas || ['Código', 'Descripción', 'Cantidad', 'Ubicación'];
         const filas = datos.filas || (datos.items || []).map(it => [

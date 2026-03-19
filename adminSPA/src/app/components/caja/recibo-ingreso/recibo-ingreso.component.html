@@ -158,19 +158,7 @@
             <input type="number" class="form-control form-control-sm" [(ngModel)]="form.importe" step="0.01" min="0" placeholder="0.00">
           </div>
         </div>
-        <div class="row g-2 mb-2">
-          <div class="col-md-6">
-            <label class="form-label">Medio de pago</label>
-            <select class="form-select form-select-sm" [(ngModel)]="form.idMediosPago">
-              <option [ngValue]="null">::Seleccione::</option>
-              <option *ngFor="let mp of mediosPago" [ngValue]="mp.idMediosPago">{{ mp.descripcion }}</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Referencia</label>
-            <input type="text" class="form-control form-control-sm" [(ngModel)]="form.referencia" placeholder="Referencia">
-          </div>
-        </div>
+        <!-- Forma de pago se selecciona en el modal al guardar -->
         <div *ngIf="!editandoId && cajas.length" class="mb-2">
           <label class="form-label">Caja (apertura activa)</label>
           <select class="form-select form-select-sm" [(ngModel)]="form.idApertura">
@@ -180,12 +168,47 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-success" (click)="guardar()">
+        <button type="button" class="btn btn-success" (click)="abrirModalFormaPago()">
           <i class="fas fa-save me-1"></i> Guardar
         </button>
         <button type="button" class="btn btn-secondary" (click)="cerrarForm()">
           <i class="fas fa-times me-1"></i> Cancelar
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Forma de pago (se abre al hacer clic en Guardar) -->
+<div class="modal fade" [class.show]="mostrarModalFormaPago" [style.display]="mostrarModalFormaPago ? 'block' : 'none'" tabindex="-1" style="z-index: 1060;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Forma de pago</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalFormaPago()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Forma de pago</label>
+          <select class="form-select" [(ngModel)]="formaPagoSeleccionada.idFormaPago">
+            <option [ngValue]="null">::Seleccione::</option>
+            <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Monto</label>
+          <input type="number" class="form-control" [(ngModel)]="form.importe" step="0.01" min="0" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Referencia (opcional)</label>
+          <input type="text" class="form-control" [(ngModel)]="form.referencia" placeholder="N° operación">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" (click)="confirmarGuardarConFormaPago()">
+          <i class="bi bi-check-circle me-1"></i>Confirmar y guardar
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalFormaPago()">Cancelar</button>
       </div>
     </div>
   </div>
@@ -219,4 +242,4 @@
   </div>
 </div>
 
-<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer || mostrarModalFormaPago" style="z-index: 1040;"></div>

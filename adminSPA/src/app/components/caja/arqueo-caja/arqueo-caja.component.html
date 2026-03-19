@@ -20,11 +20,11 @@
               <div class="row mb-3 justify-content-center">
                 <div class="col-md-3 mb-2">
                   <label class="form-label">Fecha inicial:</label>
-                  <input type="date" class="form-control form-control-sm" [(ngModel)]="fecha">
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="fecha" (ngModelChange)="onFechaChange()">
                 </div>
                 <div class="col-md-3 mb-2">
                   <label class="form-label">Fecha final:</label>
-                  <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaFinal">
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaFinal" (ngModelChange)="onFechaChange()">
                 </div>
                 <div class="col-md-3 mb-2">
                   <label class="form-label">Caja:</label>
@@ -46,13 +46,13 @@
                   <button class="btn btn-primary btn-sm" (click)="consultar()" [disabled]="loading">
                     <i class="fas fa-search"></i> Consultar
                   </button>
-                  <button class="btn btn-danger btn-sm" type="button" disabled>
+                  <button class="btn btn-danger btn-sm" type="button" [disabled]="!tieneMovimientos" (click)="abrirModalPdf()">
                     <i class="fas fa-file-pdf"></i> Pdf
                   </button>
-                  <button class="btn btn-success btn-sm" type="button" disabled>
+                  <button class="btn btn-success btn-sm" type="button" [disabled]="!tieneMovimientos" (click)="imprimir()">
                     <i class="fas fa-print"></i> Imprimir
                   </button>
-                  <button class="btn btn-info btn-sm text-white" type="button" disabled>
+                  <button class="btn btn-info btn-sm text-white" type="button" [disabled]="!tieneMovimientos" (click)="guardarSaldoAnterior()">
                     <i class="fas fa-save"></i> Guardar
                   </button>
                   <button class="btn btn-secondary btn-sm" type="button" [routerLink]="['/home']">
@@ -269,5 +269,55 @@
   </div>
 </div>
 <div class="modal-backdrop fade show" *ngIf="mostrarModalDetalleFormaPago" style="z-index: 1040;"></div>
+
+<!-- Modal PDF Arqueo -->
+<div class="modal fade" [class.show]="mostrarModalPdf" [style.display]="mostrarModalPdf ? 'block' : 'none'" tabindex="-1" style="z-index: 1060;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-file-pdf me-2"></i>Generar PDF - Arqueo de Caja</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="cerrarModalPdf()"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Seleccione el formato del PDF:</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-danger" [disabled]="generandoPdf" (click)="generarPdf('ticket')">
+            <i class="bi bi-receipt"></i> Formato Ticket
+          </button>
+          <button type="button" class="btn btn-outline-danger" [disabled]="generandoPdf" (click)="generarPdf('A5')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A5
+          </button>
+          <button type="button" class="btn btn-outline-danger" [disabled]="generandoPdf" (click)="generarPdf('A4')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A4
+          </button>
+        </div>
+        <hr class="my-3" />
+        <button type="button" class="btn btn-outline-success w-100" [disabled]="generandoPdf" (click)="abrirFormWhatsapp()">
+          <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+        </button>
+        <div *ngIf="mostrarWhatsappForm" class="mt-3 p-2 border rounded">
+          <label class="form-label small">Número (código país + número, ej. 51999999999)</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappNumber" placeholder="51999999999" />
+          <label class="form-label small">Formato del PDF</label>
+          <select class="form-select form-select-sm mb-2" [(ngModel)]="whatsappFormato">
+            <option value="ticket">Ticket</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsapp" (click)="enviarPdfPorWhatsapp()">
+              <span *ngIf="enviandoWhatsapp"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+              <span *ngIf="!enviandoWhatsapp"><i class="bi bi-send"></i> Enviar</span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsapp" (click)="mostrarWhatsappForm = false">Cancelar</button>
+          </div>
+          <p class="small mt-2 mb-0" [class.text-success]="whatsappMensaje && whatsappNumber && !enviandoWhatsapp" [class.text-danger]="whatsappMensaje && (enviandoWhatsapp || !whatsappNumber)">{{ whatsappMensaje }}</p>
+        </div>
+        <p class="text-muted small mt-2 mb-0" *ngIf="generandoPdf && !mostrarWhatsappForm"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalPdf" style="z-index: 1050;"></div>
 
 

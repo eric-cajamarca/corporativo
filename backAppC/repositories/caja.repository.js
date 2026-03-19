@@ -434,9 +434,10 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
           )
         ) AS conceptoCatalogoDescripcion,
         mc.monto,
+        mc.idMediosPago,
         tmc.nombre AS tipoMovimiento,
         tmc.tipo AS tipoOperacion,
-        ISNULL(fp.descripcion, mp.descripcion) AS medioPago,
+        COALESCE(fp.descripcion, mp.descripcion) AS medioPago,
         mon.simbolo + ' ' + mon.descripcion AS moneda,
         mc.documentoRelacionado,
         mc.observaciones,
