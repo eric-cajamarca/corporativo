@@ -453,13 +453,16 @@ exports.buscarVentaDespachosRepo = async (pool, idEmpresa, filtros) => {
       v.numero,
       CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
       v.total,
+      ISNULL(v.eliminado, 0) AS eliminado,
       v.idEstadoPago,
       ISNULL(ep.descripcion, '') AS estadoPagoNombre,
       cl.rSocial AS clienteRazonSocial,
-      cl.ruc AS clienteRuc
+      cl.ruc AS clienteRuc,
+      ISNULL(c.codigo, '') AS codigoComprobante
     FROM Ventas v
     LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
     LEFT JOIN EstadoPago ep ON ep.idEstadoPago = v.idEstadoPago
+    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
     WHERE ${whereVenta}
   `);
   let venta = ventaResult.recordset && ventaResult.recordset[0];

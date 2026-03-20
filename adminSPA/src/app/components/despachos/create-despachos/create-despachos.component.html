@@ -33,6 +33,129 @@
               <a class="btn btn-outline-secondary ms-2" routerLink="/despachos">Volver</a>
             </div>
           </div>
+
+          <div class="card mb-3" *ngIf="ventaInfo && !loadingVenta">
+            <div class="card-header">
+              Devoluciones y cambios
+            </div>
+            <div class="card-body">
+              <p class="mb-2 text-muted">
+                Recomendación: si el comprobante ya está aceptado por SUNAT, el cambio de producto se maneja con
+                nota de crédito por el producto devuelto y una nueva venta para el producto de reemplazo.
+              </p>
+
+              <div class="mb-3">
+                <label class="form-label">Despacho</label>
+                <select class="form-select" [ngModel]="despachoSeleccionadoId" (ngModelChange)="seleccionarDespacho($event)">
+                  <option [ngValue]="null">Seleccione un despacho</option>
+                  <option *ngFor="let d of despachosVenta" [ngValue]="d.idDespacho">
+                    {{ d.fechaDespacho }} — {{ d.tipoDespacho }} — {{ d.estado }}
+                  </option>
+                </select>
+                <div *ngIf="cargandoDespachos" class="form-text">Cargando despachos…</div>
+              </div>
+
+              <div *ngIf="despachoSeleccionadoId">
+                <div *ngIf="cargandoDetalleDespacho" class="alert alert-info">Cargando detalle del despacho…</div>
+                <div *ngIf="errorDevolucion" class="alert alert-warning">{{ errorDevolucion }}</div>
+
+                <div class="table-responsive mb-3" *ngIf="detalleDespachoSeleccionado.length">
+                  <table class="table table-sm table-striped">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th class="text-end">Despachado</th>
+                        <th class="text-end">Devolver</th>
+                        <th>Notas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let d of detalleDespachoSeleccionado; let i = index">
+                        <td>{{ d.productoDescripcion }}</td>
+                        <td class="text-end">{{ d.cantidadDespachada | number:'1.0-3' }}</td>
+                        <td class="text-end" style="width: 140px;">
+                          <input type="number"
+                                 class="form-control form-control-sm text-end"
+                                 [(ngModel)]="devolucionItems[i].cantidadDevuelta"
+                                 [min]="0"
+                                 [max]="d.cantidadDespachada"
+                                 step="0.001">
+                        </td>
+                        <td>
+                          <input type="text"
+                                 class="form-control form-control-sm"
+                                 [(ngModel)]="devolucionItems[i].notas"
+                                 placeholder="Motivo o detalle">
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label">Observaciones de devolución</label>
+                  <textarea class="form-control" [(ngModel)]="devolucionObservaciones" rows="2"></textarea>
+                </div>
+
+                <button type="button" class="btn btn-warning" (click)="registrarDevolucion()" [disabled]="enviandoDevolucion">
+                  {{ enviandoDevolucion ? 'Registrando…' : 'Registrar devolución' }}
+                </button>
+              </div>
+
+              <div *ngIf="despachoSeleccionadoId" class="mt-4">
+                <h6>Devoluciones registradas</h6>
+                <div *ngIf="cargandoDevoluciones" class="form-text">Cargando devoluciones…</div>
+                <div *ngIf="!cargandoDevoluciones && !devolucionesDespacho.length" class="form-text">
+                  No hay devoluciones registradas.
+                </div>
+                <div class="table-responsive" *ngIf="devolucionesDespacho.length">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Usuario</th>
+                        <th class="text-end">Cantidad</th>
+                        <th>Observaciones</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let dv of devolucionesDespacho">
+                        <td>{{ dv.fechaDevolucion }}</td>
+                        <td>{{ dv.usuarioNombre }}</td>
+                        <td class="text-end">{{ dv.cantidadTotalDevuelta | number:'1.0-3' }}</td>
+                        <td>{{ dv.observaciones }}</td>
+                        <td class="text-end">
+                          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="verDetalleDevolucion(dv.idDevolucionDespacho)">
+                            Ver detalle
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div *ngIf="detalleDevolucionSeleccionada.length" class="table-responsive">
+                  <table class="table table-sm table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th class="text-end">Cantidad</th>
+                        <th>Notas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let dd of detalleDevolucionSeleccionada">
+                        <td>{{ dd.productoDescripcion }}</td>
+                        <td class="text-end">{{ dd.cantidadDevuelta | number:'1.0-3' }}</td>
+                        <td>{{ dd.notas }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </ng-container>
 
         <!-- Modo antiguo: comprobante + detalle con cantidades -->

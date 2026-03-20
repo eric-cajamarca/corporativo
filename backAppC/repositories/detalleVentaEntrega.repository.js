@@ -39,7 +39,8 @@ exports.listarPorVentaRepo = async (pool, idVenta, idEmpresa) => {
 };
 
 /**
- * Registra una entrega parcial. En transacción: INSERT DetalleVentaEntrega + UPDATE DetalleVenta.cantEntregada y fUltEntrega
+ * Registra una entrega parcial. En transacción: INSERT DetalleVentaEntrega + UPDATE DetalleVenta.fUltEntrega.
+ * cantEntregada se calcula solo desde DetalleDespachos.
  */
 exports.crearRepo = async (pool, datos) => {
   const { idVenta, idDetalle, cantidad, idUsuario, notas, idEmpresa } = datos;
@@ -64,11 +65,9 @@ exports.crearRepo = async (pool, datos) => {
 
     await new sql.Request(transaction)
       .input('idDetalle', sql.Int, idDetalle)
-      .input('cantidad', sql.Decimal(18, 3), cantidad)
       .query(`
         UPDATE DetalleVenta
-        SET cantEntregada = cantEntregada + @cantidad,
-            fUltEntrega = SYSDATETIME()
+        SET fUltEntrega = SYSDATETIME()
         WHERE idDetalle = @idDetalle
       `);
 

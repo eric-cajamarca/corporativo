@@ -5,7 +5,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { EnviosService } from '../../../services/envios.service';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -13,6 +13,10 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ChoferesService, ChoferInterno } from '../../../services/choferes.service';
 import { RegistrarChoferVehiculoModalComponent } from '../registrar-chofer-vehiculo-modal/registrar-chofer-vehiculo-modal.component';
 import { RegistrarTransportistaModalComponent } from '../registrar-transportista-modal/registrar-transportista-modal.component';
+import {
+  DevolucionDespachoDetalle,
+  DevolucionDespachoResumen
+} from '../../../models/devolucion-despacho.model';
 
 declare const iziToast: any;
 
@@ -41,6 +45,8 @@ export interface VentaDespachosResult {
     estadoPagoNombre?: string;
     clienteRazonSocial: string;
     clienteRuc: string;
+    codigoComprobante?: string;
+    eliminado?: boolean;
   };
   despachos: Array<{
     idDespacho: string;
@@ -87,6 +93,14 @@ export class IndexDespachosComponent {
   loadingDetalle: Record<string, boolean> = {};
   guardandoCantidad: Record<string, boolean> = {};
   cantADespacharEdicion: Record<string, number | undefined> = {};
+  devolucionCantidadPorDetalle: Record<string, number> = {};
+  devolucionNotasPorDetalle: Record<string, string> = {};
+  devolucionObservacionesPorDespacho: Record<string, string> = {};
+  enviandoDevolucion: Record<string, boolean> = {};
+  cargandoDevoluciones: Record<string, boolean> = {};
+  devolucionesPorDespacho: Record<string, DevolucionDespachoResumen[]> = {};
+  detalleDevolucionPorDespacho: Record<string, DevolucionDespachoDetalle[]> = {};
+  idDevolucionSeleccionada: Record<string, string | null> = {};
  
 
   /** Modal Crear despacho */
@@ -94,6 +108,8 @@ export class IndexDespachosComponent {
   tiposDespacho: Array<{ idTipoDespacho: number; nombre: string }> = [];
   idTipoDespachoPanel: number | null = null;
   observacionesPanel = '';
+  accionDespachoPanel: 'NORMAL' | 'CAMBIO_PRODUCTO' | 'DEVOLUCION' = 'NORMAL';
+  observacionesCambioPanel = '';
   cantADespacharPanel: Record<number, number> = {};
   enviandoCrear = false;
   generandoPdf = false;
@@ -128,13 +144,19 @@ export class IndexDespachosComponent {
     return r.detalleVenta.filter((dv: DetalleVentaLinea) => (Number(dv.cantPendiente) || 0) > 0);
   }
 
+  get esNotaVenta(): boolean {
+    const cod = (this.resultado?.venta?.codigoComprobante || '').toUpperCase();
+    return cod === 'NV';
+  }
+
   constructor(
     private despachoService: DespachoService,
     private empresaService: EmpresaService,
     private pdfService: PdfService,
     private whatsappService: WhatsappService,
     private enviosService: EnviosService,
-    private choferesService: ChoferesService
+    private choferesService: ChoferesService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {}
@@ -185,6 +207,8 @@ export class IndexDespachosComponent {
         this.detallePorDespacho[idDespacho] = list;
         list.forEach((lin: any) => {
           this.cantADespacharEdicion[lin.idDetalleDespacho] = Number(lin.cantidadDespachada) || 0;
+          this.devolucionCantidadPorDetalle[lin.idDetalleDespacho] = 0;
+          this.devolucionNotasPorDetalle[lin.idDetalleDespacho] = '';
         });
       },
       error: () => {
@@ -196,6 +220,7 @@ export class IndexDespachosComponent {
 
   expandirDespacho(idDespacho: string): void {
     this.cargarDetalleDespacho(idDespacho);
+    this.cargarDevolucionesDespacho(idDespacho);
   }
 
   pendienteLinea(lin: { cantidadSolicitada: number; cantidadDespachada: number }): number {
@@ -229,6 +254,64 @@ export class IndexDespachosComponent {
     });
   }
 
+  cargarDevolucionesDespacho(idDespacho: string): void {
+    if (this.cargandoDevoluciones[idDespacho]) return;
+    this.cargandoDevoluciones[idDespacho] = true;
+    this.despachoService.listarDevolucionesDespacho(idDespacho).subscribe({
+      next: (res) => {
+        this.cargandoDevoluciones[idDespacho] = false;
+        this.devolucionesPorDespacho[idDespacho] = res?.data ?? [];
+      },
+      error: () => {
+        this.cargandoDevoluciones[idDespacho] = false;
+        this.devolucionesPorDespacho[idDespacho] = [];
+      }
+    });
+  }
+
+  registrarDevolucionDesdeDespacho(idDespacho: string): void {
+    if (this.enviandoDevolucion[idDespacho]) return;
+    const detalle = this.detallePorDespacho[idDespacho] || [];
+    const items = detalle
+      .map((lin) => ({
+        idDetalleDespacho: lin.idDetalleDespacho,
+        cantidadDevuelta: Number(this.devolucionCantidadPorDetalle[lin.idDetalleDespacho]) || 0,
+        notas: (this.devolucionNotasPorDetalle[lin.idDetalleDespacho] || '').trim() || undefined
+      }))
+      .filter((it) => it.cantidadDevuelta > 0);
+    if (items.length === 0) {
+      iziToast.warning({ title: 'Aviso', message: 'Ingrese al menos una cantidad a devolver.', position: 'topRight' });
+      return;
+    }
+    this.enviandoDevolucion[idDespacho] = true;
+    this.despachoService.crearDevolucionDespacho(idDespacho, {
+      observaciones: (this.devolucionObservacionesPorDespacho[idDespacho] || '').trim() || undefined,
+      items
+    }).subscribe({
+      next: () => {
+        this.enviandoDevolucion[idDespacho] = false;
+        iziToast.success({ title: 'Devolución registrada', position: 'topRight' });
+        this.detallePorDespacho[idDespacho] = [];
+        this.cargarDetalleDespacho(idDespacho);
+        this.cargarDevolucionesDespacho(idDespacho);
+      },
+      error: (err) => {
+        this.enviandoDevolucion[idDespacho] = false;
+        iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo registrar la devolución', position: 'topRight' });
+      }
+    });
+  }
+
+  verDetalleDevolucion(idDespacho: string, idDevolucionDespacho: string): void {
+    this.idDevolucionSeleccionada[idDespacho] = idDevolucionDespacho;
+    this.detalleDevolucionPorDespacho[idDespacho] = [];
+    this.despachoService.obtenerDetalleDevolucion(idDevolucionDespacho).subscribe({
+      next: (res) => {
+        this.detalleDevolucionPorDespacho[idDespacho] = res?.data ?? [];
+      }
+    });
+  }
+
   abrirModalCrearDespacho(): void {
     this.cantADespacharPanel = {};
     this.detalleConPendiente.forEach(dv => {
@@ -241,6 +324,8 @@ export class IndexDespachosComponent {
       }
     });
     this.observacionesPanel = '';
+    this.accionDespachoPanel = 'NORMAL';
+    this.observacionesCambioPanel = '';
 
     // Catálogos para delivery desde despacho
     this.modoEntregaPanel = 'RECOJO';
@@ -346,6 +431,13 @@ export class IndexDespachosComponent {
         });
       }
     }
+    const notasCambio = (this.accionDespachoPanel === 'CAMBIO_PRODUCTO' || this.accionDespachoPanel === 'DEVOLUCION')
+      ? (this.observacionesCambioPanel || '').trim()
+      : '';
+    const observacionesFinales = [this.observacionesPanel, notasCambio ? `Cambio/Devolución: ${notasCambio}` : '']
+      .map((v) => (v || '').trim())
+      .filter((v) => v.length > 0)
+      .join(' | ');
     if (this.modoEntregaPanel === 'DELIVERY') {
       if (this.idTipoEnvioPanel == null) {
         iziToast.warning({ title: 'Aviso', message: 'Selecciona/valida el tipo de envío.', position: 'topRight' });
@@ -365,7 +457,7 @@ export class IndexDespachosComponent {
     this.despachoService.crearDespacho({
       idVenta: String(r.venta.idVenta),
       idTipoDespacho: this.idTipoDespachoPanel,
-      observaciones: this.observacionesPanel || undefined,
+      observaciones: observacionesFinales || undefined,
       detalles: detalles.length > 0 ? detalles : undefined
     }).subscribe({
       next: (res: any) => {
@@ -422,6 +514,31 @@ export class IndexDespachosComponent {
         }
       }
     });
+  }
+
+  abrirEdicionComprobante(): void {
+    const r = this.resultado;
+    if (!r?.venta?.idVenta) return;
+    this.cerrarModalCrearDespacho();
+    this.router.navigate(['/ventas/editar', r.venta.idVenta]);
+  }
+
+  abrirNotasCredito(): void {
+    const r = this.resultado;
+    if (!r?.venta) return;
+    this.cerrarModalCrearDespacho();
+    this.router.navigate(['/facturacion/notas-credito-debito'], {
+      queryParams: {
+        tipoComprobanteRef: (r.venta.codigoComprobante || '').toUpperCase() || undefined,
+        serie: r.venta.serie,
+        numero: r.venta.numero
+      }
+    });
+  }
+
+  abrirNuevaVenta(): void {
+    this.cerrarModalCrearDespacho();
+    this.router.navigate(['/ventas/create']);
   }
 
   imprimirComprobanteDespacho(formato: 'A4' | 'A5' | 'ticket'): void {

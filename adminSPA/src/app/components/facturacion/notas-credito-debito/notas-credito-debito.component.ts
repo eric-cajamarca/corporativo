@@ -1,7 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FacturacionService, OrigenParaNota, ComprobanteOrigenItem } from '../../../services/facturacion.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -52,11 +52,23 @@ export class NotasCreditoDebitoComponent implements OnInit {
 
   constructor(
     private _facturacionService: FacturacionService,
-    private _catalogosService: CatalogosService
+    private _catalogosService: CatalogosService,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.cargarMotivosNotaCredito();
+    this.route.queryParams.subscribe((params) => {
+      const serie = (params['serie'] || '').trim();
+      const numero = (params['numero'] || '').trim().replace(/\D/g, '');
+      const tipo = (params['tipoComprobanteRef'] || '').trim();
+      if (tipo) this.tipoComprobanteRef = tipo;
+      if (serie) this.serie = serie;
+      if (numero) this.numero = numero;
+      if (serie && numero) {
+        this.cargarOrigen({ serie, numero, tipoComprobante: this.tipoComprobanteRef || '01' });
+      }
+    });
   }
 
   cargarMotivosNotaCredito(): void {

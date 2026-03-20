@@ -2,6 +2,14 @@ import { Component, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DespachoSerciceService } from '../../../services/despacho.sercice.service';
 import { DespachoService } from '../../../services/despacho.service';
+import {
+  CrearDevolucionDespachoRequest,
+  DevolucionDespachoDetalle,
+  DevolucionDespachoItemRequest,
+  DevolucionDespachoResumen,
+  DespachoResumen,
+  DetalleDespachoLinea
+} from '../../../models/devolucion-despacho.model';
 import { EmpresaService } from '../../../services/empresa.service';
 import { CventaService } from '../../../services/cventa.service';
 import { DventaService } from '../../../services/dventa.service';
@@ -43,6 +51,19 @@ export class CreateDespachosComponent {
   loadingVenta = false;
   enviando = false;
   errorVenta = '';
+  cargandoDespachos = false;
+  despachosVenta: DespachoResumen[] = [];
+  despachoSeleccionadoId: string | null = null;
+  detalleDespachoSeleccionado: DetalleDespachoLinea[] = [];
+  devolucionItems: DevolucionDespachoItemRequest[] = [];
+  devolucionObservaciones = '';
+  enviandoDevolucion = false;
+  cargandoDetalleDespacho = false;
+  cargandoDevoluciones = false;
+  devolucionesDespacho: DevolucionDespachoResumen[] = [];
+  detalleDevolucionSeleccionada: DevolucionDespachoDetalle[] = [];
+  idDevolucionSeleccionada: string | null = null;
+  errorDevolucion = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -86,6 +107,7 @@ export class CreateDespachosComponent {
         }
       }
     });
+    this.cargarDespachosVenta();
   }
 
   /** Crear despacho (modo idVenta) */
@@ -109,6 +131,106 @@ export class CreateDespachosComponent {
         if (typeof iziToast !== 'undefined') {
           iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo crear el despacho', position: 'topRight' });
         }
+      }
+    });
+  }
+
+  cargarDespachosVenta(): void {
+    if (!this.idVenta) return;
+    this.cargandoDespachos = true;
+    this._despachoApi.obtenerDespachosPorVenta(this.idVenta).subscribe({
+      next: (res) => {
+        this.cargandoDespachos = false;
+        this.despachosVenta = (res?.data ?? []) as DespachoResumen[];
+      },
+      error: () => {
+        this.cargandoDespachos = false;
+      }
+    });
+  }
+
+  seleccionarDespacho(idDespacho: string | null): void {
+    this.despachoSeleccionadoId = idDespacho;
+    this.detalleDespachoSeleccionado = [];
+    this.devolucionItems = [];
+    this.devolucionObservaciones = '';
+    this.devolucionesDespacho = [];
+    this.detalleDevolucionSeleccionada = [];
+    this.idDevolucionSeleccionada = null;
+    this.errorDevolucion = '';
+    if (!idDespacho) return;
+    this.cargarDetalleDespacho(idDespacho);
+    this.cargarDevolucionesDespacho(idDespacho);
+  }
+
+  cargarDetalleDespacho(idDespacho: string): void {
+    this.cargandoDetalleDespacho = true;
+    this._despachoApi.obtenerDetalleDespacho(idDespacho).subscribe({
+      next: (res) => {
+        this.cargandoDetalleDespacho = false;
+        this.detalleDespachoSeleccionado = (res?.data ?? []) as DetalleDespachoLinea[];
+        this.devolucionItems = this.detalleDespachoSeleccionado.map((d) => ({
+          idDetalleDespacho: d.idDetalleDespacho,
+          cantidadDevuelta: 0,
+          notas: ''
+        }));
+      },
+      error: () => {
+        this.cargandoDetalleDespacho = false;
+      }
+    });
+  }
+
+  cargarDevolucionesDespacho(idDespacho: string): void {
+    this.cargandoDevoluciones = true;
+    this._despachoApi.listarDevolucionesDespacho(idDespacho).subscribe({
+      next: (res) => {
+        this.cargandoDevoluciones = false;
+        this.devolucionesDespacho = res?.data ?? [];
+      },
+      error: () => {
+        this.cargandoDevoluciones = false;
+      }
+    });
+  }
+
+  registrarDevolucion(): void {
+    if (!this.despachoSeleccionadoId) return;
+    const itemsValidos = this.devolucionItems.filter((i) => Number(i.cantidadDevuelta) > 0);
+    if (itemsValidos.length === 0) {
+      this.errorDevolucion = 'Ingrese al menos una cantidad a devolver.';
+      return;
+    }
+    this.errorDevolucion = '';
+    const payload: CrearDevolucionDespachoRequest = {
+      observaciones: this.devolucionObservaciones || undefined,
+      items: itemsValidos
+    };
+    this.enviandoDevolucion = true;
+    this._despachoApi.crearDevolucionDespacho(this.despachoSeleccionadoId, payload).subscribe({
+      next: () => {
+        this.enviandoDevolucion = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Devolución registrada', position: 'topRight' });
+        }
+        this.cargarDetalleDespacho(this.despachoSeleccionadoId as string);
+        this.cargarDevolucionesDespacho(this.despachoSeleccionadoId as string);
+      },
+      error: (err) => {
+        this.enviandoDevolucion = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo registrar la devolución', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  verDetalleDevolucion(idDevolucionDespacho: string): void {
+    this.idDevolucionSeleccionada = idDevolucionDespacho;
+    this.detalleDevolucionSeleccionada = [];
+    this._despachoApi.obtenerDetalleDevolucion(idDevolucionDespacho).subscribe({
+      next: (res) => {
+        this.detalleDevolucionSeleccionada = res?.data ?? [];
       }
     });
   }

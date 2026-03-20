@@ -2,6 +2,11 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
+import {
+  CrearDevolucionDespachoRequest,
+  DevolucionDespachoDetalle,
+  DevolucionDespachoResumen
+} from '../models/devolucion-despacho.model';
 
 @Injectable({
   providedIn: 'root'
@@ -99,5 +104,32 @@ export class DespachoService {
       headers,
       withCredentials: true
     });
+  }
+
+  /** Registrar devolución de despacho */
+  crearDevolucionDespacho(idDespacho: string, data: CrearDevolucionDespachoRequest): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.post(this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/devoluciones', data, {
+      headers,
+      withCredentials: true
+    });
+  }
+
+  /** Listar devoluciones por despacho */
+  listarDevolucionesDespacho(idDespacho: string): Observable<{ data: DevolucionDespachoResumen[] }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get<{ data: DevolucionDespachoResumen[] }>(
+      this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/devoluciones',
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Obtener detalle de una devolución */
+  obtenerDetalleDevolucion(idDevolucionDespacho: string): Observable<{ data: DevolucionDespachoDetalle[] }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get<{ data: DevolucionDespachoDetalle[] }>(
+      this.url + 'despachos/devoluciones/' + encodeURIComponent(idDevolucionDespacho) + '/detalle',
+      { headers, withCredentials: true }
+    );
   }
 }
