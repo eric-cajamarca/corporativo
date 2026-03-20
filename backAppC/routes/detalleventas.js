@@ -17,6 +17,7 @@ api.put('/ventas/config-defaults', auth.auth, ventasController.putConfigDefaults
 api.get('/ventas/pendientes-pago', auth.auth, ventasController.getPendientesPago);
 api.get('/ventas/comprobante/:idVenta', auth.auth, ventasController.obtenerComprobanteParaPdf);
 api.put('/ventas/editar/:idVenta', auth.auth, ventasController.actualizarVentaEdicion);
+api.delete('/ventas/anular/:idVenta', auth.auth, ventasController.anularVenta);
 api.post('/ventas/:idVenta/cobrar', auth.auth, ventasController.postCobrarVenta);
 api.get('/ventas/:id/:idempresa', auth.auth, dventasController.obtenerDetalleVentaPorId_empresa);
 api.post('/ventas/completa', auth.auth, ventasController.crearVentaCompleta);

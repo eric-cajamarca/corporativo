@@ -159,9 +159,11 @@
 
 /* ===== TABLE ===== */
 
+/* No usar overflow:hidden: recorta los .dropdown-menu dentro de table-responsive */
 .ventas-table-wrap {
   border-radius: var(--border-radius);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
   box-shadow: var(--shadow-sm);
   background: #fff;
 }

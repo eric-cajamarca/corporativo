@@ -24,6 +24,9 @@ import { Empresa as EmpresaModel } from '../../../models/empresa.model';
   styleUrl: './index-ventas.component.css'
 })
 export class IndexVentasComponent implements OnInit {
+  /** Popper en modo fixed evita que el menú quede recortado por .table-responsive / overflow */
+  readonly dropdownPopperConfig = JSON.stringify({ strategy: 'fixed' });
+
   /** Si es true, no se muestran sidebar ni topnav (para incrustar en ventas-hoteles u otro contenedor). */
   @Input() noShell = false;
 
@@ -36,6 +39,7 @@ export class IndexVentasComponent implements OnInit {
   enviandoSunatId: string | null = null;
   consultandoEstadoId: string | null = null;
   consultandoValidezId: string | null = null;
+  anulandoIdVenta: number | null = null;
   empresa: EmpresaModel | null = null;
   /** Si es true, las boletas se envían por resumen diario; no se muestra el botón Enviar a SUNAT para boletas. */
   useResumenDiarioBoletas = false;
@@ -96,7 +100,6 @@ export class IndexVentasComponent implements OnInit {
       next: (res) => {
         this.ventasConst = res.data ?? [];
         this.ventas = [...this.ventasConst];
-        console.log('ventas',this.ventas);
         this.loading = false;
       },
       error: () => {
@@ -172,15 +175,111 @@ export class IndexVentasComponent implements OnInit {
 
   /** True si se debe mostrar el botón Enviar a SUNAT. Si resumen diario está habilitado, no se muestra para boletas (03). */
   puedeEnviarSunat(v: VentaListado): boolean {
+    if (v.eliminado) return false;
     if (this.idComprobanteStr(v) === '') return false;
     if (this.useResumenDiarioBoletas && (v.tipoComprobante === '03' || (v.nombreComprobante || '').toLowerCase().includes('boleta'))) return false;
     return true;
   }
 
-  /** True si la venta se puede editar (comprobante no enviado ni aceptado en SUNAT). */
+  /** Códigos de comprobante de catálogo que son electrónicos SUNAT (no son NV/CT). */
+  private esCodigoTipoSunat(codigo: string | undefined | null): boolean {
+    const c = (codigo || '').trim().toUpperCase();
+    return c === '01' || c === '03' || c === '07' || c === '08';
+  }
+
+  /**
+   * Documentos internos: cotización (CT) y nota de venta (NV).
+   * Nunca tratar como internos los tipos SUNAT 01/03/07/08 (evita falsos positivos por nombre).
+   */
+  esCotizacionONotaVenta(v: VentaListado): boolean {
+    const tipoCe = (v.tipoComprobante || '').trim();
+    if (this.esCodigoTipoSunat(tipoCe)) return false;
+    const codCat = (v.codigoComprobante || '').trim().toUpperCase();
+    if (this.esCodigoTipoSunat(codCat)) return false;
+    if (codCat === 'CT' || codCat === 'NV') return true;
+    const n = (v.nombreComprobante || '').toLowerCase();
+    if (n.includes('cotiz')) return true;
+    if (n.includes('nota de venta')) return true;
+    return false;
+  }
+
+  /** XML, CDR y consultas SUNAT: boleta/factura/NC/ND con fila en ComprobantesElectronicos; no NV/CT. */
+  muestraOpcionesFacturacionEnMenu(v: VentaListado): boolean {
+    return !this.esCotizacionONotaVenta(v) && this.idComprobanteStr(v) !== '';
+  }
+
+  /**
+   * Nota de venta (NV): no se envía a SUNAT; en el historial no debe mostrarse estado electrónico.
+   * No confundir con nota de crédito/débito (07/08).
+   */
+  esNotaVentaSinSunat(v: VentaListado): boolean {
+    const tipoCe = (v.tipoComprobante || '').trim();
+    if (this.esCodigoTipoSunat(tipoCe)) return false;
+    const codCat = (v.codigoComprobante || '').trim().toUpperCase();
+    if (this.esCodigoTipoSunat(codCat)) return false;
+    if (codCat === 'NV') return true;
+    const n = (v.nombreComprobante || '').toLowerCase();
+    return n.includes('nota de venta');
+  }
+
+  /** Texto para columna / export: anulado, sin SUNAT (NV), o etiqueta de estado. */
+  etiquetaEstadoSunatListado(v: VentaListado): string {
+    if (v.eliminado) return 'Anulado';
+    if (this.esNotaVentaSinSunat(v)) return '—';
+    return this.estadoSunatLabel(v.idEstadoSunat);
+  }
+
+  /** True si la fecha de emisión está dentro de las últimas 24 h (UTC/local según string del servidor). */
+  dentro24HorasDesdeEmision(v: VentaListado): boolean {
+    const s = (v.fEmision || '').trim();
+    if (!s) return false;
+    const t = new Date(s.replace(' ', 'T')).getTime();
+    if (!Number.isFinite(t)) return false;
+    return Date.now() - t <= 24 * 60 * 60 * 1000;
+  }
+
+  /** True si la venta se puede editar: no anulada, no aceptada SUNAT (excepto NV); cotización/nota venta 24 h. */
   puedeEditarVenta(v: VentaListado): boolean {
+    if (v.eliminado) return false;
     const id = v?.idEstadoSunat;
-    return id !== 1 && id !== 2 && id !== 3;
+    if (!this.esNotaVentaSinSunat(v) && (id === 1 || id === 2 || id === 3)) return false;
+    if (this.esCotizacionONotaVenta(v) && !this.dentro24HorasDesdeEmision(v)) return false;
+    return true;
+  }
+
+  /** True si se puede anular: no anulada; SUNAT aceptado solo bloquea si no es nota de venta (NV no va a SUNAT). */
+  puedeEliminarVenta(v: VentaListado): boolean {
+    if (v.eliminado) return false;
+    const id = v?.idEstadoSunat;
+    if (!this.esNotaVentaSinSunat(v) && (id === 1 || id === 2 || id === 3)) return false;
+    return true;
+  }
+
+  /** Etiqueta para columna forma de pago (evita mostrar solo {}). */
+  etiquetaFormaPago(v: VentaListado): string {
+    const fp = (v.formaPago || '').trim();
+    if (!fp || fp === '{}') return '—';
+    return fp;
+  }
+
+  confirmarAnularVenta(v: VentaListado): void {
+    if (!this.puedeEliminarVenta(v)) return;
+    if (!confirm(`¿Anular el comprobante ${v.compVenta || v.idVenta}? Se restaurará el stock y el registro quedará tachado en el historial.`)) {
+      return;
+    }
+    this.anulandoIdVenta = v.idVenta;
+    this.ventasService.anularVenta(v.idVenta).subscribe({
+      next: (res) => {
+        this.anulandoIdVenta = null;
+        alert(res.message || 'Comprobante anulado.');
+        this.cargarVentas();
+      },
+      error: (err) => {
+        this.anulandoIdVenta = null;
+        const msg = err?.error?.error || err?.error?.message || err?.message || 'No se pudo anular.';
+        alert(msg);
+      }
+    });
   }
 
   enviarASunat(v: VentaListado): void {
@@ -212,8 +311,6 @@ export class IndexVentasComponent implements OnInit {
 
   /** Consulta estado/CDR en SUNAT sin reenviar. Útil cuando SUNAT devolvió "documento en proceso" (0140). */
   consultarEstadoEnSunat(v: VentaListado): void {
-    console.log('consultarEstadoEnSunat', v);
-    console.log('idComprobanteStr', this.idComprobanteStr(v));
     const id = this.idComprobanteStr(v);
     if (!id) return;
     this.consultandoEstadoId = id;
@@ -224,7 +321,6 @@ export class IndexVentasComponent implements OnInit {
         const msg = res?.message || 'Estado actualizado';
         const det = res?.data ? `\n${res.data.estadoSunat || ''}${res.data.codigoRespuesta ? ' - ' + res.data.codigoRespuesta : ''}` : '';
         alert(msg + det);
-        console.log('res', res);
       },
       error: (err) => {
         this.consultandoEstadoId = null;
@@ -235,8 +331,6 @@ export class IndexVentasComponent implements OnInit {
 
   /** Consulta validez del comprobante en SUNAT (billValidService). */
   consultarValidezEnSunat(v: VentaListado): void {
-    console.log('consultarValidezEnSunat', v);
-    console.log('idComprobanteStr', this.idComprobanteStr(v));
     const id = this.idComprobanteStr(v);
     if (!id) return;
     this.consultandoValidezId = id;
@@ -246,7 +340,6 @@ export class IndexVentasComponent implements OnInit {
         const d = res?.data;
         const msg = d?.valido ? `Válido: ${d.mensaje || 'Comprobante aceptado'}` : `No válido: ${d?.mensaje || d?.error || 'Verifique en SUNAT'}`;
         alert(msg);
-        console.log('res', res);
       },
       error: (err) => {
         this.consultandoValidezId = null;
@@ -279,14 +372,18 @@ export class IndexVentasComponent implements OnInit {
 
   /** Comprobantes válidos SUNAT (aceptados: idEstadoSunat 1, 2, 3) según la lista filtrada actual (ventas). */
   get resumenValidosSunat(): { cantidad: number; total: number } {
-    const list = this.ventas.filter((v) => v.idEstadoSunat === 1 || v.idEstadoSunat === 2 || v.idEstadoSunat === 3);
+    const list = this.ventas.filter(
+      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && (v.idEstadoSunat === 1 || v.idEstadoSunat === 2 || v.idEstadoSunat === 3)
+    );
     const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
     return { cantidad: list.length, total };
   }
 
   /** Comprobantes no válidos SUNAT (pendientes, rechazados, error) según la lista filtrada actual (ventas). */
   get resumenNoValidosSunat(): { cantidad: number; total: number } {
-    const list = this.ventas.filter((v) => v.idEstadoSunat !== 1 && v.idEstadoSunat !== 2 && v.idEstadoSunat !== 3);
+    const list = this.ventas.filter(
+      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && v.idEstadoSunat !== 1 && v.idEstadoSunat !== 2 && v.idEstadoSunat !== 3
+    );
     const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
     return { cantidad: list.length, total };
   }
@@ -541,15 +638,16 @@ export class IndexVentasComponent implements OnInit {
     const datos = {
       empresa: empresaPdf,
       titulo: 'Lista de Ventas',
-      columnas: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+      columnas: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Forma pago', 'Total (S/)', 'Estado SUNAT'],
       filas: this.ventas.map((v, i) => [
         i + 1,
         this.formatearFecha(v.fEmision),
         v.compVenta || '—',
         v.clienteRuc || '—',
         v.clienteRazonSocial || '—',
+        this.etiquetaFormaPago(v),
         `S/ ${Number(v.total).toFixed(2)}`,
-        this.estadoSunatLabel(v.idEstadoSunat)
+        this.etiquetaEstadoSunatListado(v)
       ])
     };
     this.exportandoLista = true;
@@ -574,15 +672,16 @@ export class IndexVentasComponent implements OnInit {
       title: 'Lista de Ventas',
       filename: `ventas_${new Date().getTime()}`,
       worksheetName: 'Ventas',
-      columns: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+      columns: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Forma pago', 'Total (S/)', 'Estado SUNAT'],
       rows: this.ventas.map((v, i) => [
         i + 1,
         this.formatearFecha(v.fEmision),
         v.compVenta || '—',
         v.clienteRuc || '—',
         v.clienteRazonSocial || '—',
+        this.etiquetaFormaPago(v),
         Number(v.total),
-        this.estadoSunatLabel(v.idEstadoSunat)
+        this.etiquetaEstadoSunatListado(v)
       ])
     };
     this.exportandoLista = true;

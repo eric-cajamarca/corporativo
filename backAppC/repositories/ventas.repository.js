@@ -146,26 +146,43 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
           v.idComprobante,
           v.idCliente,
           v.idMediosPago,
-          ISNULL(mp.descripcion, ISNULL(fp.descripcion, v.idMediosPago)) AS condicionPago,
+          ISNULL(mp.descripcion, CAST(v.idMediosPago AS VARCHAR(20))) AS condicionPago,
           c.nombre AS nombreComprobante,
           c.codigo AS codigoComprobante,
           COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
           COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRuc,
           ce.idComprobanteElectronico,
           ce.tipoComprobante,
-          e.ruc AS rucEmpresa
+          e.ruc AS rucEmpresa,
+          ISNULL(v.eliminado, 0) AS eliminado,
+          CASE
+            WHEN aggfp.codigos IS NULL OR LTRIM(RTRIM(aggfp.codigos)) = '' THEN '{}'
+            ELSE '{' + aggfp.codigos + '}'
+          END AS formaPago
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
         LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
-        LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+        OUTER APPLY (
+          SELECT STUFF((
+            SELECT ',' + d.sigla
+            FROM (
+              SELECT DISTINCT UPPER(LEFT(LTRIM(RTRIM(ISNULL(fp2.descripcion, ''))), 3)) AS sigla
+              FROM MovimientosCaja mc
+              INNER JOIN FormasPago fp2 ON fp2.idFormaPago = mc.idMediosPago
+              WHERE mc.idVenta = v.idVenta AND mc.idEmpresa = v.idEmpresa
+            ) d
+            WHERE NULLIF(LTRIM(RTRIM(d.sigla)), '') IS NOT NULL
+            FOR XML PATH(''), TYPE
+          ).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS codigos
+        ) aggfp
         WHERE v.idEmpresa = @idEmpresa
-        ORDER BY v.fEmision DESC
+        ORDER BY v.fEmision DESC, v.idVenta DESC
       `);
   } catch (err) {
-    if (err.message && (err.message.includes('MediosPago') || err.message.includes('FormasPago') || err.message.includes('Invalid object'))) {
+    if (err.message && (err.message.includes('MediosPago') || err.message.includes('FormasPago') || err.message.includes('MovimientosCaja') || err.message.includes('Invalid object'))) {
       result = await pool
         .request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -187,14 +204,16 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRuc,
             ce.idComprobanteElectronico,
             ce.tipoComprobante,
-            e.ruc AS rucEmpresa
+            e.ruc AS rucEmpresa,
+            ISNULL(v.eliminado, 0) AS eliminado,
+            '' AS formaPago
           FROM Ventas v
           LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
           LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
           LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
           LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
           WHERE v.idEmpresa = @idEmpresa
-          ORDER BY v.fEmision DESC
+          ORDER BY v.fEmision DESC, v.idVenta DESC
         `);
     } else {
       throw err;
@@ -208,7 +227,9 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
     rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null,
     condicionPago: r.condicionPago != null ? String(r.condicionPago).trim() : (r.idMediosPago != null ? String(r.idMediosPago) : ''),
     clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
-    clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : ''
+    clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : '',
+    eliminado: !!r.eliminado,
+    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}'
   }));
 };
 
@@ -229,6 +250,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           ISNULL(v.gratuito, 0) AS gratuito,
           ISNULL(v.otrosCargos, 0) AS otrosCargos,
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          ISNULL(v.eliminado, 0) AS eliminado,
           v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           ISNULL(mp.descripcion, ISNULL(fp.descripcion, 'Contado')) AS condicionPago,
@@ -255,6 +277,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          ISNULL(v.eliminado, 0) AS eliminado,
           v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           'Contado' AS condicionPago,
@@ -434,7 +457,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       compRelacionado: cab.compRelacionado != null ? String(cab.compRelacionado).trim() : '',
       observaciones: cab.observaciones != null ? String(cab.observaciones).trim() : '',
       tipoComprobanteRef: cab.tipoComprobanteRef != null ? String(cab.tipoComprobanteRef).trim() : '',
-      codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : ''
+      codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : '',
+      eliminado: !!cab.eliminado
     },
     empresa: empresaPayload,
     cliente: {
@@ -460,15 +484,43 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
   };
 };
 
-/** Actualiza cabecera y detalle de una venta. Solo permitir cuando idEstadoSunat no sea Aceptado (1,2,3). */
+/** Actualiza cabecera y detalle de una venta. Solo permitir cuando idEstadoSunat no sea Aceptado (1,2,3). Cotización (CT): solo dentro de 24 h de emisión. */
 exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, detalles) => {
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
-    const idEstadoSunat = cabecera.idEstadoSunat;
-    if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) {
+    const chk = await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, c.codigo AS codigoComprobante, v.fEmision
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+      `);
+    const rowChk = chk.recordset && chk.recordset[0];
+    if (!rowChk) {
+      await transaction.rollback();
+      return { ok: false, error: 'Venta no encontrada.' };
+    }
+    if (rowChk.eliminado) {
+      await transaction.rollback();
+      return { ok: false, error: 'No se puede editar: el comprobante fue anulado.' };
+    }
+    const idEstadoSunat = rowChk.idEstadoSunat;
+    const codComp = String(rowChk.codigoComprobante || '').trim().toUpperCase();
+    const esNotaVentaSinSunat = codComp === 'NV';
+    if (!esNotaVentaSinSunat && (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3)) {
       await transaction.rollback();
       return { ok: false, error: 'No se puede editar: el comprobante ya fue enviado o aceptado en SUNAT.' };
+    }
+    if (codComp === 'CT' || codComp === 'NV') {
+      const fEm = rowChk.fEmision;
+      const tEm = fEm instanceof Date ? fEm.getTime() : new Date(fEm).getTime();
+      if (Number.isFinite(tEm) && Date.now() - tEm > 24 * 60 * 60 * 1000) {
+        await transaction.rollback();
+        return { ok: false, error: 'No se puede editar: la cotización/nota de venta solo admite edición dentro de las 24 horas posteriores a su emisión.' };
+      }
     }
     const fEmisionRaw = cabecera.fEmision || null;
     const fEmision = fEmisionRaw != null ? (getFechaSoloSQLString(fEmisionRaw) || String(fEmisionRaw).trim().slice(0, 19).replace('T', ' ') + (String(fEmisionRaw).length <= 10 ? ' 00:00:00.000' : '.000')) : null;
@@ -591,6 +643,74 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
     ORDER BY v.fEmision DESC
   `);
   return result.recordset || [];
+};
+
+/** Anula/elimina lógicamente una venta (eliminado=1). Restaura stock, elimina movimientos caja. No permitido si ya enviado a SUNAT. */
+exports.anularVentaRepo = async (pool, idVenta, idEmpresa) => {
+  const stockRepository = require('./stock.repository');
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const ventaRow = await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT v.idVenta, v.idEstadoSunat, v.idSucursal, v.compVenta, ISNULL(v.eliminado, 0) AS eliminado,
+          UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+      `);
+    const venta = ventaRow.recordset && ventaRow.recordset[0];
+    if (!venta) {
+      await transaction.rollback();
+      return { ok: false, error: 'Venta no encontrada.' };
+    }
+    if (venta.eliminado) {
+      await transaction.rollback();
+      return { ok: false, error: 'El comprobante ya fue anulado.' };
+    }
+    const codAnular = String(venta.codigoComprobante || '').trim().toUpperCase();
+    const esNotaVentaAnular = codAnular === 'NV';
+    if (!esNotaVentaAnular && (venta.idEstadoSunat === 1 || venta.idEstadoSunat === 2 || venta.idEstadoSunat === 3)) {
+      await transaction.rollback();
+      return { ok: false, error: 'No se puede eliminar: el comprobante ya fue enviado o aceptado en SUNAT.' };
+    }
+    const idSucursal = venta.idSucursal;
+    const detalleRows = await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .query(`
+        SELECT idProducto, cantidad FROM DetalleVenta WHERE idVenta = @idVenta
+      `);
+    const detalles = detalleRows.recordset || [];
+    for (const d of detalles) {
+      const cant = parseFloat(d.cantidad) || 0;
+      if (cant > 0 && d.idProducto) {
+        await stockRepository.restaurarStockEnLotes(transaction, {
+          idEmpresa,
+          idSucursal,
+          idProducto: d.idProducto,
+          cantidad: cant
+        });
+      }
+    }
+    await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query('DELETE FROM MovimientosCaja WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa');
+    await transaction.request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        DELETE FROM DetallePagoVenta WHERE idVenta = @idVenta;
+        UPDATE Ventas SET eliminado = 1 WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+      `);
+    await transaction.commit();
+    return { ok: true };
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
 };
 
 /** Actualiza estado de pago de una venta (ej: 2 = Pagado). */

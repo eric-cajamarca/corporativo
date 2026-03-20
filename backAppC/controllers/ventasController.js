@@ -632,8 +632,13 @@ const actualizarVentaEdicion = async (req, res) => {
     if (!data || !data.venta) {
       return res.status(404).json({ error: 'Venta no encontrada' });
     }
+    if (data.venta.eliminado) {
+      return res.status(400).json({ error: 'No se puede editar: el comprobante fue anulado.' });
+    }
     const idEstadoSunat = data.venta.idEstadoSunat;
-    if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) {
+    const codigoCompEdicion = String(data.venta.codigoComprobante || '').trim().toUpperCase();
+    const esNotaVentaEdicion = codigoCompEdicion === 'NV';
+    if (!esNotaVentaEdicion && (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3)) {
       return res.status(400).json({
         error: 'No se puede editar: el comprobante ya fue enviado o aceptado en SUNAT.'
       });
@@ -828,6 +833,28 @@ const crearVentaDesdeVale = async (req, res) => {
   }
 };
 
+/** DELETE /ventas/anular/:idVenta - Anula lógicamente una venta (eliminado=1). Restaura stock. No permitido si ya enviado a SUNAT. */
+const anularVenta = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVenta = parseInt(req.params.idVenta, 10);
+  if (Number.isNaN(idVenta) || idVenta < 1) {
+    return res.status(400).json({ error: 'idVenta inválido' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await ventasRepository.anularVentaRepo(pool, idVenta, req.user.empresa);
+    if (result.ok === false) {
+      return res.status(400).json({ error: result.error || 'No se pudo anular' });
+    }
+    res.json({ message: 'Comprobante anulado correctamente. El stock ha sido restaurado.' });
+  } catch (error) {
+    console.error('Error anularVenta:', error);
+    res.status(500).json({ error: error.message || 'Error al anular la venta' });
+  }
+};
+
 module.exports = {
     crearVenta,
     crearVentaCompleta,
@@ -846,7 +873,8 @@ module.exports = {
     actualizarDetalleVenta,
     obtenerDetalleVenta_idVenta,
     obtenerVenta_idDetalle,
-    eliminarDetalleVenta
+    eliminarDetalleVenta,
+    anularVenta
 }
 
 

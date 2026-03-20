@@ -214,3 +214,39 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   }
   return { consumosPorLote: consumos };
 };
+
+/**
+ * Restaura/devolve stock a Lotes (inverso de descontar). Añade cantidad al lote más reciente del producto/sucursal.
+ * Usado al anular/eliminar una venta para devolver el stock.
+ * @param {object} transaction - Transacción SQL
+ * @param {object} stockData - { idEmpresa, idSucursal, idProducto, cantidad }
+ */
+exports.restaurarStockEnLotes = async (transaction, stockData) => {
+  const { idEmpresa, idSucursal, idProducto, cantidad } = stockData;
+  const cant = parseFloat(cantidad) || 0;
+  if (cant <= 0) return;
+  if (!idEmpresa || !idProducto) return;
+
+  const req = transaction.request();
+  req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  req.input('idProducto', sql.UniqueIdentifier, idProducto);
+  req.input('cantidad', sql.Decimal(18, 2), cant);
+  const whereSuc = idSucursal != null && idSucursal !== '' ? ' AND idSucursal = @idSucursal' : '';
+  if (idSucursal != null && idSucursal !== '') req.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+
+  const rs = await req.query(`
+    SELECT TOP 1 idLote FROM Lotes
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto${whereSuc}
+    ORDER BY fechaIngreso DESC, idLote DESC
+  `);
+  const row = rs.recordset && rs.recordset[0];
+  if (!row) return;
+
+  await transaction.request()
+    .input('idLote', sql.UniqueIdentifier, row.idLote)
+    .input('cantidad', sql.Decimal(18, 2), cant)
+    .query(`
+      UPDATE Lotes SET cantidadDisponible = cantidadDisponible + @cantidad
+      WHERE idLote = @idLote
+    `);
+};

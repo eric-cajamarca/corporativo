@@ -135,6 +135,14 @@ export class VentasService {
     return this._http.post<{ message: string }>(
       this.url + 'ventas/' + idVenta + '/cobrar',
       body,
+      { headers: new HttpHeaders({ 'Content-Type': 'application/json' }), withCredentials: true }
+    );
+  }
+
+  /** Anula lógicamente un comprobante (restaura stock). No permitido si ya enviado a SUNAT. */
+  anularVenta(idVenta: number): Observable<{ message: string }> {
+    return this._http.delete<{ message: string }>(
+      this.url + 'ventas/anular/' + idVenta,
       { withCredentials: true }
     );
   }
@@ -203,6 +211,7 @@ export interface ComprobantePdfData {
     descuentos: number;
     total: number;
     resumenHash?: string;
+    eliminado?: boolean;
   };
   empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
   cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string; tipoDocSunat?: string };
@@ -233,10 +242,16 @@ export interface VentaListado {
   clienteRazonSocial?: string;
   clienteRuc?: string;
   condicionPago?: string;
+  /** Código del tipo de comprobante en BD (ej. CT=Cotización, NV=Nota de venta, 01=Factura, 03=Boleta). */
+  codigoComprobante?: string;
   /** Presente cuando la venta tiene comprobante electrónico (para botón Enviar a SUNAT). */
   idComprobanteElectronico?: string;
   /** True si el comprobante tiene XML generado (Facturador). */
   tieneXml?: boolean;
   /** True si el comprobante tiene CDR de SUNAT. */
   tieneCdr?: boolean;
+  /** Formas de pago usadas (ej. {YAP,EFE,PLI}). */
+  formaPago?: string;
+  /** True si el comprobante fue anulado/eliminado (registro tachado). */
+  eliminado?: boolean;
 }

@@ -41,6 +41,8 @@ export class UpdateVentaComponent implements OnInit {
   loading = true;
   saving = false;
   noEditable = false;
+  /** Mensaje específico cuando no se puede editar (SUNAT, anulado, plazo cotización). */
+  mensajeNoEditable = '';
   compVenta = '';
   fEmision = '';
   idCliente: number | null = null;
@@ -76,7 +78,29 @@ export class UpdateVentaComponent implements OnInit {
         }
         const v = data.venta;
         const idEstadoSunat = v.idEstadoSunat;
-        this.noEditable = idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3;
+        const eliminado = !!v.eliminado;
+        const codComp = (v.codigoComprobante || '').trim().toUpperCase();
+        const nombreComp = (v.nombreComprobante || '').toLowerCase();
+        const esNotaVentaSinSunat = codComp === 'NV' || nombreComp.includes('nota de venta');
+        let cotizacionFueraPlazo = false;
+        if (codComp === 'CT' || codComp === 'NV') {
+          const t = new Date(String(v.fEmision || '').replace(' ', 'T')).getTime();
+          cotizacionFueraPlazo = Number.isFinite(t) && Date.now() - t > 24 * 60 * 60 * 1000;
+        }
+        this.mensajeNoEditable = '';
+        if (eliminado) {
+          this.noEditable = true;
+          this.mensajeNoEditable = 'El comprobante fue anulado. No se puede editar.';
+        } else if (!esNotaVentaSinSunat && (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3)) {
+          this.noEditable = true;
+          this.mensajeNoEditable = 'El comprobante ya fue enviado o aceptado en SUNAT. No se puede editar.';
+        } else if (cotizacionFueraPlazo) {
+          this.noEditable = true;
+          this.mensajeNoEditable =
+            'La cotización / nota de venta solo puede editarse dentro de las 24 horas posteriores a su emisión.';
+        } else {
+          this.noEditable = false;
+        }
         this.compVenta = v.compVenta || '';
         this.fEmision = (v.fEmision || '').toString().slice(0, 10);
         this.idCliente = v.idCliente != null ? Number(v.idCliente) : null;

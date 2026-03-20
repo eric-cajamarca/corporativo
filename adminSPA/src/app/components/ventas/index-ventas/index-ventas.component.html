@@ -77,13 +77,14 @@
                 <th>Comprobante</th>
                 <th>Cliente</th>
                 <th>Condición</th>
+                <th>Forma pago</th>
                 <th class="text-end">Total</th>
                 <th>Est. SUNAT</th>
                 <th class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize" class="table-ventas-row">
+              <tr *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize" class="table-ventas-row" [class.text-decoration-line-through]="v.eliminado" [class.text-muted]="v.eliminado">
                 <td class="fw-medium">{{ v.idVenta }}</td>
                 <td class="text-nowrap">{{ formatearFecha(v.fEmision) }}</td>
                 <td>{{ v.compVenta || '—' }}</td>
@@ -91,66 +92,81 @@
                   <span class="cliente-nombre" title="{{ v.clienteRuc || '' }}">{{ v.clienteRazonSocial || '—' }}</span>
                 </td>
                 <td>{{ v.condicionPago || '—' }}</td>
+                <td class="small font-monospace">{{ etiquetaFormaPago(v) }}</td>
                 <td class="text-end fw-semibold">{{ formatearMoneda(v.total) }}</td>
                 <td>
-                  <span class="badge badge-estado-sunat" [ngClass]="estadoSunatClass(v.idEstadoSunat)">
+                  <span *ngIf="v.eliminado" class="badge bg-secondary">Anulado</span>
+                  <span *ngIf="!v.eliminado && esNotaVentaSinSunat(v)" class="text-muted">—</span>
+                  <span *ngIf="!v.eliminado && !esNotaVentaSinSunat(v)" class="badge badge-estado-sunat" [ngClass]="estadoSunatClass(v.idEstadoSunat)">
                     {{ estadoSunatLabel(v.idEstadoSunat) }}
                   </span>
                 </td>
                 <td class="text-center acciones-cell">
-                  <!--
-                  <a [routerLink]="['/ventas/detalle', v.idVenta]" class="btn btn-sm btn-outline-info me-1" title="Ver detalle">
-                    <i class="bi bi-eye"></i>
-                  </a>
-                -->
-                  <a *ngIf="puedeEditarVenta(v)" [routerLink]="['/ventas/editar', v.idVenta]" class="btn btn-sm btn-outline-warning me-1" title="Editar">
-                    <i class="bi bi-pencil"></i>
-                  </a>
-                  <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#pdfModal" title="PDF" (click)="abrirModalPdf(v)">
-                    <i class="bi bi-file-pdf"></i>
-                  </button>
-                  <button *ngIf="puedeEnviarSunat(v) && puedeEditarVenta(v)" type="button" class="btn btn-sm btn-success me-1" title="Enviar a SUNAT" (click)="enviarASunat(v)" [disabled]="enviandoSunatId === idComprobanteStr(v)">
-                    <span *ngIf="enviandoSunatId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i> Enviando...</span>
-                    <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i></span>
-                  </button>
-                  <div class="dropdown d-inline-block" *ngIf="idComprobanteStr(v)">
-                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Más opciones">
-                      <i class="bi bi-three-dots-vertical"></i>
+                  <span *ngIf="v.eliminado" class="badge bg-secondary">Anulado</span>
+                  <ng-container *ngIf="!v.eliminado">
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#pdfModal" title="PDF" (click)="abrirModalPdf(v)">
+                      <i class="bi bi-file-pdf"></i>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      <li>
-                        <a class="dropdown-item" href="javascript:void(0)" (click)="abrirModalArchivo(v, 'xml')" [class.text-muted]="!v.tieneXml">
-                          <i class="bi bi-file-code me-2"></i> XML
-                        </a>
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="javascript:void(0)" (click)="abrirModalArchivo(v, 'cdr')" [class.text-muted]="!v.tieneCdr">
-                          <i class="bi bi-file-earmark-check me-2"></i> CDR
-                        </a>
-                      </li>
-                      <li><hr class="dropdown-divider"></li>
-                      <li>
-                        <a class="dropdown-item" href="javascript:void(0)" [class.disabled]="consultandoEstadoId === idComprobanteStr(v)" (click)="consultandoEstadoId !== idComprobanteStr(v) && consultarEstadoEnSunat(v)">
-                          <span *ngIf="consultandoEstadoId === idComprobanteStr(v)"><i class="bi bi-hourglass-split me-2"></i></span>
-                          <i class="bi bi-arrow-repeat me-2" *ngIf="consultandoEstadoId !== idComprobanteStr(v)"></i>
-                          Consultar estado
-                        </a>
-                      </li>
-                      <li>
-                        <a class="dropdown-item" href="javascript:void(0)" [class.disabled]="consultandoValidezId === idComprobanteStr(v)" (click)="consultandoValidezId !== idComprobanteStr(v) && consultarValidezEnSunat(v)">
-                          <span *ngIf="consultandoValidezId === idComprobanteStr(v)"><i class="bi bi-hourglass-split me-2"></i></span>
-                          <i class="bi bi-search me-2" *ngIf="consultandoValidezId !== idComprobanteStr(v)"></i>
-                          Consultar validez
-                        </a>
-                      </li>
-                    </ul>
-                  </div>
+                    <button *ngIf="puedeEnviarSunat(v) && puedeEditarVenta(v)" type="button" class="btn btn-sm btn-success me-1" title="Enviar a SUNAT" (click)="enviarASunat(v)" [disabled]="enviandoSunatId === idComprobanteStr(v)">
+                      <span *ngIf="enviandoSunatId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+                      <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i></span>
+                    </button>
+                    <div class="dropdown d-inline-block">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        [attr.data-bs-popper-config]="dropdownPopperConfig"
+                        aria-expanded="false"
+                        title="Más opciones">
+                        <i class="bi bi-three-dots-vertical"></i>
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                        <li *ngIf="puedeEditarVenta(v)">
+                          <a class="dropdown-item" [routerLink]="['/ventas/editar', v.idVenta]">
+                            <i class="bi bi-pencil me-2"></i> Editar
+                          </a>
+                        </li>
+                        <li *ngIf="puedeEliminarVenta(v)">
+                          <a class="dropdown-item text-danger" href="javascript:void(0)" [class.disabled]="anulandoIdVenta === v.idVenta" (click)="anulandoIdVenta !== v.idVenta && confirmarAnularVenta(v)">
+                            <i class="bi bi-trash me-2"></i> Eliminar
+                          </a>
+                        </li>
+                        <li *ngIf="(puedeEditarVenta(v) || puedeEliminarVenta(v)) && muestraOpcionesFacturacionEnMenu(v)"><hr class="dropdown-divider"></li>
+                        <li *ngIf="muestraOpcionesFacturacionEnMenu(v)">
+                          <a class="dropdown-item" href="javascript:void(0)" (click)="abrirModalArchivo(v, 'xml')" [class.text-muted]="!v.tieneXml">
+                            <i class="bi bi-file-code me-2"></i> XML
+                          </a>
+                        </li>
+                        <li *ngIf="muestraOpcionesFacturacionEnMenu(v)">
+                          <a class="dropdown-item" href="javascript:void(0)" (click)="abrirModalArchivo(v, 'cdr')" [class.text-muted]="!v.tieneCdr">
+                            <i class="bi bi-file-earmark-check me-2"></i> CDR
+                          </a>
+                        </li>
+                        <li *ngIf="muestraOpcionesFacturacionEnMenu(v)"><hr class="dropdown-divider"></li>
+                        <li *ngIf="muestraOpcionesFacturacionEnMenu(v)">
+                          <a class="dropdown-item" href="javascript:void(0)" [class.disabled]="consultandoEstadoId === idComprobanteStr(v)" (click)="consultandoEstadoId !== idComprobanteStr(v) && consultarEstadoEnSunat(v)">
+                            <span *ngIf="consultandoEstadoId === idComprobanteStr(v)"><i class="bi bi-hourglass-split me-2"></i></span>
+                            <i class="bi bi-arrow-repeat me-2" *ngIf="consultandoEstadoId !== idComprobanteStr(v)"></i>
+                            Consultar estado
+                          </a>
+                        </li>
+                        <li *ngIf="muestraOpcionesFacturacionEnMenu(v)">
+                          <a class="dropdown-item" href="javascript:void(0)" [class.disabled]="consultandoValidezId === idComprobanteStr(v)" (click)="consultandoValidezId !== idComprobanteStr(v) && consultarValidezEnSunat(v)">
+                            <span *ngIf="consultandoValidezId === idComprobanteStr(v)"><i class="bi bi-hourglass-split me-2"></i></span>
+                            <i class="bi bi-search me-2" *ngIf="consultandoValidezId !== idComprobanteStr(v)"></i>
+                            Consultar validez
+                          </a>
+                        </li>
+                      </ul>
+                    </div>
+                  </ng-container>
                 </td>
               </tr>
             </tbody>
             <tfoot class="table-ventas-tfoot">
               <tr class="resumen-row">
-                <td colspan="5" class="text-end fw-semibold py-3"></td>
+                <td colspan="6" class="text-end fw-semibold py-3"></td>
                 <td colspan="3" class="py-3">
                   <div class="d-flex flex-wrap gap-4 justify-content-end align-items-center">
                     <span class="resumen-item resumen-validos">
