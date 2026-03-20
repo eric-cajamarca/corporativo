@@ -58,6 +58,9 @@ const obtener_sucursal_todos = async function (req, res) {
         const result = await pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query(`SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`);
+        result.recordset.forEach(el => {
+            if (el.fregistro) el.fregistro = el.fregistro.toISOString ? el.fregistro.toISOString().split('T')[0] : el.fregistro;
+        });
         res.status(200).send({ data: result.recordset });
     } catch (error) {
         console.error('obtener_sucursal_todos:', error);
@@ -163,45 +166,32 @@ const editar_sucursal_idEmpresa = async function (req, res) {
 }
 
 const editar_estado_idsucursal = async function (req, res) {
-    console.log('editar_estado_idsucursal: ', req.body, req.params.id);
-    const  idSucursal  = req.params.id;
+    if (!req.user) return res.status(401).send({ message: 'No Access', data: undefined });
+    if (req.user.rol !== 'Administrador') return res.status(403).send({ message: 'No tiene permisos', data: undefined });
+
+    const idSucursal = req.params.id;
+    const idEmpresa = req.user.empresa || req.user.idEmpresa;
+    if (!idEmpresa) return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: undefined });
+
     const estado = req.body.estado;
+    const nuevo_estado = !estado;
 
-    let nuevo_estado = false;
-    
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request()
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('estado', sql.Bit, nuevo_estado)
+            .query('UPDATE Sucursal SET estado = @estado WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa');
 
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            if (!estado) {
-                nuevo_estado = true;
-            } else {
-                nuevo_estado = false;
-            }
-
-            console.log('nuevo_estado: ', nuevo_estado);
-            try {
-                let pool = await sql.connect(dbConfig);
-                let sucursal = await pool
-                    .request()
-                    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                    .input('estado', sql.Bit, nuevo_estado)
-                    .query("UPDATE Sucursal SET estado = @estado WHERE idSucursal = @idSucursal");
-
-                res.status(200).send({ message: 'Estado de la sucursal editado correctamente', data: sucursal.rowsAffected });
-            } catch (error) {
-                console.log('editar sucursal error: ' + error);
-                res.status(500).send({ message: 'Error al editar la sucursal', data: undefined });
-            }
-
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).send({ message: 'Sucursal no encontrada o no pertenece a su empresa', data: undefined });
         }
+        res.status(200).send({ message: 'Estado de la sucursal editado correctamente', data: result.rowsAffected });
+    } catch (error) {
+        console.error('editar_estado_idsucursal:', error);
+        res.status(500).send({ message: 'Error al editar la sucursal', data: undefined });
     }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
-    }
-
 }
 
 const eliminar_sucursal_idempresa = async function (req, res) {

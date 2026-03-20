@@ -72,7 +72,7 @@ export class CreateVentasComponent implements OnInit {
   public carrito: any[] = [];
   public buscadorModal: any;
   public moneda: any = [];
-  public mediosPago:any=[];
+  public mediosPago: any[] = [];
   public formasPago: FormaPago[] = [];
   public formaPagoSeleccionada: FormaPago = {
   idFormaPago: 0,
@@ -118,7 +118,7 @@ export class CreateVentasComponent implements OnInit {
     idMoneda: 1,
     idEstadoPedido: 1,
     idEstadoPago: 2,
-    idMediosPago: '5',
+    idMediosPago: '',
     fEmision: '',
     fechaPago: '',
     fVencimiento: '',
@@ -472,11 +472,14 @@ export class CreateVentasComponent implements OnInit {
 
     this._tablasSunatService.obtener_medios_pago().subscribe(
       (response) => {
-        this.mediosPago = response.data;
-        console.log(this.mediosPago);
+        this.mediosPago = response.data || [];
+        if (this.mediosPago.length && !this.ventas.idMediosPago) {
+          const contado = this.mediosPago.find((m: any) => (m.codigo || '').toString().trim() === '009');
+          this.ventas.idMediosPago = contado ? String(contado.idMediosPago) : String(this.mediosPago[0].idMediosPago);
+        }
       },
       (error) => {
-        console.log(error);
+        console.error('Error al cargar medios de pago:', error);
       }
     );
 
@@ -532,6 +535,14 @@ export class CreateVentasComponent implements OnInit {
   limpiarBusqueda(): void {
     this.searchTerm = '';
     this.productos_filtrados = this.stockSucursales_const;
+  }
+
+  /** Retorna el idMediosPago de CONTADO para usar como valor por defecto. */
+  getIdMediosPagoContado(): string {
+    const contado = this.mediosPago?.find((m: any) => (m.codigo || '').toString().trim() === '009');
+    if (contado) return String(contado.idMediosPago);
+    if (this.mediosPago?.length) return String(this.mediosPago[0].idMediosPago);
+    return '1';
   }
 
   /** idDocumento según tabla Documentos: RUC = 6, DNI = 1 (Perú). */
@@ -1521,11 +1532,12 @@ abrirModalPrecios(item: any) {
       otrosCargos: Number(this.ventas.otrosCargos) || 0,
       descuentos: Number(this.ventas.descuentos) || 0,
       total: totalVenta,
-      idMediosPago: esPagoPendiente ? '' : String(this.ventas.idMediosPago || '5'),
+      idMediosPago: String(this.ventas.idMediosPago || this.getIdMediosPagoContado()),
       idEstadoPedido: Number(this.ventas.idEstadoPedido) || 1,
       idEstadoPago,
       idEstadoSunat: this.esComprobanteElectronico() ? 7 : 1,
-      compRelacionado: this.ventas.observacion || null
+      compRelacionado: null,
+      observaciones: this.ventas.observacion || null
     };
 
     const idEstadoPedidoVenta = Number(this.ventas.idEstadoPedido) || 1;
@@ -1719,7 +1731,7 @@ abrirModalPrecios(item: any) {
       idMoneda: 1,
       idEstadoPedido: this.configDefaults.idEstadoPedidoPorDefecto,
       idEstadoPago: this.configDefaults.idEstadoPagoPorDefecto,
-      idMediosPago: '5',
+      idMediosPago: this.getIdMediosPagoContado(),
       fEmision: '',
       fechaPago: '',
       fVencimiento: '',

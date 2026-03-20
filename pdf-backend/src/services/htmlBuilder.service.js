@@ -300,7 +300,8 @@ class HtmlBuilderService {
       logoSrc, razonSocial, dirCliente, rucCliente,
       filasItems, lineasTotales, cantidadLetras,
       textoRepresentacion, resumenHash, qrDataUri,
-      idVenta = '', barcodeIdVentaUrl = ''
+      idVenta = '', barcodeIdVentaUrl = '',
+      observaciones = ''
     } = data;
     const total = Number(venta.total) || 0;
     return `<!DOCTYPE html>
@@ -369,6 +370,7 @@ class HtmlBuilderService {
     ${lineasTotales}
   </table>
   <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  ${observaciones ? '<hr class="ticket-sep"><div style="font-size:7px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
   ${data.tablaCuotasHtml || ''}
   <div class="ticket-final">
     ${textoRepresentacion ? '<div class="txt">' + textoRepresentacion + '</div>' : ''}
@@ -451,6 +453,7 @@ class HtmlBuilderService {
     const esFactura = (venta.codigoComprobante || '01') === '01';
     const textoRepresentacion = esCotizacion ? '' : (esFactura ? 'Representación impresa de la FACTURA ELECTRÓNICA' : 'Representación impresa de la BOLETA DE VENTA ELECTRÓNICA');
 
+    const observaciones = (venta.observaciones && String(venta.observaciones).trim()) || (venta.compRelacionado && String(venta.compRelacionado).trim()) || '';
     const cuotas = Array.isArray(venta.cuotas) ? venta.cuotas : [];
     const tablaCuotasHtml = cuotas.length > 0 && esFactura
       ? `<div class="cuotas-section" style="margin-top:16px; page-break-inside:avoid;">
@@ -488,7 +491,8 @@ class HtmlBuilderService {
         qrDataUri,
         idVenta,
         barcodeIdVentaUrl,
-        tablaCuotasHtml: ticketCuotasHtml
+        tablaCuotasHtml: ticketCuotasHtml,
+        observaciones
       });
     }
 
@@ -573,6 +577,7 @@ class HtmlBuilderService {
     <table>${filasTotales}</table>
   </div>
   <div class="son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  ${observaciones ? '<div class="observaciones" style="margin-top:12px;padding:8px;border:1px solid #eee;background:#fafafa;font-size:9px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
   ${tablaCuotasHtml}
   <div class="bloque-final">
     ${(textoRepresentacion || resumenHash) ? `<div class="texto">${textoRepresentacion ? textoRepresentacion + '<br>' : ''}${qrDataUri ? 'Visite https://mifacturasunat.com<br>' : ''}${resumenHash ? 'Resumen: ' + resumenHash : ''}</div>` : ''}

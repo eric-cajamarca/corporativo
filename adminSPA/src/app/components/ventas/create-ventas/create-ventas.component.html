@@ -357,9 +357,9 @@
               <option *ngFor="let e of estadoPago" [value]="e.idEstadoPago">{{ e.descripcion }}</option>
             </select>
           </div>
-          <!-- Medio pago (no obligatorio si estado de pago es Pendiente) -->
-          <div class="col-md-4" *ngIf="ventas.idEstadoPago !== 1">
-            <label class="form-label">Medio de pago</label>
+          <!-- Condición de pago: todas las opciones de MediosPago -->
+          <div class="col-md-4">
+            <label class="form-label">Condición de pago</label>
             <select class="form-select" [(ngModel)]="ventas.idMediosPago">
               <option *ngFor="let m of mediosPago" [value]="m.idMediosPago">{{ m.descripcion }}</option>
             </select>

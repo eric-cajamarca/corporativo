@@ -111,22 +111,40 @@
                   </button>
                   <button *ngIf="puedeEnviarSunat(v) && puedeEditarVenta(v)" type="button" class="btn btn-sm btn-success me-1" title="Enviar a SUNAT" (click)="enviarASunat(v)" [disabled]="enviandoSunatId === idComprobanteStr(v)">
                     <span *ngIf="enviandoSunatId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i> Enviando...</span>
-                    <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i> SUNAT</span>
+                    <span *ngIf="enviandoSunatId !== idComprobanteStr(v)"><i class="bi bi-send"></i></span>
                   </button>
-                  <button *ngIf="idComprobanteStr(v)" type="button" class="btn btn-sm btn-outline-info me-1" title="Consultar estado / CDR en SUNAT (sin reenviar)" (click)="consultarEstadoEnSunat(v)" [disabled]="consultandoEstadoId === idComprobanteStr(v)">
-                    <span *ngIf="consultandoEstadoId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i></span>
-                    <span *ngIf="consultandoEstadoId !== idComprobanteStr(v)" title="Actualizar estado y CDR"><i class="bi bi-arrow-repeat"></i> Estado</span>
-                  </button>
-                  <button *ngIf="idComprobanteStr(v)" type="button" class="btn btn-sm btn-outline-secondary me-1" title="Consultar validez del comprobante en SUNAT" (click)="consultarValidezEnSunat(v)" [disabled]="consultandoValidezId === idComprobanteStr(v)">
-                    <span *ngIf="consultandoValidezId === idComprobanteStr(v)"><i class="bi bi-hourglass-split"></i></span>
-                    <span *ngIf="consultandoValidezId !== idComprobanteStr(v)">Validez</span>
-                  </button>
-                  <button type="button" class="btn btn-sm ms-1" [class.btn-primary]="v.tieneXml" [class.btn-outline-secondary]="!v.tieneXml" title="XML" (click)="abrirModalArchivo(v, 'xml')" [disabled]="!idComprobanteStr(v)">
-                    XML
-                  </button>
-                  <button type="button" class="btn btn-sm ms-1" [class.btn-primary]="v.tieneCdr" [class.btn-outline-secondary]="!v.tieneCdr" title="CDR" (click)="abrirModalArchivo(v, 'cdr')" [disabled]="!idComprobanteStr(v)">
-                    CDR
-                  </button>
+                  <div class="dropdown d-inline-block" *ngIf="idComprobanteStr(v)">
+                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Más opciones">
+                      <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" (click)="abrirModalArchivo(v, 'xml')" [class.text-muted]="!v.tieneXml">
+                          <i class="bi bi-file-code me-2"></i> XML
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" (click)="abrirModalArchivo(v, 'cdr')" [class.text-muted]="!v.tieneCdr">
+                          <i class="bi bi-file-earmark-check me-2"></i> CDR
+                        </a>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" [class.disabled]="consultandoEstadoId === idComprobanteStr(v)" (click)="consultandoEstadoId !== idComprobanteStr(v) && consultarEstadoEnSunat(v)">
+                          <span *ngIf="consultandoEstadoId === idComprobanteStr(v)"><i class="bi bi-hourglass-split me-2"></i></span>
+                          <i class="bi bi-arrow-repeat me-2" *ngIf="consultandoEstadoId !== idComprobanteStr(v)"></i>
+                          Consultar estado
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item" href="javascript:void(0)" [class.disabled]="consultandoValidezId === idComprobanteStr(v)" (click)="consultandoValidezId !== idComprobanteStr(v) && consultarValidezEnSunat(v)">
+                          <span *ngIf="consultandoValidezId === idComprobanteStr(v)"><i class="bi bi-hourglass-split me-2"></i></span>
+                          <i class="bi bi-search me-2" *ngIf="consultandoValidezId !== idComprobanteStr(v)"></i>
+                          Consultar validez
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
                 </td>
               </tr>
             </tbody>

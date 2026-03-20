@@ -745,16 +745,17 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
     insertVenta.input("total", sql.Decimal(18, 2), total);
     insertVenta.input("idMediosPago", sql.VarChar(20), ventaOrigen.idMediosPago || "1");
     insertVenta.input("compRelacionado", sql.VarChar(30), compRelacionado);
+    insertVenta.input("observaciones", sql.VarChar(500), "");
     insertVenta.input("idUsuario", sql.UniqueIdentifier, idUsuario);
     insertVenta.input("tipoComprobanteRef", sql.VarChar(2), ceOrigen.tipoComprobante || null);
     insertVenta.input("codigoMotivoNotaCredito", sql.VarChar(2), tipoNota === "07" ? (codigoMotivoNotaCredito || "01") : null);
 
     const ventaInsertResult = await insertVenta.query(`
       INSERT INTO Ventas (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio,
-        subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, idUsuario, tipoComprobanteRef, codigoMotivoNotaCredito)
+        subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, tipoComprobanteRef, codigoMotivoNotaCredito)
       OUTPUT INSERTED.idVenta
       VALUES (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fEmision, @idCliente, @idMoneda, @tCambio,
-        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 1, 7, @compRelacionado, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito)
+        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 1, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito)
     `);
     const idVenta = ventaInsertResult.recordset && ventaInsertResult.recordset[0] && ventaInsertResult.recordset[0].idVenta;
     if (!idVenta) {

@@ -263,13 +263,12 @@ const crearVentaCompleta = async (req, res) => {
     const fVencimientoSQL = getFechaSoloSQLString(venta.fVencimiento) || fechaEmisionConHora;
     const ventaConHora = { ...venta, fEmision: fechaEmisionConHora, fVencimiento: fVencimientoSQL };
     const idEstadoPago = venta.idEstadoPago != null ? parseInt(venta.idEstadoPago, 10) : 1;
-    if (idEstadoPago === 1) {
-      const medPago = ventaConHora.idMediosPago != null && String(ventaConHora.idMediosPago).trim() !== '';
-      if (!medPago) {
-        const rMp = await transaction.request().query('SELECT TOP 1 idMediosPago FROM MediosPago');
-        const firstId = rMp.recordset?.[0]?.idMediosPago;
-        ventaConHora.idMediosPago = firstId != null ? String(firstId) : '1';
-      }
+    const medPagoValido = ventaConHora.idMediosPago != null && String(ventaConHora.idMediosPago).trim() !== '';
+    if (!medPagoValido) {
+      const rContado = await transaction.request().query(`SELECT TOP 1 idMediosPago FROM MediosPago WHERE RTRIM(LTRIM(ISNULL(codigo,''))) = '009'`);
+      const rCualquiera = await transaction.request().query('SELECT TOP 1 idMediosPago FROM MediosPago');
+      const fallbackId = rContado.recordset?.[0]?.idMediosPago ?? rCualquiera.recordset?.[0]?.idMediosPago;
+      ventaConHora.idMediosPago = fallbackId != null ? String(fallbackId) : '1';
     }
     const ventaResult = await ventasRepository.insertar(transaction, ventaConHora, req.user.empresa, req.user.sub);
     const idVenta = ventaResult.recordset[0].idVenta;

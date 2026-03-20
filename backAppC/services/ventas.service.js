@@ -70,6 +70,7 @@ exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, pa
     idEstadoPago: 1,
     idEstadoSunat: 0,
     compRelacionado: vale.compVale || null,
+    observaciones: null,
     idUsuario
   };
 

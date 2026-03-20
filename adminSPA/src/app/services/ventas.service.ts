@@ -24,7 +24,8 @@ export interface VentaCompletaPayload {
     total: number;
     idMediosPago: string;
     idEstadoSunat?: number;
-    compRelacionado?: string;
+    compRelacionado?: string | null;
+    observaciones?: string | null;
   };
   detalles: Array<{
     idProducto: string;

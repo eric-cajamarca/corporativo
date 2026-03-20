@@ -80,11 +80,18 @@ export class SucursalService {
   }
 
   //api.put('/sucursalestado/:id',auth.auth, sucursalController.editar_estado_idsucursal);
-  editar_estado_idsucursal(id:any,estado:any):Observable<any>{
-    console.log('estado: ',estado);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.put(this.url+'sucursalestado/'+id,estado,{
-      headers:headers,
+  editar_estado_idsucursal(id: string, estado: any): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.put(this.url + 'sucursalestado/' + id, estado, {
+      headers,
+      withCredentials: true
+    });
+  }
+
+  establecer_sucursal_principal(id: string): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.put(this.url + 'sucursal/' + id + '/principal', {}, {
+      headers,
       withCredentials: true
     });
   }

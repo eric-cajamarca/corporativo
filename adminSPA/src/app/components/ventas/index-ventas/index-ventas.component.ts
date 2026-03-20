@@ -96,6 +96,7 @@ export class IndexVentasComponent implements OnInit {
       next: (res) => {
         this.ventasConst = res.data ?? [];
         this.ventas = [...this.ventasConst];
+        console.log('ventas',this.ventas);
         this.loading = false;
       },
       error: () => {

@@ -106,7 +106,8 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   const porcentajeIgv = tributo.porcentajeIgv;
 
   const montoEnLetras = numeroALetras(total);
-  const condicionPago = toStr(venta.condicionPago) || "Contado";
+  const observaciones = toStr(venta.observaciones) || toStr(venta.compRelacionado);
+  const condicionPago = toStr(venta.codigoCondicionPago) || (toStr(venta.condicionPago).toUpperCase().includes("CREDITO") ? "010" : "009");
   const dirEmisor = toStr(empresa.direccion) || "-";
   const dirCliente = toStr(cliente.direccion) || "-";
 
@@ -173,7 +174,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   <cbc:IssueTime>${hora}</cbc:IssueTime>
   <cbc:DueDate>${fecha}</cbc:DueDate>
   <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listID="0101" listName="Tipo de Documento" listSchemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01" name="Tipo de Operacion">${tipoCod}</cbc:InvoiceTypeCode>
-  <cbc:Note languageLocaleID="1000">${escXml(montoEnLetras)}</cbc:Note>
+  <cbc:Note languageLocaleID="1000">${escXml(montoEnLetras)}</cbc:Note>${observaciones ? '\n  <cbc:Note languageLocaleID="1000">' + escXml(observaciones) + '</cbc:Note>' : ''}
   <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 4217 Alpha" listName="Currency">PEN</cbc:DocumentCurrencyCode>
   <cac:Signature>
     <cbc:ID>${rucEmisor}</cbc:ID>

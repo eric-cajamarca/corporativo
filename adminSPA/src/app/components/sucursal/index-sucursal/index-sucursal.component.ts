@@ -50,34 +50,44 @@ export class IndexSucursalComponent {
   }
 
   obtenerSucursales(){
-    this._sucursalcervice.obtener_sucursal_idempresa().subscribe(
+    this._sucursalcervice.obtener_sucursal_todos().subscribe(
       response=>{
-        console.log('response: ',response.data);
-        this.sucursales = response.data;
-        this.sucursales_const = response.data;
-        console.log('this.sucursales: ',this.sucursales);
+        this.sucursales = response.data || [];
+        this.sucursales_const = [...this.sucursales];
+        //console.log('sucursales',this.sucursales);
       },
       error=>{
-        console.log('error: ',error);
+        console.error('Error al cargar sucursales:', error);
       }
     )
   }
 
-  actualizarEstado(id:any, estado:any){
-    console.log('id: ',id);
-    console.log('estado: ',estado);
-
-    let Estado = {estado:estado};
-
-    this._sucursalcervice.editar_estado_idsucursal(id, Estado).subscribe(
-      response=>{
-        console.log('response: ',response);
+  actualizarEstado(id: string, estado: boolean | number): void {
+    this.load_estado = true;
+    this._sucursalcervice.editar_estado_idsucursal(id, { estado }).subscribe({
+      next: () => {
+        this.load_estado = false;
         this.obtenerSucursales();
       },
-      error=>{
-        console.log('error: ',error);
+      error: (err) => {
+        this.load_estado = false;
+        console.error('Error al actualizar estado:', err);
       }
-    )
+    });
+  }
+
+  establecerPrincipal(id: string): void {
+    this.load_estado = true;
+    this._sucursalcervice.establecer_sucursal_principal(id).subscribe({
+      next: () => {
+        this.load_estado = false;
+        this.obtenerSucursales();
+      },
+      error: (err) => {
+        this.load_estado = false;
+        console.error('Error al establecer sucursal principal:', err);
+      }
+    });
   }
 
   

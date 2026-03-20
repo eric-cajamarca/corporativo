@@ -32,14 +32,15 @@
           </div>
     
           <!-- Tabla de sucursales -->
-          <div *ngIf="sucursales_const.length > 0" class="table-responsive">
-            <table class="table table-hover align-middle">
+          <div *ngIf="sucursales_const.length > 0" class="table-responsive" style="min-height:300px;">
+            <table class="table table-hover">
               <thead class="table-light">
                 <tr>
                   <th>Nombre</th>
                   <th>Dirección</th>
                   <th>Registro</th>
                   <th>Estado</th>
+                  <th>Principal</th>
                   <th class="text-end">Acción</th>
                 </tr>
               </thead>
@@ -51,6 +52,11 @@
                   <td>
                     <span class="badge" [ngClass]="item.estado ? 'bg-success' : 'bg-danger'">
                       {{ item.estado ? 'Activo' : 'Inactivo' }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="item.esPrincipal ? 'bg-success' : 'bg-danger'">
+                      {{ item.esPrincipal ? 'Principal' : 'No principal' }}
                     </span>
                   </td>
                   <td class="text-end">
@@ -65,6 +71,12 @@
                           <a class="dropdown-item" style="cursor: pointer;" 
                              data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idSucursal">
                             {{ item.estado ? 'Desactivar' : 'Activar' }}
+                          </a>
+                        </li>
+                        <li *ngIf="!item.esPrincipal">
+                          <a class="dropdown-item" style="cursor: pointer;" 
+                             data-bs-toggle="modal" [attr.data-bs-target]="'#principal-'+item.idSucursal">
+                            Establecer como principal
                           </a>
                         </li>
                         <li>
@@ -93,6 +105,35 @@
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                             <button type="button" class="btn btn-primary" 
                                     (click)="actualizarEstado(item.idSucursal, item.estado)" 
+                                    data-bs-dismiss="modal"
+                                    [disabled]="load_estado">
+                              <span *ngIf="!load_estado">Confirmar</span>
+                              <span *ngIf="load_estado" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                              <span *ngIf="load_estado" class="ms-1">Procesando...</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Modal confirmar establecer como principal -->
+                    <div class="modal fade" [id]="'principal-'+item.idSucursal" tabindex="-1" 
+                         aria-labelledby="principalModalLabel" aria-hidden="true">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title" id="principalModalLabel">
+                              Establecer sucursal principal: {{item.nombre}}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>¿Está seguro que desea establecer esta sucursal como principal? La sucursal principal actual dejará de serlo.</p>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" 
+                                    (click)="establecerPrincipal(item.idSucursal)" 
                                     data-bs-dismiss="modal"
                                     [disabled]="load_estado">
                               <span *ngIf="!load_estado">Confirmar</span>

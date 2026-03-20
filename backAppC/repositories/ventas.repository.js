@@ -25,19 +25,16 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     idEstadoPedido,
     idEstadoPago,
     idEstadoSunat,
-    compRelacionado
+    compRelacionado,
+    observaciones
   } = datosVenta;
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '0ab6a5' }, body: JSON.stringify({ sessionId: '0ab6a5', runId: 'prefix_compRelacionado', hypothesisId: 'HcompRelacionado', location: 'ventas.repository.js:insertar:before_compRelacionado', message: 'valor/tipo compRelacionado antes de INSERT', data: { compRelacionadoProvided: compRelacionado, typeofCompRelacionado: typeof compRelacionado, isNull: compRelacionado === null, isUndefined: compRelacionado === undefined, compRelacionadoLen: compRelacionado != null ? String(compRelacionado).length : null }, timestamp: Date.now() }) }).catch(() => {});
-  // #endregion
-
-  // Normalización crítica:
-  // mssql + tedious puede fallar con metadatos/longitud inválida si `compRelacionado` llega como `undefined` o tipo inesperado.
-  // El campo se inserta como VARCHAR(30), así que forzamos string y acotamos longitud.
   const compRelacionadoVal = (compRelacionado == null)
     ? ''
     : String(compRelacionado).trim().slice(0, 30);
+  const observacionesVal = (observaciones == null)
+    ? ''
+    : String(observaciones).trim().slice(0, 500);
 
   const fVencimientoVal = fVencimiento != null ? fVencimiento : fEmision;
   const idEstadoPedidoVal = idEstadoPedido != null ? parseInt(idEstadoPedido, 10) : 1;
@@ -68,12 +65,13 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('idEstadoPago', sql.Int, idEstadoPagoVal)
     .input('idEstadoSunat', sql.Int, idEstadoSunat)
     .input('compRelacionado', sql.VarChar(30), compRelacionadoVal)
+    .input('observaciones', sql.VarChar(500), observacionesVal)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
     .query(`INSERT INTO Ventas 
-      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, idUsuario) 
+      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario) 
       OUTPUT INSERTED.idVenta
       VALUES 
-      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @idUsuario)`);
+      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario)`);
 
   return result;
 };
@@ -148,7 +146,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
           v.idComprobante,
           v.idCliente,
           v.idMediosPago,
-          ISNULL(fp.descripcion, ISNULL(mp.descripcion, v.idMediosPago)) AS condicionPago,
+          ISNULL(mp.descripcion, ISNULL(fp.descripcion, v.idMediosPago)) AS condicionPago,
           c.nombre AS nombreComprobante,
           c.codigo AS codigoComprobante,
           COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
@@ -231,9 +229,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           ISNULL(v.gratuito, 0) AS gratuito,
           ISNULL(v.otrosCargos, 0) AS otrosCargos,
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
-          v.compRelacionado, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
+          v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
-          ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Contado')) AS condicionPago,
+          ISNULL(mp.descripcion, ISNULL(fp.descripcion, 'Contado')) AS condicionPago,
+          ISNULL(mp.codigo, '009') AS codigoCondicionPago,
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
@@ -256,7 +255,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
-          v.compRelacionado, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
+          v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           'Contado' AS condicionPago,
           cl.idCliente AS idCliente,
@@ -421,6 +420,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       nombreComprobante: cab.nombreComprobante,
       codigoComprobante: cab.codigoComprobante != null ? String(cab.codigoComprobante).trim() : '01',
       condicionPago: cab.condicionPago != null ? String(cab.condicionPago).trim() : 'Contado',
+      codigoCondicionPago: cab.codigoCondicionPago != null ? String(cab.codigoCondicionPago).trim() : '009',
       fEmision: cab.fEmision,
       subtotal: cab.subtotal,
       igv: cab.igv,
@@ -432,6 +432,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       resumenHash,
       cuotas: cuotasVenta,
       compRelacionado: cab.compRelacionado != null ? String(cab.compRelacionado).trim() : '',
+      observaciones: cab.observaciones != null ? String(cab.observaciones).trim() : '',
       tipoComprobanteRef: cab.tipoComprobanteRef != null ? String(cab.tipoComprobanteRef).trim() : '',
       codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : ''
     },
