@@ -158,6 +158,15 @@ export class CreateVentasComponent implements OnInit {
   cotizacionesParaCargar: CotizacionListado[] = [];
   loadingCotizaciones = false;
 
+  /** Empresa gestora: venta corporativa con comprobante VA. */
+  esGestora = false;
+  tipoComprobanteDestino = 'NV';
+  comprobantesDestinoOpciones = [
+    { codigo: 'NV', nombre: 'Nota de Venta' },
+    { codigo: '03', nombre: 'Boleta' },
+    { codigo: '01', nombre: 'Factura' }
+  ];
+
   /** Modal Convertir vale en venta (liquidación). Solo visible si la empresa tiene habilitado vales de despacho (config rubro usaValeDespacho). */
   usaValeDespachoHabilitado = false;
   valesParaLiquidar: ValeDespachoListItem[] = [];
@@ -244,6 +253,13 @@ export class CreateVentasComponent implements OnInit {
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
     //if (!this.ventas.fVencimiento) this.ventas.fVencimiento=hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
+    this.gestoresService.obtenerEmpresasGestionadas().subscribe({
+      next: (res: any) => {
+        const empresas = res?.data || [];
+        this.esGestora = empresas.length > 0;
+      },
+      error: () => { this.esGestora = false; }
+    });
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
     if (this.hotelPreloadVentaService.hasPreload()) {
@@ -503,32 +519,28 @@ export class CreateVentasComponent implements OnInit {
 
 
 
-  // Función para buscar productos por código o descripción
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
-    console.log('Término de búsqueda:', term);
-    
     if (term === '') {
-      // Si no hay término de búsqueda, mostrar todos los productos
       this.productos_filtrados = this.stockSucursales_const;
-      console.log('No se ingresó término de búsqueda. Mostrando todos los productos.');
     } else {
-      // Filtrar por código o descripción (uso includes en lugar de test)
       this.productos_filtrados = this.stockSucursales_const.filter(
         (item: any) => {
           const descripcion = (item.descripcion ?? '').toString().toLowerCase();
           const codigo = (item.codigo ?? '').toString().toLowerCase();
           const marca = (item.nombre ?? '').toString().toLowerCase();
+          const alias = (item.aliasEmpresa ?? '').toString().toLowerCase();
+          const sucursal = (item.sucursal ?? '').toString().toLowerCase();
           return (
             descripcion.includes(term) ||
             codigo.includes(term) ||
-            marca.includes(term)
+            marca.includes(term) ||
+            alias.includes(term) ||
+            sucursal.includes(term)
           );
         }
       );
     }
-    
-    console.log('Productos filtrados:', this.productos_filtrados);
   }
 
   // Función para limpiar la búsqueda
@@ -1513,7 +1525,7 @@ abrirModalPrecios(item: any) {
     }
     this.loading = true;
 
-    const ventaPayload = {
+    const ventaPayload: any = {
       idSucursal: this.ventas.idSucursal,
       serie: String(this.ventas.serie || '0000').substring(0, 4),
       numero: String(this.ventas.numero || '00000000').substring(0, 8),
@@ -1540,6 +1552,10 @@ abrirModalPrecios(item: any) {
       observaciones: this.ventas.observacion || null
     };
 
+    if (this.esGestora) {
+      ventaPayload.tipoComprobanteDestino = this.tipoComprobanteDestino;
+    }
+
     const idEstadoPedidoVenta = Number(this.ventas.idEstadoPedido) || 1;
     const esEstadoPendiente = idEstadoPedidoVenta === 1;
     const detalles = this.carrito.map((item: any) => {
@@ -1557,7 +1573,12 @@ abrirModalPrecios(item: any) {
         total: subtotal,
         hVenta: new Date().toISOString(),
         cantEntregada: esEstadoPendiente ? 0 : cant,
-        idEstadoPedido: idEstadoPedidoVenta
+        idEstadoPedido: idEstadoPedidoVenta,
+        idSucursalEmpresa: item.idSucursal || undefined,
+        aliasEmpresa: item.aliasEmpresa || undefined,
+        sucursal: item.sucursal || undefined,
+        descripcion: item.descripcion || undefined,
+        codigo: item.codigo || undefined
       };
     });
 
@@ -1579,11 +1600,14 @@ abrirModalPrecios(item: any) {
       detallePago: detallePago.length > 0 ? detallePago : undefined,
       idApertura
     }).subscribe({
-      next: (res) => {
+      next: (res: any) => {
         this.loading = false;
         iziToast.success({ title: 'Éxito', message: 'Venta registrada correctamente.' });
         if (res.avisoStockInsuficiente) {
           iziToast.warning({ title: 'Aviso', message: res.avisoStockInsuficiente, position: 'topRight' });
+        }
+        if (this.esGestora && res.idVentaAgrupada) {
+          this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         this.ventaSesionService.eliminarSesionActiva();
         this.limpiarVenta();
@@ -1594,6 +1618,50 @@ abrirModalPrecios(item: any) {
           title: 'Error',
           message: err.error?.error || err.error?.message || 'Error al registrar la venta.'
         });
+      }
+    });
+  }
+
+  imprimirComprobanteVA(idVentaAgrupada: string): void {
+    this.ventasService.getComprobanteVAParaPdf(idVentaAgrupada).subscribe({
+      next: (res) => {
+        if (res?.data) {
+          const pdfService = (window as any).__pdfService;
+          if (pdfService && typeof pdfService.generarPdfComprobanteVA === 'function') {
+            pdfService.generarPdfComprobanteVA(res.data);
+          } else {
+            const w = window.open('', '_blank');
+            if (w) {
+              const d = res.data;
+              const rows = d.items.map((it: any) =>
+                `<tr><td>${it.aliasEmpresa || ''}</td><td>${it.codigo || ''}</td><td>${it.descripcion || ''}</td><td>${it.cantidad}</td><td>${it.pVenta?.toFixed(2)}</td><td>${it.total?.toFixed(2)}</td></tr>`
+              ).join('');
+              const tipoLabel = d.venta.tipoComprobanteDestinoNombre || d.venta.tipoComprobanteDestino || '';
+              w.document.write(`<!DOCTYPE html><html><head><title>Comprobante VA</title>
+                <style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5}.header{text-align:center;margin-bottom:20px}.total{text-align:right;font-size:16px;font-weight:bold;margin-top:10px}@media print{.no-print{display:none}}</style>
+              </head><body>
+                <div class="header">
+                  <h2>${d.empresa.nombre || 'Empresa'}</h2>
+                  <p>RUC: ${d.empresa.ruc || ''} | ${d.empresa.direccion || ''}</p>
+                  <h3>VENTA AGRUPADA ${d.venta.compVenta || ''}</h3>
+                  <p>Tipo comprobante destino: <strong>${tipoLabel}</strong></p>
+                  <p>Fecha: ${d.venta.fEmision || ''}</p>
+                </div>
+                <p><strong>Cliente:</strong> ${d.cliente.rSocial || ''} | ${d.cliente.ruc || ''}</p>
+                <table><thead><tr><th>Empresa</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>P.Unit</th><th>Total</th></tr></thead>
+                <tbody>${rows}</tbody></table>
+                <p class="total">TOTAL: S/ ${d.venta.total?.toFixed(2)}</p>
+                <p style="text-align:center;margin-top:20px;font-size:10px">ID: ${idVentaAgrupada}</p>
+                <div style="text-align:center;margin-top:10px"><img src="https://barcode.tec-it.com/barcode.ashx?data=${idVentaAgrupada}&code=Code128&translate-esc=true&dpi=96" alt="barcode" style="height:50px"/></div>
+                <br/><button class="no-print" onclick="window.print()">Imprimir</button>
+              </body></html>`);
+              w.document.close();
+            }
+          }
+        }
+      },
+      error: () => {
+        iziToast.warning({ title: 'Aviso', message: 'No se pudo cargar el comprobante VA para impresión.', position: 'topRight' });
       }
     });
   }

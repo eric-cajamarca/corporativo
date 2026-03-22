@@ -43,7 +43,7 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
         FROM DetalleCompras dc
         INNER JOIN Compras c ON dc.idCompra = c.idCompra AND c.idEmpresa = dc.idEmpresa
         WHERE dc.idEmpresa = @idEmpresa AND dc.idProducto = @idProducto
-          AND c.fEmision >= @fechaDesde AND c.fEmision <= @fechaHasta
+          AND c.fEmision >= @fechaDesde AND c.fEmision < DATEADD(day, 1, @fechaHasta)
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -58,7 +58,7 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
         FROM DetalleVenta dv
         INNER JOIN Ventas v ON dv.idVenta = v.idVenta
         WHERE v.idEmpresa = @idEmpresa AND dv.idProducto = @idProducto
-          AND v.fEmision >= @fechaDesde AND v.fEmision <= @fechaHasta
+          AND v.fEmision >= @fechaDesde AND v.fEmision < DATEADD(day, 1, @fechaHasta)
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -76,7 +76,7 @@ exports.obtenerKardex = async (pool, idEmpresa, idProducto, fechaDesde, fechaHas
                CASE WHEN m.tipoMovimiento = 'SA' THEN m.cantidad * ISNULL(m.costoUnitario,0) ELSE 0 END AS importeSalida
         FROM MovimientosInventario m
         WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto
-          AND m.fMovimiento >= @fechaDesde AND m.fMovimiento <= @fechaHasta
+          AND m.fMovimiento >= @fechaDesde AND m.fMovimiento < DATEADD(day, 1, @fechaHasta)
       `),
     pool.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)

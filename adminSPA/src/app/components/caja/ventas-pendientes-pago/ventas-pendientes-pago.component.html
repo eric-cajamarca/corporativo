@@ -11,14 +11,14 @@
           </h5>
         </div>
         <div class="card-body">
-          <!-- Filtro: idVenta (código de barras) y cliente -->
+          <!-- Filtro: idVentaAgrupada (código de barras) y cliente -->
           <div class="row mb-3 align-items-end">
             <div class="col-md-4">
               <label class="form-label small">ID Venta / Código de barras</label>
               <input type="text" class="form-control form-control-sm"
                      [(ngModel)]="filtroIdVenta"
                      (keydown)="onFiltroKeydown($event)"
-                     placeholder="Escanear o escribir idVenta">
+                     [placeholder]="esGestora ? 'Buscar por comprobante VA o ID...' : 'Escanear o escribir idVenta'">
             </div>
             <div class="col-md-4">
               <label class="form-label small">Cliente (nombre o RUC)</label>
@@ -34,7 +34,66 @@
             </div>
           </div>
 
-          <div class="table-responsive">
+          <div class="table-responsive" *ngIf="esGestora">
+            <table class="table table-hover table-bordered table-sm">
+              <thead class="table-light">
+                <tr>
+                  <th>Comprobante VA</th>
+                  <th>Tipo</th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>RUC</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let v of listPaginated">
+                  <td>{{ v.compVenta || '—' }}</td>
+                  <td>
+                    <ng-container [ngSwitch]="v.tipoComprobanteDestino">
+                      <span *ngSwitchCase="'NV'">Nota Venta</span>
+                      <span *ngSwitchCase="'01'">Factura</span>
+                      <span *ngSwitchCase="'03'">Boleta</span>
+                      <span *ngSwitchDefault>{{ v.tipoComprobanteDestino || '—' }}</span>
+                    </ng-container>
+                  </td>
+                  <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
+                  <td>{{ v.clienteRazonSocial }}</td>
+                  <td>{{ v.clienteRuc }}</td>
+                  <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
+                  <td class="text-center">
+                    <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
+                      <i class="bi bi-cash-coin"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#comprobantesModalPendientes" (click)="abrirModalComprobantes(v)" title="Ver comprobantes">
+                      <i class="bi bi-receipt"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="list.length === 0 && !loading">
+                  <td colspan="7" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
+                </tr>
+              </tbody>
+            </table>
+            <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+              <small class="text-muted">
+                Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
+              </small>
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item" [class.disabled]="page <= 1">
+                  <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page - 1)" aria-label="Anterior">&laquo;</a>
+                </li>
+                <li *ngFor="let p of paginas" class="page-item" [class.active]="page === p">
+                  <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(p)">{{ p }}</a>
+                </li>
+                <li class="page-item" [class.disabled]="page >= totalPaginas">
+                  <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page + 1)" aria-label="Siguiente">&raquo;</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
+          <div class="table-responsive" *ngIf="!esGestora">
             <table class="table table-hover table-bordered table-sm">
               <thead class="table-light">
                 <tr>
@@ -47,22 +106,19 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let v of listPaginated">
+                <tr *ngFor="let v of listPaginatedEmpresa">
                   <td>{{ v.compVenta || v.serie + '-' + v.numero }}</td>
                   <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
                   <td>{{ v.clienteRazonSocial }}</td>
                   <td>{{ v.clienteRuc }}</td>
                   <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
                   <td class="text-center">
-                    <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
+                    <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCobrarEmpresa(v)" title="Cobrar">
                       <i class="bi bi-cash-coin"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" (click)="editarVenta(v.idVenta)" title="Editar venta">
-                      <i class="bi bi-pencil"></i>
                     </button>
                   </td>
                 </tr>
-                <tr *ngIf="list.length === 0 && !loading">
+                <tr *ngIf="listEmpresa.length === 0 && !loading">
                   <td colspan="6" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
                 </tr>
               </tbody>
@@ -99,14 +155,15 @@
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
         <h5 class="modal-title">
-          <i class="bi bi-cash-coin me-2"></i>Cobrar comprobante
-          <span *ngIf="ventaSeleccionada"> - {{ ventaSeleccionada.compVenta }}</span>
+          <i class="bi bi-cash-coin me-2"></i>Cobrar venta
+          <span *ngIf="ventaSeleccionada"> - {{ ventaSeleccionada.idVentaAgrupada }}</span>
+          <span *ngIf="!ventaSeleccionada && ventaSeleccionadaEmpresa"> - {{ ventaSeleccionadaEmpresa.compVenta || (ventaSeleccionadaEmpresa.serie + '-' + ventaSeleccionadaEmpresa.numero) }}</span>
         </h5>
         <button type="button" class="btn-close btn-close-white" (click)="cerrarModalCobrar()" aria-label="Cerrar"></button>
       </div>
-      <div class="modal-body" *ngIf="ventaSeleccionada">
-        <p class="mb-2"><strong>Cliente:</strong> {{ ventaSeleccionada.clienteRazonSocial }}</p>
-        <p class="mb-3"><strong>Total a cobrar:</strong> S/ {{ formatNumber(ventaSeleccionada.total) }}</p>
+      <div class="modal-body" *ngIf="ventaSeleccionada || ventaSeleccionadaEmpresa">
+        <p class="mb-2"><strong>Cliente:</strong> {{ ventaSeleccionada?.clienteRazonSocial || ventaSeleccionadaEmpresa?.clienteRazonSocial }}</p>
+        <p class="mb-3"><strong>Total a cobrar:</strong> S/ {{ formatNumber((ventaSeleccionada?.total || ventaSeleccionadaEmpresa?.total) || 0) }}</p>
 
         <h6 class="fw-bold mb-2">Detalle de pago</h6>
         <div class="row g-2 mb-3 align-items-end">
@@ -168,6 +225,65 @@
         <button type="button" class="btn btn-success" (click)="guardarPago()" [disabled]="guardandoPago">
           <i class="bi bi-check-circle me-1"></i>{{ guardandoPago ? 'Guardando...' : 'Guardar pago' }}
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal comprobantes por venta agrupada -->
+<div class="modal fade" id="comprobantesModalPendientes" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-receipt me-2"></i>Comprobantes por venta agrupada
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="ventaSeleccionada" class="mb-2">
+          <strong>ID Venta:</strong> {{ ventaSeleccionada.idVentaAgrupada }}
+          <span class="ms-2"><strong>Cliente:</strong> {{ ventaSeleccionada.clienteRazonSocial || '—' }}</span>
+        </div>
+        <div *ngIf="cargandoComprobantes" class="text-muted">
+          <i class="bi bi-hourglass-split"></i> Cargando comprobantes...
+        </div>
+        <div *ngIf="!cargandoComprobantes && errorComprobantes" class="text-danger">
+          {{ errorComprobantes }}
+        </div>
+        <div class="table-responsive" *ngIf="!cargandoComprobantes && !errorComprobantes">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>Empresa</th>
+                <th>Comprobante</th>
+                <th>Tipo</th>
+                <th>Fecha</th>
+                <th class="text-end">Total</th>
+                <th class="text-center">Imprimir</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of comprobantesVenta">
+                <td>{{ c.empresaRazonSocial || '—' }}</td>
+                <td>{{ c.compVenta }}</td>
+                <td>{{ c.nombreComprobante || c.codigoComprobante || '—' }}</td>
+                <td>{{ c.fEmision | date:'dd/MM/yyyy' }}</td>
+                <td class="text-end">S/ {{ c.total | number:'1.2-2' }}</td>
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-primary" [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta" (click)="imprimirComprobante(c.idVenta, 'ticket')">Ticket</button>
+                    <button class="btn btn-outline-primary" [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta" (click)="imprimirComprobante(c.idVenta, 'A5')">A5</button>
+                    <button class="btn btn-outline-primary" [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta" (click)="imprimirComprobante(c.idVenta, 'A4')">A4</button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="comprobantesVenta.length === 0">
+                <td colspan="6" class="text-center text-muted">No hay comprobantes.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>

@@ -26,6 +26,9 @@ export interface VentaCompletaPayload {
     idEstadoSunat?: number;
     compRelacionado?: string | null;
     observaciones?: string | null;
+    tipoComprobanteDestino?: string;
+    idEstadoPedido?: number;
+    idEstadoPago?: number;
   };
   detalles: Array<{
     idProducto: string;
@@ -39,9 +42,28 @@ export interface VentaCompletaPayload {
     hVenta?: string;
     cantEntregada?: number;
     idEstadoPedido?: number;
+    idSucursalEmpresa?: string;
+    aliasEmpresa?: string;
+    sucursal?: string;
+    descripcion?: string;
+    codigo?: string;
   }>;
   detallePago?: Array<{ idMediosPago: number; monto: number }>;
   idApertura?: string;
+}
+
+export interface ComprobanteVentaAgrupada {
+  idVenta: number;
+  compVenta: string;
+  serie: string;
+  numero: string;
+  idComprobante: number;
+  nombreComprobante?: string;
+  codigoComprobante?: string;
+  empresaRazonSocial?: string;
+  empresaRuc?: string;
+  fEmision: string;
+  total: number;
 }
 
 @Injectable({
@@ -54,24 +76,45 @@ export class VentasService {
     this.url = global.url;
   }
 
-  crearVentaCompleta(payload: VentaCompletaPayload): Observable<{ success: boolean; idVenta?: number; avisoStockInsuficiente?: string }> {
+  crearVentaCompleta(payload: VentaCompletaPayload): Observable<{ success: boolean; idVentaAgrupada?: string; avisoStockInsuficiente?: string }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    return this._http.post<{ success: boolean; idVenta?: number; avisoStockInsuficiente?: string }>(
+    return this._http.post<{ success: boolean; idVentaAgrupada?: string; avisoStockInsuficiente?: string }>(
       this.url + 'ventas/completa',
       payload,
       { headers, withCredentials: true }
     );
   }
 
-  /** Lista comprobantes de venta de la empresa (cabecera con comprobante y cliente). */
+  /** Lista ventas agrupadas (total corporativo). */
+  listarVentasAgrupadas(): Observable<{ data: VentaAgrupadaListado[] }> {
+    return this._http.get<{ data: VentaAgrupadaListado[] }>(this.url + 'ventas/agrupadas', { withCredentials: true });
+  }
+
+  /** Lista ventas por empresa (comprobantes). */
   listarVentasEmpresa(): Observable<{ data: VentaListado[] }> {
     return this._http.get<{ data: VentaListado[] }>(this.url + 'ventas/listar', { withCredentials: true });
+  }
+
+  /** Lista comprobantes asociados a una venta agrupada. */
+  listarComprobantesVentaAgrupada(idVentaAgrupada: string): Observable<{ data: ComprobanteVentaAgrupada[] }> {
+    return this._http.get<{ data: ComprobanteVentaAgrupada[] }>(
+      this.url + 'ventas/agrupadas/' + idVentaAgrupada + '/comprobantes',
+      { withCredentials: true }
+    );
   }
 
   /** Datos de una venta para generar comprobante PDF o edición (empresa, venta, cliente, items). */
   getComprobanteParaPdf(idVenta: number): Observable<{ data: ComprobantePdfData }> {
     return this._http.get<{ data: ComprobantePdfData }>(
       this.url + 'ventas/comprobante/' + idVenta,
+      { withCredentials: true }
+    );
+  }
+
+  /** Datos del comprobante VA (Venta Agrupada) para generar PDF con barcode. */
+  getComprobanteVAParaPdf(idVentaAgrupada: string): Observable<{ data: ComprobanteVAPdfData }> {
+    return this._http.get<{ data: ComprobanteVAPdfData }>(
+      this.url + 'ventas/agrupadas/' + idVentaAgrupada + '/comprobante-va',
       { withCredentials: true }
     );
   }
@@ -118,8 +161,20 @@ export class VentasService {
     );
   }
 
-  /** Ventas pendientes de pago (idEstadoPago = 1). Params: idVenta?, cliente? */
-  getPendientesPago(params?: { idVenta?: string; cliente?: string }): Observable<{ data: VentaPendientePago[] }> {
+  /** Ventas agrupadas pendientes de pago (idEstadoPago = 1). Params: idVentaAgrupada?, cliente? */
+  getPendientesPago(params?: { idVentaAgrupada?: string; cliente?: string }): Observable<{ data: VentaPendientePagoAgrupada[] }> {
+    const q = new URLSearchParams();
+    if (params?.idVentaAgrupada) q.set('idVentaAgrupada', params.idVentaAgrupada);
+    if (params?.cliente) q.set('cliente', params.cliente);
+    const query = q.toString();
+    return this._http.get<{ data: VentaPendientePagoAgrupada[] }>(
+      this.url + 'ventas/agrupadas/pendientes-pago' + (query ? '?' + query : ''),
+      { withCredentials: true }
+    );
+  }
+
+  /** Ventas pendientes de pago por empresa. Params: idVenta?, cliente? */
+  getPendientesPagoEmpresa(params?: { idVenta?: string; cliente?: string }): Observable<{ data: VentaPendientePago[] }> {
     const q = new URLSearchParams();
     if (params?.idVenta) q.set('idVenta', params.idVenta);
     if (params?.cliente) q.set('cliente', params.cliente);
@@ -130,7 +185,16 @@ export class VentasService {
     );
   }
 
-  /** Registrar cobro de una venta pendiente. */
+  /** Registrar cobro de una venta agrupada pendiente. */
+  cobrarVentaAgrupada(idVentaAgrupada: string, body: { detallePago: Array<{ idMediosPago: number; monto: number }>; idApertura?: string }): Observable<{ message: string }> {
+    return this._http.post<{ message: string }>(
+      this.url + 'ventas/agrupadas/' + idVentaAgrupada + '/cobrar',
+      body,
+      { headers: new HttpHeaders({ 'Content-Type': 'application/json' }), withCredentials: true }
+    );
+  }
+
+  /** Registrar cobro de una venta pendiente por empresa. */
   cobrarVenta(idVenta: number, body: { detallePago: Array<{ idMediosPago: number; monto: number }>; idApertura?: string }): Observable<{ message: string }> {
     return this._http.post<{ message: string }>(
       this.url + 'ventas/' + idVenta + '/cobrar',
@@ -146,6 +210,19 @@ export class VentasService {
       { withCredentials: true }
     );
   }
+}
+
+export interface VentaPendientePagoAgrupada {
+  idVentaAgrupada: string;
+  fEmision: string;
+  total: number;
+  idEstadoPago: number;
+  clienteRazonSocial: string;
+  clienteRuc: string;
+  compVenta?: string;
+  serie?: string;
+  numero?: string;
+  tipoComprobanteDestino?: string;
 }
 
 export interface VentaPendientePago {
@@ -225,6 +302,57 @@ export interface ComprobantePdfData {
     pVenta: number;
     subtotal?: number;
     total: number;
+  }>;
+}
+
+export interface VentaAgrupadaListado {
+  idVentaAgrupada: string;
+  fEmision: string;
+  total: number;
+  clienteRazonSocial?: string;
+  clienteRuc?: string;
+  idEstadoPago?: number;
+  idSucursal?: string;
+  sucursal?: string;
+  compVenta?: string;
+  serie?: string;
+  numero?: string;
+  tipoComprobanteDestino?: string;
+  observaciones?: string;
+}
+
+export interface ComprobanteVAPdfData {
+  venta: {
+    idVentaAgrupada: string;
+    compVenta: string;
+    serie?: string;
+    numero?: string;
+    fEmision: string;
+    subtotal: number;
+    igv: number;
+    descuentos: number;
+    total: number;
+    idEstadoPago?: number;
+    tipoComprobanteDestino?: string;
+    tipoComprobanteDestinoNombre?: string;
+    observaciones?: string;
+    sucursal?: string;
+  };
+  empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
+  cliente: { rSocial?: string; razonSocial?: string; ruc?: string; celular?: string; direccion?: string; tipoDocSunat?: string };
+  items: Array<{
+    idDetalleVA?: number;
+    idProducto?: string;
+    codigo?: string;
+    descripcion?: string;
+    cantidad: number;
+    pVenta: number;
+    descuento?: number;
+    subtotal?: number;
+    total: number;
+    aliasEmpresa?: string;
+    sucursal?: string;
+    idEmpresaProducto?: string;
   }>;
 }
 

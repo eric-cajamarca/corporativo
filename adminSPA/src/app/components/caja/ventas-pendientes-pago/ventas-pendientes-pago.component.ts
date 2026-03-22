@@ -1,14 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
-import { VentasService, VentaPendientePago } from '../../../services/ventas.service';
+import { RouterModule } from '@angular/router';
+import { VentasService, VentaPendientePagoAgrupada, VentaPendientePago, ComprobanteVentaAgrupada } from '../../../services/ventas.service';
 import { CajaService } from '../../../services/caja.service';
 import { DocumentoService } from '../../../services/documento.service';
+import { PdfService } from '../../../services/pdf.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { EmpresaService } from '../../../services/empresa.service';
+import { numeroALetras } from '../../../utils/numeroALetras';
+import { Empresa } from '../../../interfaces/pdf-interface';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -22,14 +26,16 @@ declare var iziToast: any;
 })
 export class VentasPendientesPagoComponent implements OnInit {
   sidebarState = inject(SidebarStateService);
-  list: VentaPendientePago[] = [];
+  list: VentaPendientePagoAgrupada[] = [];
+  listEmpresa: VentaPendientePago[] = [];
   loading = false;
-  /** Filtro: idVenta (incluye escaneo código de barras) o nombre/RUC cliente */
+  /** Filtro: idVentaAgrupada (incluye escaneo código de barras) o nombre/RUC cliente */
   filtroIdVenta = '';
   filtroCliente = '';
 
   /** Modal Cobrar */
-  ventaSeleccionada: VentaPendientePago | null = null;
+  ventaSeleccionada: VentaPendientePagoAgrupada | null = null;
+  ventaSeleccionadaEmpresa: VentaPendientePago | null = null;
   formasPago: FormaPago[] = [];
   /** ID forma de pago seleccionada en el modal (para el select). */
   selectedIdFormaPago: number = 0;
@@ -37,15 +43,24 @@ export class VentasPendientesPagoComponent implements OnInit {
   detailForm = { monto: 0, referencia: '' };
   guardandoPago = false;
   cajas: Array<{ idCaja: string; idSucursal: string; idApertura: string; nombre: string }> = [];
+  comprobantesVenta: ComprobanteVentaAgrupada[] = [];
+  cargandoComprobantes = false;
+  errorComprobantes = '';
+  generandoPdf = false;
+  comprobanteImprimiendoId: number | null = null;
 
   page = 1;
   pageSize = 10;
   get totalItems(): number {
-    return this.list.length;
+    return this.esGestora ? this.list.length : this.listEmpresa.length;
   }
-  get listPaginated(): VentaPendientePago[] {
+  get listPaginated(): VentaPendientePagoAgrupada[] {
     const start = (this.page - 1) * this.pageSize;
     return this.list.slice(start, start + this.pageSize);
+  }
+  get listPaginatedEmpresa(): VentaPendientePago[] {
+    const start = (this.page - 1) * this.pageSize;
+    return this.listEmpresa.slice(start, start + this.pageSize);
   }
   get totalPaginas(): number {
     return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
@@ -68,14 +83,27 @@ export class VentasPendientesPagoComponent implements OnInit {
     private ventasService: VentasService,
     private cajaService: CajaService,
     private documentoService: DocumentoService,
-    private router: Router,
+    private pdfService: PdfService,
+    private empresaService: EmpresaService,
     //public sidebarState: SidebarStateService
   ) {}
+
+  esGestora = false;
 
   ngOnInit(): void {
     this.cargarFormasPago();
     this.cargarCajasAbiertas();
-    this.cargar();
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        const estado = res?.data;
+        this.esGestora = !!estado?.esGestora;
+        this.cargar();
+      },
+      error: () => {
+        this.esGestora = false;
+        this.cargar();
+      }
+    });
   }
 
   cargarFormasPago(): void {
@@ -101,22 +129,39 @@ export class VentasPendientesPagoComponent implements OnInit {
 
   cargar(): void {
     this.loading = true;
-    const params: { idVenta?: string; cliente?: string } = {};
     const idV = (this.filtroIdVenta || '').trim();
     const cli = (this.filtroCliente || '').trim();
-    if (idV) params.idVenta = idV;
-    if (cli) params.cliente = cli;
-    this.ventasService.getPendientesPago(params).subscribe({
-      next: (res) => {
-        this.list = res.data || [];
-        this.page = 1;
-        this.loading = false;
-      },
-      error: () => {
-        this.list = [];
-        this.loading = false;
-      }
-    });
+    if (this.esGestora) {
+      const params: { idVentaAgrupada?: string; cliente?: string } = {};
+      if (idV) params.idVentaAgrupada = idV;
+      if (cli) params.cliente = cli;
+      this.ventasService.getPendientesPago(params).subscribe({
+        next: (res) => {
+          this.list = res.data || [];
+          this.page = 1;
+          this.loading = false;
+        },
+        error: () => {
+          this.list = [];
+          this.loading = false;
+        }
+      });
+    } else {
+      const params: { idVenta?: string; cliente?: string } = {};
+      if (idV) params.idVenta = idV;
+      if (cli) params.cliente = cli;
+      this.ventasService.getPendientesPagoEmpresa(params).subscribe({
+        next: (res) => {
+          this.listEmpresa = res.data || [];
+          this.page = 1;
+          this.loading = false;
+        },
+        error: () => {
+          this.listEmpresa = [];
+          this.loading = false;
+        }
+      });
+    }
   }
 
   buscar(): void {
@@ -128,7 +173,7 @@ export class VentasPendientesPagoComponent implements OnInit {
     if (event.key === 'Enter') this.cargar();
   }
 
-  abrirModalCobrar(venta: VentaPendientePago): void {
+  abrirModalCobrar(venta: VentaPendientePagoAgrupada): void {
     this.ventaSeleccionada = venta;
     this.detallePago = [];
     this.detailForm = { monto: Number(venta.total) || 0, referencia: '' };
@@ -138,10 +183,88 @@ export class VentasPendientesPagoComponent implements OnInit {
     if (el) bootstrap.Modal.getOrCreateInstance(el).show();
   }
 
+  abrirModalCobrarEmpresa(venta: VentaPendientePago): void {
+    this.ventaSeleccionadaEmpresa = venta;
+    this.detallePago = [];
+    this.detailForm = { monto: Number(venta.total) || 0, referencia: '' };
+    const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+    this.selectedIdFormaPago = efectivo ? efectivo.idFormaPago : (this.formasPago[0]?.idFormaPago ?? 0);
+    const el = document.getElementById('modalCobrarPendiente');
+    if (el) bootstrap.Modal.getOrCreateInstance(el).show();
+  }
+
+  abrirModalComprobantes(venta: VentaPendientePagoAgrupada): void {
+    this.ventaSeleccionada = venta;
+    this.comprobantesVenta = [];
+    this.errorComprobantes = '';
+    this.cargandoComprobantes = true;
+    this.ventasService.listarComprobantesVentaAgrupada(venta.idVentaAgrupada).subscribe({
+      next: (res) => {
+        this.comprobantesVenta = res.data || [];
+        this.cargandoComprobantes = false;
+      },
+      error: () => {
+        this.cargandoComprobantes = false;
+        this.errorComprobantes = 'No se pudieron cargar los comprobantes.';
+      }
+    });
+  }
+
+  imprimirComprobante(idVenta: number, formato: 'A4' | 'A5' | 'ticket'): void {
+    this.generandoPdf = true;
+    this.comprobanteImprimiendoId = idVenta;
+    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        if (!d) {
+          this.generandoPdf = false;
+          this.comprobanteImprimiendoId = null;
+          return;
+        }
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.pdfService.generarPdfComprobanteVenta(datos, formato, nombreArchivo).subscribe({
+          next: (blob) => {
+            this.pdfService.previsualizar(blob);
+            this.generandoPdf = false;
+            this.comprobanteImprimiendoId = null;
+          },
+          error: () => {
+            this.generandoPdf = false;
+            this.comprobanteImprimiendoId = null;
+          }
+        });
+      },
+      error: () => {
+        this.generandoPdf = false;
+        this.comprobanteImprimiendoId = null;
+      }
+    });
+  }
+
   cerrarModalCobrar(): void {
     const el = document.getElementById('modalCobrarPendiente');
     if (el) bootstrap.Modal.getInstance(el)?.hide();
     this.ventaSeleccionada = null;
+    this.ventaSeleccionadaEmpresa = null;
     this.detallePago = [];
   }
 
@@ -150,7 +273,9 @@ export class VentasPendientesPagoComponent implements OnInit {
   }
 
   saldoPendiente(): number {
-    const total = this.ventaSeleccionada ? Number(this.ventaSeleccionada.total) || 0 : 0;
+    const total = this.ventaSeleccionada
+      ? Number(this.ventaSeleccionada.total) || 0
+      : (this.ventaSeleccionadaEmpresa ? Number(this.ventaSeleccionadaEmpresa.total) || 0 : 0);
     return Math.max(0, total - this.totalDetallePago());
   }
 
@@ -177,8 +302,10 @@ export class VentasPendientesPagoComponent implements OnInit {
   }
 
   guardarPago(): void {
-    if (!this.ventaSeleccionada) return;
-    const totalVenta = Number(this.ventaSeleccionada.total) || 0;
+    if (!this.ventaSeleccionada && !this.ventaSeleccionadaEmpresa) return;
+    const totalVenta = this.ventaSeleccionada
+      ? Number(this.ventaSeleccionada.total) || 0
+      : (this.ventaSeleccionadaEmpresa ? Number(this.ventaSeleccionadaEmpresa.total) || 0 : 0);
     const totalPago = this.totalDetallePago();
     if (totalPago <= 0) {
       if (typeof iziToast !== 'undefined') iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un pago.', position: 'topRight' });
@@ -191,21 +318,31 @@ export class VentasPendientesPagoComponent implements OnInit {
     const detallePago = this.detallePago.map(d => ({ idMediosPago: d.idFormaPago, monto: d.monto }));
     const idApertura = this.cajas.length > 0 ? this.cajas[0].idApertura : undefined;
     this.guardandoPago = true;
-    this.ventasService.cobrarVenta(this.ventaSeleccionada.idVenta, { detallePago, idApertura }).subscribe({
-      next: () => {
-        this.guardandoPago = false;
-        this.cerrarModalCobrar();
-        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Éxito', message: 'Cobro registrado correctamente.', position: 'topRight' });
-        this.cargar();
-      },
-      error: () => {
-        this.guardandoPago = false;
-      }
-    });
-  }
-
-  editarVenta(idVenta: number): void {
-    this.router.navigate(['/ventas/editar', idVenta]);
+    if (this.ventaSeleccionada) {
+      this.ventasService.cobrarVentaAgrupada(this.ventaSeleccionada.idVentaAgrupada, { detallePago, idApertura }).subscribe({
+        next: () => {
+          this.guardandoPago = false;
+          this.cerrarModalCobrar();
+          if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Éxito', message: 'Cobro registrado correctamente.', position: 'topRight' });
+          this.cargar();
+        },
+        error: () => {
+          this.guardandoPago = false;
+        }
+      });
+    } else if (this.ventaSeleccionadaEmpresa) {
+      this.ventasService.cobrarVenta(this.ventaSeleccionadaEmpresa.idVenta, { detallePago, idApertura }).subscribe({
+        next: () => {
+          this.guardandoPago = false;
+          this.cerrarModalCobrar();
+          if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Éxito', message: 'Cobro registrado correctamente.', position: 'topRight' });
+          this.cargar();
+        },
+        error: () => {
+          this.guardandoPago = false;
+        }
+      });
+    }
   }
 
   formatNumber(value: number): string {

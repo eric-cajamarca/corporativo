@@ -10,6 +10,10 @@ import {
 } from '../../../services/movimiento-inventario.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
+import { ComprobanteService } from '../../../services/comprobante.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
+import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -47,6 +51,7 @@ export class MovimientoInventarioComponent implements OnInit {
   tiposMovimiento: TipoMovimientoItem[] = [];
   sucursales: any[] = [];
   productos: any[] = [];
+  comprobantesInventario: any[] = [];
   filas: FilaDetalle[] = [];
   cargando = false;
   guardando = false;
@@ -56,6 +61,9 @@ export class MovimientoInventarioComponent implements OnInit {
     private movimientoService: MovimientoInventarioService,
     private sucursalService: SucursalService,
     private productoService: ProductoService,
+    private comprobanteService: ComprobanteService,
+    private buscadorProductosModal: BuscadorProductosModalService,
+    private productoCrearModal: ProductoCrearModalService,
     private router: Router,
     //public sidebarState: SidebarStateService
   ) {
@@ -63,6 +71,7 @@ export class MovimientoInventarioComponent implements OnInit {
       tipoMovimiento: ['', [Validators.required]],
       idSucursal: ['', [Validators.required]],
       fechaMovimiento: [this.fechaHoy(), [Validators.required]],
+      idComprobante: [''],
       docRelacionado: [''],
       observaciones: ['']
     });
@@ -77,6 +86,7 @@ export class MovimientoInventarioComponent implements OnInit {
     this.cargarTipos();
     this.cargarSucursales();
     this.cargarProductos();
+    this.cargarComprobantesInventario();
     this.agregarFila();
   }
 
@@ -112,6 +122,33 @@ export class MovimientoInventarioComponent implements OnInit {
     });
   }
 
+  cargarComprobantesInventario(): void {
+    this.comprobanteService.obtener_comprobantes().subscribe({
+      next: (res) => {
+        const data = res?.data || [];
+        const codigosValidos = new Set(['IV', 'II', 'IN', 'SA']);
+        this.comprobantesInventario = data.filter((c: any) => codigosValidos.has(String(c.codigo || '').toUpperCase()));
+      },
+      error: () => {
+        this.comprobantesInventario = [];
+      }
+    });
+  }
+
+  onComprobanteChange(event: Event): void {
+    const target = event.target as HTMLSelectElement | null;
+    const id = target?.value ? String(target.value) : '';
+    const comp = this.comprobantesInventario.find(c => String(c.idComprobante) === id);
+    if (!comp) {
+      this.form.patchValue({ docRelacionado: '' });
+      return;
+    }
+    const serie = comp.serie || '';
+    const numero = comp.numero != null ? String(comp.numero) : '';
+    const doc = serie && numero ? `${serie}-${numero}` : (serie || numero || '');
+    this.form.patchValue({ docRelacionado: doc });
+  }
+
   esEntrada(): boolean {
     const t = this.form.get('tipoMovimiento')?.value;
     return t === 'INVENTARIO_INICIAL' || t === 'ENTRADA_VARIA' || t === 'REAJUSTE_POSITIVO';
@@ -127,6 +164,38 @@ export class MovimientoInventarioComponent implements OnInit {
       fechaVencimiento: '',
       numeroLote: ''
     });
+  }
+
+  async abrirBuscadorProductos(): Promise<void> {
+    const idSucursal = this.form.get('idSucursal')?.value || undefined;
+    const seleccionado = await this.buscadorProductosModal.abrir(idSucursal);
+    if (!seleccionado) return;
+    this.agregarProductoSeleccionado(seleccionado);
+  }
+
+  async abrirCrearProducto(): Promise<void> {
+    try {
+      const guardado = await this.productoCrearModal.abrir();
+      if (guardado) {
+        this.cargarProductos();
+      }
+    } catch {
+      // modal cerrado
+    }
+  }
+
+  agregarProductoSeleccionado(p: ProductoSeleccionado): void {
+    let fila = this.filas.find(f => !f.idProducto);
+    if (!fila) {
+      this.agregarFila();
+      fila = this.filas[this.filas.length - 1];
+    }
+    fila.idProducto = String(p.idProducto);
+    fila.codigo = p.codigo || '';
+    fila.descripcion = p.descripcion || '';
+    if (!fila.cantidad || fila.cantidad <= 0) {
+      fila.cantidad = 1;
+    }
   }
 
   quitarFila(index: number): void {
@@ -172,6 +241,7 @@ export class MovimientoInventarioComponent implements OnInit {
       tipoMovimiento: this.form.get('tipoMovimiento')?.value,
       idSucursal: this.form.get('idSucursal')?.value,
       fechaMovimiento: this.form.get('fechaMovimiento')?.value || undefined,
+      idComprobante: this.form.get('idComprobante')?.value || undefined,
       docRelacionado: this.form.get('docRelacionado')?.value || undefined,
       observaciones: this.form.get('observaciones')?.value || undefined,
       items

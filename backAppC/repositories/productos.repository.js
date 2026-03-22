@@ -39,15 +39,27 @@ const sql = require("mssql");
 
 //   return result.recordset;
 // };
-exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
+const construirInClause = (request, ids, prefijo) => {
+  const params = [];
+  (ids || []).forEach((id, index) => {
+    const key = `${prefijo}${index}`;
+    request.input(key, sql.UniqueIdentifier, id);
+    params.push(`@${key}`);
+  });
+  return params.length > 0 ? params.join(', ') : null;
+};
+
+exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
   try {
+    const ids = (idsEmpresa || []).filter(Boolean);
+    if (ids.length === 0) return [];
     // Primero, obtener productos básicos
-    const result = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    const request = pool.request();
+    const inClause = construirInClause(request, ids, 'idEmpresa');
+    const result = await request.query(`
         SELECT 
             ss.idProducto,
+            ss.idEmpresa,
             p.codigo,
             c.nombre as categoria,
             p.descripcion,
@@ -60,21 +72,27 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
             ss.cantidad as stock,
             p.tipoProducto,
             p.fProduccion,
-            p.fVencimiento
-        FROM (SELECT idEmpresa, idSucursal, idProducto, SUM(cantidadDisponible) AS cantidad FROM Lotes GROUP BY idEmpresa, idSucursal, idProducto) ss
+            p.fVencimiento,
+            ISNULL(e.alias, e.nombreComercial) as aliasEmpresa,
+            e.razon_Social as razonSocialEmpresa
+        FROM (
+          SELECT idEmpresa, idSucursal, idProducto, SUM(cantidadDisponible) AS cantidad
+          FROM Lotes
+          GROUP BY idEmpresa, idSucursal, idProducto
+        ) ss
         INNER JOIN Productos p ON ss.idProducto = p.idProducto
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
         INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
-        WHERE ss.idEmpresa = @idEmpresa
+        INNER JOIN Empresas e ON ss.idEmpresa = e.idEmpresa
+        WHERE ss.idEmpresa IN (${inClause})
       `);
 
     // Obtener precios por separado
-    const preciosResult = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    const preciosRequest = pool.request();
+    const inClausePrecios = construirInClause(preciosRequest, ids, 'idEmpresaPrecio');
+    const preciosResult = await preciosRequest.query(`
         SELECT 
             pp.idProducto,
             pp.idLista,
@@ -89,7 +107,7 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
         INNER JOIN ListasPrecio lp ON pp.idLista = lp.idLista
         INNER JOIN Moneda m ON lp.idMoneda = m.idMoneda
         INNER JOIN Productos p ON pp.idProducto = p.idProducto
-        WHERE p.idEmpresa = @idEmpresa
+        WHERE p.idEmpresa IN (${inClausePrecios})
         AND lp.activo = 1
       `);
 
@@ -123,6 +141,7 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
 
       return {
         idProducto: producto.idProducto,
+        idEmpresa: producto.idEmpresa,
         codigo: producto.codigo,
         categoria: producto.categoria,
         descripcion: producto.descripcion,
@@ -132,12 +151,14 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
         idSucursal: producto.idSucursal,
         sucursal: producto.sucursal,
         cUnitario: producto.cUnitario,
-        pVenta: precioPrincipal ? precioPrincipal.precio:0, // ← AQUÍ ESTÁ LA CORRECCIÓN
+        pVenta: precioPrincipal ? precioPrincipal.precio:0,
         stock: producto.stock,
         tipoProducto: producto.tipoProducto,
         fProduccion: producto.fProduccion,
         fVencimiento: producto.fVencimiento,
         precios: preciosProducto,
+        aliasEmpresa: producto.aliasEmpresa || '',
+        razonSocialEmpresa: producto.razonSocialEmpresa || '',
       };
     });   // Encontrar el precio principal (normal)
    
@@ -161,8 +182,6 @@ exports.obtenerProductosTodosRepo = async (pool, idEmpresa) => {
     //   fVencimiento: producto.fVencimiento,
     //   precios: preciosMap[producto.idProducto] || {}
     // }));
-
-    console.log('Productos obtenidos en repo:', productos.length);
 
     return productos;
   } catch (error) {

@@ -10,6 +10,8 @@ import { PresentacionService } from '../../../services/presentacion.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
+import { ComprasService } from '../../../services/compras.service';
+import { PreciosService } from '../../../services/precios.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -61,6 +63,9 @@ export class CreateProductoComponent implements OnInit {
   marcas: Marca[] = [];
   presentaciones: Presentacion[] = [];
   sucursales: Sucursal[] = [];
+  listasPrecio: any[] = [];
+  correlativo: { idCorrelativo?: string; numero?: number; [key: string]: unknown } = { numero: 0 };
+  private codigoManual = '';
 
   // Estados
   guardando = signal<boolean>(false);
@@ -102,6 +107,8 @@ export class CreateProductoComponent implements OnInit {
     private sucursalService: SucursalService,
     private gestoresService: GestoresService,
     private productosImagenService: ProductosImagenService,
+    private comprasService: ComprasService,
+    private preciosService: PreciosService,
     private router: Router,
     @Optional() public activeModal: NgbActiveModal,
     public sidebarState: SidebarStateService
@@ -112,6 +119,9 @@ export class CreateProductoComponent implements OnInit {
   ngOnInit(): void {
     this.initForm();
     this.cargarDatos();
+    this.productoForm.get('useCorrelativo')?.valueChanges.subscribe(() => {
+      this.onCheckboxChangeCorrelativo();
+    });
     this.gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
@@ -125,6 +135,7 @@ export class CreateProductoComponent implements OnInit {
     this.productoForm = this.fb.group({
       // Datos básicos
       codigo: ['', [Validators.required, Validators.minLength(2)]],
+      useCorrelativo: [false],
       descripcion: ['', [Validators.required, Validators.minLength(3)]],
       idCategoria: ['', Validators.required],
       idMarca: ['', Validators.required],
@@ -140,14 +151,17 @@ export class CreateProductoComponent implements OnInit {
       fVencimiento: [''],
       
       // Estado
-      estado: [true]
+      estado: [true],
+
+      // Precio
+      idListaPrecio: [null]
     });
   }
 
   private cargarDatos(): void {
     this.cargandoDatos.set(true);
     let completados = 0;
-    const total = 4;
+    const total = 6;
 
     const verificarCompletado = () => {
       completados++;
@@ -194,6 +208,33 @@ export class CreateProductoComponent implements OnInit {
       },
       error: () => verificarCompletado()
     });
+
+    // Cargar listas de precios
+    this.preciosService.listar_listas_precios_empresa().subscribe({
+      next: (response) => {
+        this.listasPrecio = response?.data || [];
+        const principal = this.listasPrecio.find((l: any) => l.principal === true || l.principal === 1);
+        const idLista = principal?.idLista ?? this.listasPrecio[0]?.idLista ?? null;
+        if (idLista != null) {
+          this.productoForm.patchValue({ idListaPrecio: idLista });
+        }
+        verificarCompletado();
+      },
+      error: () => verificarCompletado()
+    });
+
+    // Cargar correlativo de productos
+    this.comprasService.obtener_correlativo_empresa().subscribe({
+      next: (res) => {
+        const data = res?.data;
+        this.correlativo = data && typeof data === 'object' ? data : this.correlativo;
+        if (this.productoForm.get('useCorrelativo')?.value) {
+          this.productoForm.patchValue({ codigo: this.correlativo.numero || '' });
+        }
+        verificarCompletado();
+      },
+      error: () => verificarCompletado()
+    });
   }
 
   cambiarTab(tab: string): void {
@@ -229,6 +270,7 @@ export class CreateProductoComponent implements OnInit {
     const v = this.productoForm.value;
     const producto = {
       Codigo: v.codigo,
+      useCorrelativo: !!v.useCorrelativo,
       idCategoria: Number(v.idCategoria),
       idMarca: Number(v.idMarca),
       descripcion: v.descripcion,
@@ -246,7 +288,8 @@ export class CreateProductoComponent implements OnInit {
         cantidadIngresada: this.loteData.cantidadIngresada,
         ubicacion: this.loteData.ubicacion
       } : null,
-      precioVenta: this.precioVenta && this.precioVenta > 0 ? this.precioVenta : 0
+      precioVenta: this.precioVenta && this.precioVenta > 0 ? this.precioVenta : 0,
+      idListaPrecio: v.idListaPrecio != null && v.idListaPrecio !== '' ? Number(v.idListaPrecio) : null
     };
 
     this.productoService.crearProducto(producto).subscribe({
@@ -264,9 +307,12 @@ export class CreateProductoComponent implements OnInit {
             this.idProductoCreado = idProducto;
             this.imagenesProducto = [];
             this.activeTab.set('galeria');
+            this.actualizarCorrelativoSiAplica();
           } else if (this.activeModal) {
+            this.actualizarCorrelativoSiAplica();
             this.activeModal.close(true);
           } else {
+            this.actualizarCorrelativoSiAplica();
             this.router.navigate(['/productos']);
           }
         } else {
@@ -289,6 +335,39 @@ export class CreateProductoComponent implements OnInit {
         });
       }
     });
+  }
+
+  onCheckboxChangeCorrelativo(): void {
+    const useCorrelativo = !!this.productoForm.get('useCorrelativo')?.value;
+    if (useCorrelativo) {
+      this.codigoManual = this.productoForm.get('codigo')?.value || '';
+      this.productoForm.patchValue({ codigo: this.correlativo.numero || '' });
+    } else {
+      this.productoForm.patchValue({ codigo: this.codigoManual || '' });
+    }
+  }
+
+  private actualizarCorrelativoSiAplica(): void {
+    const useCorrelativo = !!this.productoForm.get('useCorrelativo')?.value;
+    if (!useCorrelativo || !this.correlativo?.idCorrelativo) return;
+    const siguiente = (Number(this.correlativo.numero) || 0) + 1;
+    const payload = { ...this.correlativo, numero: siguiente };
+    this.comprasService.editar_correlativos_empresa(this.correlativo.idCorrelativo, payload).subscribe({
+      next: () => {
+        this.correlativo = payload;
+      },
+      error: (error) => {
+        console.error('actualizarCorrelativoSiAplica:', error);
+      }
+    });
+  }
+
+  abrirNuevaCategoria(): void {
+    window.open('/categorias/create', '_blank');
+  }
+
+  abrirNuevaMarca(): void {
+    window.open('/marcas/create', '_blank');
   }
 
   private marcarCamposComoTocados(): void {

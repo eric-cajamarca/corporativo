@@ -1,20 +1,20 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { VentasService, VentaListado } from '../../../services/ventas.service';
+import { VentasService, VentaAgrupadaListado, ComprobanteVentaAgrupada, VentaListado, ComprobanteVAPdfData } from '../../../services/ventas.service';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
+import { Empresa as EmpresaModel } from '../../../models/empresa.model';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
-import { Empresa as EmpresaModel } from '../../../models/empresa.model';
 
 @Component({
   selector: 'app-index-ventas',
@@ -30,18 +30,20 @@ export class IndexVentasComponent implements OnInit {
   /** Si es true, no se muestran sidebar ni topnav (para incrustar en ventas-hoteles u otro contenedor). */
   @Input() noShell = false;
 
-  ventas: VentaListado[] = [];
-  ventasConst: VentaListado[] = [];
+  ventas: VentaAgrupadaListado[] = [];
+  ventasConst: VentaAgrupadaListado[] = [];
+  ventasEmpresa: VentaListado[] = [];
+  ventasEmpresaConst: VentaListado[] = [];
   loading = true;
   ventaSeleccionada: VentaListado | null = null;
-  generandoPdf = false;
   exportandoLista = false;
+  generandoPdf = false;
   enviandoSunatId: string | null = null;
   consultandoEstadoId: string | null = null;
   consultandoValidezId: string | null = null;
   anulandoIdVenta: number | null = null;
   empresa: EmpresaModel | null = null;
-  /** Si es true, las boletas se envían por resumen diario; no se muestra el botón Enviar a SUNAT para boletas. */
+  esGestora = false;
   useResumenDiarioBoletas = false;
 
   archivoModalId: string | null = null;
@@ -69,6 +71,13 @@ export class IndexVentasComponent implements OnInit {
   filtroNumero = '';
   filtroTipoComprobante = '';
 
+  comprobantesVenta: ComprobanteVentaAgrupada[] = [];
+  ventaAgrupadaSeleccionada: VentaAgrupadaListado | null = null;
+  cargandoComprobantes = false;
+  errorComprobantes = '';
+  comprobanteImprimiendoId: number | null = null;
+  imprimiendoVAId: string | null = null;
+
   constructor(
     private ventasService: VentasService,
     private facturacionService: FacturacionService,
@@ -91,28 +100,54 @@ export class IndexVentasComponent implements OnInit {
         this.useResumenDiarioBoletas = false;
       }
     });
-    this.cargarVentas();
-  }
-
-  cargarVentas(): void {
-    this.loading = true;
-    this.ventasService.listarVentasEmpresa().subscribe({
+    this.empresaService.getEstadoConfiguracion().subscribe({
       next: (res) => {
-        this.ventasConst = res.data ?? [];
-        this.ventas = [...this.ventasConst];
-        this.loading = false;
+        const estado = res?.data;
+        this.esGestora = !!estado?.esGestora;
+        this.cargarVentas();
       },
       error: () => {
-        this.ventasConst = [];
-        this.ventas = [];
-        this.loading = false;
+        this.esGestora = false;
+        this.cargarVentas();
       }
     });
   }
 
+  cargarVentas(): void {
+    this.loading = true;
+    if (this.esGestora) {
+      this.ventasService.listarVentasAgrupadas().subscribe({
+        next: (res) => {
+          this.ventasConst = res.data ?? [];
+          this.ventas = [...this.ventasConst];
+          this.loading = false;
+        },
+        error: () => {
+          this.ventasConst = [];
+          this.ventas = [];
+          this.loading = false;
+        }
+      });
+    } else {
+      this.ventasService.listarVentasEmpresa().subscribe({
+        next: (res) => {
+          this.ventasEmpresaConst = res.data ?? [];
+          this.ventasEmpresa = [...this.ventasEmpresaConst];
+          this.loading = false;
+        },
+        error: () => {
+          this.ventasEmpresaConst = [];
+          this.ventasEmpresa = [];
+          this.loading = false;
+        }
+      });
+    }
+  }
+
   aplicarFiltros(): void {
     this.page = 1;
-    let list = [...this.ventasConst];
+    if (this.esGestora) {
+      let list = [...this.ventasConst];
 
     if (this.filtroFecha === 'today') {
       const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
@@ -136,13 +171,42 @@ export class IndexVentasComponent implements OnInit {
     const razon = (this.filtroRazon || '').toLowerCase().trim();
     if (razon) list = list.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
 
-    const num = (this.filtroNumero || '').trim();
-    if (num) list = list.filter((v) => (v.compVenta || '').toLowerCase().includes(num.toLowerCase()));
+      const num = (this.filtroNumero || '').trim();
+      if (num) list = list.filter((v) => (v.idVentaAgrupada || '').toLowerCase().includes(num.toLowerCase()));
 
-    const tipo = (this.filtroTipoComprobante || '').trim();
-    if (tipo) list = list.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
+      this.ventas = list;
+    } else {
+      let list = [...this.ventasEmpresaConst];
+      if (this.filtroFecha === 'today') {
+        const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+        list = list.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
+      } else if (this.filtroFecha === 'month') {
+        const now = new Date();
+        const mes = String(now.getMonth() + 1).padStart(2, '0');
+        const anio = now.getFullYear();
+        list = list.filter((v) => {
+          const f = (v.fEmision || '').slice(0, 10);
+          return f.startsWith(`${anio}-${mes}`);
+        });
+      } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
+        if (this.fechaDesde) list = list.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
+        if (this.fechaHasta) list = list.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
+      }
 
-    this.ventas = list;
+      const ruc = (this.filtroRuc || '').toLowerCase().trim();
+      if (ruc) list = list.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
+
+      const razon = (this.filtroRazon || '').toLowerCase().trim();
+      if (razon) list = list.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
+
+      const num = (this.filtroNumero || '').trim();
+      if (num) list = list.filter((v) => (v.compVenta || '').toLowerCase().includes(num.toLowerCase()));
+
+      const tipo = (this.filtroTipoComprobante || '').trim();
+      if (tipo) list = list.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
+
+      this.ventasEmpresa = list;
+    }
   }
 
   limpiarFiltros(): void {
@@ -154,7 +218,90 @@ export class IndexVentasComponent implements OnInit {
     this.filtroRazon = '';
     this.filtroNumero = '';
     this.filtroTipoComprobante = '';
-    this.ventas = [...this.ventasConst];
+    if (this.esGestora) {
+      this.ventas = [...this.ventasConst];
+    } else {
+      this.ventasEmpresa = [...this.ventasEmpresaConst];
+    }
+  }
+  estadoPagoLabel(idEstadoPago: number | undefined): string {
+    if (idEstadoPago == null) return 'Pendiente';
+    return idEstadoPago === 2 ? 'Pagado' : 'Pendiente';
+  }
+
+  formatearMoneda(value: number | undefined): string {
+    if (value == null) return 'S/ 0.00';
+    return 'S/ ' + Number(value).toFixed(2);
+  }
+
+  formatearFecha(fEmision: string | undefined): string {
+    if (!fEmision) return '—';
+    return fEmision.slice(0, 19).replace('T', ' ');
+  }
+
+  etiquetaTipoComprobanteDestino(codigo: string | undefined | null): string {
+    const c = (codigo || '').trim().toUpperCase();
+    if (c === 'NV') return 'Nota Venta';
+    if (c === '01') return 'Factura';
+    if (c === '03') return 'Boleta';
+    return c || '—';
+  }
+
+  imprimirVA(idVentaAgrupada: string): void {
+    if (!idVentaAgrupada) return;
+    this.imprimiendoVAId = idVentaAgrupada;
+    this.ventasService.getComprobanteVAParaPdf(idVentaAgrupada).subscribe({
+      next: (res) => {
+        this.imprimiendoVAId = null;
+        if (!res?.data) {
+          alert('No se pudieron cargar los datos del comprobante VA.');
+          return;
+        }
+        const pdfService = (window as unknown as {
+          __pdfService?: { generarPdfComprobanteVA?: (d: ComprobanteVAPdfData) => void };
+        }).__pdfService;
+        if (pdfService?.generarPdfComprobanteVA) {
+          pdfService.generarPdfComprobanteVA(res.data);
+          return;
+        }
+        const w = window.open('', '_blank');
+        if (!w) {
+          alert('Permita ventanas emergentes para imprimir el comprobante VA.');
+          return;
+        }
+        const d = res.data;
+        const rows = d.items
+          .map(
+            (it) =>
+              `<tr><td>${it.aliasEmpresa || ''}</td><td>${it.codigo || ''}</td><td>${it.descripcion || ''}</td><td>${it.cantidad}</td><td>${it.pVenta?.toFixed(2)}</td><td>${it.total?.toFixed(2)}</td></tr>`
+          )
+          .join('');
+        const tipoLabel = d.venta.tipoComprobanteDestinoNombre || d.venta.tipoComprobanteDestino || '';
+        w.document.write(`<!DOCTYPE html><html><head><title>Comprobante VA</title>
+                <style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5}.header{text-align:center;margin-bottom:20px}.total{text-align:right;font-size:16px;font-weight:bold;margin-top:10px}@media print{.no-print{display:none}}</style>
+              </head><body>
+                <div class="header">
+                  <h2>${d.empresa.nombre || 'Empresa'}</h2>
+                  <p>RUC: ${d.empresa.ruc || ''} | ${d.empresa.direccion || ''}</p>
+                  <h3>VENTA AGRUPADA ${d.venta.compVenta || ''}</h3>
+                  <p>Tipo comprobante destino: <strong>${tipoLabel}</strong></p>
+                  <p>Fecha: ${d.venta.fEmision || ''}</p>
+                </div>
+                <p><strong>Cliente:</strong> ${d.cliente.rSocial || ''} | ${d.cliente.ruc || ''}</p>
+                <table><thead><tr><th>Empresa</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>P.Unit</th><th>Total</th></tr></thead>
+                <tbody>${rows}</tbody></table>
+                <p class="total">TOTAL: S/ ${d.venta.total?.toFixed(2)}</p>
+                <p style="text-align:center;margin-top:20px;font-size:10px">ID: ${idVentaAgrupada}</p>
+                <div style="text-align:center;margin-top:10px"><img src="https://barcode.tec-it.com/barcode.ashx?data=${idVentaAgrupada}&code=Code128&translate-esc=true&dpi=96" alt="barcode" style="height:50px"/></div>
+                <br/><button class="no-print" onclick="window.print()">Imprimir</button>
+              </body></html>`);
+        w.document.close();
+      },
+      error: () => {
+        this.imprimiendoVAId = null;
+        alert('No se pudo cargar el comprobante VA para impresión.');
+      }
+    });
   }
 
   /** 7 = Pendiente de envío; 1 = Aceptado; 3 = Aceptado con obs.; 4 = Rechazado; 6 = Error envío. */
@@ -173,7 +320,7 @@ export class IndexVentasComponent implements OnInit {
     return id != null ? String(id).trim() : '';
   }
 
-  /** True si se debe mostrar el botón Enviar a SUNAT. Si resumen diario está habilitado, no se muestra para boletas (03). */
+  /** True si se debe mostrar el botón Enviar a SUNAT. */
   puedeEnviarSunat(v: VentaListado): boolean {
     if (v.eliminado) return false;
     if (this.idComprobanteStr(v) === '') return false;
@@ -181,16 +328,11 @@ export class IndexVentasComponent implements OnInit {
     return true;
   }
 
-  /** Códigos de comprobante de catálogo que son electrónicos SUNAT (no son NV/CT). */
   private esCodigoTipoSunat(codigo: string | undefined | null): boolean {
     const c = (codigo || '').trim().toUpperCase();
     return c === '01' || c === '03' || c === '07' || c === '08';
   }
 
-  /**
-   * Documentos internos: cotización (CT) y nota de venta (NV).
-   * Nunca tratar como internos los tipos SUNAT 01/03/07/08 (evita falsos positivos por nombre).
-   */
   esCotizacionONotaVenta(v: VentaListado): boolean {
     const tipoCe = (v.tipoComprobante || '').trim();
     if (this.esCodigoTipoSunat(tipoCe)) return false;
@@ -203,15 +345,10 @@ export class IndexVentasComponent implements OnInit {
     return false;
   }
 
-  /** XML, CDR y consultas SUNAT: boleta/factura/NC/ND con fila en ComprobantesElectronicos; no NV/CT. */
   muestraOpcionesFacturacionEnMenu(v: VentaListado): boolean {
     return !this.esCotizacionONotaVenta(v) && this.idComprobanteStr(v) !== '';
   }
 
-  /**
-   * Nota de venta (NV): no se envía a SUNAT; en el historial no debe mostrarse estado electrónico.
-   * No confundir con nota de crédito/débito (07/08).
-   */
   esNotaVentaSinSunat(v: VentaListado): boolean {
     const tipoCe = (v.tipoComprobante || '').trim();
     if (this.esCodigoTipoSunat(tipoCe)) return false;
@@ -222,14 +359,12 @@ export class IndexVentasComponent implements OnInit {
     return n.includes('nota de venta');
   }
 
-  /** Texto para columna / export: anulado, sin SUNAT (NV), o etiqueta de estado. */
   etiquetaEstadoSunatListado(v: VentaListado): string {
     if (v.eliminado) return 'Anulado';
     if (this.esNotaVentaSinSunat(v)) return '—';
     return this.estadoSunatLabel(v.idEstadoSunat);
   }
 
-  /** True si la fecha de emisión está dentro de las últimas 24 h (UTC/local según string del servidor). */
   dentro24HorasDesdeEmision(v: VentaListado): boolean {
     const s = (v.fEmision || '').trim();
     if (!s) return false;
@@ -238,7 +373,6 @@ export class IndexVentasComponent implements OnInit {
     return Date.now() - t <= 24 * 60 * 60 * 1000;
   }
 
-  /** True si la venta se puede editar: no anulada, no aceptada SUNAT (excepto NV); cotización/nota venta 24 h. */
   puedeEditarVenta(v: VentaListado): boolean {
     if (v.eliminado) return false;
     const id = v?.idEstadoSunat;
@@ -247,7 +381,6 @@ export class IndexVentasComponent implements OnInit {
     return true;
   }
 
-  /** True si se puede anular: no anulada; SUNAT aceptado solo bloquea si no es nota de venta (NV no va a SUNAT). */
   puedeEliminarVenta(v: VentaListado): boolean {
     if (v.eliminado) return false;
     const id = v?.idEstadoSunat;
@@ -255,7 +388,6 @@ export class IndexVentasComponent implements OnInit {
     return true;
   }
 
-  /** Etiqueta para columna forma de pago (evita mostrar solo {}). */
   etiquetaFormaPago(v: VentaListado): string {
     const fp = (v.formaPago || '').trim();
     if (!fp || fp === '{}') return '—';
@@ -309,7 +441,6 @@ export class IndexVentasComponent implements OnInit {
     });
   }
 
-  /** Consulta estado/CDR en SUNAT sin reenviar. Útil cuando SUNAT devolvió "documento en proceso" (0140). */
   consultarEstadoEnSunat(v: VentaListado): void {
     const id = this.idComprobanteStr(v);
     if (!id) return;
@@ -329,7 +460,6 @@ export class IndexVentasComponent implements OnInit {
     });
   }
 
-  /** Consulta validez del comprobante en SUNAT (billValidService). */
   consultarValidezEnSunat(v: VentaListado): void {
     const id = this.idComprobanteStr(v);
     if (!id) return;
@@ -346,7 +476,6 @@ export class IndexVentasComponent implements OnInit {
         alert(err?.error?.message || err?.message || 'Error al consultar validez');
       }
     });
-
   }
 
   estadoSunatClass(idEstadoSunat: number | undefined): string {
@@ -354,38 +483,6 @@ export class IndexVentasComponent implements OnInit {
     if (idEstadoSunat === 7) return 'bg-warning text-dark';
     if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) return 'bg-info';
     return 'bg-danger';
-  }
-
-  formatearMoneda(value: number | undefined): string {
-    if (value == null) return 'S/ 0.00';
-    return 'S/ ' + Number(value).toFixed(2);
-  }
-
-  formatearFecha(fEmision: string | undefined): string {
-    if (!fEmision) return '—';
-    return fEmision.slice(0, 19).replace('T', ' ');
-  }
-
-  min(a: number, b: number): number {
-    return Math.min(a, b);
-  }
-
-  /** Comprobantes válidos SUNAT (aceptados: idEstadoSunat 1, 2, 3) según la lista filtrada actual (ventas). */
-  get resumenValidosSunat(): { cantidad: number; total: number } {
-    const list = this.ventas.filter(
-      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && (v.idEstadoSunat === 1 || v.idEstadoSunat === 2 || v.idEstadoSunat === 3)
-    );
-    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
-    return { cantidad: list.length, total };
-  }
-
-  /** Comprobantes no válidos SUNAT (pendientes, rechazados, error) según la lista filtrada actual (ventas). */
-  get resumenNoValidosSunat(): { cantidad: number; total: number } {
-    const list = this.ventas.filter(
-      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && v.idEstadoSunat !== 1 && v.idEstadoSunat !== 2 && v.idEstadoSunat !== 3
-    );
-    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
-    return { cantidad: list.length, total };
   }
 
   abrirModalArchivo(v: VentaListado, tipo: 'xml' | 'cdr'): void {
@@ -624,32 +721,137 @@ export class IndexVentasComponent implements OnInit {
     });
   }
 
+  get resumenValidosSunat(): { cantidad: number; total: number } {
+    const list = this.ventasEmpresa.filter(
+      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && (v.idEstadoSunat === 1 || v.idEstadoSunat === 2 || v.idEstadoSunat === 3)
+    );
+    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+    return { cantidad: list.length, total };
+  }
+
+  get resumenNoValidosSunat(): { cantidad: number; total: number } {
+    const list = this.ventasEmpresa.filter(
+      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && v.idEstadoSunat !== 1 && v.idEstadoSunat !== 2 && v.idEstadoSunat !== 3
+    );
+    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
+    return { cantidad: list.length, total };
+  }
+
+  abrirModalComprobantes(v: VentaAgrupadaListado): void {
+    this.ventaAgrupadaSeleccionada = v;
+    this.comprobantesVenta = [];
+    this.errorComprobantes = '';
+    this.cargandoComprobantes = true;
+    this.ventasService.listarComprobantesVentaAgrupada(v.idVentaAgrupada).subscribe({
+      next: (res) => {
+        this.comprobantesVenta = res.data || [];
+        this.cargandoComprobantes = false;
+      },
+      error: () => {
+        this.cargandoComprobantes = false;
+        this.errorComprobantes = 'No se pudieron cargar los comprobantes.';
+      }
+    });
+  }
+
+  imprimirComprobante(idVenta: number, formato: 'A4' | 'A5' | 'ticket'): void {
+    this.generandoPdf = true;
+    this.comprobanteImprimiendoId = idVenta;
+    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        if (!d) {
+          this.generandoPdf = false;
+          this.comprobanteImprimiendoId = null;
+          return;
+        }
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.pdfService.generarPdfComprobanteVenta(datos, formato, nombreArchivo).subscribe({
+          next: (blob) => {
+            this.pdfService.previsualizar(blob);
+            this.generandoPdf = false;
+            this.comprobanteImprimiendoId = null;
+          },
+          error: () => {
+            this.generandoPdf = false;
+            this.comprobanteImprimiendoId = null;
+            alert('Error al generar el PDF.');
+          }
+        });
+      },
+      error: () => {
+        this.generandoPdf = false;
+        this.comprobanteImprimiendoId = null;
+        alert('No se pudieron cargar los datos del comprobante.');
+      }
+    });
+  }
+
+  min(a: number, b: number): number {
+    return Math.min(a, b);
+  }
+
   /** Exporta la lista actual (filtrada) de ventas a PDF (vista previa). */
   exportarListaPdf(): void {
-    if (this.ventas.length === 0) return;
+    if (this.esGestora && this.ventas.length === 0) return;
+    if (!this.esGestora && this.ventasEmpresa.length === 0) return;
     const emp = this.empresa;
-    const empresaPdf: Empresa = {
+    const empresaPdf = {
       logo: emp?.logo ?? '',
       nombre: emp?.nombre ?? '',
       ruc: emp?.ruc ?? '',
       direccion: emp?.direccion ?? '',
       telefono: emp?.telefono ?? ''
     };
-    const datos = {
-      empresa: empresaPdf,
-      titulo: 'Lista de Ventas',
-      columnas: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Forma pago', 'Total (S/)', 'Estado SUNAT'],
-      filas: this.ventas.map((v, i) => [
-        i + 1,
-        this.formatearFecha(v.fEmision),
-        v.compVenta || '—',
-        v.clienteRuc || '—',
-        v.clienteRazonSocial || '—',
-        this.etiquetaFormaPago(v),
-        `S/ ${Number(v.total).toFixed(2)}`,
-        this.etiquetaEstadoSunatListado(v)
-      ])
-    };
+    const datos = this.esGestora
+      ? {
+          empresa: empresaPdf,
+          titulo: 'Lista de Ventas Agrupadas',
+          columnas: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+          filas: this.ventas.map((v, i) => [
+            i + 1,
+            this.formatearFecha(v.fEmision),
+            v.idVentaAgrupada || '—',
+            v.clienteRuc || '—',
+            v.clienteRazonSocial || '—',
+            v.sucursal || '—',
+            `S/ ${Number(v.total).toFixed(2)}`,
+            this.estadoPagoLabel(v.idEstadoPago)
+          ])
+        }
+      : {
+          empresa: empresaPdf,
+          titulo: 'Lista de Ventas',
+          columnas: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+          filas: this.ventasEmpresa.map((v, i) => [
+            i + 1,
+            this.formatearFecha(v.fEmision),
+            v.compVenta || '—',
+            v.clienteRuc || '—',
+            v.clienteRazonSocial || '—',
+            `S/ ${Number(v.total).toFixed(2)}`,
+            this.etiquetaEstadoSunatListado(v)
+          ])
+        };
     this.exportandoLista = true;
     this.pdfService.generarPdfDinamico(datos, 'lista-ventas', 9).subscribe({
       next: (blob) => {
@@ -667,23 +869,40 @@ export class IndexVentasComponent implements OnInit {
 
   /** Descarga la lista actual (filtrada) de ventas en Excel. */
   exportarListaExcel(): void {
-    if (this.ventas.length === 0) return;
-    const datosExcel = {
-      title: 'Lista de Ventas',
-      filename: `ventas_${new Date().getTime()}`,
-      worksheetName: 'Ventas',
-      columns: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Forma pago', 'Total (S/)', 'Estado SUNAT'],
-      rows: this.ventas.map((v, i) => [
-        i + 1,
-        this.formatearFecha(v.fEmision),
-        v.compVenta || '—',
-        v.clienteRuc || '—',
-        v.clienteRazonSocial || '—',
-        this.etiquetaFormaPago(v),
-        Number(v.total),
-        this.etiquetaEstadoSunatListado(v)
-      ])
-    };
+    if (this.esGestora && this.ventas.length === 0) return;
+    if (!this.esGestora && this.ventasEmpresa.length === 0) return;
+    const datosExcel = this.esGestora
+      ? {
+          title: 'Lista de Ventas Agrupadas',
+          filename: `ventas_${new Date().getTime()}`,
+          worksheetName: 'Ventas',
+          columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+          rows: this.ventas.map((v, i) => [
+            i + 1,
+            this.formatearFecha(v.fEmision),
+            v.idVentaAgrupada || '—',
+            v.clienteRuc || '—',
+            v.clienteRazonSocial || '—',
+            v.sucursal || '—',
+            Number(v.total),
+            this.estadoPagoLabel(v.idEstadoPago)
+          ])
+        }
+      : {
+          title: 'Lista de Ventas',
+          filename: `ventas_${new Date().getTime()}`,
+          worksheetName: 'Ventas',
+          columns: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+          rows: this.ventasEmpresa.map((v, i) => [
+            i + 1,
+            this.formatearFecha(v.fEmision),
+            v.compVenta || '—',
+            v.clienteRuc || '—',
+            v.clienteRazonSocial || '—',
+            Number(v.total),
+            this.etiquetaEstadoSunatListado(v)
+          ])
+        };
     this.exportandoLista = true;
     this.excelService.generarExcel(datosExcel).subscribe({
       next: (blob) => {

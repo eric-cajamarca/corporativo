@@ -791,6 +791,11 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .query('SELECT COUNT(*) as total FROM Clientes WHERE idEmpresa = @idEmpresa');
 
+        // Verificar si la empresa es gestora de otras
+        const gestionadas = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('SELECT COUNT(*) as total FROM Gestores_Empresas WHERE idEmpresaOrigen = @idEmpresa AND estado = 1');
+
         // Guías electrónicas: habilitado si la empresa tiene usaGuiasElectronicas = 1
         let habilitarGuiasElectronicas = false;
         try {
@@ -807,6 +812,8 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
         return {
             tieneColaboradores: colaboradores.recordset[0].total > 0,
             cantidadColaboradores: colaboradores.recordset[0].total,
+            esGestora: gestionadas.recordset[0].total > 0,
+            cantidadEmpresasGestionadas: gestionadas.recordset[0].total,
             tieneProductos: productos.recordset[0].total > 0,
             cantidadProductos: productos.recordset[0].total,
             tieneProveedores: proveedores.recordset[0].total > 0,

@@ -56,8 +56,12 @@
         <div class="row">
           <div class="col-md-6 mb-3">
             <label class="form-label">Código *</label>
-            <input type="text" class="form-control" formControlName="codigo" [class.is-invalid]="hasError('codigo')" placeholder="Ej: PROD-001">
+            <input type="text" class="form-control" formControlName="codigo" [class.is-invalid]="hasError('codigo')" placeholder="Ej: PROD-001" [readonly]="productoForm.get('useCorrelativo')?.value">
             @if (hasError('codigo')) { <div class="invalid-feedback">{{ getError('codigo') }}</div> }
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" formControlName="useCorrelativo" id="useCorrelativo" (change)="onCheckboxChangeCorrelativo()">
+              <label class="form-check-label" for="useCorrelativo">Usar correlativo</label>
+            </div>
           </div>
           <div class="col-md-6 mb-3">
             <label class="form-label">Tipo de Producto *</label>
@@ -73,19 +77,25 @@
             @if (hasError('descripcion')) { <div class="invalid-feedback">{{ getError('descripcion') }}</div> }
           </div>
           <div class="col-md-4 mb-3">
-            <label class="form-label">Categorí­a *</label>
-            <select class="form-select" formControlName="idCategoria" [class.is-invalid]="hasError('idCategoria')">
-              <option value="">Seleccione...</option>
-              @for (cat of categorias; track cat.idCategoria) { <option [value]="cat.idCategoria">{{ cat.nombre }}</option> }
-            </select>
+            <label class="form-label">Categoría *</label>
+            <div class="input-group">
+              <select class="form-select" formControlName="idCategoria" [class.is-invalid]="hasError('idCategoria')">
+                <option value="">Seleccione...</option>
+                @for (cat of categorias; track cat.idCategoria) { <option [value]="cat.idCategoria">{{ cat.nombre }}</option> }
+              </select>
+              <button class="btn btn-outline-secondary" type="button" (click)="abrirNuevaCategoria()">Crear</button>
+            </div>
             @if (hasError('idCategoria')) { <div class="invalid-feedback">{{ getError('idCategoria') }}</div> }
           </div>
           <div class="col-md-4 mb-3">
             <label class="form-label">Marca *</label>
-            <select class="form-select" formControlName="idMarca" [class.is-invalid]="hasError('idMarca')">
-              <option value="">Seleccione...</option>
-              @for (marca of marcas; track marca.idMarca) { <option [value]="marca.idMarca">{{ marca.nombre }}</option> }
-            </select>
+            <div class="input-group">
+              <select class="form-select" formControlName="idMarca" [class.is-invalid]="hasError('idMarca')">
+                <option value="">Seleccione...</option>
+                @for (marca of marcas; track marca.idMarca) { <option [value]="marca.idMarca">{{ marca.nombre }}</option> }
+              </select>
+              <button class="btn btn-outline-secondary" type="button" (click)="abrirNuevaMarca()">Crear</button>
+            </div>
             @if (hasError('idMarca')) { <div class="invalid-feedback">{{ getError('idMarca') }}</div> }
           </div>
           <div class="col-md-4 mb-3">
@@ -167,6 +177,15 @@
             <small class="text-muted">Definido en la pestaña Inventario</small>
           </div>
           <div class="col-md-4 mb-3">
+            <label class="form-label">Lista de precios</label>
+            <select class="form-select" formControlName="idListaPrecio">
+              <option value="">Seleccione...</option>
+              @for (lista of listasPrecio; track lista.idLista) {
+                <option [value]="lista.idLista">{{ lista.nombre }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-4 mb-3">
             <label class="form-label">Margen de Ganancia %</label>
             <div class="input-group">
               <input type="number" class="form-control" [(ngModel)]="margenGanancia" [ngModelOptions]="{standalone: true}" (ngModelChange)="calcularPrecioVenta()" step="1" min="0" placeholder="30">
@@ -192,7 +211,7 @@
             <div class="card bg-light">
               <div class="card-body">
                 <h6 class="card-title mb-3"><i class="fas fa-info-circle me-1"></i> Nota sobre Precios</h6>
-                <p class="card-text small mb-0">Puede configurar listas de precios adicionales (mayorista, distribuidor, etc.) despues de crear el producto, desde la sección de edición del producto.</p>
+                <p class="card-text small mb-0">Seleccione la lista de precios para asignar el precio. Puede configurar listas adicionales después de crear el producto.</p>
               </div>
             </div>
           </div>

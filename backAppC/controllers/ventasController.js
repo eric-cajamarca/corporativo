@@ -2,25 +2,11 @@ const path = require('path');
 const fs = require('fs');
 const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
-const detalleVentaService = require('../services/detalle-ventas.service');
-const stockService = require('../services/stock.service');
 const ventasRepository = require('../repositories/ventas.repository');
 const facturacionRepository = require('../repositories/facturacion.repository');
-const gestoresRepository = require('../repositories/gestores.repository');
 const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
-const { getNowLocal, getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
-const inventarioRepository = require('../repositories/inventario.repository');
-
-/** Fecha de emisión en formato SQL local (YYYY-MM-DD HH:mm:ss.sss) para guardar sin conversión UTC.
- *  Devuelve string para que el driver mssql no convierta el Date a UTC al insertar. */
-function fechaEmisionConHoraActual(fEmision) {
-  if (!fEmision) return getNowLocalSQLString();
-  const str = typeof fEmision === 'string' ? fEmision.trim() : (fEmision instanceof Date ? fEmision.toISOString().slice(0, 19).replace('T', ' ') : '');
-  const parteFecha = str.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(parteFecha)) return getNowLocalSQLString();
-  return getFechaEmisionSQLString(parteFecha);
-}
+const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 
 const crearVenta = async function (req, res) {
     const datosVenta = req.body;
@@ -124,6 +110,74 @@ const obtenerVentas = async function (req, res) {
   }
 };
 
+const obtenerVentasAgrupadas = async function (req, res) {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const list = await ventasRepository.listarVentasAgrupadas(pool, idEmpresa);
+    res.json({ data: list });
+  } catch (error) {
+    console.error('Error al obtener ventas agrupadas:', error);
+    res.status(500).json({ error: 'Error al obtener ventas agrupadas' });
+  }
+};
+
+const obtenerVentasEmpresa = async function (req, res) {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const list = await ventasRepository.listarVentasEmpresa(pool, idEmpresa);
+    res.json({ data: list });
+  } catch (error) {
+    console.error('Error al obtener ventas por empresa:', error);
+    res.status(500).json({ error: 'Error al obtener ventas por empresa' });
+  }
+};
+
+const obtenerDetalleVentaAgrupada = async function (req, res) {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVentaAgrupada = req.params.idVentaAgrupada;
+  if (!idVentaAgrupada) {
+    return res.status(400).json({ error: 'idVentaAgrupada es requerido' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const detalle = await ventasRepository.obtenerDetalleVentaAgrupada(pool, idEmpresa, idVentaAgrupada);
+    res.json({ data: detalle });
+  } catch (error) {
+    console.error('Error al obtener detalle de venta agrupada:', error);
+    res.status(500).json({ error: 'Error al obtener detalle de venta agrupada' });
+  }
+};
+
+const obtenerComprobantesVentaAgrupada = async function (req, res) {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVentaAgrupada = req.params.idVentaAgrupada;
+  if (!idVentaAgrupada) {
+    return res.status(400).json({ error: 'idVentaAgrupada es requerido' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await ventasRepository.listarComprobantesPorAgrupada(pool, idEmpresa, idVentaAgrupada);
+    res.json({ data });
+  } catch (error) {
+    console.error('Error al obtener comprobantes por venta agrupada:', error);
+    res.status(500).json({ error: 'Error al obtener comprobantes' });
+  }
+};
+
 const obtenerComprobanteParaPdf = async function (req, res) {
   const idEmpresa = req.user?.empresa;
   if (!req.user || !idEmpresa) {
@@ -151,6 +205,26 @@ const obtenerComprobanteParaPdf = async function (req, res) {
       ? error.message
       : 'Error al obtener datos del comprobante';
     res.status(500).json({ error: message });
+  }
+};
+
+const obtenerComprobanteVAParaPdf = async (req, res) => {
+  try {
+    const idEmpresa = req.user.empresa;
+    const { idVentaAgrupada } = req.params;
+    if (!idVentaAgrupada) {
+      return res.status(400).json({ error: 'idVentaAgrupada es requerido.' });
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const pool = await sql.connect(dbConfig);
+    const data = await ventasRepository.obtenerComprobanteVAParaPdf(pool, idEmpresa, idVentaAgrupada, baseUrl);
+    if (!data) {
+      return res.status(404).json({ error: 'Venta agrupada no encontrada.' });
+    }
+    return res.json({ message: 'Comprobante VA obtenido.', data });
+  } catch (error) {
+    console.error('Error obtenerComprobanteVAParaPdf:', error);
+    return res.status(500).json({ error: error.message || 'Error interno.' });
   }
 };
 
@@ -233,202 +307,18 @@ const actualizarVenta = async function (req, res) {
 
 
 const crearVentaCompleta = async (req, res) => {
-  const { venta, detalles, detallePago, idApertura } = req.body; // detallePago = [{ idMediosPago, monto }], opcional
-  const pool = await sql.connect(dbConfig);
-  const CajaRepository = require('../repositories/caja.repository');
-  const ventasRepository = require('../repositories/ventas.repository');
-  const CreditosService = require('../services/creditos.service');
-
-  const transaction = new sql.Transaction(pool);
-  let txStarted = false;
-  let txCommitted = false;
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
   try {
-    await transaction.begin();
-    txStarted = true;
-
-    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, req.user.empresa);
-    const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
-    const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
-    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
-
-    let idSucursalStock = venta.idSucursal || null;
-    if (!idSucursalStock) {
-      const rsSuc = await transaction.request()
-        .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-        .query('SELECT TOP 1 idSucursal FROM Sucursal WHERE idEmpresa = @idEmpresa');
-      idSucursalStock = rsSuc.recordset?.[0]?.idSucursal || null;
-    }
-
-    const fechaEmisionConHora = fechaEmisionConHoraActual(venta.fEmision);
-    const fVencimientoSQL = getFechaSoloSQLString(venta.fVencimiento) || fechaEmisionConHora;
-    const ventaConHora = { ...venta, fEmision: fechaEmisionConHora, fVencimiento: fVencimientoSQL };
-    const idEstadoPago = venta.idEstadoPago != null ? parseInt(venta.idEstadoPago, 10) : 1;
-    const medPagoValido = ventaConHora.idMediosPago != null && String(ventaConHora.idMediosPago).trim() !== '';
-    if (!medPagoValido) {
-      const rContado = await transaction.request().query(`SELECT TOP 1 idMediosPago FROM MediosPago WHERE RTRIM(LTRIM(ISNULL(codigo,''))) = '009'`);
-      const rCualquiera = await transaction.request().query('SELECT TOP 1 idMediosPago FROM MediosPago');
-      const fallbackId = rContado.recordset?.[0]?.idMediosPago ?? rCualquiera.recordset?.[0]?.idMediosPago;
-      ventaConHora.idMediosPago = fallbackId != null ? String(fallbackId) : '1';
-    }
-    const ventaResult = await ventasRepository.insertar(transaction, ventaConHora, req.user.empresa, req.user.sub);
-    const idVenta = ventaResult.recordset[0].idVenta;
-
-    const idSucursalParaStock = idSucursalStock || venta.idSucursal || null;
-    const idEstadoPedidoVenta = venta.idEstadoPedido != null ? parseInt(venta.idEstadoPedido, 10) : 1;
-    const esEstadoPendiente = (idEstadoPedidoVenta === 1);
-    const avisoStockInsuficiente = [];
-    for (const det of detalles) {
-      const cantPedida = parseFloat(det.cantidad) || 0;
-      const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
-
-      const stockDisponible = await stockService.obtenerStockDisponible(transaction, req.user.empresa, det.idProducto, idSucursalParaStock);
-      if (stockDisponible < cantPedida) {
-        if (!permitirVentasNegativas) {
-          console.error('crearVentaCompleta stock insuficiente:', {
-            idEmpresa: req.user.empresa,
-            idSucursalParaStock,
-            idSucursalVenta: venta.idSucursal,
-            idProducto: det.idProducto,
-            idProductoTipo: typeof det.idProducto,
-            cantPedida,
-            stockDisponible
-          });
-          throw new Error(`Stock insuficiente para el producto. Solicitado: ${cantPedida}, disponible: ${stockDisponible}`);
-        }
-        avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
-      }
-
-      const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPedida, stockDisponible) : cantPedida;
-      let consumosPorLote = [];
-      if (cantidadADescontar > 0) {
-        const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
-          idEmpresa: req.user.empresa,
-          idSucursal: idSucursalParaStock,
-          idProducto: det.idProducto,
-          cantidad: cantidadADescontar
-        }, { controlUbicaciones });
-        consumosPorLote = resultadoDescuento?.consumosPorLote || [];
-      }
-
-      const costoTotalLinea = Array.isArray(consumosPorLote)
-        ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
-        : 0;
-      const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
-
-      await detalleVentaService.crearDetalle(transaction, {
-        ...det,
-        idVenta,
-        cantEntregada,
-        idEstadoPedido: idEstadoPedidoVenta,
-        hVenta: getNowLocalSQLString(),
-        costoUnitario: costoUnitarioProm,
-        costoTotal: costoTotalLinea
-      });
-
-      if (cantidadADescontar > 0) {
-        await inventarioRepository.insertarFilaMovimiento(transaction, {
-          idEmpresa: req.user.empresa,
-          idSucursal: idSucursalParaStock,
-          idProducto: det.idProducto,
-          tipoMovimiento: 'SA',
-          cantidad: cantidadADescontar,
-          docRelacionado: venta.compVenta || (venta.serie + '-' + venta.numero),
-          idUsuario: req.user.sub,
-          observaciones: 'Venta',
-          costoUnitario: costoUnitarioProm,
-          idLote: null
-        });
-      }
-    }
-
-    await ventasRepository.actualizarNumeroComprobante(transaction, req.user.empresa, venta.idComprobante, venta.numero);
-
-    await facturacionRepository.registrarComprobanteElectronicoPorVentaRepo(
-      transaction,
-      req.user.empresa,
-      idVenta,
-      venta.idComprobante,
-      venta.serie,
-      venta.numero,
-      fechaEmisionConHora
-    );
-
-    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
-      await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);
-      let idAperturaActual = idApertura || null;
-      if (!idAperturaActual && venta.idSucursal) {
-        const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, venta.idSucursal);
-        idAperturaActual = apertura?.idApertura;
-      }
-      const rComp = await transaction.request()
-        .input('idComprobante', sql.Int, venta.idComprobante)
-        .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-        .query('SELECT codigo FROM Comprobantes WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa');
-      const esCotizacion = (rComp.recordset?.[0]?.codigo || '').trim().toUpperCase() === 'CT';
-      if (idAperturaActual && !esCotizacion) {
-        await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
-          idApertura: idAperturaActual,
-          idEmpresa: req.user.empresa,
-          idSucursal: venta.idSucursal,
-          idUsuario: req.user.sub,
-          idVenta,
-          compVenta: venta.compVenta || (venta.serie + '-' + venta.numero),
-          detallePago
-        });
-      }
-    }
-
-    let condicionCredito = false;
-    let descMedioPago = '';
-    if (venta.idMediosPago != null && String(venta.idMediosPago).trim() !== '') {
-      const rCond = await transaction.request()
-        .input('idMediosPago', sql.VarChar(20), String(venta.idMediosPago).trim())
-        .query(`SELECT descripcion FROM MediosPago WHERE idMediosPago = TRY_CAST(@idMediosPago AS INT) OR CAST(idMediosPago AS VARCHAR(20)) = @idMediosPago`);
-      descMedioPago = rCond.recordset?.[0]?.descripcion || '';
-      const descNormalizada = descMedioPago.normalize('NFD').replace(/\u0300-\u036f/g, '');
-      condicionCredito = /credito/i.test(descNormalizada) || /cr[éèêëÉÈÊË]dito/i.test(descMedioPago);
-    }
-
-    await transaction.commit();
-    txCommitted = true;
-
-    if (condicionCredito && venta.idCliente && Number(venta.total) > 0) {
-      try {
-        const fEmision = venta.fEmision ? new Date(venta.fEmision) : new Date();
-        const fVencimiento = venta.fVencimiento ? new Date(venta.fVencimiento) : new Date(fEmision.getTime() + 30 * 24 * 60 * 60 * 1000);
-        const plazoDias = Math.max(1, Math.round((fVencimiento - fEmision) / (24 * 60 * 60 * 1000)));
-        await CreditosService.crearCreditoService(pool, req.user, {
-          idVenta: Number(idVenta),
-          idCliente: venta.idCliente,
-          montoTotal: Number(venta.total),
-          plazoDias,
-          tasaInteres: 0,
-          numeroCuotas: 1,
-          fechaVencimiento: fVencimiento
-        });
-      } catch (errCredito) {
-        console.error('Error crear crédito desde venta:', errCredito);
-      }
-    }
-
+    const resultado = await ventasService.crearVentaCorporativaCompleta(req.body, req.user);
     res.json({
       success: true,
-      idVenta,
-      ...(avisoStockInsuficiente.length > 0 && { avisoStockInsuficiente: 'Stock insuficiente para uno o más productos. Se descontó solo el disponible.' })
+      idVentaAgrupada: resultado.idVentaAgrupada,
+      ventasEmpresa: resultado.ventasEmpresa,
+      ...(resultado.avisoStockInsuficiente && { avisoStockInsuficiente: resultado.avisoStockInsuficiente })
     });
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '0ab6a5' }, body: JSON.stringify({ sessionId: '0ab6a5', runId: 'pre-fix_tx_aborted', hypothesisId: 'H1', location: 'ventasController.js:crearVentaCompleta:catch', message: 'capturando error original antes de rollback', data: { txStarted, txCommitted, errorMessage: error?.message, errorCode: error?.code, errorNumber: error?.number, errorLineNumber: error?.lineNumber, errorProcedure: error?.procedure } , timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-
-    try {
-      await transaction.rollback();
-    } catch (rollbackError) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '0ab6a5' }, body: JSON.stringify({ sessionId: '0ab6a5', runId: 'pre-fix_tx_aborted', hypothesisId: 'H1', location: 'ventasController.js:crearVentaCompleta:rollback', message: 'rollback falló (posible EABORT por transaction abortada)', data: { rollbackMessage: rollbackError?.message, rollbackCode: rollbackError?.code, rollbackNumber: rollbackError?.number } , timestamp: Date.now() }) }).catch(() => {});
-      // #endregion
-    }
-
     console.error('Error crearVentaCompleta:', error);
     res.status(500).json({ error: error?.message });
   }
@@ -736,6 +626,93 @@ const getPendientesPago = async (req, res) => {
   }
 };
 
+/** GET /ventas/agrupadas/pendientes-pago - Lista ventas agrupadas pendientes de pago. */
+const getPendientesPagoAgrupadas = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const list = await ventasRepository.listarPendientesPagoAgrupado(pool, req.user.empresa, req.query);
+    res.json({ data: list });
+  } catch (error) {
+    console.error('Error getPendientesPagoAgrupadas:', error);
+    res.status(500).json({ error: error.message || 'Error al listar ventas agrupadas pendientes' });
+  }
+};
+
+/** POST /ventas/agrupadas/:idVentaAgrupada/cobrar - Registra cobro de una venta agrupada. */
+const postCobrarVentaAgrupada = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  const idVentaAgrupada = req.params.idVentaAgrupada;
+  const { detallePago, idApertura } = req.body || {};
+  if (!idVentaAgrupada) {
+    return res.status(400).json({ message: 'idVentaAgrupada es requerido' });
+  }
+  if (!detallePago || !Array.isArray(detallePago) || detallePago.length === 0) {
+    return res.status(400).json({ message: 'detallePago es requerido y debe tener al menos un pago' });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const CajaRepository = require('../repositories/caja.repository');
+    const ventaAgrRow = await pool.request()
+      .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+      .input('idEmpresaCobradora', sql.UniqueIdentifier, req.user.empresa)
+      .query(`
+        SELECT idVentaAgrupada, idSucursal, idEstadoPago
+        FROM VentaAgrupada
+        WHERE idVentaAgrupada = @idVentaAgrupada AND idEmpresaCobradora = @idEmpresaCobradora
+      `);
+    const ventaAgr = ventaAgrRow.recordset && ventaAgrRow.recordset[0];
+    if (!ventaAgr) {
+      return res.status(404).json({ message: 'Venta agrupada no encontrada' });
+    }
+    if (ventaAgr.idEstadoPago !== 1) {
+      return res.status(400).json({ message: 'La venta ya está pagada o no está pendiente de pago' });
+    }
+
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+      await ventasRepository.actualizarEstadoPagoVentaAgrupada(transaction, idVentaAgrupada, req.user.empresa, 2);
+      const ventasEmp = await ventasRepository.listarVentasEmpresaPorAgrupada(transaction, idVentaAgrupada);
+      for (const ve of ventasEmp) {
+        await ventasRepository.actualizarEstadoPagoVenta(transaction, ve.idVenta, ve.idEmpresa, 2);
+      }
+
+      const ventaCobradora = ventasEmp.find(v => String(v.idEmpresa) === String(req.user.empresa));
+      if (ventaCobradora) {
+        await ventasRepository.insertarDetallePagoVenta(transaction, ventaCobradora.idVenta, detallePago);
+        let idAperturaActual = idApertura || null;
+        if (!idAperturaActual && ventaAgr.idSucursal) {
+          const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, ventaAgr.idSucursal);
+          idAperturaActual = apertura?.idApertura;
+        }
+        if (idAperturaActual) {
+          await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
+            idApertura: idAperturaActual,
+            idEmpresa: req.user.empresa,
+            idSucursal: ventaAgr.idSucursal,
+            idUsuario: req.user.sub,
+            idVenta: ventaCobradora.idVenta,
+            compVenta: ventaCobradora.compVenta || '',
+            detallePago
+          });
+        }
+      }
+      await transaction.commit();
+      res.json({ message: 'Cobro registrado correctamente' });
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  } catch (error) {
+    console.error('Error postCobrarVentaAgrupada:', error);
+    res.status(500).json({ error: error.message || 'Error al registrar cobro' });
+  }
+};
 /** POST /ventas/:idVenta/cobrar - Registra cobro de una venta pendiente. Body: { detallePago: [{ idMediosPago, monto }], idApertura? }. */
 const postCobrarVenta = async (req, res) => {
   if (!req.user || !req.user.empresa) {
@@ -861,13 +838,20 @@ module.exports = {
     crearVentaDesdeVale,
     obtenerVentaPorId,
     obtenerVentas,
+    obtenerVentasAgrupadas,
+    obtenerVentasEmpresa,
+    obtenerDetalleVentaAgrupada,
+    obtenerComprobantesVentaAgrupada,
     obtenerComprobanteParaPdf,
+    obtenerComprobanteVAParaPdf,
     actualizarVenta,
     actualizarVentaEdicion,
     getConfigDefaults,
     putConfigDefaults,
     getPendientesPago,
+    getPendientesPagoAgrupadas,
     postCobrarVenta,
+    postCobrarVentaAgrupada,
     // detalle venta (crearDetalleVenta está comentado; se usa crearVentaCompleta)
     crearDetalleVenta_DescontarStock,
     actualizarDetalleVenta,

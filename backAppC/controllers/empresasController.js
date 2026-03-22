@@ -705,6 +705,14 @@ const createDireccionEmpresa = async function (req, res) {
         //let nombre = 'Mi empresa';
 
         let pool = await sql.connect(dbConfig);
+        if (principal) {
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('UPDATE DireccionEmpresa SET principal = 0 WHERE idEmpresa = @idEmpresa');
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa');
+        }
         let insertDireccionEmpresa = await pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
             .input('ubigeo', sql.VarChar, ubigeo)
@@ -726,7 +734,7 @@ const createDireccionEmpresa = async function (req, res) {
             await pool.request()
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('direccion', sql.VarChar(200), dirTexto || null)
-                .query("UPDATE Sucursal SET direccion = @direccion WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
+                .query("UPDATE Sucursal SET direccion = @direccion, esPrincipal = 1 WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
         }
 
         // Crear sucursal solo si el usuario indica crearSucursal y nombreSucursal (nueva dirección = nueva sucursal con nombre elegido)
@@ -737,9 +745,10 @@ const createDireccionEmpresa = async function (req, res) {
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('nombre', sql.VarChar, String(req.body.nombreSucursal).trim())
                 .input('direccion', sql.VarChar, direccion || '')
+                .input('esPrincipal', sql.Bit, !!principal)
                 .input('fregistro', sql.DateTime, moment().format('YYYY-MM-DD'))
                 .input('estado', sql.Bit, true)
-                .query('INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, fRegistro, estado) VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @fregistro, @estado)');
+                .query('INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, esPrincipal, fRegistro, estado) VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @esPrincipal, @fregistro, @estado)');
         }
 
         res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
@@ -806,6 +815,20 @@ const updateDireccionEmpresa = async function (req, res) {
         if (req.user.rol == 'Administrador') {
             try {
                 const pool = await sql.connect(dbConfig);
+                const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+                const previo = await pool.request()
+                    .input('id', sql.Int, id)
+                    .query('SELECT direccion, principal FROM DireccionEmpresa WHERE idDireccionEmpresa = @id');
+                const direccionAnterior = previo?.recordset?.[0]?.direccion;
+                const principalAnterior = previo?.recordset?.[0]?.principal === true || previo?.recordset?.[0]?.principal === 1;
+                if (principal && idEmpresa) {
+                    await pool.request()
+                        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                        .query('UPDATE DireccionEmpresa SET principal = 0 WHERE idEmpresa = @idEmpresa');
+                    await pool.request()
+                        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                        .query('UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa');
+                }
                 const result = await pool
                     .request()
                     .input('id', sql.Int, id)
@@ -819,14 +842,26 @@ const updateDireccionEmpresa = async function (req, res) {
                     .input('codLocal', sql.VarChar, codLocal)
                     .input('principal', sql.Bit, principal)
                     .query('UPDATE DireccionEmpresa SET ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, codLocal = @codLocal, principal = @principal WHERE idDireccionEmpresa = @id');
-                if (principal) {
-                    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
-                    if (idEmpresa) {
-                        const dirTexto = (direccion != null && direccion !== undefined) ? String(direccion).trim() : '';
+                if (idEmpresa) {
+                    const dirTexto = (direccion != null && direccion !== undefined) ? String(direccion).trim() : '';
+                    if (principal) {
                         await pool.request()
                             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                             .input('direccion', sql.VarChar(200), dirTexto || null)
-                            .query("UPDATE Sucursal SET direccion = @direccion WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
+                            .query("UPDATE Sucursal SET direccion = @direccion, esPrincipal = 1 WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
+                    }
+                    if (principalAnterior && !principal) {
+                        await pool.request()
+                            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                            .query("UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
+                    }
+                    if (direccionAnterior != null && String(direccionAnterior).trim() !== dirTexto) {
+                        await pool.request()
+                            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                            .input('direccionAnterior', sql.VarChar(200), String(direccionAnterior))
+                            .input('direccionNueva', sql.VarChar(200), dirTexto || null)
+                            .input('esPrincipal', sql.Bit, !!principal)
+                            .query('UPDATE Sucursal SET direccion = @direccionNueva, esPrincipal = @esPrincipal WHERE idEmpresa = @idEmpresa AND direccion = @direccionAnterior');
                     }
                 }
                 res.status(200).send({ data: result.rowsAffected });

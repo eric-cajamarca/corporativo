@@ -1,5 +1,6 @@
 // SIEMPRE valida reglas de negocio aquí (regla 1.3)
 const gestoresRepository = require('../repositories/gestores.repository');
+const comprobantesRepository = require('../repositories/comprobantes.repository');
 
 /**
  * Obtiene las empresas gestionadas por la empresa actual
@@ -106,6 +107,12 @@ const asignarEmpresaGestionada = async (pool, idEmpresaDestino, user) => {
     }
 
     const resultado = await gestoresRepository.asignarGestor(pool, user.empresa, idEmpresaDestino);
+    try {
+        await comprobantesRepository.insertarComprobanteVentaAgrupadaSiNoExiste(pool, user.empresa);
+    } catch (error) {
+        console.error('gestores.service asignarEmpresaGestionada comprobante VA:', error);
+        throw new Error('Error al asegurar comprobante Venta Agrupada para la empresa gestora: ' + error.message);
+    }
     return resultado;
 };
 

@@ -1,5 +1,6 @@
 // src/services/productos.service.js
 const ProductosRepository = require('../repositories/productos.repository');
+const gestoresRepository = require('../repositories/gestores.repository');
 
 exports.obtenerProductosTodosService = async (pool, user) => {
   if (!user) {
@@ -10,7 +11,12 @@ exports.obtenerProductosTodosService = async (pool, user) => {
     throw new Error("NO_PERMISSIONS");
   }
   
-  const productos = await ProductosRepository.obtenerProductosTodosRepo(pool, user.empresa);
+  const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
+  const idsEmpresa = [
+    user.empresa,
+    ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)
+  ];
+  const productos = await ProductosRepository.obtenerProductosTodosMultiEmpresaRepo(pool, idsEmpresa);
   return productos;
 };
 

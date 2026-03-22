@@ -45,7 +45,16 @@
         <div class="row mb-3">
           <div class="col-md-4">
             <label class="form-label">Documento (opcional)</label>
-            <input type="text" class="form-control" formControlName="docRelacionado" placeholder="Nº o referencia" />
+            <select class="form-select" formControlName="idComprobante" (change)="onComprobanteChange($event)">
+              <option value="">-- Seleccione comprobante --</option>
+              @for (c of comprobantesInventario; track c.idComprobante) {
+                <option [value]="c.idComprobante">{{ c.codigo }} - {{ c.nombre }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Correlativo</label>
+            <input type="text" class="form-control" formControlName="docRelacionado" readonly />
           </div>
           <div class="col-md-8">
             <label class="form-label">Observaciones</label>
@@ -56,9 +65,17 @@
         <h6 class="text-muted border-bottom pb-2 mb-3 mt-4">Detalle del movimiento</h6>
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="text-muted small">Agregue productos y cantidades. Para entradas puede indicar costo unitario, fecha vencimiento y nº de lote.</span>
-          <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFila()">
-            <i class="fas fa-plus me-1"></i> Agregar línea
-          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFila()">
+              <i class="fas fa-plus me-1"></i> Agregar línea
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success" (click)="abrirBuscadorProductos()">
+              <i class="fas fa-search me-1"></i> Buscar producto
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirCrearProducto()">
+              <i class="fas fa-box-open me-1"></i> Crear producto
+            </button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-bordered table-hover">

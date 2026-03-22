@@ -26,7 +26,8 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     idEstadoPago,
     idEstadoSunat,
     compRelacionado,
-    observaciones
+    observaciones,
+    idVentaAgrupada
   } = datosVenta;
 
   const compRelacionadoVal = (compRelacionado == null)
@@ -40,7 +41,7 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
   const idEstadoPedidoVal = idEstadoPedido != null ? parseInt(idEstadoPedido, 10) : 1;
   const idEstadoPagoVal = idEstadoPago != null ? parseInt(idEstadoPago, 10) : 1;
 
-  const result = await transaction
+  const req = transaction
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
@@ -66,14 +67,22 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('idEstadoSunat', sql.Int, idEstadoSunat)
     .input('compRelacionado', sql.VarChar(30), compRelacionadoVal)
     .input('observaciones', sql.VarChar(500), observacionesVal)
-    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-    .query(`INSERT INTO Ventas 
-      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario) 
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario);
+
+  if (idVentaAgrupada) {
+    req.input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada);
+    return await req.query(`INSERT INTO Ventas 
+      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, idVentaAgrupada) 
       OUTPUT INSERTED.idVenta
       VALUES 
-      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario)`);
+      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario, @idVentaAgrupada)`);
+  }
 
-  return result;
+  return await req.query(`INSERT INTO Ventas 
+    (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario) 
+    OUTPUT INSERTED.idVenta
+    VALUES 
+    (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario)`);
 };
 
 /** Actualiza el número correlativo del comprobante usado en la venta (incrementa en BD para la siguiente). */
@@ -87,21 +96,17 @@ exports.actualizarNumeroComprobante = async (transaction, idEmpresa, idComproban
     .query('UPDATE Comprobantes SET numero = @numero WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante');
 };
 
-/** Obtiene y reserva el siguiente número para el comprobante (incrementa en BD). Debe ejecutarse dentro de una transacción. */
+/** Obtiene y reserva el siguiente número para el comprobante usando SP con UPDLOCK/HOLDLOCK (concurrencia segura). */
 exports.obtenerSiguienteNumeroComprobante = async (transaction, idEmpresa, idComprobante) => {
   const result = await transaction.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idComprobante', sql.Int, idComprobante)
-    .query(`
-      UPDATE Comprobantes
-      SET numero = ISNULL(numero, 0) + 1
-      OUTPUT INSERTED.numero, INSERTED.serie
-      WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
-    `);
-  const row = result.recordset && result.recordset[0];
-  const num = row && row.numero != null ? Number(row.numero) : 1;
-  const serie = (row && row.serie != null ? String(row.serie) : '0000').substring(0, 4);
-  return { numero: String(num).padStart(8, '0'), serie };
+    .output('serieOut', sql.VarChar(4))
+    .output('numeroOut', sql.VarChar(8))
+    .execute('sp_ObtenerSiguienteCorrelativo');
+  const serie = (result.output.serieOut || '0000').substring(0, 4);
+  const numero = result.output.numeroOut || '00000001';
+  return { numero, serie };
 };
 
 /** Inserta el desglose de pagos de una venta (ej: 40 efectivo + 40 yape). Requiere tabla DetallePagoVenta.
@@ -721,4 +726,592 @@ exports.actualizarEstadoPagoVenta = async (transaction, idVenta, idEmpresa, idEs
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idEstadoPago', sql.Int, idEstadoPago)
     .query('UPDATE Ventas SET idEstadoPago = @idEstadoPago WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa');
+};
+
+/** Inserta cabecera de venta agrupada corporativa con comprobante VA. */
+exports.insertarVentaAgrupada = async (transaction, datos) => {
+  const {
+    idEmpresaCobradora,
+    idSucursal,
+    idCliente,
+    fEmision,
+    subtotal,
+    igv,
+    descuentos,
+    total,
+    idEstadoPago,
+    idUsuario,
+    serie,
+    numero,
+    compVenta,
+    tipoComprobanteDestino,
+    idComprobante,
+    observaciones
+  } = datos;
+  const observacionesVal = (observaciones == null) ? '' : String(observaciones).trim().slice(0, 500);
+  const result = await transaction.request()
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idCliente', sql.Int, idCliente)
+    .input('fEmision', sql.VarChar(23), fEmision)
+    .input('subtotal', sql.Decimal(18, 2), subtotal)
+    .input('igv', sql.Decimal(18, 2), igv)
+    .input('descuentos', sql.Decimal(18, 2), descuentos)
+    .input('total', sql.Decimal(18, 2), total)
+    .input('idEstadoPago', sql.Int, idEstadoPago)
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('serie', sql.VarChar(4), serie || null)
+    .input('numero', sql.VarChar(8), numero || null)
+    .input('compVenta', sql.VarChar(13), compVenta || null)
+    .input('tipoComprobanteDestino', sql.VarChar(2), tipoComprobanteDestino || 'NV')
+    .input('idComprobante', sql.Int, idComprobante || null)
+    .input('observaciones', sql.VarChar(500), observacionesVal)
+    .query(`
+      INSERT INTO VentaAgrupada (
+        idEmpresaCobradora, idSucursal, idCliente, fEmision,
+        subtotal, igv, descuentos, total, idEstadoPago, idUsuario,
+        serie, numero, compVenta, tipoComprobanteDestino, idComprobante, observaciones
+      )
+      OUTPUT INSERTED.idVentaAgrupada
+      VALUES (
+        @idEmpresaCobradora, @idSucursal, @idCliente, @fEmision,
+        @subtotal, @igv, @descuentos, @total, @idEstadoPago, @idUsuario,
+        @serie, @numero, @compVenta, @tipoComprobanteDestino, @idComprobante, @observaciones
+      )
+    `);
+  return result.recordset && result.recordset[0];
+};
+
+/** Inserta una linea de detalle del comprobante VA. */
+exports.insertarDetalleVentaAgrupada = async (transaction, datos) => {
+  const {
+    idVentaAgrupada, idProducto, idEmpresaProducto, aliasEmpresa,
+    sucursal, cantidad, pVenta, descuento, subtotal, igv, total,
+    descripcionProducto, codigoProducto
+  } = datos;
+  await transaction.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idEmpresaProducto', sql.UniqueIdentifier, idEmpresaProducto)
+    .input('aliasEmpresa', sql.VarChar(10), aliasEmpresa || null)
+    .input('sucursal', sql.VarChar(50), sucursal || null)
+    .input('cantidad', sql.Decimal(18, 3), cantidad)
+    .input('pVenta', sql.Decimal(18, 5), pVenta)
+    .input('descuento', sql.Decimal(18, 2), descuento || 0)
+    .input('subtotal', sql.Decimal(18, 2), subtotal)
+    .input('igv', sql.Bit, igv ? 1 : 0)
+    .input('total', sql.Decimal(18, 2), total)
+    .input('descripcionProducto', sql.VarChar(200), descripcionProducto || null)
+    .input('codigoProducto', sql.VarChar(20), codigoProducto || null)
+    .query(`
+      INSERT INTO DetalleVentaAgrupada (
+        idVentaAgrupada, idProducto, idEmpresaProducto, aliasEmpresa,
+        sucursal, cantidad, pVenta, descuento, subtotal, igv, total,
+        descripcionProducto, codigoProducto
+      ) VALUES (
+        @idVentaAgrupada, @idProducto, @idEmpresaProducto, @aliasEmpresa,
+        @sucursal, @cantidad, @pVenta, @descuento, @subtotal, @igv, @total,
+        @descripcionProducto, @codigoProducto
+      )
+    `);
+};
+
+/** Inserta registro de auditoria/conciliacion en VentaAgrupadaLog. */
+exports.insertarVentaAgrupadaLog = async (transaction, datos) => {
+  const { idVentaAgrupada, evento, compVA, totalVA, sumaVentasHijas, idUsuario, detalle } = datos;
+  const diferencia = (totalVA != null && sumaVentasHijas != null)
+    ? Number(totalVA) - Number(sumaVentasHijas) : null;
+  const estadoConciliacion = diferencia != null && Math.abs(diferencia) <= 0.01 ? 'OK' : 'PENDIENTE';
+  await transaction.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .input('evento', sql.VarChar(30), evento)
+    .input('compVA', sql.VarChar(13), compVA || null)
+    .input('totalVA', sql.Decimal(18, 2), totalVA || 0)
+    .input('sumaVentasHijas', sql.Decimal(18, 2), sumaVentasHijas || 0)
+    .input('diferencia', sql.Decimal(18, 2), diferencia || 0)
+    .input('estadoConciliacion', sql.VarChar(10), estadoConciliacion)
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario || null)
+    .input('detalle', sql.VarChar(500), detalle || null)
+    .query(`
+      INSERT INTO VentaAgrupadaLog (
+        idVentaAgrupada, evento, compVA, totalVA, sumaVentasHijas,
+        diferencia, estadoConciliacion, idUsuario, detalle
+      ) VALUES (
+        @idVentaAgrupada, @evento, @compVA, @totalVA, @sumaVentasHijas,
+        @diferencia, @estadoConciliacion, @idUsuario, @detalle
+      )
+    `);
+};
+
+/** Inserta cabecera de venta por empresa (corporativa). */
+exports.insertarVentaEmpresa = async (transaction, datos) => {
+  const {
+    idVentaAgrupada,
+    idEmpresa,
+    idVenta,
+    idComprobante,
+    serie,
+    numero,
+    compVenta,
+    fEmision,
+    fVencimiento,
+    idCliente,
+    idMoneda,
+    tCambio,
+    subtotal,
+    igv,
+    exonerado,
+    gratuito,
+    otrosCargos,
+    descuentos,
+    total,
+    idMediosPago,
+    idEstadoPedido,
+    idEstadoPago,
+    idEstadoSunat,
+    tipoComprobante,
+    compRelacionado,
+    observaciones,
+    idUsuario
+  } = datos;
+  const compRelacionadoVal = (compRelacionado == null)
+    ? ''
+    : String(compRelacionado).trim().slice(0, 30);
+  const observacionesVal = (observaciones == null)
+    ? ''
+    : String(observaciones).trim().slice(0, 500);
+  const result = await transaction.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idVenta', sql.Int, idVenta)
+    .input('idComprobante', sql.Int, idComprobante)
+    .input('serie', sql.VarChar(4), serie)
+    .input('numero', sql.VarChar(8), numero)
+    .input('compVenta', sql.VarChar(13), compVenta)
+    .input('fEmision', sql.VarChar(23), fEmision)
+    .input('fVencimiento', sql.VarChar(23), fVencimiento)
+    .input('idCliente', sql.Int, idCliente)
+    .input('idMoneda', sql.Int, idMoneda)
+    .input('tCambio', sql.Decimal(10, 4), tCambio)
+    .input('subtotal', sql.Decimal(18, 2), subtotal)
+    .input('igv', sql.Decimal(18, 2), igv)
+    .input('exonerado', sql.Decimal(18, 2), exonerado)
+    .input('gratuito', sql.Decimal(18, 2), gratuito)
+    .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
+    .input('descuentos', sql.Decimal(18, 2), descuentos)
+    .input('total', sql.Decimal(18, 2), total)
+    .input('idMediosPago', sql.VarChar(20), idMediosPago)
+    .input('idEstadoPedido', sql.Int, idEstadoPedido)
+    .input('idEstadoPago', sql.Int, idEstadoPago)
+    .input('idEstadoSunat', sql.Int, idEstadoSunat)
+    .input('tipoComprobante', sql.VarChar(2), tipoComprobante)
+    .input('compRelacionado', sql.VarChar(30), compRelacionadoVal)
+    .input('observaciones', sql.VarChar(500), observacionesVal)
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .query(`
+      INSERT INTO VentaEmpresa (
+        idVentaAgrupada, idEmpresa, idVenta, idComprobante, serie, numero, compVenta,
+        fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado,
+        gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido,
+        idEstadoPago, idEstadoSunat, tipoComprobante, compRelacionado, observaciones, idUsuario
+      )
+      OUTPUT INSERTED.idVentaEmpresa
+      VALUES (
+        @idVentaAgrupada, @idEmpresa, @idVenta, @idComprobante, @serie, @numero, @compVenta,
+        @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado,
+        @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido,
+        @idEstadoPago, @idEstadoSunat, @tipoComprobante, @compRelacionado, @observaciones, @idUsuario
+      )
+    `);
+  return result.recordset && result.recordset[0];
+};
+
+/** Inserta detalle de venta por empresa (corporativa). */
+exports.insertarDetalleVentaEmpresa = async (transaction, datos) => {
+  const {
+    idVentaEmpresa,
+    idProducto,
+    cantidad,
+    pVenta,
+    descuento,
+    subtotal,
+    igv,
+    isc,
+    total,
+    cantEntregada,
+    idEstadoPedido,
+    costoUnitario,
+    costoTotal
+  } = datos;
+  await transaction.request()
+    .input('idVentaEmpresa', sql.UniqueIdentifier, idVentaEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('cantidad', sql.Decimal(18, 3), cantidad)
+    .input('pVenta', sql.Decimal(18, 5), pVenta)
+    .input('descuento', sql.Decimal(18, 2), descuento)
+    .input('subtotal', sql.Decimal(18, 2), subtotal)
+    .input('igv', sql.Bit, igv)
+    .input('isc', sql.Bit, isc)
+    .input('total', sql.Decimal(18, 2), total)
+    .input('cantEntregada', sql.Decimal(18, 3), cantEntregada)
+    .input('idEstadoPedido', sql.Int, idEstadoPedido)
+    .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
+    .input('costoTotal', sql.Decimal(18, 6), costoTotal)
+    .query(`
+      INSERT INTO DetalleVentaEmpresa (
+        idVentaEmpresa, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total,
+        cantEntregada, idEstadoPedido, costoUnitario, costoTotal
+      )
+      VALUES (
+        @idVentaEmpresa, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total,
+        @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal
+      )
+    `);
+};
+
+/** Obtiene cliente por idEmpresa e idCliente. */
+exports.obtenerClientePorId = async (transaction, idEmpresa, idCliente) => {
+  const result = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idCliente', sql.Int, idCliente)
+    .query(`
+      SELECT TOP 1 idCliente, idDocumento, ruc, rSocial, correo, celular, condicion
+      FROM Clientes
+      WHERE idEmpresa = @idEmpresa AND idCliente = @idCliente
+    `);
+  return result.recordset && result.recordset[0];
+};
+
+/** Obtiene cliente por idCliente en un conjunto de empresas permitidas. */
+exports.obtenerClientePorIdEnEmpresas = async (transaction, idCliente, idsEmpresa) => {
+  const ids = (idsEmpresa || []).filter(Boolean);
+  if (!idCliente || ids.length === 0) return null;
+  const request = transaction.request().input('idCliente', sql.Int, idCliente);
+  const placeholders = ids.map((id, index) => {
+    const key = `idEmpresa${index}`;
+    request.input(key, sql.UniqueIdentifier, id);
+    return `@${key}`;
+  });
+  const result = await request.query(`
+    SELECT TOP 1 idCliente, idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion
+    FROM Clientes
+    WHERE idCliente = @idCliente AND idEmpresa IN (${placeholders.join(', ')})
+  `);
+  return result.recordset && result.recordset[0];
+};
+
+/** Busca cliente por documento (RUC/DNI) en una empresa. */
+exports.buscarClientePorDocumento = async (transaction, idEmpresa, ruc) => {
+  const result = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('ruc', sql.VarChar(11), ruc)
+    .query(`
+      SELECT TOP 1 idCliente, idDocumento, ruc, rSocial, correo, celular, condicion
+      FROM Clientes
+      WHERE idEmpresa = @idEmpresa AND ruc = @ruc
+    `);
+  return result.recordset && result.recordset[0];
+};
+
+/** Inserta cliente en empresa destino replicando datos básicos. */
+exports.crearClienteEnEmpresa = async (transaction, idEmpresa, clienteBase) => {
+  const result = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idDocumento', sql.VarChar(1), clienteBase.idDocumento)
+    .input('ruc', sql.VarChar(11), clienteBase.ruc)
+    .input('rSocial', sql.VarChar(200), clienteBase.rSocial)
+    .input('correo', sql.VarChar(100), clienteBase.correo || null)
+    .input('celular', sql.VarChar(50), clienteBase.celular || null)
+    .input('condicion', sql.VarChar(50), clienteBase.condicion || null)
+    .query(`
+      INSERT INTO Clientes (idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion, estado)
+      OUTPUT INSERTED.idCliente
+      VALUES (@idEmpresa, @idDocumento, @ruc, @rSocial, @correo, @celular, @condicion, 1)
+    `);
+  return result.recordset && result.recordset[0];
+};
+
+/** Lista ventas agrupadas por empresa cobradora con datos del comprobante VA. */
+exports.listarVentasAgrupadas = async (pool, idEmpresaCobradora) => {
+  const result = await pool.request()
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`
+      SELECT
+        va.idVentaAgrupada,
+        CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
+        va.total,
+        va.idEstadoPago,
+        va.idSucursal,
+        ISNULL(s.nombre, '') AS sucursal,
+        va.idCliente,
+        ISNULL(cl.rSocial, '') AS clienteRazonSocial,
+        ISNULL(cl.ruc, '') AS clienteRuc,
+        va.serie,
+        va.numero,
+        va.compVenta,
+        ISNULL(va.tipoComprobanteDestino, 'NV') AS tipoComprobanteDestino,
+        va.observaciones
+      FROM VentaAgrupada va
+      LEFT JOIN Sucursal s ON s.idSucursal = va.idSucursal
+      LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
+      WHERE va.idEmpresaCobradora = @idEmpresaCobradora AND ISNULL(va.eliminado, 0) = 0
+      ORDER BY va.fEmision DESC
+    `);
+  return result.recordset || [];
+};
+
+/** Lista ventas agrupadas pendientes de pago (idEstadoPago = 1). Busca por idVentaAgrupada o compVenta VA. */
+exports.listarPendientesPagoAgrupado = async (pool, idEmpresaCobradora, filtros = {}) => {
+  const { idVentaAgrupada, cliente } = filtros;
+  const request = pool.request().input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora);
+  let whereClause = 'va.idEmpresaCobradora = @idEmpresaCobradora AND va.idEstadoPago = 1 AND ISNULL(va.eliminado, 0) = 0';
+  if (idVentaAgrupada != null && String(idVentaAgrupada).trim() !== '') {
+    const filtro = String(idVentaAgrupada).trim();
+    request.input('filtroVA', sql.VarChar(100), '%' + filtro + '%');
+    whereClause += ' AND (CAST(va.idVentaAgrupada AS VARCHAR(36)) LIKE @filtroVA OR ISNULL(va.compVenta, \'\') LIKE @filtroVA)';
+  }
+  if (cliente != null && String(cliente).trim() !== '') {
+    request.input('cliente', sql.VarChar(100), '%' + String(cliente).trim() + '%');
+    whereClause += ' AND (cl.rSocial LIKE @cliente OR cl.ruc LIKE @cliente)';
+  }
+  const result = await request.query(`
+    SELECT
+      va.idVentaAgrupada,
+      CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
+      va.total,
+      va.idEstadoPago,
+      cl.rSocial AS clienteRazonSocial,
+      cl.ruc AS clienteRuc,
+      va.compVenta,
+      va.serie,
+      va.numero,
+      ISNULL(va.tipoComprobanteDestino, 'NV') AS tipoComprobanteDestino
+    FROM VentaAgrupada va
+    LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
+    WHERE ${whereClause}
+    ORDER BY va.fEmision DESC
+  `);
+  return result.recordset || [];
+};
+
+/** Actualiza estado de pago en venta agrupada. */
+exports.actualizarEstadoPagoVentaAgrupada = async (transaction, idVentaAgrupada, idEmpresaCobradora, idEstadoPago) => {
+  await transaction.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .input('idEstadoPago', sql.Int, idEstadoPago)
+    .query(`
+      UPDATE VentaAgrupada
+      SET idEstadoPago = @idEstadoPago
+      WHERE idVentaAgrupada = @idVentaAgrupada AND idEmpresaCobradora = @idEmpresaCobradora
+    `);
+};
+
+/** Lista ventas por empresa asociadas a una venta agrupada. */
+exports.listarVentasEmpresaPorAgrupada = async (transaction, idVentaAgrupada) => {
+  const result = await transaction.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .query(`
+      SELECT idVenta, idEmpresa, compVenta
+      FROM VentaEmpresa
+      WHERE idVentaAgrupada = @idVentaAgrupada
+    `);
+  return result.recordset || [];
+};
+
+/** Lista comprobantes por venta agrupada (para modal de detalle). */
+exports.listarComprobantesPorAgrupada = async (pool, idEmpresaCobradora, idVentaAgrupada) => {
+  const result = await pool.request()
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .query(`
+      SELECT
+        ve.idVenta,
+        ve.compVenta,
+        ve.serie,
+        ve.numero,
+        ve.idComprobante,
+        c.nombre AS nombreComprobante,
+        c.codigo AS codigoComprobante,
+        e.razon_Social AS empresaRazonSocial,
+        e.ruc AS empresaRuc,
+        CONVERT(VARCHAR(19), ve.fEmision, 120) AS fEmision,
+        ve.total
+      FROM VentaEmpresa ve
+      INNER JOIN VentaAgrupada va ON va.idVentaAgrupada = ve.idVentaAgrupada
+      INNER JOIN Empresas e ON e.idEmpresa = ve.idEmpresa
+      LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
+      WHERE ve.idVentaAgrupada = @idVentaAgrupada
+        AND va.idEmpresaCobradora = @idEmpresaCobradora
+      ORDER BY ve.fEmision ASC
+    `);
+  return result.recordset || [];
+};
+
+/** Lista ventas por empresa (corporativas). */
+exports.listarVentasEmpresa = async (pool, idEmpresa) => {
+  const result = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        ve.idVentaEmpresa,
+        ve.idVentaAgrupada,
+        ve.compVenta,
+        CONVERT(VARCHAR(19), ve.fEmision, 120) AS fEmision,
+        ve.total,
+        ve.idEstadoSunat,
+        ve.serie,
+        ve.numero,
+        ve.idComprobante,
+        ve.idCliente,
+        ve.idMediosPago,
+        c.nombre AS nombreComprobante,
+        c.codigo AS codigoComprobante,
+        COALESCE(LTRIM(RTRIM(cl.rSocial)), '') AS clienteRazonSocial,
+        COALESCE(cl.ruc, '') AS clienteRuc,
+        ISNULL(ve.eliminado, 0) AS eliminado
+      FROM VentaEmpresa ve
+      LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
+      LEFT JOIN Clientes cl ON cl.idCliente = ve.idCliente AND cl.idEmpresa = ve.idEmpresa
+      WHERE ve.idEmpresa = @idEmpresa AND ISNULL(ve.eliminado, 0) = 0
+      ORDER BY ve.fEmision DESC
+    `);
+  return result.recordset || [];
+};
+
+/** Datos del comprobante VA para generar PDF (cabecera, empresa gestora, cliente, items con alias empresa). */
+exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAgrupada, baseUrl = 'http://localhost:3000') => {
+  const cabResult = await pool.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`
+      SELECT
+        va.idVentaAgrupada, va.compVenta, va.serie, va.numero,
+        CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
+        va.subtotal, va.igv, va.descuentos, va.total,
+        va.idEstadoPago, va.tipoComprobanteDestino, va.observaciones,
+        va.idCliente, va.idSucursal,
+        ISNULL(s.nombre, '') AS sucursal,
+        ISNULL(cl.rSocial, '') AS clienteRazonSocial,
+        ISNULL(cl.ruc, '') AS clienteRuc,
+        ISNULL(cl.idDocumento, '1') AS clienteTipoDoc,
+        ISNULL(cl.celular, '') AS clienteCelular,
+        (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
+      FROM VentaAgrupada va
+      LEFT JOIN Sucursal s ON s.idSucursal = va.idSucursal
+      LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
+      WHERE va.idVentaAgrupada = @idVentaAgrupada AND va.idEmpresaCobradora = @idEmpresaCobradora
+    `);
+  const cab = cabResult.recordset && cabResult.recordset[0];
+  if (!cab) return null;
+
+  const empResult = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`
+      SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
+        ISNULL(e.rubro, '') AS rubro, ISNULL(e.celular, '') AS celular,
+        ISNULL(e.correo, '') AS correo,
+        ISNULL(de.direccion, '') AS direccion
+      FROM Empresas e
+      LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
+      WHERE e.idEmpresa = @idEmpresa
+    `);
+  const emp = empResult.recordset && empResult.recordset[0];
+
+  const itemsResult = await pool.request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .query(`
+      SELECT
+        dva.idDetalleVA, dva.idProducto, dva.cantidad, dva.pVenta,
+        dva.descuento, dva.subtotal, dva.total,
+        dva.descripcionProducto, dva.codigoProducto,
+        dva.aliasEmpresa, dva.sucursal, dva.idEmpresaProducto
+      FROM DetalleVentaAgrupada dva
+      WHERE dva.idVentaAgrupada = @idVentaAgrupada
+      ORDER BY dva.idDetalleVA
+    `);
+
+  const base = (baseUrl || '').replace(/\/$/, '');
+  const logoFileName = emp && (emp.logoArchivo ?? emp.logo ?? '');
+  const logoUrl = (typeof logoFileName === 'string' && logoFileName.trim())
+    ? `${base}/logos/${logoFileName.trim()}`
+    : `${base}/assets/img/01.jpg`;
+
+  const tipoDestLabels = { 'NV': 'Nota de Venta', '01': 'Factura', '03': 'Boleta' };
+
+  return {
+    venta: {
+      idVentaAgrupada: cab.idVentaAgrupada,
+      compVenta: cab.compVenta,
+      serie: cab.serie,
+      numero: cab.numero,
+      fEmision: cab.fEmision,
+      subtotal: cab.subtotal,
+      igv: cab.igv,
+      descuentos: cab.descuentos,
+      total: cab.total,
+      idEstadoPago: cab.idEstadoPago,
+      tipoComprobanteDestino: cab.tipoComprobanteDestino,
+      tipoComprobanteDestinoNombre: tipoDestLabels[cab.tipoComprobanteDestino] || cab.tipoComprobanteDestino,
+      observaciones: cab.observaciones || '',
+      sucursal: cab.sucursal
+    },
+    empresa: emp ? {
+      nombre: emp.nombre,
+      ruc: emp.ruc,
+      direccion: (emp.direccion || '').trim(),
+      telefono: (emp.celular || '').trim(),
+      rubro: (emp.rubro || '').trim(),
+      correo: (emp.correo || '').trim(),
+      logo: logoUrl
+    } : { nombre: '', ruc: '', direccion: '', telefono: '', logo: `${base}/assets/img/01.jpg` },
+    cliente: {
+      rSocial: cab.clienteRazonSocial,
+      razonSocial: cab.clienteRazonSocial,
+      ruc: cab.clienteRuc,
+      celular: (cab.clienteCelular || '').trim(),
+      direccion: (cab.clienteDireccion || '').trim(),
+      tipoDocSunat: (cab.clienteTipoDoc === '6' || (cab.clienteRuc && String(cab.clienteRuc).length === 11)) ? '6' : '1'
+    },
+    items: (itemsResult.recordset || []).map(d => ({
+      idDetalleVA: d.idDetalleVA,
+      idProducto: d.idProducto,
+      codigo: d.codigoProducto,
+      descripcion: d.descripcionProducto,
+      cantidad: d.cantidad,
+      pVenta: d.pVenta,
+      descuento: d.descuento,
+      subtotal: d.subtotal,
+      total: d.total,
+      aliasEmpresa: d.aliasEmpresa || '',
+      sucursal: d.sucursal || '',
+      idEmpresaProducto: d.idEmpresaProducto
+    }))
+  };
+};
+
+/** Obtiene detalle de una venta agrupada (para despacho/caja). */
+exports.obtenerDetalleVentaAgrupada = async (pool, idEmpresaCobradora, idVentaAgrupada) => {
+  const result = await pool.request()
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .query(`
+      SELECT
+        ve.idEmpresa,
+        ve.idVentaEmpresa,
+        dv.idProducto,
+        p.codigo,
+        p.descripcion,
+        dv.cantidad,
+        dv.pVenta,
+        dv.subtotal,
+        dv.total
+      FROM VentaAgrupada va
+      INNER JOIN VentaEmpresa ve ON ve.idVentaAgrupada = va.idVentaAgrupada
+      INNER JOIN DetalleVentaEmpresa dv ON dv.idVentaEmpresa = ve.idVentaEmpresa
+      INNER JOIN Productos p ON p.idProducto = dv.idProducto
+      WHERE va.idVentaAgrupada = @idVentaAgrupada
+        AND va.idEmpresaCobradora = @idEmpresaCobradora
+    `);
+  return result.recordset || [];
 };

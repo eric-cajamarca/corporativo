@@ -14,6 +14,7 @@ exports.insertarFilaMovimiento = async (transaction, datos) => {
     tipoMovimiento,
     cantidad,
     docRelacionado,
+    idComprobante,
     idUsuario,
     observaciones,
     costoUnitario,
@@ -26,14 +27,15 @@ exports.insertarFilaMovimiento = async (transaction, datos) => {
     .input('tipoMovimiento', sql.VarChar(2), tipoMovimiento)
     .input('cantidad', sql.Decimal(18, 3), cantidad)
     .input('docRelacionado', sql.VarChar(50), docRelacionado || null)
+    .input('idComprobante', sql.Int, idComprobante != null ? idComprobante : null)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
     .input('observaciones', sql.VarChar(255), observaciones || null)
     .input('costoUnitario', sql.Decimal(18, 6), costoUnitario != null ? parseFloat(costoUnitario) : null)
     .input('idLote', sql.UniqueIdentifier, idLote || null)
     .query(`
-      INSERT INTO MovimientosInventario (idEmpresa, idSucursal, idProducto, tipoMovimiento, cantidad, docRelacionado, idUsuario, observaciones, costoUnitario, idLote)
+      INSERT INTO MovimientosInventario (idEmpresa, idSucursal, idProducto, tipoMovimiento, cantidad, docRelacionado, idComprobante, idUsuario, observaciones, costoUnitario, idLote)
       OUTPUT INSERTED.idMovimiento
-      VALUES (@idEmpresa, @idSucursal, @idProducto, @tipoMovimiento, @cantidad, @docRelacionado, @idUsuario, @observaciones, @costoUnitario, @idLote)
+      VALUES (@idEmpresa, @idSucursal, @idProducto, @tipoMovimiento, @cantidad, @docRelacionado, @idComprobante, @idUsuario, @observaciones, @costoUnitario, @idLote)
     `);
   return result.recordset && result.recordset[0] ? result.recordset[0].idMovimiento : null;
 };

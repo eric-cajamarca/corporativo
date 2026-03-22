@@ -5,6 +5,7 @@ const inventarioRepository = require('../repositories/inventario.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const stockService = require('./stock.service');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
+const comprobantesRepository = require('../repositories/comprobantes.repository');
 
 /** Mapeo tipo frontend -> { tipoBD: 'EN'|'SA'|'AJ', esEntrada: boolean } */
 const TIPOS_MOVIMIENTO = {
@@ -26,7 +27,7 @@ function getConfig(configRows, clave, def) {
  * tipoMovimiento: INVENTARIO_INICIAL | ENTRADA_VARIA | REAJUSTE_POSITIVO | REAJUSTE_NEGATIVO | SALIDA_MERMA
  */
 exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
-  const { tipoMovimiento, idSucursal, fechaMovimiento, docRelacionado, observaciones, items } = body;
+  const { tipoMovimiento, idSucursal, fechaMovimiento, docRelacionado, observaciones, items, idComprobante } = body;
 
   const mapa = TIPOS_MOVIMIENTO[tipoMovimiento];
   if (!mapa) {
@@ -47,6 +48,28 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
   const transaction = new sql.Transaction(pool);
   try {
     await transaction.begin();
+
+    let docRelacionadoFinal = docRelacionado || null;
+    let comprobanteActual = null;
+    if (idComprobante != null && String(idComprobante).trim() !== '') {
+      const idComp = parseInt(idComprobante, 10);
+      if (Number.isNaN(idComp)) {
+        throw new Error('Comprobante inválido');
+      }
+      const compRes = await comprobantesRepository.obtenerComprobantePorIdEmpresa(transaction, idEmpresa, idComp);
+      comprobanteActual = compRes?.recordset?.[0];
+      if (!comprobanteActual) {
+        throw new Error('Comprobante no encontrado');
+      }
+      const codigo = String(comprobanteActual.codigo || '').toUpperCase();
+      const codigosValidos = new Set(['IV', 'II', 'IN', 'SA']);
+      if (!codigosValidos.has(codigo)) {
+        throw new Error('Comprobante no válido para inventario');
+      }
+      const serie = comprobanteActual.serie || '';
+      const numero = comprobanteActual.numero != null ? String(comprobanteActual.numero) : '';
+      docRelacionadoFinal = serie && numero ? `${serie}-${numero}` : (serie || numero || null);
+    }
 
     let siguienteNumLote = 1;
     if (mapa.esEntrada) {
@@ -78,12 +101,34 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
         if (disponible < cantidad) {
           throw new Error(`Stock insuficiente para producto. Solicitado: ${cantidad}, disponible: ${disponible}`);
         }
-        await stockService.descontarDesdeLotes(transaction, {
+        const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
           idEmpresa,
           idSucursal,
           idProducto: item.idProducto,
           cantidad
         }, { controlUbicaciones });
+        const consumos = resultadoDescuento?.consumosPorLote || [];
+        if (consumos.length > 0) {
+          for (const c of consumos) {
+            const cantTomada = Number(c.cantidadTomada) || 0;
+            if (cantTomada <= 0) continue;
+            const idMov = await inventarioRepository.insertarFilaMovimiento(transaction, {
+              idEmpresa,
+              idSucursal,
+              idProducto: item.idProducto,
+              tipoMovimiento: mapa.tipoBD,
+              cantidad: cantTomada,
+              docRelacionado: docRelacionadoFinal,
+              idComprobante: comprobanteActual?.idComprobante || null,
+              idUsuario,
+              observaciones: observaciones || null,
+              costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : null,
+              idLote: c.idLote || null
+            });
+            if (primerIdMovimiento == null) primerIdMovimiento = idMov;
+          }
+          continue;
+        }
       }
 
       const idMov = await inventarioRepository.insertarFilaMovimiento(transaction, {
@@ -92,13 +137,19 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
         idProducto: item.idProducto,
         tipoMovimiento: mapa.tipoBD,
         cantidad,
-        docRelacionado: docRelacionado || null,
+        docRelacionado: docRelacionadoFinal,
+        idComprobante: comprobanteActual?.idComprobante || null,
         idUsuario,
         observaciones: observaciones || null,
         costoUnitario: mapa.esEntrada ? (parseFloat(item.costoUnitario) || 0) : null,
         idLote
       });
       if (primerIdMovimiento == null) primerIdMovimiento = idMov;
+    }
+
+    if (comprobanteActual) {
+      const siguiente = (parseInt(comprobanteActual.numero, 10) || 0) + 1;
+      await comprobantesRepository.actualizarNumeroComprobante(transaction, idEmpresa, comprobanteActual.idComprobante, siguiente);
     }
 
     await transaction.commit();

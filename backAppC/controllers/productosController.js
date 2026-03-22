@@ -341,6 +341,7 @@ const crear_producto = async (req, res) => {
     tipoProducto,
     lote,
     precioVenta,
+    idListaPrecio,
   } = req.body;
 
   const idEmpresa = req.user.empresa;
@@ -464,8 +465,22 @@ const crear_producto = async (req, res) => {
 
       const precioVal = parseFloat(precioVenta);
       if (!Number.isNaN(precioVal) && precioVal > 0) {
-        const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
-        const lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
+        let lista = null;
+        if (idListaPrecio != null && idListaPrecio !== '') {
+          const listaResult = await preciosVRepository.obtenerListaPorId(
+            transaction,
+            parseInt(idListaPrecio, 10),
+            idEmpresa
+          );
+          lista = listaResult && listaResult.recordset && listaResult.recordset[0];
+          if (!lista) {
+            await transaction.rollback();
+            return res.status(400).send({ message: "Lista de precios inválida", data: undefined });
+          }
+        } else {
+          const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
+          lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
+        }
         if (lista && lista.idLista && lista.idMoneda) {
           await preciosVRepository.crearPrecioProducto(transaction, {
             idLista: lista.idLista,
