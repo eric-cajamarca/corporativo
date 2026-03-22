@@ -90,8 +90,11 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
         { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
         { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
         { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 },
-        { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 }
-
+        { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 },
+        { codigo: 'II', nombre: 'Inventario Inicial', serie: 'II01', numero: 0, activo: 1 },
+        { codigo: 'IN', nombre: 'Ingreso', serie: 'IN01', numero: 0, activo: 1 },
+        { codigo: 'IV', nombre: 'Inventario', serie: 'IV01', numero: 0, activo: 1 },
+        { codigo: 'SA', nombre: 'Salida', serie: 'SA01', numero: 0, activo: 1 }
     ];
 
     const comprobantesCreados = [];

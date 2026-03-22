@@ -87,6 +87,14 @@ export class CreateProductoComponent implements OnInit {
   precioVenta = 0;
   margenGanancia = 0;
 
+  // Buscar producto base
+  textoBusqueda = '';
+  resultadosBusqueda: any[] = [];
+  mostrarResultados = false;
+  buscandoProducto = false;
+  private todosProductos: any[] = [];
+  private productosYaCargados = false;
+
   /** true cuando se abre como modal (desde ProductoCrearModalService) */
   esModal = false;
 
@@ -339,27 +347,115 @@ export class CreateProductoComponent implements OnInit {
 
   onCheckboxChangeCorrelativo(): void {
     const useCorrelativo = !!this.productoForm.get('useCorrelativo')?.value;
+    const codigoCtrl = this.productoForm.get('codigo');
     if (useCorrelativo) {
-      this.codigoManual = this.productoForm.get('codigo')?.value || '';
+      this.codigoManual = codigoCtrl?.value || '';
       this.productoForm.patchValue({ codigo: this.correlativo.numero || '' });
+      codigoCtrl?.clearValidators();
     } else {
       this.productoForm.patchValue({ codigo: this.codigoManual || '' });
+      codigoCtrl?.setValidators([Validators.required, Validators.minLength(2)]);
     }
+    codigoCtrl?.updateValueAndValidity();
   }
 
   private actualizarCorrelativoSiAplica(): void {
     const useCorrelativo = !!this.productoForm.get('useCorrelativo')?.value;
-    if (!useCorrelativo || !this.correlativo?.idCorrelativo) return;
-    const siguiente = (Number(this.correlativo.numero) || 0) + 1;
-    const payload = { ...this.correlativo, numero: siguiente };
-    this.comprasService.editar_correlativos_empresa(this.correlativo.idCorrelativo, payload).subscribe({
-      next: () => {
-        this.correlativo = payload;
+    if (!useCorrelativo) return;
+    this.comprasService.obtener_correlativo_empresa().subscribe({
+      next: (res) => {
+        const data = res?.data;
+        this.correlativo = data && typeof data === 'object' ? data : this.correlativo;
+        this.productoForm.patchValue({ codigo: this.correlativo.numero || '' });
       },
       error: (error) => {
         console.error('actualizarCorrelativoSiAplica:', error);
       }
     });
+  }
+
+  recargarCategorias(): void {
+    this.categoriaService.obtener_categorias().subscribe({
+      next: (response) => { this.categorias = response.data || []; },
+      error: () => {}
+    });
+  }
+
+  recargarMarcas(): void {
+    this.marcaService.obtener_marcas().subscribe({
+      next: (response) => { this.marcas = response.data || []; },
+      error: () => {}
+    });
+  }
+
+  buscarProductoBase(): void {
+    const texto = this.textoBusqueda.trim().toLowerCase();
+    if (texto.length < 2) {
+      this.resultadosBusqueda = [];
+      this.mostrarResultados = false;
+      return;
+    }
+
+    if (this.productosYaCargados) {
+      this.filtrarProductos(texto);
+      return;
+    }
+
+    this.buscandoProducto = true;
+    this.productoService.obtenerProductosTodos().subscribe({
+      next: (res) => {
+        this.todosProductos = Array.isArray(res.data) ? res.data : [];
+        this.productosYaCargados = true;
+        this.buscandoProducto = false;
+        this.filtrarProductos(texto);
+      },
+      error: () => {
+        this.buscandoProducto = false;
+      }
+    });
+  }
+
+  private filtrarProductos(texto: string): void {
+    this.resultadosBusqueda = this.todosProductos
+      .filter((p: any) =>
+        (p.descripcion || '').toLowerCase().includes(texto) ||
+        (p.codigo || '').toLowerCase().includes(texto) ||
+        (p.categoria || '').toLowerCase().includes(texto) ||
+        (p.marca || '').toLowerCase().includes(texto)
+      )
+      .slice(0, 10);
+    this.mostrarResultados = this.resultadosBusqueda.length > 0;
+  }
+
+  seleccionarProductoBase(producto: any): void {
+    this.productoForm.patchValue({
+      descripcion: producto.descripcion || '',
+      idCategoria: producto.idCategoria != null ? String(producto.idCategoria) : '',
+      idMarca: producto.idMarca != null ? String(producto.idMarca) : '',
+      idPresentacion: producto.idPresentacion != null ? String(producto.idPresentacion) : '',
+      tipoProducto: producto.tipoProducto || 'S',
+    });
+    if (producto.cUnitario != null && producto.cUnitario > 0) {
+      this.loteData.costoUnitario = Number(producto.cUnitario);
+    }
+    const precio = producto.pVenta || producto.precio || 0;
+    if (precio > 0) {
+      this.precioVenta = Number(precio);
+      this.calcularMargen();
+    }
+    this.textoBusqueda = '';
+    this.resultadosBusqueda = [];
+    this.mostrarResultados = false;
+    iziToast.show({
+      title: 'Producto cargado',
+      titleColor: '#17a2b8',
+      message: `Datos de "${producto.descripcion}" copiados. Modifique lo necesario.`,
+      position: 'topRight'
+    });
+  }
+
+  cerrarResultadosBusqueda(): void {
+    setTimeout(() => { this.mostrarResultados = false; }, 200);
   }
 
   abrirNuevaCategoria(): void {

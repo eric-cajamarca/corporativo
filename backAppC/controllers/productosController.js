@@ -342,6 +342,7 @@ const crear_producto = async (req, res) => {
     lote,
     precioVenta,
     idListaPrecio,
+    useCorrelativo,
   } = req.body;
 
   const idEmpresa = req.user.empresa;
@@ -390,8 +391,10 @@ const crear_producto = async (req, res) => {
     VecesVendidas: 0,
   };
 
+  const usarCorrelativo = useCorrelativo === true || useCorrelativo === 'true';
+
   if (
-    !datosProducto.Codigo ||
+    (!usarCorrelativo && !datosProducto.Codigo) ||
     datosProducto.idCategoria === null || Number.isNaN(datosProducto.idCategoria) ||
     datosProducto.idMarca === null || Number.isNaN(datosProducto.idMarca) ||
     !datosProducto.descripcion ||
@@ -425,6 +428,23 @@ const crear_producto = async (req, res) => {
     await transaction.begin();
 
     try {
+      if (usarCorrelativo) {
+        const corrResult = await transaction.request()
+          .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+          .query(`
+            UPDATE Correlativos WITH (UPDLOCK, HOLDLOCK)
+            SET numero = numero + 1
+            OUTPUT INSERTED.numero
+            WHERE idEmpresa = @idEmpresa
+          `);
+        const row = corrResult.recordset && corrResult.recordset[0];
+        if (row) {
+          datosProducto.Codigo = String(row.numero);
+        } else {
+          datosProducto.Codigo = String(Date.now()).slice(-8);
+        }
+      }
+
       await transaction.request()
         .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
         .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)

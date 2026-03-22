@@ -53,11 +53,50 @@
     } @else {
     <form [formGroup]="productoForm">
       @if (activeTab() === 'basico') {
+        <div class="mb-3">
+          <label class="form-label text-muted small mb-1">
+            <i class="fas fa-copy me-1"></i> Copiar datos de producto existente (opcional)
+          </label>
+          <div class="position-relative">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="fas fa-search"></i></span>
+              <input type="text" class="form-control" [(ngModel)]="textoBusqueda" [ngModelOptions]="{standalone: true}"
+                placeholder="Buscar producto por descripción, código, categoría o marca..."
+                (input)="buscarProductoBase()" (blur)="cerrarResultadosBusqueda()">
+              @if (buscandoProducto) {
+                <span class="input-group-text"><span class="spinner-border spinner-border-sm"></span></span>
+              }
+            </div>
+            @if (mostrarResultados) {
+              <div class="list-group position-absolute w-100 shadow" style="z-index: 1050; max-height: 250px; overflow-y: auto; top: 100%;">
+                @for (prod of resultadosBusqueda; track prod.idProducto) {
+                  <button type="button" class="list-group-item list-group-item-action py-2" (mousedown)="seleccionarProductoBase(prod)">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <strong class="small">{{ prod.descripcion }}</strong>
+                        <div class="text-muted" style="font-size: 0.75rem;">
+                          {{ prod.codigo }} | {{ prod.categoria }} | {{ prod.marca }}
+                        </div>
+                      </div>
+                      @if (prod.pVenta) {
+                        <span class="badge bg-success ms-2">S/ {{ prod.pVenta }}</span>
+                      }
+                    </div>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+        <hr class="mt-0 mb-3">
         <div class="row">
           <div class="col-md-6 mb-3">
-            <label class="form-label">Código *</label>
-            <input type="text" class="form-control" formControlName="codigo" [class.is-invalid]="hasError('codigo')" placeholder="Ej: PROD-001" [readonly]="productoForm.get('useCorrelativo')?.value">
-            @if (hasError('codigo')) { <div class="invalid-feedback">{{ getError('codigo') }}</div> }
+            <label class="form-label">Código {{ productoForm.get('useCorrelativo')?.value ? '' : '*' }}</label>
+            <input type="text" class="form-control" formControlName="codigo"
+              [class.is-invalid]="hasError('codigo') && !productoForm.get('useCorrelativo')?.value"
+              placeholder="Ej: PROD-001"
+              [readonly]="productoForm.get('useCorrelativo')?.value">
+            @if (hasError('codigo') && !productoForm.get('useCorrelativo')?.value) { <div class="invalid-feedback">{{ getError('codigo') }}</div> }
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox" formControlName="useCorrelativo" id="useCorrelativo" (change)="onCheckboxChangeCorrelativo()">
               <label class="form-check-label" for="useCorrelativo">Usar correlativo</label>
@@ -79,7 +118,7 @@
           <div class="col-md-4 mb-3">
             <label class="form-label">Categoría *</label>
             <div class="input-group">
-              <select class="form-select" formControlName="idCategoria" [class.is-invalid]="hasError('idCategoria')">
+              <select class="form-select" formControlName="idCategoria" [class.is-invalid]="hasError('idCategoria')" (focus)="recargarCategorias()">
                 <option value="">Seleccione...</option>
                 @for (cat of categorias; track cat.idCategoria) { <option [value]="cat.idCategoria">{{ cat.nombre }}</option> }
               </select>
@@ -90,7 +129,7 @@
           <div class="col-md-4 mb-3">
             <label class="form-label">Marca *</label>
             <div class="input-group">
-              <select class="form-select" formControlName="idMarca" [class.is-invalid]="hasError('idMarca')">
+              <select class="form-select" formControlName="idMarca" [class.is-invalid]="hasError('idMarca')" (focus)="recargarMarcas()">
                 <option value="">Seleccione...</option>
                 @for (marca of marcas; track marca.idMarca) { <option [value]="marca.idMarca">{{ marca.nombre }}</option> }
               </select>
