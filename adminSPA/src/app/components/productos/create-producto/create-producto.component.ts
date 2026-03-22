@@ -15,6 +15,7 @@ import { PreciosService } from '../../../services/precios.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
 
 declare var iziToast: any;
 
@@ -318,7 +319,11 @@ export class CreateProductoComponent implements OnInit {
             this.actualizarCorrelativoSiAplica();
           } else if (this.activeModal) {
             this.actualizarCorrelativoSiAplica();
-            this.activeModal.close(true);
+            if (idProducto) {
+              this.cerrarModalSiCorresponde(idProducto);
+            } else {
+              this.activeModal.dismiss();
+            }
           } else {
             this.actualizarCorrelativoSiAplica();
             this.router.navigate(['/productos']);
@@ -472,6 +477,37 @@ export class CreateProductoComponent implements OnInit {
     });
   }
 
+  /** Payload al cerrar modal (movimiento inventario: rellenar detalle con ingreso/salida según pantalla padre). */
+  private buildProductoCreadoModalResult(idProducto: string): ProductoCreadoModalResult {
+    const v = this.productoForm.value;
+    const loteQty = this.modoLote() ? Number(this.loteData.cantidadIngresada) || 0 : 0;
+    const costo = Number(this.loteData.costoUnitario) || 0;
+    const fvRaw = v.fVencimiento != null && String(v.fVencimiento).trim() !== ''
+      ? String(v.fVencimiento).trim()
+      : '';
+    const fv = fvRaw.length >= 10 ? fvRaw.slice(0, 10) : fvRaw;
+    return {
+      idProducto,
+      codigo: String(v.codigo || ''),
+      descripcion: String(v.descripcion || ''),
+      cantidadDesdeLote: loteQty > 0 ? loteQty : undefined,
+      costoUnitario: costo > 0 ? costo : undefined,
+      fechaVencimiento: fv || undefined,
+      numeroLote: undefined,
+      idSucursalLote:
+        this.modoLote() && this.loteData.idSucursal
+          ? String(this.loteData.idSucursal)
+          : undefined,
+    };
+  }
+
+  private cerrarModalSiCorresponde(idProducto: string): void {
+    if (!this.activeModal) {
+      return;
+    }
+    this.activeModal.close(this.buildProductoCreadoModalResult(idProducto));
+  }
+
   hasError(field: string): boolean {
     const control = this.productoForm.get(field);
     return !!(control?.invalid && control?.touched);
@@ -538,8 +574,15 @@ export class CreateProductoComponent implements OnInit {
   }
 
   finalizarCreacion(): void {
-    if (this.activeModal) this.activeModal.close(true);
-    else this.router.navigate(['/productos']);
+    if (this.activeModal) {
+      if (this.idProductoCreado) {
+        this.activeModal.close(this.buildProductoCreadoModalResult(this.idProductoCreado));
+      } else {
+        this.activeModal.dismiss();
+      }
+    } else {
+      this.router.navigate(['/productos']);
+    }
   }
 
   irAEditar(): void {

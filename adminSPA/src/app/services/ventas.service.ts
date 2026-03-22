@@ -111,7 +111,7 @@ export class VentasService {
     );
   }
 
-  /** Datos del comprobante VA (Venta Agrupada) para generar PDF con barcode. */
+  /** Datos del comprobante VA (Venta Agrupada) para ticket térmico / impresión (no PDF A4). */
   getComprobanteVAParaPdf(idVentaAgrupada: string): Observable<{ data: ComprobanteVAPdfData }> {
     return this._http.get<{ data: ComprobanteVAPdfData }>(
       this.url + 'ventas/agrupadas/' + idVentaAgrupada + '/comprobante-va',

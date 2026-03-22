@@ -1,16 +1,23 @@
 // src/services/productos.service.js
 const ProductosRepository = require('../repositories/productos.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
+const permisosService = require('./permisos.service');
 
 exports.obtenerProductosTodosService = async (pool, user) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador") {
+  const esAdmin = user.rol === "Administrador";
+  const puedeVerLista =
+    esAdmin ||
+    (await permisosService.verificarPermisoUsuario(pool, "CREAR_VENTAS", user)) ||
+    (await permisosService.verificarPermisoUsuario(pool, "VER_PRODUCTOS", user));
+
+  if (!puedeVerLista) {
     throw new Error("NO_PERMISSIONS");
   }
-  
+
   const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
   const idsEmpresa = [
     user.empresa,

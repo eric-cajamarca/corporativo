@@ -6,7 +6,8 @@ import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { VentasService, VentaAgrupadaListado, ComprobanteVentaAgrupada, VentaListado, ComprobanteVAPdfData } from '../../../services/ventas.service';
+import { VentasService, VentaAgrupadaListado, ComprobanteVentaAgrupada, VentaListado } from '../../../services/ventas.service';
+import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
@@ -77,6 +78,15 @@ export class IndexVentasComponent implements OnInit {
   errorComprobantes = '';
   comprobanteImprimiendoId: number | null = null;
   imprimiendoVAId: string | null = null;
+  /** idVenta del comprobante hijo (modal imprimir desde venta agrupada). */
+  idVentaPdfComprobanteHijo: number | null = null;
+  mostrarWhatsappFormHijo = false;
+  datosParaWhatsappHijo: { datos: unknown; nombreArchivo: string } | null = null;
+  whatsappMensajeHijo: string | null = null;
+  whatsappNumberHijo = '';
+  whatsappCaptionHijo = '';
+  whatsappFormatoHijo: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsappHijo = false;
 
   constructor(
     private ventasService: VentasService,
@@ -247,6 +257,7 @@ export class IndexVentasComponent implements OnInit {
     return c || '—';
   }
 
+  /** Comprobante VA solo en formato ticket térmico (ventana + Imprimir). */
   imprimirVA(idVentaAgrupada: string): void {
     if (!idVentaAgrupada) return;
     this.imprimiendoVAId = idVentaAgrupada;
@@ -257,45 +268,9 @@ export class IndexVentasComponent implements OnInit {
           alert('No se pudieron cargar los datos del comprobante VA.');
           return;
         }
-        const pdfService = (window as unknown as {
-          __pdfService?: { generarPdfComprobanteVA?: (d: ComprobanteVAPdfData) => void };
-        }).__pdfService;
-        if (pdfService?.generarPdfComprobanteVA) {
-          pdfService.generarPdfComprobanteVA(res.data);
-          return;
+        if (!openComprobanteVaTicket(res.data, idVentaAgrupada)) {
+          alert('Permita ventanas emergentes para ver e imprimir el ticket VA.');
         }
-        const w = window.open('', '_blank');
-        if (!w) {
-          alert('Permita ventanas emergentes para imprimir el comprobante VA.');
-          return;
-        }
-        const d = res.data;
-        const rows = d.items
-          .map(
-            (it) =>
-              `<tr><td>${it.aliasEmpresa || ''}</td><td>${it.codigo || ''}</td><td>${it.descripcion || ''}</td><td>${it.cantidad}</td><td>${it.pVenta?.toFixed(2)}</td><td>${it.total?.toFixed(2)}</td></tr>`
-          )
-          .join('');
-        const tipoLabel = d.venta.tipoComprobanteDestinoNombre || d.venta.tipoComprobanteDestino || '';
-        w.document.write(`<!DOCTYPE html><html><head><title>Comprobante VA</title>
-                <style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5}.header{text-align:center;margin-bottom:20px}.total{text-align:right;font-size:16px;font-weight:bold;margin-top:10px}@media print{.no-print{display:none}}</style>
-              </head><body>
-                <div class="header">
-                  <h2>${d.empresa.nombre || 'Empresa'}</h2>
-                  <p>RUC: ${d.empresa.ruc || ''} | ${d.empresa.direccion || ''}</p>
-                  <h3>VENTA AGRUPADA ${d.venta.compVenta || ''}</h3>
-                  <p>Tipo comprobante destino: <strong>${tipoLabel}</strong></p>
-                  <p>Fecha: ${d.venta.fEmision || ''}</p>
-                </div>
-                <p><strong>Cliente:</strong> ${d.cliente.rSocial || ''} | ${d.cliente.ruc || ''}</p>
-                <table><thead><tr><th>Empresa</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>P.Unit</th><th>Total</th></tr></thead>
-                <tbody>${rows}</tbody></table>
-                <p class="total">TOTAL: S/ ${d.venta.total?.toFixed(2)}</p>
-                <p style="text-align:center;margin-top:20px;font-size:10px">ID: ${idVentaAgrupada}</p>
-                <div style="text-align:center;margin-top:10px"><img src="https://barcode.tec-it.com/barcode.ashx?data=${idVentaAgrupada}&code=Code128&translate-esc=true&dpi=96" alt="barcode" style="height:50px"/></div>
-                <br/><button class="no-print" onclick="window.print()">Imprimir</button>
-              </body></html>`);
-        w.document.close();
       },
       error: () => {
         this.imprimiendoVAId = null;
@@ -561,9 +536,113 @@ export class IndexVentasComponent implements OnInit {
 
   abrirModalPdf(v: VentaListado): void {
     this.ventaSeleccionada = v;
+    this.idVentaPdfComprobanteHijo = null;
     this.mostrarWhatsappForm = false;
     this.datosParaWhatsapp = null;
     this.whatsappMensaje = null;
+  }
+
+  abrirModalPdfComprobanteHijo(idVenta: number): void {
+    this.idVentaPdfComprobanteHijo = idVenta;
+    this.mostrarWhatsappFormHijo = false;
+    this.datosParaWhatsappHijo = null;
+    this.whatsappMensajeHijo = null;
+    const el = document.getElementById('pdfModalComprobanteHijo');
+    if (el && (window as unknown as { bootstrap?: { Modal: { getOrCreateInstance: (e: HTMLElement) => { show: () => void } } } }).bootstrap) {
+      (window as unknown as { bootstrap: { Modal: { getOrCreateInstance: (e: HTMLElement) => { show: () => void } } } }).bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+  }
+
+  generarPdfComprobanteHijo(formato: 'A4' | 'A5' | 'ticket'): void {
+    const id = this.idVentaPdfComprobanteHijo;
+    if (id == null) return;
+    this.imprimirComprobante(id, formato);
+  }
+
+  cerrarFormWhatsappHijo(): void {
+    this.mostrarWhatsappFormHijo = false;
+    this.datosParaWhatsappHijo = null;
+    this.whatsappNumberHijo = '';
+    this.whatsappCaptionHijo = '';
+    this.whatsappFormatoHijo = 'A4';
+    this.whatsappMensajeHijo = null;
+  }
+
+  abrirFormWhatsappHijo(): void {
+    const idVenta = this.idVentaPdfComprobanteHijo;
+    if (idVenta == null) return;
+    this.generandoPdf = true;
+    this.whatsappMensajeHijo = null;
+    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        this.generandoPdf = false;
+        if (!d) return;
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.datosParaWhatsappHijo = { datos, nombreArchivo };
+        this.whatsappNumberHijo = (d.cliente as { celular?: string })?.celular ?? '';
+        this.mostrarWhatsappFormHijo = true;
+      },
+      error: (err) => {
+        this.generandoPdf = false;
+        this.whatsappMensajeHijo = err?.error?.error || err?.message || 'No se pudieron cargar los datos.';
+      }
+    });
+  }
+
+  enviarPdfPorWhatsappHijo(): void {
+    if (!this.datosParaWhatsappHijo || !this.whatsappNumberHijo.trim()) {
+      this.whatsappMensajeHijo = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsappHijo = true;
+    this.whatsappMensajeHijo = null;
+    const { datos, nombreArchivo } = this.datosParaWhatsappHijo;
+    const formato = this.whatsappFormatoHijo;
+    this.pdfService.generarPdfComprobanteVenta(datos as never, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this.whatsappService.enviarArchivo(this.whatsappNumberHijo.trim(), base64, nombreArchivo, 'document', this.whatsappCaptionHijo.trim() || undefined).subscribe({
+            next: (res) => {
+              this.enviandoWhatsappHijo = false;
+              this.whatsappMensajeHijo = res.message;
+              if (res.success) setTimeout(() => this.cerrarFormWhatsappHijo(), 2000);
+            },
+            error: (err) => {
+              this.enviandoWhatsappHijo = false;
+              this.whatsappMensajeHijo = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+            }
+          });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: () => {
+        this.enviandoWhatsappHijo = false;
+        this.whatsappMensajeHijo = 'Error al generar el PDF.';
+      }
+    });
   }
 
   abrirFormWhatsapp(): void {

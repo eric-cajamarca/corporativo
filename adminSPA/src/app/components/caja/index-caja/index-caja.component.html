@@ -138,6 +138,7 @@
                           <thead class="table-light">
                             <tr>
                               <th>Fecha</th>
+                              <th *ngIf="mostrarColumnaEmpresaMovimiento">Empresa</th>
                               <th>Tipo</th>
                               <th>Descripción</th>
                               <th>Monto</th>
@@ -147,6 +148,7 @@
                           <tbody>
                             <tr *ngFor="let movimiento of movimientosPaginated">
                               <td>{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</td>
+                              <td *ngIf="mostrarColumnaEmpresaMovimiento" class="small text-muted">{{ movimiento.empresaMovimiento || '—' }}</td>
                               <td>
                                 <span class="badge"
                                       [ngClass]="{'bg-success': movimiento.tipoOperacion === 'I',

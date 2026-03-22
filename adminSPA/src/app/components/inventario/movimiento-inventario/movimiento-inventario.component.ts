@@ -13,7 +13,7 @@ import { ProductoService } from '../../../services/producto.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
-import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
+import { ProductoCrearModalService, ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -174,13 +174,51 @@ export class MovimientoInventarioComponent implements OnInit {
   }
 
   async abrirCrearProducto(): Promise<void> {
-    try {
-      const guardado = await this.productoCrearModal.abrir();
-      if (guardado) {
-        this.cargarProductos();
+    const creado = await this.productoCrearModal.abrir();
+    if (!creado) {
+      return;
+    }
+    this.cargarProductos();
+    const idSuc = creado.idSucursalLote;
+    const sucCtrl = this.form.get('idSucursal');
+    if (idSuc && (!sucCtrl?.value || sucCtrl.value === '')) {
+      this.form.patchValue({ idSucursal: idSuc });
+    }
+    this.aplicarProductoCreadoAlDetalle(creado);
+  }
+
+  /**
+   * Tras crear producto en el modal: agrega línea al detalle del movimiento.
+   * Entrada: usa cantidad/costo/vencimiento del lote inicial si se indicó en el modal.
+   * Salida: deja el producto con cantidad 1 para que el usuario ajuste.
+   */
+  aplicarProductoCreadoAlDetalle(creado: ProductoCreadoModalResult): void {
+    let fila = this.filas.find((f) => !f.idProducto);
+    if (!fila) {
+      this.agregarFila();
+      fila = this.filas[this.filas.length - 1];
+    }
+    fila.idProducto = String(creado.idProducto);
+    fila.codigo = creado.codigo || '';
+    fila.descripcion = creado.descripcion || '';
+
+    if (this.esEntrada()) {
+      const q =
+        creado.cantidadDesdeLote != null && creado.cantidadDesdeLote > 0
+          ? Number(creado.cantidadDesdeLote)
+          : 1;
+      fila.cantidad = q;
+      if (creado.costoUnitario != null && creado.costoUnitario > 0) {
+        fila.costoUnitario = Number(creado.costoUnitario);
       }
-    } catch {
-      // modal cerrado
+      if (creado.fechaVencimiento) {
+        fila.fechaVencimiento = String(creado.fechaVencimiento).slice(0, 10);
+      }
+      if (creado.numeroLote) {
+        fila.numeroLote = String(creado.numeroLote);
+      }
+    } else {
+      fila.cantidad = 1;
     }
   }
 

@@ -2,6 +2,43 @@ const sql = require('mssql');
 const CajaRepository = require('../repositories/caja.repository');
 const conceptoRepository = require('../repositories/concepto.repository');
 const permisosService = require('./permisos.service');
+const gestoresRepository = require('../repositories/gestores.repository');
+
+/** Empresa del JWT + empresas gestionadas (misma lista que usa la gestora en ventas) para ver movimientos consolidados. */
+const idsEmpresaParaVistaCaja = async (pool, idEmpresaUsuario) => {
+  const ids = new Set();
+  if (idEmpresaUsuario) ids.add(String(idEmpresaUsuario));
+  try {
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaUsuario);
+    for (const g of gestionadas || []) {
+      if (g.idEmpresa) ids.add(String(g.idEmpresa));
+    }
+  } catch (_) {
+    /* si falla gestores, solo empresa propia */
+  }
+  return Array.from(ids);
+};
+
+/**
+ * Empresa gestionada: incluir movimientos en caja de la(s) gestora(s) activa(s) cuando el ingreso está ligado a una Venta de esta empresa (cobro VA).
+ * No expone toda la caja de la gestora, solo filas con mc.idVenta -> Ventas.idEmpresa = JWT.
+ */
+const opcionesVistaCajaDelegacion = async (pool, idEmpresaUsuario) => {
+  if (!idEmpresaUsuario) return null;
+  try {
+    const gestores = await gestoresRepository.obtenerGestoresDeEmpresa(pool, idEmpresaUsuario);
+    const idsDelegada = (gestores || [])
+      .filter((g) => Number(g.estadoGestor) === 1 && g.idEmpresa)
+      .map((g) => g.idEmpresa);
+    if (idsDelegada.length === 0) return null;
+    return {
+      idEmpresaVinculoVentas: idEmpresaUsuario,
+      idsEmpresaCajaDelegada: idsDelegada,
+    };
+  } catch (_) {
+    return null;
+  }
+};
 
 /** Administrador tiene todo; si no, debe tener al menos uno de los permisos indicados. */
 const tienePermisoCaja = async (pool, user, ...nombresPermiso) => {
@@ -122,7 +159,9 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
 exports.obtenerMovimientosCajaService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
-  const movimientos = await CajaRepository.obtenerMovimientosCajaRepo(pool, user.empresa, filtros);
+  const idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
+  const delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  const movimientos = await CajaRepository.obtenerMovimientosCajaRepo(pool, idsEmpresa, filtros, delegacion);
   return movimientos;
 };
 
@@ -130,7 +169,9 @@ exports.obtenerRecibosEgresoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const params = { ...filtros, tipoMovimiento: "E", soloRecibos: true };
-  return CajaRepository.obtenerMovimientosCajaRepo(pool, user.empresa, params);
+  const idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
+  const delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  return CajaRepository.obtenerMovimientosCajaRepo(pool, idsEmpresa, params, delegacion);
 };
 
 exports.eliminarMovimientoCajaService = async (pool, user, idMovimientoCaja) => {
@@ -187,5 +228,7 @@ exports.obtenerResumenCajaDiarioService = async (pool, user, fecha) => {
 exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'VER_ARQUEO', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
-  return CajaRepository.obtenerArqueoDinamicoRepo(pool, user.empresa, filtros);
+  const idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
+  const delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  return CajaRepository.obtenerArqueoDinamicoRepo(pool, idsEmpresa, filtros, delegacion);
 };

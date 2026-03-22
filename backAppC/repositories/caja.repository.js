@@ -386,8 +386,56 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
   return result.recordset[0];
 };
 
-exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
-  let whereClause = "WHERE mc.idEmpresa = @idEmpresa";
+/**
+ * opcionesVistaDelegacion: empresa gestionada ve ingresos registrados en caja de la gestora cuando idVenta es su Ventas.
+ * idEmpresaVinculoVentas = JWT empresa; idsEmpresaCajaDelegada = gestoras activas (Gestores_Empresas).
+ */
+exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesVistaDelegacion) => {
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0) return [];
+
+  const request = pool.request();
+  const inPlaceholders = ids.map((id, i) => {
+    const key = `idEmp${i}`;
+    request.input(key, sql.UniqueIdentifier, id);
+    return `@${key}`;
+  });
+
+  const del = opcionesVistaDelegacion;
+  const usaDelegacion =
+    del &&
+    del.idEmpresaVinculoVentas &&
+    Array.isArray(del.idsEmpresaCajaDelegada) &&
+    del.idsEmpresaCajaDelegada.length > 0;
+
+  let whereMcEmpresa;
+  if (usaDelegacion) {
+    const inDel = bindIdsEmpresaArqueo(request, del.idsEmpresaCajaDelegada, "idDelMc").join(", ");
+    request.input("idEmpVinculoVentas", sql.UniqueIdentifier, del.idEmpresaVinculoVentas);
+    whereMcEmpresa = `(
+      mc.idEmpresa IN (${inPlaceholders.join(", ")})
+      OR (
+        mc.idEmpresa IN (${inDel})
+        AND mc.idVenta IS NOT NULL
+        AND mc.idVenta <> 0
+        AND EXISTS (
+          SELECT 1 FROM Ventas v
+          WHERE v.idVenta = mc.idVenta AND v.idEmpresa = @idEmpVinculoVentas
+        )
+      )
+    )`;
+  } else {
+    whereMcEmpresa = `mc.idEmpresa IN (${inPlaceholders.join(", ")})`;
+  }
+
+  let whereClause = `WHERE ${whereMcEmpresa}`;
+
+  let joinAperturaCaja = "";
+  if (filtros.idCaja) {
+    joinAperturaCaja = "INNER JOIN AperturasCaja ac_f ON mc.idApertura = ac_f.idApertura";
+    request.input("idCajaFiltro", sql.UniqueIdentifier, filtros.idCaja);
+    whereClause += " AND ac_f.idCaja = @idCajaFiltro";
+  }
 
   if (filtros.idApertura) {
     whereClause += " AND mc.idApertura = @idApertura";
@@ -411,16 +459,17 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
     whereClause += " AND mc.documentoRelacionado LIKE 'RE %'";
   }
 
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+  request
     .input("idApertura", sql.UniqueIdentifier, filtros.idApertura || null)
     .input("fechaDesde", sql.DateTime, filtros.fechaDesde || null)
     .input("fechaHasta", sql.DateTime, filtros.fechaHasta || null)
-    .input("tipoMovimiento", sql.Char(1), filtros.tipoMovimiento || null)
-    .query(`
+    .input("tipoMovimiento", sql.Char(1), filtros.tipoMovimiento || null);
+
+  const result = await request.query(`
       SELECT
         mc.idMovimientoCaja,
+        mc.idEmpresa,
+        ISNULL(NULLIF(LTRIM(RTRIM(e.alias)), ''), e.razon_Social) AS empresaMovimiento,
         mc.idApertura,
         mc.idTipoMovimientoCaja,
         mc.fechaMovimiento,
@@ -441,14 +490,16 @@ exports.obtenerMovimientosCajaRepo = async (pool, idEmpresa, filtros) => {
         mon.simbolo + ' ' + mon.descripcion AS moneda,
         mc.documentoRelacionado,
         mc.observaciones,
-        uw.nombres + ' ' + uw.apellidos AS usuario
+        LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, ''))) AS usuario
       FROM MovimientosCaja mc
+      ${joinAperturaCaja}
       INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
+      LEFT JOIN Empresas e ON e.idEmpresa = mc.idEmpresa
       LEFT JOIN Concepto conc ON mc.idConcepto = conc.idConcepto
       LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
       LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
       INNER JOIN Moneda mon ON mc.idMoneda = mon.idMoneda
-      INNER JOIN UsuarioWeb uw ON mc.idUsuario = uw.idUsuario
+      LEFT JOIN UsuarioWeb uw ON mc.idUsuario = uw.idUsuario
       ${whereClause}
       ORDER BY mc.fechaMovimiento DESC
     `);
@@ -627,10 +678,22 @@ exports.obtenerIdTipoMovimientoEgresoRepo = async (pool, nombrePreferido) => {
 };
 
 /** Registra en caja los movimientos de venta al contado por cada forma de pago. Si ya existían movimientos para idVenta, los elimina y reemplaza (para reflejar cambios de desglose).
- *  FK MovimientosCaja.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago, se valida y se usa un idMediosPago válido como fallback. */
+ *  FK MovimientosCaja.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago, se valida y se usa un idMediosPago válido como fallback.
+ *  compVenta puede ir vacío (se usa S/N en documento). conceptoVentaCaja opcional (ej. cobro VA con comprobante gestora). */
 exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
-  const { idApertura, idEmpresa, idSucursal, idUsuario, idVenta, compVenta, detallePago } = payload;
-  if (!idApertura || !idVenta || !compVenta || !detallePago || detallePago.length === 0) return;
+  const {
+    idApertura,
+    idEmpresa,
+    idSucursal,
+    idUsuario,
+    idVenta,
+    compVenta,
+    detallePago,
+    conceptoVentaCaja,
+  } = payload;
+  if (!idApertura || !idVenta || !detallePago || detallePago.length === 0) return;
+
+  const compNorm = compVenta && String(compVenta).trim() ? String(compVenta).trim() : "S/N";
 
   const req = transaction.request();
   const tipoVenta = await req.query("SELECT idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE nombre = 'VENTA_CONTADO'");
@@ -647,7 +710,11 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .query("DELETE FROM MovimientosCaja WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa");
 
-  const concepto = "Venta al contado " + (compVenta || "");
+  let concepto =
+    conceptoVentaCaja && String(conceptoVentaCaja).trim()
+      ? String(conceptoVentaCaja).trim()
+      : "Venta al contado " + compNorm;
+  if (concepto.length > 100) concepto = concepto.substring(0, 100);
   for (const pago of detallePago) {
     let idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
     if (idMediosPago == null || !validIds.has(idMediosPago)) idMediosPago = idMediosPagoDefault;
@@ -664,7 +731,7 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
       .input("monto", sql.Decimal(18, 2), monto)
       .input("idMediosPago", sql.Int, idMediosPago)
       .input("idMoneda", sql.Int, 1)
-      .input("documentoRelacionado", sql.VarChar(20), compVenta || null)
+      .input("documentoRelacionado", sql.VarChar(20), compNorm.length > 20 ? compNorm.substring(0, 20) : compNorm)
       .input("idVenta", sql.Int, idVenta)
       .query(`
         INSERT INTO MovimientosCaja (idApertura, idEmpresa, idSucursal, idUsuario, idTipoMovimientoCaja, fechaMovimiento, concepto, monto, idMediosPago, idMoneda, documentoRelacionado, idVenta)
@@ -673,17 +740,65 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
   }
 };
 
+/** Arregla placeholders @arqEmp0,@arqEmp1,... para IN (UUIDs) */
+const bindIdsEmpresaArqueo = (request, idsEmpresa, prefix) => {
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  return ids.map((id, i) => {
+    const key = `${prefix}${i}`;
+    request.input(key, sql.UniqueIdentifier, id);
+    return `@${key}`;
+  });
+};
+
 /** Arqueo dinámico: resumen por concepto y forma de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal).
- *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago; para el resto usa MovimientosCaja + MediosPago.
- *  Incluye ventasCredito: total de ventas con condición Crédito en el período (informativo, no efectivo en caja). */
-exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
+ *  idsEmpresa: empresa(s) del JWT; si es gestora incluye gestionadas (misma lista que movimientos de caja).
+ *  Venta agrupada multiempresa: MovimientosCaja.idEmpresa = empresa del comprobante hijo; idVenta = venta hija; concepto puede incluir VA.
+ *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago; para el resto usa MovimientosCaja + MediosPago. */
+exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVistaDelegacion) => {
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0) {
+    return {
+      movimientos: [],
+      detalle: [],
+      ventasCredito: { concepto: 'VENTA_CREDITO', importe: 0 },
+      cobroCreditos: { concepto: 'COBRO CREDITOS', importe: 0 },
+    };
+  }
+
   const { fecha, fechaInicial, fechaFinal, idCaja } = filtros || {};
   const usaRango = fechaInicial && fechaFinal;
   const fechaFiltro = fecha || getFechaHoyLocal();
   const filtrarPorCaja = idCaja && idCaja !== 'TODAS';
 
-  const request = pool.request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+  const del = opcionesVistaDelegacion;
+  const usaDelegacion =
+    del &&
+    del.idEmpresaVinculoVentas &&
+    Array.isArray(del.idsEmpresaCajaDelegada) &&
+    del.idsEmpresaCajaDelegada.length > 0;
+
+  const request = pool.request();
+  const inMc = bindIdsEmpresaArqueo(request, ids, "arqMc").join(", ");
+  let inDel = "";
+  if (usaDelegacion) {
+    inDel = bindIdsEmpresaArqueo(request, del.idsEmpresaCajaDelegada, "arqDel").join(", ");
+    request.input("idEmpVinculoVentas", sql.UniqueIdentifier, del.idEmpresaVinculoVentas);
+  }
+  const whereMcPrincipal = usaDelegacion
+    ? `(
+      mc.idEmpresa IN (${inMc})
+      OR (
+        mc.idEmpresa IN (${inDel})
+        AND mc.idVenta IS NOT NULL
+        AND mc.idVenta <> 0
+        AND EXISTS (
+          SELECT 1 FROM Ventas v
+          WHERE v.idVenta = mc.idVenta AND v.idEmpresa = @idEmpVinculoVentas
+        )
+      )
+    )`
+    : `mc.idEmpresa IN (${inMc})`;
+
   if (usaRango) {
     request.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
   } else {
@@ -695,7 +810,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     ? "AND CONVERT(DATE, mc.fechaMovimiento) >= @fechaInicial AND CONVERT(DATE, mc.fechaMovimiento) <= @fechaFinal"
     : "AND CONVERT(DATE, mc.fechaMovimiento) = @fecha";
 
-  /* Excluir cotizaciones: solo ventas con comprobante distinto de CT (Cotización). */
+  /* Excluir cotizaciones: solo ventas con comprobante distinto de CT (Cotización).
+     NO exigir v.idEmpresa = mc.idEmpresa: cobro VA registra caja en gestora con idVenta de venta hija. */
   const sqlVentas = `
     SELECT
       tmc.nombre AS concepto,
@@ -705,14 +821,14 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
-    INNER JOIN Ventas v ON v.idVenta = mc.idVenta AND v.idEmpresa = mc.idEmpresa
+    INNER JOIN Ventas v ON v.idVenta = mc.idVenta
     INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
     INNER JOIN DetallePagoVenta dpv ON dpv.idVenta = mc.idVenta
     LEFT JOIN FormasPago fp ON fp.idFormaPago = dpv.idMediosPago
-    WHERE mc.idEmpresa = @idEmpresa
+    WHERE ${whereMcPrincipal}
       ${condicionFecha}
       AND mc.idVenta IS NOT NULL
-      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+      ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
     GROUP BY tmc.nombre, tmc.tipo, fp.descripcion
   `;
   const sqlOtros = `
@@ -726,10 +842,10 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
-    WHERE mc.idEmpresa = @idEmpresa
+    WHERE ${whereMcPrincipal}
       ${condicionFecha}
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)
-      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+      ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
     GROUP BY tmc.nombre, tmc.tipo, fp.descripcion, mp.descripcion
   `;
 
@@ -739,52 +855,58 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     (${sqlOtros})
     ORDER BY tipoOperacion DESC, concepto, formaPago
   `);
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'X-Debug-Session-Id':'3c0e71'
-    },
-    body:JSON.stringify({
-      sessionId:'3c0e71',
-      runId:'post-fix',
-      hypothesisId:'H2-H3',
-      location:'caja.repository.js:obtenerArqueoDinamicoRepo',
-      message:'Filas arqueo dinámico por concepto/formaPago',
-      data:(result.recordset || []).map(r => ({
-        concepto:r.concepto,
-        tipoOperacion:r.tipoOperacion,
-        formaPago:r.formaPago,
-        importe:r.importe
-      })),
-      timestamp:Date.now()
-    })
-  }).catch(()=>{});
-  // #endregion
 
-  const sqlDetalleVentas = `
+  let detalleRecordset = [];
+  try {
+    const reqDetalle = pool.request();
+    const inMcDet = bindIdsEmpresaArqueo(reqDetalle, ids, "arqDet").join(", ");
+    let inDelDet = "";
+    if (usaDelegacion) {
+      inDelDet = bindIdsEmpresaArqueo(reqDetalle, del.idsEmpresaCajaDelegada, "arqDetDel").join(", ");
+      reqDetalle.input("idEmpVinculoVentasDet", sql.UniqueIdentifier, del.idEmpresaVinculoVentas);
+    }
+    const whereMcDetalle = usaDelegacion
+      ? `(
+      mc.idEmpresa IN (${inMcDet})
+      OR (
+        mc.idEmpresa IN (${inDelDet})
+        AND mc.idVenta IS NOT NULL
+        AND mc.idVenta <> 0
+        AND EXISTS (
+          SELECT 1 FROM Ventas v
+          WHERE v.idVenta = mc.idVenta AND v.idEmpresa = @idEmpVinculoVentasDet
+        )
+      )
+    )`
+      : `mc.idEmpresa IN (${inMcDet})`;
+    if (usaRango) {
+      reqDetalle.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
+    } else {
+      reqDetalle.input("fecha", sql.Date, fechaFiltro);
+    }
+    if (filtrarPorCaja) reqDetalle.input("idCaja", sql.UniqueIdentifier, idCaja);
+    const sqlDetalleVentas = `
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
       ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
       mc.monto AS importe,
-      v.serie + '-' + v.numero AS comprobante,
+      COALESCE(NULLIF(LTRIM(RTRIM(mc.documentoRelacionado)), ''), v.serie + '-' + v.numero) AS comprobante,
       ISNULL(cl.rSocial, '') AS clienteOrProveedor
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
-    INNER JOIN Ventas v ON v.idVenta = mc.idVenta AND v.idEmpresa = mc.idEmpresa
+    INNER JOIN Ventas v ON v.idVenta = mc.idVenta
     INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
     LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
-    WHERE mc.idEmpresa = @idEmpresa
+    WHERE ${whereMcDetalle}
       ${condicionFecha}
       AND mc.idVenta IS NOT NULL
-      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+      ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
   `;
-  const sqlDetalleOtros = `
+    const sqlDetalleOtros = `
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
@@ -797,21 +919,11 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
-    WHERE mc.idEmpresa = @idEmpresa
+    WHERE ${whereMcDetalle}
       ${condicionFecha}
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)
-      ${filtrarPorCaja ? 'AND ac.idCaja = @idCaja' : ''}
+      ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
   `;
-  let detalleRecordset = [];
-  try {
-    const reqDetalle = pool.request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
-    if (usaRango) {
-      reqDetalle.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
-    } else {
-      reqDetalle.input("fecha", sql.Date, fechaFiltro);
-    }
-    if (filtrarPorCaja) reqDetalle.input("idCaja", sql.UniqueIdentifier, idCaja);
     const resDetalle = await reqDetalle.query(`(${sqlDetalleVentas}) UNION ALL (${sqlDetalleOtros}) ORDER BY tipoOperacion DESC, concepto, formaPago`);
     detalleRecordset = resDetalle.recordset || [];
   } catch (err) {
@@ -820,8 +932,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
 
   let ventasCredito = { concepto: 'VENTA_CREDITO', importe: 0 };
   try {
-    const reqCredito = pool.request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+    const reqCredito = pool.request();
+    const inVc = bindIdsEmpresaArqueo(reqCredito, ids, 'arqVc').join(', ');
     if (usaRango) {
       reqCredito.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
     } else {
@@ -830,14 +942,13 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     const condicionFechaVentas = usaRango
       ? "AND CONVERT(DATE, v.fEmision) >= @fechaInicial AND CONVERT(DATE, v.fEmision) <= @fechaFinal"
       : "AND CONVERT(DATE, v.fEmision) = @fecha";
-    /* Excluir cotizaciones: solo ventas con comprobante distinto de CT. */
     const rCredito = await reqCredito.query(`
       SELECT ISNULL(SUM(v.total), 0) AS total
       FROM Ventas v
       INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
       INNER JOIN MediosPago mp ON (mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT) OR CAST(mp.idMediosPago AS VARCHAR(20)) = RTRIM(LTRIM(ISNULL(v.idMediosPago, ''))))
         AND (mp.descripcion LIKE '%credito%' OR mp.descripcion LIKE '%crédito%' OR LOWER(REPLACE(mp.descripcion, 'í', 'i')) LIKE '%credito%')
-      WHERE v.idEmpresa = @idEmpresa ${condicionFechaVentas}
+      WHERE v.idEmpresa IN (${inVc}) ${condicionFechaVentas}
     `);
     const total = rCredito.recordset?.[0]?.total;
     ventasCredito.importe = Number(total) || 0;
@@ -847,8 +958,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
 
   let cobroCreditos = { concepto: 'COBRO CREDITOS', importe: 0 };
   try {
-    const reqCobro = pool.request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+    const reqCobro = pool.request();
+    const inPc = bindIdsEmpresaArqueo(reqCobro, ids, 'arqPc').join(', ');
     if (usaRango) {
       reqCobro.input("fechaInicial", sql.Date, fechaInicial).input("fechaFinal", sql.Date, fechaFinal);
     } else {
@@ -860,7 +971,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idEmpresa, filtros) => {
     const rCobro = await reqCobro.query(`
       SELECT ISNULL(SUM(pc.montoPagado), 0) AS total
       FROM PagosCuotas pc
-      WHERE pc.idEmpresa = @idEmpresa ${condicionFechaPago}
+      WHERE pc.idEmpresa IN (${inPc}) ${condicionFechaPago}
     `);
     const totalCobro = rCobro.recordset?.[0]?.total;
     cobroCreditos.importe = Number(totalCobro) || 0;

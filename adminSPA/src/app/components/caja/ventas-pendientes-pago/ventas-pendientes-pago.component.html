@@ -66,7 +66,11 @@
                     <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
                       <i class="bi bi-cash-coin"></i>
                     </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#comprobantesModalPendientes" (click)="abrirModalComprobantes(v)" title="Ver comprobantes">
+                    <button type="button" class="btn btn-outline-secondary btn-sm me-1" title="Ticket VA — imprimir" (click)="imprimirTicketVA(v.idVentaAgrupada)" [disabled]="imprimiendoVaId === v.idVentaAgrupada">
+                      <span *ngIf="imprimiendoVaId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
+                      <span *ngIf="imprimiendoVaId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#comprobantesModalPendientes" (click)="abrirModalComprobantes(v)" title="Ver comprobantes hijos">
                       <i class="bi bi-receipt"></i>
                     </button>
                   </td>
@@ -241,9 +245,19 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
-        <div *ngIf="ventaSeleccionada" class="mb-2">
-          <strong>ID Venta:</strong> {{ ventaSeleccionada.idVentaAgrupada }}
-          <span class="ms-2"><strong>Cliente:</strong> {{ ventaSeleccionada.clienteRazonSocial || '—' }}</span>
+        <div *ngIf="ventaSeleccionada" class="mb-3">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <strong>ID Venta:</strong> {{ ventaSeleccionada.idVentaAgrupada }}
+            <span class="ms-1"><strong>Cliente:</strong> {{ ventaSeleccionada.clienteRazonSocial || '—' }}</span>
+          </div>
+          <div class="alert alert-light border py-2 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span class="small mb-0"><i class="bi bi-printer me-1"></i><strong>Comprobante VA</strong> (solo ticket)</span>
+            <button type="button" class="btn btn-primary btn-sm" (click)="imprimirTicketVA(ventaSeleccionada.idVentaAgrupada)" [disabled]="imprimiendoVaId === ventaSeleccionada.idVentaAgrupada">
+              <span *ngIf="imprimiendoVaId === ventaSeleccionada.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
+              <span *ngIf="imprimiendoVaId !== ventaSeleccionada.idVentaAgrupada"><i class="bi bi-printer me-1"></i></span>
+              Abrir ticket / Imprimir
+            </button>
+          </div>
         </div>
         <div *ngIf="cargandoComprobantes" class="text-muted">
           <i class="bi bi-hourglass-split"></i> Cargando comprobantes...
@@ -271,11 +285,11 @@
                 <td>{{ c.fEmision | date:'dd/MM/yyyy' }}</td>
                 <td class="text-end">S/ {{ c.total | number:'1.2-2' }}</td>
                 <td class="text-center">
-                  <div class="btn-group btn-group-sm" role="group">
-                    <button class="btn btn-outline-primary" [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta" (click)="imprimirComprobante(c.idVenta, 'ticket')">Ticket</button>
-                    <button class="btn btn-outline-primary" [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta" (click)="imprimirComprobante(c.idVenta, 'A5')">A5</button>
-                    <button class="btn btn-outline-primary" [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta" (click)="imprimirComprobante(c.idVenta, 'A4')">A4</button>
-                  </div>
+                  <button type="button" class="btn btn-outline-primary btn-sm" title="Generar PDF"
+                          [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta"
+                          (click)="abrirModalPdfComprobanteHijo(c.idVenta)">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                  </button>
                 </td>
               </tr>
               <tr *ngIf="comprobantesVenta.length === 0">
@@ -284,6 +298,59 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal PDF comprobantes hijos (mismo estilo que historial ventas) -->
+<div class="modal fade" id="pdfModalComprobanteHijoPendientes" tabindex="-1" aria-labelledby="pdfModalComprobanteHijoPendientesLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="pdfModalComprobanteHijoPendientesLabel">
+          <i class="bi bi-file-pdf"></i> Generar Comprobante PDF
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Seleccione el formato para el comprobante:</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-primary" [disabled]="generandoPdf" (click)="generarPdfComprobanteHijo('ticket')">
+            <i class="bi bi-receipt"></i> Formato Ticket
+          </button>
+          <button type="button" class="btn btn-outline-primary" [disabled]="generandoPdf" (click)="generarPdfComprobanteHijo('A5')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A5
+          </button>
+          <button type="button" class="btn btn-outline-primary" [disabled]="generandoPdf" (click)="generarPdfComprobanteHijo('A4')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A4
+          </button>
+        </div>
+        <hr class="my-3" />
+        <button type="button" class="btn btn-outline-success w-100" [disabled]="generandoPdf" (click)="abrirFormWhatsappHijo()">
+          <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+        </button>
+        <div *ngIf="mostrarWhatsappFormHijo && datosParaWhatsappHijo" class="mt-3 p-2 border rounded">
+          <label class="form-label small">Número (código país + número)</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappNumberHijo" placeholder="51999999999" />
+          <label class="form-label small">Formato del PDF</label>
+          <select class="form-select form-select-sm mb-2" [(ngModel)]="whatsappFormatoHijo">
+            <option value="ticket">Ticket</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+          <label class="form-label small">Mensaje opcional</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappCaptionHijo" placeholder="Opcional" />
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsappHijo" (click)="enviarPdfPorWhatsappHijo()">
+              <span *ngIf="enviandoWhatsappHijo"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+              <span *ngIf="!enviandoWhatsappHijo"><i class="bi bi-send"></i> Enviar</span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsappHijo" (click)="cerrarFormWhatsappHijo()">Cancelar</button>
+          </div>
+          <p class="small mt-2 mb-0 text-danger" *ngIf="whatsappMensajeHijo">{{ whatsappMensajeHijo }}</p>
+        </div>
+        <p class="text-muted small mt-2 mb-0" *ngIf="generandoPdf && !mostrarWhatsappFormHijo"><i class="bi bi-hourglass-split"></i> Cargando...</p>
       </div>
     </div>
   </div>

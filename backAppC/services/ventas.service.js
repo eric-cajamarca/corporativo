@@ -9,7 +9,6 @@ const facturacionRepository = require('../repositories/facturacion.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const stockService = require('./stock.service');
 const inventarioRepository = require('../repositories/inventario.repository');
-const CajaRepository = require('../repositories/caja.repository');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 
 exports.crearVenta = async (datosVenta, idEmpresa, idUsuario) => {
@@ -520,7 +519,13 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         }
       }
 
-      ventasEmpresa.push({ idEmpresa: idEmpresaProducto, idVenta, compVenta });
+      ventasEmpresa.push({
+        idEmpresa: idEmpresaProducto,
+        idVenta,
+        compVenta,
+        total: totalesEmpresa.total,
+        idSucursal: idSucursalEmpresa,
+      });
     }
 
     // --- Auditoria: registrar CREACION ---
@@ -534,28 +539,27 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       detalle: `VA ${compVentaVA}, tipo destino: ${tipoComprobanteDestino}, empresas: ${ventasEmpresa.length}`
     });
 
-    // --- Caja: registrar cobro en la empresa gestora ---
+    // --- Caja + detalle pago: reparto por comprobante/empresa (multiempresa) ---
     if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
-      const primerVentaHija = ventasEmpresa[0];
-      if (primerVentaHija) {
-        await ventasRepository.insertarDetallePagoVenta(transaction, primerVentaHija.idVenta, detallePago);
-        let idAperturaActual = idApertura || null;
-        if (!idAperturaActual && idSucursalCobradora) {
-          const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, user.empresa, idSucursalCobradora);
-          idAperturaActual = apertura?.idApertura;
-        }
-        if (idAperturaActual) {
-          await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
-            idApertura: idAperturaActual,
-            idEmpresa: user.empresa,
-            idSucursal: idSucursalCobradora,
-            idUsuario: user.sub,
-            idVenta: primerVentaHija.idVenta,
-            compVenta: compVentaVA,
-            detallePago
-          });
-        }
+      if (ventasEmpresa.length === 0) {
+        throw new Error('No hay ventas hijas para asociar el pago y el movimiento de caja.');
       }
+      const ventaAgrupadaCobroService = require('./ventaAgrupadaCobro.service');
+      await ventaAgrupadaCobroService.aplicarCobroVentasAgrupadasMulticompania(pool, transaction, {
+        lineasVenta: ventasEmpresa.map((v) => ({
+          idVenta: v.idVenta,
+          idEmpresa: v.idEmpresa,
+          compVenta: v.compVenta,
+          total: v.total,
+          idSucursal: v.idSucursal,
+        })),
+        detallePago,
+        idEmpresaCobradora: user.empresa,
+        idUsuario: user.sub,
+        compVentaVA: compVentaVA,
+        idAperturaGestoraOpcional: idApertura || null,
+        idSucursalGestoraFallback: idSucursalCobradora,
+      });
     }
 
     await transaction.commit();

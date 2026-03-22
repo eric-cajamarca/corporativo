@@ -67,13 +67,13 @@
           <span class="text-muted small">Agregue productos y cantidades. Para entradas puede indicar costo unitario, fecha vencimiento y nº de lote.</span>
           <div class="d-flex gap-2">
             <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFila()">
-              <i class="fas fa-plus me-1"></i> Agregar línea
+              <i class="bi bi-plus-circle me-1"></i> Agregar línea
             </button>
             <button type="button" class="btn btn-sm btn-outline-success" (click)="abrirBuscadorProductos()">
-              <i class="fas fa-search me-1"></i> Buscar producto
+              <i class="bi bi-search me-1"></i> Buscar producto
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirCrearProducto()">
-              <i class="fas fa-box-open me-1"></i> Crear producto
+              <i class="bi bi-box-open me-1"></i> Crear producto
             </button>
           </div>
         </div>
@@ -118,7 +118,7 @@
                   }
                   <td>
                     <button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarFila($index)" [disabled]="filas.length <= 1" title="Quitar">
-                      <i class="fas fa-trash"></i>
+                      <i class="bi bi-trash"></i>
                     </button>
                   </td>
                 </tr>
@@ -142,7 +142,7 @@
               <span class="spinner-border spinner-border-sm me-1"></span>
             }
             @if (!guardando) {
-              <i class="fas fa-save me-1"></i>
+              <i class="bi bi-save me-1"></i>
             }
             Guardar movimiento
           </button>

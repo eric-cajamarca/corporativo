@@ -249,11 +249,12 @@ const registrarMovimiento = async (req, res) => {
 // Obtener movimientos de caja
 const obtenerMovimientosCaja = async (req, res) => {
   try {
-    const { idApertura, fechaDesde, fechaHasta, tipoMovimiento, soloRecibos } = req.query;
+    const { idApertura, idCaja, fechaDesde, fechaHasta, tipoMovimiento, soloRecibos } = req.query;
 
     const pool = await sql.connect(dbConfig);
     const movimientos = await CajaServices.obtenerMovimientosCajaService(pool, req.user, {
       idApertura,
+      idCaja: idCaja || null,
       fechaDesde,
       fechaHasta,
       tipoMovimiento: tipoMovimiento || null,

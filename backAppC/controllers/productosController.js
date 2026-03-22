@@ -69,9 +69,6 @@ const obtener_productos_compras = async (req, res) => {
   try {
 
     const pool = await sql.connect(dbConfig);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productosController.js:obtener_productos_compras',message:'pool after connect',data:{poolConnected:pool.connected,poolId:pool?.id},timestamp:Date.now(),hypothesisId:'H1,H4,H5'})}).catch(()=>{});
-    // #endregion
 
     const productos = await ProductosServices.obtenerProductosComprasService(pool, req.user);
 
@@ -429,20 +426,35 @@ const crear_producto = async (req, res) => {
 
     try {
       if (usarCorrelativo) {
-        const corrResult = await transaction.request()
-          .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-          .query(`
-            UPDATE Correlativos WITH (UPDLOCK, HOLDLOCK)
-            SET numero = numero + 1
-            OUTPUT INSERTED.numero
-            WHERE idEmpresa = @idEmpresa
-          `);
-        const row = corrResult.recordset && corrResult.recordset[0];
-        if (row) {
-          datosProducto.Codigo = String(row.numero);
-        } else {
-          datosProducto.Codigo = String(Date.now()).slice(-8);
+        const maxIntentos = 500;
+        let codigoAsignado = null;
+        for (let intento = 0; intento < maxIntentos && !codigoAsignado; intento += 1) {
+          const corrResult = await transaction.request()
+            .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+            .query(`
+              UPDATE Correlativos WITH (UPDLOCK, HOLDLOCK)
+              SET numero = numero + 1
+              OUTPUT INSERTED.numero
+              WHERE idEmpresa = @idEmpresa
+            `);
+          const row = corrResult.recordset && corrResult.recordset[0];
+          if (!row) {
+            codigoAsignado = `P-${String(Date.now()).slice(-10)}`;
+            break;
+          }
+          const candidato = String(row.numero);
+          const chk = await transaction.request()
+            .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+            .input("Codigo", sql.VarChar(50), candidato)
+            .query(
+              "SELECT COUNT(1) AS n FROM Productos WHERE idEmpresa = @idEmpresa AND RTRIM(LTRIM(Codigo)) = @Codigo"
+            );
+          const ocupado = Number(chk.recordset?.[0]?.n) > 0;
+          if (!ocupado) {
+            codigoAsignado = candidato;
+          }
         }
+        datosProducto.Codigo = codigoAsignado || `P-${String(Date.now()).slice(-10)}`;
       }
 
       await transaction.request()

@@ -6,12 +6,14 @@ import { VentasService, VentaPendientePagoAgrupada, VentaPendientePago, Comproba
 import { CajaService } from '../../../services/caja.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { PdfService } from '../../../services/pdf.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { EmpresaService } from '../../../services/empresa.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
+import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { Empresa } from '../../../interfaces/pdf-interface';
 
 declare var bootstrap: any;
@@ -48,6 +50,16 @@ export class VentasPendientesPagoComponent implements OnInit {
   errorComprobantes = '';
   generandoPdf = false;
   comprobanteImprimiendoId: number | null = null;
+  /** idVentaAgrupada mientras se carga el ticket VA para impresión. */
+  imprimiendoVaId: string | null = null;
+  idVentaPdfComprobanteHijo: number | null = null;
+  mostrarWhatsappFormHijo = false;
+  datosParaWhatsappHijo: { datos: unknown; nombreArchivo: string } | null = null;
+  whatsappMensajeHijo: string | null = null;
+  whatsappNumberHijo = '';
+  whatsappCaptionHijo = '';
+  whatsappFormatoHijo: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsappHijo = false;
 
   page = 1;
   pageSize = 10;
@@ -84,6 +96,7 @@ export class VentasPendientesPagoComponent implements OnInit {
     private cajaService: CajaService,
     private documentoService: DocumentoService,
     private pdfService: PdfService,
+    private whatsappService: WhatsappService,
     private empresaService: EmpresaService,
     //public sidebarState: SidebarStateService
   ) {}
@@ -193,6 +206,36 @@ export class VentasPendientesPagoComponent implements OnInit {
     if (el) bootstrap.Modal.getOrCreateInstance(el).show();
   }
 
+  /** Comprobante venta agrupada: solo ticket (ventana + Imprimir). */
+  imprimirTicketVA(idVentaAgrupada: string): void {
+    if (!idVentaAgrupada) return;
+    this.imprimiendoVaId = idVentaAgrupada;
+    this.ventasService.getComprobanteVAParaPdf(idVentaAgrupada).subscribe({
+      next: (res) => {
+        this.imprimiendoVaId = null;
+        if (!res?.data) {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.warning({ title: 'Aviso', message: 'No se pudieron cargar los datos del comprobante VA.', position: 'topRight' });
+          }
+          return;
+        }
+        if (!openComprobanteVaTicket(res.data, idVentaAgrupada) && typeof iziToast !== 'undefined') {
+          iziToast.warning({
+            title: 'Aviso',
+            message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: () => {
+        this.imprimiendoVaId = null;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo cargar el ticket VA.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
   abrirModalComprobantes(venta: VentaPendientePagoAgrupada): void {
     this.ventaSeleccionada = venta;
     this.comprobantesVenta = [];
@@ -256,6 +299,112 @@ export class VentasPendientesPagoComponent implements OnInit {
       error: () => {
         this.generandoPdf = false;
         this.comprobanteImprimiendoId = null;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudieron cargar los datos del comprobante.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  abrirModalPdfComprobanteHijo(idVenta: number): void {
+    this.idVentaPdfComprobanteHijo = idVenta;
+    this.mostrarWhatsappFormHijo = false;
+    this.datosParaWhatsappHijo = null;
+    this.whatsappMensajeHijo = null;
+    const el = document.getElementById('pdfModalComprobanteHijoPendientes');
+    if (el && (window as unknown as { bootstrap?: { Modal: { getOrCreateInstance: (e: HTMLElement) => { show: () => void } } } }).bootstrap) {
+      (window as unknown as { bootstrap: { Modal: { getOrCreateInstance: (e: HTMLElement) => { show: () => void } } } }).bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+  }
+
+  generarPdfComprobanteHijo(formato: 'A4' | 'A5' | 'ticket'): void {
+    const id = this.idVentaPdfComprobanteHijo;
+    if (id == null) return;
+    this.imprimirComprobante(id, formato);
+  }
+
+  cerrarFormWhatsappHijo(): void {
+    this.mostrarWhatsappFormHijo = false;
+    this.datosParaWhatsappHijo = null;
+    this.whatsappNumberHijo = '';
+    this.whatsappCaptionHijo = '';
+    this.whatsappFormatoHijo = 'A4';
+    this.whatsappMensajeHijo = null;
+  }
+
+  abrirFormWhatsappHijo(): void {
+    const idVenta = this.idVentaPdfComprobanteHijo;
+    if (idVenta == null) return;
+    this.generandoPdf = true;
+    this.whatsappMensajeHijo = null;
+    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        this.generandoPdf = false;
+        if (!d) return;
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.datosParaWhatsappHijo = { datos, nombreArchivo };
+        this.whatsappNumberHijo = (d.cliente as { celular?: string })?.celular ?? '';
+        this.mostrarWhatsappFormHijo = true;
+      },
+      error: (err) => {
+        this.generandoPdf = false;
+        this.whatsappMensajeHijo = err?.error?.error || err?.message || 'No se pudieron cargar los datos.';
+      }
+    });
+  }
+
+  enviarPdfPorWhatsappHijo(): void {
+    if (!this.datosParaWhatsappHijo || !this.whatsappNumberHijo.trim()) {
+      this.whatsappMensajeHijo = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsappHijo = true;
+    this.whatsappMensajeHijo = null;
+    const { datos, nombreArchivo } = this.datosParaWhatsappHijo;
+    const formato = this.whatsappFormatoHijo;
+    this.pdfService.generarPdfComprobanteVenta(datos as never, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this.whatsappService.enviarArchivo(this.whatsappNumberHijo.trim(), base64, nombreArchivo, 'document', this.whatsappCaptionHijo.trim() || undefined).subscribe({
+            next: (res) => {
+              this.enviandoWhatsappHijo = false;
+              this.whatsappMensajeHijo = res.message;
+              if (res.success) setTimeout(() => this.cerrarFormWhatsappHijo(), 2000);
+            },
+            error: (err) => {
+              this.enviandoWhatsappHijo = false;
+              this.whatsappMensajeHijo = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+            }
+          });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: () => {
+        this.enviandoWhatsappHijo = false;
+        this.whatsappMensajeHijo = 'Error al generar el PDF.';
       }
     });
   }
@@ -323,7 +472,13 @@ export class VentasPendientesPagoComponent implements OnInit {
         next: () => {
           this.guardandoPago = false;
           this.cerrarModalCobrar();
-          if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Éxito', message: 'Cobro registrado correctamente.', position: 'topRight' });
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({
+              title: 'Éxito',
+              message: 'Cobro registrado. Use el botón de impresora en la lista para el ticket VA.',
+              position: 'topRight'
+            });
+          }
           this.cargar();
         },
         error: () => {

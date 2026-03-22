@@ -2,6 +2,16 @@
 const sql = require('mssql');
 const { getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 
+/** IN (@p0,@p1,...) para UUIDs en requests de consulta PDF / multiempresa */
+const bindUniqueIdentifiersIn = (request, idsEmpresa, prefix) => {
+  const list = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  return list.map((id, i) => {
+    const k = `${prefix}${i}`;
+    request.input(k, sql.UniqueIdentifier, id);
+    return `@${k}`;
+  }).join(', ');
+};
+
 exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
   const {
     idSucursal,
@@ -71,18 +81,24 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
 
   if (idVentaAgrupada) {
     req.input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada);
-    return await req.query(`INSERT INTO Ventas 
-      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, idVentaAgrupada) 
-      OUTPUT INSERTED.idVenta
-      VALUES 
-      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario, @idVentaAgrupada)`);
+    return await req.query(`
+      DECLARE @ins TABLE (idVenta INT);
+      INSERT INTO Ventas
+      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, idVentaAgrupada)
+      OUTPUT INSERTED.idVenta INTO @ins
+      VALUES
+      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario, @idVentaAgrupada);
+      SELECT idVenta FROM @ins;`);
   }
 
-  return await req.query(`INSERT INTO Ventas 
-    (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario) 
-    OUTPUT INSERTED.idVenta
-    VALUES 
-    (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario)`);
+  return await req.query(`
+    DECLARE @ins TABLE (idVenta INT);
+    INSERT INTO Ventas
+    (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario)
+    OUTPUT INSERTED.idVenta INTO @ins
+    VALUES
+    (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario);
+    SELECT idVenta FROM @ins;`);
 };
 
 /** Actualiza el número correlativo del comprobante usado en la venta (incrementa en BD para la siguiente). */
@@ -238,16 +254,21 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
   }));
 };
 
-/** Datos completos de una venta para generar comprobante PDF (cabecera, empresa, cliente, items). baseUrl para armar URL del logo (ej: http://localhost:3000). */
-exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = 'http://localhost:3000') => {
+/** Datos completos de una venta para generar comprobante PDF. idsEmpresa: JWT + gestionadas (gestora) o [una empresa].
+ *  Logo, impuestos y productos corresponden a v.idEmpresa de la venta encontrada. */
+exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 'http://localhost:3000') => {
+  const idsPermitidos = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (idsPermitidos.length === 0) return null;
+
+  const inEmp = (req) => bindUniqueIdentifiersIn(req, idsPermitidos, 'pdfEmp');
+
   let cabecera;
   try {
-    cabecera = await pool
-      .request()
-      .input('idVenta', sql.Int, idVenta)
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    const reqCab = pool.request().input('idVenta', sql.Int, idVenta);
+    const inList = inEmp(reqCab);
+    cabecera = await reqCab.query(`
         SELECT
+          v.idEmpresa,
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv,
@@ -269,23 +290,27 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
         LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
-        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList})
       `);
   } catch (err) {
     if (err.message && (err.message.includes('MediosPago') || err.message.includes('Invalid object'))) {
-      cabecera = await pool
-        .request()
-        .input('idVenta', sql.Int, idVenta)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .query(`
+      const reqCab2 = pool.request().input('idVenta', sql.Int, idVenta);
+      const inList2 = inEmp(reqCab2);
+      cabecera = await reqCab2.query(`
         SELECT
+          v.idEmpresa,
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
-          v.subtotal, v.igv, ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          v.subtotal, v.igv,
+          ISNULL(v.exonerado, 0) AS exonerado,
+          ISNULL(v.gratuito, 0) AS gratuito,
+          ISNULL(v.otrosCargos, 0) AS otrosCargos,
+          ISNULL(v.descuentos, 0) AS descuentos, v.total,
           ISNULL(v.eliminado, 0) AS eliminado,
           v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
           'Contado' AS condicionPago,
+          '009' AS codigoCondicionPago,
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
@@ -293,18 +318,22 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
-        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList2})
       `);
     } else {
       throw err;
     }
   }
 
+  const cab = cabecera.recordset && cabecera.recordset[0] ? cabecera.recordset[0] : null;
+  if (!cab || !cab.idEmpresa) return null;
+  const idEmpresaVenta = cab.idEmpresa;
+
   let empresaResult;
   try {
     empresaResult = await pool
       .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
       .query(`
         SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
           ISNULL(e.rubro, '') AS rubro,
@@ -318,41 +347,41 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
   } catch (err) {
     empresaResult = await pool
       .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
       .query(`
         SELECT razon_Social AS nombre, ruc, Logo AS logoArchivo
         FROM Empresas WHERE idEmpresa = @idEmpresa
       `);
   }
-  const empresa = empresaResult;
 
   const items = await pool
     .request()
     .input('idVenta', sql.Int, idVenta)
+    .input('idEmpresaVenta', sql.UniqueIdentifier, idEmpresaVenta)
     .query(`
       SELECT dv.idDetalle, dv.idProducto, dv.cantidad, ISNULL(dv.cantEntregada, 0) AS cantEntregada, dv.pVenta, dv.subtotal, dv.total, p.descripcion, p.codigo
       FROM DetalleVenta dv
-      INNER JOIN Productos p ON p.idProducto = dv.idProducto
+      INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = @idEmpresaVenta
       WHERE dv.idVenta = @idVenta
     `);
 
   const hashResult = await pool
     .request()
     .input('idVenta', sql.Int, idVenta)
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
     .query(`
       SELECT TOP 1 hash AS resumenHash FROM ComprobantesElectronicos
       WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
     `);
 
   let cuotasVenta = [];
-  const codigoComprobante = (cabecera.recordset && cabecera.recordset[0]) ? String((cabecera.recordset[0].codigoComprobante || '01').trim()) : '01';
+  const codigoComprobante = cab ? String((cab.codigoComprobante || '01').trim()) : '01';
   if (codigoComprobante === '01') {
     try {
       const cuotasResult = await pool
         .request()
         .input('idVenta', sql.Int, idVenta)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
         .query(`
           SELECT cu.numeroCuota,
             CONVERT(VARCHAR(10), cu.fechaVencimiento, 120) AS fechaPago,
@@ -374,7 +403,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
 
   const impuestosResult = await pool
     .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
     .query(`
       SELECT idImpuesto, descripcion, ISNULL(codigoSunat, '') AS codigoSunat,
         CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje, pIncluyeIGV
@@ -390,13 +419,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
     pIncluyeIGV: !!r.pIncluyeIGV
   }));
 
-  const cab = cabecera.recordset && cabecera.recordset[0] ? cabecera.recordset[0] : null;
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
   const detalle = items.recordset || [];
   const hashRow = hashResult.recordset && hashResult.recordset[0] ? hashResult.recordset[0] : null;
   const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
-
-  if (!cab) return null;
 
   let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '') ? String(cab.clienteDireccion).trim() : '';
   if (!clienteDireccion && cab.idCliente != null) {
@@ -404,7 +430,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
       const dirClienteResult = await pool
         .request()
         .input('idCliente', sql.Int, cab.idCliente)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
         .query(`SELECT TOP 1 ISNULL(direccion, '') AS direccion FROM DireccionClientes WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa ORDER BY idDireccionClientes`);
       const dirRow = dirClienteResult.recordset && dirClienteResult.recordset[0];
       if (dirRow && dirRow.direccion) clienteDireccion = String(dirRow.direccion).trim();
@@ -440,6 +466,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idEmpresa, baseUrl = '
   return {
     venta: {
       idVenta: cab.idVenta,
+      idEmpresa: cab.idEmpresa,
       idEstadoSunat: cab.idEstadoSunat != null ? cab.idEstadoSunat : null,
       idSucursal: cab.idSucursal,
       idComprobante: cab.idComprobante,
@@ -1107,14 +1134,21 @@ exports.actualizarEstadoPagoVentaAgrupada = async (transaction, idVentaAgrupada,
     `);
 };
 
-/** Lista ventas por empresa asociadas a una venta agrupada. */
+/** Lista ventas por empresa asociadas a una venta agrupada (total + sucursal de Ventas para caja multiempresa). */
 exports.listarVentasEmpresaPorAgrupada = async (transaction, idVentaAgrupada) => {
   const result = await transaction.request()
     .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
     .query(`
-      SELECT idVenta, idEmpresa, compVenta
-      FROM VentaEmpresa
-      WHERE idVentaAgrupada = @idVentaAgrupada
+      SELECT
+        ve.idVenta,
+        ve.idEmpresa,
+        ve.compVenta,
+        ve.total,
+        v.idSucursal
+      FROM VentaEmpresa ve
+      LEFT JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
+      WHERE ve.idVentaAgrupada = @idVentaAgrupada
+      ORDER BY ve.fEmision ASC, ve.idVenta ASC
     `);
   return result.recordset || [];
 };

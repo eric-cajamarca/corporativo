@@ -24,6 +24,8 @@ export interface AperturaCaja {
 export interface MovimientoCaja {
   idMovimientoCaja?: string;
   idMovimiento?: string;
+  idEmpresa?: string;
+  empresaMovimiento?: string;
   idApertura?: string;
   idTipoMovimientoCaja?: number;
   idCaja?: string;

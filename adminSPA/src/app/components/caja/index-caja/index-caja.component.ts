@@ -64,6 +64,10 @@ export class IndexCajaComponent implements OnInit {
     const start = (this.page - 1) * this.pageSize;
     return this.movimientos.slice(start, start + this.pageSize);
   }
+
+  get mostrarColumnaEmpresaMovimiento(): boolean {
+    return this.movimientos.some((m) => !!m.empresaMovimiento);
+  }
   get totalPaginas(): number {
     return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
   }

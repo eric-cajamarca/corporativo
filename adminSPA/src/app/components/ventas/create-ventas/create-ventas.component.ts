@@ -21,6 +21,7 @@ import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
 import { VentasService } from '../../../services/ventas.service';
+import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
@@ -253,12 +254,16 @@ export class CreateVentasComponent implements OnInit {
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
     //if (!this.ventas.fVencimiento) this.ventas.fVencimiento=hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
-    this.gestoresService.obtenerEmpresasGestionadas().subscribe({
-      next: (res: any) => {
-        const empresas = res?.data || [];
-        this.esGestora = empresas.length > 0;
+    // esGestora desde estado_configuración (BD Gestores_Empresas), no desde listado gestores
+    // (obtenerEmpresasGestionadas solo permite Administrador y dejaba al vendedor sin modal gestora).
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        const estado = res?.data;
+        this.esGestora = !!estado?.esGestora;
       },
-      error: () => { this.esGestora = false; }
+      error: () => {
+        this.esGestora = false;
+      }
     });
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
@@ -1622,42 +1627,20 @@ abrirModalPrecios(item: any) {
     });
   }
 
+  /** Solo ticket térmico (ventana + Imprimir); no PDF A4. */
   imprimirComprobanteVA(idVentaAgrupada: string): void {
     this.ventasService.getComprobanteVAParaPdf(idVentaAgrupada).subscribe({
       next: (res) => {
-        if (res?.data) {
-          const pdfService = (window as any).__pdfService;
-          if (pdfService && typeof pdfService.generarPdfComprobanteVA === 'function') {
-            pdfService.generarPdfComprobanteVA(res.data);
-          } else {
-            const w = window.open('', '_blank');
-            if (w) {
-              const d = res.data;
-              const rows = d.items.map((it: any) =>
-                `<tr><td>${it.aliasEmpresa || ''}</td><td>${it.codigo || ''}</td><td>${it.descripcion || ''}</td><td>${it.cantidad}</td><td>${it.pVenta?.toFixed(2)}</td><td>${it.total?.toFixed(2)}</td></tr>`
-              ).join('');
-              const tipoLabel = d.venta.tipoComprobanteDestinoNombre || d.venta.tipoComprobanteDestino || '';
-              w.document.write(`<!DOCTYPE html><html><head><title>Comprobante VA</title>
-                <style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f5f5}.header{text-align:center;margin-bottom:20px}.total{text-align:right;font-size:16px;font-weight:bold;margin-top:10px}@media print{.no-print{display:none}}</style>
-              </head><body>
-                <div class="header">
-                  <h2>${d.empresa.nombre || 'Empresa'}</h2>
-                  <p>RUC: ${d.empresa.ruc || ''} | ${d.empresa.direccion || ''}</p>
-                  <h3>VENTA AGRUPADA ${d.venta.compVenta || ''}</h3>
-                  <p>Tipo comprobante destino: <strong>${tipoLabel}</strong></p>
-                  <p>Fecha: ${d.venta.fEmision || ''}</p>
-                </div>
-                <p><strong>Cliente:</strong> ${d.cliente.rSocial || ''} | ${d.cliente.ruc || ''}</p>
-                <table><thead><tr><th>Empresa</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>P.Unit</th><th>Total</th></tr></thead>
-                <tbody>${rows}</tbody></table>
-                <p class="total">TOTAL: S/ ${d.venta.total?.toFixed(2)}</p>
-                <p style="text-align:center;margin-top:20px;font-size:10px">ID: ${idVentaAgrupada}</p>
-                <div style="text-align:center;margin-top:10px"><img src="https://barcode.tec-it.com/barcode.ashx?data=${idVentaAgrupada}&code=Code128&translate-esc=true&dpi=96" alt="barcode" style="height:50px"/></div>
-                <br/><button class="no-print" onclick="window.print()">Imprimir</button>
-              </body></html>`);
-              w.document.close();
-            }
-          }
+        if (!res?.data) {
+          iziToast.warning({ title: 'Aviso', message: 'No se pudieron cargar los datos del comprobante VA.', position: 'topRight' });
+          return;
+        }
+        if (!openComprobanteVaTicket(res.data, idVentaAgrupada)) {
+          iziToast.warning({
+            title: 'Aviso',
+            message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
+            position: 'topRight'
+          });
         }
       },
       error: () => {

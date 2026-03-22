@@ -142,9 +142,11 @@ export class IndexProductoComponent {
   }
 
   abrirCrearProducto(): void {
-    this._productoCrearModal.abrir().then(() => {
-      this.initData();
-    }).catch(() => {});
+    this._productoCrearModal.abrir().then((r) => {
+      if (r) {
+        this.initData();
+      }
+    });
   }
 
 

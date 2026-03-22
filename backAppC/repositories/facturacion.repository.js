@@ -587,7 +587,7 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
     tipoComprobante = (vRow.tipoComprobante || "01").toString().trim();
   }
 
-  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa);
+  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, [idEmpresa]);
   if (!payload || !payload.venta || !payload.cliente) return null;
 
   const venta = payload.venta;
@@ -635,7 +635,7 @@ exports.obtenerComprobanteOrigenParaNotaRepo = async (pool, idComprobanteElectro
     `);
   const ce = ceResult.recordset && ceResult.recordset[0];
   if (!ce) return null;
-  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, ce.idVenta, idEmpresa);
+  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, ce.idVenta, [idEmpresa]);
   if (!payload) return null;
   return {
     comprobanteOrigen: {
@@ -751,11 +751,13 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
     insertVenta.input("codigoMotivoNotaCredito", sql.VarChar(2), tipoNota === "07" ? (codigoMotivoNotaCredito || "01") : null);
 
     const ventaInsertResult = await insertVenta.query(`
+      DECLARE @ins TABLE (idVenta INT);
       INSERT INTO Ventas (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio,
         subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, tipoComprobanteRef, codigoMotivoNotaCredito)
-      OUTPUT INSERTED.idVenta
+      OUTPUT INSERTED.idVenta INTO @ins
       VALUES (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fEmision, @idCliente, @idMoneda, @tCambio,
-        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 1, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito)
+        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 1, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito);
+      SELECT idVenta FROM @ins;
     `);
     const idVenta = ventaInsertResult.recordset && ventaInsertResult.recordset[0] && ventaInsertResult.recordset[0].idVenta;
     if (!idVenta) {
@@ -1283,7 +1285,7 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
 exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElectronico) => {
   const comp = await exports.obtenerComprobanteParaEnvioRepo(pool, idComprobanteElectronico, user.empresa);
   if (!comp) return { ok: false, mensaje: "Comprobante no encontrado" };
-  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, user.empresa);
+  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, [user.empresa]);
   if (!payload) return { ok: false, mensaje: "No se encontraron datos de la venta para generar el comprobante" };
   const configFirma = await exports.obtenerConfiguracionParaFirmaRepo(pool, user.empresa);
   const certBase64 = configFirma?.certificadoDigital;
@@ -1349,7 +1351,7 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
   debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:comprobante", message: "comprobante", data: compData });
   // #endregion
 
-  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, user.empresa);
+  const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, [user.empresa]);
   if (!payload) {
     return {
       ok: false,

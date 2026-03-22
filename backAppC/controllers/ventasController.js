@@ -3,10 +3,26 @@ const fs = require('fs');
 const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const ventasRepository = require('../repositories/ventas.repository');
+const gestoresRepository = require('../repositories/gestores.repository');
 const facturacionRepository = require('../repositories/facturacion.repository');
 const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+
+/** Empresa JWT + gestionadas (gestora): permite PDF/comprobante de ventas de empresas hijas. */
+const idsEmpresaParaComprobanteVenta = async (pool, idEmpresaUsuario) => {
+  const ids = new Set();
+  if (idEmpresaUsuario) ids.add(String(idEmpresaUsuario));
+  try {
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaUsuario);
+    for (const g of gestionadas || []) {
+      if (g.idEmpresa) ids.add(String(g.idEmpresa));
+    }
+  } catch (_) {
+    /* solo JWT */
+  }
+  return Array.from(ids);
+};
 
 const crearVenta = async function (req, res) {
     const datosVenta = req.body;
@@ -194,7 +210,8 @@ const obtenerComprobanteParaPdf = async function (req, res) {
   try {
     const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
     const pool = await sql.connect(dbConfig);
-    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa, baseUrl);
+    const idsEmpresa = await idsEmpresaParaComprobanteVenta(pool, idEmpresa);
+    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idsEmpresa, baseUrl);
     if (!data) {
       return res.status(404).json({ error: 'Venta no encontrada' });
     }
@@ -518,7 +535,8 @@ const actualizarVentaEdicion = async (req, res) => {
   }
   try {
     const pool = await sql.connect(dbConfig);
-    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idEmpresa);
+    const idsEmpresa = await idsEmpresaParaComprobanteVenta(pool, idEmpresa);
+    const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idsEmpresa);
     if (!data || !data.venta) {
       return res.status(404).json({ error: 'Venta no encontrada' });
     }
@@ -533,7 +551,8 @@ const actualizarVentaEdicion = async (req, res) => {
         error: 'No se puede editar: el comprobante ya fue enviado o aceptado en SUNAT.'
       });
     }
-    const result = await ventasRepository.actualizarVentaCompleta(pool, idVenta, idEmpresa, {
+    const idEmpresaVenta = data.venta.idEmpresa || idEmpresa;
+    const result = await ventasRepository.actualizarVentaCompleta(pool, idVenta, idEmpresaVenta, {
       ...cabecera,
       idEstadoSunat
     }, detalles);
@@ -656,12 +675,11 @@ const postCobrarVentaAgrupada = async (req, res) => {
   }
   try {
     const pool = await sql.connect(dbConfig);
-    const CajaRepository = require('../repositories/caja.repository');
     const ventaAgrRow = await pool.request()
       .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
       .input('idEmpresaCobradora', sql.UniqueIdentifier, req.user.empresa)
       .query(`
-        SELECT idVentaAgrupada, idSucursal, idEstadoPago
+        SELECT idVentaAgrupada, idSucursal, idEstadoPago, compVenta
         FROM VentaAgrupada
         WHERE idVentaAgrupada = @idVentaAgrupada AND idEmpresaCobradora = @idEmpresaCobradora
       `);
@@ -676,32 +694,37 @@ const postCobrarVentaAgrupada = async (req, res) => {
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
     try {
-      await ventasRepository.actualizarEstadoPagoVentaAgrupada(transaction, idVentaAgrupada, req.user.empresa, 2);
       const ventasEmp = await ventasRepository.listarVentasEmpresaPorAgrupada(transaction, idVentaAgrupada);
+      if (!ventasEmp || ventasEmp.length === 0) {
+        throw new Error('La venta agrupada no tiene comprobantes asociados (VentaEmpresa). No se puede cobrar.');
+      }
+
+      await ventasRepository.actualizarEstadoPagoVentaAgrupada(transaction, idVentaAgrupada, req.user.empresa, 2);
       for (const ve of ventasEmp) {
         await ventasRepository.actualizarEstadoPagoVenta(transaction, ve.idVenta, ve.idEmpresa, 2);
       }
 
-      const ventaCobradora = ventasEmp.find(v => String(v.idEmpresa) === String(req.user.empresa));
-      if (ventaCobradora) {
-        await ventasRepository.insertarDetallePagoVenta(transaction, ventaCobradora.idVenta, detallePago);
-        let idAperturaActual = idApertura || null;
-        if (!idAperturaActual && ventaAgr.idSucursal) {
-          const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, ventaAgr.idSucursal);
-          idAperturaActual = apertura?.idApertura;
-        }
-        if (idAperturaActual) {
-          await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
-            idApertura: idAperturaActual,
-            idEmpresa: req.user.empresa,
-            idSucursal: ventaAgr.idSucursal,
-            idUsuario: req.user.sub,
-            idVenta: ventaCobradora.idVenta,
-            compVenta: ventaCobradora.compVenta || '',
-            detallePago
-          });
-        }
-      }
+      const compParaCaja = (ventaAgr.compVenta && String(ventaAgr.compVenta).trim())
+        ? String(ventaAgr.compVenta).trim()
+        : 'S/N';
+
+      const ventaAgrupadaCobroService = require('../services/ventaAgrupadaCobro.service');
+      await ventaAgrupadaCobroService.aplicarCobroVentasAgrupadasMulticompania(pool, transaction, {
+        lineasVenta: ventasEmp.map((v) => ({
+          idVenta: v.idVenta,
+          idEmpresa: v.idEmpresa,
+          compVenta: v.compVenta,
+          total: v.total,
+          idSucursal: v.idSucursal,
+        })),
+        detallePago,
+        idEmpresaCobradora: req.user.empresa,
+        idUsuario: req.user.sub,
+        compVentaVA: compParaCaja,
+        idAperturaGestoraOpcional: idApertura || null,
+        idSucursalGestoraFallback: ventaAgr.idSucursal,
+      });
+
       await transaction.commit();
       res.json({ message: 'Cobro registrado correctamente' });
     } catch (err) {
@@ -710,7 +733,20 @@ const postCobrarVentaAgrupada = async (req, res) => {
     }
   } catch (error) {
     console.error('Error postCobrarVentaAgrupada:', error);
-    res.status(500).json({ error: error.message || 'Error al registrar cobro' });
+    const msg = error.message || 'Error al registrar cobro';
+    const cod = error.code;
+    const esNegocio =
+      cod === 'TOTAL_PAGO_INCONSISTENTE' ||
+      cod === 'PAGO_INSUFICIENTE' ||
+      cod === 'PAGO_EXCEDENTE' ||
+      msg.includes('Debe abrir una caja') ||
+      msg.includes('No hay caja abierta') ||
+      msg.includes('no coincide con la suma de comprobantes') ||
+      msg.includes('No alcanzan las formas de pago') ||
+      msg.includes('Sobran montos en formas de pago') ||
+      msg.includes('no tiene idVenta válido') ||
+      msg.includes('no tiene comprobantes asociados');
+    res.status(esNegocio ? 400 : 500).json({ error: msg });
   }
 };
 /** POST /ventas/:idVenta/cobrar - Registra cobro de una venta pendiente. Body: { detallePago: [{ idMediosPago, monto }], idApertura? }. */
@@ -749,10 +785,18 @@ const postCobrarVenta = async (req, res) => {
     try {
       await ventasRepository.actualizarEstadoPagoVenta(transaction, idVenta, req.user.empresa, 2);
       await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);
+      let idSucursalCaja = venta.idSucursal;
       let idAperturaActual = idApertura || null;
       if (!idAperturaActual && venta.idSucursal) {
         const apertura = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, req.user.empresa, venta.idSucursal);
         idAperturaActual = apertura?.idApertura;
+      }
+      if (!idAperturaActual) {
+        const cualquier = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(pool, req.user.empresa);
+        if (cualquier?.idApertura) {
+          idAperturaActual = cualquier.idApertura;
+          idSucursalCaja = cualquier.idSucursal || venta.idSucursal;
+        }
       }
       const rComp = await transaction.request()
         .input('idComprobante', sql.Int, venta.idComprobante)
@@ -763,7 +807,7 @@ const postCobrarVenta = async (req, res) => {
         await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
           idApertura: idAperturaActual,
           idEmpresa: req.user.empresa,
-          idSucursal: venta.idSucursal,
+          idSucursal: idSucursalCaja,
           idUsuario: req.user.sub,
           idVenta,
           compVenta: venta.compVenta || '',
