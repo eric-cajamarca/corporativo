@@ -270,6 +270,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         SELECT
           v.idEmpresa,
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
+          v.idVentaAgrupada,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv,
           ISNULL(v.exonerado, 0) AS exonerado,
@@ -300,6 +301,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         SELECT
           v.idEmpresa,
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
+          v.idVentaAgrupada,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.subtotal, v.igv,
           ISNULL(v.exonerado, 0) AS exonerado,
@@ -467,6 +469,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     venta: {
       idVenta: cab.idVenta,
       idEmpresa: cab.idEmpresa,
+      idVentaAgrupada: cab.idVentaAgrupada != null ? String(cab.idVentaAgrupada).trim() : null,
       idEstadoSunat: cab.idEstadoSunat != null ? cab.idEstadoSunat : null,
       idSucursal: cab.idSucursal,
       idComprobante: cab.idComprobante,

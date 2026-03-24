@@ -8,7 +8,7 @@ const obtenerDespachosVenta = async (req, res) => {
     const { idVenta } = req.params;
 
     const pool = await sql.connect(dbConfig);
-    const despachos = await DespachosServices.obtenerDespachosVentaService(pool, req.user, idVenta);
+    const despachos = await DespachosServices.obtenerDespachosVentaService(pool, req.user, idVenta, req.query);
 
     res.status(200).send({ data: despachos });
   } catch (error) {
@@ -36,7 +36,8 @@ const crearDespacho = async (req, res) => {
       idVenta,
       idTipoDespacho,
       observaciones,
-      detalles
+      detalles,
+      idEmpresa
     } = req.body;
 
     // Validación básica
@@ -48,11 +49,16 @@ const crearDespacho = async (req, res) => {
     }
 
     const pool = await sql.connect(dbConfig);
+    const idEmpresaOperativa =
+      idEmpresa != null && String(idEmpresa).trim() !== ''
+        ? String(idEmpresa).trim()
+        : undefined;
     const result = await DespachosServices.crearDespachoService(pool, req.user, {
       idVenta,
       idTipoDespacho,
       observaciones,
-      detalles: Array.isArray(detalles) ? detalles : undefined
+      detalles: Array.isArray(detalles) ? detalles : undefined,
+      ...(idEmpresaOperativa ? { idEmpresa: idEmpresaOperativa } : {})
     });
 
     res.status(200).send({
@@ -65,7 +71,7 @@ const crearDespacho = async (req, res) => {
     }
     if (error.message === "NO_PERMISSIONS") {
       return res.status(403).send({
-        message: "No tiene permisos para realizar esta acción",
+        message: "No tiene permisos para realizar esta acción o para operar en esta empresa",
         data: undefined
       });
     }
@@ -218,8 +224,40 @@ const buscarVentaDespachos = async (req, res) => {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permiso para esta empresa", data: undefined });
+    }
     console.error("Error buscar venta despachos:", error);
     res.status(500).send({ message: "Error al buscar", data: undefined });
+  }
+};
+
+const buscarVentaAgrupadaDespachoGestora = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const resultado = await DespachosServices.buscarVentaAgrupadaDespachoGestoraService(pool, req.user, req.query);
+    if (!resultado) {
+      return res.status(404).send({ message: "Sin coincidencias", data: null });
+    }
+    res.status(200).send({ message: "OK", data: resultado });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({ message: "Sin permisos", data: undefined });
+    }
+    if (error.message === "NO_ES_GESTORA") {
+      return res.status(403).send({ message: "Solo disponible para empresa gestora", data: undefined });
+    }
+    if (error.message === "FILTROS_REQUERIDOS") {
+      return res.status(400).send({
+        message: "Indique id o número de venta agrupada, RUC o nombre de cliente",
+        data: undefined
+      });
+    }
+    console.error("Error buscar VA despachos:", error);
+    res.status(500).send({ message: "Error al buscar venta agrupada", data: undefined });
   }
 };
 
@@ -247,5 +285,6 @@ module.exports = {
   obtenerTiposDespacho,
   obtenerEstadoDespachos,
   buscarVentaDespachos,
+  buscarVentaAgrupadaDespachoGestora,
   obtenerDetalleDespacho
 };

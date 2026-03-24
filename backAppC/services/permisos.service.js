@@ -1,6 +1,135 @@
 // SIEMPRE valida reglas de negocio aquí (regla 1.3)
 // NUNCA hagas cálculos de precios/impuestos en repositories
 const permisosRepository = require('../repositories/permisos.repository');
+const gestoresRepository = require('../repositories/gestores.repository');
+
+/**
+ * Navegación reducida para empresa gestora (tiene empresas gestionadas activas).
+ * Consultas: Dashboard + Análisis. Ventas: nueva, historial, cotizaciones.
+ * Caja: gestión, ventas pendientes, arqueo. Despachos: módulo completo. Empresa mínima.
+ */
+function construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChofer) {
+    const can = (p) => esAdmin || permisos.includes(p);
+    const items = [];
+
+    if (can('VER_DASHBOARD')) {
+        items.push({
+            modulo: 'DASHBOARD',
+            nombre: 'Dashboard',
+            icono: 'bi bi-speedometer2',
+            ruta: '/home',
+            permiso: 'VER_DASHBOARD',
+            visible: true
+        });
+    }
+    if (can('VER_ANALISIS')) {
+        items.push({
+            modulo: 'ANALISIS',
+            nombre: 'Análisis',
+            icono: 'bi bi-graph-up',
+            ruta: '/analisis',
+            permiso: 'VER_ANALISIS',
+            visible: true
+        });
+    }
+
+    items.push({ tipo: 'separador' });
+
+    const subVentas = [];
+    if (can('CREAR_VENTAS')) {
+        subVentas.push({ nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: true });
+    }
+    if (can('VER_VENTAS')) {
+        subVentas.push({ nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true });
+        subVentas.push({ nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true });
+    }
+    if (subVentas.length > 0) {
+        items.push({
+            modulo: 'VENTAS',
+            nombre: 'Ventas',
+            icono: 'bi bi-cart',
+            ruta: null,
+            permiso: 'VER_VENTAS',
+            visible: true,
+            submenu: subVentas
+        });
+    }
+
+    const subCaja = [];
+    if (can('VER_CAJA')) {
+        subCaja.push({ nombre: 'Gestión de Cajas', ruta: '/caja', permiso: 'VER_CAJA', visible: true });
+        subCaja.push({ nombre: 'Ventas pendientes de pago', ruta: '/caja/ventas-pendientes-pago', permiso: 'VER_CAJA', visible: true });
+    }
+    if (can('VER_ARQUEO') || can('VER_CAJA')) {
+        subCaja.push({ nombre: 'Arqueo de Caja', ruta: '/caja/arqueo', permiso: 'VER_ARQUEO', visible: true });
+    }
+    if (subCaja.length > 0) {
+        items.push({
+            modulo: 'CAJA',
+            nombre: 'Caja',
+            icono: 'bi bi-cash-coin',
+            ruta: null,
+            permiso: 'VER_CAJA',
+            visible: true,
+            submenu: subCaja
+        });
+    }
+
+    items.push({ tipo: 'separador' });
+
+    const subDespachos = [
+        {
+            nombre: 'Despachos',
+            ruta: '/despachos',
+            permiso: 'VER_DESPACHOS',
+            visible: esAdmin || permisos.includes('VER_DESPACHOS')
+        },
+        {
+            nombre: 'Envios programados',
+            ruta: '/envios',
+            permiso: 'VER_ENVIOS',
+            visible: esAdmin || permisos.includes('VER_ENVIOS')
+        },
+        {
+            nombre: 'Mis envíos (Chofer)',
+            ruta: '/envios/mis-envios',
+            permiso: 'VER_ENVIOS_CHOFER',
+            visible: esAdmin || tieneVerEnviosChofer
+        }
+    ].filter((s) => s.visible);
+    if (subDespachos.length > 0) {
+        items.push({
+            modulo: 'DESPACHOS',
+            nombre: 'Despachos',
+            icono: 'bi bi-truck',
+            ruta: null,
+            permiso: 'VER_DESPACHOS',
+            visible: true,
+            submenu: subDespachos
+        });
+    }
+
+    if (can('VER_EMPRESA')) {
+        items.push({
+            modulo: 'EMPRESA',
+            nombre: 'Empresa',
+            icono: 'bi bi-building-check',
+            ruta: '/editar-empresa',
+            permiso: 'VER_EMPRESA',
+            visible: true
+        });
+    }
+
+    return items.filter((item) => {
+        if (item.tipo === 'separador') return true;
+        if (!item.visible) return false;
+        if (item.submenu) {
+            item.submenu = item.submenu.filter((sub) => sub.visible);
+            if (item.submenu.length === 0) return false;
+        }
+        return true;
+    });
+}
 
 /**
  * Obtiene los permisos de un usuario
@@ -173,7 +302,6 @@ const obtenerNavegacionSidebar = async (pool, user) => {
 
     // Obtener permisos del usuario
     const permisosData = await obtenerPermisosUsuario(pool, user);
-    console.log('estos permisos tiene el usuario', permisosData);
     const permisos = permisosData.listaPermisos;
 
     // Si es administrador, tiene acceso a todo
@@ -438,7 +566,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
     ];
 
     // Filtrar solo los elementos visibles
-    return navegacion.filter(item => {
+    let resultado = navegacion.filter(item => {
         if (item.tipo === 'separador') return true;
         if (!item.visible) return false;
         
@@ -451,6 +579,13 @@ const obtenerNavegacionSidebar = async (pool, user) => {
         
         return true;
     });
+
+    const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+    if (esGestora) {
+        resultado = construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChofer);
+    }
+
+    return resultado;
 };
 
 module.exports = {

@@ -71,7 +71,6 @@ export class CreateVentasComponent implements OnInit {
   public impuestosActivosEmpresa: Impuesto[] = [];
   public sucursales: Sucursal[] = [];
   public carrito: any[] = [];
-  public buscadorModal: any;
   public moneda: any = [];
   public mediosPago: any[] = [];
   public formasPago: FormaPago[] = [];
@@ -265,6 +264,7 @@ export class CreateVentasComponent implements OnInit {
         this.esGestora = false;
       }
     });
+    this._productoService.limpiarCacheListaProductos();
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
     if (this.hotelPreloadVentaService.hasPreload()) {
@@ -399,8 +399,8 @@ export class CreateVentasComponent implements OnInit {
     this.limpiarVenta();
   }
   /** Consulta productos para refrescar stock (p. ej. tras registrar una venta). */
-  cargarProductos(): void {
-    this._productoService.obtenerProductosTodos().subscribe({
+  cargarProductos(opciones?: { evitarCache?: boolean }): void {
+    this._productoService.obtenerProductosTodos(opciones).subscribe({
       next: (response: any) => {
         if (response?.data != null) {
           this.productos = response.data;
@@ -417,7 +417,7 @@ export class CreateVentasComponent implements OnInit {
 
   // Función para cargar todos los productos
   cargarDatos(){
-    this._productoService.obtenerProductosTodos().subscribe(
+    this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe(
       (response: any) => {
         if (response.data != undefined) {
           this.productos = response.data;
@@ -883,11 +883,9 @@ abrirModalPrecios(item: any) {
   
 
   abrirBuscadorModal(): void {
-    
-    this.searchTerm = '';
-    this.productos_filtrados = [];          // o cárgalos todos
-    const modal = new bootstrap.Modal(this.buscadorModal.nativeElement);
-    modal.show();
+    const el = document.getElementById('buscadorModal');
+    if (!el) return;
+    bootstrap.Modal.getOrCreateInstance(el).show();
   }
 
   onInputChangesCompventas() {
@@ -1820,7 +1818,7 @@ abrirModalPrecios(item: any) {
     }
 
     this.actualizaTotales();
-    this.cargarProductos();
+    this.cargarProductos({ evitarCache: true });
   }
 }
 

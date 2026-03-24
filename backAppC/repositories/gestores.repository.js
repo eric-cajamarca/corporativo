@@ -233,10 +233,39 @@ const guardarConfiguracion = async (pool, idEmpresa, clave, valor, descripcion, 
     return result.rowsAffected[0];
 };
 
+/** True si la empresa tiene al menos una relación activa como gestora (origen). */
+const esEmpresaGestoraActiva = async (pool, idEmpresa) => {
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT COUNT(*) AS n
+            FROM Gestores_Empresas
+            WHERE idEmpresaOrigen = @idEmpresa AND estado = 1
+        `);
+    return Number(result.recordset[0]?.n || 0) > 0;
+};
+
+/** True si idEmpresaOrigen gestiona activamente a idEmpresaDestino. */
+const verificarGestorGestionaEmpresa = async (pool, idEmpresaOrigen, idEmpresaDestino) => {
+    if (!idEmpresaOrigen || !idEmpresaDestino) return false;
+    if (String(idEmpresaOrigen) === String(idEmpresaDestino)) return true;
+    const result = await pool.request()
+        .input('idOrigen', sql.UniqueIdentifier, idEmpresaOrigen)
+        .input('idDestino', sql.UniqueIdentifier, idEmpresaDestino)
+        .query(`
+            SELECT 1 AS ok
+            FROM Gestores_Empresas
+            WHERE idEmpresaOrigen = @idOrigen AND idEmpresaDestino = @idDestino AND estado = 1
+        `);
+    return (result.recordset || []).length > 0;
+};
+
 module.exports = {
     obtenerGestoresPorEmpresa,
     obtenerEmpresasGestionadas,
     obtenerGestoresDeEmpresa,
+    esEmpresaGestoraActiva,
+    verificarGestorGestionaEmpresa,
     asignarGestor,
     removerGestor,
     activarGestor,

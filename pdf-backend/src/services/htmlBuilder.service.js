@@ -290,6 +290,43 @@ class HtmlBuilderService {
     return [rucEmisor, codigo, serieNum, igv, total, fecha, tipoDoc, rucCliente, hash].join('|');
   }
 
+  /** Comprobantes con QR y leyenda SUNAT (Facturador). No NV ni CT ni cotización. */
+  _codigosComprobanteConQrSunat() {
+    return new Set(['01', '03', '07', '08']);
+  }
+
+  _debeMostrarQrYPieSunat(esCotizacion, codigoComprobante) {
+    const cod = String(codigoComprobante || '').trim();
+    if (esCotizacion || cod === 'CT' || cod === 'NV') return false;
+    return this._codigosComprobanteConQrSunat().has(cod);
+  }
+
+  _tituloRepresentacionElectronica(codigo) {
+    const c = String(codigo || '').trim();
+    const map = {
+      '01': 'FACTURA ELECTRÓNICA',
+      '03': 'BOLETA DE VENTA ELECTRÓNICA',
+      '07': 'NOTA DE CRÉDITO ELECTRÓNICA',
+      '08': 'NOTA DE DÉBITO ELECTRÓNICA'
+    };
+    return map[c] || 'COMPROBANTE DE PAGO ELECTRÓNICO';
+  }
+
+  /** Pie legal SUNAT al final del PDF (hash viene de ComprobantesElectronicos al generar XML). */
+  _htmlPieSunatElectronico(codigoComprobante, resumenHash) {
+    const titulo = this._tituloRepresentacionElectronica(codigoComprobante);
+    const hashEsc = (resumenHash && String(resumenHash).trim())
+      ? String(resumenHash).trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      : '—';
+    return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;">
+      <div>* Bienes transferidos en la Amazonía para ser consumidos en la misma</div>
+      <div>* Representación impresa de ${titulo}</div>
+      <div>* Generado desde el Factuador SUNAT</div>
+      <div>* Resumen código H: ${hashEsc}</div>
+      <div>* Consultar el comprobante en el portal SUNAT con su CLAVE SOL</div>
+    </div>`;
+  }
+
   /**
    * Construye HTML para comprobante en formato TICKET (80mm, térmico).
    * Misma estructura que factura electrónica: empresa, comprobante, cliente, ítems, totales, SON, bloque final con QR.
@@ -299,9 +336,10 @@ class HtmlBuilderService {
       empresa, venta, titulo, compVenta, fEmision,
       logoSrc, razonSocial, dirCliente, rucCliente,
       filasItems, lineasTotales, cantidadLetras,
-      textoRepresentacion, resumenHash, qrDataUri,
-      idVenta = '', barcodeIdVentaUrl = '',
-      observaciones = ''
+      qrDataUri, pieSunatHtml = '',
+      barcodeIdVentaUrl = '',
+      observaciones = '',
+      tablaCuotasHtml = ''
     } = data;
     const total = Number(venta.total) || 0;
     return `<!DOCTYPE html>
@@ -332,9 +370,12 @@ class HtmlBuilderService {
     .ticket-son { font-size: 7px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; }
     .ticket-final { margin-top: 6px; padding: 4px 0; font-size: 6px; }
     .ticket-final .txt { margin-bottom: 2px; }
-    .ticket-final .qr-wrap { text-align: center; margin-top: 4px; }
-    .ticket-final .qr-wrap img { width: 70px; height: 70px; }
-    .ticket-final .barcode-venta { margin-top: 4px; font-size: 6px; }
+    .ticket-sunat-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 4px; margin-top: 4px; width: 100%; }
+    .ticket-sunat-text { flex: 1; min-width: 0; text-align: left; }
+    .ticket-sunat-text .pie-sunat-electronico { font-size: 5px !important; line-height: 1.35 !important; margin: 0 !important; }
+    .ticket-sunat-qr { flex-shrink: 0; }
+    .ticket-sunat-qr img { width: 56px; height: 56px; display: block; }
+    .ticket-final .barcode-venta { margin-top: 4px; text-align: center; }
     .ticket-final .barcode-venta img { height: 28px; width: auto; max-width: 60mm; }
   </style>
 </head>
@@ -371,13 +412,11 @@ class HtmlBuilderService {
   </table>
   <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
   ${observaciones ? '<hr class="ticket-sep"><div style="font-size:7px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
-  ${data.tablaCuotasHtml || ''}
+  ${tablaCuotasHtml || ''}
   <div class="ticket-final">
-    ${textoRepresentacion ? '<div class="txt">' + textoRepresentacion + '</div>' : ''}
-    ${qrDataUri ? '<div class="txt">Visite https://mifacturasunat.com</div>' : ''}
-    ${resumenHash ? '<div class="txt">Resumen: ' + resumenHash + '</div>' : ''}
     ${qrDataUri ? '<div class="qr-wrap"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
-    ${barcodeIdVentaUrl ? '<div class="barcode-venta">Venta: ' + idVenta + '<br><img src="' + barcodeIdVentaUrl + '" alt="' + idVenta + '"/></div>' : ''}
+    ${pieSunatHtml || ''}
+    ${barcodeIdVentaUrl ? '<div class="barcode-venta">Venta (despacho):<br><img src="' + barcodeIdVentaUrl + '" alt="código"/></div>' : ''}
   </div>
 </body>
 </html>`;
@@ -404,9 +443,13 @@ class HtmlBuilderService {
     const compVenta = venta.compVenta || '';
     const fEmision = venta.fEmision || '';
     const idVenta = venta.idVenta != null ? String(venta.idVenta) : '';
-    const barcodeIdVentaUrl = idVenta
-      ? 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(idVenta) + '&code=Code128&translate=esc'
-      : '';
+    const codigoComp = String(venta.codigoComprobante || '').trim();
+    const tieneVentaAgrupada =
+      venta.idVentaAgrupada != null && String(venta.idVentaAgrupada).trim() !== '';
+    const barcodeIdVentaUrl =
+      tieneVentaAgrupada && idVenta
+        ? 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(idVenta) + '&code=Code128&translate=esc'
+        : '';
     const subtotal = Number(venta.subtotal) || 0;
     const igv = Number(venta.igv) || 0;
     const exonerado = Number(venta.exonerado) || 0;
@@ -414,16 +457,18 @@ class HtmlBuilderService {
     const otrosCargos = Number(venta.otrosCargos) || 0;
     const descuentos = Number(venta.descuentos) || 0;
     const total = Number(venta.total) || 0;
-    const resumenHash = esCotizacion ? '' : ((venta.resumenHash && String(venta.resumenHash).trim()) || '');
+    const mostrarQrPie = this._debeMostrarQrYPieSunat(esCotizacion, codigoComp);
+    const resumenHash = mostrarQrPie ? ((venta.resumenHash && String(venta.resumenHash).trim()) || '') : '';
+    const pieSunatHtml = mostrarQrPie ? this._htmlPieSunatElectronico(codigoComp, resumenHash) : '';
 
     const logoSrc = await this._resolveLogoToDataUri(empresa.logo);
     let qrDataUri = '';
-    if (!esCotizacion) {
+    if (mostrarQrPie) {
       const qrString = this._buildQrString(empresa, venta, cliente);
       try {
         qrDataUri = await QRCode.toDataURL(qrString, { width: formato === 'ticket' ? 80 : 120, margin: 1 });
       } catch (e) {
-        qrDataUri = this._defaultLogoDataUri();
+        qrDataUri = '';
       }
     }
 
@@ -450,8 +495,7 @@ class HtmlBuilderService {
     const filasTotales = lineasTotales.map(l => `
       <tr${l.total ? ' class="total-row"' : ''}><td>${l.label}</td><td class="text-end">${Number(l.value).toFixed(2)}</td></tr>`).join('');
 
-    const esFactura = (venta.codigoComprobante || '01') === '01';
-    const textoRepresentacion = esCotizacion ? '' : (esFactura ? 'Representación impresa de la FACTURA ELECTRÓNICA' : 'Representación impresa de la BOLETA DE VENTA ELECTRÓNICA');
+    const esFactura = codigoComp === '01';
 
     const observaciones = (venta.observaciones && String(venta.observaciones).trim()) || (venta.compRelacionado && String(venta.compRelacionado).trim()) || '';
     const cuotas = Array.isArray(venta.cuotas) ? venta.cuotas : [];
@@ -486,10 +530,8 @@ class HtmlBuilderService {
         filasItems: filas,
         lineasTotales: ticketTotalesHtml,
         cantidadLetras,
-        textoRepresentacion,
-        resumenHash,
         qrDataUri,
-        idVenta,
+        pieSunatHtml,
         barcodeIdVentaUrl,
         tablaCuotasHtml: ticketCuotasHtml,
         observaciones
@@ -529,10 +571,12 @@ class HtmlBuilderService {
     .son { margin-top: 14px; padding: 8px; font-size: 10px; border: 1px solid #eee; background: #fafafa; }
     .son strong { color: #0056b3; }
     .bloque-final { margin-top: 20px; border: 1px solid #333; padding: 10px 12px; overflow: hidden; }
-    .bloque-final .texto { float: left; width: 70%; font-size: 8px; line-height: 1.4; }
-    .bloque-final .qr { float: right; width: 28%; text-align: right; }
-    .bloque-final .qr img { width: 100px; height: 100px; }
-    .bloque-final .barcode-venta { margin-top: 8px; clear: both; font-size: 8px; }
+    .sunat-footer-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .sunat-footer-text { flex: 1; min-width: 0; }
+    .sunat-footer-text .pie-sunat-electronico { margin: 0 !important; }
+    .sunat-footer-qr { flex-shrink: 0; text-align: right; }
+    .sunat-footer-qr img { width: 100px; height: 100px; display: block; }
+    .bloque-final .barcode-venta { margin-top: 10px; clear: both; text-align: center; }
     .bloque-final .barcode-venta img { height: 36px; width: auto; max-width: 180px; }
   </style>
 </head>
@@ -580,9 +624,11 @@ class HtmlBuilderService {
   ${observaciones ? '<div class="observaciones" style="margin-top:12px;padding:8px;border:1px solid #eee;background:#fafafa;font-size:9px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
   ${tablaCuotasHtml}
   <div class="bloque-final">
-    ${(textoRepresentacion || resumenHash) ? `<div class="texto">${textoRepresentacion ? textoRepresentacion + '<br>' : ''}${qrDataUri ? 'Visite https://mifacturasunat.com<br>' : ''}${resumenHash ? 'Resumen: ' + resumenHash : ''}</div>` : ''}
-    ${qrDataUri ? '<div class="qr"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
-    ${barcodeIdVentaUrl ? '<div class="barcode-venta">Código venta (despachos): <img src="' + barcodeIdVentaUrl + '" alt="' + idVenta + '"/><br><span>' + idVenta + '</span></div>' : ''}
+    ${(pieSunatHtml || qrDataUri) ? `<div class="sunat-footer-row">
+      <div class="sunat-footer-text">${pieSunatHtml || ''}</div>
+      ${qrDataUri ? '<div class="sunat-footer-qr"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
+    </div>` : ''}
+    ${barcodeIdVentaUrl ? '<div class="barcode-venta"><img src="' + barcodeIdVentaUrl + '" alt=""/></div>' : ''}
   </div>
 </body>
 </html>`;

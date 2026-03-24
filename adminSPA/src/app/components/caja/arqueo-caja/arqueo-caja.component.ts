@@ -22,6 +22,16 @@ export interface FilaArqueoConcepto {
   icono: string;
 }
 
+export interface ArqueoTotalesPorEmpresaFila {
+  idEmpresa: string;
+  razonSocial: string;
+  movimientos: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[];
+  ventasCredito?: { importe?: number };
+  cobroCreditos?: { importe?: number };
+  totalIngresos: number;
+  totalEgresos: number;
+}
+
 @Component({
   selector: 'app-arqueo-caja',
   standalone: true,
@@ -64,6 +74,9 @@ export class ArqueoCajaComponent implements OnInit {
 
   public loading: boolean = false;
 
+  public esGestora = false;
+  public totalesPorEmpresa: ArqueoTotalesPorEmpresaFila[] = [];
+
   mostrarModalPdf = false;
   generandoPdf = false;
   empresa: Empresa | null = null;
@@ -105,10 +118,33 @@ export class ArqueoCajaComponent implements OnInit {
     return `${y}-${m}-${day}`;
   }
 
+  private static totalesDesdeFilasMovimiento(
+    filas: { tipoOperacion?: string; importe?: number }[]
+  ): { ingresos: number; egresos: number } {
+    let ingresos = 0;
+    let egresos = 0;
+    for (const r of filas || []) {
+      const tipo = (r.tipoOperacion || 'I') === 'I' ? 'I' : 'E';
+      const imp = Number(r.importe || 0);
+      if (tipo === 'I') ingresos += imp;
+      else egresos += imp;
+    }
+    return { ingresos, egresos };
+  }
+
   ngOnInit(): void {
     this.fecha = ArqueoCajaComponent.fechaLocalHoy();
     this.cargarCajas();
-    this.consultar();
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        this.esGestora = !!res?.data?.esGestora;
+        this.consultar();
+      },
+      error: () => {
+        this.esGestora = false;
+        this.consultar();
+      }
+    });
     this.empresaService.getEmpresa$().subscribe((emp) => {
       const e = emp as any;
       const razonSocial = e?.razon_Social ?? e?.nombre ?? '';
@@ -172,6 +208,7 @@ export class ArqueoCajaComponent implements OnInit {
     this.detalleArqueo = [];
     this.totalIngresos = 0;
     this.totalEgresos = 0;
+    this.totalesPorEmpresa = [];
 
     // Llamada al backend: devuelve data (filas crudas), ventasCredito y cobroCreditos
     this.cajaService.obtenerArqueoDinamico({
@@ -247,13 +284,21 @@ export class ArqueoCajaComponent implements OnInit {
         this.ventasCreditoImporte = Number((response as any).ventasCredito?.importe) || 0;
         this.cobroCreditosImporte = Number((response as any).cobroCreditos?.importe) || 0;
         this.detalleArqueo = (response as any).detalle || [];
-        console.log('[Arqueo] 6. Totales - totalIngresos, totalEgresos, ventasCreditoImporte, cobroCreditosImporte:', {
-          totalIngresos: this.totalIngresos,
-          totalEgresos: this.totalEgresos,
-          ventasCreditoImporte: this.ventasCreditoImporte,
-          cobroCreditosImporte: this.cobroCreditosImporte
-        });
-        console.log('[Arqueo] 7. detalleArqueo (response.detalle):', this.detalleArqueo);
+        const porEmp = (response as any).totalesPorEmpresa;
+        if (Array.isArray(porEmp) && porEmp.length > 0) {
+          this.totalesPorEmpresa = porEmp.map((pe: any) => {
+            const t = ArqueoCajaComponent.totalesDesdeFilasMovimiento(pe.movimientos || []);
+            return {
+              idEmpresa: pe.idEmpresa,
+              razonSocial: pe.razonSocial || '',
+              movimientos: pe.movimientos || [],
+              ventasCredito: pe.ventasCredito,
+              cobroCreditos: pe.cobroCreditos,
+              totalIngresos: t.ingresos,
+              totalEgresos: t.egresos
+            };
+          });
+        }
         this.loading = false;
       },
       error: (error) => {

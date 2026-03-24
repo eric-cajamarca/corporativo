@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { DespachoService } from '../../../services/despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -63,6 +63,36 @@ export interface VentaDespachosResult {
   entregadoMismoDia: boolean;
 }
 
+export interface VentaAgrupadaCabDespacho {
+  idVentaAgrupada: string;
+  compVenta: string;
+  serie?: string;
+  numero?: string;
+  total: number;
+  fEmision: string;
+  clienteRuc: string;
+  clienteRazonSocial: string;
+}
+
+export interface ComprobanteVaHijoDespacho {
+  idEmpresa: string;
+  idVenta: number;
+  compVenta: string;
+  serie?: string;
+  numero?: string;
+  nombreComprobante?: string;
+  codigoComprobante?: string;
+  empresaRazonSocial?: string;
+  empresaRuc?: string;
+  fEmision: string;
+  total: number;
+  despachos?: VentaDespachosResult['despachos'];
+  detalleVenta?: DetalleVentaLinea[];
+}
+
+const UUID_REGEX_VA =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 @Component({
   selector: 'app-index-despachos',
   standalone: true,
@@ -70,8 +100,31 @@ export interface VentaDespachosResult {
   templateUrl: './index-despachos.component.html',
   styleUrl: './index-despachos.component.css'
 })
-export class IndexDespachosComponent {
+export class IndexDespachosComponent implements OnInit {
   public sidebarState = inject(SidebarStateService);
+
+  esGestora = false;
+  /** Empresa gestora: búsqueda por venta agrupada por defecto; comprobante sucursal opcional */
+  mostrarBusquedaSimple = false;
+  vaCriterio = '';
+  vaRuc = '';
+  vaNombreCliente = '';
+  loadingVa = false;
+  errorMsgVa = '';
+  resultadoVaLista: Array<{
+    idVentaAgrupada: string;
+    compVenta: string;
+    total: number;
+    fEmision: string;
+    clienteRuc: string;
+    clienteRazonSocial: string;
+  }> | null = null;
+  resultadoVaDetalle: {
+    ventaAgrupada: VentaAgrupadaCabDespacho;
+    comprobantes: ComprobanteVaHijoDespacho[];
+  } | null = null;
+  /** Al operar despacho de un comprobante hijo (empresa gestionada) */
+  idEmpresaDespachoActiva: string | null = null;
   
   /** Criterio de búsqueda: número de comprobante o idVenta (puede escanearse del código de barras del comprobante) */
   criterioBusqueda = '';
@@ -159,7 +212,119 @@ export class IndexDespachosComponent {
     private router: Router
   ) {}
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        this.esGestora = !!res?.data?.esGestora;
+        this.mostrarBusquedaSimple = !this.esGestora;
+      },
+      error: () => {
+        this.esGestora = false;
+        this.mostrarBusquedaSimple = true;
+      }
+    });
+  }
+
+  buscarVentaAgrupada(): void {
+    this.errorMsgVa = '';
+    this.resultadoVaLista = null;
+    this.resultadoVaDetalle = null;
+    const raw = (this.vaCriterio || '').trim();
+    const ruc = (this.vaRuc || '').trim();
+    const nombreCliente = (this.vaNombreCliente || '').trim();
+    if (!raw && !ruc && !nombreCliente) {
+      this.errorMsgVa = 'Indique id o número de venta agrupada, RUC o nombre del cliente.';
+      return;
+    }
+    let idVentaAgrupada: string | undefined;
+    let compVenta: string | undefined;
+    if (raw) {
+      if (UUID_REGEX_VA.test(raw)) idVentaAgrupada = raw;
+      else compVenta = raw;
+    }
+    this.loadingVa = true;
+    this.despachoService
+      .buscarVentaAgrupadaGestora({ idVentaAgrupada, compVenta, ruc: ruc || undefined, nombreCliente: nombreCliente || undefined })
+      .subscribe({
+        next: (res) => {
+          this.loadingVa = false;
+          const data = res?.data;
+          if (!data) {
+            this.errorMsgVa = 'Sin resultados.';
+            return;
+          }
+          if (data.modo === 'lista') {
+            this.resultadoVaLista = data.coincidencias || [];
+            return;
+          }
+          if (data.modo === 'detalle') {
+            this.resultadoVaDetalle = {
+              ventaAgrupada: data.ventaAgrupada as VentaAgrupadaCabDespacho,
+              comprobantes: (data.comprobantes || []) as ComprobanteVaHijoDespacho[]
+            };
+          }
+        },
+        error: (err) => {
+          this.loadingVa = false;
+          this.errorMsgVa = err?.error?.message || 'Error al buscar venta agrupada.';
+        }
+      });
+  }
+
+  seleccionarVentaAgrupadaLista(row: { idVentaAgrupada: string }): void {
+    this.vaCriterio = row.idVentaAgrupada;
+    this.buscarVentaAgrupada();
+  }
+
+  abrirComprobanteVa(comp: ComprobanteVaHijoDespacho): void {
+    this.idEmpresaDespachoActiva = comp.idEmpresa;
+    const va = this.resultadoVaDetalle?.ventaAgrupada;
+    this.resultado = {
+      venta: {
+        idVenta: comp.idVenta,
+        compVenta: String(comp.compVenta || ''),
+        serie: String(comp.serie || ''),
+        numero: String(comp.numero || ''),
+        fEmision: String(comp.fEmision || ''),
+        total: Number(comp.total) || 0,
+        idEstadoPedidoVenta: null,
+        estadoPedidoVentaNombre: null,
+        clienteRazonSocial: va?.clienteRazonSocial || '',
+        clienteRuc: va?.clienteRuc || '',
+        codigoComprobante: String(comp.codigoComprobante || ''),
+        eliminado: false
+      },
+      despachos: (comp.despachos || []) as VentaDespachosResult['despachos'],
+      detalleVenta: comp.detalleVenta || [],
+      entregadoMismoDia: false
+    };
+    this.detallePorDespacho = {};
+  }
+
+  private refrescarVistaTrasCambio(): void {
+    const r = this.resultado;
+    if (!r?.venta?.idVenta) return;
+    const idV = String(r.venta.idVenta);
+    if (this.idEmpresaDespachoActiva) {
+      this.despachoService
+        .buscarVentaDespachos({ idVenta: idV, idEmpresa: this.idEmpresaDespachoActiva })
+        .subscribe({
+          next: (res) => {
+            if (res?.data) this.resultado = res.data as VentaDespachosResult;
+          }
+        });
+      return;
+    }
+    this.despachoService
+      .buscarVentaDespachos(
+        r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: idV }
+      )
+      .subscribe({
+        next: (res) => {
+          if (res?.data) this.resultado = res.data as VentaDespachosResult;
+        }
+      });
+  }
 
   onToggleSidebar(collapsed: boolean): void {
     this.sidebarState.setCollapsed(collapsed);
@@ -173,6 +338,7 @@ export class IndexDespachosComponent {
       this.resultado = null;
       return;
     }
+    this.idEmpresaDespachoActiva = null;
     this.errorMsg = '';
     this.resultado = null;
     this.loading = true;
@@ -243,11 +409,7 @@ export class IndexDespachosComponent {
         this.detallePorDespacho[idDespacho] = [];
         this.cargarDetalleDespacho(idDespacho);
         if (this.resultado?.detalleVenta) {
-          this.despachoService.buscarVentaDespachos(
-            this.resultado.venta.compVenta ? { compVenta: this.resultado.venta.compVenta } : { idVenta: String(this.resultado.venta.idVenta) }
-          ).subscribe({
-            next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
-          });
+          this.refrescarVistaTrasCambio();
         }
       },
       error: () => { this.guardandoCantidad[key] = false; }
@@ -454,12 +616,22 @@ export class IndexDespachosComponent {
     }
 
     this.enviandoCrear = true;
-    this.despachoService.crearDespacho({
+    const bodyCrear: {
+      idVenta: string;
+      idTipoDespacho: number;
+      observaciones?: string;
+      idEmpresa?: string;
+      detalles?: Array<{ idDetalle: number; idProducto: string; cantidadADespachar: number }>;
+    } = {
       idVenta: String(r.venta.idVenta),
       idTipoDespacho: this.idTipoDespachoPanel,
       observaciones: observacionesFinales || undefined,
       detalles: detalles.length > 0 ? detalles : undefined
-    }).subscribe({
+    };
+    if (this.idEmpresaDespachoActiva) {
+      bodyCrear.idEmpresa = this.idEmpresaDespachoActiva;
+    }
+    this.despachoService.crearDespacho(bodyCrear).subscribe({
       next: (res: any) => {
         this.enviandoCrear = false;
         this.cerrarModalCrearDespacho();
@@ -484,27 +656,15 @@ export class IndexDespachosComponent {
 
           this.enviosService.crearEnvio(payload).subscribe({
             next: () => {
-              this.despachoService.buscarVentaDespachos(
-                r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
-              ).subscribe({
-                next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
-              });
+              this.refrescarVistaTrasCambio();
             },
             error: (err: any) => {
               iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo crear el envío', position: 'topRight' });
-              this.despachoService.buscarVentaDespachos(
-                r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
-              ).subscribe({
-                next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
-              });
+              this.refrescarVistaTrasCambio();
             }
           });
         } else {
-          this.despachoService.buscarVentaDespachos(
-            r.venta.compVenta ? { compVenta: r.venta.compVenta } : { idVenta: String(r.venta.idVenta) }
-          ).subscribe({
-            next: (res) => { if (res?.data) this.resultado = res.data as VentaDespachosResult; }
-          });
+          this.refrescarVistaTrasCambio();
         }
       },
       error: (err) => {

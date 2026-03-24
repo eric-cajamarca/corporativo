@@ -8,5 +8,6 @@ router.use(auth);
 router.use(querySafeMiddleware);
 
 router.get("/resumen", dashboardController.obtenerResumenDashboard);
+router.get("/resumen-consolidado", dashboardController.obtenerResumenConsolidadoGestora);
 
 module.exports = router;

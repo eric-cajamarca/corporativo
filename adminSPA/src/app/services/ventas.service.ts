@@ -382,4 +382,6 @@ export interface VentaListado {
   formaPago?: string;
   /** True si el comprobante fue anulado/eliminado (registro tachado). */
   eliminado?: boolean;
+  /** Si la venta pertenece a una venta agrupada (comprobante hijo). */
+  idVentaAgrupada?: string | null;
 }

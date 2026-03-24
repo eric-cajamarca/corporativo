@@ -65,11 +65,12 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
   await transaction.begin();
 
   try {
-    let idSucursal = user.sucursal || null;
+    const idEmpresaOperativa = datos.idEmpresaOperativa || user.empresa;
+    let idSucursal = datos.idSucursalOperativa || user.sucursal || null;
     if (!idSucursal) {
       const reqSuc = transaction.request();
       const rsSuc = await reqSuc
-        .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
+        .input("idEmpresa", sql.UniqueIdentifier, idEmpresaOperativa)
         .query("SELECT TOP 1 idSucursal FROM Sucursal WHERE idEmpresa = @idEmpresa");
       idSucursal = rsSuc.recordset?.[0]?.idSucursal || null;
     }
@@ -80,7 +81,7 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
     // Crear el despacho con estado Entregado (COMPLETADO)
     const reqDespacho = transaction.request();
     const despachoResult = await reqDespacho
-      .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresaOperativa)
       .input("idSucursal", sql.UniqueIdentifier, idSucursal)
       .input("idVenta", sql.Int, datos.idVenta)
       .input("idTipoDespacho", sql.Int, datos.idTipoDespacho)
@@ -101,7 +102,7 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
     const idDespacho = despachoResult.recordset[0].idDespacho;
 
     // Crear detalles: si vienen detalles con cant. por línea, usarlos; si no, crear con todo el pendiente
-    await crearDetallesDespacho(transaction, idDespacho, user.empresa, datos.idVenta, datos.idTipoDespacho, datos.detalles);
+    await crearDetallesDespacho(transaction, idDespacho, idEmpresaOperativa, datos.idVenta, datos.idTipoDespacho, datos.detalles);
 
     // Sincronizar DetalleVenta (cantEntregada, idEstadoPedido) y Ventas.idEstadoPedido
     await sincronizarDetalleVentaYVentaTrasDespacho(transaction, idDespacho, datos.idVenta);
@@ -558,4 +559,152 @@ exports.obtenerEstadoDespachosRepo = async (pool, idEmpresa) => {
     `);
 
   return result.recordset;
+};
+
+exports.obtenerIdEmpresaDesdeDespachoRepo = async (pool, idDespacho) => {
+  const r = await pool
+    .request()
+    .input("idDespacho", sql.UniqueIdentifier, idDespacho)
+    .query(`SELECT idEmpresa FROM Despachos WHERE idDespacho = @idDespacho`);
+  return r.recordset[0]?.idEmpresa || null;
+};
+
+exports.obtenerIdEmpresaDesdeDetalleDespachoRepo = async (pool, idDetalleDespacho) => {
+  const r = await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, idDetalleDespacho)
+    .query(`
+      SELECT d.idEmpresa
+      FROM DetalleDespachos dd
+      INNER JOIN Despachos d ON d.idDespacho = dd.idDespacho
+      WHERE dd.idDetalleDespacho = @id
+    `);
+  return r.recordset[0]?.idEmpresa || null;
+};
+
+/**
+ * Coincidencias de VentaAgrupada para empresa cobradora (gestora). Al menos un filtro distinto de vacío.
+ */
+exports.listarVentaAgrupadaCoincidenciasDespachoRepo = async (pool, idEmpresaCobradora, filtros) => {
+  const { idVentaAgrupada, compVenta, ruc, nombreCliente } = filtros;
+  const req = pool.request().input("idGestora", sql.UniqueIdentifier, idEmpresaCobradora);
+  let where = "va.idEmpresaCobradora = @idGestora";
+  if (idVentaAgrupada) {
+    req.input("idVA", sql.UniqueIdentifier, idVentaAgrupada);
+    where += " AND va.idVentaAgrupada = @idVA";
+  }
+  if (compVenta && String(compVenta).trim()) {
+    const c = String(compVenta).trim();
+    req.input("compLike", sql.VarChar(80), `%${c}%`);
+    where +=
+      " AND (ISNULL(va.compVenta,'') LIKE @compLike OR CAST(va.idVentaAgrupada AS VARCHAR(36)) LIKE @compLike)";
+  }
+  if (ruc && String(ruc).trim()) {
+    req.input("rucLike", sql.VarChar(20), `%${String(ruc).trim()}%`);
+    where += " AND ISNULL(cl.ruc,'') LIKE @rucLike";
+  }
+  if (nombreCliente && String(nombreCliente).trim()) {
+    req.input("nomLike", sql.VarChar(200), `%${String(nombreCliente).trim()}%`);
+    where += " AND ISNULL(cl.rSocial,'') LIKE @nomLike";
+  }
+  const r = await req.query(`
+    SELECT TOP 25
+      va.idVentaAgrupada,
+      va.compVenta,
+      va.total,
+      CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
+      ISNULL(cl.ruc,'') AS clienteRuc,
+      ISNULL(cl.rSocial,'') AS clienteRazonSocial
+    FROM VentaAgrupada va
+    LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
+    WHERE ${where}
+    ORDER BY va.fEmision DESC
+  `);
+  return r.recordset || [];
+};
+
+/** Cabecera VA + comprobantes hijos con despachos y detalle de venta (empresa gestora). */
+exports.construirDetalleVentaAgrupadaDespachoRepo = async (pool, idEmpresaCobradora, idVentaAgrupada) => {
+  const ventaAgrupadaRs = await pool
+    .request()
+    .input("idVA", sql.UniqueIdentifier, idVentaAgrupada)
+    .input("idGestora", sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`
+      SELECT
+        va.idVentaAgrupada,
+        va.compVenta,
+        va.serie,
+        va.numero,
+        va.total,
+        CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
+        ISNULL(cl.ruc,'') AS clienteRuc,
+        ISNULL(cl.rSocial,'') AS clienteRazonSocial
+      FROM VentaAgrupada va
+      LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
+      WHERE va.idVentaAgrupada = @idVA AND va.idEmpresaCobradora = @idGestora
+    `);
+  const vaRow = ventaAgrupadaRs.recordset[0];
+  if (!vaRow) return null;
+
+  const comprobantesRaw = await pool
+    .request()
+    .input("idEmpresaCobradora", sql.UniqueIdentifier, idEmpresaCobradora)
+    .input("idVentaAgrupada", sql.UniqueIdentifier, idVentaAgrupada)
+    .query(`
+      SELECT
+        ve.idVenta,
+        ve.idEmpresa,
+        ve.compVenta,
+        ve.serie,
+        ve.numero,
+        ve.idComprobante,
+        c.nombre AS nombreComprobante,
+        c.codigo AS codigoComprobante,
+        e.razon_Social AS empresaRazonSocial,
+        e.ruc AS empresaRuc,
+        CONVERT(VARCHAR(19), ve.fEmision, 120) AS fEmision,
+        ve.total
+      FROM VentaEmpresa ve
+      INNER JOIN VentaAgrupada va ON va.idVentaAgrupada = ve.idVentaAgrupada
+      INNER JOIN Empresas e ON e.idEmpresa = ve.idEmpresa
+      LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
+      WHERE ve.idVentaAgrupada = @idVentaAgrupada
+        AND va.idEmpresaCobradora = @idEmpresaCobradora
+      ORDER BY ve.fEmision ASC
+    `);
+
+  const comprobantes = [];
+  for (const row of comprobantesRaw.recordset || []) {
+    const despachosResult = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, row.idEmpresa)
+      .input("idVenta", sql.Int, row.idVenta)
+      .query(`
+        SELECT
+          d.idDespacho,
+          d.idVenta,
+          CONVERT(VARCHAR(19), d.fechaDespacho, 120) AS fechaDespacho,
+          d.estado,
+          d.observaciones,
+          td.nombre AS tipoDespacho,
+          uw.nombres + ' ' + ISNULL(uw.apellidos, '') AS usuarioDespacho,
+          COUNT(dd.idDetalleDespacho) AS totalLineas,
+          SUM(CASE WHEN dd.estado = 'DESPACHADO' THEN 1 ELSE 0 END) AS lineasDespachadas
+        FROM Despachos d
+        INNER JOIN TiposDespacho td ON d.idTipoDespacho = td.idTipoDespacho
+        INNER JOIN UsuarioWeb uw ON d.idUsuarioDespacho = uw.idUsuario
+        LEFT JOIN DetalleDespachos dd ON d.idDespacho = dd.idDespacho
+        WHERE d.idEmpresa = @idEmpresa AND d.idVenta = @idVenta
+        GROUP BY d.idDespacho, d.idVenta, d.fechaDespacho, d.estado, d.observaciones, td.nombre, uw.nombres, uw.apellidos
+        ORDER BY d.fechaDespacho DESC
+      `);
+    const detalleVenta = await exports.obtenerDetalleVentaParaDespachoRepo(pool, row.idEmpresa, row.idVenta);
+    comprobantes.push({
+      ...row,
+      despachos: despachosResult.recordset || [],
+      detalleVenta
+    });
+  }
+
+  return { ventaAgrupada: vaRow, comprobantes };
 };

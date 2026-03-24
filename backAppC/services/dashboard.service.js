@@ -116,3 +116,171 @@ exports.obtenerResumenDashboardService = async (pool, user, periodo) => {
 
   return cache.getCached(cacheKey, fetchDashboard, ttlSeconds);
 };
+
+function mergeGraficoVista(a, b) {
+  if (!a && !b) return { etiquetas: [], datos: [], leyenda: "" };
+  const left = a || { etiquetas: [], datos: [], leyenda: "" };
+  const right = b || { etiquetas: [], datos: [], leyenda: "" };
+  const len = Math.max((left.datos || []).length, (right.datos || []).length);
+  const datos = [];
+  for (let i = 0; i < len; i++) {
+    datos.push(Number(left.datos[i] || 0) + Number(right.datos[i] || 0));
+  }
+  return {
+    etiquetas: (left.etiquetas && left.etiquetas.length >= (right.etiquetas || []).length)
+      ? [...left.etiquetas]
+      : [...(right.etiquetas || [])],
+    datos,
+    leyenda: left.leyenda || right.leyenda || ""
+  };
+}
+
+function mergeGraficoVentas(g1, g2) {
+  if (!g1) return g2 ? JSON.parse(JSON.stringify(g2)) : null;
+  if (!g2) return JSON.parse(JSON.stringify(g1));
+  return {
+    porDiaHora: mergeGraficoVista(g1.porDiaHora, g2.porDiaHora),
+    mesPorDia: mergeGraficoVista(g1.mesPorDia, g2.mesPorDia),
+    seisMeses: mergeGraficoVista(g1.seisMeses, g2.seisMeses),
+    doceMeses: mergeGraficoVista(g1.doceMeses, g2.doceMeses)
+  };
+}
+
+function mergeResumenDashboard(acumulado, siguiente) {
+  if (!siguiente) return acumulado;
+  if (!acumulado) return JSON.parse(JSON.stringify(siguiente));
+  const wA = Number(acumulado.ventasTotales || 0);
+  const wB = Number(siguiente.ventasTotales || 0);
+  const w = wA + wB;
+  const combVar = (key) => {
+    const va = Number(acumulado[key] || 0);
+    const vb = Number(siguiente[key] || 0);
+    if (w <= 0) return 0;
+    return (va * wA + vb * wB) / w;
+  };
+
+  const m = { ...acumulado };
+  m.ventasTotales = wA + wB;
+  m.ingresos = Number(m.ingresos || 0) + Number(siguiente.ingresos || 0);
+  m.costos = Number(m.costos || 0) + Number(siguiente.costos || 0);
+  m.utilidadBruta = Number(m.utilidadBruta || 0) + Number(siguiente.utilidadBruta || 0);
+  m.gastosOperativos = Number(m.gastosOperativos || 0) + Number(siguiente.gastosOperativos || 0);
+  m.utilidadNeta = Number(m.utilidadNeta || 0) + Number(siguiente.utilidadNeta || 0);
+  m.clientesActivos = Number(m.clientesActivos || 0) + Number(siguiente.clientesActivos || 0);
+
+  m.ventasVariacion = combVar("ventasVariacion");
+  m.utilidadVariacion = combVar("utilidadVariacion");
+  m.clientesVariacion = combVar("clientesVariacion");
+
+  const vt = Number(m.ventasTotales || 0);
+  m.roi = vt > 0 ? (Number(m.utilidadNeta || 0) / vt) * 100 : 0;
+
+  const mapProd = new Map();
+  for (const p of m.productosMasVendidos || []) {
+    const k = `${p.nombre}||${p.categoria}`;
+    mapProd.set(k, { ...p });
+  }
+  for (const p of siguiente.productosMasVendidos || []) {
+    const k = `${p.nombre}||${p.categoria}`;
+    const prev = mapProd.get(k) || { nombre: p.nombre, categoria: p.categoria, ventas: 0, monto: 0 };
+    prev.ventas = Number(prev.ventas || 0) + Number(p.ventas || 0);
+    prev.monto = Number(prev.monto || 0) + Number(p.monto || 0);
+    mapProd.set(k, prev);
+  }
+  m.productosMasVendidos = Array.from(mapProd.values())
+    .sort((a, b) => Number(b.monto || 0) - Number(a.monto || 0))
+    .slice(0, 5);
+
+  const vmA = m.ventasMensuales || [];
+  const vmB = siguiente.ventasMensuales || [];
+  const vmLen = Math.max(vmA.length, vmB.length);
+  m.ventasMensuales = Array.from({ length: vmLen }, (_, i) =>
+    Number(vmA[i] || 0) + Number(vmB[i] || 0)
+  );
+  m.ventasMensualesLabels = (m.ventasMensualesLabels && m.ventasMensualesLabels.length >= (siguiente.ventasMensualesLabels || []).length)
+    ? m.ventasMensualesLabels
+    : siguiente.ventasMensualesLabels || m.ventasMensualesLabels;
+
+  m.graficoVentas = mergeGraficoVentas(m.graficoVentas, siguiente.graficoVentas);
+
+  const alertasA = m.alertas || [];
+  const alertasB = siguiente.alertas || [];
+  m.alertas = [...alertasA, ...alertasB].slice(0, 25);
+
+  return m;
+}
+
+async function obtenerResumenUnaEmpresa(pool, idEmpresa, periodoNorm) {
+  const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
+    obtenerRangoFechas(periodoNorm);
+  const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+  const getConfig = (clave, def) => configRows.find((c) => c.clave === clave)?.valor ?? def;
+  const configInventario = {
+    stockMinimoGeneral: Math.max(
+      0,
+      parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MINIMO", "10"), 10) || 10
+    ),
+    stockMaximoGeneral: Math.max(
+      0,
+      parseInt(getConfig("INVENTARIO_ALERTA_STOCK_MAXIMO", "1000"), 10) || 1000
+    ),
+    controlVencimiento:
+      String(getConfig("INVENTARIO_CONTROL_VENCIMIENTO", "true")).toLowerCase() === "true"
+  };
+  return DashboardRepository.obtenerResumenDashboardRepo(
+    pool,
+    idEmpresa,
+    fechaInicio,
+    fechaFin,
+    fechaInicioAnterior,
+    fechaFinAnterior,
+    configInventario
+  );
+}
+
+/**
+ * Dashboard agregado: empresa gestora + cada gestionada. Solo si es gestora activa.
+ */
+exports.obtenerResumenConsolidadoGestoraService = async (pool, user, periodo) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  if (!esGestora) throw new Error("NO_ES_GESTORA");
+
+  const periodoNorm = normalizarPeriodo(periodo);
+  const cacheKey = `dashboard:consolidado:${user.empresa}:${periodoNorm}`;
+  const ttlRaw = parseInt(process.env.REDIS_DASHBOARD_TTL_SECONDS || "180", 10);
+  const ttlSeconds = Number.isNaN(ttlRaw) ? 180 : Math.max(60, ttlRaw);
+
+  const fetchConsolidado = async () => {
+    const sql = require("mssql");
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
+    const nombreGestoraRs = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
+      .query(`SELECT razon_Social FROM Empresas WHERE idEmpresa = @idEmpresa`);
+    const nombreGestora = nombreGestoraRs.recordset[0]?.razon_Social || "Empresa gestora";
+
+    const filas = [
+      { idEmpresa: user.empresa, razonSocial: nombreGestora },
+      ...gestionadas.map((g) => ({
+        idEmpresa: g.idEmpresa,
+        razonSocial: g.razon_Social || g.razonSocial || ""
+      }))
+    ];
+
+    const porEmpresa = [];
+    let consolidado = null;
+    for (const row of filas) {
+      const resumen = await obtenerResumenUnaEmpresa(pool, row.idEmpresa, periodoNorm);
+      porEmpresa.push({
+        idEmpresa: row.idEmpresa,
+        razonSocial: row.razonSocial,
+        resumen
+      });
+      consolidado = mergeResumenDashboard(consolidado, resumen);
+    }
+    return { consolidado, porEmpresa };
+  };
+
+  return cache.getCached(cacheKey, fetchConsolidado, ttlSeconds);
+};

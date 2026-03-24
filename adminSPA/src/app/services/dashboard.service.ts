@@ -57,4 +57,18 @@ export class DashboardService {
       withCredentials: true
     });
   }
+
+  /** Consolidado gestora + empresas gestionadas (403 si no es gestora). */
+  obtenerResumenConsolidado(periodo?: string): Observable<{
+    data: { consolidado: ResumenDashboard; porEmpresa: { idEmpresa: string; razonSocial: string; resumen: ResumenDashboard }[] };
+  }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    const params = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
+    return this._http.get(this.url + 'dashboard/resumen-consolidado' + params, {
+      headers,
+      withCredentials: true
+    }) as Observable<{
+      data: { consolidado: ResumenDashboard; porEmpresa: { idEmpresa: string; razonSocial: string; resumen: ResumenDashboard }[] };
+    }>;
+  }
 }

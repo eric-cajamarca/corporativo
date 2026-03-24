@@ -230,5 +230,27 @@ exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
   if (!(await tienePermisoCaja(pool, user, 'VER_ARQUEO', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
   const delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
-  return CajaRepository.obtenerArqueoDinamicoRepo(pool, idsEmpresa, filtros, delegacion);
+  const result = await CajaRepository.obtenerArqueoDinamicoRepo(pool, idsEmpresa, filtros, delegacion);
+
+  let totalesPorEmpresa;
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  if (esGestora && Array.isArray(idsEmpresa) && idsEmpresa.length > 1) {
+    totalesPorEmpresa = [];
+    for (const idEm of idsEmpresa) {
+      const part = await CajaRepository.obtenerArqueoDinamicoRepo(pool, [idEm], filtros, null);
+      const nm = await pool
+        .request()
+        .input("id", sql.UniqueIdentifier, idEm)
+        .query(`SELECT razon_Social FROM Empresas WHERE idEmpresa = @id`);
+      totalesPorEmpresa.push({
+        idEmpresa: idEm,
+        razonSocial: nm.recordset[0]?.razon_Social || "",
+        movimientos: part.movimientos || [],
+        ventasCredito: part.ventasCredito || { concepto: "VENTA_CREDITO", importe: 0 },
+        cobroCreditos: part.cobroCreditos || { concepto: "COBRO CREDITOS", importe: 0 }
+      });
+    }
+  }
+
+  return { ...result, totalesPorEmpresa };
 };

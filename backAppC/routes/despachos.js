@@ -11,6 +11,7 @@ router.use(querySafeMiddleware);
 
 // Búsqueda por comprobante o idVenta
 router.get('/buscar', despachosController.buscarVentaDespachos);
+router.get('/venta-agrupada/buscar', despachosController.buscarVentaAgrupadaDespachoGestora);
 
 // Rutas para gestión de despachos
 router.get('/venta/:idVenta', despachosController.obtenerDespachosVenta);

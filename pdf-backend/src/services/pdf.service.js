@@ -1,5 +1,30 @@
 const puppeteer = require('puppeteer');
 
+/** Reutilizar Chromium entre peticiones (evita ~1–3 s de launch por PDF). */
+let browserSingleton = null;
+let browserLaunchPromise = null;
+
+async function getSharedBrowser() {
+  if (browserSingleton && browserSingleton.isConnected()) return browserSingleton;
+  if (!browserLaunchPromise) {
+    browserLaunchPromise = puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    }).then((b) => {
+      browserSingleton = b;
+      b.on('disconnected', () => {
+        browserSingleton = null;
+        browserLaunchPromise = null;
+      });
+      return b;
+    }).catch((err) => {
+      browserLaunchPromise = null;
+      throw err;
+    });
+  }
+  return browserLaunchPromise;
+}
+
 /**
  * Genera PDF desde HTML.
  * @param {string} html - HTML del contenido
@@ -7,14 +32,9 @@ const puppeteer = require('puppeteer');
  * @param {string} formato - 'A4' | 'A5' | 'ticket' (ticket = 80mm de ancho)
  */
 async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
-  let browser;
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-
-    const page = await browser.newPage();
     await page.setDefaultNavigationTimeout(15000);
     const wrappedHtml = `
       <!DOCTYPE html>
@@ -31,7 +51,7 @@ async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
       </head>
       <body>${html}</body></html>`;
 
-    await page.setContent(wrappedHtml, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.setContent(wrappedHtml, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
     const isTicket = String(formato).toLowerCase() === 'ticket';
     const pdfOptions = {
@@ -47,9 +67,8 @@ async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
     }
 
     return await page.pdf(pdfOptions);
-
   } finally {
-    if (browser) await browser.close();
+    await page.close();
   }
 }
 

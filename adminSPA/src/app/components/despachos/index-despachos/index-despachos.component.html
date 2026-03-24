@@ -13,24 +13,127 @@
               <h5 class="mb-0"><i class="bi bi-truck"></i> Despachos y entregas</h5>
             </div>
             <div class="card-body">
-              <p class="text-muted mb-3">
-                Busque por <strong>número de comprobante</strong> o por <strong>código de venta (idVenta)</strong>.
-                Puede escanear el código de barras del comprobante para buscar por idVenta.
-              </p>
+              <div *ngIf="esGestora" class="mb-4 p-3 border rounded bg-light">
+                <h6 class="text-success mb-2"><i class="bi bi-diagram-3"></i> Venta agrupada (gestora)</h6>
+                <p class="text-muted small mb-3">
+                  Busque por <strong>id</strong> o <strong>número de VA</strong>, o por <strong>RUC</strong> / <strong>nombre del cliente</strong>.
+                  Luego abra cada comprobante de sucursal para crear o revisar despachos.
+                </p>
+                <div class="row g-2 mb-2">
+                  <div class="col-md-4">
+                    <label class="form-label small mb-0">Id o Nº VA</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      [(ngModel)]="vaCriterio"
+                      (keydown.enter)="buscarVentaAgrupada()"
+                      placeholder="UUID o VA-…"
+                    />
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small mb-0">RUC cliente</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      [(ngModel)]="vaRuc"
+                      (keydown.enter)="buscarVentaAgrupada()"
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small mb-0">Nombre cliente</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      [(ngModel)]="vaNombreCliente"
+                      (keydown.enter)="buscarVentaAgrupada()"
+                      placeholder="Opcional"
+                    />
+                  </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <button type="button" class="btn btn-success" (click)="buscarVentaAgrupada()" [disabled]="loadingVa">
+                    <span *ngIf="!loadingVa">Buscar VA</span>
+                    <span *ngIf="loadingVa">Buscando…</span>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="mostrarBusquedaSimple = !mostrarBusquedaSimple">
+                    {{ mostrarBusquedaSimple ? 'Ocultar búsqueda por comprobante' : 'Buscar comprobante de sucursal (idVenta / Nº)' }}
+                  </button>
+                </div>
+                <div *ngIf="errorMsgVa" class="alert alert-warning mt-2 mb-0 py-2 small" role="alert">{{ errorMsgVa }}</div>
 
-              <div class="input-group input-group-lg mb-3">
-                <input
-                  type="text"
-                  class="form-control"
-                  placeholder="Nº comprobante (ej. NP01-00000011) o código idVenta"
-                  [(ngModel)]="criterioBusqueda"
-                  (keydown.enter)="buscar()"
-                />
-                <button type="button" class="btn btn-primary" (click)="buscar()" [disabled]="loading">
-                  <span *ngIf="!loading">Buscar</span>
-                  <span *ngIf="loading">Buscando…</span>
-                </button>
+                <div *ngIf="resultadoVaLista?.length" class="table-responsive mt-3">
+                  <table class="table table-sm table-striped align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>VA</th>
+                        <th>Cliente</th>
+                        <th>Emisión</th>
+                        <th class="text-end">Total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let row of resultadoVaLista">
+                        <td><code class="small">{{ row.compVenta }}</code></td>
+                        <td>{{ row.clienteRazonSocial }} <span *ngIf="row.clienteRuc" class="text-muted">({{ row.clienteRuc }})</span></td>
+                        <td>{{ row.fEmision }}</td>
+                        <td class="text-end">{{ row.total | number:'1.2-2' }}</td>
+                        <td>
+                          <button type="button" class="btn btn-sm btn-outline-primary" (click)="seleccionarVentaAgrupadaLista(row)">Abrir</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <ng-container *ngIf="resultadoVaDetalle as vad">
+                <div *ngIf="vad.comprobantes.length" class="mt-3">
+                  <div class="small text-muted mb-2">
+                    <strong>VA:</strong> {{ vad.ventaAgrupada.compVenta }}
+                    — {{ vad.ventaAgrupada.clienteRazonSocial }}
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-12 col-md-6 col-xl-4" *ngFor="let comp of vad.comprobantes">
+                      <div class="card h-100 border-secondary">
+                        <div class="card-body py-2 px-3">
+                          <div class="fw-semibold">{{ comp.compVenta }}</div>
+                          <div class="small text-muted">{{ comp.empresaRazonSocial }} <span *ngIf="comp.empresaRuc">({{ comp.empresaRuc }})</span></div>
+                          <div class="small">{{ comp.nombreComprobante }} · {{ comp.fEmision }} · {{ comp.total | number:'1.2-2' }}</div>
+                          <div class="small" *ngIf="comp.despachos?.length as n">
+                            <span class="badge bg-info text-dark">{{ n }} despacho(s)</span>
+                          </div>
+                          <button type="button" class="btn btn-sm btn-primary mt-2" (click)="abrirComprobanteVa(comp)">
+                            Gestionar despachos
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </ng-container>
               </div>
+
+              <ng-container *ngIf="!esGestora || mostrarBusquedaSimple">
+                <p class="text-muted mb-3">
+                  Busque por <strong>número de comprobante</strong> o por <strong>código de venta (idVenta)</strong>.
+                  Puede escanear el código de barras del comprobante para buscar por idVenta.
+                </p>
+
+                <div class="input-group input-group-lg mb-3">
+                  <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Nº comprobante (ej. NP01-00000011) o código idVenta"
+                    [(ngModel)]="criterioBusqueda"
+                    (keydown.enter)="buscar()"
+                  />
+                  <button type="button" class="btn btn-primary" (click)="buscar()" [disabled]="loading">
+                    <span *ngIf="!loading">Buscar</span>
+                    <span *ngIf="loading">Buscando…</span>
+                  </button>
+                </div>
+              </ng-container>
 
               <div *ngIf="errorMsg" class="alert alert-warning" role="alert">
                 {{ errorMsg }}

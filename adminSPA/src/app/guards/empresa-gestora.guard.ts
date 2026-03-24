@@ -1,0 +1,39 @@
+import { inject } from '@angular/core';
+import { Router, CanActivateFn } from '@angular/router';
+import { EmpresaService } from '../services/empresa.service';
+import { map, catchError, of } from 'rxjs';
+
+function normalizePath(url: string): string {
+  return url.split('?')[0].replace(/^\//, '') || '';
+}
+
+/** Rutas que la empresa gestora puede usar aunque el menú esté reducido. */
+function esRutaPermitidaGestora(path: string): boolean {
+  if (!path || path === 'home') return true;
+  if (path === 'editar-empresa') return true;
+  if (path === 'analisis') return true;
+  if (path.startsWith('ventas')) return true;
+  if (path.startsWith('cotizaciones')) return true;
+  if (path === 'caja' || path.startsWith('caja/arqueo') || path.startsWith('caja/ventas-pendientes-pago')) {
+    return true;
+  }
+  if (path.startsWith('despachos')) return true;
+  if (path.startsWith('envios')) return true;
+  return false;
+}
+
+export const empresaGestoraGuard: CanActivateFn = (_route, state) => {
+  const empresaService = inject(EmpresaService);
+  const router = inject(Router);
+  const path = normalizePath(state.url);
+
+  return empresaService.getEstadoConfiguracion().pipe(
+    map((res) => {
+      const esGestora = res?.data?.esGestora === true;
+      if (!esGestora) return true;
+      if (esRutaPermitidaGestora(path)) return true;
+      return router.createUrlTree(['/home']);
+    }),
+    catchError(() => of(true))
+  );
+};

@@ -20,8 +20,11 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
       <div>
         <h1 class="content-title mb-1">Dashboard Ejecutivo</h1>
-        <p class="content-subtitle text-muted mb-0">
+        <p class="content-subtitle text-muted mb-0" *ngIf="!esGestora">
           Bienvenido, {{userName}} - Resumen general del negocio
+        </p>
+        <p class="content-subtitle text-muted mb-0" *ngIf="esGestora">
+          Bienvenido, {{userName}} — Dashboard consolidado (su empresa y las gestionadas)
         </p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
@@ -51,26 +54,55 @@
       <i class="bi bi-plus-circle"></i>
       <span>Nueva Venta</span>
     </button>
-    <button class="quick-action-btn" (click)="navigateTo('compras-create')">
-      <i class="bi bi-shopping-cart"></i>
-      <span>Nueva Compra</span>
-    </button>
-    <button class="quick-action-btn" (click)="navigateTo('clientes')">
-      <i class="bi bi-people"></i>
-      <span>Clientes</span>
-    </button>
-    <button class="quick-action-btn" (click)="navigateTo('productos')">
-      <i class="bi bi-box"></i>
-      <span>Productos</span>
-    </button>
+    <ng-container *ngIf="!esGestora">
+      <button class="quick-action-btn" (click)="navigateTo('compras-create')">
+        <i class="bi bi-shopping-cart"></i>
+        <span>Nueva Compra</span>
+      </button>
+      <button class="quick-action-btn" (click)="navigateTo('clientes')">
+        <i class="bi bi-people"></i>
+        <span>Clientes</span>
+      </button>
+      <button class="quick-action-btn" (click)="navigateTo('productos')">
+        <i class="bi bi-box"></i>
+        <span>Productos</span>
+      </button>
+      <button class="quick-action-btn" (click)="navigateTo('reportes')">
+        <i class="bi bi-bar-chart"></i>
+        <span>Reportes</span>
+      </button>
+    </ng-container>
     <button class="quick-action-btn" (click)="navigateTo('caja')">
       <i class="bi bi-cash-register"></i>
       <span>Caja</span>
     </button>
-    <button class="quick-action-btn" (click)="navigateTo('reportes')">
-      <i class="bi bi-bar-chart"></i>
-      <span>Reportes</span>
-    </button>
+  </div>
+
+  <div class="card mb-4 shadow-sm" *ngIf="esGestora && porEmpresaDashboard.length > 0">
+    <div class="card-header py-2">
+      <strong>Por empresa</strong>
+      <span class="text-muted small ms-2">Mismos KPIs que arriba, desglosados</span>
+    </div>
+    <div class="card-body p-0 table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Empresa</th>
+            <th class="text-end">Ventas</th>
+            <th class="text-end">Utilidad neta</th>
+            <th class="text-end">Clientes activos</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of porEmpresaDashboard">
+            <td>{{ row.razonSocial || row.idEmpresa }}</td>
+            <td class="text-end">{{ row.resumen.ventasTotales | number:'1.2-2' }}</td>
+            <td class="text-end">{{ row.resumen.utilidadNeta | number:'1.2-2' }}</td>
+            <td class="text-end">{{ row.resumen.clientesActivos | number:'1.0-0' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- KPIs principales -->

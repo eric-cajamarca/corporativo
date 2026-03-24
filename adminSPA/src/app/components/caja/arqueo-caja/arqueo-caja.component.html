@@ -163,6 +163,32 @@
                 <strong>Efectivo disponible en caja:</strong> {{ formatCurrency(saldoEfectivoDisponible) }}
                 <small class="d-block text-muted mt-1">Solo los movimientos con forma de pago &quot;Efectivo&quot; afectan este saldo. El resto se muestra arriba pero no resta del efectivo.</small>
               </div>
+
+              <div class="mt-4" *ngIf="esGestora && totalesPorEmpresa.length > 0">
+                <h6 class="fw-bold text-center mb-2">Arqueo por empresa (consolidado arriba)</h6>
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Empresa</th>
+                        <th class="text-end">Total ingresos</th>
+                        <th class="text-end">Total egresos</th>
+                        <th class="text-end">Ventas crédito</th>
+                        <th class="text-end">Cobro créditos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let pe of totalesPorEmpresa">
+                        <td>{{ pe.razonSocial || pe.idEmpresa }}</td>
+                        <td class="text-end">{{ formatCurrency(pe.totalIngresos) }}</td>
+                        <td class="text-end">{{ formatCurrency(pe.totalEgresos) }}</td>
+                        <td class="text-end">{{ formatCurrency(pe.ventasCredito?.importe || 0) }}</td>
+                        <td class="text-end">{{ formatCurrency(pe.cobroCreditos?.importe || 0) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
     
             </div>
           </div>

@@ -7,7 +7,8 @@ import { SidebarComponent } from '../sidebar/sidebar.component';
 import { SidebarStateService } from '../../services/sidebar-state.service';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
-import { DashboardService } from '../../services/dashboard.service';
+import { DashboardService, ResumenDashboard } from '../../services/dashboard.service';
+import { EmpresaService } from '../../services/empresa.service';
 import { Chart } from 'chart.js/auto';
 
 @Component({
@@ -59,11 +60,16 @@ export class InicioComponent implements OnInit {
   // Estado de carga
   public cargandoDatos = signal<boolean>(true);
 
+  /** Empresa gestora: dashboard consolidado + filas por empresa gestionada */
+  public esGestora = false;
+  public porEmpresaDashboard: { idEmpresa: string; razonSocial: string; resumen: ResumenDashboard }[] = [];
+
   constructor(
     private router: Router,
     public authService: AuthService,
     private permisosService: PermisosService,
     private dashboardService: DashboardService,
+    private empresaService: EmpresaService,
     public sidebarState: SidebarStateService
   ) {
     // Efecto para actualizar datos del usuario
@@ -77,8 +83,16 @@ export class InicioComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.initializeDashboard();
-    
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        this.esGestora = !!res?.data?.esGestora;
+        this.initializeDashboard();
+      },
+      error: () => {
+        this.esGestora = false;
+        this.initializeDashboard();
+      }
+    });
   }
 
   /**
@@ -103,31 +117,66 @@ export class InicioComponent implements OnInit {
   /**
    * Carga los datos del dashboard
    */
+  private aplicarResumenDashboard(d: ResumenDashboard | null | undefined): void {
+    if (d) {
+      this.ventasTotales = Number(d.ventasTotales) || 0;
+      this.utilidadNeta = Number(d.utilidadNeta) || 0;
+      this.clientesActivos = Number(d.clientesActivos) || 0;
+      this.roi = Number(d.roi) || 0;
+      this.ventasVariacion = Number(d.ventasVariacion) || 0;
+      this.utilidadVariacion = Number(d.utilidadVariacion) || 0;
+      this.clientesVariacion = Number(d.clientesVariacion) || 0;
+      this.ingresos = Number(d.ingresos) || 0;
+      this.costos = Number(d.costos) || 0;
+      this.utilidadBruta = Number(d.utilidadBruta) || 0;
+      this.gastosOperativos = Number(d.gastosOperativos) || 0;
+      this.productosMasVendidos = Array.isArray(d.productosMasVendidos) ? d.productosMasVendidos : [];
+      this.ventasMensualesChart = Array.isArray(d.ventasMensuales) && d.ventasMensuales.length >= 12
+        ? d.ventasMensuales.slice(0, 12)
+        : (Array.isArray(d.ventasMensuales) ? d.ventasMensuales : []);
+      this.ventasMensualesLabels = Array.isArray(d.ventasMensualesLabels) ? d.ventasMensualesLabels : [];
+      this.graficoVentas = d.graficoVentas || null;
+      this.alertas = Array.isArray(d.alertas) ? d.alertas : [];
+    }
+  }
+
   private cargarDatosDashboard(): void {
     this.cargandoDatos.set(true);
+    this.porEmpresaDashboard = [];
+
+    if (this.esGestora) {
+      this.dashboardService.obtenerResumenConsolidado(this.periodoSeleccionado).subscribe({
+        next: (response) => {
+          const payload = response.data;
+          if (payload?.consolidado) {
+            this.aplicarResumenDashboard(payload.consolidado);
+          }
+          this.porEmpresaDashboard = Array.isArray(payload?.porEmpresa) ? payload.porEmpresa : [];
+          this.cargandoDatos.set(false);
+          setTimeout(() => this.createCharts(), 100);
+        },
+        error: (error) => {
+          console.error('Error al cargar dashboard consolidado:', error);
+          this.dashboardService.obtenerResumen(this.periodoSeleccionado).subscribe({
+            next: (response) => {
+              this.aplicarResumenDashboard(response.data);
+              this.cargandoDatos.set(false);
+              setTimeout(() => this.createCharts(), 100);
+            },
+            error: () => {
+              this.cargandoDatos.set(false);
+              this.ventasTotales = 0;
+              this.ventasMensualesChart = [];
+            }
+          });
+        }
+      });
+      return;
+    }
+
     this.dashboardService.obtenerResumen(this.periodoSeleccionado).subscribe({
       next: (response) => {
-        const d = response.data;
-        if (d) {
-          this.ventasTotales = Number(d.ventasTotales) || 0;
-          this.utilidadNeta = Number(d.utilidadNeta) || 0;
-          this.clientesActivos = Number(d.clientesActivos) || 0;
-          this.roi = Number(d.roi) || 0;
-          this.ventasVariacion = Number(d.ventasVariacion) || 0;
-          this.utilidadVariacion = Number(d.utilidadVariacion) || 0;
-          this.clientesVariacion = Number(d.clientesVariacion) || 0;
-          this.ingresos = Number(d.ingresos) || 0;
-          this.costos = Number(d.costos) || 0;
-          this.utilidadBruta = Number(d.utilidadBruta) || 0;
-          this.gastosOperativos = Number(d.gastosOperativos) || 0;
-          this.productosMasVendidos = Array.isArray(d.productosMasVendidos) ? d.productosMasVendidos : [];
-          this.ventasMensualesChart = Array.isArray(d.ventasMensuales) && d.ventasMensuales.length >= 12
-            ? d.ventasMensuales.slice(0, 12)
-            : (Array.isArray(d.ventasMensuales) ? d.ventasMensuales : []);
-          this.ventasMensualesLabels = Array.isArray(d.ventasMensualesLabels) ? d.ventasMensualesLabels : [];
-          this.graficoVentas = d.graficoVentas || null;
-          this.alertas = Array.isArray(d.alertas) ? d.alertas : [];
-        }
+        this.aplicarResumenDashboard(response.data);
         this.cargandoDatos.set(false);
         setTimeout(() => this.createCharts(), 100);
       },

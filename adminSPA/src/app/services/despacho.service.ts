@@ -21,9 +21,10 @@ export class DespachoService {
   }
 
   // Obtener despachos por venta
-  obtenerDespachosPorVenta(idVenta: string): Observable<any> {
+  obtenerDespachosPorVenta(idVenta: string, idEmpresa?: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'despachos/venta/' + idVenta, {
+    const q = idEmpresa ? '?idEmpresa=' + encodeURIComponent(idEmpresa) : '';
+    return this._http.get(this.url+'despachos/venta/' + idVenta + q, {
       headers: headers,
       withCredentials: true
     });
@@ -34,6 +35,7 @@ export class DespachoService {
     idVenta: string;
     idTipoDespacho: number;
     observaciones?: string;
+    idEmpresa?: string;
     detalles?: Array<{ idDetalle: number; idProducto: string; cantidadADespachar: number }>;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
@@ -86,11 +88,31 @@ export class DespachoService {
     });
   }
 
+  /** Búsqueda venta agrupada (empresa gestora). */
+  buscarVentaAgrupadaGestora(params: {
+    idVentaAgrupada?: string;
+    compVenta?: string;
+    ruc?: string;
+    nombreCliente?: string;
+  }): Observable<any> {
+    const q = new URLSearchParams();
+    if (params.idVentaAgrupada) q.set('idVentaAgrupada', params.idVentaAgrupada);
+    if (params.compVenta) q.set('compVenta', params.compVenta);
+    if (params.ruc) q.set('ruc', params.ruc);
+    if (params.nombreCliente) q.set('nombreCliente', params.nombreCliente);
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get(this.url + 'despachos/venta-agrupada/buscar?' + q.toString(), {
+      headers,
+      withCredentials: true
+    });
+  }
+
   /** Buscar venta por número de comprobante o idVenta. Devuelve venta + despachos + entregadoMismoDia */
-  buscarVentaDespachos(params: { compVenta?: string; idVenta?: string | number }): Observable<any> {
+  buscarVentaDespachos(params: { compVenta?: string; idVenta?: string | number; idEmpresa?: string }): Observable<any> {
     const q = new URLSearchParams();
     if (params.compVenta) q.set('compVenta', params.compVenta);
     if (params.idVenta != null && params.idVenta !== '') q.set('idVenta', String(params.idVenta));
+    if (params.idEmpresa) q.set('idEmpresa', params.idEmpresa);
     const query = q.toString();
     const url = this.url + 'despachos/buscar' + (query ? '?' + query : '');
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });

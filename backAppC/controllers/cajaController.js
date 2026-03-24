@@ -477,7 +477,8 @@ const obtenerArqueoDinamico = async (req, res) => {
       data: result.movimientos || [],
       detalle: result.detalle || [],
       ventasCredito: result.ventasCredito || { concepto: 'VENTA CREDITO', importe: 0 },
-      cobroCreditos: result.cobroCreditos || { concepto: 'COBRO CREDITOS', importe: 0 }
+      cobroCreditos: result.cobroCreditos || { concepto: 'COBRO CREDITOS', importe: 0 },
+      totalesPorEmpresa: result.totalesPorEmpresa
     });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
