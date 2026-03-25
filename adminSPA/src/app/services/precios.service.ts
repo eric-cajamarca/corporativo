@@ -47,8 +47,7 @@ export class PreciosService {
   }
 
   crear_lista_precios(data:any):Observable<any>{
-    console.log('Datos enviados al servicio crear_lista_precios:', data);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'lista_precios',data,{withCredentials:true,headers:headers});
   }
 

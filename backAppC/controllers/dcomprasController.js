@@ -35,11 +35,9 @@ const obtener_detalle_compras_idcompra = async function (req, res) {
 
                     .query("SELECT * FROM DetalleCompras  WHERE idCompra = @idCompra");
 
-                    console.log('detallecompras: ', detallecompras.recordset);
-                res.status(200).send({ data: detallecompras.recordset });
+                                    res.status(200).send({ data: detallecompras.recordset });
             } catch (error) {
-                console.log('obterner detallecompras error: ' + error);
-                res.status(500).send({ message: 'Error al obtener los detallecompras', data: undefined });
+                                res.status(500).send({ message: 'Error al obtener los detallecompras', data: undefined });
             }
         } else {
             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -168,13 +166,11 @@ const crear_detalle_compras_idcompra = async function (req, res) {
 
 
 const crear_detallecompras = async function (detalle) {
-    console.log('detalle en crear nuevo_detallecompras: ', detalle);
-    try {
+        try {
         // Formatear pUnitario a dos decimales
         const pUnitarioFormateado = parseFloat(detalle.pUnitario);
 
-        console.log('pUnitarioFormateado en crear_detallecompras: ', pUnitarioFormateado);
-
+        
         let pool = await sql.connect(dbConfig);
         let detalleCompra = await pool
             .request()
@@ -190,19 +186,15 @@ const crear_detallecompras = async function (detalle) {
             .query("INSERT INTO DetalleCompras (idEmpresa, idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario) VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)");
 
         //res.status(200).send({ data: detalleCompra.rowsAffected });
-        console.log('detalleCompra en crear_detallecompras: ', detalleCompra.rowsAffected);
-
+        
     } catch (error) {
-        console.log('crear detallecompras error: ' + error);
-        res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
+                res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
     }
 
 }
 
 const editar_detalle_compras_idcompra = async (req, res) => {
-    console.log('editar_detalle_compras_idcompra reqbody: ', req.body);
-    console.log('editar_detalle_compras_idcompra: reqparams', req.params);
-    //const {idDetalleCompra, idEmpresa, idSucursal, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario } = req.body;
+            //const {idDetalleCompra, idEmpresa, idSucursal, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario } = req.body;
 
     const idCompra = req.params.id;
 
@@ -215,8 +207,7 @@ const editar_detalle_compras_idcompra = async (req, res) => {
             DetalleCompra.push(detalleCompra);
         });
 
-        console.log('DetalleCompra en editar_detalle_compras_idcompra ', DetalleCompra);
-
+        
 
         const idUsuario = req.user.sub;
         const idEmpresa = req.user.empresa;
@@ -238,8 +229,7 @@ const editar_detalle_compras_idcompra = async (req, res) => {
             };
         });
 
-        console.log('dCompra en editar_detalle_compras_idcompra: ', dCompra);
-
+        
 
         if (req.user.rol == 'Administrador') {
             try {
@@ -253,13 +243,11 @@ const editar_detalle_compras_idcompra = async (req, res) => {
                     }
 
                 }
-                console.log('todos los detalles de compra fueron actualizados');
-
+                
                 res.status(200).send({ data: 1, message: 'Detalle de compra actualizado correctamente' });
 
             } catch (error) {
-                console.log('crear detallecompras error: ' + error);
-                res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
+                                res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
             }
         } else {
             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -272,12 +260,10 @@ const editar_detalle_compras_idcompra = async (req, res) => {
 
 const actualizarDetalleCompra = async function (detalle) {
 
-    console.log('detalle en actualizarDetalleCompra: ', detalle);
-    //const pUnitarioFormateado = parseFloat(detalle.pUnitario);
+        //const pUnitarioFormateado = parseFloat(detalle.pUnitario);
     //quiero formatear detalle.pUnitario a un decimal con 5 decimales
     const pUnitarioFormateado = parseFloat(detalle.pUnitario);
-    console.log('pUnitarioFormateado en actualizarDetalleCompra: ', pUnitarioFormateado);
-
+    
     try {
         let pool = await sql.connect(dbConfig); // Asegúrate de tener dbConfig definido con tus credenciales de la base de datos
         let result = await pool.request()
@@ -291,16 +277,14 @@ const actualizarDetalleCompra = async function (detalle) {
             .input('pUnitario', sql.Decimal(18, 5), pUnitarioFormateado)
             .input('total', sql.Decimal(18, 2), detalle.total)
             .query('UPDATE DetalleCompras SET idSucursal = @idSucursal, cantidad = @cantidad, idProducto = @idProducto, idPresentacion = @idPresentacion, pUnitario = @pUnitario, total = @total WHERE idDetalleCompra = @idDetalleCompra and idCompra = @idCompra');
-        console.log(result);
-    } catch (error) {
+            } catch (error) {
         console.error('Error al actualizar el detalle de compra:', error);
     }
 }
 
 const eliminar_detalle_compras_idcompra = async function (req, res) {
     const idCompra = req.params.id;
-    console.log('eliminar_detalle_compras_idcompra: ', idCompra);
-    if (req.user) {
+        if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
                 let pool = await sql.connect(dbConfig);
@@ -312,8 +296,7 @@ const eliminar_detalle_compras_idcompra = async function (req, res) {
                 res.status(200).send({ data: detallecompras.rowsAffected });
 
             } catch (error) {
-                console.log('eliminar detallecompras error: ' + error);
-                res.status(500).send({ message: 'Error al eliminar detallecompras', data: undefined });
+                                res.status(500).send({ message: 'Error al eliminar detallecompras', data: undefined });
             }
         } else {
             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });

@@ -30,8 +30,7 @@ export class ProveedoresService {
 
    //Metodo para obtener un proveedor por ruc
    obtener_proveedor_ruc(id:any):Observable<any>{
-    console.log('obtener_proveedor_id - id',id);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'proveedoresruc/'+id,{
       headers: headers,
       withCredentials: true
@@ -40,8 +39,7 @@ export class ProveedoresService {
 
   //Metodo para obtener un proveedor por id
   obtener_proveedor_id(id:any):Observable<any>{
-    console.log('obtener_proveedor_id - id',id);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'proveedores/'+id,{
       headers: headers,
       withCredentials: true
@@ -79,8 +77,7 @@ export class ProveedoresService {
 
 
   cambiar_estado_proveedores(id: any, data: any): Observable<any> {
-    console.log('cambiar_estado_proveedores - id', id, data);
-    let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+        let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.put(this.url + 'cambiar_estado_proveedores/' + id, data, { 
       headers: headers,
       withCredentials: true 

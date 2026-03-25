@@ -36,14 +36,12 @@ async function crearDocumento(req,res){
 
 //2. crea el metodo listarDocumentos segun los datos de la tabla
 async function listarDocumentos(req,res){
-    console.log('listar documentos',req.user);
-    if (req.user) {
+        if (req.user) {
         if (req.user.rol) {
             
             try {
                 let pool = await sql.connect(dbConfig);
                 let documentos = await pool.request().query('select * from Documentos');
-                console.log('documentos', documentos.recordset)
                 res.status(200).send({ message: 'Lista de documentos', data: documentos.recordset });
             } catch (error) {
                 res.status(500).send({ message: error.message, data: undefined });
@@ -129,8 +127,7 @@ const listarFormasPago = async function (req,res) {
             res.status(200).send({data: formasPago.recordset});
         
         }catch(error){
-            console.log(error);
-            res.status(500).send({ message: error.message, data: undefined });
+                        res.status(500).send({ message: error.message, data: undefined });
         }
     }else{
         res.status(500).send({ message: 'No Access' });

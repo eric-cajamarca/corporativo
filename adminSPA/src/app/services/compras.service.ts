@@ -81,9 +81,7 @@ export class ComprasService {
   }
 
   editar_compra(id: any, compra: any): Observable<any> {
-    console.log('id en el servicio', id);
-    console.log('compra en el servicio', compra);
-
+        
     let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.put(this.url + 'compras/' + id, compra, { 
       headers:headers,
@@ -189,8 +187,7 @@ export class ComprasService {
   //api.get('/comprasCliente/:id',auth.auth, comprasController.buscar_comprobante_idCliente);
 
   buscar_comprobante_idCliente(id: any): Observable<any> {
-    console.log('id', id);
-    let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+        let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.get(this.url + 'comprasCliente/' + id, { 
       headers:headers,
       withCredentials: true

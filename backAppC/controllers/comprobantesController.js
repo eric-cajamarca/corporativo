@@ -28,19 +28,15 @@ async function obtener_comprobantes(req, res) {
 }
 
 async function obtenerComprobantes_alias(req, res) {
-    console.log('aqui entro a obtener comprobantes');
-    let alias = req.params.id;
+        let alias = req.params.id;
 
-    console.log('alias', alias);
-    console.log('params', req.params);
-
+        
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
             const result = await pool.request().query('SELECT * FROM Comprobantes'+alias+' where id = 15');
     
-            console.log('resultado del result', result.recordset);
-            res.json(result.recordset);
+                        res.json(result.recordset);
     
         } catch (error) {
             console.error('Error al obtener los comprobantes:', error);

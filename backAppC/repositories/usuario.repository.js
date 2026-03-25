@@ -6,14 +6,12 @@ const sql = require('mssql');
  */
 exports.checkEmailExists = async (pool, email, Empresa) =>{
       
-   console.log('checkEmailExists Empresa', Empresa, email);
-    const result = await pool
+       const result = await pool
       .request()
       .input('email', sql.VarChar, email)
       .input('idEmpresa', sql.UniqueIdentifier, Empresa)
       .query('SELECT idUsuario FROM usuarioWeb WHERE email = @email and idEmpresa = @idEmpresa');
-     console.log('checkEmailExists', result.recordset.length);
-    return result.recordset.length > 0;
+         return result.recordset.length > 0;
   
 }
 
@@ -21,8 +19,7 @@ exports.checkEmailExists = async (pool, email, Empresa) =>{
  * Crea un nuevo usuario en la BD
  */
 exports.createUsuario = async (pool, usuarioData) => {
-  console.log('createUsurio en repositoy', usuarioData);
-  
+    
     const result = await pool
       .request()
       .input('idUsuario', sql.UniqueIdentifier, usuarioData.idUsuario)

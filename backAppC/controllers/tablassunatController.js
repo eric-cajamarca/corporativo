@@ -14,8 +14,7 @@ const obtener_estado_pago = async (req, res) => {
             let estadoPago = await pool.request().query("SELECT * FROM EstadoPago");
             res.status(200).send({ data: estadoPago.recordset });
         } catch (error) {
-            console.log('obterner estadoPago error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los estadoPago', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los estadoPago', data: undefined });
         }
 
     } else {
@@ -55,8 +54,7 @@ const obtener_medios_pago = async (req, res) => {
             let mediosPago = await pool.request().query("SELECT * FROM MediosPago");
             res.status(200).send({ data: mediosPago.recordset });
         } catch (error) {
-            console.log('obterner mediosPago error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los mediosPago', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los mediosPago', data: undefined });
         }
 
     }
@@ -84,8 +82,7 @@ const obtener_moneda = async (req, res) => {
             res.status(200).send({ data: moneda.recordset });
 
         } catch (error) {
-            console.log('obterner moneda error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los moneda', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los moneda', data: undefined });
         }
     }
     else {
@@ -110,8 +107,7 @@ const obtener_leyenda = async (req, res) => {
             res.status(200).send({ data: leyenda.recordset });
 
         } catch (error) {
-            console.log('obterner leyenda error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los leyenda', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los leyenda', data: undefined });
         }
     }
     else {
@@ -137,8 +133,7 @@ const obtener_tipo_doc = async (req, res) => {
             res.status(200).send({ data: tipoDoc.recordset });
 
         } catch (error) {
-            console.log('obterner tipoDoc error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los tipoDoc', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los tipoDoc', data: undefined });
         }
     }
     else {
@@ -165,8 +160,7 @@ const obtener_tipo_factura = async (req, res) => {
             res.status(200).send({ data: tipoFactura.recordset });
 
         } catch (error) {
-            console.log('obterner tipoFactura error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los tipoFactura', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los tipoFactura', data: undefined });
         }
     }
     else {
@@ -192,8 +186,7 @@ const obtener_tipo_operacion = async (req, res) => {
             res.status(200).send({ data: tipoOperacion.recordset });
 
         } catch (error) {
-            console.log('obterner tipoOperacion error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los tipoOperacion', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los tipoOperacion', data: undefined });
         }
     }
     else {
@@ -218,8 +211,7 @@ const obtener_modalidad_traslado = async (req, res) => {
             res.status(200).send({ data: modalidadTraslado.recordset });
 
         } catch (error) {
-            console.log('obterner modalidadTraslado error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los modalidadTraslado', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los modalidadTraslado', data: undefined });
         }
     }
     else {
@@ -244,8 +236,7 @@ const obtener_motivos_traslado = async (req, res) => {
             res.status(200).send({ data: motivosTraslado.recordset });
 
         } catch (error) {
-            console.log('obterner motivosTraslado error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los motivosTraslado', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los motivosTraslado', data: undefined });
         }
     }
     else {
@@ -271,8 +262,7 @@ const obtener_regimen_percepcion = async (req, res) => {
             res.status(200).send({ data: regimenPercepcion.recordset });
 
         } catch (error) {
-            console.log('obterner regimenPercepcion error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los regimenPercepcion', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los regimenPercepcion', data: undefined });
         }
     }
     else {
@@ -296,8 +286,7 @@ const obtener_regimen_retencion = async (req, res) => {
             res.status(200).send({ data: regimenRetencion.recordset });
 
         } catch (error) {
-            console.log('obterner regimenRetencion error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los regimenRetencion', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los regimenRetencion', data: undefined });
         }
     }
     else {
@@ -324,8 +313,7 @@ const obtener_tributos = async (req, res) => {
             res.status(200).send({ data: tributos.recordset });
 
         } catch (error) {
-            console.log('obterner tributos error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los tributos', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los tributos', data: undefined });
         }
     }
     else {
@@ -352,8 +340,7 @@ const obtener_estado_sunat = async (req, res) => {
             res.status(200).send({ data: estadoSunat.recordset });
 
         } catch (error) {
-            console.log('obterner estadoSunat error: ' + error);
-            res.status(500).send({ message: 'Error al obtener los estadoSunat', data: undefined });
+                        res.status(500).send({ message: 'Error al obtener los estadoSunat', data: undefined });
         }
 
     } else {

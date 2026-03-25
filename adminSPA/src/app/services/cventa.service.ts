@@ -28,8 +28,7 @@ export class CventaService {
   }
 
   obtener_datos_cventas_empresa(id:any, aliasempresa:any):Observable<any>{
-    console.log('aliasempresa',aliasempresa);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url + `cventas/${id}/${aliasempresa}`, { 
       headers: headers,
       withCredentials: true

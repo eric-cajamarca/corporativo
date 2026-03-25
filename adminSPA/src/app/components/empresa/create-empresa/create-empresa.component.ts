@@ -275,8 +275,7 @@ export class CreateEmpresaComponent implements OnInit {
         }
 
         this.empresaEncontrada = data;
-        console.log('empresaEncontrada:', this.empresaEncontrada);
-        this.encontrado.set(true);
+                this.encontrado.set(true);
         this.empresaForm.patchValue({
           razonSocial: data.razonSocial || '',
           nombreComercial: data.nombreComercial || '',
@@ -371,10 +370,7 @@ export class CreateEmpresaComponent implements OnInit {
    * Navega al siguiente paso
    */
   nextStep(): void {
-    console.log('nextStep - Paso actual:', this.currentStep());
-    console.log('nextStep - Estado del formulario:', this.empresaForm.value);
-    console.log('nextStep - Formulario válido:', this.empresaForm.valid);
-    
+                
     if (this.currentStep() < 3) {
       // Validar paso 1: RUC verificado
       if (this.currentStep() === 1 && !this.encontrado()) {
@@ -406,8 +402,7 @@ export class CreateEmpresaComponent implements OnInit {
       }
       
       this.currentStep.update(step => step + 1);
-      console.log('nextStep - Nuevo paso:', this.currentStep());
-    }
+          }
   }
 
   /**
@@ -428,14 +423,9 @@ export class CreateEmpresaComponent implements OnInit {
    * Registra la empresa
    */
   registrar(): void {
-    console.log('=== INTENTANDO REGISTRAR EMPRESA ===');
-    console.log('Estado del formulario - invalid:', this.empresaForm.invalid);
-    console.log('Valores del formulario:', this.empresaForm.value);
-    console.log('Errores del formulario:', this.empresaForm.errors);
-    
+                    
     const camposInvalidos = this.getCamposInvalidos();
-    console.log('Campos inválidos:', camposInvalidos);
-    
+        
     if (this.empresaForm.invalid) {
       // Marcar todos los campos como touched para mostrar errores
       Object.keys(this.empresaForm.controls).forEach(key => {

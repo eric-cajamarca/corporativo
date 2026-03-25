@@ -323,8 +323,7 @@ export class IndexProductoComponent {
       c.idProductoHijo && c.cantidad > 0
     );
     
-    console.log('Componentes para kit:', componentesValidos);
-    // Llamar al servicio para convertir a compuesto
+        // Llamar al servicio para convertir a compuesto
     this._productoCompuestoService.crear_producto_compuesto({
       idProductoPadre: this.productoSeleccionado.idProducto,
       componentes: componentesValidos
@@ -387,8 +386,7 @@ export class IndexProductoComponent {
       this.nuevoAtributo.nombre = '';
     }
 
-    console.log(this.atributosProducto);
-  }
+      }
   
   eliminarAtributo(atributo: any): void {
     const index = this.atributosProducto.indexOf(atributo);
@@ -411,7 +409,6 @@ export class IndexProductoComponent {
   }
   
   generarCombinaciones(): void {
-    console.log('generando cominaciones',this.atributosProducto)
     if (this.atributosProducto.length < 0) return;
     
     // Generar todas las combinaciones posibles
@@ -496,12 +493,9 @@ export class IndexProductoComponent {
   }
   
   verComponentesKit(_item: any){
-    console.log('verComponentesKit',_item);
-    this._productoCompuestoService.obtener_componentes(_item.idProducto).subscribe(
+        this._productoCompuestoService.obtener_componentes(_item.idProducto).subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data == undefined) {
+                        if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
             titleColor: '#FF0000',
@@ -534,8 +528,7 @@ export class IndexProductoComponent {
       }
       },
       error => {
-        console.log(error);
-      }
+              }
     );
     
 

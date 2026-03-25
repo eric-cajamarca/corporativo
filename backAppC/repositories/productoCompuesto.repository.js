@@ -64,8 +64,7 @@ exports.obtenerProductoPorId = async (pool, idProducto, idEmpresa) => {
                 AND estado = 1
             `);
         
-        console.log('obtenerProductoPorId result:', result.recordset);
-        return result.recordset[0] || null;
+                return result.recordset[0] || null;
     } catch (error) {
         throw new Error(`Repository Error: ${error.message}`);
     }

@@ -439,8 +439,7 @@ exports.obtenerAtributosEmpresa = async (pool, usuarioAutenticado) => {
 function validarDatosVariante(datos) {
     const { idProductoBase, sku } = datos;
     
-    console.log('Validando datos de variante:', datos);
-    if (!idProductoBase || !sku) {
+        if (!idProductoBase || !sku) {
         throw new Error('CAMPOS_REQUERIDOS');
     }
     

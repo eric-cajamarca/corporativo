@@ -31,7 +31,6 @@ export class DventaService {
   }
 
   actualizar_CEntrega_DVentas(id:any, data:any):Observable<any>{
-    console.log('id',id,'data:',data)
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'ventas/'+id,data,{
       headers:headers,

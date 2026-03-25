@@ -154,49 +154,40 @@ export class IndexComprasComponent {
     this.empresaService.getEmpresa$().subscribe(emp => {
       this.empresa = emp;
       
-      console.log('Empresa en IndexComprasComponent:', this.empresa);
-    });
+          });
         
 
     this._categoriaService.obtener_categorias().subscribe(
       response => {
         this.categoria = response.data;
-        console.log('this.categoria', this.categoria);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._presentacionService.obtener_presentaciones().subscribe(
       response => {
         this.presentacion = response.data;
-        console.log('this.presentacion', this.presentacion);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._sucursalService.obtener_sucursal_idempresa().subscribe(
       response => {
         this.sucursales = response.data;
-        console.log('this.sucursales', this.sucursales);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._marcaService.obtenerMarcas().subscribe(
       response => {
         this.marcas = response.data;
         this.marcas.sort((a: { nombre: string; }, b: { nombre: any; }) => a.nombre.localeCompare(b.nombre));
-        console.log('this.marcas', this.marcas);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._productoService.obtenerProductosTodos().subscribe(
@@ -238,8 +229,7 @@ export class IndexComprasComponent {
         } else {
           this.compras = response.data;
           this.compras_const = response.data;
-          console.log('this.compras', this.compras);
-        }
+                  }
       },
       error: (err) => {
         console.error('initData compras:', err);
@@ -307,9 +297,7 @@ export class IndexComprasComponent {
 
     this._comprasService.obtener_detalle_compras_idcompra(id).subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data != undefined) {
+                        if (response.data != undefined) {
 
           response.data.forEach((element: any) => {
             const selectedObject = this.productos.find((item: any) => item.idProducto == element.idProducto);
@@ -366,12 +354,10 @@ export class IndexComprasComponent {
 
 
           this.loadDetalleCompras = false;
-          console.log('this.detalleCompras', this.detalleCompras);
-        }
+                  }
       },
       error => {
-        console.log(error);
-      }
+              }
     );
 
 
@@ -380,12 +366,9 @@ export class IndexComprasComponent {
 
   
   set_eliminar(id: any) {
-    console.log('aqui set_eliminar', id);
-    this._comprasService.eliminar_idcompra_empresa(id).subscribe(
+        this._comprasService.eliminar_idcompra_empresa(id).subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data == undefined) {
+                        if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
             titleColor: '#FF0000',
@@ -418,8 +401,7 @@ export class IndexComprasComponent {
 
       },
       error => {
-        console.log(error);
-      }
+              }
     );
 
 

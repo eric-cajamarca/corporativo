@@ -57,8 +57,7 @@ const obtener_productos_todos = async (req, res) => {
       });
     }
 
-    console.log("Error obtener productos:", error);
-    res.status(500).send({
+        res.status(500).send({
       message: "Error al obtener los productos",
       data: undefined,
     });
@@ -85,8 +84,7 @@ const obtener_productos_compras = async (req, res) => {
       });
     }
 
-    console.log("Error obtener productos:", error);
-    res.status(500).send({
+        res.status(500).send({
       message: "Error al obtener los productos",
       data: undefined,
     });
@@ -216,8 +214,7 @@ const obtener_productos_id = async (req, res) => {
 // }
 
 const gestionProductos_Compras = async (req, res) => {
-  console.log("req.body en gestionProductos_Compras ", req.body);
-  const {
+    const {
     Codigo,
     idCategoria,
     idMarca,
@@ -275,11 +272,9 @@ const gestionProductos_Compras = async (req, res) => {
     
 
     if (idProducto) {
-      console.log("actualizando producto con id ", idProducto);
-      resultado = await actualizar_producto_compra(datosProducto, req.user);
+            resultado = await actualizar_producto_compra(datosProducto, req.user);
     } else {
-      console.log("creando nuevo producto");
-      resultado = await crear_producto_compra(datosProducto, req.user);
+            resultado = await crear_producto_compra(datosProducto, req.user);
     }
 
     res.status(200).send({
@@ -544,8 +539,7 @@ const actualizar_producto_compra = async function (datosProducto, user) {
   // const idProducto = req.params.id;
   // const { Codigo, idCategoria, descripcion, idPresentacion, cUnitario, fProduccion, fVencimiento } = req.body;
 
-  console.log("actualizar producto producto controlleer ", datosProducto);
-  // console.log('idProducto ', req.params.id)
+    // console.log('idProducto ', req.params.id)
 
   const detalle = datosProducto;
 
@@ -569,12 +563,10 @@ const actualizar_producto_compra = async function (datosProducto, user) {
         "UPDATE Productos SET Codigo = @Codigo, idCategoria = @idCategoria, descripcion = @descripcion, idPresentacion = @idPresentacion, cUnitario = @cUnitario, fProduccion = @fProduccion, fVencimiento = @fVencimiento WHERE idProducto = @idProducto and idEmpresa = @idEmpresa"
       );
 
-    console.log("productosresult actualizar productos", productos.rowsAffected);
-    return detalle.idProducto;
+        return detalle.idProducto;
     //res.status(200).send({ data: productos.rowsAffected });
   } catch (error) {
-    console.log("actualizar productos error: " + error);
-    res
+        res
       .status(200)
       .send({ message: "Error al actualizar los productos", data: undefined });
   }
@@ -587,8 +579,7 @@ const actualizar_producto_compra = async function (datosProducto, user) {
 };
 
 const crear_producto_compra = async (datosProducto, user) => {
-  console.log("crear_nuevo_producto ", datosProducto);
-  //crear id unico
+    //crear id unico
 
   const detalle = datosProducto;
 
@@ -618,15 +609,13 @@ const crear_producto_compra = async (datosProducto, user) => {
       );
 
     //if(productos.rowsAffected == 1){
-    console.log("producto creado ", detalle.idProducto);
-    return detalle.idProducto;
+        return detalle.idProducto;
     // }else{
     //     res.status(500).send({ message: 'Error al crear los productos', data: undefined });
     // }
     
   } catch (error) {
-    console.log("crear productos error: " + error);
-    res
+        res
       .status(500)
       .send({ message: "Error al crear los productos", data: undefined });
   }
@@ -738,8 +727,7 @@ const eliminar_producto = async function (req, res) {
 
         res.status(200).send({ data: productos.rowsAffected });
       } catch (error) {
-        console.log("eliminar productos error: " + error);
-        res
+                res
           .status(500)
           .send({
             message: "Error al eliminar los productos",

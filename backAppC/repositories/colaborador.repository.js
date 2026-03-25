@@ -2,8 +2,7 @@ const sql = require('mssql');
 
 
 exports.updateEstado = async (pool, id, estado, idEmpresa) =>{
-  console.log('updateEstado en repository: ', id, estado, idEmpresa);
-    try {
+      try {
       const result = await pool
         .request()
         .input('idUsuario', sql.UniqueIdentifier, id)

@@ -7,8 +7,7 @@ const permisosService = require('../services/permisos.service');
  * Obtiene los permisos del usuario autenticado
  */
 const obtener_permisos_usuario = async function (req, res) {
-    console.log('req.user en obtener navegacion sidebar', req.user);
-    try {
+        try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
@@ -164,8 +163,7 @@ const crear_permiso = async function (req, res) {
 const actualizar_permisos_rol = async function (req, res) {
     const { idRol } = req.params;
     const { permisos } = req.body;
-    console.log('controlador actualizar_permisos_rol',req.body, req.params );
-    try {
+        try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
@@ -268,8 +266,7 @@ const inicializar_permisos = async function (req, res) {
  */
 const obtener_navegacion_sidebar = async function (req, res) {
     
-    console.log('req.user en obtener navegacion sidebar', req.user);
-    try {
+        try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }

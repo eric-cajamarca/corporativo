@@ -34,8 +34,7 @@ const obtenerMarcas = async function (req, res) {
 
 //obtener una marca por su id
 const obtenerMarcaPorId = async function (req, res) {
-    console.log('req.params', req.params.id);
-    const idMarca = req.params.id;
+        const idMarca = req.params.id;
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
@@ -82,9 +81,7 @@ const crearMarca = async function (req, res) {
 
 //editar marca
 const editarMarca = async function (req, res) {
-    console.log('req.params', req.params.id);
-    console.log('req.body', req.body);
-    const { nombre, descripcion, contacto, paginaWeb } = req.body;
+            const { nombre, descripcion, contacto, paginaWeb } = req.body;
     const idMarca = req.params.id;
     const idEmpresa = req.user.empresa;
 
@@ -114,9 +111,7 @@ const editarMarca = async function (req, res) {
 
 const editarEstadoMarca = async function (req, res) {
 
-    console.log('editarEstadoMarca', req.body);
-        console.log('editarEstadoMarca', req.params);
-    const { estado } = req.body;
+                const { estado } = req.body;
     const idMarca = req.params.id;
     const idEmpresa = req.user.empresa;
     let nuevoEstado;
@@ -129,8 +124,7 @@ const editarEstadoMarca = async function (req, res) {
             nuevoEstado = 1;
         }
 
-        console.log('editarEstadoMarca antes de enviar a la bd', estado);
-        
+                
         try {
             const pool = await sql.connect(dbConfig);
             const result = await pool
@@ -140,15 +134,13 @@ const editarEstadoMarca = async function (req, res) {
                 .input('estado', sql.Bit, nuevoEstado)
                 .query('UPDATE Marcas SET estado = @estado WHERE idMarca = @idMarca and idEmpresa = @idEmpresa');
             
-                console.log('editarMarca result.rowsAffected', result.rowsAffected);
-                res.status(200).send({ data: result.rowsAffected });
+                                res.status(200).send({ data: result.rowsAffected });
         } catch (error) {
             console.error('Error al editar el estado de la marca:', error);
             res.status(500).send({ data: undefined });
         }
     } else {
-        console.log('No Access');
-        res.status(401).send({ message: 'No Access', data: undefined });
+                res.status(401).send({ message: 'No Access', data: undefined });
     }
 }
 

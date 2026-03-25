@@ -30,14 +30,11 @@ export class UpdateSucursalComponent {
   ngOnInit(): void {
     this._Route.params.subscribe(
       params => {
-        console.log('params: ', params);
-        this.id = params['id'];
-        console.log('this.id: ', this.id);
-
+                this.id = params['id'];
+        
         this._sucursalService.obtener_sucursal_idempresa().subscribe(
           response => {
-            console.log('response: ', response);
-            this.sucursal = response;
+                        this.sucursal = response;
             // this.sucursal = this.sucursal[0].descripcion;
             // this.load_data = true;
 
@@ -45,8 +42,7 @@ export class UpdateSucursalComponent {
             this.sucursal = response.data.find((sucursal: any) => sucursal.idSucursal == this.id);
             //this.sucursal = this.sucursal[0].descripcion;
 
-            console.log('this.sucursal: ', this.sucursal);
-
+            
 
             //convertir this.sucursal a un objeto par usarlo en mi formulario
             // this.sucursal = {
@@ -56,11 +52,9 @@ export class UpdateSucursalComponent {
             //   id: this.sucursal[0].id,
             // }
 
-            console.log('this.sucursal: ', this.sucursal);
-          },
+                      },
           error => {
-            console.log('error: ', error);
-          }
+                      }
         )
 
       }
@@ -68,18 +62,14 @@ export class UpdateSucursalComponent {
   }
 
   actualizar(updateForm: any) {
-    console.log('updateForm: ', updateForm);
-    console.log('this.sucursal: ', this.sucursal);
-    this.load_data = true;
+            this.load_data = true;
     this._sucursalService.editar_sucursal_idEmpresa(this.sucursal).subscribe(
       response => {
-        console.log('response: ', response);
-        this._router.navigate(['/sucursal']);
+                this._router.navigate(['/sucursal']);
         this.load_data = false;
       },
       error => {
-        console.log('error: ', error);
-      }
+              }
     )
   }
 

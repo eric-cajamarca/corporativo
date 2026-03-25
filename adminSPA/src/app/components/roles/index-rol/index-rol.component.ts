@@ -38,13 +38,10 @@ export class IndexRolComponent {
   ngOnInit(): void {
     this._rolService.obtenerRoles().subscribe(
       response=>{
-        console.log('response: ',response.data);
-        this.roles = response.data;
-        console.log('this.roles: ',this.roles);
-      },
+                this.roles = response.data;
+              },
       error=>{
-        console.log('error: ',error);
-      }
+              }
     )
 
   }

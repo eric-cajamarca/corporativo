@@ -30,14 +30,11 @@ export class UpdateRolComponent {
   ngOnInit(): void {
     this._Route.params.subscribe(
       params => {
-        console.log('params: ', params);
-        this.id = params['id'];
-        console.log('this.id: ', this.id);
-
+                this.id = params['id'];
+        
         this._rolService.obtenerRolId(this.id).subscribe(
           response => {
-            console.log('response: ', response);
-            this.rol = response;
+                        this.rol = response;
             // this.rol = this.rol[0].descripcion;
             // this.load_data = true;
 
@@ -49,11 +46,9 @@ export class UpdateRolComponent {
 
             }
 
-            console.log('this.rol: ', this.rol);
-          },
+                      },
           error => {
-            console.log('error: ', error);
-          }
+                      }
         )
       }
     )
@@ -65,8 +60,7 @@ export class UpdateRolComponent {
   actualizar(updateForm: any) {
     //validar si el formulario es valido
     if (updateForm.valid) {
-      console.log('this.rol: ', this.rol);
-      this._rolService.actualizarRol(this.id, this.rol).subscribe(
+            this._rolService.actualizarRol(this.id, this.rol).subscribe(
         response=>{
           if (response.data == undefined) {
             iziToast.show({

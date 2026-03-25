@@ -63,9 +63,7 @@ export class IndexProveedorComponent {
       this.load_estado = true;
       this._proveedorService.obtener_proveedores().subscribe(
         response => {
-          console.log('response.data');
-          console.log(response.data);
-          if (response.data == undefined) {
+                              if (response.data == undefined) {
             iziToast.show({
               title: 'ERROR',
               titleColor: '#FF0000',
@@ -82,8 +80,7 @@ export class IndexProveedorComponent {
           }
         },
         error => {
-          console.log('error', error);
-        }
+                  }
       );
     }
   
@@ -123,9 +120,7 @@ export class IndexProveedorComponent {
     //aqui hago el cambio de estado de activo o inactivo
     set_state(id: any, estado: any) {
   
-      console.log('id', id);
-      console.log('condicion', estado);
-      this.load_estado = true;
+                  this.load_estado = true;
       this._proveedorService.cambiar_estado_proveedores(id, { estado: estado } ).subscribe(
         response => {
           if (response.data != undefined) {
@@ -142,8 +137,7 @@ export class IndexProveedorComponent {
           
         },
         error=>{
-          console.log('error',error);
-        }
+                  }
       );
       
   
@@ -151,13 +145,11 @@ export class IndexProveedorComponent {
   
     eliminar(id: any) {
   
-      console.log('id', id);
-  
+        
       this.load_estado = true;
       this._proveedorService.eliminar_direccionProveedor(id).subscribe(
         response => {
-          console.log('response.data', response.data);
-        }
+                  }
       )
   
       this._proveedorService.eliminar_proveedor(id).subscribe(

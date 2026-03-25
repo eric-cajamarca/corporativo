@@ -1,5 +1,5 @@
 // Verificación de interfaces de análisis
-console.log('🔍 VERIFICANDO INTERFACES DE ANÁLISIS...\n');
+console.error('🔍 VERIFICANDO INTERFACES DE ANÁLISIS...\n');
 
 // Leer el archivo de interfaces
 const fs = require('fs');
@@ -9,7 +9,7 @@ try {
   const interfacesPath = path.join(__dirname, 'src/app/interfaces/analisis-interface.ts');
   const content = fs.readFileSync(interfacesPath, 'utf8');
 
-  console.log('✅ Archivo de interfaces encontrado');
+  console.error('✅ Archivo de interfaces encontrado');
 
   // Verificar propiedades requeridas
   const requiredProperties = {
@@ -76,24 +76,24 @@ try {
   let allPresent = true;
 
   Object.entries(requiredProperties).forEach(([interfaceName, properties]) => {
-    console.log(`\n📋 Verificando ${interfaceName}:`);
+    console.error(`\n📋 Verificando ${interfaceName}:`);
     properties.forEach(prop => {
       if (content.includes(`${prop}:`)) {
-        console.log(`  ✅ ${prop}`);
+        console.error(`  ✅ ${prop}`);
       } else {
-        console.log(`  ❌ ${prop} - NO ENCONTRADO`);
+        console.error(`  ❌ ${prop} - NO ENCONTRADO`);
         allPresent = false;
       }
     });
   });
 
-  console.log(`\n${allPresent ? '🎉' : '⚠️'} RESULTADO: ${allPresent ? 'Todas las propiedades están presentes' : 'Faltan propiedades'}`);
+  console.error(`\n${allPresent ? '🎉' : '⚠️'} RESULTADO: ${allPresent ? 'Todas las propiedades están presentes' : 'Faltan propiedades'}`);
 
   if (allPresent) {
-    console.log('\n💡 Si Angular aún tiene errores:');
-    console.log('   1. rm -rf node_modules && npm install');
-    console.log('   2. rm -rf .angular dist');
-    console.log('   3. ng serve --port 4200');
+    console.error('\n💡 Si Angular aún tiene errores:');
+    console.error('   1. rm -rf node_modules && npm install');
+    console.error('   2. rm -rf .angular dist');
+    console.error('   3. ng serve --port 4200');
   }
 
 } catch (error) {

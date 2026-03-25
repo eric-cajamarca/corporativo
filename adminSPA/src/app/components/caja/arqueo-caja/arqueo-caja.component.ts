@@ -218,11 +218,9 @@ export class ArqueoCajaComponent implements OnInit {
       idCaja: this.cajaSeleccionada
     }).subscribe({
       next: (response) => {
-        console.log('[Arqueo] 1. Respuesta cruda obtenerArqueoDinamico:', response);
-
+        
         const filas: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[] = response.data || [];
-        console.log('[Arqueo] 2. Filas extraídas (response.data):', filas);
-
+        
         // Mapas para agrupar: por concepto (I/E) y por forma de pago (ingresos/egresos)
         const conceptosMap = new Map<string, { tipoOperacion: 'I' | 'E'; importe: number }>();
         const ingresosMap = new Map<string, number>();
@@ -247,10 +245,7 @@ export class ArqueoCajaComponent implements OnInit {
             egresosMap.set(formaPago, (egresosMap.get(formaPago) || 0) + importe);
           }
         });
-        console.log('[Arqueo] 3. Después del forEach - conceptosMap:', Object.fromEntries(conceptosMap));
-        console.log('[Arqueo] 3. Después del forEach - ingresosMap:', Object.fromEntries(ingresosMap));
-        console.log('[Arqueo] 3. Después del forEach - egresosMap:', Object.fromEntries(egresosMap));
-
+                        
         // Resumen por concepto (ej. VENTA CONTADO, APERTURA_CAJA): con icono y signo (egresos negativos)
         this.resumenConceptos = Array.from(conceptosMap.entries())
           .map(([key, val]) => {
@@ -263,8 +258,7 @@ export class ArqueoCajaComponent implements OnInit {
             };
           })
           .sort((a, b) => (a.tipoOperacion === 'I' ? 0 : 1) - (b.tipoOperacion === 'I' ? 0 : 1));
-        console.log('[Arqueo] 4. resumenConceptos (con icono, egresos negativos):', this.resumenConceptos);
-
+        
         // Filas crudas para detalle; ingresos/egresos agrupados por forma de pago (modales)
         this.filasArqueoRaw = filas.map((r: any) => ({
           concepto: (r.concepto || 'Sin especificar').replace(/_/g, ' '),
@@ -274,10 +268,7 @@ export class ArqueoCajaComponent implements OnInit {
         }));
         this.movimientosIngresos = Array.from(ingresosMap.entries()).map(([formaPago, importe]) => ({ formaPago, importe }));
         this.movimientosEgresos = Array.from(egresosMap.entries()).map(([formaPago, importe]) => ({ formaPago, importe }));
-        console.log('[Arqueo] 5. filasArqueoRaw:', this.filasArqueoRaw);
-        console.log('[Arqueo] 5. movimientosIngresos:', this.movimientosIngresos);
-        console.log('[Arqueo] 5. movimientosEgresos:', this.movimientosEgresos);
-
+                        
         // Totales y datos extra del response; luego se arma la primera tabla (resumen fijo de 6 filas)
         this.totalIngresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'I').reduce((acc, c) => acc + c.importe, 0);
         this.totalEgresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'E').reduce((acc, c) => acc + Math.abs(c.importe), 0);

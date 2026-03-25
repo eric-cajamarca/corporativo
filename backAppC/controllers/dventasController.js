@@ -82,9 +82,7 @@ async function obtenerDetalleVentaPorId_empresa(req, res) {
   const CompVentas = req.params.id; // Cambia el nombre de la variable a compVentas
   const Destino = req.params.idempresa;
 
-  console.log('entro obtenerDetalleVentaPorId_empresa :', 'req.params');
-  console.log(req.params);
-  try {
+      try {
     let pool = await sql.connect(dbConfig);
     let result = await pool
       .request()
@@ -142,27 +140,23 @@ async function actualizarDetalleVentakkk(req, res) {
     // Verifica que data sea un array antes de intentar recorrerlo
     if (Array.isArray(data)) {
       // Recorre cada elemento en el array data
-      console.log('verifico si data es un array');
-
+      
       data.forEach(async (registro) => {
         const id = registro.id; // Asegúrate de tener la propiedad correcta que contiene el id
         const CantEntregado = registro.CantEntregado;
 
         // Verifica si CantEntregado es mayor o igual a 0
         if (parseFloat(CantEntregado) >= 0) {
-          console.log('la cantidad es mayor a 0');
-          // Realiza la actualización en la base de datos
+                    // Realiza la actualización en la base de datos
           let pool = await sql.connect(dbConfig);
           await pool
             .request()
             .input('id', sql.Int, id)
             .input('CantEntregado', sql.Decimal, CantEntregado)
           // .query('UPDATE DetalleVentas SET CantEntregado = @CantEntregado WHERE Id = @id');
-          console.log('modifico en la base de datos');
-
+          
         } else {
-          console.log(`La cantidad para el registro con id ${id} es menor que 0`);
-          // Puedes manejar esto como desees, por ejemplo, agregar un mensaje a una lista de errores
+                    // Puedes manejar esto como desees, por ejemplo, agregar un mensaje a una lista de errores
         }
       });
 
@@ -185,8 +179,7 @@ async function actualizarDetalleVenta(req, res) {
   let contador = 0;
 
 
-  console.log('data:', data);
-
+  
   if (req.user) {
     try {
       // Verifica que data sea un array antes de intentar recorrerlo
@@ -233,8 +226,7 @@ async function actualizarDetalleVenta(req, res) {
   
           if (sumaTotal <= cantidadActual) {
   
-            console.log('entro a sumaTotal <= cantidadActual');
-  
+              
             let CantEntregado = sumaTotal;
   
             let pool = await sql.connect(dbConfig);
@@ -243,8 +235,7 @@ async function actualizarDetalleVenta(req, res) {
               .input('id', sql.Int, id)
               .input('CantEntregado', sql.Decimal, CantEntregado)
               .query('UPDATE DetalleVentas SET CantEntregado = @CantEntregado WHERE Id = @id');
-            console.log('guardo correctamente por cada registro');
-  
+              
             estado = result.rowsAffected;
             mensaje = 'Registros actualizados correctamente';
             // }
@@ -253,7 +244,6 @@ async function actualizarDetalleVenta(req, res) {
   
             contador++;
   
-            console.log('data.length', data.length, 'contador:', contador)
             if (contador == data.length) {
               estado = undefined;
               mensaje = 'La cantidad que deseas registrar es mayor a la cantidad comprada';

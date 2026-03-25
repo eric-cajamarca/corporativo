@@ -1,12 +1,10 @@
 const lotesService = require('../services/lotes.service');
 
 const getAll = async function (req, res) {
-    console.log('Usuario en getAll controller:', req.user);
-    if (!req.user) {
+        if (!req.user) {
         return res.status(401).send({ success: false, error: 'Unauthorized' });
     }else{
-        console.log('idEmpresa en getAll controller:', req.user.empresa);
-        try {
+                try {
             const idEmpresa  = req.user.empresa; // Asumiendo middleware JWT
             const lotes = await lotesService.getAll(idEmpresa);
             res.status(200).send({ success: true, data: lotes });
@@ -23,10 +21,8 @@ const getById = async function (req, res) {
     }else{
         try {
             const { idLote } = req.params;
-            console.log('idLote recibido en controller:', idLote);
-            const lote = await lotesService.getById(idLote);
-            console.log('Lote obtenido en controller:', lote);
-            res.status(200).send({ success: true, data: lote });
+                        const lote = await lotesService.getById(idLote);
+                        res.status(200).send({ success: true, data: lote });
         } catch (error) {
             res.status(500).send({ success: false, data:undefined });
         }

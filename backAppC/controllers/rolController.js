@@ -171,8 +171,7 @@ const obtener_roles = async function (req, res) {
 
 const obtener_rol_id = async function (req, res) {
   const { id } = req.params;
-  console.log('obtener_rol_id:', id);
-
+  
   try {
     // Validación básica de token
     if (!req.user) {

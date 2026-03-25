@@ -41,8 +41,7 @@ export class variosService {
 
     crearMarca(marca: any): Observable<any> {
         let params = JSON.stringify(marca);
-        console.log('marca.id', marca._id);
-        let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+                let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
         return this._http.post(this.url + 'marcas', params, { 
             headers: headers,
             withCredentials: true
@@ -64,8 +63,7 @@ export class variosService {
     //   }
 
     editarEstadoMarca(id:any, estado:any): Observable<any>{
-        console.log('id, estado', id,estado);
-        let params = JSON.stringify(estado);
+                let params = JSON.stringify(estado);
         let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
         return this._http.put(this.url + 'marcasestado/'+id,{estado},{
             headers:headers,
@@ -87,8 +85,7 @@ export class variosService {
 
     editarUnidPorCaja(unidporcaja: any): Observable<any> {
         let params = JSON.stringify(unidporcaja);
-        console.log('unidporcaja', unidporcaja._id);
-        let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+                let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
         return this._http.put(this.url + 'unidporcaja/' + unidporcaja._id, params, { 
             headers: headers,
             withCredentials: true

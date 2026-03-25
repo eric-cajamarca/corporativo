@@ -125,8 +125,7 @@ export class LoginEmpresaComponent implements OnInit {
       ruc: this.user.ruc.trim()
     };
 
-    console.log('Intentando login:', { ...data, password: '***' });
-
+    
     this._adminService.admin_login(data).subscribe({
       next: (response) => {
         this.loading = false;
@@ -146,8 +145,7 @@ export class LoginEmpresaComponent implements OnInit {
           position: 'topRight'
         });
 
-        console.log('Usuario autenticado:', this.usuario);
-      },
+              },
       error: (error) => {
         this.loading = false;
         console.error('Login error:', error);
@@ -200,8 +198,7 @@ export class LoginEmpresaComponent implements OnInit {
     // Navegar al dashboard; el AuthGuard verificará el token en la siguiente petición (cookie ya disponible)
     setTimeout(() => {
       this._router.navigate(['/home']).then(() => {
-        console.log('Navegación a /home completada');
-      });
+              });
     }, 0);
   }
 

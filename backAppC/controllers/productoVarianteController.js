@@ -19,8 +19,7 @@ const crear_variante = async function (req, res) {
             atributos // Array: [{idAtributo, idValor}, ...]
         } = req.body;
 
-        console.log('Crear variante - atributos recibidos:', req.body);
-        // Validaciones básicas
+                // Validaciones básicas
         if (!idProductoBase ) {
             return res.status(400).send({ 
                 message: 'SKU y Producto Base son requeridos', 

@@ -33,17 +33,12 @@ export class CreateCategoriaComponent {
   }
 
   registrar(registroForm:any) {
-    console.log('Formulario enviado', this.categorias);
-    this._categoriaService.crear_categoria(this.categorias).subscribe(
+        this._categoriaService.crear_categoria(this.categorias).subscribe(
       response=>{
-        console.log('response');
-        console.log(response);
-        if(response == undefined){
-          console.log('Catgoría no creada');
-          
+                        if(response == undefined){
+                    
         }else{
-          console.log('Categoría creada');
-          iziToast.show({
+                    iziToast.show({
             title: 'SUCCESS',
             titleColor: '#008000',
             color: '#FFF',

@@ -61,8 +61,7 @@ const obtener_Categoria_id = async (req, res) => {
             .query("select * from Categorias where idCategoria = @idCategoria");
             res.status(200).send({data: categoria.recordset});
         } catch (error) {
-            console.log('obtener_Categoria_id', error);
-            res.status(500).send({message: error.message, data: undefined});
+                        res.status(500).send({message: error.message, data: undefined});
         }
     }
     else {
@@ -108,8 +107,7 @@ const crear_Categoria = async (req, res) => {
             .query("insert into Categorias (idEmpresa,nombre,descripcion,estado) values (@idEmpresa,@nombre,@descripcion,@estado)");
             res.status(200).send({data: categoria.rowsAffected});
         } catch (error) {
-            console.log('crear_Categoria', error);
-            res.status(500).send({message: error.message, data: undefined});
+                        res.status(500).send({message: error.message, data: undefined});
         }
     }
     else {
@@ -134,8 +132,7 @@ const editar_Categoria = async function(req, res) {
             .query("update Categorias set nombre=@nombre, descripcion = @descripcion where idCategoria = @idCategoria and idEmpresa = @idEmpresa");
             res.status(200).send({data: categoria.rowsAffected});
         } catch (error) {
-            console.log('editar_Categoria', error);
-            res.status(500).send({message: error.message, data: undefined});
+                        res.status(500).send({message: error.message, data: undefined});
         }
     }
     else {
@@ -170,8 +167,7 @@ const cambiar_estado_categoria = async function(req, res) {
             .query("update Categorias set estado=@estado where idCategoria = @idCategoria and idEmpresa = @idEmpresa");
             res.status(200).send({data: categoria.rowsAffected});
         } catch (error) {
-            console.log('cambiar_estado_categoria', error);
-            res.status(500).send({message: error.message, data: undefined});
+                        res.status(500).send({message: error.message, data: undefined});
         }
     }
     else {
@@ -192,8 +188,7 @@ const eliminar_Categoria = async (req, res) => {
             .query("delete from Categorias where idCategoria = @idCategoria and idEmpresa = @idEmpresa");
             res.status(200).send({data: categoria.rowsAffected});
         } catch (error) {
-            console.log('eliminar_Categoria', error);
-            res.status(500).send({message: error.message, data: undefined});
+                        res.status(500).send({message: error.message, data: undefined});
         }
     }
     else {

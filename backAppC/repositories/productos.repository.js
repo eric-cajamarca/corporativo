@@ -390,8 +390,7 @@ exports.obtenerProductosCompras = async (pool, idEmpresa) => {
       };
     });   // Encontrar el precio principal (normal)
 
-    console.log('Productos obtenidos en repo:', productos.length);
-
+    
     return productos;
   } catch (error) {
     throw new Error(`Repository Error: ${error.message}`);

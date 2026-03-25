@@ -46,8 +46,7 @@ exports.obtenerPrecioPorId = async (pool, id) => {
 
 
 exports.actualizarPrecioProducto = async (pool, precioData) => {
-    console.log('Actualizar precio con datos:', precioData);
-    const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = precioData;
+        const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = precioData;
     
     try {
         const result = await pool
@@ -68,8 +67,7 @@ exports.actualizarPrecioProducto = async (pool, precioData) => {
                          idUsuario = @idUsuario
                      where idPrecio = @idPrecio`);
 
-        console.log('Resultado de la actualización del precio:', result);
-        return result;
+                return result;
     } catch (error) {
         throw new Error(`Repository Error: ${error.message}`);
     }
@@ -132,8 +130,7 @@ exports.crearListaPrecio = async (pool, listaData) => {
             activo 
         } = listaData;
 
-        console.log('Creating listaData in repository:', listaData);
-        const result = await pool
+                const result = await pool
 
             .request()
             .input('idSucursal', sql.UniqueIdentifier, toGuidOrNull(idSucursal))

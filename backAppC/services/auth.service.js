@@ -29,8 +29,7 @@ exports.adminLogin = async (pool, email, password, ruc) => {
     }
     const isPasswordValid = await bcrypt.compare(password, passwordHash);
     if (isPasswordValid) {
-      console.log('✓ Login como colaborador:', colaborador.email, 'Rol:', colaborador.rol);
-      return {
+            return {
         idUsuario: colaborador.idUsuario,
         idEmpresa: empresa.idEmpresa,
         razonSocial: empresa.razon_Social || empresa.razonSocial,
@@ -54,8 +53,7 @@ exports.adminLogin = async (pool, email, password, ruc) => {
     throw new Error('La contraseña es incorrecta');
   }
 
-  console.log('Empresa autenticada correctamente');
-
+  
   // 4. Buscar usuario administrador de la empresa (opcional para completar datos)
   try {
     const usuario = await usuarioRepository.buscarUsuarioAdminPorEmpresa(pool, empresa.idEmpresa);
@@ -104,15 +102,13 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
   const { nombres, apellidos, email, password, idRol } = datos;
   const idEmpresa = usuarioAutenticado.empresa;
 
-  console.log('antes chekar email');
-  // 3. Verificar email duplicado
+    // 3. Verificar email duplicado
   const emailExiste = await usuarioRepository.checkEmailExists(pool, email, idEmpresa);
   if (emailExiste) {
     throw new Error('EMAIL_EXISTE');
   }
 
-  console.log('despues chekar email');
-
+  
   // 4. Hashear password
   const hashedPassword = await bcrypt.hash(password, 8);
 
@@ -131,8 +127,7 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
     fregistro: moment().format('YYYY-MM-DD')
   };
 
-  console.log('en servicio UsuarioData', usuarioData);
-  // 7. Crear usuario
+    // 7. Crear usuario
   const rowsAffected = await usuarioRepository.createUsuario(pool, usuarioData);
 
   // 8. Asignar sucursal principal al usuario (si existe tabla UsuarioSucursal)
@@ -172,8 +167,7 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
           INSERT INTO UsuarioSucursal (idUsuarioSucursal, idUsuario, idSucursal, estado, esDefault, fAsignacion)
           VALUES (@idUsuarioSucursal, @idUsuario, @idSucursal, @estado, @esDefault, GETDATE())
         `);
-      console.log('✓ Sucursal principal asignada al usuario:', idSucursal);
-    } catch (error) {
+          } catch (error) {
       console.warn('⚠️ No se pudo asignar sucursal al usuario:', error.message);
     }
   }

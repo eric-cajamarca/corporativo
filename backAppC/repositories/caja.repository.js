@@ -353,8 +353,7 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
   if (!idSucursal) {
     throw new Error("No se pudo determinar la sucursal para el movimiento. Verifique la apertura de caja o el usuario.");
   }
-  console.log('datos en el repositorio de movimientoscaja', datos);
-  const result = await poolOrTransaction
+    const result = await poolOrTransaction
     .request()
     .input("idApertura", sql.UniqueIdentifier, datos.idApertura)
     .input("idEmpresa", sql.UniqueIdentifier, user.empresa)

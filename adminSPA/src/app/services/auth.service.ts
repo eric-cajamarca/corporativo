@@ -80,8 +80,7 @@ export class AuthService {
       rol: data.rol || '',
       lastVerified: Date.now()
     });
-    console.log('Usuario establecido desde login:', this._userData());
-  }
+      }
 
 //   getEmpresa_login(): Observable<any> {
 //     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
@@ -109,23 +108,18 @@ export class AuthService {
   }
 
   private handleAuthError() {
-    console.log('Error al verificar el token');
-    this._userData.set(null);
+        this._userData.set(null);
     // Solo redirigir a login si NO estamos en una ruta pública
     if (!this.isPublicRoute()) {
-      console.log('Redirigiendo a login desde ruta privada');
-      this.router.navigate(['/login-empresa']);
+            this.router.navigate(['/login-empresa']);
     } else {
-      console.log('Estamos en ruta pública, no redirigir a login');
-    }
+          }
   }
 
   forceLogout() {
-    console.log('Logout forzado desde el backend', this.url);
-    this.http.post(this.url + 'logout',{},{ withCredentials: true }).subscribe({
+        this.http.post(this.url + 'logout',{},{ withCredentials: true }).subscribe({
       complete: () => {
-        console.log('Logout forzado');
-        this._userData.set(null);
+                this._userData.set(null);
         this.router.navigate(['/login-empresa']);
         this.verifyToken().subscribe();
       }

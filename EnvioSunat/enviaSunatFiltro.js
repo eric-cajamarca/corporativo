@@ -14,8 +14,8 @@ const RPTA_DIR = path.join(basePath, 'sunat_archivos', 'sfs', 'RPTA');
 // const DATA_DIR   = 'D:\\BSC\\SFS_v1.4\\sunat_archivos\\sfs\\DATA\\';
 // const RPTA_DIR   = 'D:\\BSC\\SFS_v1.4\\sunat_archivos\\sfs\\RPTA\\';
 
-console.log("📂 DATA_DIR:", DATA_DIR);
-console.log("📂 RPTA_DIR:", RPTA_DIR);
+console.error("📂 DATA_DIR:", DATA_DIR);
+console.error("📂 RPTA_DIR:", RPTA_DIR);
 
 const FACTURADOR = 'http://localhost:9000';
 
@@ -48,12 +48,12 @@ function bodyJSON(ruc, tipoDoc, serie, numero) {
 
 /* ------------------- 1. Actualizar bandeja ------------------- */
 async function actualizarBandeja() {
-  console.log("🔄 Actualizando bandeja...");
+  console.error("🔄 Actualizando bandeja...");
   try {
     await axios.post(url('00', 'A'), {});
-    console.log("✅ Bandeja actualizada");
+    console.error("✅ Bandeja actualizada");
   } catch (e) {
-    console.log("⚠️ No se pudo actualizar:", e.message);
+    console.error("⚠️ No se pudo actualizar:", e.message);
   }
 }
 
@@ -113,44 +113,44 @@ function listaPendientes() {
   const pendientes = listaPendientes();
 
   if (!pendientes.length) {
-    console.log("🎉 No hay comprobantes pendientes por enviar.");
+    console.error("🎉 No hay comprobantes pendientes por enviar.");
     return;
   }
 
-  console.log("📌 Comprobantes pendientes:", pendientes.length);
+  console.error("📌 Comprobantes pendientes:", pendientes.length);
 
   await actualizarBandeja();
 
-  console.log('aqui muestro el base de pendientes', pendientes);
+  console.error('aqui muestro el base de pendientes', pendientes);
   for (const base of pendientes) {
     const [ruc, tipoDoc, serie, numero] = base.split('-');
 
     try {
-      console.log(`⚙️ Generando XML de: ${base}`);
+      console.error(`⚙️ Generando XML de: ${base}`);
       await generar(ruc, tipoDoc, serie, numero);
 
-      console.log(`📤 Enviando a SUNAT: ${base}`);
+      console.error(`📤 Enviando a SUNAT: ${base}`);
       await enviar(ruc, tipoDoc, serie, numero);
 
-      console.log("📥 Validando CDR...");
+      console.error("📥 Validando CDR...");
       const cdr = leerCDR(base);
 
 
-      console.log("cdr",cdr);
+      console.error("cdr",cdr);
       
       if (!cdr) {
-        console.log(`⚠️ No se encontró CDR para ${base}`);
+        console.error(`⚠️ No se encontró CDR para ${base}`);
       } else {
-        console.log(`📄 Resultado CDR (${base})`);
-        console.log(`   ➤ Código: ${cdr.estado}`);
-        console.log(`   ➤ Descripción: ${cdr.descripcion}`);
+        console.error(`📄 Resultado CDR (${base})`);
+        console.error(`   ➤ Código: ${cdr.estado}`);
+        console.error(`   ➤ Descripción: ${cdr.descripcion}`);
       }
 
     } catch (err) {
-      console.log(`❌ Error procesando ${base}`);
-      console.log(err.response?.data || err.message);
+      console.error(`❌ Error procesando ${base}`);
+      console.error(err.response?.data || err.message);
     }
   }
 
-  console.log("🏁 Proceso completado.");
+  console.error("🏁 Proceso completado.");
 })();

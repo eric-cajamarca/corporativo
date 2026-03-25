@@ -23,10 +23,7 @@ const crearCliente = async function (req, res) {
 
     //quiero extaer data del req para poder crear el registro
 
-    console.log('crearCliente - req.data', req.data);
-    console.log('crearCliente - req.body', req.body);
-    console.log('crearCliente- req.user', req.user);
-
+            
     if (req.user) {
         if (req.user.rol == 'Administrador' || req.user.rol=='Vendedor') {
 
@@ -240,9 +237,7 @@ const cambiarCondicionCliente = async function (req, res) {
 
     const { condicion } = req.body;
 
-    console.log('cambiarCondicionCliente - req.params', idCliente);
-    console.log('cambiarCondicionCliente - req.body', condicion);
-    let nuevacondicion = '';
+            let nuevacondicion = '';
 
     if (condicion === 'ACTIVO') {
         nuevacondicion = 'INACTIVO';
@@ -254,8 +249,7 @@ const cambiarCondicionCliente = async function (req, res) {
         if (req.user.rol == 'Administrador') {
 
 
-            console.log('cambiarCondicionCliente - nuevacondicion antes de editar', nuevacondicion);
-
+            
             try {
                 let pool = await sql.connect(dbConfig);
                 let editCliente = await pool.request()
@@ -263,11 +257,9 @@ const cambiarCondicionCliente = async function (req, res) {
                     .input('nuevacondicion', sql.VarChar, nuevacondicion)
                     .query('update Clientes set condicion = @nuevacondicion where idCliente = @idCliente');
 
-                console.log('cambiarCondicionCliente - deleteCliente', editCliente.rowsAffected);
-                res.status(200).send({ message: 'Cliente eliminado', data: editCliente.rowsAffected });
+                                res.status(200).send({ message: 'Cliente eliminado', data: editCliente.rowsAffected });
             } catch (error) {
-                console.log('cambiarCondicionCliente - error', error);
-                res.status(500).send({ message: error.message, data: undefined });
+                                res.status(500).send({ message: error.message, data: undefined });
             }
 
         }
@@ -286,9 +278,7 @@ const cambiarEstadoCliente = async function (req, res) {
 
     const { estado } = req.body;
 
-    console.log('cambiarCondicionCliente - req.params', idCliente);
-    console.log('cambiarCondicionCliente - estado', estado, req.body);
-    let nuevoEstado = '';
+            let nuevoEstado = '';
 
     if (estado) {
         nuevoEstado = 0;
@@ -300,8 +290,7 @@ const cambiarEstadoCliente = async function (req, res) {
         if (req.user.rol == 'Administrador') {
 
 
-            console.log('cambiarCondicionCliente - nuevacondicion antes de editar', nuevoEstado);
-
+            
             try {
                 let pool = await sql.connect(dbConfig);
                 let editCliente = await pool.request()
@@ -309,11 +298,9 @@ const cambiarEstadoCliente = async function (req, res) {
                     .input('estado', sql.Bit, nuevoEstado)
                     .query('update Clientes set estado = @estado where idCliente = @idCliente');
 
-                console.log('cambiarCondicionCliente - deleteCliente', editCliente.rowsAffected);
-                res.status(200).send({ message: 'Cliente eliminado', data: editCliente.rowsAffected });
+                                res.status(200).send({ message: 'Cliente eliminado', data: editCliente.rowsAffected });
             } catch (error) {
-                console.log('cambiarCondicionCliente - error', error);
-                res.status(500).send({ message: error.message, data: undefined });
+                                res.status(500).send({ message: error.message, data: undefined });
             }
 
         }

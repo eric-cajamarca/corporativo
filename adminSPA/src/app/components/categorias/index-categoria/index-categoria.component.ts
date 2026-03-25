@@ -59,32 +59,23 @@ export class IndexCategoriaComponent {
   initData() {
     this._categoriaService.obtener_categorias().subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data == undefined) {
-          console.log('No hay datos');
-        } else {
+                        if (response.data == undefined) {
+                  } else {
           this.categorias = response.data;
           this.categorias_const = response.data;
         }
       },
       error => {
-        console.log('Error al obtener marcas');
-        console.log(<any>error);
-      }
+                      }
     );
   }
 
   cambiarEstado(id: any, estado: any) {
-    console.log('Cambiar estado de la marca: ', id, estado);
-    this._categoriaService.cambiar_estado_categoria(id, estado).subscribe(
+        this._categoriaService.cambiar_estado_categoria(id, estado).subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data == undefined) {
+                        if (response.data == undefined) {
 
-          console.log('No hay datos');
-        } else {
+                  } else {
           this.categorias = response.data;
           
 
@@ -101,8 +92,7 @@ export class IndexCategoriaComponent {
         }
       },
       error => {
-        console.log('Error al obtener las categorías');
-        //console.log(<any>error);
+                //console.log(<any>error);
       }
     );
 
@@ -119,9 +109,7 @@ export class IndexCategoriaComponent {
   }
 
   seleccionar(id: any) {
-    console.log('Seleccionar CATEGORIAS con id: ', id);
-    console.log('this.CATEGORIASs_const', this.categorias_const);
-
+        
     // //quiero buscar el id en el array de categorias y extraer el objeto
     // const idEncontrado = this.categorias_const.filter((item: any) => item.idCategoria == id);
     // this.prod_Modificar = idEncontrado[0];
@@ -131,11 +119,8 @@ export class IndexCategoriaComponent {
 
     this._categoriaService.obtener_categoria_id(id, this.token).subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data == undefined) {
-          console.log('No hay datos');
-        } else {
+                        if (response.data == undefined) {
+                  } else {
           
           this.prod_Modificar = response.data[0];
           // console.log('this.prod_Modificar');
@@ -144,9 +129,7 @@ export class IndexCategoriaComponent {
         }
       },
       error => {
-        console.log('Error al obtener marcas');
-        console.log(<any>error);
-      }
+                      }
     );
 
 
@@ -154,14 +137,11 @@ export class IndexCategoriaComponent {
 
   
   editarCategorias(id: number) {
-    console.log('Editar marca con id: ', id , this.prod_Modificar);
-    this._categoriaService.editar_categoria(this.prod_Modificar.idCategoria, this.prod_Modificar).subscribe(
+        this._categoriaService.editar_categoria(this.prod_Modificar.idCategoria, this.prod_Modificar).subscribe(
       response=>{
         
-        console.log('response.data', response.data);
-        if(response.data == undefined){
-          console.log('No hay datos');
-        }else{
+                if(response.data == undefined){
+                  }else{
           this.categorias = response.data;
           iziToast.show({
             title: 'SUCCESS',
@@ -177,22 +157,16 @@ export class IndexCategoriaComponent {
       
       },
       error => {
-        console.log('Error al obtener marcas');
-        console.log(<any>error);
-      }
+                      }
     );
 
   }
 
   deleteMarca(id: number) {
-    console.log('Eliminar marca con id: ', id);
-    this._categoriaService.editar_categoria(id, this.categorias).subscribe(
+        this._categoriaService.editar_categoria(id, this.categorias).subscribe(
       response => {
-        console.log('response.data');
-        console.log(response.data);
-        if (response.data == undefined) {
-          console.log('No hay datos');
-        } else {
+                        if (response.data == undefined) {
+                  } else {
           this.categorias = response.data;
           iziToast.show({
             title: 'SUCCESS',

@@ -21,8 +21,7 @@ exports.crearProductoCompuesto = async (pool, datos, usuarioAutenticado) => {
             throw new Error('PRODUCTO_PADRE_NO_EXISTE');
         }
 
-        console.log('Producto padre encontrado:', productoPadre);
-        
+                
         // if (productoPadre.tipoProducto !== 'C') {
         //     throw new Error('PRODUCTO_NO_ES_COMPUESTO');
         // }

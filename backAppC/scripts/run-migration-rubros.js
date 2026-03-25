@@ -23,13 +23,11 @@ async function run() {
       if (!batch) continue;
       try {
         await pool.request().query(batch);
-        console.log('Batch', i + 1, 'OK');
       } catch (err) {
         console.error('Batch', i + 1, 'Error:', err.message);
         throw err;
       }
     }
-    console.log('Migración completada.');
   } finally {
     if (pool) await pool.close();
   }

@@ -49,8 +49,7 @@ export class IndexTipoMovimientosComponent implements OnInit {
     this.catalogosService.listarTipoMovimientos(this.buscar || undefined).subscribe({
       next: (res) => {
         this.items = (res.data || []) as TipoMovimientoCajaItem[];
-        console.log('tipos movimientos caja',this.items);
-        this.loading = false;
+                this.loading = false;
       },
       error: () => {
         this.loading = false;

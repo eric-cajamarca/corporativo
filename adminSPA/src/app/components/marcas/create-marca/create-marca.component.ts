@@ -31,17 +31,12 @@ export class CreateMarcaComponent {
   }
 
   registrar(registroForm:any) {
-    console.log('Formulario enviado', this.marca);
-    this._marcaService.crearMarca(this.marca).subscribe(
+        this._marcaService.crearMarca(this.marca).subscribe(
       response=>{
-        console.log('response');
-        console.log(response);
-        if(response == undefined){
-          console.log('Marca no creada');
-          
+                        if(response == undefined){
+                    
         }else{
-          console.log('Marca creada');
-          iziToast.show({
+                    iziToast.show({
             title: 'SUCCESS',
             titleColor: '#008000',
             color: '#FFF',

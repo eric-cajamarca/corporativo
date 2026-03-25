@@ -29,13 +29,11 @@ export class CreateRolComponent {
   registrar(registroForm: any){
     //validar si el formulario es valido
     if(registroForm.valid){
-       console.log('this.rol: ',this.rol);
-
+       
         //llamar al servicio crearRol
         this._rolService.crearRol(this.rol).subscribe(
           response=>{
-            console.log('response: ',response);
-            //valido que response no sea undefined
+                        //valido que response no sea undefined
             if (response.data == undefined) {
               iziToast.show({
                 title: 'ERROR',
@@ -66,11 +64,9 @@ export class CreateRolComponent {
             }
           },
           error=>{
-            console.log('error: ',error);
-          }
+                      }
         )
     } else{
-      console.log('formulario no valido');
-    }
+          }
   }
 }

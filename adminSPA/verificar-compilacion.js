@@ -1,5 +1,5 @@
 // Script para verificar compilación básica de TypeScript
-console.log('🔍 VERIFICANDO COMPILACIÓN DE ANGULAR...\n');
+console.error('🔍 VERIFICANDO COMPILACIÓN DE ANGULAR...\n');
 
 // Verificar sintaxis básica de archivos TypeScript
 const fs = require('fs');
@@ -39,16 +39,16 @@ function checkFile(filePath) {
     }
 
     if (errors.length > 0) {
-      console.log(`❌ ${path.basename(filePath)}:`);
-      errors.forEach(error => console.log(`   - ${error}`));
+      console.error(`❌ ${path.basename(filePath)}:`);
+      errors.forEach(error => console.error(`   - ${error}`));
       return false;
     } else {
-      console.log(`✅ ${path.basename(filePath)}`);
+      console.error(`✅ ${path.basename(filePath)}`);
       return true;
     }
 
   } catch (error) {
-    console.log(`❌ Error leyendo ${filePath}: ${error.message}`);
+    console.error(`❌ Error leyendo ${filePath}: ${error.message}`);
     return false;
   }
 }
@@ -64,7 +64,7 @@ const filesToCheck = [
   'src/app/services/caja.service.ts'
 ];
 
-console.log('📁 Verificando archivos...\n');
+console.error('📁 Verificando archivos...\n');
 
 let totalFiles = filesToCheck.length;
 let validFiles = 0;
@@ -76,18 +76,18 @@ filesToCheck.forEach(file => {
       validFiles++;
     }
   } else {
-    console.log(`❌ ${file} - NO EXISTE`);
+    console.error(`❌ ${file} - NO EXISTE`);
   }
 });
 
-console.log(`\n📊 RESULTADO: ${validFiles}/${totalFiles} archivos válidos`);
+console.error(`\n📊 RESULTADO: ${validFiles}/${totalFiles} archivos válidos`);
 
 if (validFiles === totalFiles) {
-  console.log('\n🎉 SINTAXIS BÁSICA CORRECTA');
-  console.log('💡 Si Angular aún tiene errores, intenta:');
-  console.log('   1. rm -rf node_modules && npm install');
-  console.log('   2. ng build --configuration development');
-  console.log('   3. ng serve --port 4200');
+  console.error('\n🎉 SINTAXIS BÁSICA CORRECTA');
+  console.error('💡 Si Angular aún tiene errores, intenta:');
+  console.error('   1. rm -rf node_modules && npm install');
+  console.error('   2. ng build --configuration development');
+  console.error('   3. ng serve --port 4200');
 } else {
-  console.log('\n⚠️  HAY ERRORES DE SINTAXIS QUE CORREGIR');
+  console.error('\n⚠️  HAY ERRORES DE SINTAXIS QUE CORREGIR');
 }

@@ -46,12 +46,10 @@ export class EmpresaService {
   this.getEmpresasPdf().subscribe(response => {
     if (response.data?.[0]) {
       const empresaData = response.data[0];
-      console.log('Datos de la empresa obtenidos en servicio:', empresaData);
-      // Construye URL completa del logo usando el nombre del archivo
+            // Construye URL completa del logo usando el nombre del archivo
       empresaData.logo = `http://localhost:3000/api/obtener_logo/${empresaData.logo}`;
       this.empresaSubject.next(empresaData);
-      console.log('Empresa cargada en el servicio:', empresaData);
-    }
+          }
   });
   }
 
@@ -94,9 +92,7 @@ export class EmpresaService {
   getEmpresas():Observable<any>{
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     //let headers = new HttpHeaders().set('Content-Type','application/json');
-    console.log('url',this.url +'empresa');
-     console.log('headers',headers);
-    return this._http.get(this.url +'empresa',{
+             return this._http.get(this.url +'empresa',{
       headers:headers,
       withCredentials: true
     });
@@ -204,8 +200,7 @@ export class EmpresaService {
   // }
 
   updateEmpresa(id: any, data: any): Observable<any> {
-    console.log('Datos para actualizar:', data);
-    
+        
     // Configuración común
     const options = {
         withCredentials: true,
@@ -227,10 +222,8 @@ export class EmpresaService {
             }
         });
 
-        console.log('FormData contenido:');
-        fd.forEach((value, key) => {
-            console.log(key, value);
-        });
+                fd.forEach((value, key) => {
+                    });
 
         return this._http.put(`${this.url}empresa/${id}`, fd, options);
     } 
@@ -341,8 +334,7 @@ export class EmpresaService {
   
   // EliminarDirecion_id
   eliminarDireccion_id(id:any):Observable<any>{
-    console.log('id en el servicio',id);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.delete(this.url+'direccion_empresa/'+id,{
       headers: headers,
       withCredentials: true

@@ -123,8 +123,7 @@ export class IndexColaboradorComponent implements OnInit {
     this.adminService.getAdmin().subscribe({
       next: (response) => {
         if (response.data) {
-          console.log('response.data en cargarColaboradores: ', response.data);
-          this.colaboradores = response.data;
+                    this.colaboradores = response.data;
           this.colaboradores_const = response.data;
         } else {
           iziToast.show({

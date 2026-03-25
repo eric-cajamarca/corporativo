@@ -16,8 +16,7 @@ const { v4: uuidv4 } = require('uuid');
 // crea un crud para la tabla sucursal de la base de datos
 const obtener_sucursal_idempresa = async function (req, res) {
     const idEmpresa = req.user.empresa;
-    console.log('obtener_sucursal_idempresa idEmpresa: ', idEmpresa);
-    if (req.user) {
+        if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
                 let pool = await sql.connect(dbConfig);
@@ -30,8 +29,7 @@ const obtener_sucursal_idempresa = async function (req, res) {
 
                 res.status(200).send({ message: 'succes', data: sucursal.recordset });
             } catch (error) {
-                console.log('obterner sucursal error: ' + error);
-                res.status(500).send({ message: 'Error al obtener los sucursal', data: undefined });
+                                res.status(500).send({ message: 'Error al obtener los sucursal', data: undefined });
             }
         } else {
             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -133,8 +131,7 @@ const establecer_sucursal_principal = async function (req, res) {
 
 const editar_sucursal_idEmpresa = async function (req, res) {
 
-    console.log('editar_sucursal_idEmpresa: ', req.body);
-    const { idEmpresa, idSucursal, nombre, direccion } = req.body;
+        const { idEmpresa, idSucursal, nombre, direccion } = req.body;
 
     if (req.user) {
         if (req.user.rol == 'Administrador') {
@@ -152,8 +149,7 @@ const editar_sucursal_idEmpresa = async function (req, res) {
 
                 res.status(200).send({ message: 'Sucursal editada correctamente', data: sucursal.rowsAffected });
             } catch (error) {
-                console.log('editar sucursal error: ' + error);
-                res.status(500).send({ message: 'Error al editar la sucursal', data: undefined });
+                                res.status(500).send({ message: 'Error al editar la sucursal', data: undefined });
             }
 
         } else {
@@ -209,8 +205,7 @@ const eliminar_sucursal_idempresa = async function (req, res) {
 
                 res.status(200).send({ message: 'Sucursal eliminada correctamente', data: sucursal.rowsAffected });
             } catch (error) {
-                console.log('eliminar sucursal error: ' + error);
-                res.status(500).send({ message: 'Error al eliminar la sucursal', data: undefined });
+                                res.status(500).send({ message: 'Error al eliminar la sucursal', data: undefined });
             }
 
         } else {

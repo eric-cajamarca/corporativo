@@ -89,8 +89,7 @@ export class CreateClientesComponent {
     this._adminService.get_Regiones().subscribe(
       response => {
         this.regiones = response;
-        console.log('this.regiones', this.regiones);
-      }
+              }
     );
 
     this._adminService.get_Procincias().subscribe(
@@ -107,8 +106,7 @@ export class CreateClientesComponent {
       }
     );
 
-    console.log('this.direccionClientes', this.direccionClientes);
-  }
+      }
 
   ngOnInit() {
     if (this.idDocumentoPre != null && this.idDocumentoPre !== '') {
@@ -251,9 +249,7 @@ export class CreateClientesComponent {
   async buscar() {
     this.busqueda=true;
   this.contBuscar = 1;
-  console.log('Documento:', this.clientes.idDocumento);
-  console.log('Filtro RUC/DNI:', this.clientes.ruc);
-  
+      
   this.filtro = this.clientes.ruc;
 
   // Validación básica
@@ -398,12 +394,10 @@ private async handleCeeSearch(): Promise<void> {
 
     if (!foundItem) {
       console.warn(`No se encontró ${type} correspondiente para: ${name}`);
-      console.log(`Lista disponible de ${type}s:`, items.map(i => i.name));
-      return undefined;
+            return undefined;
     }
 
-    console.log(`${type} encontrado:`, foundItem.name, `(ID: ${foundItem.id})`);
-    return foundItem.id;
+        return foundItem.id;
   }
 
 private showError(message: string): void {
@@ -527,8 +521,7 @@ private showError(message: string): void {
     // Obtener regiones
     this._adminService.get_Regiones().subscribe(
       response => {
-        console.log(response);
-        // Usar map en lugar de forEach + push (más eficiente)
+                // Usar map en lugar de forEach + push (más eficiente)
         this.regiones = response.map((element: any) => ({
           id: element.id,
           name: element.name
@@ -577,8 +570,7 @@ private showError(message: string): void {
       this.provincias = response.filter((element: any) => 
         element.department_id == this.direccionClientes.region
       );
-      console.log(this.provincias);
-    }
+          }
   );
   }
 
@@ -600,27 +592,22 @@ private showError(message: string): void {
       this.distritos = response.filter((element: any) => 
         element.province_id == this.direccionClientes.provincia
       );
-      console.log('Distritos cargados:', this.distritos);
-    }
+          }
   );
 }
 
   select_distrito(event: any) {
     const selectedId = event.target.value;
     this.direccionClientes.ubigeo = selectedId;
-    console.log(this.direccionClientes.ubigeo);
-  }
+      }
 
   registrar(registroForm: any){
 
-    console.log('this.cliientes', this.clientes);
-    console.log('this.direccionClientes', this.direccionClientes);
-
+        
     // if (registroForm.valid) {
       this.btn_registrar = true;
       this.data = this.clientes;
-      console.log('this.data', this.data);
-      //convertir array this.clientes a un objeto para pasarlo a mi servicio
+            //convertir array this.clientes a un objeto para pasarlo a mi servicio
       //  this.data.forEach((element: { id: string | number; name: any; }) => {
       //   this.data[element.id] = element.id;
       //  });
@@ -717,12 +704,10 @@ private showError(message: string): void {
             });
             this.btn_registrar = false;
           }
-          console.log(response.data);
-          this.btn_registrar = false;
+                    this.btn_registrar = false;
         },
         error => {
-          console.log(<any>error);
-          console.error('Error al crear el cliente:', error);
+                    console.error('Error al crear el cliente:', error);
           this.btn_registrar = false;
         }
 
@@ -733,13 +718,11 @@ private showError(message: string): void {
   onCheckboxChange(){
     if (this.mostrarDireccion) {
       this.mostrarDireccion = true;
-      console.log('El checkbox está marcado.', this.mostrarDireccion);
-      
+            
       // Realiza acciones cuando el checkbox está marcado
     } else {
       // this.mostrarDireccion = false;
-      console.log('El checkbox está desmarcado.', this.mostrarDireccion);
-      
+            
       // Realiza acciones cuando el checkbox está desmarcado
     }
     

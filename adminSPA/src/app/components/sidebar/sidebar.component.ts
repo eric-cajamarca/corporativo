@@ -95,8 +95,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private cargarEstadoConfiguracion(): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (response) => {
-        console.log('Estado de configuración:', response.data);
-        this.estadoConfiguracion.set(response.data);
+                this.estadoConfiguracion.set(response.data);
         // Actualizar navegación según el estado
         this.actualizarNavegacionSegunEstado(response.data);
       },
@@ -235,8 +234,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private cargarNavegacion(): void {
     this.permisosService.cargarNavegacion().subscribe({
       next: (response) => {
-        console.log(response);
-        if (response.data) {
+                if (response.data) {
           this.menuItems.set(response.data);
         }
       },

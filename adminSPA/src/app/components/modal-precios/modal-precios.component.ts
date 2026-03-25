@@ -20,8 +20,7 @@ export class ModalPreciosComponent {
    * Selecciona un precio y cierra el modal
    */
   seleccionarPrecio(precio: any) {
-    console.log('Precio seleccionado en modal:', precio);
-    this.activeModal.close(precio);
+        this.activeModal.close(precio);
   }
 
   /**

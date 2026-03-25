@@ -98,35 +98,30 @@ export class UpdateEmpresaComponent {
     this._adminService.get_Regiones().subscribe(
       response => {
         this.regiones = response;
-        console.log('this.regiones', this.regiones);
-      }
+              }
     );
 
     this._adminService.get_Procincias().subscribe(
       response => {
         this.provincias = response;
-        console.log('this.provincias', this.provincias);
-      }
+              }
     );
 
     this._adminService.get_Distritos().subscribe(
       response => {
         this.distritos = response;
-        console.log('this.distritos', this.distritos);
-
+        
       }
     );
 
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        console.log('this.documento', this.documento);
-
+        
       }
     );
 
-    console.log('this.direccionEmpresas', this.direccionEmpresas);
-  }
+      }
 
   ngOnInit() {
 
@@ -149,18 +144,15 @@ export class UpdateEmpresaComponent {
 
     this._empresasService.getEmpresas_id().subscribe(
       response => {
-        console.log('response', response);
-        //convetir el array response.data a un objeto this.empresas
+                //convetir el array response.data a un objeto this.empresas
         this.empresas = response.data[0];
-        console.log('this.empresas', this.empresas);
-      }
+              }
     );
     this._rubrosService.listar({ activo: true }).subscribe(res => { this.rubros = res.data || []; });
 
     this._empresasService.getDireccionEmpresa_id().subscribe(
       response => {
-        console.log('response', response);
-        //convetir el array response.data a un objeto this.empresas
+                //convetir el array response.data a un objeto this.empresas
         this.direccionEmpresas_const = response.data;
 
         
@@ -185,10 +177,7 @@ export class UpdateEmpresaComponent {
         }
         );
 
-        console.log('this.direccionEmpresas', this.direccionEmpresas_const)
-
-
-      }
+        }
     )
   }
 
@@ -367,8 +356,7 @@ export class UpdateEmpresaComponent {
     // Obtener regiones
     this._adminService.get_Regiones().subscribe(
       response => {
-        console.log(response);
-        // Usar map en lugar de forEach + push (más eficiente)
+                // Usar map en lugar de forEach + push (más eficiente)
         this.regiones = response.map((element: any) => ({
           id: element.id,
           name: element.name
@@ -417,8 +405,7 @@ export class UpdateEmpresaComponent {
       this.provincias = response.filter((element: any) => 
         element.department_id == this.direccionEmpresas.region
       );
-      console.log(this.provincias);
-    }
+          }
   );
   }
 
@@ -440,16 +427,14 @@ export class UpdateEmpresaComponent {
       this.distritos = response.filter((element: any) => 
         element.province_id == this.direccionEmpresas.provincia
       );
-      console.log('Distritos cargados:', this.distritos);
-    }
+          }
   );
 }
 
   select_distrito(event: any) {
     const selectedId = event.target.value;
     this.direccionEmpresas.ubigeo = selectedId;
-    console.log(this.direccionEmpresas.ubigeo);
-  }
+      }
 
 
   onLogoChange(event: Event): void {
@@ -510,27 +495,21 @@ export class UpdateEmpresaComponent {
     // Limpiar la variable direccionEmpresas antes de buscar
     this.direccionEmpresas = {};
 
-    console.log('ID:', id);
-
+    
     // Buscar el objeto correspondiente en el array direccionEmpresas_const
     const direccion = this.direccionEmpresas_const.find((element: any) => element.idDireccionEmpresa === id);
 
     if (direccion) {
-      console.log('Elemento encontrado:', direccion);
-      // Clonar el objeto encontrado
+            // Clonar el objeto encontrado
       this.direccionEmpresas = { ...direccion }; //...este operador se utiliza para clonar un objeto
-      console.log('Objeto clonado en this.direccionEmpresas:', this.direccionEmpresas);
-    } else {
-      console.log('No se encontró el ID:', id);
-    }
+          } else {
+          }
   }
 
   actualizarDireccion() {
-    console.log('Actualizo direccion de las Empresas:', this.direccionEmpresas);
-    this._empresasService.updateDireccionEmpresa(this.direccionEmpresas).subscribe(
+        this._empresasService.updateDireccionEmpresa(this.direccionEmpresas).subscribe(
       response => {
-        console.log('response', response);
-        iziToast.show({
+                iziToast.show({
           title: 'SUCCESS',
           titleColor: '#0062cc',
           color: '#FFF',
@@ -588,11 +567,9 @@ export class UpdateEmpresaComponent {
   }
 
   updatePrincipal(id:any){
-    console.log('id',id);
-    this._empresasService.cambiar_principal_direccion(id).subscribe(
+        this._empresasService.cambiar_principal_direccion(id).subscribe(
       response => {
-        console.log('response', response);
-        if(response.data > 0){
+                if(response.data > 0){
           iziToast.show({
             title: 'SUCCESS',
             titleColor: '#0062cc',
@@ -620,9 +597,7 @@ export class UpdateEmpresaComponent {
   }
 
   registrar(registroForm: any) {
-    console.log('this.empresas', this.empresas);
-    console.log('this.direccionEmpresas', this.direccionEmpresas);
-  
+          
     if (!registroForm.valid) {
       return; // Salir temprano si el formulario no es válido.
     }
@@ -658,8 +633,7 @@ export class UpdateEmpresaComponent {
   actualizarEmpresa() {
     this._empresasService.updateEmpresa(this.empresas.idEmpresa, this.empresas).subscribe(
       response => {
-        console.log('response', response);
-        iziToast.show({
+                iziToast.show({
           title: 'SUCCESS',
           titleColor: '#0062cc',
           color: '#FFF',
@@ -685,13 +659,11 @@ export class UpdateEmpresaComponent {
   onCheckboxChange() {
     if (this.mostrarDireccion) {
       this.mostrarDireccion = true;
-      console.log('El checkbox está marcado.', this.mostrarDireccion);
-
+      
       // Realiza acciones cuando el checkbox está marcado
     } else {
       // this.mostrarDireccion = false;
-      console.log('El checkbox está desmarcado.', this.mostrarDireccion);
-
+      
       // Realiza acciones cuando el checkbox está desmarcado
     }
 
@@ -700,8 +672,7 @@ export class UpdateEmpresaComponent {
   // Método para seleccionar la dirección a eliminar
   seleccionarDireccionAEliminar(id: number) {
     this.direccionAEliminar = id;
-    console.log('ID de la dirección a eliminar:', this.direccionAEliminar);
-  }
+      }
 
   // Método para confirmar la eliminación
   confirmarEliminar() {

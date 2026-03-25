@@ -28,12 +28,10 @@ const fs = require('fs').promises; // Usamos la versión con promesas
 
 
 const getEmpresas = async function (req, res) {
-    console.log('entro a getEmpresas', req.user);
-    
+        
     if (req.user) {
         if (req.user.rol == 'Administrador') {
-            console.log('req.user.rol');
-            try {
+                        try {
                 const pool = await sql.connect(dbConfig);
                 const result = await pool
                     .request()
@@ -41,8 +39,7 @@ const getEmpresas = async function (req, res) {
                 // res.json(result.recordset);
                 // console.log('result.recordset');
                 // console.log(result.recordset);
-                console.log('result:', result.recordset);
-                res.status(200).send({ data: result.recordset });
+                                res.status(200).send({ data: result.recordset });
             } catch (error) {
                 console.error('Error al obtener las epresas:', error);
                 res.status(200).send({ data: undefined });
@@ -62,21 +59,18 @@ const getEmpresas = async function (req, res) {
 
 
 const getEmpresasById = async function (req, res) {
-    console.log('entro a getEmpresasById', req.user.empresa);
-    const id = req.user.empresa;
+        const id = req.user.empresa;
 
     if (req.user) {
         if(req.user.rol=='Administrador'){
-            console.log('req.user.rol:');
-            try {
+                        try {
                 const pool = await sql.connect(dbConfig);
                 let result = await pool
                     .request()
                     .input('idEmpresa', sql.UniqueIdentifier, id)
                     .query('SELECT * FROM Empresas WHERE idEmpresa = @idEmpresa');
 
-                console.log('result:', result.recordset);
-                //res.json(result.recordset);
+                                //res.json(result.recordset);
                 res.status(200).send({ data: result.recordset });
             } catch (error) {
                 console.error('Error al obtener los usuarios:', error);
@@ -163,13 +157,11 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
 }
 
 const createEmpresa = async function (req, res) {
-    console.log('entro a createEmpresa', req.body);
-    const { idDocumento, ruc, razon_Social, nombre_Comercial, rubro, celular, logo, correo, password, alias, condicion, estSunat } = req.body;
+        const { idDocumento, ruc, razon_Social, nombre_Comercial, rubro, celular, logo, correo, password, alias, condicion, estSunat } = req.body;
 
     const currentDate = moment().format('YYYY-MM-DD');
     const fregistro = currentDate;
-    console.log(currentDate);
-
+    
     const pool = await sql.connect(dbConfig);
 
     // Verificar si el correo electrónico ya existe
@@ -178,8 +170,7 @@ const createEmpresa = async function (req, res) {
         .input('Ruc', sql.VarChar, ruc)
         .query('SELECT * FROM Empresas WHERE ruc = @ruc');
 
-    console.log('checkEmailQuery.recordset:', checkEmailQuery.recordset);
-
+    
     if (checkEmailQuery.recordset.length > 0) {
 
         return res.status(200).send({ message: 'La Empresa ya existe. Por favor registre una empresa diferente', data: undefined });
@@ -212,8 +203,7 @@ const createEmpresa = async function (req, res) {
                 .query('INSERT INTO Empresas (idEmpresa, idDocumento, ruc, razon_Social, nombreComercial, rubro, idRubro, celular, correo, password, logo, alias, condicion, estSunat, estado, fregistro) VALUES (@idEmpresa, @idDocumento, @ruc, @razon_Social, @nombreComercial, @rubro, @idRubro, @celular, @correo, @password, @logo, @alias, @condicion, @estSunat, @estado, @fregistro)');
 
 
-            console.log('✓ Empresa creada con ID:', idEmpresa);
-
+            
             // Inicializar datos maestros de la empresa (roles, comprobantes, sucursal, etc.)
             try {
                 const datosEmpresa = {
@@ -227,14 +217,7 @@ const createEmpresa = async function (req, res) {
                 // #endregion
                 const resultadoInicializacion = await empresaService.inicializarDatosEmpresa(pool, idEmpresa, datosEmpresa);
                 
-                console.log('✅ Datos maestros inicializados:', {
-                    roles: resultadoInicializacion.roles.length,
-                    comprobantes: resultadoInicializacion.comprobantes.length,
-                    sucursal: resultadoInicializacion.sucursal ? 'OK' : 'ERROR',
-                    secuencias: resultadoInicializacion.secuencias.length,
-                    errores: resultadoInicializacion.errores.length
-                });
-
+                
                 await empresaService.insertarEmpresaIntegraciones(pool, idEmpresa);
                 await empresaService.marcarEmpresaPrincipalSiEsPrimera(pool, idEmpresa);
 
@@ -368,8 +351,7 @@ const putCredencialesProveedor = async function (req, res) {
 
 // Ruta pública: enviar código de activación por WhatsApp (sin sesión). Usa Factiliza WHATSAPP desde FactilizaConfig.
 const enviarCodigoActivacion = async function (req, res) {
-    console.log('entro a enviarCodigoActivacion', req.body);
-    // #region agent log
+        // #region agent log
     fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:entry',message:'enviarCodigoActivacion entered',data:{hasBody:!!req.body,idEmpresa:req.body?.idEmpresa!=null},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
     // #endregion
     try {
@@ -440,9 +422,7 @@ const verificarEmpresaCodigo = async function (req, res) {
 
 const updateEmpresa = async function (req, res) {
     try {
-        console.log('Datos recibidos:', req.body);
-        console.log('Archivo recibido:', req.file);
-
+                
         const idEmpresa = req.user.empresa;
         const {
             ruc, correo, celular, nombreComercial, 
@@ -485,8 +465,7 @@ const updateEmpresa = async function (req, res) {
                 try {
                     const oldPath = path.join(__dirname, '../uploads/configuraciones/', logoAnterior);
                     await fs.promises.unlink(oldPath);
-                    console.log('Imagen anterior eliminada:', logoAnterior);
-                } catch (err) {
+                                    } catch (err) {
                     console.warn('No se pudo eliminar la imagen anterior:', err.message);
                 }
             }
@@ -522,8 +501,7 @@ const updateEmpresa = async function (req, res) {
 };
 
 const cambiar_estado_empresa = async function (req, res) {
-    console.log('entro a cambiar_estado_empresa', req.params);
-    if (req.user) {
+        if (req.user) {
         let idEmpresa = req.params['id'];
         const { estado } = req.body;
 
@@ -573,19 +551,16 @@ const cambiar_estado_empresa = async function (req, res) {
 
 const obtener_logo = async function (req, res) {
     try {
-        console.log('Solicitud para obtener logo:', req.params.img);
-        
+                
         const img = req.params.img || 'default.jpg';
         const logoPath = path.join(__dirname, '../uploads/configuraciones/', img);
         
-        console.log('Ruta del logo:', logoPath);
-        // Verificar si existe el archivo
+                // Verificar si existe el archivo
         try {
             await fs.access(logoPath);
             return res.sendFile(logoPath);
         } catch (err) {
-            console.log('Logo no encontrado, usando default:', err.message);
-            const defaultPath = path.join(__dirname, '../public/assets/img/01.jpg');
+                        const defaultPath = path.join(__dirname, '../public/assets/img/01.jpg');
             return res.sendFile(defaultPath);
         }
     } catch (error) {
@@ -610,10 +585,8 @@ const obtener_datos_colaborador_admin = async (req, res) => {
             //     .input('id', sql.Int, id)
             //     .query('SELECT * FROM usuarioWeb WHERE email = @id');
             // res.json({ message: 'Usuario actualizado correctamente' });
-            console.log(result.recordset);
-            data = result.recordset;
-            console.log('data: ', data);
-            // res.status(200).send({data: data });
+                        data = result.recordset;
+                        // res.status(200).send({data: data });
             res.json({ data });
 
 
@@ -636,9 +609,7 @@ const cambiar_estado_colaborador_admin = async function (req, res) {
 
         let nuevo_estado;
 
-        console.log('cambiar_estado_colaborador_admin: ', data);
-        console.log('id: ', id);
-
+                
 
         if (data.estado) {
             nuevo_estado = false;
@@ -646,16 +617,14 @@ const cambiar_estado_colaborador_admin = async function (req, res) {
             nuevo_estado = true;
         }
 
-        console.log('nuevo estado: ', nuevo_estado);
-
+        
         const pool = await sql.connect(dbConfig);
         const result = await pool
             .request()
             .input('id', sql.Int, id)
             .input('estado', sql.Bit, nuevo_estado)
             .query('UPDATE usuarioWeb SET estado = @estado WHERE id = @id');
-        console.log(result.recordset);
-        res.status(200).send({ data: result.recordset });
+                res.status(200).send({ data: result.recordset });
 
     } else {
         res.status(403).send({ data: undefined, message: 'NoToken' });
@@ -753,8 +722,7 @@ const createDireccionEmpresa = async function (req, res) {
 
         res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
     } catch (error) {
-        console.log('error', error);
-        res.status(500).send({ message: error.message, data: undefined });
+                res.status(500).send({ message: error.message, data: undefined });
 
     }
 
@@ -807,8 +775,7 @@ const createSucursalEmpresa = async function (req, res) {
 };
 
 const updateDireccionEmpresa = async function (req, res) {
-    console.log('entro a updateDireccionEmpresa', req.body);
-    const { idDireccionEmpresa, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, codLocal, principal } = req.body;
+        const { idDireccionEmpresa, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, codLocal, principal } = req.body;
     const id = idDireccionEmpresa;
 
     if (req.user) {
@@ -881,8 +848,7 @@ const updateDireccionEmpresa = async function (req, res) {
 const getDireccionEmpresa_id = async function (req, res) {
     
     const idEmpresa = req.user.empresa;
-    console.log('entro a getDireccionEmpresa_id', idEmpresa);
-    if (req.user) {
+        if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
                 const pool = await sql.connect(dbConfig);
@@ -935,8 +901,7 @@ const deleteDireccion_id = async function (req,res) {
 
 //convertir en principal la direccion de la empresa por su idDireccionEmpresa y el resro de direcciones en false
 const cambiar_principal_direccion = async function (req, res) {
-    console.log('entro a cambiar_principal_direccion', req.body, req.params);
-    const idDireccionEmpresa = req.params.id;
+        const idDireccionEmpresa = req.params.id;
     const idEmpresa = req.user.empresa;
 
     if (req.user) {
@@ -980,8 +945,7 @@ const cambiar_principal_direccion = async function (req, res) {
 }
 
 const getEstadoConfiguracion = async function (req, res) {
-    console.log('getEstadoConfiguracion - Usuario:', req.user);
-    
+        
     if (!req.user || !req.user.empresa) {
         return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
@@ -990,8 +954,7 @@ const getEstadoConfiguracion = async function (req, res) {
         const pool = await sql.connect(dbConfig);
         const estado = await empresaService.obtenerEstadoConfiguracion(pool, req.user.empresa);
         
-        console.log('Estado de configuración:', estado);
-        res.status(200).send({ data: estado });
+                res.status(200).send({ data: estado });
     } catch (error) {
         console.error('Error obteniendo estado de configuración:', error);
         res.status(500).send({ message: 'Error al obtener estado de configuración', data: undefined });

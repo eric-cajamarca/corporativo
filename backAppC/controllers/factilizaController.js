@@ -319,7 +319,7 @@ const getXmlSunat = async function (req, res) {
       body: JSON.stringify(body)
     });
 
-    console.log('Request response:', response); // ← depura el body
+     // ← depura el body
     const raw = await response.text();
     let respuesta;
     try { respuesta = JSON.parse(raw); } catch {

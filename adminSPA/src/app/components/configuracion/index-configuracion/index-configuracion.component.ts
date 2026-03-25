@@ -256,8 +256,7 @@ export class IndexConfiguracionComponent implements OnInit {
   }
 
   guardarConfiguracionGeneral(): void {
-    console.log('Guardando configuración general:', this.configuracion);
-    // Llamada al backend para guardar
+        // Llamada al backend para guardar
   }
 
   /** Carga configuración de facturación electrónica desde el API */
@@ -434,29 +433,24 @@ export class IndexConfiguracionComponent implements OnInit {
   }
 
   guardarConfiguracionVentas(): void {
-    console.log('Guardando configuración de ventas:', this.ventas);
-    // Llamada al backend para guardar
+        // Llamada al backend para guardar
   }
 
   guardarConfiguracionSistema(): void {
-    console.log('Guardando configuración del sistema:', this.sistema);
-    // Llamada al backend para guardar
+        // Llamada al backend para guardar
   }
 
   exportarConfiguracion(): void {
-    console.log('Exportando configuración...');
-    // Descargar archivo de configuración
+        // Descargar archivo de configuración
   }
 
   importarConfiguracion(): void {
-    console.log('Importando configuración...');
-    // Abrir selector de archivos
+        // Abrir selector de archivos
   }
 
   restaurarConfiguracion(): void {
     if (confirm('¿Está seguro de restaurar la configuración por defecto? Esta acción no se puede deshacer.')) {
-      console.log('Restaurando configuración por defecto...');
-      // Restaurar valores por defecto
+            // Restaurar valores por defecto
     }
   }
 
@@ -725,7 +719,6 @@ export class IndexConfiguracionComponent implements OnInit {
         this._router.navigate(['/reportes']);
         break;
       default:
-        console.log('Módulo no implementado:', module);
-    }
+            }
   }
 }

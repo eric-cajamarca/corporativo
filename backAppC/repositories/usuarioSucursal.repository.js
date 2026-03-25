@@ -5,8 +5,7 @@ const sql = require('mssql');
  * Obtiene las sucursales asignadas a un usuario
  */
 const obtenerSucursalesUsuario = async (pool, idUsuario, idEmpresa) => {
-    console.log('obtenerSucursaleUsuario repository', idUsuario, idEmpresa);
-    const result = await pool.request()
+        const result = await pool.request()
         .input('idUsuario', sql.UniqueIdentifier, idUsuario)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .query(`

@@ -30,8 +30,7 @@ export class ClienteService {
 
    //Metodo para obtener un cliente por ruc
    obtener_cliente_ruc(id:any):Observable<any>{
-    console.log('obtener_cliente_id - id',id);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'clientesruc/'+id,{
       headers: headers,
       withCredentials: true
@@ -40,8 +39,7 @@ export class ClienteService {
 
   //Metodo para obtener un cliente por id
   obtener_cliente_id(id:any):Observable<any>{
-    console.log('obtener_cliente_id - id',id);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'clientes/'+id,{
       headers: headers,
       withCredentials: true
@@ -79,8 +77,7 @@ export class ClienteService {
 
 
   cambiar_estado_clientes(id: any, data: any): Observable<any> {
-    console.log('cambiar_estado_clientes - id', id, data);
-    let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+        let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.put(this.url + 'cambiar_estado_clientes/' + id, data, { headers: headers });
   }
   ////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,7 +93,6 @@ export class ClienteService {
 
   //metodo para obtener direccionCliente idCLiente
   obtener_direccionesCliente_idCliente(id:any):Observable<any>{
-    console.log(id)
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'direccionesClientes/'+id,{
       headers: headers,

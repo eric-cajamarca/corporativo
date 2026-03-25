@@ -2,8 +2,7 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 
 const obtenerEnvios = async (req, res) => {
-    console.log('aqui entro a obtener envios');
-    try {
+        try {
         const pool = await sql.connect(dbConfig);
         const result = await pool.request().query('SELECT * FROM Historialpedidos');
         res.json(result.recordset);
@@ -16,10 +15,7 @@ const obtenerEnvios = async (req, res) => {
 const getCompEnvio = async function (req, res) {
     const codicion = req.params.id;
 
-    console.log('getcodicion');
-    console.log(req.params);
-    console.log(codicion);
-    try {
+                try {
         let pool = await sql.connect(dbConfig);
         let result = await pool
             .request()
@@ -40,9 +36,7 @@ const createCompEnvio = async (req, res) => {
     //extraer Alias del array data
     let alias = data[0].Alias;
 
-    console.log('entro a createCompEnvio:');
-    console.log('alias:', alias);
-
+        
     //quiero capturar la fecha y la hora del sistema y guardarla en formato varchar(10) en la tabla Historialpedidos
     let fecha = new Date();
 
@@ -57,10 +51,8 @@ const createCompEnvio = async (req, res) => {
     let hora = fecha.getHours();
 
     let fechaActual = anio + '-' + mes + '-' + dia;
-    console.log('fechaActual:', fechaActual);
-
-    console.log(' alias:', alias);
-
+    
+    
 
     if (req.user) {
 
@@ -68,14 +60,12 @@ const createCompEnvio = async (req, res) => {
         const pool = await sql.connect(dbConfig);
         const result = await pool.request().query('SELECT * FROM Comprobantes' + alias + ' where id = 15');
 
-        console.log('resultado del result', result.recordset);
-        res.json(result.recordset);
+                res.json(result.recordset);
 
         //extraer el numero de comprobante de result.recordset
         let NumeroCompEnvio = result.recordset[0].Numero;
         let serieCompEnvio = result.recordset[0].Serie;
-        console.log('NumeroCompEnvio:', NumeroCompEnvio);
-
+        
 
         let CompEnvio = serieCompEnvio + '-' + NumeroCompEnvio;
         //quiero que el numero de NumeroCompEnvio tenga 8 digitos y que empiece con 00000001
@@ -98,8 +88,7 @@ const createCompEnvio = async (req, res) => {
             CompEnvio = serieCompEnvio + '-' + NumeroCompEnvio++;
         }
 
-        console.log('CompEnvio:', CompEnvio);
-
+        
         try {
 
             //quiero comprobar si el CompEnvio ya existe en la tabla Historialpedidos
@@ -108,22 +97,17 @@ const createCompEnvio = async (req, res) => {
                 .request()
                 .input('CompEnvio', sql.VarChar, data[0].CompEnvio)
                 .query('SELECT * FROM Historialpedidos WHERE CompEnvio = @CompEnvio');
-            console.log('result.recordset.length:', result.recordset.length);
-            if (result.recordset.length > 0) {
+                        if (result.recordset.length > 0) {
                 return res.status(400).json({ message: 'El comprobante ya existe.' });
             } else {
-                console.log('no existe');
-
+                
                 //recorre el arreglo data y guarda en sql server los datos
                 data.forEach(async (element) => {
-                    console.log('element:', element);
-
+                    
                     //quiero validar que element.Cantidad sea mayor a 0
                     if (element.Cantidad <= 0) {
-                        console.log('element.Cantidad:', element.Cantidad);
-                    } else {
-                        console.log('element.Cantidad:', element.Cantidad);
-                        const pool = await sql.connect(dbConfig);
+                                            } else {
+                                                const pool = await sql.connect(dbConfig);
                         const result = await pool
                             .request()
                             .input('CompEnvio', sql.VarChar, CompEnvio)
@@ -169,8 +153,7 @@ const updateCompEnvio = async (req, res) => {
     const { CompVentas, FEnvio, Descripcion, Presentacion, Cantidad } = req.body;
     const CompEnvio = req.params.id;
 
-    console.log(CompEnvio);
-
+    
     try {
         const pool = await sql.connect(dbConfig);
         const result = await pool

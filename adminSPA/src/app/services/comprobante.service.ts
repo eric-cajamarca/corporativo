@@ -22,8 +22,7 @@ export class ComprobanteService {
   // api.get('/comprobantes/:id', auth.auth,comprobantesController.obtenerComprobantes_alias);
 
   obtener_comprobantes_alias(id:any):Observable<any>{
-    console.log('id',id);
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+        let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'comprobantes/'+id,{
       headers: headers,
       withCredentials: true

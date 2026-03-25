@@ -136,7 +136,6 @@ app.use((req, res, next) => {
 app.get('/database', async (req, res) => {
   try {
     await connectDB();
-    console.log('Conexi?n exitosa a la base de datos');
     res.send('?Conexi?n exitosa a la base de datos!');
   } catch (error) {
     console.error('Error al conectar a la base de datos:', error);
@@ -218,7 +217,6 @@ app.get('/health', (req, res) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
   try {
     const envioSunatJob = require('./jobs/envioSunat.job');
     envioSunatJob.iniciar();

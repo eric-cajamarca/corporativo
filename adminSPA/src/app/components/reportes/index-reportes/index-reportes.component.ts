@@ -665,8 +665,7 @@ export class IndexReportesComponent implements OnInit {
   }
 
   navigateTo(module: string): void {
-    console.log('Navegando a:', module);
-
+    
     switch (module) {
       case 'dashboard':
         this._router.navigate(['/home']);
@@ -699,7 +698,6 @@ export class IndexReportesComponent implements OnInit {
         // Ya estamos aquí
         break;
       default:
-        console.log('Módulo no implementado:', module);
-    }
+            }
   }
 }

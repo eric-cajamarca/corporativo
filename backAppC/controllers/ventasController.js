@@ -56,14 +56,11 @@ const crearVenta = async function (req, res) {
 const obtenerVentaPorId = async function (req, res) {
   const Serie_Numero = req.params.id;
   const idempresa = req.user.empresa;
-    console.log('idempresa :', idempresa);
-
+    
     if (!Serie_Numero) {
     return res.status(400).send('Falta el parámetro Serie_Numero');
   }
-    console.log('Serie_numero :', Serie_Numero);
-    console.log('idempresa :', idempresa);
-    if(req.user) {
+            if(req.user) {
     try {
       let pool = await sql.connect(dbConfig);
         let result = await pool
@@ -249,9 +246,7 @@ const obtenerComprobanteVAParaPdf = async (req, res) => {
 const actualizarVenta = async function (req, res) {
   const { Serie_Numero, EstadoPedido, EstadoSunat } = req.body;
   // const Serie_Numero = req.params.id;
-    console.log('estado pedido', EstadoPedido);
-    console.log('estado sunat', EstadoSunat);
-    if(req.user) {
+            if(req.user) {
         try {
         let pool = await sql.connect(dbConfig);
             let result = await pool

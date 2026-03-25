@@ -81,8 +81,7 @@ export class CreateProveedorComponent {
     this._adminService.get_Regiones().subscribe(
       response => {
         this.regiones = response;
-        console.log('this.regiones', this.regiones);
-      }
+              }
     );
 
     this._adminService.get_Procincias().subscribe(
@@ -99,15 +98,13 @@ export class CreateProveedorComponent {
       }
     );
 
-    console.log('this.direccionProveedores', this.direccionProveedores);
-  }
+      }
 
   ngOnInit() {
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        console.log('this.documento', this.documento);
-
+        
         //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
         //  this.documento.forEach((element: { id: string | number; name: any; }) => {
         //   this.documento[element.id] = element.id;
@@ -241,9 +238,7 @@ export class CreateProveedorComponent {
   async buscar() {
     this.busqueda=true;
   this.contBuscar = 1;
-  console.log('Documento:', this.proveedores.idDocumento);
-  console.log('Filtro RUC/DNI:', this.proveedores.ruc);
-  
+      
   this.filtro = this.proveedores.ruc;
 
   // Validación básica
@@ -396,12 +391,10 @@ private async handleDniSearch(): Promise<void> {
 
     if (!foundItem) {
       console.warn(`No se encontró ${type} correspondiente para: ${name}`);
-      console.log(`Lista disponible de ${type}s:`, items.map(i => i.name));
-      return undefined;
+            return undefined;
     }
 
-    console.log(`${type} encontrado:`, foundItem.name, `(ID: ${foundItem.id})`);
-    return foundItem.id;
+        return foundItem.id;
   }
 
 
@@ -524,8 +517,7 @@ private async handleDniSearch(): Promise<void> {
     // Obtener regiones
     this._adminService.get_Regiones().subscribe(
       response => {
-        console.log(response);
-        // Usar map en lugar de forEach + push (más eficiente)
+                // Usar map en lugar de forEach + push (más eficiente)
         this.regiones = response.map((element: any) => ({
           id: element.id,
           name: element.name
@@ -574,8 +566,7 @@ private async handleDniSearch(): Promise<void> {
       this.provincias = response.filter((element: any) => 
         element.department_id == this.direccionProveedores.region
       );
-      console.log(this.provincias);
-    }
+          }
   );
   }
 
@@ -597,24 +588,21 @@ private async handleDniSearch(): Promise<void> {
       this.distritos = response.filter((element: any) => 
         element.province_id == this.direccionProveedores.provincia
       );
-      console.log('Distritos cargados:', this.distritos);
-    }
+          }
   );
 }
 
   select_distrito(event: any) {
     const selectedId = event.target.value;
     this.direccionProveedores.ubigeo = selectedId;
-    console.log(this.direccionProveedores.ubigeo);
-  }
+      }
 
   registrar(registroForm: any){
 
     // if (registroForm.valid) {
       this.btn_registrar = true;
       this.data = this.proveedores;
-      console.log('this.data', this.data);
-      //convertir array this.clientes a un objeto para pasarlo a mi servicio
+            //convertir array this.clientes a un objeto para pasarlo a mi servicio
       //  this.data.forEach((element: { id: string | number; name: any; }) => {
       //   this.data[element.id] = element.id;
       //  });
@@ -670,12 +658,10 @@ private async handleDniSearch(): Promise<void> {
             });
             this.btn_registrar = false;
           }
-          console.log(response.data);
-          this.btn_registrar = false;
+                    this.btn_registrar = false;
         },
         error => {
-          console.log(<any>error);
-          console.error('Error al crear el cliente:', error);
+                    console.error('Error al crear el cliente:', error);
           this.btn_registrar = false;
         }
 
@@ -686,13 +672,11 @@ private async handleDniSearch(): Promise<void> {
   onCheckboxChange(){
     if (this.mostrarDireccion) {
       this.mostrarDireccion = true;
-      console.log('El checkbox está marcado.', this.mostrarDireccion);
-      
+            
       // Realiza acciones cuando el checkbox está marcado
     } else {
       // this.mostrarDireccion = false;
-      console.log('El checkbox está desmarcado.', this.mostrarDireccion);
-      
+            
       // Realiza acciones cuando el checkbox está desmarcado
     }
     

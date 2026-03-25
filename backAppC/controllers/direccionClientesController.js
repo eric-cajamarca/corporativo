@@ -9,9 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 //crear n crud con esta tabla CREATE TABLE DireccionClientes ( idDireccionClientes INT IDENTITY(1,1) PRIMARY KEY not null, idEmpresa  UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE, idCliente int not null,ubigeo varchar(10) null,codPais varchar(10) null,region varchar(50) NULL,provincia varchar(50) NULL,distrito varchar(50) NULL,urbanizacion varchar(100) null,direccion VARCHAR(255) null,referencia varchar(200) null,codLocal varchar(10) null)
 //1. crea el metodo crearDireccionCliente segun los datos de la tabla
 const crearDireccionCliente = async function (req, res) {
-    console.log('crearDireccionCliente req.body', req.body);
-    console.log('req.user', req.user);
-
+        
 
 
     if (req.user) {
@@ -50,8 +48,7 @@ const crearDireccionCliente = async function (req, res) {
 
                     res.status(200).send({ message: 'DireccionCliente creado', data: insertDireccionCliente.rowsAffected });
                 } catch (error) {
-                    console.log('error', error);
-                    res.status(500).send({ message: error.message, data: undefined });
+                                        res.status(500).send({ message: error.message, data: undefined });
 
                 }
             
@@ -114,8 +111,7 @@ const listarDireccionesClientes_idCliente = async function (req, res) {
                 
                 res.status(200).send({ message: 'Lista de DireccionClientes', data: listaDireccionClientes.recordset });
             } catch (error) {
-                console.log('listarDireccionesClientes_idCliente error', error);
-                res.status(500).send({ message: error.message, data: undefined });
+                                res.status(500).send({ message: error.message, data: undefined });
             }
         }
         else {

@@ -87,8 +87,7 @@ export class UpdateClientesComponent {
     this._adminService.get_Regiones().subscribe(
       response => {
         this.regiones = response;
-        console.log('this.regiones', this.regiones);
-      }
+              }
     );
 
     this._adminService.get_Procincias().subscribe(
@@ -108,8 +107,7 @@ export class UpdateClientesComponent {
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        console.log('this.documento', this.documento);
-      }
+              }
     );
 
 
@@ -163,10 +161,7 @@ export class UpdateClientesComponent {
 
   buscar() {
     this.contBuscar = 1;
-    console.log('veo que cod comprobante', this.clientes.idDocumento)
-
-    console.log('filtro', this.clientes.ruc);
-    this.filtro = this.clientes.ruc;
+        this.filtro = this.clientes.ruc;
 
     try {
 
@@ -251,8 +246,7 @@ export class UpdateClientesComponent {
       }, 50);
       this._adminService.get_Regiones().subscribe(
         response => {
-          console.log(response);
-          response.forEach((element: any) => {
+                    response.forEach((element: any) => {
             this.regiones.push({
               id: element.id,
               name: element.name
@@ -297,8 +291,7 @@ export class UpdateClientesComponent {
             );
           }
         });
-        console.log(this.provincias);
-
+        
 
       }
     );
@@ -320,8 +313,7 @@ export class UpdateClientesComponent {
             // this.direccion.zip = this.distritos.forEach(element.id);
           }
         });
-        console.log(this.distritos);
-
+        
 
 
       }
@@ -331,8 +323,7 @@ export class UpdateClientesComponent {
   select_distrito(event: any) {
     const selectedId = event.target.value;
     this.direccionClientes.ubigeo = selectedId;
-    console.log(this.direccionClientes.ubigeo);
-  }
+      }
 
 
   private findLocationId(items: any[], name: string, _type: string): string | undefined {
@@ -570,14 +561,11 @@ export class UpdateClientesComponent {
 
   registrar(registroForm: any) {
 
-    console.log('this.cliientes', this.clientes);
-    console.log('this.direccionClientes', this.direccionClientes);
-
+        
     // if (registroForm.valid) {
     this.btn_registrar = true;
     this.data = this.clientes;
-    console.log('this.data', this.data);
-    //convertir array this.clientes a un objeto para pasarlo a mi servicio
+        //convertir array this.clientes a un objeto para pasarlo a mi servicio
     //  this.data.forEach((element: { id: string | number; name: any; }) => {
     //   this.data[element.id] = element.id;
     //  });
@@ -588,10 +576,8 @@ export class UpdateClientesComponent {
         if (response.data != undefined) {
           this._clientesService.obtener_cliente_id(this.clientes.ruc).subscribe(
             response => {
-              console.log('response.data', response.data);
-              this.direccionClientes.idCliente = response.data[0].idCliente;
-              console.log('this.direccionClientes con idCliente', this.direccionClientes);
-              if (response.data != undefined) {
+                            this.direccionClientes.idCliente = response.data[0].idCliente;
+                            if (response.data != undefined) {
                 // this._clientesService.crear_direccionCliente(this.token, this.direccionClientes).subscribe(
                 //   response => {
                 //     if (response.data != undefined) {
@@ -630,12 +616,10 @@ export class UpdateClientesComponent {
           });
           this.btn_registrar = false;
         }
-        console.log(response.data);
-        this.btn_registrar = false;
+                this.btn_registrar = false;
       },
       error => {
-        console.log(<any>error);
-        console.error('Error al crear el cliente:', error);
+                console.error('Error al crear el cliente:', error);
         this.btn_registrar = false;
       }
 
@@ -646,13 +630,11 @@ export class UpdateClientesComponent {
   onCheckboxChange() {
     if (this.mostrarDireccion) {
       this.mostrarDireccion = true;
-      console.log('El checkbox está marcado.', this.mostrarDireccion);
-
+      
       // Realiza acciones cuando el checkbox está marcado
     } else {
       // this.mostrarDireccion = false;
-      console.log('El checkbox está desmarcado.', this.mostrarDireccion);
-
+      
       // Realiza acciones cuando el checkbox está desmarcado
     }
 

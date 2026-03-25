@@ -41,8 +41,7 @@ export class CreateColaboradorComponent {
 
     this._rolService.obtenerRoles().subscribe(
       (response: any) => {
-        console.log('response.data', response.data);
-        
+                
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -55,14 +54,12 @@ export class CreateColaboradorComponent {
           //this._router.navigate(['/']);
         } else {
           this.roles = response.data;
-          console.log('this.roles: ', this.roles);
-          //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
+                    //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
           
           
 
 
-          console.log(this.roles);
-        }
+                  }
 
       }
     )
@@ -74,17 +71,13 @@ export class CreateColaboradorComponent {
   }
 
   registrar(registroForm:any){
-    console.log('registroForm');
-    console.log(registroForm);
-    if(registroForm.valid){
+            if(registroForm.valid){
       this.btn_registrar=true;
 
-      console.log('variable colaborador', this.colaborador);
-
+      
       this._colaboradorService.registro_colaborador_admin(this.colaborador).subscribe(
         (response: any) =>{
-          console.log('data:',response.data);
-          if(response.data == undefined){
+                    if(response.data == undefined){
             iziToast.show({
               title: 'ERROR',
               titleColor: '#FF0000',

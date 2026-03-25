@@ -3,8 +3,7 @@ const dbConfig = require('../dbconfig');
 const productoCompuestoService = require('../services/productoCompuesto.service');
 
 const crear_producto_compuesto = async function (req, res) {
-    console.log('Crear producto compuesto - req.user:', req.body);
-    let pool;
+        let pool;
     try {
         if (!req.user) {
             return res.status(401).send({ 

@@ -223,9 +223,7 @@ const cambiarCondicionProveedor = async function (req, res) {
 
     const { condicion } = req.body;
 
-    console.log('cambiarCondicionProveedor - req.params', idProveedor);
-    console.log('cambiarCondicionProveedor - req.body', condicion);
-    let nuevacondicion = '';
+            let nuevacondicion = '';
 
     if (condicion === 'ACTIVO') {
         nuevacondicion = 'INACTIVO';
@@ -237,8 +235,7 @@ const cambiarCondicionProveedor = async function (req, res) {
         if (req.user.rol == 'Administrador') {
 
 
-            console.log('cambiarCondicionProveedor - nuevacondicion antes de editar', nuevacondicion);
-
+            
             try {
                 let pool = await sql.connect(dbConfig);
                 let editProveedor = await pool.request()
@@ -268,9 +265,7 @@ const cambiarEstadoProveedor = async function (req, res) {
 
     const { estado } = req.body;
 
-    console.log('cambiarCondicionProveedor - req.params', idProveedor);
-    console.log('cambiarCondicionProveedor - estado', estado, req.body);
-    let nuevoEstado = '';
+            let nuevoEstado = '';
 
     if (estado) {
         nuevoEstado = 0;
@@ -282,8 +277,7 @@ const cambiarEstadoProveedor = async function (req, res) {
         if (req.user.rol == 'Administrador') {
 
 
-            console.log('cambiarCondicionProveedor - nuevacondicion antes de editar', nuevoEstado);
-
+            
             try {
                 let pool = await sql.connect(dbConfig);
                 let editProveedor = await pool.request()
@@ -291,11 +285,9 @@ const cambiarEstadoProveedor = async function (req, res) {
                     .input('estado', sql.Bit, nuevoEstado)
                     .query('update Proveedores set estado = @estado where idProveedor = @idProveedor');
 
-                console.log('cambiarCondicionProveedor - deleteProveedor', editProveedor.rowsAffected);
-                res.status(200).send({ message: 'Proveedor eliminado', data: editProveedor.rowsAffected });
+                                res.status(200).send({ message: 'Proveedor eliminado', data: editProveedor.rowsAffected });
             } catch (error) {
-                console.log('cambiarCondicionProveedor - error', error);
-                res.status(500).send({ message: error.message, data: undefined });
+                                res.status(500).send({ message: error.message, data: undefined });
             }
 
         }
@@ -312,9 +304,7 @@ const cambiarEstadoProveedor = async function (req, res) {
 //direcciones de proveedores
 //1. crea el metodo crearDireccionCliente segun los datos de la tabla
 const crearDireccionProveedor = async function (req, res) {
-    console.log('crearDireccionProveedor req.body', req.body);
-    console.log('req.user', req.user);
-
+        
 
 
     if (req.user) {
@@ -353,8 +343,7 @@ const crearDireccionProveedor = async function (req, res) {
 
                     res.status(200).send({ message: 'DireccionProveedor creado', data: insertDireccionProveedor.rowsAffected });
                 } catch (error) {
-                    console.log('error', error);
-                    res.status(500).send({ message: error.message, data: undefined });
+                                        res.status(500).send({ message: error.message, data: undefined });
 
                 }
             
@@ -402,8 +391,7 @@ const listarDireccionProveedores = async function (req, res) {
 const listarDirecciones_idProveedor = async function (req, res) {
     const idProveedor = req.params.id;
 
-    console.log('listarDireccionesProveedores', idProveedor);
-
+    
     if (req.user) {
         if (req.user.rol == 'Administrador') {
             //aqui permito que todas las empresas puedan ver las direcciones de los Proveedores
@@ -417,8 +405,7 @@ const listarDirecciones_idProveedor = async function (req, res) {
 
                 res.status(200).send({ message: 'Lista de DireccionProveedores', data: listaDireccionProveedores.recordset });
             } catch (error) {
-                console.log('listarDireccionesProveedores_idProveedor error', error);
-                res.status(500).send({ message: error.message, data: undefined });
+                                res.status(500).send({ message: error.message, data: undefined });
             }
         }
         else {

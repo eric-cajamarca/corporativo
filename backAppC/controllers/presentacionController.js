@@ -13,14 +13,12 @@ const e = require('cors');
 // )
 
 const obtener_Presentaciones = async (req, res) => {
-    console.log('obtener_Presentaciones')
     if(req.user){
         try {
             let pool = await sql.connect(dbConfig);
             let presentaciones = await pool.request().query("select idPresentacion,codigo,Descripcion from Presentacion");
             res.status(200).send({data: presentaciones.recordset});
         } catch (error) {
-            console.log('error obtener_Presentaciones',error)
             res.status(500).send({message: error.message, data: undefined});
         }
     }

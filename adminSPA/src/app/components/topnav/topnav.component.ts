@@ -184,8 +184,7 @@ export class TopnavComponent implements OnInit {
    */
   onSearch(): void {
     if (this.searchQuery.trim()) {
-      console.log('Buscando:', this.searchQuery);
-      // Implementar búsqueda global aquí
+            // Implementar búsqueda global aquí
       this.showSearchResults = true;
     }
   }

@@ -30,9 +30,7 @@ export class AdminService {
   admin_login(data: any): Observable<any> {
     const headers = new HttpHeaders().set('Content-Type', 'application/json');
     //Usar withCredentials: true para que se incluyan cookies
-    console.log(data);
-    console.log(this.url + 'admin_login');
-    return this._http.post(this.url + 'admin_login', data, {
+            return this._http.post(this.url + 'admin_login', data, {
       headers: headers,
       withCredentials: true
     });

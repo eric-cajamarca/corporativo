@@ -63,9 +63,7 @@ export class IndexClientesComponent {
     this.load_estado = true;
     this._clientesService.obtener_clientes().subscribe(
       response => {
-        console.log('response.data');
-        console.log(response);
-
+                
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -80,12 +78,10 @@ export class IndexClientesComponent {
           this.clientes = response.data;
           this.clientes_const = response.data;
           this.load_estado = false;
-          console.log(this.clientes)
-        }
+          }
       },
       error => {
-        console.log('error', error);
-      }
+              }
     );
   }
 
@@ -126,9 +122,7 @@ export class IndexClientesComponent {
   //aqui hago el cambio de estado de activo o inactivo
   set_state(id: any, estado: any) {
 
-    console.log('id', id);
-    console.log('condicion', estado);
-    this.load_estado = true;
+            this.load_estado = true;
     this._clientesService.cambiar_estado_clientes(id, { estado: estado } ).subscribe(
       response => {
         if (response.data != undefined) {
@@ -145,8 +139,7 @@ export class IndexClientesComponent {
         
       },
       error=>{
-        console.log('error',error);
-      }
+              }
     );
     
 
@@ -154,13 +147,11 @@ export class IndexClientesComponent {
 
   eliminar(id: any) {
 
-    console.log('id', id);
-
+    
     this.load_estado = true;
     this._clientesService.eliminar_direccionCliente(id).subscribe(
       response => {
-        console.log('response.data', response.data);
-      }
+              }
     )
 
     this._clientesService.eliminar_cliente(id).subscribe(
@@ -202,6 +193,5 @@ export class IndexClientesComponent {
 
   elegir(cliente: any): void {
     this.clienteElegido.emit(cliente);
-    console.log('Cliente elegido:', cliente);
-  }
+      }
 }

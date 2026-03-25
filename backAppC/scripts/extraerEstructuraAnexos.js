@@ -35,24 +35,20 @@ const hojaArg = process.argv[2];
 
 if (hojaArg) {
   const bloques = estructurasDeHoja(hojaArg);
-  console.log("\n=== Hoja:", hojaArg, "===\n");
-  bloques.forEach((b) => console.log(b.fila, "|", b.archivo, "| Orden:", b.orden, "|", b.dato));
+    bloques.forEach((b) => );
 } else {
-  console.log("Hojas:", workbook.SheetNames.join(", "));
-  hojasRelevantes.forEach((name) => {
+    hojasRelevantes.forEach((name) => {
     const sheet = workbook.Sheets[name];
     if (!sheet) return;
     const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-    console.log("\n=== Hoja:", name, "| Filas:", data.length, "===");
-    let archivoActual = "";
+        let archivoActual = "";
     for (let i = 0; i < Math.min(data.length, 120); i++) {
       const row = data[i];
       const dato = (row[2] != null ? row[2] : row[1] != null ? row[1] : "").toString().trim();
       const orden = (row[7] != null && row[7] !== "" ? row[7] : row[6] != null ? row[6] : "").toString().trim();
       if (dato.toLowerCase().includes("archivo:")) archivoActual = dato;
       if (orden !== "" || (archivoActual && dato && /^\d+$/.test(String(orden)))) {
-        console.log(i + 1, "|", archivoActual.substring(0, 45), "|", orden, "|", dato.substring(0, 50));
-      }
+              }
     }
   });
 }

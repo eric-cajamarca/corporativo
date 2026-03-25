@@ -1,8 +1,7 @@
 const lotesRepository = require('../repositories/lotes.repository');
 
 async function getAll(idEmpresa) {
-    console.log('idEmpresa en service:', idEmpresa);
-    return await lotesRepository.getAll(idEmpresa);
+        return await lotesRepository.getAll(idEmpresa);
 }
 
 async function getById(idLote) {

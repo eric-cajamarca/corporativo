@@ -110,8 +110,7 @@ export class CreatePreciosComponent implements OnInit {
     this.preciosService.listar_listas_precios_empresa().subscribe({
       next: (response) => {
         this.listasPrecio = response.data || [];
-        console.log('Listas de precios cargadas:', this.listasPrecio);
-      },
+              },
       error: (error) => {
         console.error('Error al cargar listas de precios:', error);
       }
@@ -139,8 +138,7 @@ export class CreatePreciosComponent implements OnInit {
     this._sucursalService.obtener_sucursal_idempresa().subscribe({
       next: (response) => {
         this.sucursales = response.data || [];
-        console.log('Sucursales cargadas:', response.data);
-      },
+              },
       error: (error) => {
         console.error('Error al cargar sucursales:', error);
       }
@@ -151,8 +149,7 @@ export class CreatePreciosComponent implements OnInit {
     this._tablasSunatService.obtener_moneda().subscribe({
       next: (response) => {
         this.monedas = response.data;
-        console.log('Monedas cargadas:', response.data);
-      },
+              },
       error: (error) => {
         console.error('Error al cargar monedas:', error);
       }
@@ -269,20 +266,17 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   guardarListaPrecio(): void {
-    console.log('Guardando lista de precios...', this.formListaPrecio.value);
-    if (this.formListaPrecio.invalid) return;
+        if (this.formListaPrecio.invalid) return;
     
     const raw = this.formListaPrecio.value;
     const formData = {
       ...raw,
       idSucursal: raw.idSucursal === 'null' || raw.idSucursal === '' || raw.idSucursal === undefined ? null : raw.idSucursal
     };
-    console.log('Datos del formulario:', formData);
-    
+        
     if (formData.idLista) {
       // Editar
-      console.log('Editando lista de precios...');
-      this.preciosService.editar_lista_precios(formData.idLista, formData).subscribe({
+            this.preciosService.editar_lista_precios(formData.idLista, formData).subscribe({
         next: (response) => {
           this.modal.hide();
           this.cargarListasPrecio();
@@ -295,8 +289,7 @@ export class CreatePreciosComponent implements OnInit {
       });
     } else {
       // Crear
-      console.log('Creando nueva lista de precios...');
-      this.preciosService.crear_lista_precios(formData).subscribe({
+            this.preciosService.crear_lista_precios(formData).subscribe({
         next: (response) => {
           this.modal.hide();
           this.cargarListasPrecio();
@@ -312,8 +305,7 @@ export class CreatePreciosComponent implements OnInit {
 
 
   guardarPrecios(): void {
-    console.log('Guardando precios...',this.listaSeleccionadaId);
-    if (!this.listaSeleccionadaId) {
+        if (!this.listaSeleccionadaId) {
       alert('Selecciona una lista de precios primero');
       return;
     }
@@ -330,20 +322,17 @@ export class CreatePreciosComponent implements OnInit {
         idUsuario: 'USUARIO_ACTUAL' // Obtener del servicio de autenticación
       }));
     
-      console.log('Precios filtrados para guardar:', preciosAGuardar);
-
+      
     if (preciosAGuardar.length === 0) {
       alert('No hay precios nuevos para guardar');
       return;
     }
     
-    console.log('Precios a guardar:', preciosAGuardar);
- 
+     
 
     this.preciosService.creaer_precio_producto(preciosAGuardar).subscribe({
         next: (response) => {
-          console.log('Precio guardado:', response);
-        },
+                  },
         error: (error) => {
           console.error('Error al guardar precio:', error);
         }

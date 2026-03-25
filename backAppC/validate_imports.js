@@ -1,5 +1,4 @@
 // Validación simple de imports sin ejecutar funciones
-console.log('🔍 VALIDANDO IMPORTS DE MÓDULOS NUEVOS');
 
 const modulesToTest = [
   // Controladores
@@ -41,26 +40,17 @@ const modulesToTest = [
 let successCount = 0;
 let errorCount = 0;
 
-console.log('\n📦 Probando imports...\n');
-
 for (const modulePath of modulesToTest) {
   try {
-    // Solo intentar importar, no ejecutar
     require.resolve(modulePath);
-    console.log(`✅ ${modulePath}`);
     successCount++;
-  } catch (error) {
-    console.log(`❌ ${modulePath}: ${error.message}`);
+  } catch {
     errorCount++;
   }
 }
 
-console.log(`\n📊 RESULTADO: ${successCount} exitosos, ${errorCount} errores`);
-
 if (errorCount === 0) {
-  console.log('\n🎉 TODOS LOS MÓDULOS SE IMPORTAN CORRECTAMENTE');
-  console.log('✅ El backend está listo para pruebas con base de datos');
+  process.exit(0);
 } else {
-  console.log('\n⚠️  HAY ERRORES QUE CORREGIR');
   process.exit(1);
 }

@@ -51,8 +51,7 @@ export class UpdateColaboradorComponent {
         this._adminservice.obtener_datos_colaborador_admin(this.id).subscribe(
           response => {
 
-            console.log('reponse: ', response);
-
+            
             if (response.data != undefined) {
               // Modificar el campo 'password' dentro del array 'data'
               response.data.forEach((item:any) => {
@@ -67,8 +66,7 @@ export class UpdateColaboradorComponent {
 
               this.colaborador.idRol = this.colaborador.idRol || null;
               
-              console.log('colaborador: ', this.colaborador);
-              // this.colaborador = response;             
+                            // this.colaborador = response;             
               this.data = true;
               this.load_data = false;
              }else {
@@ -83,8 +81,7 @@ export class UpdateColaboradorComponent {
 
         this._rolService.obtenerRoles().subscribe(
           response => {
-            console.log('response.data', response.data);
-            
+                        
             if (response.data == undefined) {
               iziToast.show({
                 title: 'ERROR',
@@ -97,14 +94,12 @@ export class UpdateColaboradorComponent {
               //this._router.navigate(['/']);
             } else {
               this.roles = response.data || null;
-              console.log('this.roles: ', this.roles);
-              //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
+                            //convertir array de lista de roles this.roles a un objeto par usarlo en mi formulario
               
               
 
 
-              console.log(this.roles);
-            }
+                          }
 
           }
         )
@@ -122,16 +117,12 @@ export class UpdateColaboradorComponent {
     if (updateForm.valid) {
       this.btn_actualizar = true;
 
-      console.log('updateForm: ', this.colaborador);
-      if(this.colaborador.password == ''){
-        console.log('pasword vacio');
-        this.colaborador.password = 'sin datos'
+            if(this.colaborador.password == ''){
+                this.colaborador.password = 'sin datos'
       }else{
-        console.log('pasword con datos');
-        
+                
       }
-      console.log('this.colaborador: ', this.colaborador);
-
+      
       
       try {
         this._adminservice.editar_colaborador_admin(this.id, this.colaborador).subscribe(

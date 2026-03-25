@@ -39,8 +39,7 @@ exports.enviarLinkRecuperacion = async (to, recoveryLink, tipo) => {
 
   if (!tieneSmtp) {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[DEV] SMTP no configurado. Enlace de recuperación (copiar y abrir en el navegador):');
-      console.log(recoveryLink);
+      console.error('[DEV] SMTP no configurado. Enlace de recuperación (copiar en navegador):', recoveryLink);
       return;
     }
     throw new Error('SMTP no configurado: defina SMTP_HOST, SMTP_USER y SMTP_PASS en .env');

@@ -24,8 +24,7 @@ exports.getDatosEmpresaLogin = async (pool, user) => {
  * @returns {Array} Array con los IDs de los roles creados
  */
 exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
-    console.log('Creando roles predeterminados para empresa:', idEmpresa);
-    
+        
     // sql ya importado arriba
     
     const rolesPredeterminados = [
@@ -52,11 +51,9 @@ exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
                 `);
 
             rolesCreados.push({ idRol, descripcion: rol.descripcion });
-            console.log(`Rol creado: ${rol.descripcion} (${idRol})`);
-        }
+                    }
 
-        console.log(`✓ ${rolesCreados.length} roles predeterminados creados`);
-        return rolesCreados;
+                return rolesCreados;
 
     } catch (error) {
         console.error('Error creando roles predeterminados:', error);
@@ -71,8 +68,7 @@ exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
  * @returns {Array} Array con los comprobantes creados
  */
 exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
-    console.log('Creando comprobantes predeterminados para empresa:', idEmpresa);
-    
+        
     // sql ya importado arriba
     
     const comprobantesPredeterminados = [
@@ -116,11 +112,9 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
 
             const idComprobante = result.recordset[0].idComprobante;
             comprobantesCreados.push({ idComprobante, ...comp });
-            console.log(`Comprobante creado: ${comp.nombre} - ${comp.serie}`);
-        }
+                    }
 
-        console.log(`✓ ${comprobantesCreados.length} comprobantes predeterminados creados`);
-        return comprobantesCreados;
+                return comprobantesCreados;
 
     } catch (error) {
         console.error('Error creando comprobantes predeterminados:', error);
@@ -136,8 +130,7 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
  * @returns {Object} Sucursal creada
  */
 exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
-    console.log('Creando sucursal principal para empresa:', idEmpresa);
-    const direccionSucursal = datosEmpresa.direccion || 'Sin dirección';
+        const direccionSucursal = datosEmpresa.direccion || 'Sin dirección';
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c0e71'},body:JSON.stringify({sessionId:'3c0e71',location:'empresa.service.crearSucursalPrincipal',message:'direccion used for sucursal',data:{datosEmpresaDireccion:datosEmpresa.direccion,direccionSucursal},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
     // #endregion
@@ -156,8 +149,7 @@ exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
                 VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @telefono, @estado, GETDATE())
             `);
 
-        console.log(`✓ Sucursal principal creada: ${idSucursal}`);
-        return { idSucursal, nombre: 'Sucursal Principal' };
+                return { idSucursal, nombre: 'Sucursal Principal' };
 
     } catch (error) {
         console.error('Error creando sucursal principal:', error);
@@ -174,8 +166,7 @@ exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
  * @returns {Array} Secuencias creadas
  */
 exports.crearSecuenciasIniciales = async (pool, idEmpresa, idSucursal, comprobantes) => {
-    console.log('Creando secuencias iniciales para sucursal:', idSucursal);
-    
+        
     // sql ya importado arriba
     const secuenciasCreadas = [];
 
@@ -193,11 +184,9 @@ exports.crearSecuenciasIniciales = async (pool, idEmpresa, idSucursal, comproban
                 `);
 
             secuenciasCreadas.push({ codigo: comp.codigo, serie: comp.serie });
-            console.log(`Secuencia creada: ${comp.codigo} - ${comp.serie}`);
-        }
+                    }
 
-        console.log(`✓ ${secuenciasCreadas.length} secuencias creadas`);
-        return secuenciasCreadas;
+                return secuenciasCreadas;
 
     } catch (error) {
         console.error('Error creando secuencias:', error);
@@ -212,8 +201,7 @@ exports.crearSecuenciasIniciales = async (pool, idEmpresa, idSucursal, comproban
  * @returns {Array} Ubicaciones creadas
  */
 exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
-    console.log('Creando ubicaciones predeterminadas para sucursal:', idSucursal);
-    
+        
     // sql ya importado arriba
     
     const ubicacionesPredeterminadas = [
@@ -237,11 +225,9 @@ exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
                 `);
 
             ubicacionesCreadas.push(ubi);
-            console.log(`Ubicación creada: ${ubi.codigoUbicacion}`);
-        }
+                    }
 
-        console.log(`✓ ${ubicacionesCreadas.length} ubicaciones predeterminadas creadas`);
-        return ubicacionesCreadas;
+                return ubicacionesCreadas;
 
     } catch (error) {
         console.error('Error creando ubicaciones predeterminadas:', error);
@@ -257,8 +243,7 @@ exports.crearUbicacionesPredeterminadas = async (pool, idSucursal) => {
  * @returns {Array} Listas de precios creadas
  */
 exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) => {
-    console.log('Creando listas de precios predeterminadas para empresa:', idEmpresa);
-    
+        
     // sql ya importado arriba
     
     // Estructura: idLista, idEmpresa, idSucursal, nombre, idMoneda, principal, conIgv, fechaInicio, fechaFin, activo, fCreacion
@@ -288,11 +273,9 @@ exports.crearListasPreciosPredeterminadas = async (pool, idEmpresa, idSucursal) 
 
             const idLista = result.recordset[0]?.idLista;
             listasCreadas.push({ idLista, ...lista });
-            console.log(`Lista de precios creada: ${lista.nombre}`);
-        }
+                    }
 
-        console.log(`✓ ${listasCreadas.length} listas de precios predeterminadas creadas`);
-        return listasCreadas;
+                return listasCreadas;
 
     } catch (error) {
         console.error('Error creando listas de precios predeterminadas:', error);
@@ -458,8 +441,7 @@ exports.crearCorrelativoInicial = async (pool, idEmpresa, numeroInicial = NUMERO
                 VALUES (@idEmpresa, @numero)
             `);
         const row = result.recordset[0];
-        console.log(`✓ Correlativo inicial creado para empresa: numero=${row?.numero}`);
-        return row;
+                return row;
     } catch (error) {
         console.error('Error creando correlativo inicial:', error);
         throw new Error('Error al crear correlativo inicial: ' + error.message);
@@ -474,8 +456,7 @@ exports.crearCorrelativoInicial = async (pool, idEmpresa, numeroInicial = NUMERO
  * @returns {Object} Map descripcion -> idClasificacionConcepto (para enlazar conceptos)
  */
 exports.crearClasificacionesConceptoPredeterminadas = async (pool, idEmpresa) => {
-    console.log('Creando clasificaciones de concepto predeterminadas para empresa:', idEmpresa);
-    const sql = require('mssql');
+        const sql = require('mssql');
     const clasificaciones = [
         'Ventas',
         'Compras',
@@ -499,8 +480,7 @@ exports.crearClasificacionesConceptoPredeterminadas = async (pool, idEmpresa) =>
             const idClasificacionConcepto = result.recordset[0].idClasificacionConcepto;
             mapDescripcionToId[descripcion] = idClasificacionConcepto;
         }
-        console.log('✓', clasificaciones.length, 'clasificaciones de concepto creadas');
-        return mapDescripcionToId;
+                return mapDescripcionToId;
     } catch (error) {
         console.error('Error creando clasificaciones de concepto:', error);
         throw new Error('Error al crear clasificaciones de concepto: ' + error.message);
@@ -534,8 +514,7 @@ async function obtenerMapTiposMovimientoCaja(pool) {
  * @returns {Array} Conceptos creados
  */
 exports.crearConceptosPredeterminados = async (pool, idEmpresa, mapClasificacionDescripcionToId) => {
-    console.log('Creando conceptos predeterminados para empresa:', idEmpresa);
-    const sql = require('mssql');
+        const sql = require('mssql');
     const mapTipoMov = await obtenerMapTiposMovimientoCaja(pool);
     const getTipoId = (nombre) => (nombre && mapTipoMov[nombre.toUpperCase()]) || null;
     const getClasifId = (desc) => (desc && mapClasificacionDescripcionToId[desc]) || null;
@@ -583,8 +562,7 @@ exports.crearConceptosPredeterminados = async (pool, idEmpresa, mapClasificacion
                 `);
             conceptosCreados.push(result.recordset[0]);
         }
-        console.log('✓', conceptosCreados.length, 'conceptos predeterminados creados');
-        return conceptosCreados;
+                return conceptosCreados;
     } catch (error) {
         console.error('Error creando conceptos predeterminados:', error);
         throw new Error('Error al crear conceptos predeterminados: ' + error.message);
@@ -606,8 +584,7 @@ exports.crearConceptosPredeterminados = async (pool, idEmpresa, mapClasificacion
  * @returns {Object} Resumen de datos creados
  */
 exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
-    console.log('🚀 Inicializando datos maestros para empresa:', idEmpresa);
-    
+        
     const resultado = {
         roles: [],
         comprobantes: [],
@@ -713,18 +690,7 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         }
 
 
-        console.log('✅ Inicialización completada:', {
-            roles: resultado.roles.length,
-            comprobantes: resultado.comprobantes.length,
-            secuencias: resultado.secuencias.length,
-            ubicaciones: resultado.ubicaciones.length,
-            listasPrecios: resultado.listasPrecios.length,
-            correlativo: resultado.correlativo ? 'OK' : 'ERROR',
-            clasificacionesConcepto: resultado.clasificacionesConcepto ? Object.keys(resultado.clasificacionesConcepto).length : 0,
-            conceptos: resultado.conceptos.length,
-            errores: resultado.errores.length
-        });
-
+        
         return resultado;
 
     } catch (error) {

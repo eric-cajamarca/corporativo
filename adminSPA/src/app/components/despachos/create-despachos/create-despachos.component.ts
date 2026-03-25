@@ -251,13 +251,11 @@ export class CreateDespachosComponent {
     this._empresaService.getEmpresas_id().subscribe(
       response => {
         this.aliasempresa = response[0].Alias;
-        console.log('this.alias', this.aliasempresa);
-
+        
 
         this._cventaService.obtener_datos_cventas_empresa(this.serieNumero, this.aliasempresa).subscribe(
           response => {
-            console.log('obtener_datos_cventas', response);
-            if (response != undefined) {
+                        if (response != undefined) {
               // Modificar el campo 'password' dentro del responseay 'data'
               response.forEach((item: any) => {
                 this.compVenta.Serie_Numero = item.Serie_Numero;
@@ -280,8 +278,7 @@ export class CreateDespachosComponent {
               });
             }
 
-            console.log('this.compVenta', this.compVenta);
-          }
+                      }
         );
 
         // console.log('this.aliasempresa antes de entrar a obtner_comprobantes_alias', this.aliasempresa);
@@ -330,17 +327,14 @@ export class CreateDespachosComponent {
 
   guardarDatos(miFormulario: any) {
     // console.log('miformulario', miFormulario);
-    console.log('guardo los datos del formulario', this.detalleVenta);
-    // Validar cantidades antes de enviar al backend
+        // Validar cantidades antes de enviar al backend
 
     // Suponiendo que detalleVenta es un array de objetos con las propiedades CantidadIngresar y Cantidad
     for (const item of this.detalleVenta) {
       // console.log('item.cantingresar', item.CantidadIngresar);
-      console.log('item.cantEntregado', item.CantEntregado);
-
+      
       if (item.CantEntregado > item.Cantidad) {
-        console.log('Error:', item.CantEntregado, 'para el registro con Id', item.Descripcion);
-        // Puedes manejar el error aquí según tus necesidades
+                // Puedes manejar el error aquí según tus necesidades
         this.valides = true;
         iziToast.show({
           title: 'ERROR',
@@ -357,8 +351,7 @@ export class CreateDespachosComponent {
     }
 
     if (!this.valides) {
-      console.log('El formulario si es valido');
-      this._dventaService.actualizar_CEntrega_DVentas(this.serieNumero, this.detalleVenta).subscribe(
+            this._dventaService.actualizar_CEntrega_DVentas(this.serieNumero, this.detalleVenta).subscribe(
         response => {
           if (response.data == undefined) {
             iziToast.show({
@@ -411,8 +404,7 @@ export class CreateDespachosComponent {
     }));
 
     // Muestra el objeto resultante en la consola
-    console.log('this.registroCompEnvio', this.registroCompEnvio);
-
+    
     this._despachoService.registro_compEnvio(this.registroCompEnvio).subscribe(
       response => {
         if (response.data == undefined) {

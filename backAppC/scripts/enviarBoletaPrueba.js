@@ -19,8 +19,7 @@ const NUMERO = NUMERO_RAW.replace(/\D/g, "").padStart(8, "0");
 const TIPO_BOLETA = "03";
 
 async function main() {
-  console.log("Enviando a SUNAT boleta:", `${SERIE}-${NUMERO_RAW} (tipo 03)`, USAR_UBL ? "[XML UBL + firma]" : "");
-  let pool;
+    let pool;
   try {
     pool = await sql.connect(dbConfig);
     let comp = await facturacionRepository.obtenerComprobantePorSerieNumeroRepo(
@@ -43,8 +42,7 @@ async function main() {
     }
     const idComprobanteElectronico = comp.idComprobanteElectronico;
     const idEmpresa = comp.idEmpresa;
-    console.log("Comprobante encontrado:", idComprobanteElectronico, "Empresa:", idEmpresa);
-
+    
     const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
     if (!config || !config.rutaCarpetaFacturadorSunat) {
       console.error("Configure la carpeta del Facturador SUNAT en Configuración > Facturación.");
@@ -64,8 +62,7 @@ async function main() {
       opciones
     );
     if (result && result.ok) {
-      console.log("OK:", result.mensaje);
-      console.log("idEstadoSunat:", result.idEstadoSunat, "codigoRespuesta:", result.codigoRespuesta);
+      process.exit(0);
     } else {
       console.error("Error:", result ? result.mensaje : "Sin resultado");
       process.exit(1);

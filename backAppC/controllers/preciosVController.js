@@ -7,8 +7,7 @@ const precioProductoService = require('../services/preciosV.service');
 //crear un registro en PreciosV
 const crearPrecioV = async function (detalle) {
     
-    console.log('detalle en crear preciosV', detalle);
-
+    
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
@@ -32,8 +31,7 @@ const crearPrecioV = async function (detalle) {
 
 //obtener un precio por su id
 const obtenerPrecioV = async function (req, res) {
-    console.log('req.params', req.params.id);
-    const idPrecioV = req.params.id;
+        const idPrecioV = req.params.id;
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
@@ -117,8 +115,7 @@ const actualizarPrecioV = async function (req, res) {
 
 
 const crear_lista_precio = async function (req, res) {
-    console.log('idEmpresa from req.user:', req.body);
-    try {
+        try {
         // Verificar autenticación
         if (!req.user) {
             return res.status(401).send({ 
@@ -139,8 +136,7 @@ const crear_lista_precio = async function (req, res) {
         } = req.body;
 
         const idSucursal = (req.body.idSucursal === 'null' || req.body.idSucursal === '' || req.body.idSucursal === undefined) ? null : req.body.idSucursal;
-        console.log('idEmpresa from req.user:', req.user);
-        
+                
         // Validación básica en el controller
         if (!req.user.empresa || !nombre || !idMoneda) {
             return res.status(400).send({ 
@@ -152,8 +148,7 @@ const crear_lista_precio = async function (req, res) {
         // Crear conexión a la base de datos
         pool = await sql.connect(dbConfig);
         let idEmpresa = req.user.empresa;
-        console.log('Datos recibidos para crear lista de precios:', req.body);
-        // Llamar al service
+                // Llamar al service
         const resultado = await precioProductoService.crearListaPrecio(
             pool,
             { 
@@ -232,8 +227,7 @@ const crear_lista_precio = async function (req, res) {
 
 const editar_lista_precio = async function (req, res) {
 
-    console.log('idEmpresa from req.user:', req.body);
-    try {
+        try {
         if (!req.user) {
             return res.status(401).send({ 
                 message: 'No Access', 
@@ -540,14 +534,11 @@ const desactivar_lista_precio = async function (req, res) {
 // );
 
 const crear_precio_producto = async function (req, res) {
-    console.log('Datos recibidos para crear precio de producto:', req.body);
-    console.log('Usuario autenticado:', req.user);
-    
+            
     if (req.user.rol) {
     
          // Obtener datos del request
-            console.log('entro al trycahs');
-            const precioData = req.body;
+                        const precioData = req.body;
             
             // Crear conexión a la base de datos
             const pool = await sql.connect(dbConfig);
@@ -575,8 +566,7 @@ const crear_precio_producto = async function (req, res) {
 };
 
 const editar_precio_producto = async function (req, res) {
-    console.log('Datos recibidos para editar precio de producto:', req.body);
-    try {
+        try {
         // Verificar autenticación
         if (!req.user) {
             return res.status(401).send({ 

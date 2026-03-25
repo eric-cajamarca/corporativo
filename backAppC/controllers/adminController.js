@@ -28,8 +28,7 @@ const getAdmin = async function (req, res) {
 
     // 4. Llamar al Service
     const usuarios = await usuarioService.getAdmin(pool, req.user.empresa);
-    console.log('usuarios en controller: ', usuarios);
-    // 5. Responder HTTP
+        // 5. Responder HTTP
     res.status(200).send({ data: usuarios });
   } catch (error) {
     console.error('Error al obtener usuarios:', error);
@@ -54,8 +53,7 @@ const getEmpresa_login = async function (req, res) {
 
 
 const createAdmin = async (req, res) => {
-  console.log('createAdmin req.body:', req.body);
-
+  
   try {
     // Validación básica de token
     if (!req.user) {
@@ -103,8 +101,7 @@ const createAdmin = async (req, res) => {
 
 const updateAdmin = async (req, res) => {
   const { id } = req.params;
-  console.log('updateAdmin id:', id);
-
+  
   try {
     // Validación básica de token
     if (!req.user) {
@@ -207,15 +204,12 @@ const obtener_datos_colaborador_admin = async (req, res) => {
     const { id } = req.params;
     let data;
 
-    console.log('obtener_datos_colaborador_admin = id: ', id);
-    console.log('req.params antes de validar el usuario: ', req.user);
-
+        
 
     if (req.user) {
         //quiero validar si el rol del usuario es administrador
         if (req.user.rol == 'Administrador') {
-            console.log('despues de validar el user.rol: ', req.user.rol);
-            try {
+                        try {
 
                 const pool = await sql.connect(dbConfig);
                 const result = await pool
@@ -262,8 +256,7 @@ const obtener_datos_colaborador_admin = async (req, res) => {
 
 
 const cambiar_estado_colaborador_admin = async (req, res) => {
-  console.log('cambiar_estado_colaborador_admin:', req.params);
-
+  
   // Validación básica de autenticación
   if (!req.user) {
     return res.status(403).json({ data: undefined, message: 'NoToken' });
@@ -329,8 +322,7 @@ const admin_login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 1 día
     });
 
-    console.log('✓ Cookie de sesión establecida para:', datosUsuario.email);
-
+    
     // 6. Responder éxito con datos del usuario (sin el token)
     const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
     res.status(200).send({

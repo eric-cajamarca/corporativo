@@ -457,28 +457,24 @@ export class CreateVentasComponent implements OnInit {
     this._comprobanteService.obtenerComprobantesVenta().subscribe(
       (response) => {
         this.comprobantes = response.data;
-        console.log('comprobantes',this.comprobantes);
-      },
+              },
       (error) => {
-        console.log(error);
-      }
+              }
     );
 
     this._tablasSunatService.obtener_moneda().subscribe(
       (response) => {
         this.moneda = response.data;
-        console.log(this.moneda);
-      },
+              },
       (error) => {
-        console.log(error);
-      }
+              }
     );
 
     this._tablasSunatService.obtener_estado_pago().subscribe(
       (response) => {
         this.estadoPago = response.data;
       },
-      (error) => { console.log(error); }
+      (error) => {  }
     );
 
     this._tablasSunatService.obtener_estados_pedidos().subscribe(
@@ -488,7 +484,7 @@ export class CreateVentasComponent implements OnInit {
           this.ventas.idEstadoPedido = this.estadosPedidos[0].idEstadoPedido;
         }
       },
-      (error) => { console.log(error); }
+      (error) => {  }
     );
 
     this._tablasSunatService.obtener_medios_pago().subscribe(
@@ -509,8 +505,7 @@ export class CreateVentasComponent implements OnInit {
       
   
 
-    console.log('documento', this.documento);
-    // this._documentosService.obtener_documento().subscribe(
+        // this._documentosService.obtener_documento().subscribe(
     //   response => {
     //     this.documento = response.data;
     //     console.log('this.documento', this.documento);
@@ -614,8 +609,7 @@ export class CreateVentasComponent implements OnInit {
   }
 
   seleccionaProducto(prod: any): void {
-    console.log('Producto seleccionado:', prod);
-    // 1.  Agrega al carrito
+        // 1.  Agrega al carrito
     this.agregarAlCarrito(prod);
 
     // 2.  Cierra el modal (por JS)
@@ -659,8 +653,7 @@ export class CreateVentasComponent implements OnInit {
   }
 
   agregarAlCarrito(producto: any): void {
-    console.log('Agregando al carrito:', producto);
-    const existe = this.carrito.find(p => p.idProducto === producto.idProducto);
+        const existe = this.carrito.find(p => p.idProducto === producto.idProducto);
     if (existe) {
       existe.cantidad += 1;
     } else {
@@ -669,9 +662,7 @@ export class CreateVentasComponent implements OnInit {
         cantidad: 1
       });
       
-      console.log('Producto agregado al carrito:', this.carrito);
-      console.log('ventas', this.ventas)
-    }
+            }
     this.actualizaTotales();
   }
 
@@ -712,8 +703,7 @@ export class CreateVentasComponent implements OnInit {
       }
 
       this.productoEncontrado = encontrado ?? null;
-      console.log('Producto encontrado por código:', this.productoEncontrado);
-
+      
       if (this.productoEncontrado) {
         // Agregar al carrito usando la función existente
         //this.productoEncontrado.pVenta = this.obtenerPrecioPrincipal(this.productoEncontrado);
@@ -848,9 +838,7 @@ abrirModalPrecios(item: any) {
         if (precioSeleccionado) {
           item.pVenta = precioSeleccionado.precio;
           this.actualizaTotales(); // Recalcula totales si aplica
-          console.log('Precio seleccionado desde el modal:', precioSeleccionado);
-          console.log('Item actualizado con nuevo precio:', item);
-        }
+                            }
       },
       error: () => {
         // Modal cerrado sin selección
@@ -889,8 +877,7 @@ abrirModalPrecios(item: any) {
   }
 
   onInputChangesCompventas() {
-    console.log('Cambios en el formulario de ventas:', this.ventas);
-  }
+      }
 
   limpiarCliente() {}
 
@@ -943,8 +930,7 @@ abrirModalPrecios(item: any) {
             celular: row.celular ?? '',
             condicion: row.condicion ?? 'ACTIVO'
           };
-          console.log('[Ventas] Datos del cliente (desde BD):', { row, cliente: this.cliente });
-          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+                    this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
             next: (dirRes) => {
               if (dirRes.data && dirRes.data[0]) {
                 this.direccionCliente = dirRes.data[0];
@@ -988,8 +974,7 @@ abrirModalPrecios(item: any) {
           condicion: (data.condicion ?? data.estado ?? 'ACTIVO').toString()
         };
         this.clienteBuscando = false;
-        console.log('[Ventas] Datos del cliente (desde API Factiliza):', { data, cliente: this.cliente });
-        iziToast.info({ title: 'Info', message: 'Cliente no registrado. Se creará al registrar la venta.', position: 'topRight' });
+                iziToast.info({ title: 'Info', message: 'Cliente no registrado. Se creará al registrar la venta.', position: 'topRight' });
       },
       error: (err) => {
         this.clienteBuscando = false;

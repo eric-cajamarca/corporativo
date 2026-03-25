@@ -79,8 +79,7 @@ exports.crearPrecioProducto = async (pool, Data, usuarioAutenticado) => {
             throw new Error('NO_ACCESO');
         }
 
-        console.log('Datos recibidos en el service para crear precio producto:', Data);
-        
+                
         // Validar que Data sea un array
         if (!Array.isArray(Data)) {
             throw new Error('LOS_DATOS_DEBEN_SER_UN_ARRAY');
@@ -117,17 +116,14 @@ exports.crearPrecioProducto = async (pool, Data, usuarioAutenticado) => {
 
                 if (precioExistente) {
                     // Actualizar precio existente
-                    console.log(`El precio para el producto ${precioData.idProducto} ya existe. Actualizando...`);
-                    result = await precioProductoRepository.actualizarPrecioProducto(
+                                        result = await precioProductoRepository.actualizarPrecioProducto(
                         pool,
                         precioData
                     );
                     mensaje = 'Precio actualizado';
-                    console.log('Resultado de la actualización del precio en el servicio:', result);
-                } else {
+                                    } else {
                     // Crear nuevo precio
-                    console.log(`El precio para el producto ${precioData.idProducto} no existe. Creando nuevo precio...`);
-                    result = await precioProductoRepository.crearPrecioProducto(
+                                        result = await precioProductoRepository.crearPrecioProducto(
                         pool,
                         precioData
                     );
@@ -579,8 +575,7 @@ exports.desactivarListaPrecio = async (pool, idLista, usuarioAutenticado) => {
         }
         // Verificar si la lista esta activa o desactivada
         if (!lista.activo) {
-            console.log('La lista está activa o desactivada:', lista.activo);
-            if (cantidadUso > 0) {
+                        if (cantidadUso > 0) {
                 result = await precioProductoRepository.activarListaPrecio(pool, idLista);
                 mensaje = 'Lista de precios activada (contiene productos)';
             }
@@ -593,8 +588,7 @@ exports.desactivarListaPrecio = async (pool, idLista, usuarioAutenticado) => {
             };
 
         }else{
-             console.log('La lista está activa, procediendo a desactivarla o eliminarla según su uso.');
-            const cantidadUso = await precioProductoRepository.verificarUsoListaPrecio(pool, idLista);
+                         const cantidadUso = await precioProductoRepository.verificarUsoListaPrecio(pool, idLista);
         
 
             let result;

@@ -72,8 +72,7 @@ export class UpdateProveedorComponent {
     this._adminService.get_Regiones().subscribe(
       response => {
         this.regiones = response;
-        console.log('this.regiones', this.regiones);
-      }
+              }
     );
 
     this._adminService.get_Procincias().subscribe(
@@ -93,8 +92,7 @@ export class UpdateProveedorComponent {
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        console.log('this.documento', this.documento);
-      }
+              }
     );
 
 
@@ -108,8 +106,7 @@ export class UpdateProveedorComponent {
 
         this._proveedorService.obtener_proveedor_id(this.proveedores.idCliente).subscribe(
           response => {
-            console.log('response.data', response.data);
-            if (response.data != undefined) {
+                        if (response.data != undefined) {
 
 
               // Modificar el campo 'password' dentro del array 'data'
@@ -123,8 +120,7 @@ export class UpdateProveedorComponent {
                 this.proveedores.condicion = item.condicion;
                 // this.proveedores.fregistro = item.fregistro;
               });
-              console.log('this.proveedores', this.proveedores);
-            }
+                          }
           }
         );
 
@@ -157,10 +153,7 @@ export class UpdateProveedorComponent {
 
   buscar() {
     this.contBuscar = 1;
-    console.log('veo que cod comprobante', this.proveedores.idDocumento)
-
-    console.log('filtro', this.proveedores.ruc);
-    this.filtro = this.proveedores.ruc;
+        this.filtro = this.proveedores.ruc;
 
     try {
 
@@ -244,8 +237,7 @@ export class UpdateProveedorComponent {
       }, 50);
       this._adminService.get_Regiones().subscribe(
         response => {
-          console.log(response);
-          response.forEach((element: any) => {
+                    response.forEach((element: any) => {
             this.regiones.push({
               id: element.id,
               name: element.name
@@ -290,8 +282,7 @@ export class UpdateProveedorComponent {
             );
           }
         });
-        console.log(this.provincias);
-
+        
 
       }
     );
@@ -313,8 +304,7 @@ export class UpdateProveedorComponent {
             // this.direccion.zip = this.distritos.forEach(element.id);
           }
         });
-        console.log(this.distritos);
-
+        
 
 
       }
@@ -324,8 +314,7 @@ export class UpdateProveedorComponent {
   select_distrito(event: any) {
     const selectedId = event.target.value;
     this.direccionProveedores.ubigeo = selectedId;
-    console.log(this.direccionProveedores.ubigeo);
-  }
+      }
 
 
   private findLocationId(items: any[], name: string, _type: string): string | undefined {
@@ -559,14 +548,11 @@ export class UpdateProveedorComponent {
 
   registrar(registroForm: any) {
 
-    console.log('this.cliientes', this.proveedores);
-    console.log('this.direccionproveedores', this.direccionProveedores);
-
+        
     // if (registroForm.valid) {
     this.btn_registrar = true;
     this.data = this.proveedores;
-    console.log('this.data', this.data);
-    //convertir array this.clientes a un objeto para pasarlo a mi servicio
+        //convertir array this.clientes a un objeto para pasarlo a mi servicio
     //  this.data.forEach((element: { id: string | number; name: any; }) => {
     //   this.data[element.id] = element.id;
     //  });
@@ -577,10 +563,8 @@ export class UpdateProveedorComponent {
         if (response.data != undefined) {
           this._proveedorService.obtener_proveedor_id(this.proveedores.ruc).subscribe(
             response => {
-              console.log('response.data', response.data);
-              this.direccionProveedores.idCliente = response.data[0].idCliente;
-              console.log('this.direccionProveedores con idCliente', this.direccionProveedores);
-              if (response.data != undefined) {
+                            this.direccionProveedores.idCliente = response.data[0].idCliente;
+                            if (response.data != undefined) {
                 // this._clientesService.crear_direccionCliente(this.token, this.direccionClientes).subscribe(
                 //   response => {
                 //     if (response.data != undefined) {
@@ -619,12 +603,10 @@ export class UpdateProveedorComponent {
           });
           this.btn_registrar = false;
         }
-        console.log(response.data);
-        this.btn_registrar = false;
+                this.btn_registrar = false;
       },
       error => {
-        console.log(<any>error);
-        console.error('Error al crear el cliente:', error);
+                console.error('Error al crear el cliente:', error);
         this.btn_registrar = false;
       }
 
@@ -635,20 +617,43 @@ export class UpdateProveedorComponent {
   onCheckboxChange() {
     if (this.mostrarDireccion) {
       this.mostrarDireccion = true;
-      console.log('El checkbox está marcado.', this.mostrarDireccion);
-
+      
       // Realiza acciones cuando el checkbox está marcado
     } else {
       // this.mostrarDireccion = false;
-      console.log('El checkbox está desmarcado.', this.mostrarDireccion);
-
+      
       // Realiza acciones cuando el checkbox está desmarcado
     }
 
   }
 
-  consultar() {
-    this.factilizaSvc.getAnexoByRUC('20512034617')
-      .subscribe(res => console.log(res));
+  /**
+   * Consulta anexo SUNAT vía Factiliza para el RUC del proveedor en edición.
+   * (El RUC fijo anterior era solo prueba; el dato viene de `proveedores` tras cargar el proveedor.)
+   */
+  consultar(): void {
+    const ruc = (this.proveedores?.ruc ?? '').toString().trim();
+    if (!ruc || ruc.length !== 11) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'Aviso',
+          message: 'El proveedor debe tener un RUC de 11 dígitos para consultar el anexo.',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
+    this.factilizaSvc.getAnexoByRUC(ruc).subscribe({
+      next: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'OK', message: 'Consulta de anexo completada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo consultar el anexo.', position: 'topRight' });
+        }
+      }
+    });
   }
 }

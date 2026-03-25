@@ -27,12 +27,7 @@ const getCompVentaById_Empresa = async function (req, res) {
   const aliasempresa = req.params.aliasempresa;
   // var aliasempresa= req.params['aliasempresa'];
 
-console.log('aqui me encuentro dentro de getComooooooo')
-
-  console.log('aliasempresa :', aliasempresa);
-  console.log('req.params', req.params);
-  console.log('Serie_numero :', Serie_Numero);
-
+    
   if (req.user) {
     try {
       let pool = await sql.connect(dbConfig);
@@ -59,10 +54,7 @@ const updateCompVenta = async function (req, res) {
   const { Serie_Numero, Estado, EstadoPedido, EstadoSunat } = req.body;
   // const Serie_Numero = req.params.id;
 
-  console.log('estado', Estado);
-  console.log('Estadopedido', EstadoPedido);
-  console.log('estado sunat', EstadoSunat);
-  if (req.user) {
+        if (req.user) {
 
     try {
       let pool = await sql.connect(dbConfig);

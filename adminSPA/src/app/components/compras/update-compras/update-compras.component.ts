@@ -119,24 +119,19 @@ export class UpdateComprasComponent {
 
     this.loadCompras = true;
     this._route.params.subscribe(params => {
-      console.log('params', params);
-      this.idCompra = params['id'];
-      console.log('this.idCompra', this.idCompra);
-
+            this.idCompra = params['id'];
+      
       //aqui obtengo la compra por id
       this._comprasService.obtener_compras_id(this.idCompra).subscribe(
         response => {
-          console.log('obtener_compras_id', response);
-          if (response.data != undefined) {
+                    if (response.data != undefined) {
             this.compras = response.data[0];
             this.compras_const = JSON.parse(JSON.stringify(response.data[0]));
-            console.log('this.compras', this.compras);
-          }
+                      }
           this.loadCompras = false;
         },
         error => {
-          console.log(error);
-        }
+                  }
       );
 
       this._comprasService.obtener_detalle_compras_idcompra(this.idCompra).subscribe(
@@ -184,62 +179,50 @@ export class UpdateComprasComponent {
     this._comprobanteService.obtenerComprobantesCompra().subscribe(
       response => {
         this.comprobantes = response.data;
-        console.log(this.comprobantes);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
 
     this._tablasSunatService.obtener_moneda().subscribe(
       response => {
         this.moneda = response.data;
-        console.log(this.moneda);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._tablasSunatService.obtener_estado_pago().subscribe(
       response => {
         this.estadoPago = response.data;
-        console.log(this.estadoPago);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._tablasSunatService.obtener_medios_pago().subscribe(
       response => {
         this.mediosPago = response.data;
-        console.log(this.mediosPago);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._categoriaService.obtener_categorias().subscribe(
       response => {
         this.categoria = response.data;
-        console.log('this.categoria', this.categoria);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this._presentacionService.obtener_presentaciones().subscribe(
       response => {
         this.presentacion = response.data;
-        console.log('this.presentacion', this.presentacion);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
    this.cargarSucursales();
@@ -248,11 +231,9 @@ export class UpdateComprasComponent {
       response => {
         this.marcas = response.data;
         this.marcas.sort((a: { nombre: string; }, b: { nombre: any; }) => a.nombre.localeCompare(b.nombre));
-        console.log('this.marcas', this.marcas);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     // this._marcaService.obtenerMarcas().subscribe(
@@ -378,11 +359,9 @@ export class UpdateComprasComponent {
       response => {
         this.correlativo = response.data[0];
 
-        console.log('this.correlativo', this.correlativo);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
   }
 
@@ -414,12 +393,7 @@ export class UpdateComprasComponent {
         if (response.data != undefined) {
           if (this.productos && this.sucursales && this.categoria && this.presentacion && this.stockSucursales) {
             // Realizar operaciones con los arrays
-            console.log('this.productos', this.productos);
-            console.log('this.sucursales', this.sucursales);
-            console.log('this.categoria', this.categoria);
-            console.log('this.presentacion', this.presentacion);
-            console.log('this.stockSucursales', this.stockSucursales);
-
+                                                            
             //quiero buscar en response.data el idProducto y traer todo el objeto del idProducto y agregarlo a this.stockSucursales
 
             this.stockSucursales.forEach((element: any) => {
@@ -450,15 +424,13 @@ export class UpdateComprasComponent {
 
 
           this.stockSucursales_const = this.stockSucursales;
-          console.log('this.stockSucursales', this.stockSucursales);
-        } else {
+                  } else {
           this.stockSucursales = [];
         }
 
       },
       error => {
-        console.log(error);
-      }
+              }
     );
   }
 
@@ -467,11 +439,9 @@ export class UpdateComprasComponent {
     this._sucursalService.obtener_sucursal_idempresa().subscribe(
       response => {
         this.sucursales = response.data;
-        console.log('this.sucursales', this.sucursales);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
   }
 
@@ -481,11 +451,9 @@ export class UpdateComprasComponent {
       response => {
         this.categoria = response.data;
         this.categoria.sort((a: { nombre: string; }, b: { nombre: any; }) => a.nombre.localeCompare(b.nombre));
-        console.log('this.categoria', this.categoria);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
   }
 
@@ -495,28 +463,22 @@ export class UpdateComprasComponent {
       response => {
         this.marcas = response.data;
         this.marcas.sort((a: { nombre: string; }, b: { nombre: any; }) => a.nombre.localeCompare(b.nombre));
-        console.log('this.marcas', this.marcas);
-      },
+              },
       error => {
-        console.log(error);
-      }
+              }
     );
   }
 
   buscar() {
-    console.log('this.filtro', this.filtro);
-    console.log('this.clientes.ruc', this.compras.ruc);
-
+        
     this._proveedoresService.obtener_proveedor_ruc(this.compras.ruc).subscribe(
       response => {
-        console.log('obtener_proveedor_ruc', response);
-        if (response.data && response.data.length > 0) {
+                if (response.data && response.data.length > 0) {
 
           this.proveedores = response.data[0];
           this.compras.idProveedor = this.proveedores.idProveedor;
           this.compras.idDocumento = this.proveedores.idDocumento;
-          console.log("proveedores", this.proveedores);
-        } else {
+                  } else {
           iziToast.show({
             title: 'ERROR',
             titleColor: '#FF0000',
@@ -536,8 +498,7 @@ export class UpdateComprasComponent {
 
   quitar(idx: any, subtotal: any) {
     if (idx >= 0 && idx < this.detalleCompras.length) {
-      console.log('idx', idx);
-      //quiero agregar al objeto this.prodEliminado los idProducto de los productos que se eliminen eliminar
+            //quiero agregar al objeto this.prodEliminado los idProducto de los productos que se eliminen eliminar
 
       this.detalleCompras.splice(idx, 1);
       this.compras.total = this.compras.total - subtotal;
@@ -550,8 +511,7 @@ export class UpdateComprasComponent {
     if (idx >= 0 && idx < this.stockSucursales.length) {
 
       this.prodSelecionado = this.stockSucursales[idx];
-      console.log('this.prodSelecionado', this.prodSelecionado);
-
+      
       this.nuevoProducto.idProducto = this.prodSelecionado.idProducto;
       this.nuevoProducto.codigo = this.prodSelecionado.producto.Codigo;
       this.nuevoProducto.descripcion = this.prodSelecionado.producto.descripcion;
@@ -577,8 +537,7 @@ export class UpdateComprasComponent {
 
 
 
-    console.log('this.nuevoProducto', this.nuevoProducto);
-
+    
   }
 
 
@@ -694,31 +653,23 @@ export class UpdateComprasComponent {
   }
 
   onselectMarca(selectedValue: any) {
-    console.log('selectedValue', selectedValue);
-    const selectedObject = this.marcas.find((item: any) => item.idMarca == selectedValue);
+        const selectedObject = this.marcas.find((item: any) => item.idMarca == selectedValue);
     this.nuevoProducto.marca = selectedObject;
-    console.log('selectedObject', selectedObject);
-    console.log('this.nuevoProducto', this.nuevoProducto);
-  }
+          }
 
   onInputChangesCompCompras() {
     this.compras.compCompra = this.compras.serie + '-' + this.compras.numero;
-    console.log('ejecuto una funcion onInputChangesCompCompras');
-    console.log('this.compras.compCompra', this.compras.compCompra);
-    console.log('this.compras.idProveedor', this.compras.idProveedor);
-
+            
     let idProveedor = {};
     idProveedor = this.compras.idProveedor;
 
     this._comprasService.buscar_comprobante_idCliente(idProveedor).subscribe(
       response => {
         if (response.data != undefined) {
-          console.log('response.data', response.data);
-
+          
           //quiero buscar this.compras.compCompra en response.data y si existe mostrar un mensaje que el comprobante ya existe
           const selectedObject = response.data.find((item: any) => item.compCompra == this.compras.compCompra);
-          console.log('selectedObject', selectedObject);
-          if (selectedObject) {
+                    if (selectedObject) {
             iziToast.show({
               title: 'ERROR',
               titleColor: '#FF0000',
@@ -735,8 +686,7 @@ export class UpdateComprasComponent {
         }
       },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     this.updatecompra++;
@@ -753,9 +703,7 @@ export class UpdateComprasComponent {
       const selectedObject = this.presentacion.find((item: any) => item.idPresentacion == idPresentacion);
       this.nuevoProducto.presentacion = selectedObject;
       // Ahora, selectedObject contiene toda la información del elemento seleccionado
-      console.log('selectedObject', selectedObject);
-      console.log('this.nuevoProducto', this.nuevoProducto);
-    } else {
+                } else {
       console.error("Valor inválido para idPresentacion");
     }
 
@@ -767,9 +715,7 @@ export class UpdateComprasComponent {
     const selectedObject = this.categoria.find((item: any) => item.idCategoria == numericValue);
     this.nuevoProducto.categoria = selectedObject;
     // Ahora, selectedObject contiene toda la información del elemento seleccionado
-    console.log('selectedObject', selectedObject);
-    console.log('this.nuevoProducto', this.nuevoProducto);
-
+        
   }
 
   onSelectSucursal(selectedValue: any) {
@@ -782,9 +728,7 @@ export class UpdateComprasComponent {
       const selectedObject = this.sucursales.find((item: any) => item.idSucursal == numericValue);
       this.nuevoProducto.sucursal = selectedObject;
       // Ahora, selectedObject contiene toda la información del elemento seleccionado
-      console.log('selectedObject', selectedObject);
-      console.log('this.nuevoProducto', this.nuevoProducto);
-    } else {
+                } else {
       console.error("Valor inválido para idSucursal");
     }
 
@@ -794,18 +738,15 @@ export class UpdateComprasComponent {
   onCheckboxChange() {
     if (this.nuevoProducto.useCorrelativo) {
 
-      console.log('El checkbox está marcado.', this.nuevoProducto.useCorrelativo);
-
+      
       // Realiza acciones cuando el checkbox está marcado
 
       this.nuevoProducto.codigo = this.correlativo.numero;
       this.nuevoProducto.idProducto = undefined;
 
-      console.log('this.nuevoProducto', this.nuevoProducto);
-
+      
     } else {
-      console.log('El checkbox está desmarcado.', this.nuevoProducto.useCorrelativo);
-      // Realiza acciones cuando el checkbox NO está marcado
+            // Realiza acciones cuando el checkbox NO está marcado
       this.nuevoProducto.codigo = '';
     }
 
@@ -823,15 +764,12 @@ export class UpdateComprasComponent {
 
   crearNuevoProductoModal() {
 
-    console.log('this.nuevoProducto', this.nuevoProducto);
-    this._productoService.crearProducto(this.nuevoProducto).subscribe(
+        this._productoService.crearProducto(this.nuevoProducto).subscribe(
       response => {
-        console.log('response', response);
-        if (response.data) {
+                if (response.data) {
           // this.productos.push(response.data);
           //this.productos = response.data;
-          console.log('this.productos', response.data);
-          this.nuevoProducto.idProducto = response.data;
+                    this.nuevoProducto.idProducto = response.data;
           this.obtenerProductos();
 
           // Crear lote (stock) con idSucursal, idProducto, cantidad, costoUnitario
@@ -846,8 +784,7 @@ export class UpdateComprasComponent {
             stockSucursal['idLote'] = this.nuevoProducto.idLote;
           }
 
-          console.log('stockSucursal antes de enviar a backend', stockSucursal);
-          this._sucursalService.crear_stock_sucursal_idEmpresa(stockSucursal).subscribe(
+                    this._sucursalService.crear_stock_sucursal_idEmpresa(stockSucursal).subscribe(
             response => {
               if (response.data) {
                 iziToast.show({
@@ -861,10 +798,7 @@ export class UpdateComprasComponent {
 
                 this.productoCreado = true;
                 // this.obtenerProductos();
-                console.log('this.productoCreado', this.productoCreado);
-                console.log('this.productos', this.productos);
-                console.log('this.nuevoProducto', this.nuevoProducto);
-
+                                                
                 this.obtenerStockSucursal();
                 this.obtenerCorrelativo();  // Actualizar correlativo
                 //aqui quiero desmarcar el checkbox
@@ -873,8 +807,7 @@ export class UpdateComprasComponent {
               }
             },
             error => {
-              console.log(error);
-            }
+                          }
           );
 
 
@@ -884,15 +817,12 @@ export class UpdateComprasComponent {
 
             this._comprasService.editar_correlativos_empresa(this.correlativo.idCorrelativo,this.correlativo).subscribe(
               response => {
-                console.log('response', response);
-                if (response.data) {
-                  console.log('correlativo actualizado correctamente');
-                  this.obtenerCorrelativo();
+                                if (response.data) {
+                                    this.obtenerCorrelativo();
                 }
               },
               error => {
-                console.log(error);
-              }
+                              }
             );
           } else {
             console.error("correlativo o correlativo.numero es undefined");
@@ -902,8 +832,7 @@ export class UpdateComprasComponent {
         }
       },
       error => {
-        console.log(error);
-      }
+              }
     );
 
     
@@ -992,8 +921,7 @@ export class UpdateComprasComponent {
   agregarProductoNuevo() {
 
     this.productoCreado = false;
-    console.log('this.nuevoProducto inicial', this.nuevoProducto);
-
+    
     // Verificar si los campos necesarios están presentes y no vacíos
     if (!this.nuevoProducto.idPresentacion || !this.nuevoProducto.idCategoria || !this.nuevoProducto.idSucursal) {
       iziToast.show({
@@ -1021,16 +949,13 @@ export class UpdateComprasComponent {
       let subTotal = this.nuevoProducto.cantidad * this.nuevoProducto.pUnitario;
       this.nuevoProducto.subtotal = subTotal;
     } else {
-      console.log('Error: cantidad o pUnitario no son números válidos', this.nuevoProducto.cantidad, this.nuevoProducto.pUnitario);
-      return;
+            return;
     }
 
-    console.log('this.nuevoProducto con subtotal', this.nuevoProducto);
-
+    
     // Agregar nuevoProducto a detalleCompras
     this.detalleCompras.push({ ...this.nuevoProducto });
-    console.log('Producto agregado: ', this.nuevoProducto);
-    this.llenarDetalleCompras();
+        this.llenarDetalleCompras();
 
     //quiero buscar en detalleCompras el idProducto de this.nuevoProducto y asignar a this.detalleCompras.subtotal = this.nuevoProducto.subtotal
     //  this.detalleCompras.forEach((element: any) => {
@@ -1049,8 +974,7 @@ export class UpdateComprasComponent {
     this.sumarDetalleCompras();
     this.sumarFooterFactura();
 
-    console.log('this.detalleCompras despues de agregar el producto nuevo', this.detalleCompras);
-    this.updateDetalleCompra++;
+        this.updateDetalleCompra++;
   }
 
 
@@ -1140,8 +1064,7 @@ export class UpdateComprasComponent {
 
     const comprasCambiadas = !this.sonIguales(this.compras, this.compras_const);
     const detalleCambiado = !this.sonIguales(this.detalleCompras, this.detalleCompras_const);
-    console.log('comprasCambiadas', comprasCambiadas);
-    if (comprasCambiadas) {
+        if (comprasCambiadas) {
       const payloadCompra = {
         compCompra: this.compras.compCompra,
         serie: this.compras.serie,
@@ -1230,20 +1153,17 @@ export class UpdateComprasComponent {
       }
     });
     
-    console.log('idDetalleCompraEliminado', idDetalleCompraEliminado);
-  }
+      }
 
 
   agregarNuevaCategoria() {
-    console.log('agregarNuevaCategoria', this.categoria);
-    //this._router.navigate(['/categorias/create']);
+        //this._router.navigate(['/categorias/create']);
     window.open('/categorias/create', '_blank');
 
   }
 
   agregarNuevaMarca() {
-    console.log('agregarNuevaMarca', this.marcas);
-    window.open('/marcas/create', '_blank');
+        window.open('/marcas/create', '_blank');
   }
 
 
@@ -1263,8 +1183,7 @@ export class UpdateComprasComponent {
   //quiero multiplicar el precio unitario por la cantidad y mostrar el resultado en el subtotal de this.nuevoProducto
   actualizarSubtotalNuevoProducto() {
     this.nuevoProducto.subtotal = parseFloat((Number(this.nuevoProducto.cantidad) * this.nuevoProducto.pUnitario).toFixed(2));
-    console.log('actualizarSubtotalNuevoProducto this.nuevoProducto', this.nuevoProducto);
-  }
+      }
 
   onSelectPUnitario(selectedValue: any) {
     this.nuevoProducto.subtotal = parseFloat((Number(this.nuevoProducto.cantidad) * this.nuevoProducto.pUnitario).toFixed(2));
