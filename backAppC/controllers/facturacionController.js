@@ -49,7 +49,9 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       envioAutomatico,
       minutosEnvioAutomatico,
       envioPorLotes,
-      programacionEnvioLotes
+      programacionEnvioLotes,
+      modoEnvioSunat,
+      horaEnvioSunat
     } = req.body;
 
     const pool = await sql.connect(dbConfig);
@@ -75,7 +77,9 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       envioAutomatico,
       minutosEnvioAutomatico,
       envioPorLotes,
-      programacionEnvioLotes
+      programacionEnvioLotes,
+      modoEnvioSunat,
+      horaEnvioSunat
     });
 
     res.status(200).send({
@@ -392,7 +396,7 @@ const enviarLoteSunat = async (req, res) => {
   // #endregion
   try {
     const pool = await sql.connect(dbConfig);
-    const result = await FacturacionServices.enviarLotePendientesService(pool, req.user.empresa);
+    const result = await FacturacionServices.enviarLotePendientesService(pool, req.user.empresa, { manual: true });
     // #region agent log
     const loteResult = { enviados: result?.enviados, errores: result?.errores, total: result?.total, mensaje: result?.mensaje };
     console.error("[SUNAT] enviarLoteSunat: result", loteResult);

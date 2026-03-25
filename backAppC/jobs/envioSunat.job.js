@@ -8,7 +8,7 @@ const dbConfig = require("../dbconfig");
 const FacturacionServices = require("../services/facturacion.service");
 const debugSunatLog = require("../utils/debugSunatLog.util");
 
-const INTERVALO_MS = 10 * 60 * 1000; // 10 minutos
+const INTERVALO_MS = 60 * 1000; // 1 minuto (modo 2: ventana N min; modo 3: disparo por hora Lima)
 
 let intervaloId = null;
 
@@ -40,7 +40,7 @@ async function ejecutarEnvio() {
 function iniciar() {
   if (intervaloId) return;
   intervaloId = setInterval(ejecutarEnvio, INTERVALO_MS);
-  console.error("Job envío automático SUNAT: iniciado (cada 10 min)");
+  console.error("Job envío automático SUNAT: iniciado (cada 1 min)");
 }
 
 function detener() {

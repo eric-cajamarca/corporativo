@@ -4,6 +4,7 @@ const path = require("path");
 const ventasRepository = require("../repositories/ventas.repository");
 const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
 const debugSunatLog = require("../utils/debugSunatLog.util");
+const { formatearHoraEnvioParaInput } = require("../utils/limaSunat.util");
 const { escribirArchivosPlanos, escribirXmlFirma, nombreArchivoComprobante } = require("../utils/facturadorSunat.util");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
 const archivoPlanoFacturador = require("../services/archivoPlanoFacturador.service");
@@ -39,6 +40,9 @@ exports.obtenerConfiguracionFacturacionRepo = async (pool, idEmpresa) => {
         c.envioPorLotes,
         c.programacionEnvioLotes,
         c.envioDirectoSunat,
+        ISNULL(c.modoEnvioSunat, 2) AS modoEnvioSunat,
+        c.horaEnvioSunat,
+        c.fechaUltimaOlaEnvioProgramado,
         ISNULL(c.useResumenDiarioBoletas, 0) AS useResumenDiarioBoletas,
         ISNULL(c.usaGuiasElectronicas, 0) AS usaGuiasElectronicas,
         c.urlBaseApiGuias,
@@ -58,6 +62,10 @@ exports.obtenerConfiguracionFacturacionRepo = async (pool, idEmpresa) => {
     row.envioDirectoSunat = row.envioDirectoSunat === true || row.envioDirectoSunat === 1 || String(row.envioDirectoSunat || "").trim() === "1";
     row.useResumenDiarioBoletas = Boolean(row.useResumenDiarioBoletas);
     row.usaGuiasElectronicas = Boolean(row.usaGuiasElectronicas);
+    row.modoEnvioSunat = Number(row.modoEnvioSunat) || 2;
+    if (row.horaEnvioSunat != null) {
+      row.horaEnvioSunat = formatearHoraEnvioParaInput(row.horaEnvioSunat);
+    }
   }
   return row;
 };
@@ -181,6 +189,8 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("minutosEnvioAutomatico", sql.Int, datos.minutosEnvioAutomatico ?? 10)
       .input("envioPorLotes", sql.Bit, datos.envioPorLotes !== undefined ? datos.envioPorLotes : 0)
       .input("programacionEnvioLotes", sql.VarChar, datos.programacionEnvioLotes || null)
+      .input("modoEnvioSunat", sql.TinyInt, datos.modoEnvioSunat !== undefined && datos.modoEnvioSunat !== null ? Number(datos.modoEnvioSunat) : 2)
+      .input("horaEnvioSunat", sql.VarChar(8), datos.horaEnvioSunat && String(datos.horaEnvioSunat).trim() ? String(datos.horaEnvioSunat).trim().slice(0, 8) : null)
       .input("useResumenDiarioBoletas", sql.Bit, datos.useResumenDiarioBoletas !== undefined ? datos.useResumenDiarioBoletas : 0)
       .input("usaGuiasElectronicas", sql.Bit, datos.usaGuiasElectronicas !== undefined ? datos.usaGuiasElectronicas : 0)
       .input("urlBaseApiGuias", sql.VarChar, datos.urlBaseApiGuias || null)
@@ -205,6 +215,8 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
             minutosEnvioAutomatico = @minutosEnvioAutomatico,
             envioPorLotes = @envioPorLotes,
             programacionEnvioLotes = @programacionEnvioLotes,
+            modoEnvioSunat = @modoEnvioSunat,
+            horaEnvioSunat = CASE WHEN @horaEnvioSunat IS NULL OR LTRIM(RTRIM(@horaEnvioSunat)) = '' THEN NULL ELSE CAST(@horaEnvioSunat AS TIME) END,
             useResumenDiarioBoletas = @useResumenDiarioBoletas,
             usaGuiasElectronicas = @usaGuiasElectronicas,
             urlBaseApiGuias = @urlBaseApiGuias,
@@ -253,6 +265,8 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("minutosEnvioAutomatico", sql.Int, datos.minutosEnvioAutomatico ?? 10)
       .input("envioPorLotes", sql.Bit, datos.envioPorLotes !== undefined ? datos.envioPorLotes : 0)
       .input("programacionEnvioLotes", sql.VarChar, datos.programacionEnvioLotes || null)
+      .input("modoEnvioSunat", sql.TinyInt, datos.modoEnvioSunat !== undefined && datos.modoEnvioSunat !== null ? Number(datos.modoEnvioSunat) : 2)
+      .input("horaEnvioSunat", sql.VarChar(8), datos.horaEnvioSunat && String(datos.horaEnvioSunat).trim() ? String(datos.horaEnvioSunat).trim().slice(0, 8) : null)
       .input("useResumenDiarioBoletas", sql.Bit, datos.useResumenDiarioBoletas !== undefined ? datos.useResumenDiarioBoletas : 0)
       .input("usaGuiasElectronicas", sql.Bit, datos.usaGuiasElectronicas !== undefined ? datos.usaGuiasElectronicas : 0)
       .input("urlBaseApiGuias", sql.VarChar, datos.urlBaseApiGuias || null)
@@ -263,13 +277,15 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
           idEmpresa, certificadoDigital, claveCertificado, usuarioSunat,
           claveSunat, modoPrueba, serieFactura, serieBoleta,
           serieNotaCredito, serieNotaDebito, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
-          urlEnvio, envioDirectoSunat, envioAutomatico, minutosEnvioAutomatico, envioPorLotes, programacionEnvioLotes, useResumenDiarioBoletas, usaGuiasElectronicas,
+          urlEnvio, envioDirectoSunat, envioAutomatico, minutosEnvioAutomatico, envioPorLotes, programacionEnvioLotes,
+          modoEnvioSunat, horaEnvioSunat, useResumenDiarioBoletas, usaGuiasElectronicas,
           urlBaseApiGuias, idApiGuias, claveApiGuias
         ) VALUES (
           @idEmpresa, @certificadoDigital, @claveCertificado, @usuarioSunat,
           @claveSunat, @modoPrueba, @serieFactura, @serieBoleta,
           @serieNotaCredito, @serieNotaDebito, @rutaCarpetaFacturadorSunat, @urlFacturadorSunat,
-          @urlEnvio, @envioDirectoSunat, @envioAutomatico, @minutosEnvioAutomatico, @envioPorLotes, @programacionEnvioLotes, @useResumenDiarioBoletas, @usaGuiasElectronicas,
+          @urlEnvio, @envioDirectoSunat, @envioAutomatico, @minutosEnvioAutomatico, @envioPorLotes, @programacionEnvioLotes,
+          @modoEnvioSunat, CASE WHEN @horaEnvioSunat IS NULL OR LTRIM(RTRIM(@horaEnvioSunat)) = '' THEN NULL ELSE CAST(@horaEnvioSunat AS TIME) END, @useResumenDiarioBoletas, @usaGuiasElectronicas,
           @urlBaseApiGuias, @idApiGuias, @claveApiGuias
         )
       `);
@@ -278,14 +294,17 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
   return { mensaje: "Configuración actualizada exitosamente" };
 };
 
-/** Lista empresas con envío automático activo (Facturador o envío directo configurado). */
+/** Empresas con job programado: modos 2 o 3, envío automático ON y Facturador o envío directo válido. */
 exports.listarEmpresasConEnvioAutomaticoRepo = async (pool) => {
   try {
     const result = await pool.request().query(`
       SELECT idEmpresa, minutosEnvioAutomatico, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
-             urlEnvio, usuarioSunat, claveSunat, ISNULL(envioDirectoSunat, 0) AS envioDirectoSunat
+             urlEnvio, usuarioSunat, claveSunat, ISNULL(envioDirectoSunat, 0) AS envioDirectoSunat,
+             ISNULL(modoEnvioSunat, 2) AS modoEnvioSunat, horaEnvioSunat, fechaUltimaOlaEnvioProgramado,
+             ISNULL(useResumenDiarioBoletas, 0) AS useResumenDiarioBoletas
       FROM ConfiguracionFacturacionElectronica
       WHERE envioAutomatico = 1
+        AND ISNULL(modoEnvioSunat, 2) IN (2, 3)
         AND (
           (rutaCarpetaFacturadorSunat IS NOT NULL AND LTRIM(RTRIM(rutaCarpetaFacturadorSunat)) <> '')
           OR (ISNULL(envioDirectoSunat, 0) = 1 AND urlEnvio IS NOT NULL AND LTRIM(RTRIM(urlEnvio)) <> '' AND usuarioSunat IS NOT NULL AND claveSunat IS NOT NULL)
@@ -294,12 +313,86 @@ exports.listarEmpresasConEnvioAutomaticoRepo = async (pool) => {
     return result.recordset || [];
   } catch (_) {
     const result = await pool.request().query(`
-      SELECT idEmpresa, minutosEnvioAutomatico, rutaCarpetaFacturadorSunat, urlFacturadorSunat
+      SELECT idEmpresa, minutosEnvioAutomatico, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
+             NULL AS modoEnvioSunat, NULL AS horaEnvioSunat, NULL AS fechaUltimaOlaEnvioProgramado, 0 AS useResumenDiarioBoletas
       FROM ConfiguracionFacturacionElectronica
       WHERE envioAutomatico = 1 AND rutaCarpetaFacturadorSunat IS NOT NULL AND LTRIM(RTRIM(rutaCarpetaFacturadorSunat)) <> ''
     `);
     return result.recordset || [];
   }
+};
+
+exports.actualizarFechaUltimaOlaEnvioProgramadoRepo = async (pool, idEmpresa, fechaYmdLima) => {
+  const d = String(fechaYmdLima || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+  await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("fecha", sql.Date, d)
+    .query(`
+      UPDATE ConfiguracionFacturacionElectronica
+      SET fechaUltimaOlaEnvioProgramado = @fecha
+      WHERE idEmpresa = @idEmpresa
+    `);
+};
+
+/** Tras confirmar cobro: marca pago y ventana de envío (modo 2). Modo 3 solo marca pago. */
+exports.marcarPagoComprobantesElectronicosPorVentaRepo = async (pool, idVenta, idEmpresa, opts = {}) => {
+  const modo = Number(opts.modoEnvioSunat) || 2;
+  const minutos = Math.max(1, Number(opts.minutosEspera) || 10);
+  if (modo === 2) {
+    await pool
+      .request()
+      .input("idVenta", sql.Int, idVenta)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("minutos", sql.Int, minutos)
+      .query(`
+        UPDATE ComprobantesElectronicos
+        SET fechaConfirmacionPago = SYSUTCDATETIME(),
+            fechaElegibleEnvio = DATEADD(MINUTE, @minutos, SYSUTCDATETIME())
+        WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
+      `);
+    return;
+  }
+  if (modo === 3) {
+    await pool
+      .request()
+      .input("idVenta", sql.Int, idVenta)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        UPDATE ComprobantesElectronicos
+        SET fechaConfirmacionPago = SYSUTCDATETIME(),
+            fechaElegibleEnvio = NULL
+        WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
+      `);
+    return;
+  }
+};
+
+exports.listarIdsComprobantePendientePorVentaRepo = async (pool, idVenta, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input("idVenta", sql.Int, idVenta)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idComprobanteElectronico FROM ComprobantesElectronicos
+      WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
+    `);
+  return (r.recordset || []).map((row) => row.idComprobanteElectronico);
+};
+
+exports.registrarFalloIntentoEnvioRepo = async (pool, idComprobanteElectronico, idEmpresa) => {
+  await pool
+    .request()
+    .input("id", sql.UniqueIdentifier, idComprobanteElectronico)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      UPDATE ComprobantesElectronicos
+      SET intentosEnvio = ISNULL(intentosEnvio, 0) + 1,
+          fechaUltimoIntentoEnvio = SYSUTCDATETIME(),
+          fechaProximoReintento = DATEADD(MINUTE, 15, SYSUTCDATETIME())
+      WHERE idComprobanteElectronico = @id AND idEmpresa = @idEmpresa AND idEstadoSunat = 7
+    `);
 };
 
 exports.validarVentaEmpresaRepo = async (pool, idVenta, idEmpresa) => {
@@ -850,10 +943,24 @@ exports.obtenerXmlComprobanteRepo = async (pool, idComprobanteElectronico, idEmp
 };
 
 /** Lista comprobantes pendientes de envío (idEstadoSunat = 7) por empresa, para envío automático o por lotes.
- * @param {object} opciones - { excluirBoletas: boolean } Si true, solo devuelve facturas (01); boletas se envían por resumen diario.
+ * @param {object} opciones - { excluirBoletas: boolean, filtroProgramacion: null|'modo2'|'modo3' }
+ * filtroProgramacion null = manual / compatibilidad (solo pendiente).
+ * modo2 = cobro confirmado y fechaElegibleEnvio vencida.
+ * modo3 = cobro confirmado (envío en hora fija por job).
  */
 exports.listarPendientesEnvioRepo = async (pool, idEmpresa, limite = 500, opciones = {}) => {
   const excluirBoletas = opciones.excluirBoletas === true;
+  const filtro = opciones.filtroProgramacion || null;
+  let extra = "";
+  if (filtro === "modo2") {
+    extra = ` AND ce.fechaElegibleEnvio IS NOT NULL AND ce.fechaElegibleEnvio <= SYSUTCDATETIME()
+      AND (ce.fechaProximoReintento IS NULL OR ce.fechaProximoReintento <= SYSUTCDATETIME())
+      AND ISNULL(ce.intentosEnvio, 0) < ISNULL(ce.maxIntentosEnvio, 10) `;
+  } else if (filtro === "modo3") {
+    extra = ` AND ce.fechaConfirmacionPago IS NOT NULL
+      AND (ce.fechaProximoReintento IS NULL OR ce.fechaProximoReintento <= SYSUTCDATETIME())
+      AND ISNULL(ce.intentosEnvio, 0) < ISNULL(ce.maxIntentosEnvio, 10) `;
+  }
   const result = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
@@ -865,6 +972,7 @@ exports.listarPendientesEnvioRepo = async (pool, idEmpresa, limite = 500, opcion
       INNER JOIN Empresas e ON e.idEmpresa = ce.idEmpresa
       WHERE ce.idEmpresa = @idEmpresa AND ce.idEstadoSunat = 7
       ${excluirBoletas ? "AND ce.tipoComprobante = '01'" : ""}
+      ${extra}
       ORDER BY ce.fechaEmision ASC
     `);
   return result.recordset;

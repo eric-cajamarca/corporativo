@@ -64,7 +64,9 @@ export class IndexConfiguracionComponent implements OnInit {
     urlEnvio: '' as string,
     usuarioSunat: '' as string,
     claveSunat: '' as string,
-    rucEmpresa: '' as string
+    rucEmpresa: '' as string,
+    modoEnvioSunat: 2,
+    horaEnvioSunat: '09:00' as string
   };
   public facturacionGuardando = false;
   public enviandoLote = false;
@@ -284,10 +286,38 @@ export class IndexConfiguracionComponent implements OnInit {
           this.facturacion.usuarioSunat = c.usuarioSunat ?? '';
           this.facturacion.claveSunat = ''; // No se devuelve por seguridad; solo se envía al guardar si el usuario la escribe
           this.facturacion.rucEmpresa = c.rucEmpresa ?? '';
+          this.facturacion.modoEnvioSunat = c.modoEnvioSunat != null ? Number(c.modoEnvioSunat) : 2;
+          this.facturacion.horaEnvioSunat = (c.horaEnvioSunat && String(c.horaEnvioSunat).trim()) ? String(c.horaEnvioSunat).trim().slice(0, 5) : '09:00';
         }
       },
       error: () => {}
     });
+  }
+
+  /** Payload común para PUT facturación (evita resetear modo/hora al guardar otra pestaña). */
+  private buildPayloadFacturacionElectronica(): Parameters<FacturacionService['actualizarConfiguracion']>[0] {
+    const hora = (this.facturacion.horaEnvioSunat || '').trim().slice(0, 5);
+    return {
+      serieFactura: this.facturacion.serieFactura,
+      serieBoleta: this.facturacion.serieBoleta,
+      serieNotaCredito: this.facturacion.serieNotaCredito,
+      serieNotaDebito: this.facturacion.serieNotaDebito,
+      rutaCarpetaFacturadorSunat: this.facturacion.rutaCarpetaFacturadorSunat || undefined,
+      urlFacturadorSunat: this.facturacion.urlFacturadorSunat || undefined,
+      urlEnvio: this.facturacion.urlEnvio || undefined,
+      envioDirectoSunat: this.facturacion.envioDirectoSunat,
+      useResumenDiarioBoletas: this.facturacion.useResumenDiarioBoletas,
+      usaGuiasElectronicas: this.facturacion.usaGuiasElectronicas,
+      usuarioSunat: this.facturacion.usuarioSunat || undefined,
+      claveSunat: this.facturacion.claveSunat || undefined,
+      envioAutomatico: this.facturacion.envioAutomatico,
+      minutosEnvioAutomatico: this.facturacion.minutosEnvioAutomatico,
+      envioPorLotes: this.facturacion.envioPorLotes,
+      programacionEnvioLotes: this.facturacion.programacionEnvioLotes || undefined,
+      modoPrueba: this.facturacion.modoPrueba,
+      modoEnvioSunat: this.facturacion.modoEnvioSunat,
+      horaEnvioSunat: hora ? `${hora}:00`.slice(0, 8) : null
+    };
   }
 
   onCertificadoArchivoChange(event: Event): void {
@@ -330,25 +360,7 @@ export class IndexConfiguracionComponent implements OnInit {
 
   guardarConfiguracionFacturacion(): void {
     this.facturacionGuardando = true;
-    this._facturacionService.actualizarConfiguracion({
-      serieFactura: this.facturacion.serieFactura,
-      serieBoleta: this.facturacion.serieBoleta,
-      serieNotaCredito: this.facturacion.serieNotaCredito,
-      serieNotaDebito: this.facturacion.serieNotaDebito,
-      rutaCarpetaFacturadorSunat: this.facturacion.rutaCarpetaFacturadorSunat || undefined,
-      urlFacturadorSunat: this.facturacion.urlFacturadorSunat || undefined,
-      urlEnvio: this.facturacion.urlEnvio || undefined,
-      envioDirectoSunat: this.facturacion.envioDirectoSunat,
-      useResumenDiarioBoletas: this.facturacion.useResumenDiarioBoletas,
-      usaGuiasElectronicas: this.facturacion.usaGuiasElectronicas,
-      usuarioSunat: this.facturacion.usuarioSunat || undefined,
-      claveSunat: this.facturacion.claveSunat || undefined,
-      envioAutomatico: this.facturacion.envioAutomatico,
-      minutosEnvioAutomatico: this.facturacion.minutosEnvioAutomatico,
-      envioPorLotes: this.facturacion.envioPorLotes,
-      programacionEnvioLotes: this.facturacion.programacionEnvioLotes || undefined,
-      modoPrueba: this.facturacion.modoPrueba
-    }).subscribe({
+    this._facturacionService.actualizarConfiguracion(this.buildPayloadFacturacionElectronica()).subscribe({
       next: () => {
         this.facturacionGuardando = false;
         if (typeof iziToast !== 'undefined') {
@@ -359,6 +371,24 @@ export class IndexConfiguracionComponent implements OnInit {
         this.facturacionGuardando = false;
         if (typeof iziToast !== 'undefined') {
           iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración de facturación.' });
+        }
+      }
+    });
+  }
+
+  guardarConfiguracionEnvioSunat(): void {
+    this.facturacionGuardando = true;
+    this._facturacionService.actualizarConfiguracion(this.buildPayloadFacturacionElectronica()).subscribe({
+      next: () => {
+        this.facturacionGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Guardado', message: 'Modos de envío SUNAT actualizados.' });
+        }
+      },
+      error: () => {
+        this.facturacionGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración.' });
         }
       }
     });

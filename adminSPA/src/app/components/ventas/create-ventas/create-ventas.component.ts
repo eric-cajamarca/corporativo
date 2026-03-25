@@ -562,6 +562,16 @@ export class CreateVentasComponent implements OnInit {
   private readonly ID_DOC_DNI = '1';
 
   /**
+   * Empresa gestora: el select "Comprobante destino" refleja el código del tipo elegido (01, 03, NV).
+   */
+  private sincronizarTipoComprobanteDestinoDesdeCodigo(codigo: string | undefined | null): void {
+    if (!this.esGestora) return;
+    const c = String(codigo ?? '').trim();
+    const permitidos = new Set(this.comprobantesDestinoOpciones.map((o) => o.codigo));
+    this.tipoComprobanteDestino = permitidos.has(c) ? c : 'NV';
+  }
+
+  /**
    * Consulta el número correlativo en BD al seleccionar el comprobante y asigna serie/número.
    * Ajusta el tipo de documento: Factura (01) = RUC, otros = DNI.
    */
@@ -571,11 +581,18 @@ export class CreateVentasComponent implements OnInit {
       this.ventas.numero = '';
       this.ventas.compVenta = '';
       this.ventas.idComprobante = '';
+      if (this.esGestora) {
+        this.tipoComprobanteDestino = 'NV';
+      }
       this.guardarEstadoProvisional();
       return;
     }
     const id = Number(idComprobante);
     this.ventas.idComprobante = idComprobante as any;
+    const compPrevio = this.comprobantes.find((c: any) => Number(c.idComprobante) === id);
+    if (compPrevio) {
+      this.sincronizarTipoComprobanteDestinoDesdeCodigo(compPrevio.codigo);
+    }
     this._comprobanteService.obtenerComprobantesVenta().subscribe({
       next: (response) => {
         const lista = response.data || [];
@@ -587,10 +604,14 @@ export class CreateVentasComponent implements OnInit {
           this.ventas.numero = String(siguienteNumero).padStart(8, '0');
           this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
           this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
+          this.sincronizarTipoComprobanteDestinoDesdeCodigo(comp.codigo);
         } else {
           this.ventas.serie = '';
           this.ventas.numero = '00000001';
           this.ventas.compVenta = (this.ventas.serie ? this.ventas.serie + '-' : '') + this.ventas.numero;
+          if (this.esGestora) {
+            this.tipoComprobanteDestino = 'NV';
+          }
         }
         this.guardarEstadoProvisional();
       },
@@ -602,6 +623,7 @@ export class CreateVentasComponent implements OnInit {
           this.ventas.numero = String(siguienteNumero).padStart(8, '0');
           this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
           this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
+          this.sincronizarTipoComprobanteDestinoDesdeCodigo(comp.codigo);
         }
         this.guardarEstadoProvisional();
       }

@@ -57,6 +57,10 @@ export class FacturacionService {
     minutosEnvioAutomatico?: number;
     envioPorLotes?: boolean;
     programacionEnvioLotes?: string;
+    /** 1 inmediato al cobrar, 2 diferido N min, 3 hora fija diaria (Lima) */
+    modoEnvioSunat?: number;
+    /** HH:mm para modo 3 */
+    horaEnvioSunat?: string | null;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'facturacion/configuracion', data, {

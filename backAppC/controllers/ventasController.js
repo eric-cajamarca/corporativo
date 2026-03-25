@@ -8,6 +8,7 @@ const facturacionRepository = require('../repositories/facturacion.repository');
 const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const sunatPostPagoService = require('../services/sunatPostPago.service');
 
 /** Empresa JWT + gestionadas (gestora): permite PDF/comprobante de ventas de empresas hijas. */
 const idsEmpresaParaComprobanteVenta = async (pool, idEmpresaUsuario) => {
@@ -721,6 +722,9 @@ const postCobrarVentaAgrupada = async (req, res) => {
       });
 
       await transaction.commit();
+      for (const ve of ventasEmp) {
+        sunatPostPagoService.encolarTrasConfirmarPago(pool, ve.idVenta, ve.idEmpresa);
+      }
       res.json({ message: 'Cobro registrado correctamente' });
     } catch (err) {
       await transaction.rollback();
@@ -810,6 +814,7 @@ const postCobrarVenta = async (req, res) => {
         });
       }
       await transaction.commit();
+      sunatPostPagoService.encolarTrasConfirmarPago(pool, idVenta, req.user.empresa);
       res.json({ message: 'Cobro registrado correctamente' });
     } catch (err) {
       await transaction.rollback();

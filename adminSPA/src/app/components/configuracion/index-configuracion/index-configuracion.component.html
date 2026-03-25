@@ -44,6 +44,9 @@
           <button class="nav-link" id="nav-facturacion-tab" data-bs-toggle="tab" data-bs-target="#nav-facturacion" type="button" role="tab" aria-controls="nav-facturacion" aria-selected="false">
             <i class="fas fa-file-invoice-dollar me-2"></i>Facturación
           </button>
+          <button class="nav-link" id="nav-envio-sunat-tab" data-bs-toggle="tab" data-bs-target="#nav-envio-sunat" type="button" role="tab" aria-controls="nav-envio-sunat" aria-selected="false">
+            <i class="fas fa-paper-plane me-2"></i>Envío SUNAT
+          </button>
           <button class="nav-link" id="nav-impuestos-tab" data-bs-toggle="tab" data-bs-target="#nav-impuestos" type="button" role="tab" aria-controls="nav-impuestos" aria-selected="false" (click)="cargarImpuestos()">
             <i class="fas fa-percent me-2"></i>Impuestos
           </button>
@@ -298,6 +301,47 @@
                   </div>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modos de envío SUNAT (BD + job) -->
+        <div class="tab-pane fade" id="nav-envio-sunat" role="tabpanel" aria-labelledby="nav-envio-sunat-tab">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">Modos de envío a SUNAT</h5>
+            </div>
+            <div class="card-body">
+              <p class="text-muted small mb-3">Zona horaria para el modo 3: <strong>America/Lima</strong>. Los modos 2 y 3 requieren activar el envío automático en segundo plano y tener Facturador o envío directo configurado en la pestaña Facturación.</p>
+              <div class="mb-3">
+                <label class="form-label">Modo de envío</label>
+                <select class="form-select" id="modoEnvioSunat" [(ngModel)]="facturacion.modoEnvioSunat" name="modoEnvioSunat">
+                  <option [ngValue]="1">1 — Inmediato al confirmar el cobro de la venta</option>
+                  <option [ngValue]="2">2 — Automático cada N minutos después del cobro (cola en base de datos)</option>
+                  <option [ngValue]="3">3 — Una vez al día a la hora indicada (después del cobro)</option>
+                </select>
+              </div>
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="envioAutomaticoSunatTab" [(ngModel)]="facturacion.envioAutomatico" name="envioAutomaticoSunatTab">
+                <label class="form-check-label" for="envioAutomaticoSunatTab">Envío automático en segundo plano (necesario para modos 2 y 3)</label>
+              </div>
+              <div class="row g-3 mb-3" *ngIf="facturacion.modoEnvioSunat === 2">
+                <div class="col-md-4">
+                  <label for="minutosEnvioSunatTab" class="form-label">Minutos de espera tras el cobro</label>
+                  <input type="number" class="form-control" id="minutosEnvioSunatTab" [(ngModel)]="facturacion.minutosEnvioAutomatico" name="minutosEnvioSunatTab" min="1" max="1440">
+                  <small class="text-muted">El job revisa cada minuto; los comprobantes se envían cuando cumple la ventana.</small>
+                </div>
+              </div>
+              <div class="row g-3 mb-3" *ngIf="facturacion.modoEnvioSunat === 3">
+                <div class="col-md-4">
+                  <label for="horaEnvioSunat" class="form-label">Hora diaria (Lima)</label>
+                  <input type="time" class="form-control" id="horaEnvioSunat" [(ngModel)]="facturacion.horaEnvioSunat" name="horaEnvioSunat">
+                  <small class="text-muted">Solo una ola por día calendario en Lima; facturas en lote según reglas; boletas según «resumen diario» en Facturación.</small>
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" (click)="guardarConfiguracionEnvioSunat()" [disabled]="facturacionGuardando">
+                <i class="fas fa-save me-2"></i>{{ facturacionGuardando ? 'Guardando...' : 'Guardar modos de envío' }}
+              </button>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ const firmaXmlSunat = require('./firmaXmlSunat.service');
 const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
 const { nombreArchivoComprobante, leerXmlComprobante } = require('../utils/facturadorSunat.util');
 const debugSunatLog = require('../utils/debugSunatLog.util');
+const { ymdLima, minutosDesdeMedianocheLima, parseHoraEnvioSunat } = require('../utils/limaSunat.util');
 
 exports.obtenerConfiguracionFacturacionService = async (pool, user) => {
   if (!user) {
@@ -126,6 +127,12 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
   return result;
 };
 
+/** Envío unitario desde job o post-cobro (sin req HTTP); requiere rol admin en validación interna. */
+exports.enviarComprobanteSunatPorEmpresaService = async (pool, idEmpresa, idComprobanteElectronico, opciones = {}) => {
+  const user = { empresa: idEmpresa, rol: "Administrador" };
+  return exports.enviarComprobanteSunatService(pool, user, idComprobanteElectronico, opciones);
+};
+
 exports.consultarEstadoSunatService = async (pool, user, idComprobanteElectronico) => {
   if (!user) {
     throw new Error("NO_ACCESS");
@@ -240,12 +247,22 @@ exports.obtenerEstadosSunatService = async (pool, user) => {
 
 /**
  * Envía un lote de comprobantes pendientes (idEstadoSunat = 7) de una empresa.
- * Usado por envío automático y por envío por lotes manual.
+ * @param {object} [opts]
+ * @param {boolean} [opts.manual] - true = sin filtro modo2/modo3 (envío manual / botón lote)
+ * @param {null|'modo2'|'modo3'} [opts.filtroProgramacion] - si no es manual, filtra por programación en BD
  */
-exports.enviarLotePendientesService = async (pool, idEmpresa) => {
+exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
+  const manual = opts.manual === true;
+  const filtroProgramacion = manual ? null : opts.filtroProgramacion || null;
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
   // #region agent log
-  const entryData = { idEmpresa, tieneRutaFacturador: !!config?.rutaCarpetaFacturadorSunat, envioDirectoSunat: !!config?.envioDirectoSunat };
+  const entryData = {
+    idEmpresa,
+    manual,
+    filtroProgramacion,
+    tieneRutaFacturador: !!config?.rutaCarpetaFacturadorSunat,
+    envioDirectoSunat: !!config?.envioDirectoSunat
+  };
   console.error("[SUNAT] enviarLotePendientesService: entry", entryData);
   debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:entry", message: "entry", data: entryData });
   // #endregion
@@ -255,7 +272,10 @@ exports.enviarLotePendientesService = async (pool, idEmpresa) => {
   }
 
   const excluirBoletas = config?.useResumenDiarioBoletas === true;
-  const pendientes = await FacturacionRepository.listarPendientesEnvioRepo(pool, idEmpresa, 100, { excluirBoletas });
+  const pendientes = await FacturacionRepository.listarPendientesEnvioRepo(pool, idEmpresa, 100, {
+    excluirBoletas,
+    filtroProgramacion
+  });
   // #region agent log
   const pendData = { count: pendientes.length, idEmpresa };
   console.error("[SUNAT] enviarLotePendientesService: pendientes", pendData);
@@ -281,10 +301,18 @@ exports.enviarLotePendientesService = async (pool, idEmpresa) => {
         }
       );
       if (result?.ok) enviados++;
-      else errores++;
+      else {
+        errores++;
+        await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, ce.idComprobanteElectronico, idEmpresa);
+      }
     } catch (err) {
       console.error("facturacion.service: error enviando comprobante", ce.idComprobanteElectronico, err.message);
       errores++;
+      try {
+        await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, ce.idComprobanteElectronico, idEmpresa);
+      } catch (_) {
+        /* ignore */
+      }
     }
   }
 
@@ -297,20 +325,51 @@ exports.enviarLotePendientesService = async (pool, idEmpresa) => {
 };
 
 /**
- * Ejecuta el envío automático para todas las empresas con envioAutomatico = 1.
- * Llamado por el job en segundo plano.
+ * Ejecuta el envío automático para empresas con envioAutomatico = 1 y modo 2 o 3.
+ * Modo 2: pendientes con fechaElegibleEnvio vencida. Modo 3: una ola diaria desde hora configurada (Lima).
  */
 exports.ejecutarEnvioAutomaticoService = async (pool) => {
   const empresas = await FacturacionRepository.listarEmpresasConEnvioAutomaticoRepo(pool);
   // #region agent log
-  const empData = { count: empresas.length, ids: empresas.map(e => e.idEmpresa) };
+  const empData = { count: empresas.length, ids: empresas.map((e) => e.idEmpresa) };
   console.error("[SUNAT] ejecutarEnvioAutomaticoService: empresas con envío automático", empData);
   debugSunatLog.write({ location: "facturacion.service.ejecutarEnvioAutomaticoService:empresas", message: "empresas", data: empData });
   // #endregion
   const resultados = [];
+  const hoyLima = ymdLima(new Date());
+  const ahoraMin = minutosDesdeMedianocheLima(new Date());
   for (const emp of empresas) {
     try {
-      const res = await exports.enviarLotePendientesService(pool, emp.idEmpresa);
+      const modo = Number(emp.modoEnvioSunat) || 2;
+      let filtroProgramacion = null;
+      let actualizarOla = false;
+
+      if (modo === 2) {
+        filtroProgramacion = "modo2";
+      } else if (modo === 3) {
+        const { horas, minutos } = parseHoraEnvioSunat(emp.horaEnvioSunat);
+        const configMin = horas * 60 + minutos;
+        const ultima = emp.fechaUltimaOlaEnvioProgramado;
+        const ultimaYmd = ultima != null ? ymdLima(ultima) : null;
+        if (ultimaYmd === hoyLima) {
+          resultados.push({ idEmpresa: emp.idEmpresa, enviados: 0, errores: 0, total: 0, omitido: "ola_diaria_ya_ejecutada" });
+          continue;
+        }
+        if (ahoraMin < configMin) {
+          resultados.push({ idEmpresa: emp.idEmpresa, enviados: 0, errores: 0, total: 0, omitido: "antes_hora_programada" });
+          continue;
+        }
+        filtroProgramacion = "modo3";
+        actualizarOla = true;
+      }
+
+      const res = await exports.enviarLotePendientesService(pool, emp.idEmpresa, {
+        manual: false,
+        filtroProgramacion
+      });
+      if (actualizarOla) {
+        await FacturacionRepository.actualizarFechaUltimaOlaEnvioProgramadoRepo(pool, emp.idEmpresa, hoyLima);
+      }
       resultados.push({ idEmpresa: emp.idEmpresa, ...res });
     } catch (err) {
       console.error("facturacion.service: envío automático empresa", emp.idEmpresa, err.message);
