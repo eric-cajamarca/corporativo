@@ -1485,12 +1485,16 @@ abrirModalPrecios(item: any) {
         idSucursal: this.ventas.idSucursal,
         moneda: null,
         idCondicionPago: null,
-        total: totalVenta
+        total: totalVenta,
+        esCotizacionAgrupada: !!(this.esGestora || this.carrito.some((item: { idEmpresa?: string }) => !!item.idEmpresa))
       },
       detalles: this.carrito.map((item: any) => {
         const cant = Number(item.cantidad) || 0;
         const pVenta = Number(item.pVenta) || 0;
         const subtotal = cant * pVenta;
+        const idSucursalLinea = item.idSucursal != null && String(item.idSucursal).trim() !== ''
+          ? item.idSucursal
+          : this.ventas.idSucursal;
         return {
           cantidad: cant,
           pVenta,
@@ -1502,7 +1506,10 @@ abrirModalPrecios(item: any) {
           codigo: (item.codigo ?? item.Codigo ?? '').toString(),
           descripcion: (item.descripcion ?? '').toString(),
           idPresentacion: item.idPresentacion != null ? item.idPresentacion : 1,
-          idSucursal: this.ventas.idSucursal
+          idSucursal: idSucursalLinea,
+          idProducto: item.idProducto != null ? String(item.idProducto) : undefined,
+          idEmpresaProducto: item.idEmpresa != null ? String(item.idEmpresa) : undefined,
+          aliasEmpresa: item.aliasEmpresa != null ? String(item.aliasEmpresa).substring(0, 10) : undefined
         };
       })
     };
@@ -1677,20 +1684,34 @@ abrirModalPrecios(item: any) {
           iziToast.warning({ title: 'Aviso', message: 'Cotización sin detalle válido.' });
           return;
         }
-        const lineas = data.detalles.filter((d: { idProducto: string | null }) => d.idProducto != null) as Array<{ idProducto: string; codigo: string; descripcion: string; codigoPresentacion: string; idPresentacion: number; cantidad: number; pVenta: number; idSucursal?: string; nombreSucursal?: string }>;
+        const lineas = data.detalles.filter((d: { idProducto: string | null }) => d.idProducto != null) as Array<{
+          idProducto: string;
+          idEmpresaProducto?: string | null;
+          aliasEmpresa?: string;
+          codigo: string;
+          descripcion: string;
+          codigoPresentacion: string;
+          idPresentacion: number;
+          cantidad: number;
+          pVenta: number;
+          idSucursal?: string;
+          nombreSucursal?: string;
+        }>;
         if (lineas.length === 0) {
           iziToast.warning({ title: 'Aviso', message: 'No se encontraron productos por código en esta cotización.' });
           return;
         }
         this.carrito = lineas.map((d) => ({
           idProducto: d.idProducto,
+          idEmpresa: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : undefined,
           codigo: d.codigo,
           descripcion: d.descripcion,
           codigoPresentacion: d.codigoPresentacion ?? '',
           cantidad: Number(d.cantidad) || 0,
           pVenta: Number(d.pVenta) || 0,
           idSucursal: d.idSucursal,
-          sucursal: (d.nombreSucursal ?? '').trim() || undefined
+          sucursal: (d.nombreSucursal ?? '').trim() || undefined,
+          aliasEmpresa: (d.aliasEmpresa ?? '').trim() || undefined
         }));
         const primeraSucursal = lineas[0]?.idSucursal;
         if (primeraSucursal) {

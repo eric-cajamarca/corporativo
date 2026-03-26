@@ -745,6 +745,7 @@
             <thead class="table-light">
               <tr>
                 <th>Serie-Número</th>
+                <th>Tipo</th>
                 <th>Fecha</th>
                 <th>Cliente</th>
                 <th>Total</th>
@@ -755,6 +756,13 @@
               @for (c of cotizacionesParaCargar; track c.idCotizacion) {
                 <tr role="button" (click)="cargarCotizacion(c.idCotizacion)">
                   <td>{{ c.serieNumero }}</td>
+                  <td>
+                    @if (c.esCotizacionAgrupada === true || c.esCotizacionAgrupada === 1) {
+                      <span class="badge bg-primary">Agrupada</span>
+                    } @else {
+                      <span class="text-muted small">—</span>
+                    }
+                  </td>
                   <td>{{ c.fEmision | date:'shortDate' }}</td>
                   <td>{{ c.clienteRazonSocial }}</td>
                   <td>S/ {{ c.total | number:'1.2-2' }}</td>

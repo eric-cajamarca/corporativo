@@ -16,6 +16,8 @@ export interface CotizacionCabecera {
   moneda?: string | null;
   idCondicionPago?: number | null;
   total: number;
+  /** true = cotización corporativa (gestora), una cabecera con líneas multi-empresa */
+  esCotizacionAgrupada?: boolean;
 }
 
 export interface CotizacionDetalle {
@@ -30,6 +32,9 @@ export interface CotizacionDetalle {
   descripcion?: string;
   idPresentacion?: number;
   idSucursal?: number | string;
+  idProducto?: string;
+  idEmpresaProducto?: string;
+  aliasEmpresa?: string;
 }
 
 export interface CrearCotizacionPayload {
@@ -50,6 +55,7 @@ export interface CotizacionListado {
   clienteRuc?: string;
   nombreComprobante?: string;
   codigoComprobante?: string;
+  esCotizacionAgrupada?: boolean | number;
 }
 
 export interface CotizacionDetalleResponse {
@@ -93,9 +99,12 @@ export interface CotizacionParaVentaResponse {
     clienteRazonSocial?: string;
     clienteRuc?: string;
     total: number;
+    esCotizacionAgrupada?: boolean | number;
   };
   detalles: Array<{
     idProducto: string | null;
+    idEmpresaProducto?: string | null;
+    aliasEmpresa?: string;
     codigo: string;
     descripcion: string;
     codigoPresentacion: string;

@@ -29,6 +29,12 @@ exports.crearCotizacion = async (transaction, payload, idEmpresa, idUsuario) => 
   const fEmision = cotizacion.fEmision ? String(cotizacion.fEmision).substring(0, 10) : null;
   const fVencimiento = cotizacion.fVencimiento ? String(cotizacion.fVencimiento).substring(0, 10) : null;
 
+  const rawAgr = cotizacion.esCotizacionAgrupada;
+  const esCotizacionAgrupada =
+    rawAgr === true ||
+    rawAgr === 1 ||
+    rawAgr === '1' ||
+    String(rawAgr || '').toLowerCase() === 'true';
   const datosCabecera = {
     idComprobante,
     serie,
@@ -40,7 +46,8 @@ exports.crearCotizacion = async (transaction, payload, idEmpresa, idUsuario) => 
     idCliente: Number(cotizacion.idCliente),
     moneda: cotizacion.moneda || null,
     idCondicionPago: cotizacion.idCondicionPago != null ? Number(cotizacion.idCondicionPago) : null,
-    total
+    total,
+    esCotizacionAgrupada
   };
 
   const result = await cotizacionesRepository.insertar(transaction, datosCabecera, idEmpresa, idUsuario);
@@ -65,7 +72,10 @@ exports.crearCotizacion = async (transaction, payload, idEmpresa, idUsuario) => 
     codigo: d.codigo != null ? d.codigo : '',
     descripcion: d.descripcion != null ? d.descripcion : '',
     idPresentacion: d.idPresentacion != null ? d.idPresentacion : 1,
-    idSucursal: d.idSucursal != null ? d.idSucursal : idSucursalDefault
+    idSucursal: d.idSucursal != null ? d.idSucursal : idSucursalDefault,
+    idProducto: d.idProducto != null ? d.idProducto : null,
+    idEmpresaProducto: d.idEmpresaProducto != null ? d.idEmpresaProducto : null,
+    aliasEmpresa: d.aliasEmpresa != null ? d.aliasEmpresa : null
   }));
 
   await cotizacionesRepository.insertarDetalle(transaction, idCotizacion, idEmpresa, items, idSucursalDefault);

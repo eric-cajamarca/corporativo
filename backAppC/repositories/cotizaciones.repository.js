@@ -9,6 +9,34 @@ function toIdSucursalUniqueIdentifier(value) {
   return uuidRegex.test(s) ? s : null;
 }
 
+async function sucursalPerteneceAEmpresa(transaction, idEmpresa, idSucursal) {
+  if (!idEmpresa || !idSucursal) return false;
+  const rs = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .query('SELECT 1 AS ok FROM Sucursal WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal');
+  return !!rs.recordset?.[0]?.ok;
+}
+
+/** Sucursal de la empresa con más stock en Lotes para el producto; si no hay, null. */
+async function obtenerSucursalPreferenteLotes(transaction, idEmpresa, idProducto) {
+  if (!idEmpresa || !idProducto) return null;
+  const rs = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT TOP 1 idSucursal
+      FROM (
+        SELECT idSucursal, SUM(cantidadDisponible) AS qty
+        FROM Lotes
+        WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0
+        GROUP BY idSucursal
+      ) x
+      ORDER BY x.qty DESC
+    `);
+  return rs.recordset?.[0]?.idSucursal || null;
+}
+
 /**
  * Obtiene el primer idSucursal de la empresa (para BD con idSucursal UNIQUEIDENTIFIER).
  * Debe ejecutarse dentro de una transacción.
@@ -52,8 +80,11 @@ exports.insertar = async (transaction, datosCabecera, idEmpresa, idUsuario) => {
     idCliente,
     moneda,
     idCondicionPago,
-    total
+    total,
+    esCotizacionAgrupada
   } = datosCabecera;
+
+  const esAgrupada = esCotizacionAgrupada === true || esCotizacionAgrupada === 1;
 
   const result = await transaction.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -69,10 +100,11 @@ exports.insertar = async (transaction, datosCabecera, idEmpresa, idUsuario) => {
     .input('idCondicionPago', sql.Int, idCondicionPago || null)
     .input('total', sql.Decimal(18, 2), total != null ? total : 0)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('esCotizacionAgrupada', sql.Bit, esAgrupada ? 1 : 0)
     .query(`
-      INSERT INTO Cotizaciones (idEmpresa, serieNumero, idComprobante, serie, numero, fEmision, fVencimiento, idDocumento, idCliente, moneda, idCondicionPago, total, idUsuario)
+      INSERT INTO Cotizaciones (idEmpresa, serieNumero, idComprobante, serie, numero, fEmision, fVencimiento, idDocumento, idCliente, moneda, idCondicionPago, total, idUsuario, esCotizacionAgrupada)
       OUTPUT INSERTED.idCotizacion
-      VALUES (@idEmpresa, @serieNumero, @idComprobante, @serie, @numero, @fEmision, @fVencimiento, @idDocumento, @idCliente, @moneda, @idCondicionPago, @total, @idUsuario)
+      VALUES (@idEmpresa, @serieNumero, @idComprobante, @serie, @numero, @fEmision, @fVencimiento, @idDocumento, @idCliente, @moneda, @idCondicionPago, @total, @idUsuario, @esCotizacionAgrupada)
     `);
   return result;
 };
@@ -87,6 +119,25 @@ exports.insertarDetalle = async (transaction, idCotizacion, idEmpresa, items, id
     const descuento = it.descuento != null ? Number(it.descuento) : 0;
     const igv = it.igv != null ? Number(it.igv) : 0;
     const isc = it.isc != null ? Number(it.isc) : 0;
+    const idProductoLinea = toIdSucursalUniqueIdentifier(it.idProducto);
+    const idEmpresaProductoLinea = toIdSucursalUniqueIdentifier(it.idEmpresaProducto);
+    const aliasEmpresaLinea = it.aliasEmpresa != null ? String(it.aliasEmpresa).substring(0, 10) : null;
+    let idSucursalLinea = toIdSucursalUniqueIdentifier(it.idSucursal);
+    const empCab = String(idEmpresa).toLowerCase();
+    const empProd = idEmpresaProductoLinea ? String(idEmpresaProductoLinea).toLowerCase() : '';
+    if (idEmpresaProductoLinea && idProductoLinea && empProd !== empCab) {
+      const okSuc = idSucursalLinea && (await sucursalPerteneceAEmpresa(transaction, idEmpresaProductoLinea, idSucursalLinea));
+      if (!okSuc) {
+        idSucursalLinea =
+          (await obtenerSucursalPreferenteLotes(transaction, idEmpresaProductoLinea, idProductoLinea)) ||
+          (await exports.obtenerPrimeraSucursalPorEmpresa(transaction, idEmpresaProductoLinea));
+      }
+    } else if (!idSucursalLinea) {
+      idSucursalLinea = defaultSucursal;
+    }
+    if (!idSucursalLinea) {
+      idSucursalLinea = defaultSucursal;
+    }
     await transaction.request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idCotizacion', sql.Int, idCotizacion)
@@ -99,11 +150,14 @@ exports.insertarDetalle = async (transaction, idCotizacion, idEmpresa, items, id
       .input('igv', sql.Decimal(18, 2), igv)
       .input('ISC', sql.Decimal(18, 2), isc)
       .input('total', sql.Decimal(18, 2), total)
-      .input('idSucursal', sql.UniqueIdentifier, toIdSucursalUniqueIdentifier(it.idSucursal) || defaultSucursal)
+      .input('idSucursal', sql.UniqueIdentifier, idSucursalLinea)
       .input('hVenta', sql.VarChar(10), null)
+      .input('idProducto', sql.UniqueIdentifier, idProductoLinea)
+      .input('idEmpresaProducto', sql.UniqueIdentifier, idEmpresaProductoLinea)
+      .input('aliasEmpresa', sql.VarChar(10), aliasEmpresaLinea)
       .query(`
-        INSERT INTO DetalleCotizacion (idEmpresa, idCotizacion, cantidad, codigo, descripcion, idPresentacion, pVenta, descuentos, igv, ISC, total, idSucursal, hVenta)
-        VALUES (@idEmpresa, @idCotizacion, @cantidad, @codigo, @descripcion, @idPresentacion, @pVenta, @descuentos, @igv, @ISC, @total, @idSucursal, @hVenta)
+        INSERT INTO DetalleCotizacion (idEmpresa, idCotizacion, cantidad, codigo, descripcion, idPresentacion, pVenta, descuentos, igv, ISC, total, idSucursal, hVenta, idProducto, idEmpresaProducto, aliasEmpresa)
+        VALUES (@idEmpresa, @idCotizacion, @cantidad, @codigo, @descripcion, @idPresentacion, @pVenta, @descuentos, @igv, @ISC, @total, @idSucursal, @hVenta, @idProducto, @idEmpresaProducto, @aliasEmpresa)
       `);
   }
 };
@@ -157,7 +211,8 @@ exports.listarConFiltros = async (pool, idEmpresa, filtros = {}) => {
       cl.rSocial AS clienteRazonSocial,
       cl.ruc AS clienteRuc,
       comp.nombre AS nombreComprobante,
-      comp.codigo AS codigoComprobante
+      comp.codigo AS codigoComprobante,
+      ISNULL(c.esCotizacionAgrupada, 0) AS esCotizacionAgrupada
     FROM Cotizaciones c
     LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente AND cl.idEmpresa = c.idEmpresa
     LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
@@ -175,6 +230,7 @@ exports.obtenerPorId = async (pool, idCotizacion, idEmpresa) => {
       SELECT
         c.idCotizacion, c.serieNumero, c.idComprobante, c.serie, c.numero,
         c.fEmision, c.fVencimiento, c.idDocumento, c.idCliente, c.moneda, c.idCondicionPago, c.total,
+        ISNULL(c.esCotizacionAgrupada, 0) AS esCotizacionAgrupada,
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
@@ -185,7 +241,8 @@ exports.obtenerPorId = async (pool, idCotizacion, idEmpresa) => {
   const det = await pool.request()
     .input('idCotizacion', sql.Int, idCotizacion)
     .query(`
-      SELECT idDetalleCotizacion, cantidad, codigo, descripcion, idPresentacion, pVenta, descuentos, igv, ISC, total, idSucursal
+      SELECT idDetalleCotizacion, cantidad, codigo, descripcion, idPresentacion, pVenta, descuentos, igv, ISC, total, idSucursal,
+             idProducto, idEmpresaProducto, aliasEmpresa
       FROM DetalleCotizacion
       WHERE idCotizacion = @idCotizacion
       ORDER BY idDetalleCotizacion
@@ -197,8 +254,7 @@ exports.obtenerPorId = async (pool, idCotizacion, idEmpresa) => {
 };
 
 /**
- * Cotización con detalles listos para cargar en venta: cada línea incluye idProducto resuelto por codigo (JOIN Productos).
- * Líneas sin producto coincidente tendrán idProducto null (el front puede omitirlas o advertir).
+ * Cotización con detalles listos para venta: idProducto persistido o resuelto por código (empresa cabecera).
  */
 exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
   const cab = await pool.request()
@@ -208,6 +264,7 @@ exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
       SELECT
         c.idCotizacion, c.serieNumero, c.idComprobante, c.serie, c.numero,
         c.fEmision, c.fVencimiento, c.idDocumento, c.idCliente, c.moneda, c.idCondicionPago, c.total,
+        ISNULL(c.esCotizacionAgrupada, 0) AS esCotizacionAgrupada,
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
@@ -222,19 +279,40 @@ exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query(`
       SELECT d.idDetalleCotizacion, d.cantidad, d.codigo, d.descripcion, d.idPresentacion, d.pVenta, d.descuentos, d.igv, d.ISC, d.total, d.idSucursal,
+             d.idEmpresaProducto,
+             ISNULL(d.aliasEmpresa, '') AS aliasEmpresa,
              ISNULL(s.nombre, '') AS nombreSucursal,
-             p.idProducto,
+             COALESCE(pPorId.idProducto, pPorCodigoEmp.idProducto, pPorCodigo.idProducto, codigoEnRed.idProductoMatch, d.idProducto) AS idProducto,
              ISNULL(pr.codigo, '') AS codigoPresentacion
       FROM DetalleCotizacion d
-      LEFT JOIN Sucursal s ON s.idSucursal = d.idSucursal AND s.idEmpresa = @idEmpresa
-      LEFT JOIN Productos p ON p.idEmpresa = @idEmpresa AND RTRIM(LTRIM(ISNULL(p.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
+      LEFT JOIN Sucursal s ON s.idSucursal = d.idSucursal
+      LEFT JOIN Productos pPorId ON pPorId.idProducto = d.idProducto
+      LEFT JOIN Productos pPorCodigoEmp ON d.idProducto IS NULL
+        AND d.idEmpresaProducto IS NOT NULL
+        AND pPorCodigoEmp.idEmpresa = d.idEmpresaProducto
+        AND RTRIM(LTRIM(ISNULL(pPorCodigoEmp.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
+      LEFT JOIN Productos pPorCodigo ON d.idProducto IS NULL AND d.idEmpresaProducto IS NULL
+        AND pPorCodigo.idEmpresa = @idEmpresa
+        AND RTRIM(LTRIM(ISNULL(pPorCodigo.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
+      OUTER APPLY (
+        SELECT TOP 1 p.idProducto AS idProductoMatch
+        FROM Productos p
+        INNER JOIN Gestores_Empresas ge ON ge.idEmpresaDestino = p.idEmpresa
+          AND ge.idEmpresaOrigen = @idEmpresa AND ge.estado = 1
+        WHERE d.idProducto IS NULL
+          AND d.idEmpresaProducto IS NULL
+          AND RTRIM(LTRIM(ISNULL(p.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
+        ORDER BY p.idProducto
+      ) codigoEnRed
       LEFT JOIN Presentacion pr ON pr.idPresentacion = d.idPresentacion
       WHERE d.idCotizacion = @idCotizacion
       ORDER BY d.idDetalleCotizacion
     `);
   const detalles = (det.recordset || []).map(row => ({
     idDetalleCotizacion: row.idDetalleCotizacion,
-    idProducto: row.idProducto,
+    idProducto: row.idProducto != null ? String(row.idProducto) : null,
+    idEmpresaProducto: row.idEmpresaProducto,
+    aliasEmpresa: row.aliasEmpresa != null ? String(row.aliasEmpresa).trim() : '',
     codigo: row.codigo,
     descripcion: row.descripcion,
     codigoPresentacion: row.codigoPresentacion || '',
@@ -262,8 +340,15 @@ exports.actualizar = async (transaction, idCotizacion, datosCabecera, idEmpresa)
     idCliente,
     moneda,
     idCondicionPago,
-    total
+    total,
+    esCotizacionAgrupada
   } = datosCabecera;
+
+  const esAgrupada =
+    esCotizacionAgrupada === true ||
+    esCotizacionAgrupada === 1 ||
+    esCotizacionAgrupada === '1' ||
+    String(esCotizacionAgrupada || '').toLowerCase() === 'true';
 
   await transaction.request()
     .input('idCotizacion', sql.Int, idCotizacion)
@@ -278,10 +363,12 @@ exports.actualizar = async (transaction, idCotizacion, datosCabecera, idEmpresa)
     .input('moneda', sql.VarChar(20), moneda || null)
     .input('idCondicionPago', sql.Int, idCondicionPago || null)
     .input('total', sql.Decimal(18, 2), total != null ? total : 0)
+    .input('esCotizacionAgrupada', sql.Bit, esAgrupada ? 1 : 0)
     .query(`
       UPDATE Cotizaciones
       SET serieNumero = @serieNumero, serie = @serie, numero = @numero, fEmision = @fEmision, fVencimiento = @fVencimiento,
-          idDocumento = @idDocumento, idCliente = @idCliente, moneda = @moneda, idCondicionPago = @idCondicionPago, total = @total
+          idDocumento = @idDocumento, idCliente = @idCliente, moneda = @moneda, idCondicionPago = @idCondicionPago, total = @total,
+          esCotizacionAgrupada = @esCotizacionAgrupada
       WHERE idCotizacion = @idCotizacion AND idEmpresa = @idEmpresa
     `);
 };

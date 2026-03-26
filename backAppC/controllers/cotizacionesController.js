@@ -97,11 +97,21 @@ const actualizar = async (req, res) => {
       idCliente: Number(cotizacion.idCliente),
       moneda: cotizacion.moneda || null,
       idCondicionPago: cotizacion.idCondicionPago != null ? Number(cotizacion.idCondicionPago) : null,
-      total: Number(cotizacion.total) || 0
+      total: Number(cotizacion.total) || 0,
+      esCotizacionAgrupada:
+        cotizacion.esCotizacionAgrupada === true ||
+        cotizacion.esCotizacionAgrupada === 1 ||
+        cotizacion.esCotizacionAgrupada === '1' ||
+        String(cotizacion.esCotizacionAgrupada || '').toLowerCase() === 'true'
     };
     await cotizacionesRepository.actualizar(transaction, idCotizacion, datosCabecera, idEmpresa);
     await cotizacionesRepository.eliminarDetalle(transaction, idCotizacion);
     if (detalles && Array.isArray(detalles) && detalles.length > 0) {
+      let idSucursalDef = cotizacion.idSucursal != null ? String(cotizacion.idSucursal).trim() : null;
+      const uuidRe = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (!idSucursalDef || !uuidRe.test(idSucursalDef)) {
+        idSucursalDef = await cotizacionesRepository.obtenerPrimeraSucursalPorEmpresa(transaction, idEmpresa);
+      }
       const items = detalles.map(d => ({
         cantidad: d.cantidad,
         pVenta: d.pVenta,
@@ -113,9 +123,12 @@ const actualizar = async (req, res) => {
         codigo: d.codigo != null ? d.codigo : '',
         descripcion: d.descripcion != null ? d.descripcion : '',
         idPresentacion: d.idPresentacion != null ? d.idPresentacion : 1,
-        idSucursal: d.idSucursal != null ? d.idSucursal : cotizacion.idSucursal
+        idSucursal: d.idSucursal != null ? d.idSucursal : idSucursalDef,
+        idProducto: d.idProducto != null ? d.idProducto : null,
+        idEmpresaProducto: d.idEmpresaProducto != null ? d.idEmpresaProducto : null,
+        aliasEmpresa: d.aliasEmpresa != null ? d.aliasEmpresa : null
       }));
-      await cotizacionesRepository.insertarDetalle(transaction, idCotizacion, idEmpresa, items);
+      await cotizacionesRepository.insertarDetalle(transaction, idCotizacion, idEmpresa, items, idSucursalDef);
     }
     await transaction.commit();
     res.json({ success: true, idCotizacion });

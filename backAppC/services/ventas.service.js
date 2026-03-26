@@ -139,6 +139,25 @@ const validarSucursalEmpresa = async (transaction, idEmpresa, idSucursal) => {
   return !!rs.recordset?.[0]?.idSucursal;
 };
 
+/** Sucursal de la empresa con más stock en Lotes para el producto. */
+const obtenerSucursalPreferentePorProducto = async (transaction, idEmpresa, idProducto) => {
+  if (!idEmpresa || !idProducto) return null;
+  const rs = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT TOP 1 idSucursal
+      FROM (
+        SELECT idSucursal, SUM(cantidadDisponible) AS qty
+        FROM Lotes
+        WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0
+        GROUP BY idSucursal
+      ) x
+      ORDER BY x.qty DESC
+    `);
+  return rs.recordset?.[0]?.idSucursal || null;
+};
+
 const asegurarClienteEmpresaConBase = async (transaction, idEmpresaDestino, clienteBase) => {
   if (!clienteBase || !clienteBase.ruc) return null;
   const clienteDestino = await ventasRepository.buscarClientePorDocumento(transaction, idEmpresaDestino, clienteBase.ruc);
@@ -228,11 +247,12 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       if (!idEmpresaProducto || !empresasPermitidas.has(idEmpresaProducto)) {
         throw new Error(`Producto ${det.descripcion || idProducto} pertenece a una empresa no autorizada.`);
       }
-      if (det.idSucursalEmpresa && !(await validarSucursalEmpresa(transaction, idEmpresaProducto, det.idSucursalEmpresa))) {
-        throw new Error(`La sucursal enviada no pertenece a la empresa del producto ${det.descripcion || ''}.`);
+      let idSucursalEmpresa = det.idSucursalEmpresa || null;
+      if (idSucursalEmpresa && !(await validarSucursalEmpresa(transaction, idEmpresaProducto, idSucursalEmpresa))) {
+        idSucursalEmpresa = null;
       }
       const arr = detallesPorEmpresa.get(String(idEmpresaProducto)) || [];
-      arr.push({ ...det, idEmpresaProducto });
+      arr.push({ ...det, idEmpresaProducto, idSucursalEmpresa });
       detallesPorEmpresa.set(String(idEmpresaProducto), arr);
     }
 
@@ -319,6 +339,12 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         throw new Error('No se permite más de una sucursal por empresa en una misma venta.');
       }
       let idSucursalEmpresa = sucursalesUnicas.size === 1 ? Array.from(sucursalesUnicas)[0] : null;
+      if (!idSucursalEmpresa) {
+        const primero = dets.find((d) => d.idProducto);
+        idSucursalEmpresa = primero
+          ? await obtenerSucursalPreferentePorProducto(transaction, idEmpresaProducto, String(primero.idProducto))
+          : null;
+      }
       if (!idSucursalEmpresa) {
         idSucursalEmpresa = await obtenerSucursalPorEmpresa(transaction, idEmpresaProducto);
       }
