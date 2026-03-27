@@ -515,3 +515,39 @@
   padding: 2px 6px;
   margin: 0 -2px;
 }
+
+/* Panel 2FA (administradores) */
+.twofa-panel {
+  padding: 24px 28px 32px;
+}
+
+.twofa-qr-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  margin-bottom: 16px;
+}
+
+.twofa-qr {
+  max-width: 220px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.twofa-loading {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.twofa-code-group {
+  margin-bottom: 20px;
+}
+
+.twofa-cancel {
+  margin-top: 16px;
+  width: 100%;
+  display: block;
+  text-align: center;
+}

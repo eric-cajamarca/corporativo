@@ -8,6 +8,10 @@ const { querySafeMiddleware } = require('../middlewares/tenant-query');
 router.use(auth);
 router.use(querySafeMiddleware);
 
+// Contexto empresa operación (gestora + gestionadas)
+router.get('/contexto-operacion', cajaController.obtenerContextoOperacionCaja);
+router.put('/config/empresa-operacion-default', cajaController.guardarEmpresaOperacionCajaDefault);
+
 // Rutas para cajas
 router.get('/cajas', cajaController.obtenerCajas);
 router.post('/cajas', cajaController.crearCaja);

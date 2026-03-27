@@ -43,19 +43,13 @@ async function sendText(config, number, text) {
       validateStatus: () => true
     });
     const data = response.data || {};
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'whatsappFactiliza.service.sendText',message:'API response',data:{status:response.status,ok:response.status>=200&&response.status<300,dataStatus:data.status,dataSuccess:data.success,dataMessage:data.message},timestamp:Date.now(),hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
     return {
       status: data.status != null ? data.status : response.status,
       success: data.success === true,
       message: data.message != null ? String(data.message) : (response.status >= 200 && response.status < 300 ? 'OK' : 'Error en API WhatsApp')
     };
   } catch (err) {
-    // #region agent log
     const errData = { message: err?.message, code: err?.code, cause: err?.cause?.message || err?.cause?.code, url };
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'whatsappFactiliza.service.sendText:axios failed',message:'axios failed',data:errData,timestamp:Date.now(),hypothesisId:'fetch'})}).catch(()=>{});
-    // #endregion
     console.error('whatsappFactiliza sendText failed:', errData);
     throw err;
   }

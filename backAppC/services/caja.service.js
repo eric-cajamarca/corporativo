@@ -3,6 +3,13 @@ const CajaRepository = require('../repositories/caja.repository');
 const conceptoRepository = require('../repositories/concepto.repository');
 const permisosService = require('./permisos.service');
 const gestoresRepository = require('../repositories/gestores.repository');
+const {
+  obtenerEmpresasPermitidasOperacionCaja,
+  resolverIdEmpresaOperacionCaja,
+  CLAVE_CONFIG_DEFAULT,
+  normalizeUuid
+} = require("../utils/cajaOperacionEmpresa.util");
+
 
 /** Empresa del JWT + empresas gestionadas (misma lista que usa la gestora en ventas) para ver movimientos consolidados. */
 const idsEmpresaParaVistaCaja = async (pool, idEmpresaUsuario) => {
@@ -108,8 +115,11 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'REGISTRAR_MOVIMIENTOS', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
 
+  const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, user, datos.idEmpresaOperacion);
+  const userOp = { ...user, empresa: idEmpresaOp };
+
   // Verificar que la apertura esté abierta y pertenezca a la empresa
-  const aperturaAbierta = await CajaRepository.verificarAperturaAbiertaRepo(pool, datos.idApertura, user.empresa);
+  const aperturaAbierta = await CajaRepository.verificarAperturaAbiertaRepo(pool, datos.idApertura, idEmpresaOp);
   if (!aperturaAbierta) {
     throw new Error("CAJA_NO_ABIERTA");
   }
@@ -122,7 +132,7 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
 
   // Si viene idConcepto: validar que exista, sea de la empresa y que el tipo coincida (I->INGRESO, E->EGRESO)
   if (datos.idConcepto) {
-    const concepto = await conceptoRepository.obtenerPorId(pool, datos.idConcepto, user.empresa);
+    const concepto = await conceptoRepository.obtenerPorId(pool, datos.idConcepto, idEmpresaOp);
     if (!concepto) {
       throw new Error("CONCEPTO_NO_ENCONTRADO");
     }
@@ -144,10 +154,10 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
   try {
     if (generarNumeroRecibo) {
       const codigo = tipoOperacion === "I" ? "RI" : "RE";
-      const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(transaction, user.empresa, codigo);
+      const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(transaction, idEmpresaOp, codigo);
       datos.documentoRelacionado = documentoRelacionado;
     }
-    const result = await CajaRepository.registrarMovimientoRepo(transaction, user, datos);
+    const result = await CajaRepository.registrarMovimientoRepo(transaction, userOp, datos);
     await transaction.commit();
     return { ...result, documentoRelacionado: datos.documentoRelacionado || null };
   } catch (err) {
@@ -159,8 +169,14 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
 exports.obtenerMovimientosCajaService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
-  const idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
-  const delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  let idsEmpresa;
+  let delegacion = null;
+  if (filtros && filtros.idEmpresaOperacion) {
+    idsEmpresa = [filtros.idEmpresaOperacion];
+  } else {
+    idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
+    delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  }
   const movimientos = await CajaRepository.obtenerMovimientosCajaRepo(pool, idsEmpresa, filtros, delegacion);
   return movimientos;
 };
@@ -169,21 +185,70 @@ exports.obtenerRecibosEgresoService = async (pool, user, filtros) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
   const params = { ...filtros, tipoMovimiento: "E", soloRecibos: true };
-  const idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
-  const delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  let idsEmpresa;
+  let delegacion = null;
+  if (filtros && filtros.idEmpresaOperacion) {
+    idsEmpresa = [filtros.idEmpresaOperacion];
+  } else {
+    idsEmpresa = await idsEmpresaParaVistaCaja(pool, user.empresa);
+    delegacion = await opcionesVistaCajaDelegacion(pool, user.empresa);
+  }
   return CajaRepository.obtenerMovimientosCajaRepo(pool, idsEmpresa, params, delegacion);
 };
 
 exports.eliminarMovimientoCajaService = async (pool, user, idMovimientoCaja) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'REGISTRAR_MOVIMIENTOS', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
-  return CajaRepository.eliminarMovimientoCajaRepo(pool, idMovimientoCaja, user.empresa);
+  const idMcEmpresa = await CajaRepository.obtenerIdEmpresaPorMovimientoRepo(pool, idMovimientoCaja);
+  if (!idMcEmpresa) return 0;
+  const permitidas = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+  const ok = permitidas.some((p) => String(p.idEmpresa).toLowerCase() === String(idMcEmpresa).toLowerCase());
+  if (!ok) throw new Error("EMPRESA_OPERACION_NO_PERMITIDA");
+  return CajaRepository.eliminarMovimientoCajaRepo(pool, idMovimientoCaja, idMcEmpresa);
 };
 
 exports.actualizarMovimientoCajaService = async (pool, user, datos) => {
   if (!user) throw new Error("NO_ACCESS");
   if (!(await tienePermisoCaja(pool, user, 'REGISTRAR_MOVIMIENTOS', 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
-  return CajaRepository.actualizarMovimientoCajaRepo(pool, user.empresa, datos);
+  const idMcEmpresa = await CajaRepository.obtenerIdEmpresaPorMovimientoRepo(pool, datos.idMovimientoCaja);
+  if (!idMcEmpresa) return 0;
+  const permitidas = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+  const ok = permitidas.some((p) => String(p.idEmpresa).toLowerCase() === String(idMcEmpresa).toLowerCase());
+  if (!ok) throw new Error("EMPRESA_OPERACION_NO_PERMITIDA");
+  return CajaRepository.actualizarMovimientoCajaRepo(pool, idMcEmpresa, datos);
+};
+
+exports.obtenerContextoOperacionCajaService = async (pool, user) => {
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
+  const empresas = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+  const idEmpresaOperacionPorDefecto = await resolverIdEmpresaOperacionCaja(pool, user, null);
+  return { empresas, idEmpresaOperacionPorDefecto };
+};
+
+exports.guardarEmpresaOperacionCajaDefaultService = async (pool, user, idEmpresaDestinoRaw) => {
+  if (!user) throw new Error("NO_ACCESS");
+  if (!(await tienePermisoCaja(pool, user, 'VER_CAJA'))) throw new Error("NO_PERMISSIONS");
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  if (!esGestora) throw new Error("NO_PERMISSIONS");
+  const permitidas = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+  const permitSet = new Set(permitidas.map((p) => String(p.idEmpresa).toLowerCase()));
+  const v = normalizeUuid(idEmpresaDestinoRaw);
+  if (idEmpresaDestinoRaw != null && String(idEmpresaDestinoRaw).trim() !== '' && !v) {
+    throw new Error('ID_EMPRESA_DEFAULT_INVALIDO');
+  }
+  if (v && !permitSet.has(v.toLowerCase())) {
+    throw new Error('EMPRESA_OPERACION_NO_PERMITIDA');
+  }
+  await gestoresRepository.guardarConfiguracion(
+    pool,
+    user.empresa,
+    CLAVE_CONFIG_DEFAULT,
+    v || '',
+    'Empresa por defecto para recibos de caja (gestora)',
+    'STRING'
+  );
+  return { ok: true, idEmpresaOperacionPorDefecto: v || null };
 };
 
 exports.obtenerTiposMovimientoCajaService = async (pool, user) => {

@@ -6,5 +6,10 @@
 export const environment = {
   production: false,
   API_URL: '/api/',
-  FRONTEND_URL: 'http://localhost:4200'
+  FRONTEND_URL: 'http://localhost:4200',
+  /**
+   * UUID de la empresa principal (mismo valor que EMPRESA_PRINCIPAL_ID en el backend).
+   * Si está vacío, el guard solo exige rol superAdmin (desarrollo).
+   */
+  empresaPrincipalId: ''
 };

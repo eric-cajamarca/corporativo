@@ -6,7 +6,7 @@ const ComunicacionBajaService = require('../services/comunicacionBaja.service');
 const debugSunatLog = require('../utils/debugSunatLog.util');
 
 // Obtener configuración de facturación electrónica
-const obtenerConfiguracionFacturacion = async (req, res) => {
+const obtenerConfiguracionFacturacion = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const configuracion = await FacturacionServices.obtenerConfiguracionFacturacionService(pool, req.user);
@@ -17,15 +17,12 @@ const obtenerConfiguracionFacturacion = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error obtener configuración facturación:", error);
-    res.status(500).send({
-      message: "Error al obtener la configuración de facturación",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Actualizar configuración de facturación electrónica
-const actualizarConfiguracionFacturacion = async (req, res) => {
+const actualizarConfiguracionFacturacion = async (req, res, next) => {
   try {
     const {
       certificadoDigital,
@@ -97,15 +94,12 @@ const actualizarConfiguracionFacturacion = async (req, res) => {
       });
     }
     console.error("Error actualizar configuración facturación:", error);
-    res.status(500).send({
-      message: "Error al actualizar la configuración de facturación",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Subir certificado digital (.pfx) y clave para firma de XML. Multipart: campo 'certificado' (archivo) y 'claveCertificado' (texto).
-const subirCertificadoFacturacion = async (req, res) => {
+const subirCertificadoFacturacion = async (req, res, next) => {
   try {
     if (!req.file || !req.file.buffer) {
       return res.status(400).send({
@@ -128,12 +122,12 @@ const subirCertificadoFacturacion = async (req, res) => {
     if (error.message === "CERTIFICADO_REQUERIDO") return res.status(400).send({ message: "Archivo de certificado requerido", data: undefined });
     if (error.message === "CONFIGURACION_FACTURACION_REQUERIDA") return res.status(400).send({ message: "Guarde primero la configuración de facturación", data: undefined });
     console.error("Error subir certificado facturación:", error);
-    res.status(500).send({ message: error.message || "Error al guardar el certificado", data: undefined });
+    return next(error);
   }
 };
 
 // Obtener comprobantes electrónicos
-const obtenerComprobantesElectronicos = async (req, res) => {
+const obtenerComprobantesElectronicos = async (req, res, next) => {
   try {
     const { tipoComprobante, estadoSunat, fechaDesde, fechaHasta } = req.query;
 
@@ -151,15 +145,12 @@ const obtenerComprobantesElectronicos = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error obtener comprobantes electrónicos:", error);
-    res.status(500).send({
-      message: "Error al obtener los comprobantes electrónicos",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Generar comprobante electrónico
-const generarComprobanteElectronico = async (req, res) => {
+const generarComprobanteElectronico = async (req, res, next) => {
   try {
     const { idVenta, tipoComprobante } = req.body;
 
@@ -198,15 +189,12 @@ const generarComprobanteElectronico = async (req, res) => {
       });
     }
     console.error("Error generar comprobante electrónico:", error);
-    res.status(500).send({
-      message: "Error al generar el comprobante electrónico",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Enviar comprobante a SUNAT. Body opcional: { usarXmlUbl: true } para generar XML UBL y enviar sin archivos planos.
-const enviarComprobanteSunat = async (req, res) => {
+const enviarComprobanteSunat = async (req, res, next) => {
   const { idComprobanteElectronico } = req.params;
   const opciones = { usarXmlUbl: req.body?.usarXmlUbl === true };
   // #region agent log
@@ -261,19 +249,12 @@ const enviarComprobanteSunat = async (req, res) => {
     debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:error", message: "error", data: { error: error.message } });
     // #endregion
     console.error("Error enviar comprobante SUNAT:", error);
-    const errMsg = error.message || "Error al enviar el comprobante a SUNAT";
-    const message = typeof errMsg === "string" && (errMsg.includes("<") || errMsg.length > 500)
-      ? "Error al enviar el comprobante a SUNAT. Revise la consola del servidor."
-      : errMsg;
-    res.status(500).json({
-      message,
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Consultar estado en SUNAT (y opcionalmente consultar CDR en SUNAT si urlConsulta está configurada)
-const consultarEstadoSunat = async (req, res) => {
+const consultarEstadoSunat = async (req, res, next) => {
   try {
     const { idComprobanteElectronico } = req.params;
 
@@ -295,15 +276,12 @@ const consultarEstadoSunat = async (req, res) => {
       });
     }
     console.error("Error consultar estado SUNAT:", error);
-    res.status(500).send({
-      message: "Error al consultar el estado en SUNAT",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Consultar validez de un comprobante en SUNAT (billValidService). Query: idComprobanteElectronico O (ruc, tipoComprobante, serie, numero)
-const consultarValidezComprobante = async (req, res) => {
+const consultarValidezComprobante = async (req, res, next) => {
   try {
     const { idComprobanteElectronico, ruc, tipoComprobante, serie, numero } = req.query;
     const pool = await sql.connect(dbConfig);
@@ -319,12 +297,12 @@ const consultarValidezComprobante = async (req, res) => {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     if (error.message === "COMPROBANTE_NO_ENCONTRADO") return res.status(404).send({ message: "Comprobante no encontrado", data: undefined });
     console.error("Error consultar validez comprobante:", error);
-    res.status(500).send({ message: error.message || "Error al consultar validez", data: undefined });
+    return next(error);
   }
 };
 
 // Obtener estadísticas de facturación
-const obtenerEstadisticasFacturacion = async (req, res) => {
+const obtenerEstadisticasFacturacion = async (req, res, next) => {
   try {
     const { periodo } = req.query;
 
@@ -337,15 +315,12 @@ const obtenerEstadisticasFacturacion = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error obtener estadísticas facturación:", error);
-    res.status(500).send({
-      message: "Error al obtener las estadísticas de facturación",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Obtener estados SUNAT
-const obtenerEstadosSunat = async (req, res) => {
+const obtenerEstadosSunat = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const estados = await FacturacionServices.obtenerEstadosSunatService(pool, req.user);
@@ -355,15 +330,12 @@ const obtenerEstadosSunat = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error obtener estados SUNAT:", error);
-    res.status(500).send({
-      message: "Error al obtener los estados de SUNAT",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 /** Valida credenciales SOL: descifrado de claves y apertura del certificado PFX. */
-const validarCredencialesSol = async (req, res) => {
+const validarCredencialesSol = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const result = await FacturacionServices.validarCredencialesSolService(pool, req.user);
@@ -380,15 +352,12 @@ const validarCredencialesSol = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error validar credenciales SOL:", error);
-    res.status(500).send({
-      message: error.message || "Error al validar credenciales",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Envío por lotes (manual): envía todos los comprobantes pendientes de la empresa del usuario
-const enviarLoteSunat = async (req, res) => {
+const enviarLoteSunat = async (req, res, next) => {
   // #region agent log
   const loteEntry = { idEmpresa: req.user?.empresa };
   console.error("[SUNAT] enviarLoteSunat: entry", loteEntry);
@@ -415,15 +384,12 @@ const enviarLoteSunat = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error envío por lotes SUNAT:", error);
-    res.status(500).send({
-      message: error.message || "Error al enviar lote a SUNAT",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Obtener contenido XML del comprobante (para ver o descargar)
-const obtenerXmlComprobante = async (req, res) => {
+const obtenerXmlComprobante = async (req, res, next) => {
   try {
     const { idComprobanteElectronico } = req.params;
     const pool = await sql.connect(dbConfig);
@@ -435,12 +401,12 @@ const obtenerXmlComprobante = async (req, res) => {
     if (error.message === "CONFIG_FACTURADOR_INCOMPLETA") return res.status(400).send({ message: "Configure la carpeta del Facturador SUNAT", data: undefined });
     if (error.message && (error.message.includes("XML") || error.message.includes("no encontrado"))) return res.status(404).send({ message: error.message, data: undefined });
     console.error("Error obtener XML comprobante:", error);
-    res.status(500).send({ message: error.message || "Error al obtener XML", data: undefined });
+    return next(error);
   }
 };
 
 // Descargar XML firmado listo para SUNAT (genera + firma y devuelve como archivo)
-const obtenerXmlComprobanteDescarga = async (req, res) => {
+const obtenerXmlComprobanteDescarga = async (req, res, next) => {
   try {
     const { idComprobanteElectronico } = req.params;
     const pool = await sql.connect(dbConfig);
@@ -454,12 +420,12 @@ const obtenerXmlComprobanteDescarga = async (req, res) => {
     if (error.message === "Comprobante no encontrado") return res.status(404).send({ message: error.message, data: undefined });
     if (error.message && (error.message.includes("certificado") || error.message.includes("Configuración"))) return res.status(400).send({ message: error.message, data: undefined });
     console.error("Error descarga XML comprobante:", error);
-    res.status(500).send({ message: error.message || "Error al generar XML para descarga", data: undefined });
+    return next(error);
   }
 };
 
 // Obtener contenido CDR del comprobante (para ver o descargar)
-const obtenerCdrComprobante = async (req, res) => {
+const obtenerCdrComprobante = async (req, res, next) => {
   try {
     const { idComprobanteElectronico } = req.params;
     const pool = await sql.connect(dbConfig);
@@ -469,12 +435,12 @@ const obtenerCdrComprobante = async (req, res) => {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     if (error.message === "COMPROBANTE_NO_ENCONTRADO" || error.message === "CDR_NO_ENCONTRADO") return res.status(404).send({ message: "CDR no encontrado", data: undefined });
     console.error("Error obtener CDR comprobante:", error);
-    res.status(500).send({ message: error.message || "Error al obtener CDR", data: undefined });
+    return next(error);
   }
 };
 
 // Resumen diario (RC): listar resúmenes con filtros
-const listarResumenesDiarios = async (req, res) => {
+const listarResumenesDiarios = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const { fechaDesde, fechaHasta, idEstadoSunat, pagina, porPagina } = req.query;
@@ -489,12 +455,12 @@ const listarResumenesDiarios = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     console.error("Error listar resúmenes diarios:", error);
-    res.status(500).send({ message: error.message || "Error al listar resúmenes", data: undefined });
+    return next(error);
   }
 };
 
 // Resumen diario: enviar resumen para una fecha (POST body: fechaResumen YYYY-MM-DD)
-const enviarResumenDiario = async (req, res) => {
+const enviarResumenDiario = async (req, res, next) => {
   try {
     const { fechaResumen } = req.body || {};
     if (!fechaResumen || typeof fechaResumen !== "string") {
@@ -509,12 +475,12 @@ const enviarResumenDiario = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     console.error("Error enviar resumen diario:", error);
-    res.status(500).send({ message: error.message || "Error al enviar resumen", data: undefined });
+    return next(error);
   }
 };
 
 // Resumen diario: boletas pendientes por fecha (GET ?fechaDesde=&fechaHasta=)
-const obtenerBoletasPendientesResumen = async (req, res) => {
+const obtenerBoletasPendientesResumen = async (req, res, next) => {
   try {
     const { fechaDesde, fechaHasta } = req.query || {};
     if (!fechaDesde || !fechaHasta) {
@@ -528,12 +494,12 @@ const obtenerBoletasPendientesResumen = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
     console.error("Error obtener boletas pendientes resumen:", error);
-    res.status(500).send({ message: error.message || "Error al listar", data: [] });
+    return next(error);
   }
 };
 
 // Resumen diario: consultar estado en SUNAT (getStatus) por idResumenDiarioSunat
-const consultarEstadoResumenDiario = async (req, res) => {
+const consultarEstadoResumenDiario = async (req, res, next) => {
   try {
     const { idResumenDiarioSunat } = req.params;
     if (!idResumenDiarioSunat) {
@@ -548,13 +514,13 @@ const consultarEstadoResumenDiario = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     console.error("Error consultar estado resumen:", error);
-    res.status(500).send({ message: error.message || "Error al consultar estado", data: undefined });
+    return next(error);
   }
 };
 
 // Obtener comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Params: idComprobanteElectronico. Query: serie, numero, tipoComprobante (01/03).
 // Comprobante por serie/numero para origen de guía (incluye cliente e items; no exige aceptado SUNAT)
-const obtenerOrigenParaGuia = async (req, res) => {
+const obtenerOrigenParaGuia = async (req, res, next) => {
   try {
     const { serie, numero } = req.query || {};
     if (serie == null || numero == null) {
@@ -569,11 +535,11 @@ const obtenerOrigenParaGuia = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: null });
     console.error("Error obtener origen para guía:", error);
-    res.status(500).send({ message: error.message || "Error al obtener datos", data: null });
+    return next(error);
   }
 };
 
-const obtenerOrigenParaNota = async (req, res) => {
+const obtenerOrigenParaNota = async (req, res, next) => {
   try {
     const { idComprobanteElectronico } = req.params;
     const { serie, numero, tipoComprobante } = req.query || {};
@@ -591,12 +557,12 @@ const obtenerOrigenParaNota = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: null });
     console.error("Error obtener origen para nota:", error);
-    res.status(500).send({ message: error.message || "Error al obtener datos", data: null });
+    return next(error);
   }
 };
 
 // Listar comprobantes origen (Factura/Boleta aceptados) por RUC o razón social del cliente. Query: rucCliente, razonSocial, tipoComprobante (01/03 opcional).
-const listarComprobantesOrigenPorCliente = async (req, res) => {
+const listarComprobantesOrigenPorCliente = async (req, res, next) => {
   try {
     const { rucCliente, razonSocial, tipoComprobante } = req.query || {};
     const ruc = (rucCliente != null && String(rucCliente).trim() !== "") ? String(rucCliente).trim() : "";
@@ -614,12 +580,12 @@ const listarComprobantesOrigenPorCliente = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
     console.error("Error listar comprobantes origen por cliente:", error);
-    res.status(500).send({ message: error.message || "Error al buscar", data: [] });
+    return next(error);
   }
 };
 
 // Crear Nota de Crédito (07) o Débito (08)
-const crearNotaCreditoDebito = async (req, res) => {
+const crearNotaCreditoDebito = async (req, res, next) => {
   try {
     const { idComprobanteElectronicoOrigen, tipoNota, codigoMotivoNotaCredito, items } = req.body || {};
     if (!idComprobanteElectronicoOrigen || !tipoNota || !items || !Array.isArray(items) || items.length === 0) {
@@ -654,12 +620,12 @@ const crearNotaCreditoDebito = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     console.error("Error crear nota crédito/débito:", error);
-    res.status(500).send({ message: error.message || "Error al crear la nota", data: undefined });
+    return next(error);
   }
 };
 
 // ---------- Comunicación de baja (RA) ----------
-const listarComprobantesParaBaja = async (req, res) => {
+const listarComprobantesParaBaja = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const data = await FacturacionServices.listarComprobantesAceptadosParaBajaService(pool, req.user);
@@ -667,22 +633,22 @@ const listarComprobantesParaBaja = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
     console.error("Error listar comprobantes para baja:", error);
-    res.status(500).send({ message: error.message || "Error al listar", data: [] });
+    return next(error);
   }
 };
 
-const listarMotivosBaja = async (req, res) => {
+const listarMotivosBaja = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const data = await FacturacionServices.listarMotivosBajaService(pool);
     res.status(200).send({ data: data || [] });
   } catch (error) {
     console.error("Error listar motivos baja:", error);
-    res.status(500).send({ message: error.message || "Error al listar", data: [] });
+    return next(error);
   }
 };
 
-const listarComunicacionesBaja = async (req, res) => {
+const listarComunicacionesBaja = async (req, res, next) => {
   try {
     const { fechaDesde, fechaHasta, idEstadoSunat, pagina, porPagina } = req.query || {};
     const pool = await sql.connect(dbConfig);
@@ -697,11 +663,11 @@ const listarComunicacionesBaja = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [], total: 0 });
     console.error("Error listar comunicaciones baja:", error);
-    res.status(500).send({ message: error.message || "Error al listar", data: [], total: 0 });
+    return next(error);
   }
 };
 
-const enviarComunicacionBaja = async (req, res) => {
+const enviarComunicacionBaja = async (req, res, next) => {
   try {
     const { comprobantes } = req.body || {};
     const pool = await sql.connect(dbConfig);
@@ -716,11 +682,11 @@ const enviarComunicacionBaja = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     console.error("Error enviar comunicación de baja:", error);
-    res.status(500).send({ message: error.message || "Error al enviar", data: undefined });
+    return next(error);
   }
 };
 
-const consultarEstadoComunicacionBaja = async (req, res) => {
+const consultarEstadoComunicacionBaja = async (req, res, next) => {
   try {
     const { idComunicacionBaja } = req.params;
     const pool = await sql.connect(dbConfig);
@@ -737,7 +703,7 @@ const consultarEstadoComunicacionBaja = async (req, res) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     console.error("Error consultar estado comunicación baja:", error);
-    res.status(500).send({ message: error.message || "Error al consultar", data: undefined });
+    return next(error);
   }
 };
 

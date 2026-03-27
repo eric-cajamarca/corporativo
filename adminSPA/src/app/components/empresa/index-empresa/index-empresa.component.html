@@ -105,6 +105,18 @@
                         Acciones
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                          <a
+                            class="dropdown-item"
+                            href="#"
+                            data-bs-toggle="modal"
+                            [attr.data-bs-target]="'#reset2fa-' + empresa.idEmpresa"
+                            (click)="$event.preventDefault()"
+                          >
+                            <i class="fas fa-shield-alt text-warning me-2"></i>
+                            Restablecer 2FA (admin)
+                          </a>
+                        </li>
                         @if (empresa.estado) {
                           <li>
                             <a class="dropdown-item" data-bs-toggle="modal" [attr.data-bs-target]="'#delete-'+empresa.idEmpresa">
@@ -121,6 +133,42 @@
                           </li>
                         }
                       </ul>
+                    </div>
+
+                    <!-- Modal restablecer 2FA -->
+                    <div class="modal fade" [id]="'reset2fa-' + empresa.idEmpresa" tabindex="-1">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                          <div class="modal-header">
+                            <h5 class="modal-title">Restablecer verificación en dos pasos</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body">
+                            <p>
+                              Se eliminará la configuración TOTP de <strong>todos los usuarios administradores</strong>
+                              de <strong>{{ empresa.razon_Social }}</strong> y del acceso admin por correo de empresa.
+                            </p>
+                            <p class="text-muted small mb-0">
+                              Deberán volver a escanear el QR en el próximo inicio de sesión. Use solo si perdieron el
+                              teléfono o hay una incidencia de seguridad.
+                            </p>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button
+                              type="button"
+                              class="btn btn-warning"
+                              (click)="confirmarReset2fa(empresa)"
+                              [disabled]="loadingReset2faId === empresa.idEmpresa"
+                            >
+                              @if (loadingReset2faId === empresa.idEmpresa) {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                              }
+                              Restablecer 2FA
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <!-- Modal de confirmación -->
@@ -228,6 +276,16 @@
             (click)="cambiarTab('servicios-api')">
             <i class="bi bi-plug me-1"></i>
             Servicios API por empresa
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            type="button"
+            class="nav-link"
+            [class.active]="activeTab() === 'seguridad-admin'"
+            (click)="cambiarTab('seguridad-admin')">
+            <i class="bi bi-shield-lock me-1"></i>
+            2FA administradores
           </button>
         </li>
       </ul>
@@ -424,7 +482,7 @@
               <p class="mt-2 mb-0 text-muted">Cargando servicios y empresas...</p>
             </div>
           } @else if (serviciosApiData) {
-            <p class="text-muted small mb-3">Asigne qué servicios API (Factiliza) puede usar cada empresa. Solo el administrador del sistema puede modificar esto.</p>
+            <p class="text-muted small mb-3">Asigne qué servicios API (Factiliza) puede usar cada empresa. Solo el <strong>superAdmin de la plataforma</strong> (empresa principal) puede modificar esto.</p>
             <div class="table-responsive">
               <table class="table table-sm table-bordered">
                 <thead class="table-light">
@@ -460,6 +518,52 @@
             @if (serviciosApiData.empresas.length === 0) {
               <p class="text-muted mb-0">No hay empresas registradas.</p>
             }
+          }
+        }
+
+        <!-- Tab: 2FA por empresa (planes vs corporativo) -->
+        @if (activeTab() === 'seguridad-admin') {
+          <p class="text-muted small mb-3">
+            Si desactiva el interruptor, los administradores de esa empresa inician sesión <strong>solo con usuario y contraseña</strong>
+            (sin app autenticadora). Recomendado para algunas corporaciones; en planes SaaS suele mantenerse activo.
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>RUC</th>
+                  <th>Razón social</th>
+                  <th class="text-center">Exigir 2FA a administradores</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (emp of empresas; track emp.idEmpresa) {
+                  <tr>
+                    <td class="text-nowrap">{{ emp.ruc }}</td>
+                    <td>{{ emp.razon_Social }}</td>
+                    <td class="text-center">
+                      <div class="form-check form-switch d-inline-flex justify-content-center">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          [id]="'sw2fa-' + emp.idEmpresa"
+                          [checked]="esAdmin2faActivo(emp)"
+                          [disabled]="guardandoPolitica2faId === emp.idEmpresa"
+                          (change)="cambiarPolitica2faAdmin(emp, $any($event.target).checked)"
+                        />
+                      </div>
+                      @if (guardandoPolitica2faId === emp.idEmpresa) {
+                        <span class="spinner-border spinner-border-sm ms-2 align-middle"></span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (empresas.length === 0) {
+            <p class="text-muted mb-0">No hay empresas en el listado. Actualice la página principal si acaba de crear una.</p>
           }
         }
       </div>

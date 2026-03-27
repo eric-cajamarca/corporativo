@@ -2,10 +2,21 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { catchError, tap, map, of } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  tap,
+  map,
+  of,
+  switchMap,
+  finalize,
+  share
+} from 'rxjs';
 import { global } from './global';
 
 interface UserData {
+  /** Empresa del JWT (multiempresa). */
+  idEmpresa?: string | null;
   razonSocial: string;
   nombres: string;
   rol: string;
@@ -18,6 +29,9 @@ interface UserData {
 export class AuthService {
   private _userData = signal<UserData | null>(null);
   private verificationInterval = 10 * 60 * 1000; // Verificar cada 15 minutos
+
+  /** Una sola petición refresh en vuelo (evita tormenta si expiran muchas llamadas a la vez). */
+  private refreshInFlight$: Observable<boolean> | null = null;
 
   // Rutas públicas que NO requieren autenticación
   private readonly publicRoutes = [
@@ -56,15 +70,59 @@ export class AuthService {
     // }, this.verificationInterval);
   }
 
-  verifyToken() {
+  /**
+   * Renueva access token vía cookie refresh (HttpOnly).
+   */
+  tryRefreshSession(): Observable<boolean> {
+    if (!this.refreshInFlight$) {
+      this.refreshInFlight$ = this.http
+        .post<{ success?: boolean }>(this.url + 'refresh_session', {}, { withCredentials: true })
+        .pipe(
+          map(() => true),
+          catchError(() => of(false)),
+          finalize(() => {
+            this.refreshInFlight$ = null;
+          }),
+          share()
+        );
+    }
+    return this.refreshInFlight$;
+  }
+
+  verifyToken(): Observable<boolean> {
     return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
-      tap(response => this.handleAuthResponse(response)),
-      map(response => response?.active === true),
-      catchError(error => {
-        console.error('verifyToken error:', error?.status, error?.message);
-        this.handleAuthError();
-        return of(false);
-      })
+      switchMap(response => {
+        if (response?.active === true && response?.data) {
+          this.handleAuthResponse(response);
+          return of(true);
+        }
+        return this.tryRefreshSession().pipe(
+          switchMap(ok => {
+            if (!ok) {
+              this.handleAuthError();
+              return of(false);
+            }
+            return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
+              tap(r2 => this.handleAuthResponse(r2)),
+              map(r2 => r2?.active === true)
+            );
+          })
+        );
+      }),
+      catchError(() =>
+        this.tryRefreshSession().pipe(
+          switchMap(ok => {
+            if (!ok) {
+              this.handleAuthError();
+              return of(false);
+            }
+            return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
+              tap(r2 => this.handleAuthResponse(r2)),
+              map(r2 => r2?.active === true)
+            );
+          })
+        )
+      )
     );
   }
 
@@ -72,28 +130,31 @@ export class AuthService {
    * Establece los datos del usuario desde la respuesta del login (sin llamar al backend).
    * Usar después de login exitoso para evitar verificar token en el mismo tick (cookie puede no estar lista).
    */
-  setUserDataFromLogin(data: { razonSocial?: string; nombres?: string; apellidos?: string; rol?: string }) {
+  setUserDataFromLogin(data: {
+    idEmpresa?: string;
+    razonSocial?: string;
+    nombres?: string;
+    apellidos?: string;
+    rol?: string;
+  }) {
     if (!data) return;
     this._userData.set({
+      idEmpresa: data.idEmpresa ?? null,
       razonSocial: data.razonSocial || '',
-      nombres: data.nombres || data.apellidos ? `${data.nombres || ''} ${data.apellidos || ''}`.trim() : 'Usuario',
+      nombres:
+        data.nombres || data.apellidos
+          ? `${data.nombres || ''} ${data.apellidos || ''}`.trim()
+          : 'Usuario',
       rol: data.rol || '',
       lastVerified: Date.now()
     });
-      }
-
-//   getEmpresa_login(): Observable<any> {
-//     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-//     return this._http.get(this.url + 'getEmpresa_login', {
-//       headers: headers,
-//       withCredentials: true
-//     });
-//   }
+  }
 
   private handleAuthResponse(response: any) {
     if (response?.active === true && response?.data) {
       const d = response.data;
       this._userData.set({
+        idEmpresa: d.idEmpresa ?? null,
         razonSocial: d.razonSocial || '',
         nombres: d.nombres || '',
         rol: d.roles ?? d.rol ?? '',
@@ -108,18 +169,16 @@ export class AuthService {
   }
 
   private handleAuthError() {
-        this._userData.set(null);
-    // Solo redirigir a login si NO estamos en una ruta pública
+    this._userData.set(null);
     if (!this.isPublicRoute()) {
-            this.router.navigate(['/login-empresa']);
-    } else {
-          }
+      this.router.navigate(['/login-empresa']);
+    }
   }
 
   forceLogout() {
-        this.http.post(this.url + 'logout',{},{ withCredentials: true }).subscribe({
+    this.http.post(this.url + 'logout', {}, { withCredentials: true }).subscribe({
       complete: () => {
-                this._userData.set(null);
+        this._userData.set(null);
         this.router.navigate(['/login-empresa']);
         this.verifyToken().subscribe();
       }

@@ -11,6 +11,8 @@ const { uploadLogo } = require('../config/multer.config');
 // Rutas para la gestión de empresas
 // READ
 api.get('/empresa', auth.auth, empresasController.getEmpresas);
+api.post('/empresa/:idEmpresa/reset-2fa-admin', auth.auth, empresasController.reset2faEmpresa);
+api.put('/empresa/:idEmpresa/politica-2fa-admin', auth.auth, empresasController.putPolitica2faAdmin);
 api.get('/empresaid',auth.auth, empresasController.getEmpresasById);
 api.get('/empresas_id',auth.auth, empresasController.getEmpresa_id);
 api.get('/obtener_logo/:img', empresasController.obtener_logo);

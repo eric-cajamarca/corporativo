@@ -8,6 +8,7 @@ const sql = require('mssql');
 exports.getDatosEmpresaLogin = async (pool, user) => {
     if (!user) return null;
     return {
+        idEmpresa: user.empresa || null,
         razonSocial: user.razonSocial || '',
         nombres: user.nombres || '',
         apellidos: user.apellidos || '',

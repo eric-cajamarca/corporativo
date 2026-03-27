@@ -101,6 +101,59 @@ exports.buscarPorEmailYRuc = async (pool, email, idEmpresa) => {
 };
 
 /**
+ * Mismo perfil que buscarPorEmailYRuc pero comparando email en minúsculas (login + bloqueo por intentos).
+ */
+exports.buscarPorEmailNormalizado = async (pool, emailNormalizado, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('emailNorm', sql.VarChar(320), emailNormalizado)
+    .query(`
+      SELECT
+        UW.idUsuario,
+        UW.idEmpresa,
+        UW.nombres,
+        UW.apellidos,
+        UW.email,
+        UW.password,
+        UW.idRol,
+        UW.estado,
+        UW.fRegistro,
+        R.descripcion AS rol
+      FROM UsuarioWeb UW
+      INNER JOIN Rol R ON UW.idRol = R.idRol
+      WHERE UW.idEmpresa = @idEmpresa
+        AND LOWER(LTRIM(RTRIM(UW.email))) = @emailNorm
+    `);
+
+  return result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
+/**
+ * Usuario/colaborador por id (renovar sesión con refresh token).
+ */
+exports.buscarPorIdYEmpresa = async (pool, idUsuario, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        UW.idUsuario,
+        UW.idEmpresa,
+        UW.nombres,
+        UW.apellidos,
+        UW.email,
+        UW.estado,
+        R.descripcion AS rol
+      FROM UsuarioWeb UW
+      INNER JOIN Rol R ON UW.idRol = R.idRol
+      WHERE UW.idUsuario = @idUsuario AND UW.idEmpresa = @idEmpresa
+    `);
+  return result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
+/**
  * Busca el primer usuario administrador de una empresa
  */
 exports.buscarUsuarioAdminPorEmpresa = async (pool, idEmpresa) => {
@@ -182,5 +235,64 @@ exports.actualizarSoloPassword = async (pool, idUsuario, passwordHash) => {
     .input('idUsuario', sql.UniqueIdentifier, idUsuario)
     .input('password', sql.Text, passwordHash)
     .query('UPDATE UsuarioWeb SET password = @password WHERE idUsuario = @idUsuario');
+  return result.rowsAffected[0];
+};
+
+/**
+ * Marca último acceso exitoso al sistema (login). Filtra por empresa.
+ */
+exports.actualizarUltimoLogin = async (pool, idUsuario, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      UPDATE UsuarioWeb
+      SET ultimoLogin = GETDATE()
+      WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa
+    `);
+  return result.rowsAffected[0];
+};
+
+exports.obtenerTotpUsuario = async (pool, idUsuario, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        totpSecret,
+        totpEnabled
+      FROM UsuarioWeb
+      WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa
+    `);
+  return result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
+exports.actualizarTotpUsuario = async (pool, idUsuario, idEmpresa, totpSecret, totpEnabled) => {
+  const result = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('totpSecret', sql.NVarChar(128), totpSecret)
+    .input('totpEnabled', sql.Bit, totpEnabled ? 1 : 0)
+    .query(`
+      UPDATE UsuarioWeb
+      SET totpSecret = @totpSecret, totpEnabled = @totpEnabled
+      WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa
+    `);
+  return result.rowsAffected[0];
+};
+
+/** Quita TOTP a usuarios con rol Administrador o superAdmin de la empresa. */
+exports.limpiarTotpRolesElevadosPorEmpresa = async (pool, idEmpresa) => {
+  const result = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
+    UPDATE UW
+    SET UW.totpSecret = NULL, UW.totpEnabled = 0
+    FROM UsuarioWeb AS UW
+    INNER JOIN Rol AS R ON UW.idRol = R.idRol AND R.idEmpresa = @idEmpresa
+    WHERE UW.idEmpresa = @idEmpresa
+      AND R.descripcion IN (N'Administrador', N'superAdmin')
+  `);
   return result.rowsAffected[0];
 };

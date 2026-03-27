@@ -10,7 +10,14 @@
           <i class="fas fa-hand-holding-usd me-2"></i>
           Cobranza de Créditos
         </h5>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="d-flex align-items-center gap-1" *ngIf="empresasOperacion.length > 1">
+            <label class="small text-white-50 mb-0 text-nowrap">Empresa</label>
+            <select class="form-select form-select-sm text-dark" style="max-width: 220px;"
+                    [ngModel]="idEmpresaOperacionSel" (ngModelChange)="onCambioEmpresaOperacion($event)">
+              <option *ngFor="let e of empresasOperacion" [value]="e.idEmpresa">{{ e.razonSocial || e.ruc }}</option>
+            </select>
+          </div>
           <input type="text" class="form-control form-control-sm" style="width: 80px;" placeholder="N°"
                  [(ngModel)]="filtros.numero" (keyup.enter)="buscar()">
           <div class="input-group input-group-sm" style="width: 200px;">

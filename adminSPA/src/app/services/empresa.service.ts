@@ -280,6 +280,26 @@ export class EmpresaService {
     });
   }
 
+  /** Restablece TOTP para administradores de la empresa y acceso admin por correo empresa (solo rol Administrador/superAdmin). */
+  reset2faEmpresa(idEmpresa: string): Observable<{ message: string }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this._http.post<{ message: string }>(
+      `${this.url}empresa/${idEmpresa}/reset-2fa-admin`,
+      {},
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Política 2FA admin por empresa (solo plataforma superAdmin). */
+  putPolitica2faAdmin(idEmpresa: string, adminRequiere2FA: boolean): Observable<{ message: string; data: { adminRequiere2FA: boolean } }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this._http.put<{ message: string; data: { adminRequiere2FA: boolean } }>(
+      `${this.url}empresa/${idEmpresa}/politica-2fa-admin`,
+      JSON.stringify({ adminRequiere2FA }),
+      { headers, withCredentials: true }
+    );
+  }
+
   // api.get('/direccion_empresa/:id',auth.auth, empresasController.getDireccionEmpresa_id);
   // api.post('/direccion_empresa',auth.auth, empresasController.createDireccionEmpresa);
   // api.put('/direccion_empresa/:id',auth.auth, empresasController.updateDireccionEmpresa);

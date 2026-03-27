@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
@@ -22,12 +22,17 @@ export class CajaService {
     return this._http.post(this.url + 'caja/cajas', data, { headers, withCredentials: true });
   }
 
-  // Obtener todas las cajas disponibles
-  obtenerCajas(): Observable<any> {
+  /** Cajas de la empresa de operación (query idEmpresaOperacion opcional; si no, el backend usa JWT/config). */
+  obtenerCajas(idEmpresaOperacion?: string | null): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    let params = new HttpParams();
+    if (idEmpresaOperacion) {
+      params = params.set('idEmpresaOperacion', idEmpresaOperacion);
+    }
     return this._http.get(this.url+'caja/cajas', {
       headers: headers,
-      withCredentials: true
+      withCredentials: true,
+      params
     });
   }
 
@@ -140,27 +145,25 @@ export class CajaService {
   }
 
   // Recibos de egreso (movimientos tipo E)
-  getRecibosEgreso(filtros?: { fechaDesde?: string; fechaHasta?: string }): Observable<any> {
+  getRecibosEgreso(filtros?: { fechaDesde?: string; fechaHasta?: string }, idEmpresaOperacion?: string | null): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    let params = '';
-    if (filtros) {
-      const q = new URLSearchParams();
-      if (filtros.fechaDesde) q.append('fechaDesde', filtros.fechaDesde);
-      if (filtros.fechaHasta) q.append('fechaHasta', filtros.fechaHasta);
-      params = '?' + q.toString();
-    }
-    return this._http.get(this.url + 'caja/recibos-egreso' + params, { headers, withCredentials: true });
+    let params = new HttpParams();
+    if (filtros?.fechaDesde) params = params.set('fechaDesde', filtros.fechaDesde);
+    if (filtros?.fechaHasta) params = params.set('fechaHasta', filtros.fechaHasta);
+    if (idEmpresaOperacion) params = params.set('idEmpresaOperacion', idEmpresaOperacion);
+    return this._http.get(this.url + 'caja/recibos-egreso', { headers, withCredentials: true, params });
   }
 
   // Recibos de ingreso (solo movimientos RI, sin ventas)
-  getRecibosIngreso(filtros?: { fechaDesde?: string; fechaHasta?: string }): Observable<any> {
+  getRecibosIngreso(filtros?: { fechaDesde?: string; fechaHasta?: string }, idEmpresaOperacion?: string | null): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    const q = new URLSearchParams();
-    if (filtros?.fechaDesde) q.append('fechaDesde', filtros.fechaDesde);
-    if (filtros?.fechaHasta) q.append('fechaHasta', filtros.fechaHasta);
-    q.append('tipoMovimiento', 'I');
-    q.append('soloRecibos', 'true');
-    return this._http.get(this.url + 'caja/movimientos?' + q.toString(), { headers, withCredentials: true });
+    let params = new HttpParams()
+      .set('tipoMovimiento', 'I')
+      .set('soloRecibos', 'true');
+    if (filtros?.fechaDesde) params = params.set('fechaDesde', filtros.fechaDesde);
+    if (filtros?.fechaHasta) params = params.set('fechaHasta', filtros.fechaHasta);
+    if (idEmpresaOperacion) params = params.set('idEmpresaOperacion', idEmpresaOperacion);
+    return this._http.get(this.url + 'caja/movimientos', { headers, withCredentials: true, params });
   }
 
   // Registrar movimiento (egreso): backend espera idApertura. fechaMovimiento = fecha del formulario (Fecha Emisión).
@@ -174,6 +177,7 @@ export class CajaService {
     idMediosPago?: number;
     documentoRelacionado?: string;
     observaciones?: string;
+    idEmpresaOperacion?: string | null;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url + 'caja/movimiento', {
@@ -186,7 +190,8 @@ export class CajaService {
       idMediosPago: data.idMediosPago ?? null,
       idMoneda: 1,
       documentoRelacionado: data.documentoRelacionado ?? null,
-      observaciones: data.observaciones ?? null
+      observaciones: data.observaciones ?? null,
+      idEmpresaOperacion: data.idEmpresaOperacion ?? undefined
     }, { headers, withCredentials: true });
   }
 
@@ -201,6 +206,7 @@ export class CajaService {
     idMediosPago?: number;
     documentoRelacionado?: string;
     observaciones?: string;
+    idEmpresaOperacion?: string | null;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url + 'caja/movimiento', {
@@ -213,7 +219,8 @@ export class CajaService {
       idMediosPago: data.idMediosPago ?? null,
       idMoneda: 1,
       documentoRelacionado: data.documentoRelacionado ?? null,
-      observaciones: data.observaciones ?? null
+      observaciones: data.observaciones ?? null,
+      idEmpresaOperacion: data.idEmpresaOperacion ?? undefined
     }, { headers, withCredentials: true });
   }
 

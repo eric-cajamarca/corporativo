@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { from, of, throwError } from 'rxjs';
 import { catchError, concatMap, map, switchMap } from 'rxjs/operators';
 import { CreditosService } from '../../../services/creditos.service';
+import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../services/caja-operacion-context.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { CajaService } from '../../../services/caja.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
@@ -102,24 +103,57 @@ export class IndexCreditosComponent implements OnInit {
   public loading = false;
   public mostrarVerCuotas = false;
 
+  empresasOperacion: EmpresaCajaOperacion[] = [];
+  idEmpresaOperacionSel = '';
+
   constructor(
     private creditosService: CreditosService,
     private clienteService: ClienteService,
     private cajaService: CajaService,
+    private cajaOpCtx: CajaOperacionContextService,
     private tablasSunat: TablasSunatService,
     public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
     this.cargarClientes();
-    this.cargarResumenCreditos();
-    this.cargarCreditos();
-    this.cajaService.obtenerCajas().subscribe({
-      next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
-      error: () => {}
+    this.cajaOpCtx.cargarContexto().subscribe({
+      next: () => {
+        this.empresasOperacion = this.cajaOpCtx.empresasOperacion;
+        this.idEmpresaOperacionSel = this.cajaOpCtx.idEmpresaOperacion || '';
+        this.cargarResumenCreditos();
+        this.cargarCreditos();
+        this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
+          next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
+          error: () => {}
+        });
+      },
+      error: () => {
+        this.cargarResumenCreditos();
+        this.cargarCreditos();
+        this.cajaService.obtenerCajas().subscribe({
+          next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
+          error: () => {}
+        });
+      }
     });
     this.tablasSunat.obtener_medios_pago().subscribe({
       next: (r) => { this.mediosPago = r.data || []; },
+      error: () => {}
+    });
+  }
+
+  private idEmpresaOp(): string | null {
+    return this.idEmpresaOperacionSel || null;
+  }
+
+  onCambioEmpresaOperacion(id: string): void {
+    this.cajaOpCtx.setEmpresaOperacion(id);
+    this.idEmpresaOperacionSel = id;
+    this.cargarResumenCreditos();
+    this.cargarCreditos();
+    this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
+      next: (r) => { this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura); },
       error: () => {}
     });
   }
@@ -137,7 +171,7 @@ export class IndexCreditosComponent implements OnInit {
 
   cargarCreditos() {
     this.loading = true;
-    this.creditosService.obtenerCreditosCliente(this.filtros.idCliente || '').subscribe({
+    this.creditosService.obtenerCreditosCliente(this.filtros.idCliente || '', this.idEmpresaOp()).subscribe({
       next: (response) => {
         if (response.data) {
           this.creditos = response.data;
@@ -199,7 +233,7 @@ export class IndexCreditosComponent implements OnInit {
   }
 
   cargarResumenCreditos() {
-    this.creditosService.obtenerResumenCreditos().subscribe({
+    this.creditosService.obtenerResumenCreditos(this.idEmpresaOp()).subscribe({
       next: (response) => {
         if (response.data) {
           this.resumenCreditos = response.data;
@@ -216,7 +250,7 @@ export class IndexCreditosComponent implements OnInit {
     this.creditoSeleccionado = credito;
     this.mostrarVerCuotas = true;
     this.loading = true;
-    this.creditosService.obtenerCuotasCredito(credito.idCredito).subscribe({
+    this.creditosService.obtenerCuotasCredito(credito.idCredito, this.idEmpresaOp()).subscribe({
       next: (response) => {
         this.cuotas = response.data || [];
         this.loading = false;
@@ -347,7 +381,7 @@ export class IndexCreditosComponent implements OnInit {
       },
       error: () => { this.nuevaCobranza.lineaAsignada = 0; }
     });
-    this.creditosService.obtenerCreditosCliente(idCliente).subscribe({
+    this.creditosService.obtenerCreditosCliente(idCliente, this.idEmpresaOp()).subscribe({
       next: (res) => {
         const list = res.data || [];
         const pendientes = list.filter((c: any) => (c.saldoPendiente ?? 0) > 0);
@@ -369,7 +403,7 @@ export class IndexCreditosComponent implements OnInit {
     }
     this.mostrarModalBuscarComprobantes = true;
     this.loadingCreditosCliente = true;
-    this.creditosService.obtenerCreditosCliente(this.nuevaCobranza.idCliente).subscribe({
+    this.creditosService.obtenerCreditosCliente(this.nuevaCobranza.idCliente, this.idEmpresaOp()).subscribe({
       next: (res) => {
         const list = (res.data || []).filter((c: any) => (c.saldoPendiente ?? 0) > 0);
         this.creditosClienteParaSelector = list;
@@ -429,11 +463,12 @@ export class IndexCreditosComponent implements OnInit {
     const payloadBase = {
       idMediosPago: this.nuevaCobranza.idMediosPago ?? undefined,
       idApertura: this.nuevaCobranza.idApertura || undefined,
-      observaciones: this.nuevaCobranza.observaciones || undefined
+      observaciones: this.nuevaCobranza.observaciones || undefined,
+      idEmpresaOperacion: this.idEmpresaOp()
     };
     from(itemsConImporte).pipe(
       concatMap((item: DetalleCobranzaItem) =>
-        this.creditosService.obtenerCuotasCredito(item.idCredito).pipe(
+        this.creditosService.obtenerCuotasCredito(item.idCredito, this.idEmpresaOp()).pipe(
           switchMap((res: any) => {
             const cuotas: CuotaCredito[] = res.data || [];
             const pendiente = cuotas.find((cu: CuotaCredito) => cu.estado === 'PENDIENTE' || cu.estado === 'VENCIDO');
@@ -555,6 +590,7 @@ export class IndexCreditosComponent implements OnInit {
     };
     if (this.pagoCuota.idMediosPago != null) payload.idMediosPago = this.pagoCuota.idMediosPago;
     if (this.pagoCuota.idApertura) payload.idApertura = this.pagoCuota.idApertura;
+    payload.idEmpresaOperacion = this.idEmpresaOp();
 
     this.creditosService.pagarCuota(payload).subscribe({
       next: (response) => {
@@ -565,7 +601,7 @@ export class IndexCreditosComponent implements OnInit {
         iziToast.success({ title: 'Éxito', message: msg });
         this.cerrarModales();
         if (this.creditoSeleccionado) {
-          this.creditosService.obtenerCuotasCredito(this.creditoSeleccionado.idCredito).subscribe({
+          this.creditosService.obtenerCuotasCredito(this.creditoSeleccionado.idCredito, this.idEmpresaOp()).subscribe({
             next: (resp) => { this.cuotas = resp.data || []; }
           });
         }

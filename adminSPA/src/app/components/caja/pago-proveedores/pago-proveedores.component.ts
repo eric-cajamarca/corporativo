@@ -3,6 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
+import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../services/caja-operacion-context.service';
 import { ComprasService } from '../../../services/compras.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
@@ -51,6 +52,9 @@ export class PagoProveedoresComponent implements OnInit {
   tiposMovimiento: any[] = [];
   mediosPago: any[] = [];
   loading = false;
+
+  empresasOperacion: EmpresaCajaOperacion[] = [];
+  idEmpresaOperacionSel = '';
 
   filtros = {
     numero: '',
@@ -109,6 +113,7 @@ export class PagoProveedoresComponent implements OnInit {
 
   constructor(
     private cajaService: CajaService,
+    private cajaOpCtx: CajaOperacionContextService,
     private comprasService: ComprasService,
     private proveedoresService: ProveedoresService,
     private tablasSunat: TablasSunatService,
@@ -139,8 +144,18 @@ export class PagoProveedoresComponent implements OnInit {
     });
   }
 
+  onCambioEmpresaOperacion(id: string): void {
+    this.cajaOpCtx.setEmpresaOperacion(id);
+    this.idEmpresaOperacionSel = id;
+    this.cargarDatos();
+    this.cargarLista();
+    if (this.proveedorSeleccionado) {
+      this.cargarComprobantesProveedor();
+    }
+  }
+
   cargarDatos(): void {
-    this.cajaService.obtenerCajas().subscribe({
+    this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
       next: (r) => {
         this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
       },
@@ -160,7 +175,7 @@ export class PagoProveedoresComponent implements OnInit {
 
   cargarLista(): void {
     this.loading = true;
-    this.comprasService.obtener_compras_todos_idEmpresa().subscribe({
+    this.comprasService.obtener_compras_todos_idEmpresa(this.idEmpresaOperacionSel || null).subscribe({
       next: (r) => {
         const compras: any[] = r.data || [];
         this.list = compras.map((c: any) => this.mapearCompra(c));
@@ -261,7 +276,7 @@ export class PagoProveedoresComponent implements OnInit {
 
   private cargarComprobantesProveedor(): void {
     if (!this.proveedorSeleccionado) return;
-    this.comprasService.obtener_compras_todos_idEmpresa().subscribe({
+    this.comprasService.obtener_compras_todos_idEmpresa(this.idEmpresaOperacionSel || null).subscribe({
       next: (r) => {
         const compras: any[] = (r.data || []).filter((c: any) => c.idProveedor === this.proveedorSeleccionado!.idProveedor && Number(c.idEstadoPago) === this.ESTADO_PENDIENTE);
         this.comprobantes = compras.map((c: any, i: number) => ({
@@ -398,7 +413,8 @@ export class PagoProveedoresComponent implements OnInit {
       concepto,
       monto: importe,
       idMediosPago: this.form.idMediosPago ?? undefined,
-      observaciones: observaciones || undefined
+      observaciones: observaciones || undefined,
+      idEmpresaOperacion: this.idEmpresaOperacionSel || null
     }).subscribe({
       next: (data: any) => {
         const comprobante = (data?.documentoRelacionado || '').toString().trim() || 'N/A';

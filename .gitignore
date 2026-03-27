@@ -1,0 +1,13 @@
+# Backend (monorepo: solo adminSPA tenía .gitignore)
+backAppC/node_modules/
+
+# Logs y depuración local
+*.log
+debug-*.log
+
+# Cursor
+.cursor/
+
+# Variables de entorno locales
+.env
+**/.env.local

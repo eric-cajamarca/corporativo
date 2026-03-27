@@ -27,10 +27,10 @@ const fs = require('fs').promises; // Usamos la versión con promesas
 // )
 
 
-const getEmpresas = async function (req, res) {
+const getEmpresas = async function (req, res, next) {
         
     if (req.user) {
-        if (req.user.rol == 'Administrador') {
+        if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
                         try {
                 const pool = await sql.connect(dbConfig);
                 const result = await pool
@@ -42,27 +42,27 @@ const getEmpresas = async function (req, res) {
                                 res.status(200).send({ data: result.recordset });
             } catch (error) {
                 console.error('Error al obtener las epresas:', error);
-                res.status(200).send({ data: undefined });
+                return next(error);
             }
         } else {
-            res.status(500).send({ message: 'No Access' });
+            return res.status(401).send({ message: 'No autorizado' });
         }
 
 
 
     }
     else {
-        res.status(500).send({ message: 'No Access' });
+        return res.status(401).send({ message: 'No autorizado' });
     }
 };
 
 
 
-const getEmpresasById = async function (req, res) {
+const getEmpresasById = async function (req, res, next) {
         const id = req.user.empresa;
 
     if (req.user) {
-        if(req.user.rol=='Administrador'){
+        if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
                         try {
                 const pool = await sql.connect(dbConfig);
                 let result = await pool
@@ -74,19 +74,19 @@ const getEmpresasById = async function (req, res) {
                 res.status(200).send({ data: result.recordset });
             } catch (error) {
                 console.error('Error al obtener los usuarios:', error);
-                res.status(500).send({ data: undefined });
+                return next(error);
             }
         }else{
-            res.status(500).send({ message: 'No Autorizado' });
+            return res.status(403).send({ message: 'No autorizado' });
 
         }
     }
     else {
-        res.status(500).send({ message: 'No Access' });
+        return res.status(401).send({ message: 'No autorizado' });
     }
 };
 
-const getEmpresa_id = async function (req, res) {
+const getEmpresa_id = async function (req, res, next) {
     const id = req.user.empresa;
     if (!req.user) {
         return res.status(401).send({ message: 'No autorizado' });
@@ -108,13 +108,18 @@ const getEmpresa_id = async function (req, res) {
         res.status(200).send({ data: result.recordset });
     } catch (error) {
         console.error('Error al obtener empresa (getEmpresa_id):', error);
-        res.status(500).send({ data: undefined });
+        return next(error);
     }
 };
 
 const empresaService = require('../services/empresa.service');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const whatsappFactilizaService = require('../services/whatsappFactiliza.service');
+const seguridadAuditoriaService = require('../services/seguridadAuditoria.service');
+const twoFactorAdminService = require('../services/twoFactorAdmin.service');
+const { obtenerIpCliente } = require('../utils/clientIp.util');
+const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
+const empresaRepository = require('../repositories/empresa.repository');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
@@ -156,7 +161,7 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
   }
 }
 
-const createEmpresa = async function (req, res) {
+const createEmpresa = async function (req, res, next) {
         const { idDocumento, ruc, razon_Social, nombre_Comercial, rubro, celular, logo, correo, password, alias, condicion, estSunat } = req.body;
 
     const currentDate = moment().format('YYYY-MM-DD');
@@ -245,13 +250,13 @@ const createEmpresa = async function (req, res) {
         }
         catch (error) {
             console.error('Error al crear la Empresa:', error);
-            res.status(500).send({ data: undefined });
+            return next(error);
         }
     }
 }
 
 // Integraciones y APIs de pago (empresa del usuario logueado)
-const getIntegraciones = async function (req, res) {
+const getIntegraciones = async function (req, res, next) {
     try {
         const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
         if (!idEmpresa) {
@@ -279,11 +284,11 @@ const getIntegraciones = async function (req, res) {
         });
     } catch (error) {
         console.error('Error al obtener integraciones:', error);
-        res.status(500).send({ message: 'Error al obtener integraciones', data: undefined });
+        return next(error);
     }
 };
 
-const putIntegraciones = async function (req, res) {
+const putIntegraciones = async function (req, res, next) {
     try {
         const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
         if (!idEmpresa) {
@@ -311,11 +316,11 @@ const putIntegraciones = async function (req, res) {
         res.status(200).send({ data: { ok: true }, message: 'Integraciones actualizadas.' });
     } catch (error) {
         console.error('Error al actualizar integraciones:', error);
-        res.status(500).send({ message: 'Error al actualizar integraciones', data: undefined });
+        return next(error);
     }
 };
 
-const putCredencialesProveedor = async function (req, res) {
+const putCredencialesProveedor = async function (req, res, next) {
     try {
         const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
         if (!idEmpresa) {
@@ -345,12 +350,12 @@ const putCredencialesProveedor = async function (req, res) {
         res.status(200).send({ data: { ok: true }, message: 'Credenciales guardadas.' });
     } catch (error) {
         console.error('Error al guardar credenciales:', error);
-        res.status(500).send({ message: 'Error al guardar credenciales', data: undefined });
+        return next(error);
     }
 };
 
 // Ruta pública: enviar código de activación por WhatsApp (sin sesión). Usa Factiliza WHATSAPP desde FactilizaConfig.
-const enviarCodigoActivacion = async function (req, res) {
+const enviarCodigoActivacion = async function (req, res, next) {
         // #region agent log
     fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:entry',message:'enviarCodigoActivacion entered',data:{hasBody:!!req.body,idEmpresa:req.body?.idEmpresa!=null},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
     // #endregion
@@ -380,7 +385,7 @@ const enviarCodigoActivacion = async function (req, res) {
         const codigoEnviar = verificacion && (verificacion.codigo != null) ? String(verificacion.codigo) : null;
         if (!codigoEnviar) {
             console.error('enviarCodigoActivacion: no se generó código de verificación');
-            return res.status(500).json({ message: 'Error al generar código de verificación' });
+            return next(new Error('Error al generar código de verificación'));
         }
         const resultado = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
         if (!resultado.sent) {
@@ -395,12 +400,12 @@ const enviarCodigoActivacion = async function (req, res) {
         fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:catch',message:'catch',data:{message:error?.message},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
         // #endregion
         console.error('Error en enviarCodigoActivacion:', error);
-        res.status(500).json({ message: error.message || 'Error al enviar código' });
+        return next(error);
     }
 };
 
 // Verificar empresa con código enviado por WhatsApp
-const verificarEmpresaCodigo = async function (req, res) {
+const verificarEmpresaCodigo = async function (req, res, next) {
     try {
         const { idEmpresa, codigo } = req.body || {};
         if (!idEmpresa || !codigo) {
@@ -414,13 +419,13 @@ const verificarEmpresaCodigo = async function (req, res) {
         res.status(200).send({ data: { ok: true }, message: 'Empresa verificada y habilitada correctamente.' });
     } catch (error) {
         console.error('Error al verificar empresa por código:', error);
-        res.status(500).send({ message: 'Error al verificar empresa', data: undefined });
+        return next(error);
     }
 };
 
 
 
-const updateEmpresa = async function (req, res) {
+const updateEmpresa = async function (req, res, next) {
     try {
                 
         const idEmpresa = req.user.empresa;
@@ -492,15 +497,11 @@ const updateEmpresa = async function (req, res) {
             fs.unlink(req.file.path, () => {});
         }
 
-        res.status(500).json({
-            success: false,
-            message: 'Error al actualizar empresa',
-            //error: process.env.NODE_ENV === 'development' ? error.message : null
-        });
+        return next(error);
     }
 };
 
-const cambiar_estado_empresa = async function (req, res) {
+const cambiar_estado_empresa = async function (req, res, next) {
         if (req.user) {
         let idEmpresa = req.params['id'];
         const { estado } = req.body;
@@ -521,14 +522,14 @@ const cambiar_estado_empresa = async function (req, res) {
             res.status(200).send({ data: result.rowsAffected });
         } catch (error) {
             console.error('Error al cambiar el estado de la empresa:', error);
-            res.status(500).send({ data: undefined });
+            return next(error);
 
         }
 
     }
 }
 
-// const obtener_logo = async function (req, res) {
+// const obtener_logo = async function (req, res, next) {
 //     console.log('entro a obtener_logo', req.params);
 //     //var img = req.params['img'];
 //     var img = '01.jpg';
@@ -549,7 +550,7 @@ const cambiar_estado_empresa = async function (req, res) {
 
 
 
-const obtener_logo = async function (req, res) {
+const obtener_logo = async function (req, res, next) {
     try {
                 
         const img = req.params.img || 'default.jpg';
@@ -565,12 +566,12 @@ const obtener_logo = async function (req, res) {
         }
     } catch (error) {
         console.error('Error al obtener logo:', error);
-        res.status(500).send('Error al obtener la imagen');
+        return next(error);
     }
 };
 
 
-const obtener_datos_colaborador_admin = async (req, res) => {
+const obtener_datos_colaborador_admin = async (req, res, next) => {
     const { id } = req.params;
     let data;
 
@@ -591,50 +592,45 @@ const obtener_datos_colaborador_admin = async (req, res) => {
 
 
         } catch (error) {
-            console.error('Error al actualizar un usuario:', error);
-            // res.status(500).send('Error al actualizar un usuario');
-            res.status(200).send({ message: 'Error al actualizar un usuario', data: undefined });
+            console.error('Error al obtener datos colaborador (empresasController):', error);
+            return next(error);
         }
     }
     else {
-        res.status(500).send({ message: 'No Access' });
+        return res.status(401).send({ message: 'No autorizado' });
     }
 };
 
-const cambiar_estado_colaborador_admin = async function (req, res) {
-    if (req.user) {
-        let id = req.params['id'];
-        let data = req.body;
-        let estado = data.estado;
-
+const cambiar_estado_colaborador_admin = async function (req, res, next) {
+    if (!req.user) {
+        return res.status(403).send({ data: undefined, message: 'NoToken' });
+    }
+    try {
+        const id = req.params['id'];
+        const data = req.body;
         let nuevo_estado;
-
-                
-
         if (data.estado) {
             nuevo_estado = false;
         } else if (!data.estado) {
             nuevo_estado = true;
         }
-
-        
         const pool = await sql.connect(dbConfig);
         const result = await pool
             .request()
             .input('id', sql.Int, id)
             .input('estado', sql.Bit, nuevo_estado)
             .query('UPDATE usuarioWeb SET estado = @estado WHERE id = @id');
-                res.status(200).send({ data: result.recordset });
-
-    } else {
-        res.status(403).send({ data: undefined, message: 'NoToken' });
+        res.status(200).send({ data: result.recordset });
+    } catch (error) {
+        console.error('cambiar_estado_colaborador_admin:', error);
+        return next(error);
     }
-}
+};
 
 
 
 
-const deleteAdmin = async (req, res) => {
+const deleteAdmin = async (req, res, next) => {
     const { id } = req.params;
     try {
         const pool = await sql.connect(dbConfig);
@@ -645,14 +641,14 @@ const deleteAdmin = async (req, res) => {
         res.json({ message: 'Usuario eliminado correctamente' });
     } catch (error) {
         console.error('Error al eliminar un Usuario:', error);
-        res.status(500).send('Error al eliminar un Usuario');
+        return next(error);
     }
 };
 
 
 
 
-const createDireccionEmpresa = async function (req, res) {
+const createDireccionEmpresa = async function (req, res, next) {
     try {
         const idEmpresa = (req.user && (req.user.empresa || req.user.idEmpresa)) ? (req.user.empresa || req.user.idEmpresa) : req.body.idEmpresa;
         if (!idEmpresa) {
@@ -732,7 +728,7 @@ const createDireccionEmpresa = async function (req, res) {
     //     }
     // }
     // else {
-    //     res.status(500).send({ message: 'No Access' });
+    //     return res.status(401).send({ message: 'No autorizado' });
     // }
 
 }
@@ -745,7 +741,7 @@ const createDireccionEmpresa = async function (req, res) {
  * Crear sucursal (para nueva dirección con nombre elegido por el usuario).
  * Body: idEmpresa, nombre (obligatorio), direccion (opcional).
  */
-const createSucursalEmpresa = async function (req, res) {
+const createSucursalEmpresa = async function (req, res, next) {
     try {
         const idEmpresa = (req.user && (req.user.empresa || req.user.idEmpresa)) ? (req.user.empresa || req.user.idEmpresa) : req.body.idEmpresa;
         if (!idEmpresa) {
@@ -770,11 +766,11 @@ const createSucursalEmpresa = async function (req, res) {
         res.status(200).send({ data: { idSucursal, nombre, direccion }, message: 'Sucursal creada' });
     } catch (error) {
         console.error('createSucursalEmpresa:', error);
-        res.status(500).send({ message: error.message || 'Error al crear sucursal', data: undefined });
+        return next(error);
     }
 };
 
-const updateDireccionEmpresa = async function (req, res) {
+const updateDireccionEmpresa = async function (req, res, next) {
         const { idDireccionEmpresa, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, codLocal, principal } = req.body;
     const id = idDireccionEmpresa;
 
@@ -834,7 +830,7 @@ const updateDireccionEmpresa = async function (req, res) {
                 res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al actualizar un DireccionEmpresa:', error);
-                res.status(500).send('Error al actualizar un DireccionEmpresa');
+                return next(error);
             }
         }
         else {
@@ -845,7 +841,7 @@ const updateDireccionEmpresa = async function (req, res) {
     }
 }
 
-const getDireccionEmpresa_id = async function (req, res) {
+const getDireccionEmpresa_id = async function (req, res, next) {
     
     const idEmpresa = req.user.empresa;
         if (req.user) {
@@ -859,7 +855,7 @@ const getDireccionEmpresa_id = async function (req, res) {
                 res.status(200).send({ data: result.recordset });
             } catch (error) {
                 console.error('Error al obtener las direcciones de la empresa:', error);
-                res.status(500).send('Error al obtener las direcciones de la empresa');
+                return next(error);
             }
         }
         else {
@@ -872,7 +868,7 @@ const getDireccionEmpresa_id = async function (req, res) {
 }
 
 // const eliminarDirecion_id
-const deleteDireccion_id = async function (req,res) {
+const deleteDireccion_id = async function (req, res, next) {
     const idDireccionEmpresa = req.params['id'];
     
 
@@ -887,7 +883,7 @@ const deleteDireccion_id = async function (req,res) {
                 res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al eliminar la direccion de la empresa:', error);
-                res.status(500).send('Error al eliminar la direccion de la empresa');
+                return next(error);
             }
         }
         else {
@@ -900,7 +896,7 @@ const deleteDireccion_id = async function (req,res) {
 }
 
 //convertir en principal la direccion de la empresa por su idDireccionEmpresa y el resro de direcciones en false
-const cambiar_principal_direccion = async function (req, res) {
+const cambiar_principal_direccion = async function (req, res, next) {
         const idDireccionEmpresa = req.params.id;
     const idEmpresa = req.user.empresa;
 
@@ -924,14 +920,14 @@ const cambiar_principal_direccion = async function (req, res) {
                         res.status(200).send({ data: result.rowsAffected });
                     } catch (error) {
                         console.error('Error al cambiar la direccion principal1:', error);
-                        res.status(500).send('Error al cambiar la direccion principal');
+                        return next(error);
                     }
                 }
 
 
             } catch (error) {
                 console.error('Error al cambiar la direccion principal0:', error);
-                res.status(500).send('Error al cambiar la direccion principal');
+                return next(error);
             }
 
 
@@ -944,7 +940,7 @@ const cambiar_principal_direccion = async function (req, res) {
     }
 }
 
-const getEstadoConfiguracion = async function (req, res) {
+const getEstadoConfiguracion = async function (req, res, next) {
         
     if (!req.user || !req.user.empresa) {
         return res.status(401).send({ message: 'No autorizado', data: undefined });
@@ -957,8 +953,103 @@ const getEstadoConfiguracion = async function (req, res) {
                 res.status(200).send({ data: estado });
     } catch (error) {
         console.error('Error obteniendo estado de configuración:', error);
-        res.status(500).send({ message: 'Error al obtener estado de configuración', data: undefined });
+        return next(error);
     }
+};
+
+const GUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+
+/**
+ * POST /empresa/:idEmpresa/reset-2fa-admin
+ * Misma regla que getEmpresas: superAdmin + empresa principal (EMPRESA_PRINCIPAL_ID).
+ */
+const reset2faEmpresa = async (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).send({ message: 'No autorizado', data: undefined });
+  }
+  if (!puedeAccesoListadoPlataformaEmpresas(req)) {
+    return res.status(403).send({
+      message: 'No tiene permisos para restablecer el 2FA de la plataforma.',
+      data: undefined
+    });
+  }
+  const idEmpresaTarget = req.params.idEmpresa;
+  if (!idEmpresaTarget || !GUID_RE.test(String(idEmpresaTarget))) {
+    return res.status(400).send({ message: 'Identificador de empresa inválido', data: undefined });
+  }
+  const ipCliente = obtenerIpCliente(req);
+  try {
+    const pool = await sql.connect(dbConfig);
+    await twoFactorAdminService.resetearTotpEmpresa(pool, idEmpresaTarget);
+    await seguridadAuditoriaService.registrar(pool, req, {
+      idEmpresa: idEmpresaTarget,
+      idUsuario: req.user.sub,
+      tipo: 'RESET_2FA_EMPRESA',
+      detalle: String(req.user.email || '').slice(0, 500),
+      ipCliente
+    });
+    return res.status(200).send({
+      message:
+        '2FA restablecido para la empresa. Los administradores deberán configurar de nuevo el autenticador al iniciar sesión.',
+      data: undefined
+    });
+  } catch (error) {
+    if (error.message === 'EMPRESA_NO_ENCONTRADA') {
+      return res.status(404).send({ message: 'Empresa no encontrada', data: undefined });
+    }
+    console.error('reset2faEmpresa:', error.message);
+    return next(error);
+  }
+};
+
+/**
+ * PUT /empresa/:idEmpresa/politica-2fa-admin
+ * Body: { "adminRequiere2FA": true | false }
+ * Mismo acceso que listado plataforma (superAdmin + empresa principal).
+ */
+const putPolitica2faAdmin = async (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).send({ message: 'No autorizado', data: undefined });
+  }
+  if (!puedeAccesoListadoPlataformaEmpresas(req)) {
+    return res.status(403).send({
+      message: 'No tiene permisos para esta operación.',
+      data: undefined
+    });
+  }
+  const idEmpresa = req.params.idEmpresa;
+  if (!idEmpresa || !GUID_RE.test(String(idEmpresa))) {
+    return res.status(400).send({ message: 'Identificador de empresa inválido', data: undefined });
+  }
+  const { adminRequiere2FA } = req.body || {};
+  if (typeof adminRequiere2FA !== 'boolean') {
+    return res.status(400).send({
+      message: 'Envíe adminRequiere2FA como booleano (true o false).',
+      data: undefined
+    });
+  }
+  const ipCliente = obtenerIpCliente(req);
+  try {
+    const pool = await sql.connect(dbConfig);
+    const n = await empresaRepository.actualizarAdminRequiere2FA(pool, idEmpresa, adminRequiere2FA);
+    if (!n) {
+      return res.status(404).send({ message: 'Empresa no encontrada', data: undefined });
+    }
+    await seguridadAuditoriaService.registrar(pool, req, {
+      idEmpresa,
+      idUsuario: req.user.sub,
+      tipo: 'POLITICA_2FA_ADMIN',
+      detalle: `adminRequiere2FA=${adminRequiere2FA}`,
+      ipCliente
+    });
+    return res.status(200).send({
+      message: 'Política de 2FA para administradores actualizada.',
+      data: { adminRequiere2FA }
+    });
+  } catch (error) {
+    console.error('putPolitica2faAdmin:', error.message);
+    return next(error);
+  }
 };
 
 module.exports = {
@@ -992,6 +1083,9 @@ module.exports = {
 
     // Estado de configuración
     getEstadoConfiguracion,
+
+    reset2faEmpresa,
+    putPolitica2faAdmin,
 
     //direcciones de la empresa
 

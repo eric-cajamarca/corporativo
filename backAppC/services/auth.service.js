@@ -2,19 +2,127 @@ const bcrypt = require('bcryptjs');
 const jwtHelper = require('../helpers/jwt');
 const empresaRepository = require('../repositories/empresa.repository');
 const usuarioRepository = require('../repositories/usuario.repository');
+const loginSeguridadRepository = require('../repositories/loginSeguridad.repository');
+const seguridadAlertasService = require('./seguridadAlertas.service');
 const emailService = require('./email.service');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 
-exports.adminLogin = async (pool, email, password, ruc) => {
+const LOGIN_INTENTOS_MAX = 5;
+const LOGIN_BLOQUEO_MINUTOS = 30;
+
+function empresaExige2faAdmin(empresa) {
+  if (!empresa) return true;
+  const v = empresa.adminRequiere2FA;
+  if (v === false || v === 0) return false;
+  return true;
+}
+
+async function evaluarEtapa2fa(pool, datosUsuario, syntheticAdmin, empresa) {
+  const twoFactorAdminService = require('./twoFactorAdmin.service');
+  const jwtHelper = require('../helpers/jwt');
+  if (!empresaExige2faAdmin(empresa)) {
+    return { stage: 'OK', datosUsuario };
+  }
+  if (!twoFactorAdminService.requiere2faRolElevado(datosUsuario.rol)) {
+    return { stage: 'OK', datosUsuario };
+  }
+  const st = await twoFactorAdminService.obtenerEstado(
+    pool,
+    datosUsuario.idUsuario,
+    datosUsuario.idEmpresa,
+    syntheticAdmin
+  );
+  if (!st.enabled) {
+    return {
+      stage: 'SETUP',
+      pendingToken: jwtHelper.createTwoFactorPendingToken({
+        idUsuario: datosUsuario.idUsuario,
+        idEmpresa: datosUsuario.idEmpresa,
+        synthetic: syntheticAdmin,
+        flow: 'setup'
+      }),
+      datosUsuario
+    };
+  }
+  return {
+    stage: 'VERIFY',
+    pendingToken: jwtHelper.createTwoFactorPendingToken({
+      idUsuario: datosUsuario.idUsuario,
+      idEmpresa: datosUsuario.idEmpresa,
+      synthetic: syntheticAdmin,
+      flow: 'verify'
+    }),
+    datosUsuario
+  };
+}
+
+function normalizarEmailLogin(email) {
+  return String(email || '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 320);
+}
+
+function correoEmpresaCoincide(correoEmpresa, emailNorm) {
+  return String(correoEmpresa || '')
+    .trim()
+    .toLowerCase() === emailNorm;
+}
+
+async function marcarUltimoLoginSiUsuarioWeb(pool, idUsuario, idEmpresa) {
+  try {
+    const n = await usuarioRepository.actualizarUltimoLogin(pool, idUsuario, idEmpresa);
+    if (!n) {
+      // Sin fila UsuarioWeb (ej. login solo con credenciales de empresa sin admin en tabla)
+      return;
+    }
+  } catch (err) {
+    console.error('marcarUltimoLoginSiUsuarioWeb:', err.message);
+  }
+}
+
+async function aplicarFalloLogin(pool, empresa, emailNorm, ipCliente) {
+  const { intentosFallidos, recienBloqueado } = await loginSeguridadRepository.registrarFallo(
+    pool,
+    empresa.idEmpresa,
+    emailNorm,
+    LOGIN_INTENTOS_MAX,
+    LOGIN_BLOQUEO_MINUTOS,
+    ipCliente
+  );
+  await seguridadAlertasService.notificarLoginFallido(pool, {
+    empresa,
+    email: emailNorm,
+    intentosFallidos,
+    recienBloqueado,
+    ipCliente
+  });
+  if (recienBloqueado) {
+    throw new Error('LOGIN_BLOQUEADO_TEMPORAL');
+  }
+}
+
+exports.adminLogin = async (pool, email, password, ruc, ipCliente = null) => {
+  const emailNorm = normalizarEmailLogin(email);
+  if (!emailNorm || !password || !ruc) {
+    throw new Error('Faltan datos requeridos');
+  }
+
   // 1. Validar RUC y obtener empresa
   const empresa = await empresaRepository.buscarPorRuc(pool, ruc);
   if (!empresa) {
     throw new Error('RUC no existe o empresa inactiva');
   }
 
+  await loginSeguridadRepository.limpiarBloqueoSiExpirado(pool, empresa.idEmpresa, emailNorm);
+  const estadoLock = await loginSeguridadRepository.obtenerEstado(pool, empresa.idEmpresa, emailNorm);
+  if (estadoLock.bloqueadoHasta && new Date(estadoLock.bloqueadoHasta) > new Date()) {
+    throw new Error('LOGIN_BLOQUEADO_TEMPORAL');
+  }
+
   // 2. Intentar login como COLABORADOR (email + contraseña del usuario en UsuarioWeb)
-  const colaborador = await usuarioRepository.buscarPorEmailYRuc(pool, email, empresa.idEmpresa);
+  const colaborador = await usuarioRepository.buscarPorEmailNormalizado(pool, emailNorm, empresa.idEmpresa);
   if (colaborador) {
     // estado puede venir como 1, true (BIT) según el driver
     const activo = colaborador.estado === 1 || colaborador.estado === true;
@@ -24,12 +132,14 @@ exports.adminLogin = async (pool, email, password, ruc) => {
     // password puede venir con distinta capitalización desde SQL Server
     const passwordHash = colaborador.password || colaborador.Password;
     if (!passwordHash || typeof passwordHash !== 'string') {
-      console.error('Login colaborador: hash de contraseña no disponible para', email);
+      console.error('Login colaborador: hash de contraseña no disponible para', emailNorm);
       throw new Error('Error interno del servidor');
     }
     const isPasswordValid = await bcrypt.compare(password, passwordHash);
     if (isPasswordValid) {
-            return {
+      await loginSeguridadRepository.resetPorExito(pool, empresa.idEmpresa, emailNorm);
+      await marcarUltimoLoginSiUsuarioWeb(pool, colaborador.idUsuario, empresa.idEmpresa);
+      const datosUsuario = {
         idUsuario: colaborador.idUsuario,
         idEmpresa: empresa.idEmpresa,
         razonSocial: empresa.razon_Social || empresa.razonSocial,
@@ -38,27 +148,32 @@ exports.adminLogin = async (pool, email, password, ruc) => {
         email: colaborador.email,
         rol: colaborador.rol || 'Colaborador'
       };
+      return await evaluarEtapa2fa(pool, datosUsuario, false, empresa);
     }
-    // Contraseña incorrecta para este colaborador
+    await aplicarFalloLogin(pool, empresa, emailNorm, ipCliente);
     throw new Error('La contraseña es incorrecta');
   }
 
   // 3. Si no es colaborador: login como EMPRESA (correo y contraseña de la empresa)
-  if (empresa.correo !== email) {
+  if (!correoEmpresaCoincide(empresa.correo, emailNorm)) {
+    await aplicarFalloLogin(pool, empresa, emailNorm, ipCliente);
     throw new Error('El email no existe o no tiene permisos para acceder');
   }
 
   const isEmpresaPasswordValid = await bcrypt.compare(password, empresa.password);
   if (!isEmpresaPasswordValid) {
+    await aplicarFalloLogin(pool, empresa, emailNorm, ipCliente);
     throw new Error('La contraseña es incorrecta');
   }
 
-  
+  await loginSeguridadRepository.resetPorExito(pool, empresa.idEmpresa, emailNorm);
+
   // 4. Buscar usuario administrador de la empresa (opcional para completar datos)
   try {
     const usuario = await usuarioRepository.buscarUsuarioAdminPorEmpresa(pool, empresa.idEmpresa);
     if (usuario) {
-      return {
+      await marcarUltimoLoginSiUsuarioWeb(pool, usuario.idUsuario, empresa.idEmpresa);
+      const datosUsuario = {
         idUsuario: usuario.idUsuario,
         idEmpresa: empresa.idEmpresa,
         razonSocial: empresa.razon_Social,
@@ -67,19 +182,111 @@ exports.adminLogin = async (pool, email, password, ruc) => {
         email: usuario.email,
         rol: usuario.rol || 'Administrador'
       };
+      return await evaluarEtapa2fa(pool, datosUsuario, false, empresa);
     }
   } catch (error) {
     console.error('Error al buscar admin por empresa:', error.message);
   }
 
-  // 5. Sin usuario administrador: datos básicos de empresa
-  return {
+  // 5. Sin usuario administrador: datos básicos de empresa (idUsuario = idEmpresa; no hay fila típica en UsuarioWeb)
+  const datosSynthetic = {
     idUsuario: empresa.idEmpresa,
     idEmpresa: empresa.idEmpresa,
     razonSocial: empresa.razon_Social,
     nombres: 'Administrador',
     apellidos: 'Sistema',
     email: empresa.correo,
+    rol: 'Administrador'
+  };
+  return await evaluarEtapa2fa(pool, datosSynthetic, true, empresa);
+};
+
+/**
+ * Reconstruye datos de sesión tras validar TOTP (misma forma que login completo).
+ */
+exports.construirDatosUsuarioPost2FA = async (pool, idUsuario, idEmpresa, synthetic) => {
+  const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
+  if (!emp) return null;
+  const empresaActiva = emp.estado === 1 || emp.estado === true;
+  if (!empresaActiva) return null;
+
+  if (synthetic) {
+    return {
+      idUsuario: idEmpresa,
+      idEmpresa,
+      razonSocial: emp.razon_Social,
+      nombres: 'Administrador',
+      apellidos: 'Sistema',
+      email: emp.correo,
+      rol: 'Administrador'
+    };
+  }
+
+  const uw = await usuarioRepository.buscarPorIdYEmpresa(pool, idUsuario, idEmpresa);
+  if (!uw) return null;
+  const activo = uw.estado === 1 || uw.estado === true;
+  if (!activo) return null;
+  return {
+    idUsuario: uw.idUsuario,
+    idEmpresa,
+    razonSocial: emp.razon_Social,
+    nombres: uw.nombres,
+    apellidos: uw.apellidos,
+    email: uw.email,
+    rol: uw.rol || 'Colaborador'
+  };
+};
+
+/**
+ * Reconstruye el payload de sesión tras validar refresh token (misma forma que adminLogin exitoso).
+ */
+exports.reconstruirDatosUsuarioParaToken = async (pool, idUsuario, idEmpresa) => {
+  const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
+  if (!emp) return null;
+  const empresaActiva = emp.estado === 1 || emp.estado === true;
+  if (!empresaActiva) return null;
+
+  const uw = await usuarioRepository.buscarPorIdYEmpresa(pool, idUsuario, idEmpresa);
+  if (uw) {
+    const activo = uw.estado === 1 || uw.estado === true;
+    if (!activo) return null;
+    return {
+      idUsuario: uw.idUsuario,
+      idEmpresa,
+      razonSocial: emp.razon_Social,
+      nombres: uw.nombres,
+      apellidos: uw.apellidos,
+      email: uw.email,
+      rol: uw.rol || 'Colaborador'
+    };
+  }
+
+  const idUS = String(idUsuario).toLowerCase();
+  const idEM = String(idEmpresa).toLowerCase();
+  if (idUS !== idEM) return null;
+
+  const admin = await usuarioRepository.buscarUsuarioAdminPorEmpresa(pool, idEmpresa);
+  if (admin) {
+    const activo = admin.estado === 1 || admin.estado === true;
+    if (!activo) return null;
+    return {
+      idUsuario: admin.idUsuario,
+      idEmpresa,
+      razonSocial: emp.razon_Social,
+      nombres: admin.nombres,
+      apellidos: admin.apellidos,
+      email: admin.email,
+      rol: admin.rol || 'Administrador'
+    };
+  }
+
+  return {
+    idUsuario: idEmpresa,
+    idEmpresa,
+    razonSocial: emp.razon_Social,
+    nombres: 'Administrador',
+    apellidos: 'Sistema',
+    email: emp.correo,
     rol: 'Administrador'
   };
 };

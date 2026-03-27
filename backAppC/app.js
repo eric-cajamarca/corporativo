@@ -1,4 +1,5 @@
 const express = require('express');
+require('express-async-errors');
 const cors = require('cors');
 const helmet = require('helmet');
 const { connectDB } = require('./dbConnection');
@@ -65,6 +66,10 @@ const suscripcionRoutes = require('./routes/suscripcion');
 
 
 const app = express();
+// Tras proxy (nginx, etc.): req.ip y X-Forwarded-For coherentes para login / auditoría
+if (process.env.TRUST_PROXY === '1') {
+  app.set('trust proxy', 1);
+}
 
 // Seguridad: Implementar headers de seguridad con helmet
 app.use(helmet({
@@ -209,6 +214,10 @@ app.use('/api', webhooksRoutes);
 app.use('/api', suscripcionRoutes);
 const grifoRoutes = require('./routes/grifo');
 app.use('/api', grifoRoutes);
+
+// Errores: 5xx → WhatsApp al desarrollador (throttle en seguridadAlertas); 4xx sin alerta
+const errorHandler = require('./middlewares/errorHandler');
+app.use(errorHandler);
 
 // Health para Kubernetes/Ambassador (sin auth)
 app.get('/health', (req, res) => {

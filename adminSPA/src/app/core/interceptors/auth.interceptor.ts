@@ -7,24 +7,38 @@ import {
   HttpEvent,
   HttpErrorResponse
 } from '@angular/common/http';
-import { Observable, catchError, throwError } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
-
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
   constructor(private authService: AuthService) {}
 
-  intercept(
-    req: HttpRequest<any>,
-    next: HttpHandler
-  ): Observable<HttpEvent<any>> {
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    const url = req.url;
+    const skipRefresh =
+      url.includes('refresh_session') ||
+      url.includes('admin_login') ||
+      url.includes('admin_2fa_') ||
+      url.includes('logout') ||
+      url.includes('recuperar-password') ||
+      url.includes('restablecer-password');
+
     return next.handle(req).pipe(
-      catchError(error => {
-        if (error instanceof HttpErrorResponse) {
-          if (error.status === 401) { // No autorizado
-            console.error('Token no válido, redirigiendo a login en interceptor');
-            this.authService.forceLogout();
+      catchError((error: HttpErrorResponse) => {
+        if (error instanceof HttpErrorResponse && error.status === 403 && !skipRefresh) {
+          const msg = error.error?.message;
+          if (msg === 'TokenExpirado' || msg === 'InvalidToken' || msg === 'NoTokenError') {
+            return this.authService.tryRefreshSession().pipe(
+              switchMap(ok => {
+                if (!ok) {
+                  this.authService.forceLogout();
+                  return throwError(() => error);
+                }
+                return next.handle(req);
+              })
+            );
           }
         }
         return throwError(() => error);

@@ -6,7 +6,7 @@ const gestoresRepository = require('../repositories/gestores.repository');
 /**
  * Navegación reducida para empresa gestora (tiene empresas gestionadas activas).
  * Consultas: Dashboard + Análisis. Ventas: nueva, historial, cotizaciones.
- * Caja: gestión, ventas pendientes, arqueo. Despachos: módulo completo. Empresa mínima.
+ * Caja: gestión, ventas pendientes, cobranza, pago proveedores, recibos, arqueo. Despachos: módulo completo. Empresa mínima.
  */
 function construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChofer) {
     const can = (p) => esAdmin || permisos.includes(p);
@@ -59,6 +59,16 @@ function construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChof
     if (can('VER_CAJA')) {
         subCaja.push({ nombre: 'Gestión de Cajas', ruta: '/caja', permiso: 'VER_CAJA', visible: true });
         subCaja.push({ nombre: 'Ventas pendientes de pago', ruta: '/caja/ventas-pendientes-pago', permiso: 'VER_CAJA', visible: true });
+    }
+    if (can('VER_CREDITOS')) {
+        subCaja.push({ nombre: 'Cobranza de Créditos', ruta: '/creditos', permiso: 'VER_CREDITOS', visible: true });
+    }
+    if (can('VER_COMPRAS')) {
+        subCaja.push({ nombre: 'Pago a Proveedores', ruta: '/caja/pago-proveedores', permiso: 'VER_COMPRAS', visible: true });
+    }
+    if (can('REGISTRAR_MOVIMIENTOS')) {
+        subCaja.push({ nombre: 'Recibo Ingreso', ruta: '/caja/recibo-ingreso', permiso: 'REGISTRAR_MOVIMIENTOS', visible: true });
+        subCaja.push({ nombre: 'Recibo Egreso', ruta: '/caja/recibo-egreso', permiso: 'REGISTRAR_MOVIMIENTOS', visible: true });
     }
     if (can('VER_ARQUEO') || can('VER_CAJA')) {
         subCaja.push({ nombre: 'Arqueo de Caja', ruta: '/caja/arqueo', permiso: 'VER_ARQUEO', visible: true });

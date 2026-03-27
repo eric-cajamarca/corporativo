@@ -1,9 +1,12 @@
 // controllers/comprasController.js
+const sql = require('mssql');
+const dbConfig = require('../dbconfig');
 const comprasService = require('../services/compras.service');
+const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 
-const obtener_compras_todos = async (req, res) => {
+const obtener_compras_todos = async (req, res, next) => {
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -17,14 +20,14 @@ const obtener_compras_todos = async (req, res) => {
         res.status(200).send({ data });
     } catch (error) {
         console.error('obtener_compras_todos:', error);
-        res.status(500).send({ message: 'Error al obtener las compras', data: undefined });
+        return next(error);
     }
 };
 
-const obtener_compras_id = async (req, res) => {
+const obtener_compras_id = async (req, res, next) => {
     const idCompra = req.params.id;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -34,15 +37,15 @@ const obtener_compras_id = async (req, res) => {
         res.status(200).send({ data });
     } catch (error) {
         console.error('obtener_compras_id:', error);
-        res.status(500).send({ message: 'Error al obtener las compras', data: undefined });
+        return next(error);
     }
 };
 
-const obtener_compras_idCompra_idEmpresa = async (req, res) => {
+const obtener_compras_idCompra_idEmpresa = async (req, res, next) => {
     const idCompra = req.params.id;
     const idEmpresa = req.user?.empresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -52,28 +55,36 @@ const obtener_compras_idCompra_idEmpresa = async (req, res) => {
         res.status(200).send({ data });
     } catch (error) {
         console.error('obtener_compras_idCompra_idEmpresa:', error);
-        res.status(500).send({ message: 'Error al obtener las compras', data: undefined });
+        return next(error);
     }
 };
 
-const obtener_compras_todos_idEmpresa = async (req, res) => {
+const obtener_compras_todos_idEmpresa = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
-    const idEmpresa = req.user.empresa || req.user.idEmpresa;
-    if (!idEmpresa) {
+    const idJwt = req.user.empresa || req.user.idEmpresa;
+    if (!idJwt) {
         return res.status(403).send({ message: 'Empresa no identificada en la sesión', data: undefined });
     }
     try {
-        const data = await comprasService.listarComprasPorIdEmpresa(idEmpresa);
+        const pool = await sql.connect(dbConfig);
+        const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
+        const data = await comprasService.listarComprasPorIdEmpresa(idEmpresaOp);
         res.status(200).send({ data });
     } catch (error) {
+        if (error.message === 'EMPRESA_OPERACION_NO_PERMITIDA') {
+            return res.status(403).send({ message: 'Empresa de operación no permitida', data: undefined });
+        }
+        if (error.message === 'NO_ACCESS') {
+            return res.status(401).send({ message: 'No autorizado', data: undefined });
+        }
         console.error('obtener_compras_todos_idEmpresa:', error);
-        res.status(500).send({ message: 'Error al obtener las compras', data: undefined });
+        return next(error);
     }
 };
 
-const crear_compra = async (req, res) => {
+const crear_compra = async (req, res, next) => {
     if (!req.user) {
         return res.status(403).send({ message: 'No Access', data: undefined });
     }
@@ -90,13 +101,13 @@ const crear_compra = async (req, res) => {
         if (error.number === 2627) {
             return res.status(400).send({ message: 'Ya existe una compra con la misma serie y número para esta empresa.', data: undefined });
         }
-        res.status(500).send({ message: 'Error al crear la compra', data: undefined });
+        return next(error);
     }
 };
 
-const editar_compra = async (req, res) => {
+const editar_compra = async (req, res, next) => {
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -112,13 +123,13 @@ const editar_compra = async (req, res) => {
         if (error.message && error.message.includes('idProveedor')) {
             return res.status(400).send({ message: error.message, data: undefined });
         }
-        res.status(500).send({ message: 'Error al editar la compra', data: undefined });
+        return next(error);
     }
 };
 
-const eliminar_idcompra_empresa = async (req, res) => {
+const eliminar_idcompra_empresa = async (req, res, next) => {
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -130,15 +141,15 @@ const eliminar_idcompra_empresa = async (req, res) => {
         res.status(200).send({ message: 'Compra eliminada correctamente', data: rowsAffected });
     } catch (error) {
         console.error('eliminar_idcompra_empresa:', error);
-        res.status(500).send({ message: 'Error al eliminar la compra', data: undefined });
+        return next(error);
     }
 };
 
-const buscar_comprobante_idCliente = async (req, res) => {
+const buscar_comprobante_idCliente = async (req, res, next) => {
     const idProveedor = req.params.id;
     const idEmpresa = req.user?.empresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -148,16 +159,16 @@ const buscar_comprobante_idCliente = async (req, res) => {
         res.status(200).send({ data });
     } catch (error) {
         console.error('buscar_comprobante_idCliente:', error);
-        res.status(500).send({ message: 'Error al obtener las compras', data: undefined });
+        return next(error);
     }
 };
 
 // --- Borrador compras ---
 
-const obtener_borrador_compras_empresa = async (req, res) => {
+const obtener_borrador_compras_empresa = async (req, res, next) => {
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -167,14 +178,14 @@ const obtener_borrador_compras_empresa = async (req, res) => {
         res.status(200).send({ data });
     } catch (error) {
         console.error('obtener_borrador_compras_empresa:', error);
-        res.status(500).send({ message: 'Error al obtener las compras', data: undefined });
+        return next(error);
     }
 };
 
-const crear_borrador_compras_empresa = async (req, res) => {
+const crear_borrador_compras_empresa = async (req, res, next) => {
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -184,14 +195,14 @@ const crear_borrador_compras_empresa = async (req, res) => {
         res.status(200).send({ message: 'Borrador de compra creado correctamente', data: undefined });
     } catch (error) {
         console.error('crear_borrador_compras_empresa:', error);
-        res.status(500).send({ message: 'Error al crear la compra', data: undefined });
+        return next(error);
     }
 };
 
-const editar_borrador_compras_empresa = async (req, res) => {
+const editar_borrador_compras_empresa = async (req, res, next) => {
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -201,14 +212,14 @@ const editar_borrador_compras_empresa = async (req, res) => {
         res.status(200).send({ message: 'Borrador de compra editado correctamente', data: undefined });
     } catch (error) {
         console.error('editar_borrador_compras_empresa:', error);
-        res.status(500).send({ message: 'Error al crear la compra', data: undefined });
+        return next(error);
     }
 };
 
-const eliminar_borrador_compras_empresa = async (req, res) => {
+const eliminar_borrador_compras_empresa = async (req, res, next) => {
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     if (req.user.rol !== 'Administrador') {
         return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -218,13 +229,13 @@ const eliminar_borrador_compras_empresa = async (req, res) => {
         res.status(200).send({ message: 'Borrador de compra eliminado correctamente', data: rowsAffected });
     } catch (error) {
         console.error('eliminar_borrador_compras_empresa:', error);
-        res.status(500).send({ message: 'Error al crear la compra', data: undefined });
+        return next(error);
     }
 };
 
 // --- Correlativos ---
 
-const obtener_correlativos_empresa = async (req, res) => {
+const obtener_correlativos_empresa = async (req, res, next) => {
     const idEmpresa = req.user?.empresa;
     if (!idEmpresa) {
         return res.status(401).send({ message: 'No autorizado', data: undefined });
@@ -234,23 +245,23 @@ const obtener_correlativos_empresa = async (req, res) => {
         res.status(200).send({ data });
     } catch (error) {
         console.error('obtener_correlativos_empresa:', error);
-        res.status(500).send({ message: 'Error al obtener los correlativos', data: undefined });
+        return next(error);
     }
 };
 
-const editar_correlativos_empresa = async (req, res) => {
+const editar_correlativos_empresa = async (req, res, next) => {
     const idCorrelativo = req.params.id;
     const { numero } = req.body;
     const idEmpresa = req.user?.empresa;
     if (!req.user) {
-        return res.status(500).send({ message: 'No Access', data: undefined });
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
     try {
         const rowsAffected = await comprasService.actualizarCorrelativo(idEmpresa, idCorrelativo, numero);
         res.status(200).send({ message: 'Correlativo editado correctamente', data: rowsAffected });
     } catch (error) {
         console.error('editar_correlativos_empresa:', error);
-        res.status(500).send({ message: 'Error al obtener los correlativos', data: undefined });
+        return next(error);
     }
 };
 

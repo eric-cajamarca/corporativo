@@ -24,7 +24,7 @@ export class AdminGuard implements CanActivate {
           return false;
         }
         const rol = this.authService.userData()?.rol ?? '';
-        if (rol !== 'Administrador') {
+        if (rol !== 'Administrador' && rol !== 'superAdmin') {
           this.router.navigate(['/home']);
           return false;
         }

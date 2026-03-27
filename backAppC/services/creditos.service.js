@@ -1,6 +1,7 @@
 const CreditosRepository = require('../repositories/creditos.repository');
+const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 
-exports.obtenerCreditosClienteService = async (pool, user, idCliente) => {
+exports.obtenerCreditosClienteService = async (pool, user, idCliente, idEmpresaOperacion) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
@@ -9,7 +10,8 @@ exports.obtenerCreditosClienteService = async (pool, user, idCliente) => {
     throw new Error("NO_PERMISSIONS");
   }
 
-  const creditos = await CreditosRepository.obtenerCreditosClienteRepo(pool, user.empresa, idCliente);
+  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
+  const creditos = await CreditosRepository.obtenerCreditosClienteRepo(pool, idE, idCliente);
   return creditos;
 };
 
@@ -22,13 +24,11 @@ exports.crearCreditoService = async (pool, user, datos) => {
     throw new Error("NO_PERMISSIONS");
   }
 
-  // Validar que el cliente existe y pertenece a la empresa
   const clienteValido = await CreditosRepository.validarClienteEmpresaRepo(pool, datos.idCliente, user.empresa);
   if (!clienteValido) {
     throw new Error("CLIENTE_NO_ENCONTRADO");
   }
 
-  // Si hay venta asociada, validar que existe y pertenece a la empresa
   if (datos.idVenta) {
     const ventaValida = await CreditosRepository.validarVentaEmpresaRepo(pool, datos.idVenta, user.empresa);
     if (!ventaValida) {
@@ -40,7 +40,7 @@ exports.crearCreditoService = async (pool, user, datos) => {
   return result;
 };
 
-exports.obtenerCuotasCreditoService = async (pool, user, idCredito) => {
+exports.obtenerCuotasCreditoService = async (pool, user, idCredito, idEmpresaOperacion) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
@@ -49,7 +49,8 @@ exports.obtenerCuotasCreditoService = async (pool, user, idCredito) => {
     throw new Error("NO_PERMISSIONS");
   }
 
-  const cuotas = await CreditosRepository.obtenerCuotasCreditoRepo(pool, user.empresa, idCredito);
+  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
+  const cuotas = await CreditosRepository.obtenerCuotasCreditoRepo(pool, idE, idCredito);
   return cuotas;
 };
 
@@ -62,39 +63,44 @@ exports.pagarCuotaService = async (pool, user, datos) => {
     throw new Error("NO_PERMISSIONS");
   }
 
-  // Validar que la cuota existe y está pendiente
-  const cuotaValida = await CreditosRepository.validarCuotaPendienteRepo(pool, datos.idCuota, user.empresa);
+  const idE = await resolverIdEmpresaOperacionCaja(pool, user, datos.idEmpresaOperacion);
+  const userOp = { ...user, empresa: idE };
+
+  const cuotaValida = await CreditosRepository.validarCuotaPendienteRepo(pool, datos.idCuota, idE);
   if (!cuotaValida) {
     throw new Error("CUOTA_NO_ENCONTRADA");
   }
 
-  const result = await CreditosRepository.pagarCuotaRepo(pool, user, datos);
+  const result = await CreditosRepository.pagarCuotaRepo(pool, userOp, datos);
   return result;
 };
 
-exports.obtenerResumenCreditosService = async (pool, user) => {
+exports.obtenerResumenCreditosService = async (pool, user, idEmpresaOperacion) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const resumen = await CreditosRepository.obtenerResumenCreditosRepo(pool, user.empresa);
+  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
+  const resumen = await CreditosRepository.obtenerResumenCreditosRepo(pool, idE);
   return resumen;
 };
 
-exports.obtenerCuotasPendientesService = async (pool, user, dias = 7) => {
+exports.obtenerCuotasPendientesService = async (pool, user, dias = 7, idEmpresaOperacion) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const cuotas = await CreditosRepository.obtenerCuotasPendientesRepo(pool, user.empresa, dias);
+  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
+  const cuotas = await CreditosRepository.obtenerCuotasPendientesRepo(pool, idE, dias);
   return cuotas;
 };
 
-exports.obtenerEficienciaCobrosService = async (pool, user) => {
+exports.obtenerEficienciaCobrosService = async (pool, user, idEmpresaOperacion) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const eficiencia = await CreditosRepository.obtenerEficienciaCobrosRepo(pool, user.empresa);
+  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
+  const eficiencia = await CreditosRepository.obtenerEficienciaCobrosRepo(pool, idE);
   return eficiencia;
 };

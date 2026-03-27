@@ -27,6 +27,10 @@ export class IndexEmpresaComponent implements OnInit {
   public empresas: any[] = [];
   public empresas_const: any[] = [];
   public load_estado = false;
+  /** idEmpresa mientras corre POST reset 2FA, o null. */
+  public loadingReset2faId: string | null = null;
+  /** idEmpresa mientras guarda política 2FA. */
+  public guardandoPolitica2faId: string | null = null;
 
   // Paginación
   public page = 1;
@@ -97,6 +101,41 @@ export class IndexEmpresaComponent implements OnInit {
   /**
    * Cambia el estado de una empresa
    */
+  confirmarReset2fa(empresa: { idEmpresa: string; razon_Social?: string }): void {
+    if (this.loadingReset2faId) {
+      return;
+    }
+    this.loadingReset2faId = empresa.idEmpresa;
+    this.empresaService.reset2faEmpresa(empresa.idEmpresa).subscribe({
+      next: (r) => {
+        this.loadingReset2faId = null;
+        const el = document.getElementById(`reset2fa-${empresa.idEmpresa}`);
+        if (el && typeof bootstrap !== 'undefined') {
+          const inst = bootstrap.Modal.getInstance(el);
+          inst?.hide();
+        }
+        iziToast.show({
+          title: 'Éxito',
+          titleColor: '#28a745',
+          message: r.message || '2FA restablecido para la empresa.',
+          position: 'topRight'
+        });
+      },
+      error: (error) => {
+        this.loadingReset2faId = null;
+        const msg =
+          (typeof error?.error?.message === 'string' && error.error.message) ||
+          'No se pudo restablecer el 2FA.';
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#dc3545',
+          message: msg,
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
   cambiarEstado(id: string, estadoActual: boolean): void {
     this.load_estado = true;
     this.empresaService.cambiar_estado_empresa(id, estadoActual).subscribe({
@@ -144,6 +183,40 @@ export class IndexEmpresaComponent implements OnInit {
     this.activeTab.set('gestores');
     const modal = new bootstrap.Modal(document.getElementById('modalGestores'));
     modal.show();
+  }
+
+  /** true = la empresa exige TOTP a administradores (planes estándar). */
+  esAdmin2faActivo(emp: { adminRequiere2FA?: boolean | number }): boolean {
+    const v = emp.adminRequiere2FA;
+    if (v === false || v === 0) return false;
+    return true;
+  }
+
+  cambiarPolitica2faAdmin(
+    empresa: { idEmpresa: string; razon_Social?: string; adminRequiere2FA?: boolean | number },
+    activar: boolean
+  ): void {
+    if (this.guardandoPolitica2faId) return;
+    this.guardandoPolitica2faId = empresa.idEmpresa;
+    this.empresaService.putPolitica2faAdmin(empresa.idEmpresa, activar).subscribe({
+      next: (r) => {
+        this.guardandoPolitica2faId = null;
+        empresa.adminRequiere2FA = r.data?.adminRequiere2FA ?? activar;
+        iziToast.show({
+          title: 'Guardado',
+          titleColor: '#28a745',
+          message: r.message || 'Política actualizada.',
+          position: 'topRight'
+        });
+      },
+      error: (err) => {
+        this.guardandoPolitica2faId = null;
+        const msg =
+          (typeof err?.error?.message === 'string' && err.error.message) || 'No se pudo guardar la política.';
+        iziToast.show({ title: 'Error', titleColor: '#dc3545', message: msg, position: 'topRight' });
+        this.cargarEmpresas();
+      }
+    });
   }
 
   /**
@@ -361,11 +434,13 @@ export class IndexEmpresaComponent implements OnInit {
       this.cargarConfiguracion();
     } else if (tab === 'servicios-api') {
       this.cargarServiciosApi();
+    } else if (tab === 'seguridad-admin') {
+      this.cargarEmpresas();
     }
   }
 
   /**
-   * Carga empresas, servicios y asignaciones para el tab Servicios API (solo Administrador).
+   * Carga empresas, servicios y asignaciones para el tab Servicios API (solo superAdmin plataforma).
    */
   cargarServiciosApi(): void {
     this.loadingServiciosApi.set(true);

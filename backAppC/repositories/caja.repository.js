@@ -506,6 +506,17 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
   return result.recordset;
 };
 
+exports.obtenerIdEmpresaPorMovimientoRepo = async (pool, idMovimientoCaja) => {
+  const result = await pool
+    .request()
+    .input("idMovimientoCaja", sql.UniqueIdentifier, idMovimientoCaja)
+    .query(`
+      SELECT idEmpresa FROM MovimientosCaja WHERE idMovimientoCaja = @idMovimientoCaja
+    `);
+  const row = result.recordset && result.recordset[0];
+  return row && row.idEmpresa != null ? row.idEmpresa : null;
+};
+
 exports.eliminarMovimientoCajaRepo = async (pool, idMovimientoCaja, idEmpresa) => {
   const result = await pool
     .request()

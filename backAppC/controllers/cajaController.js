@@ -1,16 +1,18 @@
 const dbConfig = require('../dbconfig');
 const sql = require('mssql');
 const CajaServices = require('../services/caja.service');
+const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 
 // Obtener cajas disponibles para la empresa
-const obtenerCajas = async (req, res) => {
+const obtenerCajas = async (req, res, next) => {
   try {
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!idEmpresa) {
       return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: [] });
     }
     const pool = await sql.connect(dbConfig);
-    const userWithEmpresa = { ...req.user, empresa: idEmpresa };
+    const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
+    const userWithEmpresa = { ...req.user, empresa: idEmpresaOp };
     const cajas = await CajaServices.obtenerCajasService(pool, userWithEmpresa);
     res.status(200).send({ data: Array.isArray(cajas) ? cajas : [] });
   } catch (error) {
@@ -23,16 +25,16 @@ const obtenerCajas = async (req, res) => {
         data: undefined
       });
     }
+    if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA") {
+      return res.status(403).send({ message: "Empresa de operación no permitida", data: [] });
+    }
     console.error("Error obtener cajas:", error);
-    res.status(500).send({
-      message: "Error al obtener las cajas",
-      data: []
-    });
+    return next(error);
   }
 };
 
 // Crear nueva caja
-const crearCaja = async (req, res) => {
+const crearCaja = async (req, res, next) => {
   try {
     const { idSucursal, nombre, descripcion } = req.body;
     if (!idSucursal || !nombre || !nombre.trim()) {
@@ -62,12 +64,12 @@ const crearCaja = async (req, res) => {
       return res.status(400).send({ message: "Sucursal y nombre son obligatorios", data: undefined });
     }
     console.error("Error crear caja:", error);
-    res.status(500).send({ message: "Error al registrar la caja", data: undefined });
+    return next(error);
   }
 };
 
 // Abrir caja
-const abrirCaja = async (req, res) => {
+const abrirCaja = async (req, res, next) => {
   try {
     const { idCaja, montoInicial, observaciones } = req.body;
 
@@ -113,15 +115,12 @@ const abrirCaja = async (req, res) => {
       });
     }
     console.error("Error abrir caja:", error);
-    res.status(500).send({
-      message: "Error al abrir la caja",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Cerrar caja
-const cerrarCaja = async (req, res) => {
+const cerrarCaja = async (req, res, next) => {
   try {
     const { idApertura, montoFinal, observaciones } = req.body;
 
@@ -161,15 +160,12 @@ const cerrarCaja = async (req, res) => {
       });
     }
     console.error("Error cerrar caja:", error);
-    res.status(500).send({
-      message: "Error al cerrar la caja",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Registrar movimiento de caja
-const registrarMovimiento = async (req, res) => {
+const registrarMovimiento = async (req, res, next) => {
   try {
     const {
       idApertura,
@@ -203,7 +199,8 @@ const registrarMovimiento = async (req, res) => {
       idMediosPago,
       idMoneda,
       documentoRelacionado,
-      observaciones
+      observaciones,
+      idEmpresaOperacion: req.body.idEmpresaOperacion
     });
 
     res.status(200).send({
@@ -219,6 +216,9 @@ const registrarMovimiento = async (req, res) => {
         message: "No tiene permisos para realizar esta acción",
         data: undefined
       });
+    }
+        if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA") {
+      return res.status(403).send({ message: "Empresa de operación no permitida", data: undefined });
     }
     if (error.message === "CAJA_NO_ABIERTA") {
       return res.status(400).send({
@@ -239,26 +239,25 @@ const registrarMovimiento = async (req, res) => {
       });
     }
     console.error("Error registrar movimiento:", error);
-    res.status(500).send({
-      message: "Error al registrar el movimiento",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Obtener movimientos de caja
-const obtenerMovimientosCaja = async (req, res) => {
+const obtenerMovimientosCaja = async (req, res, next) => {
   try {
     const { idApertura, idCaja, fechaDesde, fechaHasta, tipoMovimiento, soloRecibos } = req.query;
 
     const pool = await sql.connect(dbConfig);
+    const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
     const movimientos = await CajaServices.obtenerMovimientosCajaService(pool, req.user, {
       idApertura,
       idCaja: idCaja || null,
       fechaDesde,
       fechaHasta,
       tipoMovimiento: tipoMovimiento || null,
-      soloRecibos: soloRecibos === "true" || soloRecibos === true
+      soloRecibos: soloRecibos === "true" || soloRecibos === true,
+      idEmpresaOperacion: idEmpresaOp
     });
 
     res.status(200).send({ data: movimientos });
@@ -272,16 +271,16 @@ const obtenerMovimientosCaja = async (req, res) => {
         data: undefined
       });
     }
+    if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA") {
+      return res.status(403).send({ message: "Empresa de operación no permitida", data: undefined });
+    }
     console.error("Error obtener movimientos:", error);
-    res.status(500).send({
-      message: "Error al obtener los movimientos de caja",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Obtener tipos de movimiento de caja
-const obtenerTiposMovimientoCaja = async (req, res) => {
+const obtenerTiposMovimientoCaja = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
     const tipos = await CajaServices.obtenerTiposMovimientoCajaService(pool, req.user);
@@ -291,15 +290,12 @@ const obtenerTiposMovimientoCaja = async (req, res) => {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
     console.error("Error obtener tipos movimiento:", error);
-    res.status(500).send({
-      message: "Error al obtener los tipos de movimiento",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Crear tipo de movimiento de caja
-const crearTipoMovimientoCaja = async (req, res) => {
+const crearTipoMovimientoCaja = async (req, res, next) => {
   try {
     const { nombre, descripcion, tipo } = req.body;
     const pool = await sql.connect(dbConfig);
@@ -312,12 +308,12 @@ const crearTipoMovimientoCaja = async (req, res) => {
       return res.status(400).send({ message: "Ya existe un tipo con ese nombre", data: undefined });
     }
     console.error("Error crear tipo movimiento:", error);
-    res.status(500).send({ message: error.message || "Error al crear tipo de movimiento", data: undefined });
+    return next(error);
   }
 };
 
 // Actualizar tipo de movimiento de caja
-const actualizarTipoMovimientoCaja = async (req, res) => {
+const actualizarTipoMovimientoCaja = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).send({ message: "ID inválido", data: undefined });
@@ -329,12 +325,12 @@ const actualizarTipoMovimientoCaja = async (req, res) => {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos", data: undefined });
     console.error("Error actualizar tipo movimiento:", error);
-    res.status(500).send({ message: error.message || "Error al actualizar", data: undefined });
+    return next(error);
   }
 };
 
 // Eliminar tipo de movimiento de caja
-const eliminarTipoMovimientoCaja = async (req, res) => {
+const eliminarTipoMovimientoCaja = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).send({ message: "ID inválido", data: undefined });
@@ -346,18 +342,20 @@ const eliminarTipoMovimientoCaja = async (req, res) => {
     if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos", data: undefined });
     if (error.message === "Tipo de movimiento no encontrado.") return res.status(404).send({ message: error.message, data: undefined });
     console.error("Error eliminar tipo movimiento:", error);
-    res.status(500).send({ message: error.message || "Error al eliminar", data: undefined });
+    return next(error);
   }
 };
 
 // Recibos de egreso (movimientos tipo Egreso)
-const obtenerRecibosEgreso = async (req, res) => {
+const obtenerRecibosEgreso = async (req, res, next) => {
   try {
     const { fechaDesde, fechaHasta } = req.query;
     const pool = await sql.connect(dbConfig);
+    const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
     const lista = await CajaServices.obtenerRecibosEgresoService(pool, req.user, {
       fechaDesde: fechaDesde || null,
-      fechaHasta: fechaHasta || null
+      fechaHasta: fechaHasta || null,
+      idEmpresaOperacion: idEmpresaOp
     });
     res.status(200).send({ data: lista });
   } catch (error) {
@@ -367,13 +365,16 @@ const obtenerRecibosEgreso = async (req, res) => {
     if (error.message === "NO_PERMISSIONS") {
       return res.status(403).send({ message: "Sin permisos", data: undefined });
     }
+    if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA") {
+      return res.status(403).send({ message: "Empresa de operación no permitida", data: undefined });
+    }
     console.error("Error obtener recibos egreso:", error);
-    res.status(500).send({ message: "Error al obtener recibos de egreso", data: undefined });
+    return next(error);
   }
 };
 
 // Eliminar movimiento (recibo egreso)
-const eliminarMovimientoCaja = async (req, res) => {
+const eliminarMovimientoCaja = async (req, res, next) => {
   try {
     const { id } = req.params;
     const pool = await sql.connect(dbConfig);
@@ -389,13 +390,16 @@ const eliminarMovimientoCaja = async (req, res) => {
     if (error.message === "NO_PERMISSIONS") {
       return res.status(403).send({ message: "Sin permisos", data: undefined });
     }
+    if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA") {
+      return res.status(403).send({ message: "Empresa de operación no permitida", data: undefined });
+    }
     console.error("Error eliminar movimiento:", error);
-    res.status(500).send({ message: "Error al eliminar", data: undefined });
+    return next(error);
   }
 };
 
 // Actualizar movimiento (recibo egreso)
-const actualizarMovimientoCaja = async (req, res) => {
+const actualizarMovimientoCaja = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { concepto, idConcepto, monto, idMediosPago, documentoRelacionado, observaciones } = req.body;
@@ -426,13 +430,16 @@ const actualizarMovimientoCaja = async (req, res) => {
     if (error.message === "NO_PERMISSIONS") {
       return res.status(403).send({ message: "Sin permisos", data: undefined });
     }
+    if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA") {
+      return res.status(403).send({ message: "Empresa de operación no permitida", data: undefined });
+    }
     console.error("Error actualizar movimiento:", error);
-    res.status(500).send({ message: "Error al actualizar", data: undefined });
+    return next(error);
   }
 };
 
 // Obtener resumen de caja diario
-const obtenerResumenCajaDiario = async (req, res) => {
+const obtenerResumenCajaDiario = async (req, res, next) => {
   try {
     const { fecha } = req.query;
 
@@ -451,15 +458,12 @@ const obtenerResumenCajaDiario = async (req, res) => {
       });
     }
     console.error("Error obtener resumen caja:", error);
-    res.status(500).send({
-      message: "Error al obtener el resumen de caja",
-      data: undefined
-    });
+    return next(error);
   }
 };
 
 // Arqueo dinámico: conceptos y formas de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal)
-const obtenerArqueoDinamico = async (req, res) => {
+const obtenerArqueoDinamico = async (req, res, next) => {
   try {
     const { fecha, fechaInicial, fechaFinal, idCaja } = req.query;
     const pool = await sql.connect(dbConfig);
@@ -488,7 +492,39 @@ const obtenerArqueoDinamico = async (req, res) => {
       return res.status(403).send({ message: "Sin permisos", data: undefined });
     }
     console.error("Error obtener arqueo dinámico:", error);
-    res.status(500).send({ message: "Error al obtener arqueo", data: undefined });
+    return next(error);
+  }
+};
+
+
+// Contexto empresa operación caja (gestora + gestionadas) y default desde config
+const obtenerContextoOperacionCaja = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await CajaServices.obtenerContextoOperacionCajaService(pool, req.user);
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Sin permisos", data: undefined });
+    console.error("Error contexto operación caja:", error);
+    return next(error);
+  }
+};
+
+const guardarEmpresaOperacionCajaDefault = async (req, res, next) => {
+  try {
+    const { idEmpresaOperacion } = req.body || {};
+    const pool = await sql.connect(dbConfig);
+    const data = await CajaServices.guardarEmpresaOperacionCajaDefaultService(pool, req.user, idEmpresaOperacion);
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "NO_PERMISSIONS") return res.status(403).send({ message: "Solo la empresa gestora puede guardar el valor por defecto.", data: undefined });
+    if (error.message === "EMPRESA_OPERACION_NO_PERMITIDA" || error.message === "ID_EMPRESA_DEFAULT_INVALIDO") {
+      return res.status(400).send({ message: error.message, data: undefined });
+    }
+    console.error("Error guardar default operación caja:", error);
+    return next(error);
   }
 };
 
@@ -507,5 +543,7 @@ module.exports = {
   actualizarTipoMovimientoCaja,
   eliminarTipoMovimientoCaja,
   obtenerResumenCajaDiario,
-  obtenerArqueoDinamico
+  obtenerArqueoDinamico,
+  obtenerContextoOperacionCaja,
+  guardarEmpresaOperacionCajaDefault
 };

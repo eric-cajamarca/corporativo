@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { AdminService } from '../../services/admin.service';
+import { AdminService, AdminLoginUserData } from '../../services/admin.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
@@ -24,6 +24,13 @@ export class LoginEmpresaComponent implements OnInit {
   public emailInvalid: boolean = false;
   public showPassword: boolean = false;
   public loading: boolean = false;
+
+  /** null = formulario normal; setup/verify = 2FA obligatorio para admin/superAdmin. */
+  public twoFaMode: null | 'setup' | 'verify' = null;
+  public pendingToken = '';
+  public qrDataUrl = '';
+  public twoFaCode = '';
+  public loading2faQr = false;
 
   // Control de pasos del wizard
   public currentStep: number = 1; // 1: Empresa, 2: Usuario, 3: Acceso (resumen)
@@ -57,6 +64,11 @@ export class LoginEmpresaComponent implements OnInit {
     this.loading = false;
     this.currentStep = 1;
     this.maxStepReached = 1;
+    this.twoFaMode = null;
+    this.pendingToken = '';
+    this.qrDataUrl = '';
+    this.twoFaCode = '';
+    this.loading2faQr = false;
   }
 
   loadEmpresaRecordada(): void {
@@ -118,6 +130,7 @@ export class LoginEmpresaComponent implements OnInit {
     }
 
     this.loading = true;
+    this.twoFaMode = null;
 
     const data = {
       email: this.user.email.trim(),
@@ -125,7 +138,6 @@ export class LoginEmpresaComponent implements OnInit {
       ruc: this.user.ruc.trim()
     };
 
-    
     this._adminService.admin_login(data).subscribe({
       next: (response) => {
         this.loading = false;
@@ -135,21 +147,50 @@ export class LoginEmpresaComponent implements OnInit {
           return;
         }
 
-        // Login exitoso
-        this.usuario = response.data.idUsuario;
-        this.handleLoginSuccess(response.data);
+        const d = response.data;
+        if (d.requiresTwoFactorSetup) {
+          this.pendingToken = d.pendingToken || '';
+          this.twoFaMode = 'setup';
+          this.twoFaCode = '';
+          this.qrDataUrl = '';
+          if (!this.pendingToken) {
+            this.showLoginError('No se recibió token de configuración 2FA.');
+            this.twoFaMode = null;
+            return;
+          }
+          this.initQr2fa();
+          return;
+        }
+        if (d.requiresTwoFactor) {
+          this.pendingToken = d.pendingToken || '';
+          this.twoFaMode = 'verify';
+          this.twoFaCode = '';
+          if (!this.pendingToken) {
+            this.showLoginError('No se recibió token de verificación 2FA.');
+            this.twoFaMode = null;
+            return;
+          }
+          return;
+        }
+
+        this.usuario = d.idUsuario;
+        this.handleLoginSuccess(d);
 
         iziToast.success({
           title: '¡Bienvenido!',
           message: 'Acceso concedido al sistema CRM',
           position: 'topRight'
         });
-
-              },
+      },
       error: (error) => {
         this.loading = false;
         console.error('Login error:', error);
-        this.showLoginError('Error de conexión con el servidor');
+        const body = error?.error;
+        const msg =
+          (typeof body?.message === 'string' && body.message) ||
+          (typeof error?.message === 'string' && error.message) ||
+          'Error de conexión con el servidor';
+        this.showLoginError(msg);
       }
     });
   }
@@ -180,7 +221,82 @@ export class LoginEmpresaComponent implements OnInit {
     });
   }
 
-  private handleLoginSuccess(userData: any): void {
+  initQr2fa(): void {
+    this.loading2faQr = true;
+    this._adminService.admin2faSetupInit(this.pendingToken).subscribe({
+      next: (res) => {
+        this.loading2faQr = false;
+        this.qrDataUrl = res.data?.qrDataUrl || '';
+        if (!this.qrDataUrl) {
+          this.showLoginError('No se pudo generar el código QR. Intente de nuevo.');
+        }
+      },
+      error: (error) => {
+        this.loading2faQr = false;
+        const body = error?.error;
+        const msg =
+          (typeof body?.message === 'string' && body.message) ||
+          'No se pudo iniciar la configuración 2FA';
+        this.showLoginError(msg);
+        this.cancelTwoFactor();
+      }
+    });
+  }
+
+  submitTwoFaStep(): void {
+    const code = (this.twoFaCode || '').trim();
+    if (!code || !this.pendingToken) {
+      return;
+    }
+    this.loading = true;
+    const obs =
+      this.twoFaMode === 'setup'
+        ? this._adminService.admin2faSetupConfirm(this.pendingToken, code)
+        : this._adminService.admin2faVerify(this.pendingToken, code);
+
+    obs.subscribe({
+      next: (response) => {
+        this.loading = false;
+        if (!response.data) {
+          this.showLoginError(response.message || 'Error al validar el código');
+          return;
+        }
+        const d = response.data;
+        if (d.requiresTwoFactorSetup || d.requiresTwoFactor) {
+          this.showLoginError('Respuesta inesperada del servidor.');
+          return;
+        }
+        this.twoFaMode = null;
+        this.pendingToken = '';
+        this.usuario = d.idUsuario;
+        this.handleLoginSuccess(d);
+        iziToast.success({
+          title: '¡Bienvenido!',
+          message: 'Acceso concedido al sistema CRM',
+          position: 'topRight'
+        });
+      },
+      error: (error) => {
+        this.loading = false;
+        const body = error?.error;
+        const msg =
+          (typeof body?.message === 'string' && body.message) ||
+          (typeof error?.message === 'string' && error.message) ||
+          'Código incorrecto o sesión expirada';
+        this.showLoginError(msg);
+      }
+    });
+  }
+
+  cancelTwoFactor(): void {
+    this.twoFaMode = null;
+    this.pendingToken = '';
+    this.qrDataUrl = '';
+    this.twoFaCode = '';
+    this.loading2faQr = false;
+  }
+
+  private handleLoginSuccess(userData: AdminLoginUserData): void {
     // Guardar empresa recordada si está marcado el checkbox
     const rememberCheckbox = document.getElementById('remember') as HTMLInputElement;
     if (rememberCheckbox?.checked) {

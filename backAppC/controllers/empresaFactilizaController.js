@@ -1,11 +1,18 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const factilizaRepository = require('../repositories/factiliza.repository');
+const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
 
-/** Solo Administrador (dueño del sistema / super admin) */
-function requireAdmin(req, res) {
-  if (!req.user || req.user.rol !== 'Administrador') {
-    res.status(403).json({ message: 'Solo el administrador del sistema puede acceder' });
+/** Igual que listado de empresas / política 2FA: superAdmin + empresa principal (EMPRESA_PRINCIPAL_ID). */
+function requireSuperAdminPlataforma(req, res) {
+  if (!req.user) {
+    res.status(401).json({ message: 'No autorizado' });
+    return false;
+  }
+  if (!puedeAccesoListadoPlataformaEmpresas(req)) {
+    res.status(403).json({
+      message: 'Solo el superAdmin de la plataforma (empresa principal) puede acceder a esta función.'
+    });
     return false;
   }
   return true;
@@ -13,10 +20,10 @@ function requireAdmin(req, res) {
 
 /**
  * GET /api/factiliza/servicios
- * Lista nombres de servicios (FactilizaConfig) para la UI. Solo Administrador.
+ * Lista nombres de servicios (FactilizaConfig) para la UI. Solo superAdmin plataforma.
  */
 async function getServicios(req, res) {
-  if (!requireAdmin(req, res)) return;
+  if (!requireSuperAdminPlataforma(req, res)) return;
   let pool;
   try {
     pool = await sql.connect(dbConfig);
@@ -32,10 +39,10 @@ async function getServicios(req, res) {
 
 /**
  * GET /api/factiliza/empresas-servicios
- * Empresas, lista de servicios y asignaciones (matriz empresa × servicio). Solo Administrador.
+ * Empresas, lista de servicios y asignaciones (matriz empresa × servicio). Solo superAdmin plataforma.
  */
 async function getEmpresasServicios(req, res) {
-  if (!requireAdmin(req, res)) return;
+  if (!requireSuperAdminPlataforma(req, res)) return;
   let pool;
   try {
     pool = await sql.connect(dbConfig);
@@ -43,9 +50,6 @@ async function getEmpresasServicios(req, res) {
     res.json({ data: result });
   } catch (err) {
     console.error('empresaFactilizaController getEmpresasServicios:', err.message);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'39a89e'},body:JSON.stringify({sessionId:'39a89e',location:'empresaFactilizaController.js:getEmpresasServicios',message:'getEmpresasServicios error',data:{errMessage:err.message,errCode:err.code},timestamp:Date.now(),hypothesisId:'table-or-column'})}).catch(()=>{});
-    // #endregion
     res.status(500).json({ message: 'Error al cargar empresas y servicios' });
   } finally {
     // No cerrar pool global (rompe otras peticiones concurrentes).
@@ -55,10 +59,10 @@ async function getEmpresasServicios(req, res) {
 /**
  * POST /api/factiliza/empresas-servicios
  * Body: { asignaciones: [ { idEmpresa, nombreServicio, puedeUsar } ] }
- * Solo Administrador.
+ * Solo superAdmin plataforma.
  */
 async function guardarEmpresasServicios(req, res) {
-  if (!requireAdmin(req, res)) return;
+  if (!requireSuperAdminPlataforma(req, res)) return;
   const asignaciones = req.body?.asignaciones;
   if (!Array.isArray(asignaciones)) {
     return res.status(400).json({ message: 'Se requiere asignaciones (array)' });
@@ -79,9 +83,6 @@ async function guardarEmpresasServicios(req, res) {
     res.json({ message: 'Asignaciones guardadas correctamente' });
   } catch (err) {
     console.error('empresaFactilizaController guardarEmpresasServicios:', err.message);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'39a89e'},body:JSON.stringify({sessionId:'39a89e',location:'empresaFactilizaController.js:guardarEmpresasServicios',message:'guardarEmpresasServicios error',data:{errMessage:err.message,errCode:err.code},timestamp:Date.now(),hypothesisId:'merge-table'})}).catch(()=>{});
-    // #endregion
     res.status(500).json({ message: 'Error al guardar asignaciones' });
   } finally {
     // No cerrar pool global (rompe otras peticiones concurrentes).

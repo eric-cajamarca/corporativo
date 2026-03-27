@@ -45,6 +45,7 @@ import { UpdateCotizacionComponent } from './components/cotizaciones/update-coti
 import { AuthGuard } from './guards/auth.guard';
 import { AdminGuard } from './guards/admin.guards';
 import { empresaGestoraGuard } from './guards/empresa-gestora.guard';
+import { superAdminPlataformaEmpresasGuard } from './guards/superadmin-plataforma-empresas.guard';
 import { IndexProveedorComponent } from './components/proveedores/index-proveedor/index-proveedor.component';
 import { CreateProveedorComponent } from './components/proveedores/create-proveedor/create-proveedor.component';
 import { UpdateProveedorComponent } from './components/proveedores/update-proveedor/update-proveedor.component';
@@ -108,7 +109,7 @@ export const routes: Routes = [
      {
         path: 'empresa',
         component: IndexEmpresaComponent,
-        canActivate: [AuthGuard, AdminGuard, empresaGestoraGuard],
+        canActivate: [AuthGuard, superAdminPlataformaEmpresasGuard, empresaGestoraGuard],
         title: 'Empresas'
      },
      {

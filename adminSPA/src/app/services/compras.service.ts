@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { environment } from '../../environments/environment';
@@ -62,13 +62,18 @@ export class ComprasService {
     });
   }
 
-  /** Lista solo las compras de la empresa del usuario logueado. Siempre usa GET /api/compras-por-empresa. */
-  obtener_compras_todos_idEmpresa(): Observable<any> {
+  /** Lista compras de la empresa de operación (gestora/gestionada vía query idEmpresaOperacion). */
+  obtener_compras_todos_idEmpresa(idEmpresaOperacion?: string | null): Observable<any> {
     const url = environment.API_URL + 'compras-por-empresa';
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    let params = new HttpParams();
+    if (idEmpresaOperacion) {
+      params = params.set('idEmpresaOperacion', idEmpresaOperacion);
+    }
     return this._http.get(url, {
       headers,
-      withCredentials: true
+      withCredentials: true,
+      params
     });
   }
 

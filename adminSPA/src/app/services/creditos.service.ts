@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
@@ -15,28 +15,35 @@ export class CreditosService {
     this.url = global.url;
   }
 
-  // Listar todos los créditos de la empresa (tabla CreditosClientes)
-  obtenerCreditosTodos(): Observable<any> {
+  private paramsConEmpresaOp(idEmpresaOperacion?: string | null, base?: HttpParams): HttpParams {
+    let p = base ?? new HttpParams();
+    if (idEmpresaOperacion) {
+      p = p.set('idEmpresaOperacion', idEmpresaOperacion);
+    }
+    return p;
+  }
+
+  obtenerCreditosTodos(idEmpresaOperacion?: string | null): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url + 'creditos/todos', {
       headers,
-      withCredentials: true
+      withCredentials: true,
+      params: this.paramsConEmpresaOp(idEmpresaOperacion)
     });
   }
 
-  // Obtener créditos: sin idCliente lista todos; con idCliente filtra por ese cliente
-  obtenerCreditosCliente(idCliente: string): Observable<any> {
+  obtenerCreditosCliente(idCliente: string, idEmpresaOperacion?: string | null): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     if (idCliente == null || String(idCliente).trim() === '') {
-      return this.obtenerCreditosTodos();
+      return this.obtenerCreditosTodos(idEmpresaOperacion);
     }
     return this._http.get(this.url + 'creditos/cliente/' + encodeURIComponent(String(idCliente).trim()), {
       headers,
-      withCredentials: true
+      withCredentials: true,
+      params: this.paramsConEmpresaOp(idEmpresaOperacion)
     });
   }
 
-  // Crear nuevo crédito
   crearCredito(data: {
     idCliente: string;
     idVenta: string;
@@ -45,23 +52,22 @@ export class CreditosService {
     numeroCuotas: number;
     cuotaInicial?: number;
   }): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'creditos/', data, {
       headers: headers,
       withCredentials: true
     });
   }
 
-  // Obtener cuotas de un crédito
-  obtenerCuotasCredito(idCredito: string): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+  obtenerCuotasCredito(idCredito: string, idEmpresaOperacion?: string | null): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'creditos/' + idCredito + '/cuotas', {
       headers: headers,
-      withCredentials: true
+      withCredentials: true,
+      params: this.paramsConEmpresaOp(idEmpresaOperacion)
     });
   }
 
-  // Pagar cuota (idApertura opcional: si se envía, se genera Recibo de Ingreso y se refleja en arqueo)
   pagarCuota(data: {
     idCuota: string;
     montoPagado: number;
@@ -70,52 +76,52 @@ export class CreditosService {
     idApertura?: string;
     referencia?: string;
     observaciones?: string;
+    idEmpresaOperacion?: string | null;
   }): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'creditos/cuotas/' + data.idCuota + '/pagar', data, {
       headers: headers,
       withCredentials: true
     });
   }
 
-  // Obtener resumen de créditos
-  obtenerResumenCreditos(): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+  obtenerResumenCreditos(idEmpresaOperacion?: string | null): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'creditos/resumen', {
       headers: headers,
-      withCredentials: true
+      withCredentials: true,
+      params: this.paramsConEmpresaOp(idEmpresaOperacion)
     });
   }
 
-  // Obtener cuotas pendientes
   obtenerCuotasPendientes(filtros?: {
     idCliente?: string;
     fechaDesde?: string;
     fechaHasta?: string;
-  }): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    let params = '';
+  }, idEmpresaOperacion?: string | null): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    let params = new HttpParams();
     if (filtros) {
-      const queryParams = new URLSearchParams();
       Object.entries(filtros).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-          queryParams.append(key, value.toString());
+          params = params.set(key, value.toString());
         }
       });
-      params = '?' + queryParams.toString();
     }
-    return this._http.get(this.url+'creditos/cuotas/pendientes' + params, {
+    params = this.paramsConEmpresaOp(idEmpresaOperacion, params);
+    return this._http.get(this.url+'creditos/cuotas/pendientes', {
       headers: headers,
-      withCredentials: true
+      withCredentials: true,
+      params
     });
   }
 
-  // Obtener eficiencia de cobros por usuario
-  obtenerEficienciaCobros(): Observable<any> {
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+  obtenerEficienciaCobros(idEmpresaOperacion?: string | null): Observable<any> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'creditos/eficiencia-cobros', {
       headers: headers,
-      withCredentials: true
+      withCredentials: true,
+      params: this.paramsConEmpresaOp(idEmpresaOperacion)
     });
   }
 }

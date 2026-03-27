@@ -1,5 +1,23 @@
-
 import { Injectable } from '@angular/core';
+
+/** Respuesta de login / pasos 2FA (misma forma al completar sesión). */
+export interface AdminLoginUserData {
+  idUsuario: string;
+  idEmpresa: string;
+  razonSocial: string;
+  nombres: string;
+  apellidos: string;
+  email: string;
+  rol: string;
+  requiresTwoFactor?: boolean;
+  requiresTwoFactorSetup?: boolean;
+  pendingToken?: string;
+}
+
+export interface AdminLoginResponse {
+  message: string;
+  data: AdminLoginUserData;
+}
 import { Observable } from 'rxjs';
 import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -27,13 +45,42 @@ export class AdminService {
     this.url = global.url;
   }
 
-  admin_login(data: any): Observable<any> {
+  admin_login(data: { email: string; password: string; ruc: string }): Observable<AdminLoginResponse> {
     const headers = new HttpHeaders().set('Content-Type', 'application/json');
-    //Usar withCredentials: true para que se incluyan cookies
-            return this._http.post(this.url + 'admin_login', data, {
+    return this._http.post<AdminLoginResponse>(this.url + 'admin_login', data, {
       headers: headers,
       withCredentials: true
     });
+  }
+
+  /** Genera QR (data URL) para registrar TOTP; requiere pendingToken del login admin. */
+  admin2faSetupInit(pendingToken: string): Observable<{ message: string; data: { qrDataUrl: string } }> {
+    const headers = new HttpHeaders().set('Content-Type', 'application/json');
+    return this._http.post<{ message: string; data: { qrDataUrl: string } }>(
+      this.url + 'admin_2fa_setup_init',
+      { pendingToken },
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Confirma primer código TOTP y abre sesión. */
+  admin2faSetupConfirm(pendingToken: string, code: string): Observable<AdminLoginResponse> {
+    const headers = new HttpHeaders().set('Content-Type', 'application/json');
+    return this._http.post<AdminLoginResponse>(
+      this.url + 'admin_2fa_setup_confirm',
+      { pendingToken, code },
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Valida TOTP en login de admin con 2FA ya activo. */
+  admin2faVerify(pendingToken: string, code: string): Observable<AdminLoginResponse> {
+    const headers = new HttpHeaders().set('Content-Type', 'application/json');
+    return this._http.post<AdminLoginResponse>(
+      this.url + 'admin_2fa_verify',
+      { pendingToken, code },
+      { headers, withCredentials: true }
+    );
   }
 
   /** Solicitar recuperación de contraseña (RUC + email). Devuelve token para paso siguiente. */

@@ -1,7 +1,7 @@
 <div class="login-container">
   <div class="login-wrapper">
     <div class="login-card">
-      <form #loginForm="ngForm" (ngSubmit)="login(loginForm)" class="login-form">
+      <form *ngIf="!twoFaMode" #loginForm="ngForm" (ngSubmit)="login(loginForm)" class="login-form">
         <!-- Header con logo y título -->
         <div class="login-header">
           <div class="logo-container">
@@ -222,6 +222,58 @@
           <p class="version">v2.1.0 - Sistema CRM Multiempresa</p>
         </div>
       </form>
+
+      <div *ngIf="twoFaMode" class="login-form twofa-panel">
+        <div class="login-header">
+          <h1 class="login-title">Verificación en dos pasos</h1>
+          <p class="login-subtitle" *ngIf="twoFaMode === 'setup'">
+            Escanee el código con su aplicación (Google Authenticator, Microsoft Authenticator, etc.) e ingrese los 6 dígitos.
+          </p>
+          <p class="login-subtitle" *ngIf="twoFaMode === 'verify'">
+            Abra su aplicación autenticadora e ingrese el código de 6 dígitos.
+          </p>
+        </div>
+
+        <div *ngIf="twoFaMode === 'setup'" class="twofa-qr-wrap">
+          <div *ngIf="loading2faQr" class="twofa-loading">Generando código QR…</div>
+          <img *ngIf="qrDataUrl" [src]="qrDataUrl" class="twofa-qr" alt="Código QR 2FA" />
+        </div>
+
+        <div class="form-group twofa-code-group">
+          <div class="input-container">
+            <div class="input-icon">
+              <i class="fas fa-key"></i>
+            </div>
+            <input
+              type="text"
+              class="form-input"
+              id="twofaCode"
+              name="twofaCode"
+              [(ngModel)]="twoFaCode"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="8"
+              placeholder="Código de 6 dígitos"
+            />
+            <label class="form-label" for="twofaCode">Código TOTP</label>
+            <span class="input-border"></span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="login-button"
+          (click)="submitTwoFaStep()"
+          [disabled]="loading || loading2faQr || !twoFaCode.trim()"
+        >
+          <span *ngIf="!loading">{{ twoFaMode === 'setup' ? 'Activar y entrar' : 'Verificar y entrar' }}</span>
+          <span *ngIf="loading">Verificando…</span>
+        </button>
+
+        <button type="button" class="prev-step-button twofa-cancel" (click)="cancelTwoFactor()" [disabled]="loading">
+          Volver al inicio de sesión
+        </button>
+      </div>
     </div>
   </div>
 </div>

@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
+import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../services/caja-operacion-context.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
@@ -45,6 +46,9 @@ export class ReciboEgresoComponent implements OnInit {
   formaPagoSeleccionada: FormaPago = { idFormaPago: 0, descripcion: '', tipo: 0, requiereReferencia: 0 };
   mostrarModalFormaPago = false;
   loading = false;
+
+  empresasOperacion: EmpresaCajaOperacion[] = [];
+  idEmpresaOperacionSel = '';
 
   filtros = {
     numero: '',
@@ -103,6 +107,7 @@ export class ReciboEgresoComponent implements OnInit {
 
   constructor(
     private cajaService: CajaService,
+    private cajaOpCtx: CajaOperacionContextService,
     private catalogosService: CatalogosService,
     private documentoService: DocumentoService,
     private authService: AuthService,
@@ -116,8 +121,18 @@ export class ReciboEgresoComponent implements OnInit {
     this.filtros.fechaDesde = (() => { const n = hace30; return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
     this.filtros.fechaHasta = hoy;
     this.form.fechaEmision = hoy;
-    this.cargarDatos();
-    this.cargarRecibos();
+    this.cajaOpCtx.cargarContexto().subscribe({
+      next: () => {
+        this.empresasOperacion = this.cajaOpCtx.empresasOperacion;
+        this.idEmpresaOperacionSel = this.cajaOpCtx.idEmpresaOperacion || '';
+        this.cargarDatos();
+        this.cargarRecibos();
+      },
+      error: () => {
+        this.cargarDatos();
+        this.cargarRecibos();
+      }
+    });
     this.tiposEgreso();
     this.catalogosService.listarConceptosPorTipo('EGRESO').subscribe({
       next: (r) => { this.conceptos = r.data || []; },
@@ -146,8 +161,15 @@ export class ReciboEgresoComponent implements OnInit {
     });
   }
 
+  onCambioEmpresaOperacion(id: string): void {
+    this.cajaOpCtx.setEmpresaOperacion(id);
+    this.idEmpresaOperacionSel = id;
+    this.cargarDatos();
+    this.cargarRecibos();
+  }
+
   cargarDatos(): void {
-    this.cajaService.obtenerCajas().subscribe({
+    this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
       next: (r) => {
         this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
       },
@@ -372,7 +394,8 @@ export class ReciboEgresoComponent implements OnInit {
       monto: this.form.importe,
       idMediosPago: idMediosPago ?? undefined,
       documentoRelacionado: this.form.referencia?.trim() || undefined,
-      observaciones: observaciones || undefined
+      observaciones: observaciones || undefined,
+      idEmpresaOperacion: this.idEmpresaOperacionSel || null
     }).subscribe({
       next: () => {
         iziToast.success({ title: 'Éxito', message: 'Recibo de egreso registrado.' });

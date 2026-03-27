@@ -11,10 +11,14 @@ function normalizePath(url: string): string {
 function esRutaPermitidaGestora(path: string): boolean {
   if (!path || path === 'home') return true;
   if (path === 'editar-empresa') return true;
+  if (path === 'empresa') return true;
   if (path === 'analisis') return true;
   if (path.startsWith('ventas')) return true;
   if (path.startsWith('cotizaciones')) return true;
-  if (path === 'caja' || path.startsWith('caja/arqueo') || path.startsWith('caja/ventas-pendientes-pago')) {
+  if (path === 'caja' || path.startsWith('caja/')) {
+    return true;
+  }
+  if (path === 'creditos' || path.startsWith('creditos/')) {
     return true;
   }
   if (path.startsWith('despachos')) return true;
