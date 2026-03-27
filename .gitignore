@@ -5,6 +5,10 @@ backAppC/node_modules/
 *.log
 debug-*.log
 
+# Scripts de parche locales (no subir)
+backAppC/scripts/_*.js
+backAppC/utils/bash_write_test.txt
+
 # Cursor
 .cursor/
 
