@@ -662,7 +662,7 @@ const postCobrarVentaAgrupada = async (req, res) => {
     return res.status(401).json({ message: 'No Access' });
   }
   const idVentaAgrupada = req.params.idVentaAgrupada;
-  const { detallePago, idApertura } = req.body || {};
+  const { detallePago, idApertura, cuotasCredito } = req.body || {};
   if (!idVentaAgrupada) {
     return res.status(400).json({ message: 'idVentaAgrupada es requerido' });
   }
@@ -694,6 +694,35 @@ const postCobrarVentaAgrupada = async (req, res) => {
       if (!ventasEmp || ventasEmp.length === 0) {
         throw new Error('La venta agrupada no tiene comprobantes asociados (VentaEmpresa). No se puede cobrar.');
       }
+
+      const fvRow = await transaction
+        .request()
+        .input('idVA', sql.UniqueIdentifier, idVentaAgrupada)
+        .query(`
+          SELECT TOP 1 CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento
+          FROM VentaEmpresa ve
+          INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
+          WHERE ve.idVentaAgrupada = @idVA
+          ORDER BY ve.fEmision ASC
+        `);
+      const fVencCab = fvRow.recordset?.[0]?.fVencimiento || null;
+
+      const ventaCreditoPostVentaService = require('../services/ventaCreditoPostVenta.service');
+      await ventaCreditoPostVentaService.crearCreditosDesdeVentaAgrupada(transaction, {
+        ventasEmpresa: ventasEmp.map((v) => ({
+          idEmpresa: v.idEmpresa,
+          idVenta: v.idVenta,
+          idCliente: v.idCliente,
+          codigoComprobante: v.codigoComprobante || '',
+          compVenta: v.compVenta,
+          total: v.total,
+          idSucursal: v.idSucursal,
+        })),
+        detallePago,
+        cuotasCredito: Array.isArray(cuotasCredito) ? cuotasCredito : [],
+        userSub: req.user.sub,
+        fVencimientoCabecera: fVencCab,
+      });
 
       await ventasRepository.actualizarEstadoPagoVentaAgrupada(transaction, idVentaAgrupada, req.user.empresa, 2);
       for (const ve of ventasEmp) {
@@ -744,7 +773,9 @@ const postCobrarVentaAgrupada = async (req, res) => {
       msg.includes('No alcanzan las formas de pago') ||
       msg.includes('Sobran montos en formas de pago') ||
       msg.includes('no tiene idVenta válido') ||
-      msg.includes('no tiene comprobantes asociados');
+      msg.includes('no tiene comprobantes asociados') ||
+      msg.includes('plan de cuotas') ||
+      msg.includes('suma de cuotas');
     res.status(esNegocio ? 400 : 500).json({ error: msg });
   }
 };
@@ -754,7 +785,7 @@ const postCobrarVenta = async (req, res) => {
     return res.status(401).json({ message: 'No Access' });
   }
   const idVenta = parseInt(req.params.idVenta, 10);
-  const { detallePago, idApertura } = req.body || {};
+  const { detallePago, idApertura, cuotasCredito } = req.body || {};
   if (!idVenta || !Number.isFinite(idVenta)) {
     return res.status(400).json({ message: 'idVenta inválido' });
   }
@@ -769,8 +800,18 @@ const postCobrarVenta = async (req, res) => {
       .input('idVenta', sql.Int, idVenta)
       .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
       .query(`
-        SELECT idVenta, compVenta, idSucursal, idEstadoPago
-        FROM Ventas WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+        SELECT
+          v.idVenta,
+          v.compVenta,
+          v.idSucursal,
+          v.idEstadoPago,
+          v.idCliente,
+          v.total,
+          CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento,
+          UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
       `);
     const venta = ventaRow.recordset && ventaRow.recordset[0];
     if (!venta) {
@@ -782,8 +823,30 @@ const postCobrarVenta = async (req, res) => {
     const transaction = new sql.Transaction(pool);
     await transaction.begin();
     try {
+      const ventaCreditoPostVentaService = require('../services/ventaCreditoPostVenta.service');
+      const { normalizarDetallePagoIdMediosPago } = require('../utils/detallePagoNormalizar.util');
+      const detalleNorm = await normalizarDetallePagoIdMediosPago(transaction, detallePago);
+
+      await ventaCreditoPostVentaService.crearCreditosDesdeVentaAgrupada(transaction, {
+        ventasEmpresa: [
+          {
+            idEmpresa: req.user.empresa,
+            idVenta,
+            idCliente: venta.idCliente,
+            codigoComprobante: venta.codigoComprobante || '',
+            compVenta: venta.compVenta,
+            total: Number(venta.total) || 0,
+            idSucursal: venta.idSucursal,
+          },
+        ],
+        detallePago: detalleNorm,
+        cuotasCredito: Array.isArray(cuotasCredito) ? cuotasCredito : [],
+        userSub: req.user.sub,
+        fVencimientoCabecera: venta.fVencimiento,
+      });
+
       await ventasRepository.actualizarEstadoPagoVenta(transaction, idVenta, req.user.empresa, 2);
-      await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detallePago);
+      await ventasRepository.insertarDetallePagoVenta(transaction, idVenta, detalleNorm);
       let idSucursalCaja = venta.idSucursal;
       let idAperturaActual = idApertura || null;
       if (!idAperturaActual && venta.idSucursal) {
@@ -797,12 +860,10 @@ const postCobrarVenta = async (req, res) => {
           idSucursalCaja = cualquier.idSucursal || venta.idSucursal;
         }
       }
-      const rComp = await transaction.request()
-        .input('idComprobante', sql.Int, venta.idComprobante)
-        .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-        .query('SELECT codigo FROM Comprobantes WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa');
-      const esCotizacion = (rComp.recordset?.[0]?.codigo || '').trim().toUpperCase() === 'CT';
-      if (idAperturaActual && !esCotizacion) {
+      const esCotizacion = (venta.codigoComprobante || '').trim().toUpperCase() === 'CT';
+      const idsCredito = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
+      const detalleCaja = detalleNorm.filter((p) => !idsCredito.has(Number(p.idMediosPago)));
+      if (idAperturaActual && !esCotizacion && detalleCaja.length > 0) {
         await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
           idApertura: idAperturaActual,
           idEmpresa: req.user.empresa,
@@ -810,7 +871,7 @@ const postCobrarVenta = async (req, res) => {
           idUsuario: req.user.sub,
           idVenta,
           compVenta: venta.compVenta || '',
-          detallePago
+          detallePago: detalleCaja,
         });
       }
       await transaction.commit();
@@ -822,7 +883,14 @@ const postCobrarVenta = async (req, res) => {
     }
   } catch (error) {
     console.error('Error postCobrarVenta:', error);
-    res.status(500).json({ error: error.message || 'Error al registrar cobro' });
+    const msg = error.message || 'Error al registrar cobro';
+    const esNegocio =
+      msg.includes('plan de cuotas') ||
+      msg.includes('suma de cuotas') ||
+      msg.includes('total al crédito') ||
+      msg.includes('No hay caja abierta') ||
+      msg.includes('no coincide con la suma');
+    res.status(esNegocio ? 400 : 500).json({ error: msg });
   }
 };
 

@@ -15,6 +15,7 @@ declare var iziToast: any;
 
 export interface CompraProveedorItem {
   idCompra: string;
+  idEmpresa?: string;
   fecha: string;
   documento: string;
   idProveedor: number;
@@ -123,13 +124,41 @@ export class PagoProveedoresComponent implements OnInit {
   ngOnInit(): void {
     const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
     this.form.fechaEmision = hoy;
-    this.cargarDatos();
-    this.cargarProveedores();
+    this.cajaOpCtx.cargarContexto().subscribe({
+      next: () => {
+        this.empresasOperacion = this.cajaOpCtx.empresasOperacion;
+        this.idEmpresaOperacionSel = this.cajaOpCtx.idEmpresaOperacion || '';
+        this.cargarDatos();
+        this.cargarProveedores();
+      },
+      error: () => {
+        this.cargarDatos();
+        this.cargarProveedores();
+      }
+    });
     this.tiposEgreso();
     this.tablasSunat.obtener_medios_pago().subscribe({
       next: (r) => { this.mediosPago = r.data || []; },
       error: () => {}
     });
+  }
+
+  private esCajaMultiEmpresa(): boolean {
+    return this.empresasOperacion.length > 1;
+  }
+
+  private idEmpresaOperacionParaListado(): string | null {
+    return this.esCajaMultiEmpresa() ? null : (this.idEmpresaOperacionSel || null);
+  }
+
+  get colspanTablaPagos(): number {
+    return this.esCajaMultiEmpresa() ? 9 : 8;
+  }
+
+  nombreEmpresaCompra(idEmp?: string): string {
+    if (!idEmp) return '—';
+    const e = this.empresasOperacion.find((x) => String(x.idEmpresa) === String(idEmp));
+    return e ? (e.razonSocial || e.ruc || idEmp) : String(idEmp).slice(0, 13);
   }
 
   private tiposEgreso(): void {
@@ -175,7 +204,7 @@ export class PagoProveedoresComponent implements OnInit {
 
   cargarLista(): void {
     this.loading = true;
-    this.comprasService.obtener_compras_todos_idEmpresa(this.idEmpresaOperacionSel || null).subscribe({
+    this.comprasService.obtener_compras_todos_idEmpresa(this.idEmpresaOperacionParaListado()).subscribe({
       next: (r) => {
         const compras: any[] = r.data || [];
         this.list = compras.map((c: any) => this.mapearCompra(c));
@@ -209,6 +238,7 @@ export class PagoProveedoresComponent implements OnInit {
     const proveedor = this.proveedores.find((p: any) => p.idProveedor === c.idProveedor);
     return {
       idCompra: c.idCompra,
+      idEmpresa: c.idEmpresa,
       fecha: c.fEmision,
       documento: (c.serie || '') + '-' + (c.numero || ''),
       idProveedor: c.idProveedor,
@@ -317,6 +347,11 @@ export class PagoProveedoresComponent implements OnInit {
 
   /** Abre el modal Recibo de Pago con el proveedor de la compra seleccionado */
   editar(item: CompraProveedorItem): void {
+    if (item.idEmpresa) {
+      this.idEmpresaOperacionSel = String(item.idEmpresa);
+      this.cajaOpCtx.setEmpresaOperacion(this.idEmpresaOperacionSel);
+      this.cargarDatos();
+    }
     this.proveedorSeleccionado = {
       idProveedor: item.idProveedor,
       ruc: item.ruc || '',

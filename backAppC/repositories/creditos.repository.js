@@ -2,10 +2,22 @@ const sql = require("mssql");
 const CajaRepository = require("./caja.repository");
 const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
 
-/** Lista créditos de la empresa. Si idCliente viene vacío/null, devuelve todos; si es número, filtra por ese cliente. */
-exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
+function normalizarIdsEmpresaCreditos(idEmpresas) {
+  const arr = Array.isArray(idEmpresas) ? idEmpresas : idEmpresas ? [idEmpresas] : [];
+  return arr.map((x) => String(x).trim()).filter(Boolean);
+}
+
+/** Lista créditos de una o varias empresas. Si idCliente viene vacío/null, devuelve todos; si es número, filtra por ese cliente. */
+exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
+  const idsEmp = normalizarIdsEmpresaCreditos(idEmpresas);
+  if (idsEmp.length === 0) return [];
+
   const filtrarPorCliente = idCliente != null && String(idCliente).trim() !== '' && !isNaN(Number(idCliente));
-  const request = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+  const request = pool.request();
+  idsEmp.forEach((id, i) => request.input(`idEmp${i}`, sql.UniqueIdentifier, id));
+  const inEmpresa =
+    idsEmp.length === 1 ? "cc.idEmpresa = @idEmp0" : `cc.idEmpresa IN (${idsEmp.map((_, i) => `@idEmp${i}`).join(", ")})`;
+
   if (filtrarPorCliente) request.input("idCliente", sql.Int, Number(idCliente));
 
   const condicionCliente = filtrarPorCliente ? " AND cc.idCliente = @idCliente" : "";
@@ -13,6 +25,7 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
   try {
     const result = await request.query(`
       SELECT
+        cc.idEmpresa,
         cc.idCredito,
         cc.idCliente,
         cc.fechaCredito,
@@ -35,8 +48,8 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
       LEFT JOIN Ventas v ON cc.idVenta = v.idVenta
       LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
       LEFT JOIN UsuarioWeb uw ON cc.idUsuarioCredito = uw.idUsuario
-      WHERE cc.idEmpresa = @idEmpresa${condicionCliente}
-      GROUP BY cc.idCredito, cc.idCliente, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
+      WHERE ${inEmpresa}${condicionCliente}
+      GROUP BY cc.idEmpresa, cc.idCredito, cc.idCliente, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
                cc.tasaInteres, cc.estado, cc.observaciones, v.idVenta,
                v.serie, v.numero, uw.nombres, uw.apellidos
       ORDER BY cc.fechaCredito DESC
@@ -46,19 +59,24 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresa, idCliente) => {
     const msg = err.message || '';
     const code = err.number ?? err.originalError?.number;
     if (code === 208 || /Invalid object name|CuotasCredito|UsuarioWeb/.test(msg)) {
-      return await listarCreditosSimple(pool, idEmpresa, filtrarPorCliente ? Number(idCliente) : null);
+      return await listarCreditosSimple(pool, idsEmp, filtrarPorCliente ? Number(idCliente) : null);
     }
     throw err;
   }
 };
 
 /** Fallback: listado solo desde CreditosClientes (sin JOINs) cuando faltan tablas relacionadas. */
-async function listarCreditosSimple(pool, idEmpresa, idCliente) {
-  const req = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+async function listarCreditosSimple(pool, idsEmpresa, idCliente) {
+  const ids = normalizarIdsEmpresaCreditos(idsEmpresa);
+  if (ids.length === 0) return [];
+  const req = pool.request();
+  ids.forEach((id, i) => req.input(`idEmp${i}`, sql.UniqueIdentifier, id));
+  const inEmp = ids.length === 1 ? "idEmpresa = @idEmp0" : `idEmpresa IN (${ids.map((_, i) => `@idEmp${i}`).join(", ")})`;
   const cond = idCliente != null ? " AND idCliente = @idCliente" : "";
   if (idCliente != null) req.input("idCliente", sql.Int, idCliente);
   const result = await req.query(`
     SELECT
+      idEmpresa,
       idCredito,
       idCliente,
       fechaCredito,
@@ -78,7 +96,7 @@ async function listarCreditosSimple(pool, idEmpresa, idCliente) {
       montoTotal AS saldoPendiente,
       CAST(NULL AS DATE) AS proximaCuota
     FROM CreditosClientes
-    WHERE idEmpresa = @idEmpresa${cond}
+    WHERE ${inEmp}${cond}
     ORDER BY fechaCredito DESC
   `);
   return result.recordset;
@@ -110,6 +128,77 @@ exports.validarVentaEmpresaRepo = async (pool, idVenta, idEmpresa) => {
     `);
 
   return result.recordset[0].existe > 0;
+};
+
+/**
+ * Dentro de una transacción ya abierta: crédito + cuotas con montos y fechas explícitas (venta factura/boleta/NV).
+ */
+exports.crearCreditoYCuotasExplicitasEnTransaccion = async (transaction, params) => {
+  const {
+    idEmpresa,
+    idCliente,
+    idVenta,
+    idUsuarioCredito,
+    montoTotal,
+    cuotas,
+    observaciones
+  } = params;
+  if (!idEmpresa || idCliente == null || !idUsuarioCredito) return null;
+  const mt = Number(montoTotal);
+  if (!Number.isFinite(mt) || mt <= 0) return null;
+  if (!cuotas || !Array.isArray(cuotas) || cuotas.length === 0) return null;
+
+  const ins = await transaction
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("idCliente", sql.Int, idCliente)
+    .input("idVenta", sql.Int, idVenta)
+    .input("idUsuarioCredito", sql.UniqueIdentifier, idUsuarioCredito)
+    .input("montoTotal", sql.Decimal(18, 2), mt)
+    .input("plazoDias", sql.Int, 0)
+    .input("tasaInteres", sql.Decimal(5, 2), 0)
+    .input("observaciones", sql.VarChar(500), observaciones || null)
+    .query(`
+      INSERT INTO CreditosClientes (
+        idEmpresa, idCliente, idVenta, idUsuarioCredito, fechaCredito,
+        montoTotal, plazoDias, tasaInteres, estado, observaciones
+      )
+      OUTPUT INSERTED.idCredito
+      VALUES (
+        @idEmpresa, @idCliente, @idVenta, @idUsuarioCredito, GETDATE(),
+        @montoTotal, @plazoDias, @tasaInteres, 'ACTIVO', @observaciones
+      )
+    `);
+  const idCredito = ins.recordset[0].idCredito;
+
+  let n = 0;
+  for (const c of cuotas) {
+    n += 1;
+    const num = c.numeroCuota != null ? Number(c.numeroCuota) : n;
+    const monto = Number(c.monto);
+    const fv = c.fechaVencimiento ? String(c.fechaVencimiento).trim().slice(0, 10) : "";
+    if (!fv || !Number.isFinite(monto) || monto <= 0) continue;
+    await transaction
+      .request()
+      .input("idCredito", sql.UniqueIdentifier, idCredito)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("numeroCuota", sql.Int, num)
+      .input("fechaVencimiento", sql.Date, fv)
+      .input("montoCuota", sql.Decimal(18, 2), monto)
+      .input("interes", sql.Decimal(18, 2), 0)
+      .input("capital", sql.Decimal(18, 2), monto)
+      .input("saldoPendiente", sql.Decimal(18, 2), monto)
+      .query(`
+        INSERT INTO CuotasCredito (
+          idCredito, idEmpresa, numeroCuota, fechaVencimiento,
+          montoCuota, interes, capital, saldoPendiente, estado
+        ) VALUES (
+          @idCredito, @idEmpresa, @numeroCuota, @fechaVencimiento,
+          @montoCuota, @interes, @capital, @saldoPendiente, 'PENDIENTE'
+        )
+      `);
+  }
+  return { idCredito };
 };
 
 exports.crearCreditoRepo = async (pool, user, datos) => {
@@ -395,12 +484,15 @@ const resumenCreditosDefault = () => ({
   eficienciaCobro: 0
 });
 
-exports.obtenerResumenCreditosRepo = async (pool, idEmpresa) => {
+exports.obtenerResumenCreditosRepo = async (pool, idEmpresas) => {
+  const ids = normalizarIdsEmpresaCreditos(idEmpresas);
+  if (ids.length === 0) return resumenCreditosDefault();
   try {
-    const result = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    const request = pool.request();
+    ids.forEach((id, i) => request.input(`e${i}`, sql.UniqueIdentifier, id));
+    const whereEmp =
+      ids.length === 1 ? "cc.idEmpresa = @e0" : `cc.idEmpresa IN (${ids.map((_, i) => `@e${i}`).join(", ")})`;
+    const result = await request.query(`
         SELECT
           COUNT(DISTINCT cc.idCredito) AS totalCreditos,
           SUM(cc.montoTotal) AS montoTotalCreditos,
@@ -415,7 +507,7 @@ exports.obtenerResumenCreditosRepo = async (pool, idEmpresa) => {
           AVG(cc.tasaInteres) AS tasaInteresPromedio
         FROM CreditosClientes cc
         LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
-        WHERE cc.idEmpresa = @idEmpresa
+        WHERE ${whereEmp}
       `);
 
     const row = result.recordset[0] || {};

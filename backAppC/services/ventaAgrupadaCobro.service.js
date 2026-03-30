@@ -4,7 +4,9 @@
 const sql = require('mssql');
 const CajaRepository = require('../repositories/caja.repository');
 const ventasRepository = require('../repositories/ventas.repository');
-const { repartirDetallePagoEntreComprobantes } = require('../utils/ventaAgrupadaPago.util');
+const { repartirDetallePagoEntreComprobantes, round2 } = require('../utils/ventaAgrupadaPago.util');
+const ventaCreditoPostVentaService = require('./ventaCreditoPostVenta.service');
+const { normalizarDetallePagoIdMediosPago } = require('../utils/detallePagoNormalizar.util');
 
 /**
  * Resuelve apertura de caja abierta para registrar el ingreso de una línea de comprobante.
@@ -80,13 +82,22 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
     }
   }
 
-  const reparto = repartirDetallePagoEntreComprobantes(lineasVenta, detallePago);
+  const detalleNorm = await normalizarDetallePagoIdMediosPago(transaction, detallePago);
+  const reparto = repartirDetallePagoEntreComprobantes(lineasVenta, detalleNorm);
+
+  const idsCredito = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
 
   const conceptoBase = compVentaVA && String(compVentaVA).trim() ? String(compVentaVA).trim() : 'S/N';
   const conceptoVa = `Cobro VA ${conceptoBase}`;
 
   for (const linea of reparto) {
     await ventasRepository.insertarDetallePagoVenta(transaction, linea.idVenta, linea.detallePago);
+
+    const detalleCaja = (linea.detallePago || []).filter((p) => !idsCredito.has(Number(p.idMediosPago)));
+    const montoCaja = round2(detalleCaja.reduce((s, p) => s + (Number(p.monto) || 0), 0));
+    if (montoCaja <= 0.001) {
+      continue;
+    }
 
     const apInfo = await obtenerIdAperturaParaEmpresaVenta(pool, linea, {
       idEmpresaCobradora,
@@ -96,7 +107,8 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
 
     if (!apInfo || !apInfo.idApertura) {
       throw new Error(
-        `No hay caja abierta para registrar el cobro del comprobante ${linea.compVenta || linea.idVenta}. Abra una caja en la empresa de ese comprobante.`
+        `No hay caja abierta para registrar cobros al contado del comprobante ${linea.compVenta || linea.idVenta}. ` +
+          'El importe en crédito no ingresa a caja; abra caja si la venta incluye efectivo u otros medios.'
       );
     }
 
@@ -114,7 +126,7 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
       idVenta: linea.idVenta,
       compVenta: compHijo || 'S/N',
       conceptoVentaCaja,
-      detallePago: linea.detallePago,
+      detallePago: detalleCaja,
     });
   }
 };

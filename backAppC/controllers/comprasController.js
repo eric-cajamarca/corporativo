@@ -2,7 +2,6 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const comprasService = require('../services/compras.service');
-const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 
 const obtener_compras_todos = async (req, res, next) => {
     if (!req.user) {
@@ -68,9 +67,7 @@ const obtener_compras_todos_idEmpresa = async (req, res, next) => {
         return res.status(403).send({ message: 'Empresa no identificada en la sesión', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
-        const data = await comprasService.listarComprasPorIdEmpresa(idEmpresaOp);
+        const data = await comprasService.listarComprasCajaPorUsuario(req.user, req.query.idEmpresaOperacion);
         res.status(200).send({ data });
     } catch (error) {
         if (error.message === 'EMPRESA_OPERACION_NO_PERMITIDA') {

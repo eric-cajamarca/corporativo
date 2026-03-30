@@ -3,6 +3,7 @@ const sql = require('mssql');
 
 const QUERY_COMPRAS_JOIN = `
     SELECT
+        Compras.idEmpresa,
         Compras.idCompra, Compras.compCompra, Compras.idComprobante, Compras.serie, Compras.numero,
         CONVERT(VARCHAR(19), Compras.fEmision, 120) AS fEmision,
         CONVERT(VARCHAR(19), Compras.fVencimiento, 120) AS fVencimiento,
@@ -68,6 +69,28 @@ exports.listarComprasPorIdEmpresa = async (pool, idEmpresa) => {
             ${QUERY_COMPRAS_JOIN}
             WHERE Compras.idEmpresa = @idEmpresa
         `);
+    return result.recordset || [];
+};
+
+/**
+ * Lista compras de varias empresas (misma estructura que listarComprasPorIdEmpresa).
+ */
+exports.listarComprasPorIdsEmpresa = async (pool, idsEmpresa) => {
+    const ids = (idsEmpresa || []).filter(Boolean);
+    if (ids.length === 0) return [];
+    if (ids.length === 1) {
+        return exports.listarComprasPorIdEmpresa(pool, ids[0]);
+    }
+    const request = pool.request();
+    ids.forEach((id, i) => {
+        request.input(`e${i}`, sql.UniqueIdentifier, id);
+    });
+    const placeholders = ids.map((_, i) => `@e${i}`).join(', ');
+    const result = await request.query(`
+        ${QUERY_COMPRAS_JOIN}
+        WHERE Compras.idEmpresa IN (${placeholders})
+        ORDER BY Compras.fRegistro DESC
+    `);
     return result.recordset || [];
 };
 

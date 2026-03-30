@@ -88,19 +88,34 @@ export class CatalogosService {
   }
 
   // Conceptos
-  listarConceptos(buscar?: string, pagina?: number, porPagina?: number, extras?: { tipo?: string }): Observable<{ data: any[]; total: number }> {
-    const params: any = {};
-    if (buscar != null) params.buscar = buscar;
-    if (pagina != null) params.pagina = String(pagina);
-    if (porPagina != null) params.porPagina = String(porPagina);
-    if (extras?.tipo) params.tipo = extras.tipo;
+  listarConceptos(
+    buscar?: string,
+    pagina?: number,
+    porPagina?: number,
+    extras?: { tipo?: string; idEmpresaOperacion?: string | null }
+  ): Observable<{ data: any[]; total: number }> {
+    const params: Record<string, string> = {};
+    if (buscar != null) params['buscar'] = buscar;
+    if (pagina != null) params['pagina'] = String(pagina);
+    if (porPagina != null) params['porPagina'] = String(porPagina);
+    if (extras?.tipo) params['tipo'] = extras.tipo;
+    if (extras?.idEmpresaOperacion != null && String(extras.idEmpresaOperacion).trim() !== '') {
+      params['idEmpresaOperacion'] = String(extras.idEmpresaOperacion).trim();
+    }
     return this.get<{ data: any[]; total: number }>('conceptos', params);
   }
-  listarConceptosPorTipo(tipo: 'INGRESO' | 'EGRESO'): Observable<{ data: any[]; total: number }> {
-    return this.listarConceptos(undefined, 1, 500, { tipo });
+  listarConceptosPorTipo(
+    tipo: 'INGRESO' | 'EGRESO',
+    idEmpresaOperacion?: string | null
+  ): Observable<{ data: any[]; total: number }> {
+    return this.listarConceptos(undefined, 1, 500, { tipo, idEmpresaOperacion });
   }
-  obtenerConcepto(id: string): Observable<{ data: any }> {
-    return this.get<{ data: any }>('conceptos/' + id);
+  obtenerConcepto(id: string, idEmpresaOperacion?: string | null): Observable<{ data: any }> {
+    const params: Record<string, string> = {};
+    if (idEmpresaOperacion != null && String(idEmpresaOperacion).trim() !== '') {
+      params['idEmpresaOperacion'] = String(idEmpresaOperacion).trim();
+    }
+    return this.get<{ data: any }>('conceptos/' + id, Object.keys(params).length ? params : undefined);
   }
   crearConcepto(body: { descripcion: string; tipo: string; idClasificacionConcepto?: string | null; idTipoMovimientoCaja?: number | null }): Observable<{ data: any }> {
     return this.post<{ data: any }>('conceptos', body);

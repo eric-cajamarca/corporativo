@@ -15,6 +15,7 @@ declare var iziToast: any;
 
 export interface ReciboIngresoItem {
   idMovimientoCaja: string;
+  empresaMovimiento?: string;
   idApertura?: string;
   fechaMovimiento: string;
   concepto: string;
@@ -123,17 +124,15 @@ export class ReciboIngresoComponent implements OnInit {
         this.idEmpresaOperacionSel = this.cajaOpCtx.idEmpresaOperacion || '';
         this.cargarDatos();
         this.cargarRecibos();
+        this.cargarConceptos();
       },
       error: () => {
         this.cargarDatos();
         this.cargarRecibos();
+        this.cargarConceptos();
       }
     });
     this.tiposIngreso();
-    this.catalogosService.listarConceptosPorTipo('INGRESO').subscribe({
-      next: (r) => { this.conceptos = r.data || []; },
-      error: () => {}
-    });
     this.documentoService.getFormasPago().subscribe({
       next: (r) => {
         this.formasPago = r.data || [];
@@ -162,6 +161,70 @@ export class ReciboIngresoComponent implements OnInit {
     this.idEmpresaOperacionSel = id;
     this.cargarDatos();
     this.cargarRecibos();
+    this.cargarConceptos();
+    if (this.mostrarForm && !this.editandoId) {
+      this.form.idConcepto = '';
+    }
+  }
+
+  /** Catálogo de conceptos es por empresa; debe coincidir con idEmpresaOperacion al guardar recibo. */
+  cargarConceptos(): void {
+    this.catalogosService
+      .listarConceptosPorTipo('INGRESO', this.idEmpresaOperacionSel || null)
+      .subscribe({
+        next: (r) => {
+          this.conceptos = r.data || [];
+        },
+        error: () => {
+          this.conceptos = [];
+        }
+      });
+  }
+
+  /** Empresa seleccionada (texto) para mensaje cuando solo hay una en contexto. */
+  get empresaOperacionLabel(): string {
+    const id = this.idEmpresaOperacionSel;
+    const e = this.empresasOperacion.find((x) => x.idEmpresa === id);
+    return e ? (e.razonSocial || e.ruc || id) : '—';
+  }
+
+  private esCajaMultiEmpresa(): boolean {
+    return this.empresasOperacion.length > 1;
+  }
+
+  /** Sin filtro por empresa: el backend devuelve gestora + gestionadas. */
+  private idEmpresaOperacionParaListado(): string | null {
+    return this.esCajaMultiEmpresa() ? null : (this.idEmpresaOperacionSel || null);
+  }
+
+  get colspanTablaRecibos(): number {
+    return this.esCajaMultiEmpresa() ? 10 : 9;
+  }
+
+  /**
+   * Cambio de empresa desde el modal: sincroniza con contexto global, lista y reasigna caja
+   * si la apertura actual no pertenece a la nueva empresa.
+   */
+  onCambioEmpresaOperacionDesdeModal(id: string): void {
+    this.cajaOpCtx.setEmpresaOperacion(id);
+    this.idEmpresaOperacionSel = id;
+    this.cargarRecibos();
+    this.cargarConceptos();
+    if (!this.editandoId) {
+      this.form.idConcepto = '';
+    }
+    this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
+      next: (r) => {
+        this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
+        if (!this.editandoId) {
+          const ok = this.cajas.some((c: any) => c.idApertura === this.form.idApertura);
+          if (!ok) {
+            this.form.idApertura = this.cajas.length ? this.cajas[0].idApertura : '';
+          }
+        }
+      },
+      error: () => {}
+    });
   }
 
   cargarDatos(): void {
@@ -221,6 +284,7 @@ export class ReciboIngresoComponent implements OnInit {
     const doc = m.documentoRelacionado || ('RI 0001-' + (m.idMovimientoCaja || '').slice(-6));
     return {
       idMovimientoCaja: m.idMovimientoCaja,
+      empresaMovimiento: m.empresaMovimiento,
       idApertura: m.idApertura,
       fechaMovimiento: m.fechaMovimiento,
       concepto: m.concepto,

@@ -40,6 +40,20 @@ function buildFacturaBoletaJson(payload, tipoComprobante) {
   const totalDescuento = toNum(venta.descuentos);
   const total = toNum(venta.total);
 
+  const codFp =
+    String(venta.codigoCondicionPago || "").trim() === "10"
+      ? "010"
+      : String(venta.codigoCondicionPago || "").trim() || (/credito/i.test(String(venta.condicionPago || "")) ? "010" : "009");
+  const cuotasLista = Array.isArray(venta.cuotas) ? venta.cuotas : [];
+  let fechaVenJson = fechaSunat(venta.fVencimiento);
+  if (codFp === "010" && cuotasLista.length > 0) {
+    const fechas = cuotasLista
+      .map((c) => fechaSunat(c.fechaPago))
+      .filter(Boolean)
+      .sort();
+    if (fechas.length) fechaVenJson = fechas[fechas.length - 1];
+  }
+
   const itemsMap = (Array.isArray(items) ? items : []).map((d, i) => {
     const cantidad = toNum(d.cantidad);
     const pVenta = toNum(d.pVenta);
@@ -68,7 +82,8 @@ function buildFacturaBoletaJson(payload, tipoComprobante) {
     serie: toStr(venta.serie),
     numero: String(venta.numero ?? "").replace(/\D/g, "").padStart(8, "0"),
     fechaEmision: fechaSunat(venta.fEmision),
-    fechaVencimiento: "",
+    fechaVencimiento: fechaVenJson,
+    codigoFormaPagoSUNAT: codFp,
     moneda: "PEN",
     tipoOperacion: "0101",
     emisor: {
@@ -109,7 +124,15 @@ function buildFacturaBoletaJson(payload, tipoComprobante) {
     leyendas: [{ codigo: "1000", valor: "" }],
     items: itemsMap.length ? itemsMap : [{ numeroOrden: 1, codigo: "", descripcion: "Item", unidad: "NIU", cantidad: 0, valorUnitario: 0, precioUnitario: 0, subtotal: 0, tipoIgv: "10", igv: 0, total: 0 }],
     guias: [],
-    relacionados: []
+    relacionados: [],
+    cuotas:
+      codFp === "010" && (codigo === "01" || codigo === "03") && cuotasLista.length > 0
+        ? cuotasLista.map((c, i) => ({
+            numeroCuota: c.numeroCuota != null ? Number(c.numeroCuota) : i + 1,
+            importe: Number(c.total || 0).toFixed(2),
+            fechaPago: fechaSunat(c.fechaPago)
+          }))
+        : []
   };
 }
 

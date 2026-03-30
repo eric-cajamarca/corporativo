@@ -80,9 +80,10 @@
                         {{fila.importe >= 0 ? '+' : ''}}{{formatCurrency(fila.importe)}}
                       </td>
                       <td class="text-center">
-                        <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleFila(fila)" title="Ver detalle">
+                        <button *ngIf="!fila.sinDetalle" type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleFila(fila)" title="Ver detalle">
                           <i class="fas fa-list"></i> Detalle
                         </button>
+                        <span *ngIf="fila.sinDetalle" class="text-muted small">—</span>
                       </td>
                     </tr>
                     <tr class="fw-bold">
@@ -164,6 +165,20 @@
                 <small class="d-block text-muted mt-1">Solo los movimientos con forma de pago &quot;Efectivo&quot; afectan este saldo. El resto se muestra arriba pero no resta del efectivo.</small>
               </div>
 
+              <div class="alert alert-light border mb-3">
+                <div class="row text-center text-md-start">
+                  <div class="col-md-6 mb-1 mb-md-0">
+                    <strong>Ventas al crédito</strong> (periodo, vista consolidada):
+                    <span class="text-primary ms-1">{{ formatCurrency(ventasCreditoImporte) }}</span>
+                  </div>
+                  <div class="col-md-6">
+                    <strong>Cobro de créditos</strong> (periodo):
+                    <span class="text-success ms-1">{{ formatCurrency(cobroCreditosImporte) }}</span>
+                  </div>
+                </div>
+                <small class="text-muted d-block mt-1">Montos desde <em>CreditosClientes.fechaCredito</em> y <em>PagosCuotas.fechaPago</em> (informativo respecto al efectivo por forma de pago).</small>
+              </div>
+
               <div class="mt-4" *ngIf="esGestora && totalesPorEmpresa.length > 0">
                 <h6 class="fw-bold text-center mb-2">Arqueo por empresa (consolidado arriba)</h6>
                 <div class="table-responsive">
@@ -182,8 +197,8 @@
                         <td>{{ pe.razonSocial || pe.idEmpresa }}</td>
                         <td class="text-end">{{ formatCurrency(pe.totalIngresos) }}</td>
                         <td class="text-end">{{ formatCurrency(pe.totalEgresos) }}</td>
-                        <td class="text-end">{{ formatCurrency(pe.ventasCredito?.importe || 0) }}</td>
-                        <td class="text-end">{{ formatCurrency(pe.cobroCreditos?.importe || 0) }}</td>
+                        <td class="text-end">{{ formatCurrency(importeArqueoCredito(pe.ventasCredito)) }}</td>
+                        <td class="text-end">{{ formatCurrency(importeArqueoCredito(pe.cobroCreditos)) }}</td>
                       </tr>
                     </tbody>
                   </table>

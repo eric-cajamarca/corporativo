@@ -20,6 +20,8 @@ declare var iziToast: any;
 
 export interface DetalleCobranzaItem {
   idCredito: string;
+  /** Empresa del crédito para API de cuotas y pago */
+  idEmpresa?: string;
   comprobante: string;
   fechaVenta: string;
   totalComprobante: number;
@@ -143,8 +145,27 @@ export class IndexCreditosComponent implements OnInit {
     });
   }
 
-  private idEmpresaOp(): string | null {
+  private esCajaMultiEmpresa(): boolean {
+    return this.empresasOperacion.length > 1;
+  }
+
+  /** Listado y resumen consolidados (sin filtrar por una sola empresa). */
+  private idEmpresaOperacionParaListado(): string | null {
+    return this.esCajaMultiEmpresa() ? null : (this.idEmpresaOperacionSel || null);
+  }
+
+  /** Caja y registro de cobro: empresa elegida en el selector. */
+  private idEmpresaOpRegistro(): string | null {
     return this.idEmpresaOperacionSel || null;
+  }
+
+  /** Empresa del crédito en listados consolidados; si no viene, la del selector. */
+  idEmpresaDelCredito(c: Pick<CreditoCliente, 'idEmpresa'>): string | null {
+    const raw = c.idEmpresa;
+    if (raw != null && String(raw).trim() !== '') {
+      return String(raw).trim();
+    }
+    return this.idEmpresaOpRegistro();
   }
 
   onCambioEmpresaOperacion(id: string): void {
@@ -171,7 +192,7 @@ export class IndexCreditosComponent implements OnInit {
 
   cargarCreditos() {
     this.loading = true;
-    this.creditosService.obtenerCreditosCliente(this.filtros.idCliente || '', this.idEmpresaOp()).subscribe({
+    this.creditosService.obtenerCreditosCliente(this.filtros.idCliente || '', this.idEmpresaOperacionParaListado()).subscribe({
       next: (response) => {
         if (response.data) {
           this.creditos = response.data;
@@ -233,7 +254,7 @@ export class IndexCreditosComponent implements OnInit {
   }
 
   cargarResumenCreditos() {
-    this.creditosService.obtenerResumenCreditos(this.idEmpresaOp()).subscribe({
+    this.creditosService.obtenerResumenCreditos(this.idEmpresaOperacionParaListado()).subscribe({
       next: (response) => {
         if (response.data) {
           this.resumenCreditos = response.data;
@@ -250,7 +271,7 @@ export class IndexCreditosComponent implements OnInit {
     this.creditoSeleccionado = credito;
     this.mostrarVerCuotas = true;
     this.loading = true;
-    this.creditosService.obtenerCuotasCredito(credito.idCredito, this.idEmpresaOp()).subscribe({
+    this.creditosService.obtenerCuotasCredito(credito.idCredito, this.idEmpresaDelCredito(credito)).subscribe({
       next: (response) => {
         this.cuotas = response.data || [];
         this.loading = false;
@@ -381,7 +402,7 @@ export class IndexCreditosComponent implements OnInit {
       },
       error: () => { this.nuevaCobranza.lineaAsignada = 0; }
     });
-    this.creditosService.obtenerCreditosCliente(idCliente, this.idEmpresaOp()).subscribe({
+    this.creditosService.obtenerCreditosCliente(idCliente, this.idEmpresaOperacionParaListado()).subscribe({
       next: (res) => {
         const list = res.data || [];
         const pendientes = list.filter((c: any) => (c.saldoPendiente ?? 0) > 0);
@@ -403,7 +424,7 @@ export class IndexCreditosComponent implements OnInit {
     }
     this.mostrarModalBuscarComprobantes = true;
     this.loadingCreditosCliente = true;
-    this.creditosService.obtenerCreditosCliente(this.nuevaCobranza.idCliente, this.idEmpresaOp()).subscribe({
+    this.creditosService.obtenerCreditosCliente(this.nuevaCobranza.idCliente, this.idEmpresaOperacionParaListado()).subscribe({
       next: (res) => {
         const list = (res.data || []).filter((c: any) => (c.saldoPendiente ?? 0) > 0);
         this.creditosClienteParaSelector = list;
@@ -428,6 +449,7 @@ export class IndexCreditosComponent implements OnInit {
     }
     this.detalleCobranza.push({
       idCredito: c.idCredito,
+      idEmpresa: c.idEmpresa,
       comprobante: c.comprobante || ('Venta ' + (c.idVenta || '')),
       fechaVenta: c.fechaCredito || '',
       totalComprobante: c.montoTotal ?? 0,
@@ -460,15 +482,21 @@ export class IndexCreditosComponent implements OnInit {
       return;
     }
     this.loading = true;
-    const payloadBase = {
-      idMediosPago: this.nuevaCobranza.idMediosPago ?? undefined,
-      idApertura: this.nuevaCobranza.idApertura || undefined,
-      observaciones: this.nuevaCobranza.observaciones || undefined,
-      idEmpresaOperacion: this.idEmpresaOp()
-    };
     from(itemsConImporte).pipe(
-      concatMap((item: DetalleCobranzaItem) =>
-        this.creditosService.obtenerCuotasCredito(item.idCredito, this.idEmpresaOp()).pipe(
+      concatMap((item: DetalleCobranzaItem) => {
+        const idEmpresaPago =
+          (item.idEmpresa != null && String(item.idEmpresa).trim() !== '' ? String(item.idEmpresa).trim() : null) ||
+          this.idEmpresaOpRegistro();
+        if (!idEmpresaPago) {
+          return throwError(() => new Error('Seleccione la empresa de caja o agregue comprobantes con empresa definida.'));
+        }
+        const payloadBase = {
+          idMediosPago: this.nuevaCobranza.idMediosPago ?? undefined,
+          idApertura: this.nuevaCobranza.idApertura || undefined,
+          observaciones: this.nuevaCobranza.observaciones || undefined,
+          idEmpresaOperacion: idEmpresaPago
+        };
+        return this.creditosService.obtenerCuotasCredito(item.idCredito, idEmpresaPago).pipe(
           switchMap((res: any) => {
             const cuotas: CuotaCredito[] = res.data || [];
             const pendiente = cuotas.find((cu: CuotaCredito) => cu.estado === 'PENDIENTE' || cu.estado === 'VENCIDO');
@@ -487,8 +515,8 @@ export class IndexCreditosComponent implements OnInit {
             );
           }),
           catchError((err) => throwError(() => err))
-        )
-      )
+        );
+      })
     ).subscribe({
       next: () => {},
       error: (err) => {
@@ -590,7 +618,9 @@ export class IndexCreditosComponent implements OnInit {
     };
     if (this.pagoCuota.idMediosPago != null) payload.idMediosPago = this.pagoCuota.idMediosPago;
     if (this.pagoCuota.idApertura) payload.idApertura = this.pagoCuota.idApertura;
-    payload.idEmpresaOperacion = this.idEmpresaOp();
+    payload.idEmpresaOperacion = this.creditoSeleccionado
+      ? this.idEmpresaDelCredito(this.creditoSeleccionado)
+      : this.idEmpresaOpRegistro();
 
     this.creditosService.pagarCuota(payload).subscribe({
       next: (response) => {
@@ -601,7 +631,9 @@ export class IndexCreditosComponent implements OnInit {
         iziToast.success({ title: 'Éxito', message: msg });
         this.cerrarModales();
         if (this.creditoSeleccionado) {
-          this.creditosService.obtenerCuotasCredito(this.creditoSeleccionado.idCredito, this.idEmpresaOp()).subscribe({
+          this.creditosService
+            .obtenerCuotasCredito(this.creditoSeleccionado.idCredito, this.idEmpresaDelCredito(this.creditoSeleccionado))
+            .subscribe({
             next: (resp) => { this.cuotas = resp.data || []; }
           });
         }
@@ -640,6 +672,12 @@ export class IndexCreditosComponent implements OnInit {
     const id = idCliente != null ? String(idCliente) : '';
     const cliente = this.clientes.find(c => String(c.idCliente) === id);
     return cliente ? cliente.rSocial || `${cliente.nombre} ${cliente.apellido || ''}`.trim() : 'Cliente no encontrado';
+  }
+
+  nombreEmpresaCredito(idEmp?: string): string {
+    if (!idEmp) return '—';
+    const e = this.empresasOperacion.find((x) => String(x.idEmpresa) === String(idEmp));
+    return e ? (e.razonSocial || e.ruc || idEmp) : String(idEmp).slice(0, 13);
   }
 
   getEstadoBadgeClass(estado: string): string {

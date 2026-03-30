@@ -495,11 +495,11 @@ class HtmlBuilderService {
     const filasTotales = lineasTotales.map(l => `
       <tr${l.total ? ' class="total-row"' : ''}><td>${l.label}</td><td class="text-end">${Number(l.value).toFixed(2)}</td></tr>`).join('');
 
-    const esFactura = codigoComp === '01';
+    const mostrarCuotasPdf = codigoComp === '01' || codigoComp === '03';
 
     const observaciones = (venta.observaciones && String(venta.observaciones).trim()) || (venta.compRelacionado && String(venta.compRelacionado).trim()) || '';
     const cuotas = Array.isArray(venta.cuotas) ? venta.cuotas : [];
-    const tablaCuotasHtml = cuotas.length > 0 && esFactura
+    const tablaCuotasHtml = cuotas.length > 0 && mostrarCuotasPdf
       ? `<div class="cuotas-section" style="margin-top:16px; page-break-inside:avoid;">
           <strong>Detalle de cuotas a pagar</strong>
           <table class="detalle" style="margin-top:6px;">
@@ -514,7 +514,7 @@ class HtmlBuilderService {
       const ticketTotalesHtml = lineasTotales.map(l =>
         `<tr${l.total ? ' class="total-final"' : ''}><td>${l.label}</td><td class="num" style="text-align:right">${Number(l.value).toFixed(2)}</td></tr>`
       ).join('');
-      const ticketCuotasHtml = cuotas.length > 0 && esFactura
+      const ticketCuotasHtml = cuotas.length > 0 && mostrarCuotasPdf
         ? `<hr class="ticket-sep"><div style="font-size:7px;"><strong>Cuotas a pagar</strong><table style="width:100%;font-size:6px;border-collapse:collapse;"><tr><th>F.Pago</th><th>Nro</th><th class="num">Total</th></tr>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td>${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="num">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</table></div>`
         : '';
       return this._buildTicketComprobanteHtml({

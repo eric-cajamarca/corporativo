@@ -3,6 +3,14 @@ const sql = require('mssql');
 const CajaServices = require('../services/caja.service');
 const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 
+/** Si no viene idEmpresaOperacion en query, el servicio de caja usa todas las empresas permitidas (gestora + gestionadas). */
+async function resolverIdEmpresaOperacionFiltroMovimientos(pool, user, rawQuery) {
+  if (rawQuery == null) return undefined;
+  const s = String(rawQuery).trim();
+  if (s === "") return undefined;
+  return resolverIdEmpresaOperacionCaja(pool, user, rawQuery);
+}
+
 // Obtener cajas disponibles para la empresa
 const obtenerCajas = async (req, res, next) => {
   try {
@@ -249,7 +257,7 @@ const obtenerMovimientosCaja = async (req, res, next) => {
     const { idApertura, idCaja, fechaDesde, fechaHasta, tipoMovimiento, soloRecibos } = req.query;
 
     const pool = await sql.connect(dbConfig);
-    const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
+    const idEmpresaOpFiltro = await resolverIdEmpresaOperacionFiltroMovimientos(pool, req.user, req.query.idEmpresaOperacion);
     const movimientos = await CajaServices.obtenerMovimientosCajaService(pool, req.user, {
       idApertura,
       idCaja: idCaja || null,
@@ -257,7 +265,7 @@ const obtenerMovimientosCaja = async (req, res, next) => {
       fechaHasta,
       tipoMovimiento: tipoMovimiento || null,
       soloRecibos: soloRecibos === "true" || soloRecibos === true,
-      idEmpresaOperacion: idEmpresaOp
+      idEmpresaOperacion: idEmpresaOpFiltro
     });
 
     res.status(200).send({ data: movimientos });
@@ -351,11 +359,11 @@ const obtenerRecibosEgreso = async (req, res, next) => {
   try {
     const { fechaDesde, fechaHasta } = req.query;
     const pool = await sql.connect(dbConfig);
-    const idEmpresaOp = await resolverIdEmpresaOperacionCaja(pool, req.user, req.query.idEmpresaOperacion);
+    const idEmpresaOpFiltro = await resolverIdEmpresaOperacionFiltroMovimientos(pool, req.user, req.query.idEmpresaOperacion);
     const lista = await CajaServices.obtenerRecibosEgresoService(pool, req.user, {
       fechaDesde: fechaDesde || null,
       fechaHasta: fechaHasta || null,
-      idEmpresaOperacion: idEmpresaOp
+      idEmpresaOperacion: idEmpresaOpFiltro
     });
     res.status(200).send({ data: lista });
   } catch (error) {

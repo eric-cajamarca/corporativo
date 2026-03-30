@@ -20,6 +20,8 @@ export interface FilaArqueoConcepto {
   tipoOperacion: 'I' | 'E';
   importe: number;
   icono: string;
+  /** Si true, no hay filas en detalle de caja (SUNAT/movimientos); ocultar botón Detalle. */
+  sinDetalle?: boolean;
 }
 
 export interface ArqueoTotalesPorEmpresaFila {
@@ -247,7 +249,10 @@ export class ArqueoCajaComponent implements OnInit {
         });
                         
         // Resumen por concepto (ej. VENTA CONTADO, APERTURA_CAJA): con icono y signo (egresos negativos)
-        this.resumenConceptos = Array.from(conceptosMap.entries())
+        this.ventasCreditoImporte = this.importeArqueoCredito((response as any).ventasCredito);
+        this.cobroCreditosImporte = this.importeArqueoCredito((response as any).cobroCreditos);
+
+        const baseResumen = Array.from(conceptosMap.entries())
           .map(([key, val]) => {
             const [concepto] = key.split('|');
             return {
@@ -258,7 +263,25 @@ export class ArqueoCajaComponent implements OnInit {
             };
           })
           .sort((a, b) => (a.tipoOperacion === 'I' ? 0 : 1) - (b.tipoOperacion === 'I' ? 0 : 1));
-        
+
+        this.resumenConceptos = [
+          ...baseResumen,
+          {
+            concepto: 'Venta al crédito (informativo, no es efectivo en caja)',
+            tipoOperacion: 'I',
+            importe: this.ventasCreditoImporte,
+            icono: 'bi bi-credit-card-2-front',
+            sinDetalle: true
+          },
+          {
+            concepto: 'Cobro de créditos (cuotas pagadas en el período)',
+            tipoOperacion: 'I',
+            importe: this.cobroCreditosImporte,
+            icono: 'bi bi-cash-coin',
+            sinDetalle: true
+          }
+        ];
+
         // Filas crudas para detalle; ingresos/egresos agrupados por forma de pago (modales)
         this.filasArqueoRaw = filas.map((r: any) => ({
           concepto: (r.concepto || 'Sin especificar').replace(/_/g, ' '),
@@ -269,11 +292,9 @@ export class ArqueoCajaComponent implements OnInit {
         this.movimientosIngresos = Array.from(ingresosMap.entries()).map(([formaPago, importe]) => ({ formaPago, importe }));
         this.movimientosEgresos = Array.from(egresosMap.entries()).map(([formaPago, importe]) => ({ formaPago, importe }));
                         
-        // Totales y datos extra del response; luego se arma la primera tabla (resumen fijo de 6 filas)
-        this.totalIngresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'I').reduce((acc, c) => acc + c.importe, 0);
-        this.totalEgresos = this.resumenConceptos.filter(c => c.tipoOperacion === 'E').reduce((acc, c) => acc + Math.abs(c.importe), 0);
-        this.ventasCreditoImporte = Number((response as any).ventasCredito?.importe) || 0;
-        this.cobroCreditosImporte = Number((response as any).cobroCreditos?.importe) || 0;
+        // Totales desde filas de caja (sin las dos filas informativas de crédito, para no mezclar con efectivo)
+        this.totalIngresos = baseResumen.filter(c => c.tipoOperacion === 'I').reduce((acc, c) => acc + c.importe, 0);
+        this.totalEgresos = baseResumen.filter(c => c.tipoOperacion === 'E').reduce((acc, c) => acc + Math.abs(c.importe), 0);
         this.detalleArqueo = (response as any).detalle || [];
         const porEmp = (response as any).totalesPorEmpresa;
         if (Array.isArray(porEmp) && porEmp.length > 0) {
@@ -438,6 +459,13 @@ export class ArqueoCajaComponent implements OnInit {
 
   formatCurrency(valor: number): string {
     return (valor || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /** Normaliza importe devuelto por API (string/Decimal) en filas ventasCredito / cobroCreditos por empresa. */
+  importeArqueoCredito(bloque: { importe?: unknown } | undefined): number {
+    if (!bloque || bloque.importe == null) return 0;
+    const n = Number(bloque.importe);
+    return Number.isFinite(n) ? n : 0;
   }
 
   /**

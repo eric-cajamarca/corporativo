@@ -1,4 +1,6 @@
 export interface CreditoCliente {
+  /** Empresa del crédito (listado consolidado gestora). */
+  idEmpresa?: string;
   idCredito: string;
   idCliente: string;
   idVenta: string;

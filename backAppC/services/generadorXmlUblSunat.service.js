@@ -45,6 +45,69 @@ function fechaParte(fechaStr) {
   return { fecha, hora };
 }
 
+/** Catálogo forma de pago SUNAT (ej. 009 contado, 010 crédito). */
+function normalizarCodigoFormaPagoSunat(cod) {
+  const s = toStr(cod);
+  if (s === "10") return "010";
+  return s;
+}
+
+/**
+ * Términos de pago UBL 2.1 para factura/boleta: FormaPago + cuotas (monto y fecha) cuando aplica crédito.
+ * Alineado a guía XML factura electrónica Perú / RS sobre comprobantes al crédito.
+ */
+function resolverPagoFacturaBoletaUbl(venta, fechaEmisionYmd) {
+  const codFp =
+    normalizarCodigoFormaPagoSunat(toStr(venta.codigoCondicionPago)) ||
+    (toStr(venta.condicionPago).toUpperCase().includes("CREDITO") ? "010" : "009");
+  const ventaCredito = codFp === "010" || /credito/i.test(toStr(venta.condicionPago));
+  const codComp = toStr(venta.codigoComprobante);
+  const esFacturaOBoleta = codComp === "01" || codComp === "03";
+  const cuotasRaw = Array.isArray(venta.cuotas) ? venta.cuotas : [];
+  const cuotas = cuotasRaw.filter((c) => toNum(c.total) > 0.001);
+  const emitirCuotasUbl = esFacturaOBoleta && ventaCredito && cuotas.length > 0;
+
+  const paymentMeansId = ventaCredito ? "010" : "009";
+
+  let dueDate = fechaEmisionYmd;
+  if (emitirCuotasUbl) {
+    const fechas = cuotas
+      .map((c) => toStr(c.fechaPago).slice(0, 10))
+      .filter((f) => f.length === 10)
+      .sort();
+    if (fechas.length) dueDate = fechas[fechas.length - 1];
+  } else if (ventaCredito && toStr(venta.fVencimiento)) {
+    const fv = fechaParte(venta.fVencimiento);
+    if (fv.fecha) dueDate = fv.fecha;
+  }
+
+  let paymentTermsXml = `
+  <cac:PaymentTerms>
+    <cbc:ID>FormaPago</cbc:ID>
+    <cbc:PaymentMeansID>${escXml(paymentMeansId)}</cbc:PaymentMeansID>
+  </cac:PaymentTerms>`;
+
+  if (emitirCuotasUbl) {
+    for (let i = 0; i < cuotas.length; i++) {
+      const c = cuotas[i];
+      const n = c.numeroCuota != null ? Number(c.numeroCuota) : i + 1;
+      const idCuota = `Cuota${String(Number.isFinite(n) ? n : i + 1).padStart(3, "0")}`;
+      const monto = toNum(c.total);
+      let fpago = toStr(c.fechaPago).slice(0, 10);
+      if (!fpago) fpago = dueDate;
+      paymentTermsXml += `
+  <cac:PaymentTerms>
+    <cbc:ID>${escXml(idCuota)}</cbc:ID>
+    <cbc:PaymentMeansID>${escXml(idCuota)}</cbc:PaymentMeansID>
+    <cbc:Amount currencyID="PEN">${monto.toFixed(2)}</cbc:Amount>
+    <cbc:PaymentDueDate>${escXml(fpago)}</cbc:PaymentDueDate>
+  </cac:PaymentTerms>`;
+    }
+  }
+
+  return { dueDate, paymentMeansId, paymentTermsXml, ventaCredito, emitirCuotasUbl };
+}
+
 /**
  * Resuelve tributo principal para XML/planos desde payload.impuestos y monto de IGV.
  * Catálogo 05: 1000=IGV, 9997=EXO. Catálogo 07: 10=Gravado, 20=Exonerado.
@@ -107,7 +170,12 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
 
   const montoEnLetras = numeroALetras(total);
   const observaciones = toStr(venta.observaciones) || toStr(venta.compRelacionado);
-  const condicionPago = toStr(venta.codigoCondicionPago) || (toStr(venta.condicionPago).toUpperCase().includes("CREDITO") ? "010" : "009");
+  const ventaParaPago = {
+    ...venta,
+    codigoComprobante: toStr(venta.codigoComprobante) || String(tipoComprobante || "01").trim()
+  };
+  const pagoUbl = resolverPagoFacturaBoletaUbl(ventaParaPago, fecha || new Date().toISOString().slice(0, 10));
+  const dueDateInvoice = pagoUbl.dueDate || fecha;
   const dirEmisor = toStr(empresa.direccion) || "-";
   const dirCliente = toStr(cliente.direccion) || "-";
 
@@ -172,7 +240,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   <cbc:ID>${escXml(numeroComprobante)}</cbc:ID>
   <cbc:IssueDate>${fecha}</cbc:IssueDate>
   <cbc:IssueTime>${hora}</cbc:IssueTime>
-  <cbc:DueDate>${fecha}</cbc:DueDate>
+  <cbc:DueDate>${escXml(dueDateInvoice)}</cbc:DueDate>
   <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listID="0101" listName="Tipo de Documento" listSchemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01" name="Tipo de Operacion">${tipoCod}</cbc:InvoiceTypeCode>
   <cbc:Note languageLocaleID="1000">${escXml(montoEnLetras)}</cbc:Note>${observaciones ? '\n  <cbc:Note languageLocaleID="1000">' + escXml(observaciones) + '</cbc:Note>' : ''}
   <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 4217 Alpha" listName="Currency">PEN</cbc:DocumentCurrencyCode>
@@ -244,10 +312,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>
-  <cac:PaymentTerms>
-    <cbc:ID>FormaPago</cbc:ID>
-    <cbc:PaymentMeansID>${escXml(condicionPago)}</cbc:PaymentMeansID>
-  </cac:PaymentTerms>
+  ${pagoUbl.paymentTermsXml}
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="PEN">${igv.toFixed(2)}</cbc:TaxAmount>
     <cac:TaxSubtotal>

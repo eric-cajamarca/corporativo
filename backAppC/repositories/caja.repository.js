@@ -1,6 +1,15 @@
 const sql = require("mssql");
 const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
 
+function parseSqlSumImporte(val) {
+  if (val == null) return 0;
+  const n = Number(val);
+  if (Number.isFinite(n)) return n;
+  const s = String(val).replace(/,/g, "").trim();
+  const p = parseFloat(s);
+  return Number.isFinite(p) ? p : 0;
+}
+
 exports.obtenerCajasRepo = async (pool, idEmpresa) => {
   const request = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
 
@@ -763,7 +772,7 @@ const bindIdsEmpresaArqueo = (request, idsEmpresa, prefix) => {
 /** Arqueo dinámico: resumen por concepto y forma de pago. Filtro por fecha única o por rango (fechaInicial, fechaFinal).
  *  idsEmpresa: empresa(s) del JWT; si es gestora incluye gestionadas (misma lista que movimientos de caja).
  *  Venta agrupada multiempresa: MovimientosCaja.idEmpresa = empresa del comprobante hijo; idVenta = venta hija; concepto puede incluir VA.
- *  Para ventas (idVenta no nulo) usa DetallePagoVenta + FormasPago; para el resto usa MovimientosCaja + MediosPago. */
+ *  Para ventas (idVenta no nulo) suma mc.monto por forma de pago del propio movimiento; para el resto igual con mc. */
 exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVistaDelegacion) => {
   const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
   if (ids.length === 0) {
@@ -821,25 +830,27 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     : "AND CONVERT(DATE, mc.fechaMovimiento) = @fecha";
 
   /* Excluir cotizaciones: solo ventas con comprobante distinto de CT (Cotización).
-     NO exigir v.idEmpresa = mc.idEmpresa: cobro VA registra caja en gestora con idVenta de venta hija. */
+     Importe desde mc.monto (no desde DetallePagoVenta): unir dpv solo por idVenta duplica filas
+     (producto cartesiano por cada línea de pago) e infla arqueo (ej. VA multiempresa: 50 → 75).
+     Join Ventas solo por idVenta (único en BD): si idEmpresa en mc difiere de v (delegación caja gestora), sigue aplicando. */
   const sqlVentas = `
     SELECT
       tmc.nombre AS concepto,
       tmc.tipo AS tipoOperacion,
-      ISNULL(fp.descripcion, 'Sin especificar') AS formaPago,
-      SUM(dpv.monto) AS importe
+      ISNULL(fp.descripcion, ISNULL(mp.descripcion, 'Sin especificar')) AS formaPago,
+      SUM(mc.monto) AS importe
     FROM MovimientosCaja mc
     INNER JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
     INNER JOIN AperturasCaja ac ON mc.idApertura = ac.idApertura
     INNER JOIN Ventas v ON v.idVenta = mc.idVenta
     INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
-    INNER JOIN DetallePagoVenta dpv ON dpv.idVenta = mc.idVenta
-    LEFT JOIN FormasPago fp ON fp.idFormaPago = dpv.idMediosPago
+    LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
+    LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE ${whereMcPrincipal}
       ${condicionFecha}
       AND mc.idVenta IS NOT NULL
       ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
-    GROUP BY tmc.nombre, tmc.tipo, fp.descripcion
+    GROUP BY tmc.nombre, tmc.tipo, fp.descripcion, mp.descripcion
   `;
   const sqlOtros = `
     SELECT
@@ -949,19 +960,17 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     } else {
       reqCredito.input("fecha", sql.Date, fechaFiltro);
     }
-    const condicionFechaVentas = usaRango
-      ? "AND CONVERT(DATE, v.fEmision) >= @fechaInicial AND CONVERT(DATE, v.fEmision) <= @fechaFinal"
-      : "AND CONVERT(DATE, v.fEmision) = @fecha";
+    const condicionFechaCc = usaRango
+      ? "AND CONVERT(DATE, cc.fechaCredito) >= @fechaInicial AND CONVERT(DATE, cc.fechaCredito) <= @fechaFinal"
+      : "AND CONVERT(DATE, cc.fechaCredito) = @fecha";
     const rCredito = await reqCredito.query(`
-      SELECT ISNULL(SUM(v.total), 0) AS total
-      FROM Ventas v
-      INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa AND ISNULL(c.codigo, '') <> 'CT'
-      INNER JOIN MediosPago mp ON (mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT) OR CAST(mp.idMediosPago AS VARCHAR(20)) = RTRIM(LTRIM(ISNULL(v.idMediosPago, ''))))
-        AND (mp.descripcion LIKE '%credito%' OR mp.descripcion LIKE '%crédito%' OR LOWER(REPLACE(mp.descripcion, 'í', 'i')) LIKE '%credito%')
-      WHERE v.idEmpresa IN (${inVc}) ${condicionFechaVentas}
+      SELECT ISNULL(SUM(cc.montoTotal), 0) AS total
+      FROM CreditosClientes cc
+      WHERE cc.idEmpresa IN (${inVc}) ${condicionFechaCc}
+        AND UPPER(LTRIM(RTRIM(ISNULL(cc.estado, '')))) <> 'CANCELADO'
     `);
     const total = rCredito.recordset?.[0]?.total;
-    ventasCredito.importe = Number(total) || 0;
+    ventasCredito.importe = parseSqlSumImporte(total);
   } catch (err) {
     console.error("Error obtener ventas al crédito para arqueo:", err);
   }
@@ -984,7 +993,7 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
       WHERE pc.idEmpresa IN (${inPc}) ${condicionFechaPago}
     `);
     const totalCobro = rCobro.recordset?.[0]?.total;
-    cobroCreditos.importe = Number(totalCobro) || 0;
+    cobroCreditos.importe = parseSqlSumImporte(totalCobro);
   } catch (err) {
     console.error("Error obtener total cobro de créditos para arqueo:", err);
   }

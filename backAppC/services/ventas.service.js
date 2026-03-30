@@ -194,7 +194,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
   if (!user || !user.empresa || !user.sub) {
     throw new Error('Usuario no autorizado.');
   }
-  const { venta, detalles, detallePago, idApertura } = payload || {};
+  const { venta, detalles, detallePago, idApertura, cuotasCredito } = payload || {};
   if (!venta || !Array.isArray(detalles) || detalles.length === 0) {
     throw new Error('Venta y detalles son requeridos.');
   }
@@ -221,7 +221,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const fechaEmisionConHora = fechaEmisionConHoraActual(venta.fEmision);
     const fVencimientoSQL = getFechaSoloSQLString(venta.fVencimiento) || fechaEmisionConHora;
     const ventaConHora = { ...venta, fEmision: fechaEmisionConHora, fVencimiento: fVencimientoSQL };
-    const idEstadoPago = venta.idEstadoPago != null ? parseInt(venta.idEstadoPago, 10) : 1;
+    let idEstadoPago = venta.idEstadoPago != null ? parseInt(venta.idEstadoPago, 10) : 1;
     const idEstadoPedidoVenta = venta.idEstadoPedido != null ? parseInt(venta.idEstadoPedido, 10) : 1;
     const esEstadoPendiente = (idEstadoPedidoVenta === 1);
 
@@ -231,6 +231,18 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const rCualquiera = await transaction.request().query('SELECT TOP 1 idMediosPago FROM MediosPago');
       const fallbackId = rContado.recordset?.[0]?.idMediosPago ?? rCualquiera.recordset?.[0]?.idMediosPago;
       ventaConHora.idMediosPago = fallbackId != null ? String(fallbackId) : '1';
+    }
+
+    // Factura/boleta (y NV) a crédito corriente / fiado: no van a "pendientes de pago" (cobranza en módulo créditos).
+    try {
+      const ventaCreditoPostVentaService = require('./ventaCreditoPostVenta.service');
+      const idsCredCab = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
+      const idMpCab = Number(ventaConHora.idMediosPago);
+      if (idsCredCab.has(idMpCab)) {
+        idEstadoPago = 2;
+      }
+    } catch (err) {
+      console.error('contexto: idEstadoPago crédito cabecera', err);
     }
 
     const idsProducto = [...new Set(detalles.map(d => d.idProducto).filter(Boolean).map(String))];
@@ -548,6 +560,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       ventasEmpresa.push({
         idEmpresa: idEmpresaProducto,
         idVenta,
+        idCliente: idClienteEmpresa,
+        codigoComprobante,
         compVenta,
         total: totalesEmpresa.total,
         idSucursal: idSucursalEmpresa,
@@ -565,7 +579,19 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       detalle: `VA ${compVentaVA}, tipo destino: ${tipoComprobanteDestino}, empresas: ${ventasEmpresa.length}`
     });
 
-    // --- Caja + detalle pago: reparto por comprobante/empresa (multiempresa) ---
+    // --- Créditos (CuotasCredito) desde medios "crédito" en detallePago; antes de caja ---
+    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0 && ventasEmpresa.length > 0) {
+      const ventaCreditoPostVentaService = require('./ventaCreditoPostVenta.service');
+      await ventaCreditoPostVentaService.crearCreditosDesdeVentaAgrupada(transaction, {
+        ventasEmpresa,
+        detallePago,
+        cuotasCredito: Array.isArray(cuotasCredito) ? cuotasCredito : [],
+        userSub: user.sub,
+        fVencimientoCabecera: venta.fVencimiento,
+      });
+    }
+
+    // --- Caja + detalle pago: reparto por comprobante/empresa (solo medios que no son crédito) ---
     if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
       if (ventasEmpresa.length === 0) {
         throw new Error('No hay ventas hijas para asociar el pago y el movimiento de caja.');

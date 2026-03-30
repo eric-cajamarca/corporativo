@@ -101,8 +101,14 @@ export class CreateVentasComponent implements OnInit {
     direccion: '',
     correo: '',
     celular: '',
-    condicion: 'ACTIVO'
+    condicion: 'ACTIVO',
+    sujetoCredito: undefined as boolean | undefined,
+    lineaCredito: undefined as number | undefined
   };
+
+  /** Formulario modal editar línea de crédito del cliente (desde nueva venta). */
+  editClienteCreditoForm = { sujetoCredito: false, lineaCredito: 0 };
+  loadingEditClienteCredito = false;
   public cajas: any[] = [];
   public loading = false;
   public clienteBuscando = false;
@@ -166,6 +172,9 @@ export class CreateVentasComponent implements OnInit {
     { codigo: '03', nombre: 'Boleta' },
     { codigo: '01', nombre: 'Factura' }
   ];
+
+  /** Cuotas explícitas para factura/boleta a crédito (SUNAT / PDF). En NV el crédito va solo por formas de pago (una cuota en servidor). */
+  cuotasCreditoPlano: { monto: number; fechaVencimiento: string }[] = [];
 
   /** Modal Convertir vale en venta (liquidación). Solo visible si la empresa tiene habilitado vales de despacho (config rubro usaValeDespacho). */
   usaValeDespachoHabilitado = false;
@@ -569,6 +578,15 @@ export class CreateVentasComponent implements OnInit {
     const c = String(codigo ?? '').trim();
     const permitidos = new Set(this.comprobantesDestinoOpciones.map((o) => o.codigo));
     this.tipoComprobanteDestino = permitidos.has(c) ? c : 'NV';
+    if (this.tipoComprobanteDestino !== '01' && this.tipoComprobanteDestino !== '03') {
+      this.cuotasCreditoPlano = [];
+    }
+  }
+
+  onTipoComprobanteDestinoChanged(): void {
+    if (!this.esFacturaOBoletaVenta()) {
+      this.cuotasCreditoPlano = [];
+    }
   }
 
   /**
@@ -605,6 +623,9 @@ export class CreateVentasComponent implements OnInit {
           this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
           this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
           this.sincronizarTipoComprobanteDestinoDesdeCodigo(comp.codigo);
+          if (!this.esFacturaOBoletaVenta()) {
+            this.cuotasCreditoPlano = [];
+          }
         } else {
           this.ventas.serie = '';
           this.ventas.numero = '00000001';
@@ -612,6 +633,7 @@ export class CreateVentasComponent implements OnInit {
           if (this.esGestora) {
             this.tipoComprobanteDestino = 'NV';
           }
+          this.cuotasCreditoPlano = [];
         }
         this.guardarEstadoProvisional();
       },
@@ -624,6 +646,9 @@ export class CreateVentasComponent implements OnInit {
           this.ventas.compVenta = this.ventas.serie + '-' + this.ventas.numero;
           this.ventas.idDocumento = (comp.codigo === '01') ? this.ID_DOC_RUC : this.ID_DOC_DNI;
           this.sincronizarTipoComprobanteDestinoDesdeCodigo(comp.codigo);
+          if (!this.esFacturaOBoletaVenta()) {
+            this.cuotasCreditoPlano = [];
+          }
         }
         this.guardarEstadoProvisional();
       }
@@ -950,7 +975,9 @@ abrirModalPrecios(item: any) {
             direccion: (row.direccion ?? '').toString(),
             correo: row.correo ?? '',
             celular: row.celular ?? '',
-            condicion: row.condicion ?? 'ACTIVO'
+            condicion: row.condicion ?? 'ACTIVO',
+            sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
+            lineaCredito: row.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : undefined
           };
                     this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
             next: (dirRes) => {
@@ -1016,7 +1043,9 @@ abrirModalPrecios(item: any) {
       direccion: (e.direccion ?? '').toString(),
       correo: e.correo ?? '',
       celular: e.celular ?? '',
-      condicion: e.condicion ?? 'ACTIVO'
+      condicion: e.condicion ?? 'ACTIVO',
+      sujetoCredito: e.sujetoCredito === true || e.sujetoCredito === 1,
+      lineaCredito: e.lineaCredito != null && !isNaN(Number(e.lineaCredito)) ? Number(e.lineaCredito) : undefined
     };
     const modalEl = document.getElementById('clientesModal');
     const modalInst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
@@ -1084,7 +1113,9 @@ abrirModalPrecios(item: any) {
       direccion: (row.direccion ?? '').toString(),
       correo: row.correo ?? '',
       celular: row.celular ?? '',
-      condicion: row.condicion ?? 'ACTIVO'
+      condicion: row.condicion ?? 'ACTIVO',
+      sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
+      lineaCredito: row.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : undefined
     };
     this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
       next: (dirRes) => {
@@ -1151,6 +1182,75 @@ abrirModalPrecios(item: any) {
           condicion: event?.condicion ?? 'ACTIVO'
         };
         this.guardarEstadoProvisional();
+      }
+    });
+  }
+
+  abrirModalEditarClienteCredito(): void {
+    const id = Number(this.cliente?.idCliente);
+    if (!id) {
+      iziToast.warning({ title: 'Aviso', message: 'Busque un cliente registrado antes de editar línea de crédito.' });
+      return;
+    }
+    this.loadingEditClienteCredito = true;
+    this._clienteService.obtener_cliente_id(id).subscribe({
+      next: (res: any) => {
+        const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+        if (!row) {
+          this.loadingEditClienteCredito = false;
+          iziToast.error({ title: 'Error', message: 'No se encontró el cliente.' });
+          return;
+        }
+        this.editClienteCreditoForm = {
+          sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
+          lineaCredito: row.lineaCredito != null ? Number(row.lineaCredito) : 0
+        };
+        this.loadingEditClienteCredito = false;
+        const el = document.getElementById('modalEditarClienteCredito');
+        if (el) {
+          bootstrap.Modal.getOrCreateInstance(el as HTMLElement).show();
+        }
+      },
+      error: () => {
+        this.loadingEditClienteCredito = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar los datos del cliente.' });
+      }
+    });
+  }
+
+  guardarLineaCreditoClienteDesdeVenta(): void {
+    const id = Number(this.cliente?.idCliente);
+    if (!id) return;
+    this.loadingEditClienteCredito = true;
+    const payload = {
+      idDocumento: String(this.cliente.idDocumento ?? this.ventas.idDocumento ?? '1'),
+      ruc: String(this.cliente.ruc ?? '').trim(),
+      rSocial: String(this.cliente.rSocial ?? '').trim(),
+      correo: this.cliente.correo ?? '',
+      celular: this.cliente.celular ?? '',
+      condicion: this.cliente.condicion ?? 'ACTIVO',
+      sujetoCredito: this.editClienteCreditoForm.sujetoCredito,
+      lineaCredito: Math.max(0, Number(this.editClienteCreditoForm.lineaCredito) || 0)
+    };
+    this._clienteService.editar_cliente(id, payload).subscribe({
+      next: (res: any) => {
+        this.loadingEditClienteCredito = false;
+        const row = res?.data?.[0] ?? res?.data;
+        if (row) {
+          this.cliente.sujetoCredito = row.sujetoCredito === true || row.sujetoCredito === 1;
+          this.cliente.lineaCredito = row.lineaCredito != null ? Number(row.lineaCredito) : 0;
+        } else {
+          this.cliente.sujetoCredito = payload.sujetoCredito;
+          this.cliente.lineaCredito = payload.lineaCredito;
+        }
+        iziToast.success({ title: 'Listo', message: 'Cliente actualizado.' });
+        const el = document.getElementById('modalEditarClienteCredito');
+        bootstrap.Modal.getInstance(el as HTMLElement)?.hide();
+        this.guardarEstadoProvisional();
+      },
+      error: (err) => {
+        this.loadingEditClienteCredito = false;
+        iziToast.error({ title: 'Error', message: err?.error?.message ?? 'No se pudo guardar.' });
       }
     });
   }
@@ -1265,6 +1365,49 @@ abrirModalPrecios(item: any) {
     inst?.hide();
   }
 
+  /** Normaliza texto para detectar "crédito" aunque venga con tilde (FormasPago / MediosPago). */
+  private descripcionEsCredito(texto: string | undefined | null): boolean {
+    const d = (texto || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    return d.includes('credito');
+  }
+
+  /** True si el medio (MediosPago) es crédito por descripción o código SUNAT 010. */
+  private medioPagoEsCredito(m: { descripcion?: string; codigo?: string } | undefined): boolean {
+    if (!m) return false;
+    return this.descripcionEsCredito(m.descripcion || '') || ['010', '10'].includes(String(m.codigo || '').trim());
+  }
+
+  /** Tarjeta de crédito/débito: no cuenta como crédito corriente (línea cliente / cobranza cuotas). */
+  private descripcionIndicaTarjeta(texto: string | undefined | null): boolean {
+    const d = (texto || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    return d.includes('tarjeta');
+  }
+
+  /** Crédito corriente / fiado (SUNAT 010), excluye tarjeta crédito. */
+  private medioPagoEsCreditoFinanciacion(m: { descripcion?: string; codigo?: string } | undefined): boolean {
+    if (!m) return false;
+    if (this.descripcionIndicaTarjeta(m.descripcion || '')) return false;
+    return this.descripcionEsCredito(m.descripcion || '') || ['010', '10'].includes(String(m.codigo || '').trim());
+  }
+
+  /** Condición de pago de cabecera = crédito corriente (no tarjeta). */
+  cabeceraEsCreditoFinanciacion(): boolean {
+    const idCab = Number(this.ventas.idMediosPago);
+    const m = this.mediosPago.find((x: any) => Number(x.idMediosPago) === idCab);
+    return this.medioPagoEsCreditoFinanciacion(m);
+  }
+
+  /** Alias para validación SUNAT en factura/boleta. */
+  cabeceraEsMedioCredito(): boolean {
+    return this.cabeceraEsCreditoFinanciacion();
+  }
+
   /** True si el comprobante seleccionado es electrónico (01 Factura, 03 Boleta, 07 NC, 08 ND). */
   esComprobanteElectronico(): boolean {
     const id = this.ventas?.idComprobante;
@@ -1327,7 +1470,33 @@ abrirModalPrecios(item: any) {
       this.enviarCotizacion(idCliente);
       return;
     }
-    const totalCredit = this.getTotalVentaAlCredito();
+    const totalCredit = this.getMontoCreditoVenta();
+    if (
+      totalCredit > 0.01 &&
+      Number(this.ventas.idEstadoPago) === 1 &&
+      this.calcularTotalTabla() < 0.01 &&
+      (this.esFacturaOBoletaVenta() || this.esNotaVentaVenta()) &&
+      this.cabeceraEsCreditoFinanciacion() &&
+      !this.mediosPago.some((m: any) => this.medioPagoEsCreditoFinanciacion(m))
+    ) {
+      iziToast.warning({
+        title: 'Medios de pago',
+        message:
+          'Para venta al crédito corriente con pago PENDIENTE debe existir un medio de pago tipo CRÉDITO (código SUNAT 010), no solo tarjeta. Revise el catálogo Medios de pago.'
+      });
+      return;
+    }
+    if (totalCredit > 0.01 && this.esFacturaOBoletaVenta() && !this.cabeceraEsMedioCredito()) {
+      iziToast.warning({
+        title: 'Condición de pago (SUNAT)',
+        message:
+          'En factura o boleta con monto al crédito corriente, en Datos del comprobante elija la condición de pago CRÉDITO (código SUNAT 010), no tarjeta.'
+      });
+      return;
+    }
+    if (totalCredit > 0.01 && idCliente != null && idCliente !== 0 && !this.asegurarCuotasCreditoSiCorresponde()) {
+      return;
+    }
     if (totalCredit > 0 && (idCliente == null || idCliente === 0)) {
       iziToast.warning({
         title: 'Venta al crédito',
@@ -1342,11 +1511,151 @@ abrirModalPrecios(item: any) {
     this.enviarVentaConCliente(idCliente);
   }
 
-  /** Monto total de la venta que se paga con condición "crédito" (según descripción del medio de pago en el detalle). */
+  /**
+   * Suma montos del detalle que son crédito corriente / fiado (excluye tarjeta). Usado para línea de crédito del cliente y cuotas.
+   */
   getTotalVentaAlCredito(): number {
-    return this.detallePago
-      .filter((d: any) => (d.descripcion || '').toLowerCase().includes('credito'))
-      .reduce((sum: number, d: any) => sum + (Number(d.monto) || 0), 0);
+    let sum = 0;
+    for (const d of this.detallePago) {
+      const monto = Number(d.monto) || 0;
+      if (monto <= 0) continue;
+      const id = Number(d.idMediosPago ?? d.idFormaPago);
+      const medio = this.mediosPago.find((m: any) => Number(m.idMediosPago) === id);
+      if (this.medioPagoEsCreditoFinanciacion(medio)) {
+        sum += monto;
+        continue;
+      }
+      const forma = this.formasPago.find((f: FormaPago) => Number(f.idFormaPago) === id);
+      if (
+        forma &&
+        this.descripcionEsCredito(forma.descripcion || '') &&
+        !this.descripcionIndicaTarjeta(forma.descripcion || '')
+      ) {
+        sum += monto;
+        continue;
+      }
+      if (
+        this.descripcionEsCredito(d.descripcion || '') &&
+        !this.descripcionIndicaTarjeta(d.descripcion || '')
+      ) {
+        sum += monto;
+      }
+    }
+    return Math.round(sum * 100) / 100;
+  }
+
+  /**
+   * Monto que cuenta como crédito corriente: líneas en formas de pago, o pago PENDIENTE solo si la condición de cabecera ya es CRÉDITO (010 / fiado), nunca con CONTADO ni tarjeta.
+   */
+  getMontoCreditoVenta(): number {
+    const desdeDetalle = this.getTotalVentaAlCredito();
+    if (desdeDetalle > 0.01) return desdeDetalle;
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    if (idEstadoPago !== 1) return 0;
+    if (!this.cabeceraEsCreditoFinanciacion()) return 0;
+    const total = Math.round((Number(this.ventas.total) || 0) * 100) / 100;
+    if (total <= 0.01) return 0;
+    if (this.esFacturaOBoletaVenta() || this.esNotaVentaVenta()) return total;
+    return 0;
+  }
+
+  /** Nota de venta efectiva (gestora: tipo destino NV; si no, código NV). */
+  esNotaVentaVenta(): boolean {
+    if (this.esGestora) {
+      return String(this.tipoComprobanteDestino || '').trim().toUpperCase() === 'NV';
+    }
+    return this.codigoComprobanteVentaSeleccionado() === 'NV';
+  }
+
+  private codigoComprobanteVentaSeleccionado(): string {
+    const id = this.ventas?.idComprobante;
+    if (id == null || id === '') return '';
+    const comp = this.comprobantes?.find((c: any) => Number(c.idComprobante) === Number(id));
+    return String(comp?.codigo ?? '').trim().toUpperCase();
+  }
+
+  /** Factura o boleta efectiva (gestora: comprobante destino; resto: tipo seleccionado). */
+  esFacturaOBoletaVenta(): boolean {
+    if (this.esGestora) {
+      const c = String(this.tipoComprobanteDestino || '').trim().toUpperCase();
+      return c === '01' || c === '03';
+    }
+    const c = this.codigoComprobanteVentaSeleccionado();
+    return c === '01' || c === '03';
+  }
+
+  cuotasCreditoRequeridas(): boolean {
+    return this.esFacturaOBoletaVenta() && this.getMontoCreditoVenta() > 0.01;
+  }
+
+  get sumaCuotasCreditoPlano(): number {
+    return Math.round(this.cuotasCreditoPlano.reduce((s, r) => s + (Number(r.monto) || 0), 0) * 100) / 100;
+  }
+
+  validarCuotasCreditoPlano(): boolean {
+    if (!this.cuotasCreditoRequeridas()) return true;
+    const target = Math.round(this.getMontoCreditoVenta() * 100) / 100;
+    if (this.cuotasCreditoPlano.length === 0) return false;
+    if (!this.cuotasCreditoPlano.every((r) => r.fechaVencimiento && (Number(r.monto) || 0) > 0)) return false;
+    return Math.abs(this.sumaCuotasCreditoPlano - target) <= 0.02;
+  }
+
+  /** Si falta plan de cuotas (F/B + crédito), abre el modal y devuelve false. */
+  asegurarCuotasCreditoSiCorresponde(): boolean {
+    if (!this.cuotasCreditoRequeridas()) return true;
+    if (this.validarCuotasCreditoPlano()) return true;
+    this.abrirModalCuotasCredito();
+    iziToast.warning({
+      title: 'Plan de cuotas',
+      message: 'En factura o boleta a crédito defina cada cuota, monto y fecha de vencimiento. La suma debe coincidir con el total al crédito.'
+    });
+    return false;
+  }
+
+  abrirModalCuotasCredito(): void {
+    const target = Math.round(this.getMontoCreditoVenta() * 100) / 100;
+    const fvCab = (this.ventas.fVencimiento || '').toString().slice(0, 10);
+    const hoy = (() => {
+      const n = new Date();
+      return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    })();
+    const defaultFv = fvCab || hoy;
+    if (this.cuotasCreditoPlano.length === 0 && target > 0) {
+      this.cuotasCreditoPlano = [{ monto: target, fechaVencimiento: defaultFv }];
+    }
+    const el = document.getElementById('modalCuotasCredito');
+    if (el) {
+      bootstrap.Modal.getOrCreateInstance(el as HTMLElement).show();
+    }
+  }
+
+  cerrarModalCuotasCredito(): void {
+    const el = document.getElementById('modalCuotasCredito');
+    bootstrap.Modal.getInstance(el as HTMLElement)?.hide();
+  }
+
+  agregarFilaCuotaCredito(): void {
+    const fv = (this.ventas.fVencimiento || '').toString().slice(0, 10) || (() => {
+      const n = new Date();
+      return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    })();
+    this.cuotasCreditoPlano.push({ monto: 0, fechaVencimiento: fv });
+  }
+
+  quitarFilaCuotaCredito(index: number): void {
+    this.cuotasCreditoPlano.splice(index, 1);
+  }
+
+  confirmarCuotasCreditoYRegistrar(): void {
+    if (!this.validarCuotasCreditoPlano()) {
+      iziToast.warning({
+        title: 'Revise las cuotas',
+        message: 'Cada fila requiere monto y fecha. La suma de cuotas debe igualar el total al crédito.'
+      });
+      return;
+    }
+    this.cerrarModalCuotasCredito();
+    this.registrarVenta();
   }
 
   /** Valida sujeto a crédito y línea de crédito; si es válido, envía la venta. */
@@ -1415,7 +1724,10 @@ abrirModalPrecios(item: any) {
         const idCliente = creado?.idCliente != null ? Number(creado.idCliente) : null;
         const enviarVenta = (id: number) => {
           this.cliente.idCliente = id;
-          this.registrarDireccionClienteSiNuevo(id, () => this.enviarVentaConCliente(id));
+          this.registrarDireccionClienteSiNuevo(id, () => {
+            this.loading = false;
+            this.registrarVenta();
+          });
         };
         if (idCliente == null) {
           this._clienteService.obtener_cliente_ruc(payload.ruc).subscribe({
@@ -1530,6 +1842,22 @@ abrirModalPrecios(item: any) {
     });
   }
 
+  /**
+   * PENDIENTE + condición CRÉDITO corriente + sin líneas: envía una línea fiado por el total (CreditosClientes/CuotasCredito).
+   */
+  private completarDetallePagoCreditoPendiente(detallePago: { idMediosPago: number; monto: number }[]): void {
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    if (idEstadoPago !== 1) return;
+    if (!this.cabeceraEsCreditoFinanciacion()) return;
+    if (!this.esFacturaOBoletaVenta() && !this.esNotaVentaVenta()) return;
+    const totalVenta = Math.round((Number(this.ventas.total) || 0) * 100) / 100;
+    if (totalVenta <= 0.01) return;
+    if (detallePago.length > 0) return;
+    const medioCred = this.mediosPago.find((m: any) => this.medioPagoEsCreditoFinanciacion(m));
+    if (!medioCred) return;
+    detallePago.push({ idMediosPago: Number(medioCred.idMediosPago), monto: totalVenta });
+  }
+
   private enviarVentaConCliente(idCliente: number): void {
     const totalVenta = Number(this.ventas.total) || 0;
     const totalPago = this.calcularTotalTabla();
@@ -1538,6 +1866,9 @@ abrirModalPrecios(item: any) {
     if (!esPagoPendiente && totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
       this.loading = false;
       iziToast.warning({ title: 'Advertencia', message: 'El total del detalle de pago no coincide con el total de la venta.' });
+      return;
+    }
+    if (!this.asegurarCuotasCreditoSiCorresponde()) {
       return;
     }
     this.loading = true;
@@ -1599,22 +1930,33 @@ abrirModalPrecios(item: any) {
       };
     });
 
-    const detallePago = this.detallePago
+    const detallePago: { idMediosPago: number; monto: number }[] = this.detallePago
       .filter((d: any) => d.monto > 0 && (d.idFormaPago != null || d.idMediosPago != null))
       .map((d: any) => ({
         idMediosPago: Number(d.idMediosPago ?? d.idFormaPago),
         monto: Number(d.monto)
       }));
 
+    this.completarDetallePagoCreditoPendiente(detallePago);
+
     let idApertura: string | undefined;
     if (detallePago.length > 0 && this.cajas.length > 0) {
       idApertura = this.cajas[0].idApertura;
     }
 
+    const cuotasCredito =
+      this.cuotasCreditoRequeridas() && this.validarCuotasCreditoPlano()
+        ? this.cuotasCreditoPlano.map((r) => ({
+            monto: Math.round((Number(r.monto) || 0) * 100) / 100,
+            fechaVencimiento: String(r.fechaVencimiento || '').slice(0, 10)
+          }))
+        : undefined;
+
     this.ventasService.crearVentaCompleta({
       venta: ventaPayload,
       detalles,
       detallePago: detallePago.length > 0 ? detallePago : undefined,
+      ...(cuotasCredito && cuotasCredito.length ? { cuotasCredito } : {}),
       idApertura
     }).subscribe({
       next: (res: any) => {
@@ -1793,6 +2135,7 @@ abrirModalPrecios(item: any) {
   limpiarVenta(): void {
     this.carrito = [];
     this.detallePago = [];
+    this.cuotasCreditoPlano = [];
     this.pagaCon = 0;
     this.vuelto = 0;
 
@@ -1835,8 +2178,11 @@ abrirModalPrecios(item: any) {
       direccion: '',
       correo: '',
       celular: '',
-      condicion: 'ACTIVO'
+      condicion: 'ACTIVO',
+      sujetoCredito: undefined,
+      lineaCredito: undefined
     };
+    this.editClienteCreditoForm = { sujetoCredito: false, lineaCredito: 0 };
     this.direccionCliente = undefined;
 
     // Reset forma de pago seleccionada a efectivo si existe

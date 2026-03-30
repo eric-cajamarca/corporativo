@@ -51,6 +51,7 @@
                   Acciones
                 </th>
                 <th>Cliente</th>
+                <th *ngIf="empresasOperacion.length > 1">Empresa</th>
                 <th>Documento</th>
                 <th>F.Venta</th>
                 <th class="text-end">Total</th>
@@ -62,7 +63,7 @@
             </thead>
             <tbody>
               <tr *ngIf="loading">
-                <td colspan="9" class="text-center py-3">Cargando...</td>
+                <td [attr.colspan]="empresasOperacion.length > 1 ? 10 : 9" class="text-center py-3">Cargando...</td>
               </tr>
               <tr *ngFor="let credito of creditosPendientes">
                 <td>
@@ -80,6 +81,7 @@
                   </button>
                 </td>
                 <td>{{ getClienteNombre(credito.idCliente) }}</td>
+                <td *ngIf="empresasOperacion.length > 1">{{ nombreEmpresaCredito(credito.idEmpresa) }}</td>
                 <td>{{ credito.comprobante || (credito.idVenta ? 'Venta ' + credito.idVenta : '—') }}</td>
                 <td>{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
                 <td class="text-end">S/ {{ credito.montoTotal | number:'1.2-2' }}</td>
@@ -91,7 +93,7 @@
                 </td>
               </tr>
               <tr *ngIf="!loading && creditosPendientes.length === 0">
-                <td colspan="9" class="text-center py-4 text-muted">No hay créditos pendientes.</td>
+                <td [attr.colspan]="empresasOperacion.length > 1 ? 10 : 9" class="text-center py-4 text-muted">No hay créditos pendientes.</td>
               </tr>
             </tbody>
           </table>

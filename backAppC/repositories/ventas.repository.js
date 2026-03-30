@@ -126,16 +126,17 @@ exports.obtenerSiguienteNumeroComprobante = async (transaction, idEmpresa, idCom
 };
 
 /** Inserta el desglose de pagos de una venta (ej: 40 efectivo + 40 yape). Requiere tabla DetallePagoVenta.
- *  FK DetallePagoVenta.idMediosPago -> MediosPago.idMediosPago. Si el front envía idFormaPago (otra tabla),
- *  el id puede no existir en MediosPago; se valida y se usa un idMediosPago válido como fallback.
+ *  FK DetallePagoVenta.idMediosPago -> MediosPago.idMediosPago. Mapea idFormaPago (FormasPago) a MediosPago cuando haga falta.
  */
 exports.insertarDetallePagoVenta = async (transaction, idVenta, detallePago) => {
   if (!detallePago || detallePago.length === 0) return;
+  const { normalizarDetallePagoIdMediosPago } = require('../utils/detallePagoNormalizar.util');
+  const detalleNorm = await normalizarDetallePagoIdMediosPago(transaction, detallePago);
   const validIdsResult = await transaction.request().query('SELECT idMediosPago FROM MediosPago');
   const validIds = new Set((validIdsResult.recordset || []).map(r => Number(r.idMediosPago)).filter(n => !Number.isNaN(n)));
   const idMediosPagoDefault = validIds.size > 0 ? Math.min(...validIds) : null;
   if (idMediosPagoDefault == null) return;
-  for (const pago of detallePago) {
+  for (const pago of detalleNorm) {
     let idMediosPago = pago.idMediosPago != null ? Number(pago.idMediosPago) : null;
     if (idMediosPago == null || !validIds.has(idMediosPago)) idMediosPago = idMediosPagoDefault;
     const monto = Number(pago.monto);
@@ -272,6 +273,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           v.idVentaAgrupada,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+          CONVERT(VARCHAR(10), v.fVencimiento, 120) AS fVencimiento,
           v.subtotal, v.igv,
           ISNULL(v.exonerado, 0) AS exonerado,
           ISNULL(v.gratuito, 0) AS gratuito,
@@ -303,6 +305,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           v.idVentaAgrupada,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+          CONVERT(VARCHAR(10), v.fVencimiento, 120) AS fVencimiento,
           v.subtotal, v.igv,
           ISNULL(v.exonerado, 0) AS exonerado,
           ISNULL(v.gratuito, 0) AS gratuito,
@@ -378,7 +381,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
 
   let cuotasVenta = [];
   const codigoComprobante = cab ? String((cab.codigoComprobante || '01').trim()) : '01';
-  if (codigoComprobante === '01') {
+  if (codigoComprobante === '01' || codigoComprobante === '03') {
     try {
       const cuotasResult = await pool
         .request()
@@ -480,6 +483,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       condicionPago: cab.condicionPago != null ? String(cab.condicionPago).trim() : 'Contado',
       codigoCondicionPago: cab.codigoCondicionPago != null ? String(cab.codigoCondicionPago).trim() : '009',
       fEmision: cab.fEmision,
+      fVencimiento: cab.fVencimiento != null ? String(cab.fVencimiento).trim().slice(0, 10) : '',
       subtotal: cab.subtotal,
       igv: cab.igv,
       exonerado,
@@ -652,7 +656,17 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
 exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
   const { idVenta, cliente } = filtros;
   const request = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-  let whereClause = 'v.idEmpresa = @idEmpresa AND v.idEstadoPago = 1';
+  let whereClause = `v.idEmpresa = @idEmpresa AND v.idEstadoPago = 1
+    AND NOT (
+      UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('01', '03')
+      AND (
+        RTRIM(LTRIM(ISNULL(mp.codigo, ''))) IN ('010', '10')
+        OR (
+          (LOWER(ISNULL(mp.descripcion, '')) LIKE '%credito%' OR LOWER(ISNULL(mp.descripcion, '')) LIKE N'%crédito%')
+          AND LOWER(ISNULL(mp.descripcion, '')) NOT LIKE '%tarjeta%'
+        )
+      )
+    )`;
   if (idVenta != null && String(idVenta).trim() !== '') {
     request.input('idVenta', sql.Int, parseInt(idVenta, 10));
     whereClause += ' AND v.idVenta = @idVenta';
@@ -674,6 +688,11 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
       cl.ruc AS clienteRuc
     FROM Ventas v
     LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+    LEFT JOIN MediosPago mp ON (
+      mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+      OR CAST(mp.idMediosPago AS VARCHAR(20)) = RTRIM(LTRIM(ISNULL(v.idMediosPago, '')))
+    )
     WHERE ${whereClause}
     ORDER BY v.fEmision DESC
   `);
@@ -1147,9 +1166,12 @@ exports.listarVentasEmpresaPorAgrupada = async (transaction, idVentaAgrupada) =>
         ve.idEmpresa,
         ve.compVenta,
         ve.total,
-        v.idSucursal
+        ve.idCliente,
+        v.idSucursal,
+        UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
       FROM VentaEmpresa ve
       LEFT JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
+      LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
       WHERE ve.idVentaAgrupada = @idVentaAgrupada
       ORDER BY ve.fEmision ASC, ve.idVenta ASC
     `);

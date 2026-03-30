@@ -30,6 +30,11 @@
                   [disabled]="carrito.length === 0 && !ventas.idComprobante">
             <i class="bi bi-x-circle me-2"></i>Anular venta
           </button>
+          <button type="button" class="btn btn-outline-secondary rounded-pill"
+                  *ngIf="cuotasCreditoRequeridas()"
+                  (click)="abrirModalCuotasCredito()">
+            <i class="bi bi-calendar-week me-2"></i>Cuotas crédito
+          </button>
           <button type="button" class="btn btn-success btn-lg rounded-pill"
                   (click)="registrarVenta()"
                   [disabled]="loading || carrito.length === 0">
@@ -376,7 +381,7 @@
             <label class="form-label fw-bold text-primary">
               <i class="bi bi-building me-1"></i>Comprobante destino
             </label>
-            <select class="form-select border-primary" [(ngModel)]="tipoComprobanteDestino">
+            <select class="form-select border-primary" [(ngModel)]="tipoComprobanteDestino" (ngModelChange)="onTipoComprobanteDestinoChanged()">
               <option *ngFor="let opt of comprobantesDestinoOpciones" [value]="opt.codigo">{{ opt.nombre }}</option>
             </select>
             <small class="text-muted">Tipo de comprobante que se emitirá en cada empresa gestionada</small>
@@ -456,12 +461,51 @@
           <div class="col-12" *ngIf="getRazonSocialDisplay() && !cliente.idCliente">
             <div class="alert alert-info py-2 mb-0 small">Cliente no registrado. Se creará al registrar la venta.</div>
           </div>
+          <div class="col-12" *ngIf="cliente.idCliente">
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalEditarClienteCredito()" [disabled]="loadingEditClienteCredito">
+              <i class="bi bi-pencil-square me-1"></i>Editar cliente (línea de crédito)
+            </button>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
           Confirmar cliente
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: editar línea de crédito del cliente (desde nueva venta) -->
+<div class="modal fade" id="modalEditarClienteCredito" tabindex="-1" aria-labelledby="modalEditarClienteCreditoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalEditarClienteCreditoLabel">
+          <i class="bi bi-pencil-square me-2"></i>Editar cliente — crédito
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body" *ngIf="!loadingEditClienteCredito">
+        <p class="text-muted small mb-3">{{ cliente.rSocial }} · RUC/DNI {{ cliente.ruc }}</p>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="chkSujetoCreditoVenta" [(ngModel)]="editClienteCreditoForm.sujetoCredito" name="sujetoCreditoVenta">
+          <label class="form-check-label" for="chkSujetoCreditoVenta">Sujeto a crédito</label>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Línea de crédito (S/)</label>
+          <input type="number" class="form-control" step="0.01" min="0" [(ngModel)]="editClienteCreditoForm.lineaCredito" name="lineaCreditoVenta" />
+        </div>
+      </div>
+      <div class="modal-body text-center py-4" *ngIf="loadingEditClienteCredito">
+        <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="guardarLineaCreditoClienteDesdeVenta()" [disabled]="loadingEditClienteCredito">
+          Guardar
         </button>
       </div>
     </div>
@@ -851,6 +895,72 @@
             <i class="bi bi-check-circle me-1"></i> Emitir y liquidar
           </button>
         }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: plan de cuotas (factura/boleta a crédito) -->
+<div class="modal fade" id="modalCuotasCredito" tabindex="-1" aria-labelledby="modalCuotasCreditoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalCuotasCreditoLabel">
+          <i class="bi bi-calendar-week me-2"></i>Plan de cuotas (crédito)
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          Factura o boleta a crédito: indique el monto y la fecha de vencimiento de cada cuota. La suma debe coincidir con el total al crédito (incluye venta pendiente sin líneas en formas de pago): S/ {{ getMontoCreditoVenta() | number:'1.2-2' }}.
+        </p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th style="width: 4rem;">N°</th>
+                <th>Monto</th>
+                <th>Vencimiento</th>
+                <th style="width: 3rem;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of cuotasCreditoPlano; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>
+                  <input type="number" class="form-control form-control-sm" step="0.01" min="0.01"
+                         [(ngModel)]="row.monto" name="montoCuota{{ i }}" />
+                </td>
+                <td>
+                  <input type="date" class="form-control form-control-sm"
+                         [(ngModel)]="row.fechaVencimiento" name="fvCuota{{ i }}" />
+                </td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarFilaCuotaCredito(i)"
+                          [disabled]="cuotasCreditoPlano.length <= 1">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mt-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" (click)="agregarFilaCuotaCredito()">
+            <i class="bi bi-plus-lg me-1"></i>Agregar cuota
+          </button>
+          <div [class.text-danger]="!validarCuotasCreditoPlano() && cuotasCreditoPlano.length > 0"
+               [class.text-success]="validarCuotasCreditoPlano()">
+            <strong>Suma cuotas:</strong> S/ {{ sumaCuotasCreditoPlano | number:'1.2-2' }}
+            <span class="text-muted">· Objetivo: S/ {{ getMontoCreditoVenta() | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" (click)="confirmarCuotasCreditoYRegistrar()">
+          <i class="bi bi-check2-circle me-1"></i>Guardar y registrar venta
+        </button>
       </div>
     </div>
   </div>

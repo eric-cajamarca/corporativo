@@ -5,6 +5,10 @@ const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 const comprasRepository = require('../repositories/compras.repository');
 const CajaRepository = require('../repositories/caja.repository');
+const {
+    obtenerEmpresasPermitidasOperacionCaja,
+    resolverIdEmpresaOperacionCaja
+} = require('../utils/cajaOperacionEmpresa.util');
 
 /**
  * Formatea fechas fEmision/fVencimiento en un recordset a YYYY-MM-DD.
@@ -54,6 +58,23 @@ exports.obtenerComprasPorIdCompraIdEmpresa = async (idEmpresa, idCompra) => {
 exports.listarComprasPorIdEmpresa = async (idEmpresa) => {
     const pool = await sql.connect(dbConfig);
     return await comprasRepository.listarComprasPorIdEmpresa(pool, idEmpresa);
+};
+
+/**
+ * Listado para caja / pago proveedores: una empresa (query idEmpresaOperacion) o todas las permitidas si el query va vacío.
+ */
+exports.listarComprasCajaPorUsuario = async (user, idEmpresaOperacionRaw) => {
+    const pool = await sql.connect(dbConfig);
+    let recordset;
+    if (idEmpresaOperacionRaw != null && String(idEmpresaOperacionRaw).trim() !== '') {
+        const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacionRaw);
+        recordset = await comprasRepository.listarComprasPorIdEmpresa(pool, idE);
+    } else {
+        const lista = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+        const ids = lista.map((x) => x.idEmpresa).filter(Boolean);
+        recordset = await comprasRepository.listarComprasPorIdsEmpresa(pool, ids);
+    }
+    return formatearFechasCompras(recordset);
 };
 
 /**

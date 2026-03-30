@@ -1,5 +1,17 @@
 const CreditosRepository = require('../repositories/creditos.repository');
-const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
+const {
+  resolverIdEmpresaOperacionCaja,
+  obtenerEmpresasPermitidasOperacionCaja
+} = require('../utils/cajaOperacionEmpresa.util');
+
+async function idsEmpresaCreditosDesdeQuery(pool, user, idEmpresaOperacion) {
+  if (idEmpresaOperacion != null && String(idEmpresaOperacion).trim() !== "") {
+    const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
+    return [idE];
+  }
+  const lista = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+  return (lista || []).map((x) => x.idEmpresa).filter(Boolean);
+}
 
 exports.obtenerCreditosClienteService = async (pool, user, idCliente, idEmpresaOperacion) => {
   if (!user) {
@@ -10,8 +22,11 @@ exports.obtenerCreditosClienteService = async (pool, user, idCliente, idEmpresaO
     throw new Error("NO_PERMISSIONS");
   }
 
-  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
-  const creditos = await CreditosRepository.obtenerCreditosClienteRepo(pool, idE, idCliente);
+  const ids = await idsEmpresaCreditosDesdeQuery(pool, user, idEmpresaOperacion);
+  if (ids.length === 0) {
+    throw new Error("NO_ACCESS");
+  }
+  const creditos = await CreditosRepository.obtenerCreditosClienteRepo(pool, ids, idCliente);
   return creditos;
 };
 
@@ -80,8 +95,11 @@ exports.obtenerResumenCreditosService = async (pool, user, idEmpresaOperacion) =
     throw new Error("NO_ACCESS");
   }
 
-  const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
-  const resumen = await CreditosRepository.obtenerResumenCreditosRepo(pool, idE);
+  const ids = await idsEmpresaCreditosDesdeQuery(pool, user, idEmpresaOperacion);
+  if (ids.length === 0) {
+    throw new Error("NO_ACCESS");
+  }
+  const resumen = await CreditosRepository.obtenerResumenCreditosRepo(pool, ids);
   return resumen;
 };
 

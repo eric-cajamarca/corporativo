@@ -16,6 +16,7 @@ declare var iziToast: any;
 
 export interface ReciboEgresoItem {
   idMovimientoCaja: string;
+  empresaMovimiento?: string;
   idApertura?: string;
   fechaMovimiento: string;
   concepto: string;
@@ -127,17 +128,15 @@ export class ReciboEgresoComponent implements OnInit {
         this.idEmpresaOperacionSel = this.cajaOpCtx.idEmpresaOperacion || '';
         this.cargarDatos();
         this.cargarRecibos();
+        this.cargarConceptos();
       },
       error: () => {
         this.cargarDatos();
         this.cargarRecibos();
+        this.cargarConceptos();
       }
     });
     this.tiposEgreso();
-    this.catalogosService.listarConceptosPorTipo('EGRESO').subscribe({
-      next: (r) => { this.conceptos = r.data || []; },
-      error: () => {}
-    });
     this.documentoService.getFormasPago().subscribe({
       next: (r) => {
         this.formasPago = r.data || [];
@@ -166,6 +165,63 @@ export class ReciboEgresoComponent implements OnInit {
     this.idEmpresaOperacionSel = id;
     this.cargarDatos();
     this.cargarRecibos();
+    this.cargarConceptos();
+    if (this.mostrarForm && !this.editandoId) {
+      this.form.idConcepto = '';
+    }
+  }
+
+  cargarConceptos(): void {
+    this.catalogosService
+      .listarConceptosPorTipo('EGRESO', this.idEmpresaOperacionSel || null)
+      .subscribe({
+        next: (r) => {
+          this.conceptos = r.data || [];
+        },
+        error: () => {
+          this.conceptos = [];
+        }
+      });
+  }
+
+  get empresaOperacionLabel(): string {
+    const id = this.idEmpresaOperacionSel;
+    const e = this.empresasOperacion.find((x) => x.idEmpresa === id);
+    return e ? (e.razonSocial || e.ruc || id) : '—';
+  }
+
+  private esCajaMultiEmpresa(): boolean {
+    return this.empresasOperacion.length > 1;
+  }
+
+  private idEmpresaOperacionParaListado(): string | null {
+    return this.esCajaMultiEmpresa() ? null : (this.idEmpresaOperacionSel || null);
+  }
+
+  get colspanTablaRecibos(): number {
+    return this.esCajaMultiEmpresa() ? 10 : 9;
+  }
+
+  onCambioEmpresaOperacionDesdeModal(id: string): void {
+    this.cajaOpCtx.setEmpresaOperacion(id);
+    this.idEmpresaOperacionSel = id;
+    this.cargarRecibos();
+    this.cargarConceptos();
+    if (!this.editandoId) {
+      this.form.idConcepto = '';
+    }
+    this.cajaService.obtenerCajas(this.idEmpresaOperacionSel || null).subscribe({
+      next: (r) => {
+        this.cajas = (r.data || []).filter((c: any) => c.cajaAbierta && c.idApertura);
+        if (!this.editandoId) {
+          const ok = this.cajas.some((c: any) => c.idApertura === this.form.idApertura);
+          if (!ok) {
+            this.form.idApertura = this.cajas.length ? this.cajas[0].idApertura : '';
+          }
+        }
+      },
+      error: () => {}
+    });
   }
 
   cargarDatos(): void {
@@ -181,7 +237,10 @@ export class ReciboEgresoComponent implements OnInit {
     this.loading = true;
     const desde = this.filtros.fechaDesde ? this.filtros.fechaDesde + 'T00:00:00' : '';
     const hasta = this.filtros.fechaHasta ? this.filtros.fechaHasta + 'T23:59:59' : '';
-    this.cajaService.getRecibosEgreso({ fechaDesde: desde || undefined, fechaHasta: hasta || undefined }).subscribe({
+    this.cajaService.getRecibosEgreso(
+      { fechaDesde: desde || undefined, fechaHasta: hasta || undefined },
+      this.idEmpresaOperacionParaListado()
+    ).subscribe({
       next: (r) => {
         let data = (r.data || []).map((m: any) => this.mapItem(m));
         if (this.filtros.buscar) {
@@ -222,6 +281,7 @@ export class ReciboEgresoComponent implements OnInit {
     const doc = m.documentoRelacionado || ('RE 0001-' + (m.idMovimientoCaja || '').slice(-6));
     return {
       idMovimientoCaja: m.idMovimientoCaja,
+      empresaMovimiento: m.empresaMovimiento,
       idApertura: m.idApertura,
       fechaMovimiento: m.fechaMovimiento,
       concepto: m.concepto,

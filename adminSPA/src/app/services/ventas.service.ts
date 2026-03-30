@@ -49,6 +49,8 @@ export interface VentaCompletaPayload {
     codigo?: string;
   }>;
   detallePago?: Array<{ idMediosPago: number; monto: number }>;
+  /** Plan de cuotas (factura/boleta a crédito); la suma de montos debe coincidir con el total al crédito en detallePago. */
+  cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
   idApertura?: string;
 }
 
@@ -186,7 +188,15 @@ export class VentasService {
   }
 
   /** Registrar cobro de una venta agrupada pendiente. */
-  cobrarVentaAgrupada(idVentaAgrupada: string, body: { detallePago: Array<{ idMediosPago: number; monto: number }>; idApertura?: string }): Observable<{ message: string }> {
+  cobrarVentaAgrupada(
+    idVentaAgrupada: string,
+    body: {
+      detallePago: Array<{ idMediosPago: number; monto: number }>;
+      idApertura?: string;
+      /** Obligatorio si el cobro incluye factura/boleta con parte al crédito y el backend exige plan de cuotas. */
+      cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
+    }
+  ): Observable<{ message: string }> {
     return this._http.post<{ message: string }>(
       this.url + 'ventas/agrupadas/' + idVentaAgrupada + '/cobrar',
       body,
@@ -195,7 +205,14 @@ export class VentasService {
   }
 
   /** Registrar cobro de una venta pendiente por empresa. */
-  cobrarVenta(idVenta: number, body: { detallePago: Array<{ idMediosPago: number; monto: number }>; idApertura?: string }): Observable<{ message: string }> {
+  cobrarVenta(
+    idVenta: number,
+    body: {
+      detallePago: Array<{ idMediosPago: number; monto: number }>;
+      idApertura?: string;
+      cuotasCredito?: Array<{ monto: number; fechaVencimiento: string }>;
+    }
+  ): Observable<{ message: string }> {
     return this._http.post<{ message: string }>(
       this.url + 'ventas/' + idVenta + '/cobrar',
       body,
@@ -279,7 +296,10 @@ export interface ComprobantePdfData {
     compVenta: string;
     nombreComprobante?: string;
     codigoComprobante?: string;
+    condicionPago?: string;
+    codigoCondicionPago?: string;
     fEmision: string;
+    fVencimiento?: string;
     subtotal: number;
     igv: number;
     exonerado?: number;
@@ -289,6 +309,7 @@ export interface ComprobantePdfData {
     total: number;
     resumenHash?: string;
     eliminado?: boolean;
+    cuotas?: Array<{ numeroCuota?: number; fechaPago?: string; total?: number }>;
   };
   empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
   cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string; tipoDocSunat?: string };
