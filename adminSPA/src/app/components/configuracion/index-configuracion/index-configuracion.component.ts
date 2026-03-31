@@ -86,6 +86,12 @@ export class IndexConfiguracionComponent implements OnInit {
     productosConImagenes: false
   };
   public inventarioGuardando = false;
+  public pdfComprobante = {
+    cuentasBancarias: '',
+    usarTemaColor: true,
+    colorPrimario: '#0B5FA5'
+  };
+  public pdfComprobanteGuardando = false;
 
   // Configuración de ventas
   public ventas = {
@@ -186,6 +192,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cargarConfiguracionFacturacion();
     this.cargarVentasDefaults();
     this.cargarConfiguracionInventario();
+    this.cargarConfiguracionPdfComprobante();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;
@@ -200,6 +207,61 @@ export class IndexConfiguracionComponent implements OnInit {
       },
       error: () => {
         this.correlativo = { numero: 10000 };
+      }
+    });
+  }
+
+  cargarConfiguracionPdfComprobante(): void {
+    this._gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = res?.data ?? [];
+        const getVal = (clave: string, def: string) => (lista.find((c: { clave: string; valor: string }) => c.clave === clave)?.valor ?? def);
+        this.pdfComprobante.cuentasBancarias = getVal('PDF_CUENTAS_BANCARIAS', '');
+        this.pdfComprobante.usarTemaColor = String(getVal('PDF_TEMA_COLOR_ACTIVO', 'true')).toLowerCase() !== 'false';
+        const color = String(getVal('PDF_COLOR_PRIMARIO', '#0B5FA5')).trim();
+        this.pdfComprobante.colorPrimario = color || '#0B5FA5';
+      },
+      error: () => {}
+    });
+  }
+
+  guardarConfiguracionPdfComprobante(): void {
+    this.pdfComprobanteGuardando = true;
+    const color = (this.pdfComprobante.colorPrimario || '').trim();
+    const colorFinal = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#0B5FA5';
+    const configs: Array<{ clave: string; valor: string; descripcion: string; tipoDato: string }> = [
+      {
+        clave: 'PDF_CUENTAS_BANCARIAS',
+        valor: String(this.pdfComprobante.cuentasBancarias || '').trim(),
+        descripcion: 'Cuentas bancarias mostradas en PDF de comprobantes de venta (una por línea).',
+        tipoDato: 'STRING'
+      },
+      {
+        clave: 'PDF_TEMA_COLOR_ACTIVO',
+        valor: this.pdfComprobante.usarTemaColor ? 'true' : 'false',
+        descripcion: 'Habilita color de tema tecnológico en PDFs A4/A5 de comprobantes de venta.',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'PDF_COLOR_PRIMARIO',
+        valor: colorFinal,
+        descripcion: 'Color primario HEX del tema PDF (A4/A5). Ejemplo: #0B5FA5',
+        tipoDato: 'STRING'
+      }
+    ];
+    this._gestoresService.guardarConfiguracion(configs).subscribe({
+      next: () => {
+        this.pdfComprobanteGuardando = false;
+        this.pdfComprobante.colorPrimario = colorFinal;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Guardado', message: 'Configuración de PDF actualizada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        this.pdfComprobanteGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración de PDF.', position: 'topRight' });
+        }
       }
     });
   }

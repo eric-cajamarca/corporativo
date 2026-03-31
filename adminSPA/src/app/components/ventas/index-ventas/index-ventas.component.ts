@@ -3,6 +3,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
+import { forkJoin } from 'rxjs';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -62,6 +63,8 @@ export class IndexVentasComponent implements OnInit {
   datosParaWhatsapp: { datos: unknown; nombreArchivo: string } | null = null;
 
   page = 1;
+  /** Paginación de la tabla de comprobantes cuando la sesión es gestora (tabla inferior). */
+  pageCompGestora = 1;
   pageSize = 10;
 
   filtroFecha = 'all';
@@ -126,15 +129,23 @@ export class IndexVentasComponent implements OnInit {
   cargarVentas(): void {
     this.loading = true;
     if (this.esGestora) {
-      this.ventasService.listarVentasAgrupadas().subscribe({
-        next: (res) => {
-          this.ventasConst = res.data ?? [];
-          this.ventas = [...this.ventasConst];
+      forkJoin({
+        agrupadas: this.ventasService.listarVentasAgrupadas(),
+        comprobantes: this.ventasService.listarVentasEmpresa()
+      }).subscribe({
+        next: ({ agrupadas, comprobantes }) => {
+          this.ventasConst = agrupadas.data ?? [];
+          this.ventasEmpresaConst = comprobantes.data ?? [];
+          this.page = 1;
+          this.pageCompGestora = 1;
+          this.aplicarFiltros();
           this.loading = false;
         },
         error: () => {
           this.ventasConst = [];
           this.ventas = [];
+          this.ventasEmpresaConst = [];
+          this.ventasEmpresa = [];
           this.loading = false;
         }
       });
@@ -156,35 +167,74 @@ export class IndexVentasComponent implements OnInit {
 
   aplicarFiltros(): void {
     this.page = 1;
+    this.pageCompGestora = 1;
     if (this.esGestora) {
-      let list = [...this.ventasConst];
+      let listVa = [...this.ventasConst];
 
-    if (this.filtroFecha === 'today') {
-      const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
-      list = list.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
-    } else if (this.filtroFecha === 'month') {
-      const now = new Date();
-      const mes = String(now.getMonth() + 1).padStart(2, '0');
-      const anio = now.getFullYear();
-      list = list.filter((v) => {
-        const f = (v.fEmision || '').slice(0, 10);
-        return f.startsWith(`${anio}-${mes}`);
-      });
-    } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
-      if (this.fechaDesde) list = list.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
-      if (this.fechaHasta) list = list.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
-    }
+      if (this.filtroFecha === 'today') {
+        const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+        listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
+      } else if (this.filtroFecha === 'month') {
+        const now = new Date();
+        const mes = String(now.getMonth() + 1).padStart(2, '0');
+        const anio = now.getFullYear();
+        listVa = listVa.filter((v) => {
+          const f = (v.fEmision || '').slice(0, 10);
+          return f.startsWith(`${anio}-${mes}`);
+        });
+      } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
+        if (this.fechaDesde) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
+        if (this.fechaHasta) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
+      }
 
-    const ruc = (this.filtroRuc || '').toLowerCase().trim();
-    if (ruc) list = list.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
+      let ruc = (this.filtroRuc || '').toLowerCase().trim();
+      if (ruc) listVa = listVa.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
 
-    const razon = (this.filtroRazon || '').toLowerCase().trim();
-    if (razon) list = list.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
+      let razon = (this.filtroRazon || '').toLowerCase().trim();
+      if (razon) listVa = listVa.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
 
-      const num = (this.filtroNumero || '').trim();
-      if (num) list = list.filter((v) => (v.idVentaAgrupada || '').toLowerCase().includes(num.toLowerCase()));
+      const numVa = (this.filtroNumero || '').trim();
+      if (numVa) listVa = listVa.filter((v) => (v.idVentaAgrupada || '').toLowerCase().includes(numVa.toLowerCase()));
 
-      this.ventas = list;
+      this.ventas = listVa;
+
+      let listComp = [...this.ventasEmpresaConst];
+      if (this.filtroFecha === 'today') {
+        const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+        listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
+      } else if (this.filtroFecha === 'month') {
+        const now = new Date();
+        const mes = String(now.getMonth() + 1).padStart(2, '0');
+        const anio = now.getFullYear();
+        listComp = listComp.filter((v) => {
+          const f = (v.fEmision || '').slice(0, 10);
+          return f.startsWith(`${anio}-${mes}`);
+        });
+      } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
+        if (this.fechaDesde) listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
+        if (this.fechaHasta) listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
+      }
+
+      ruc = (this.filtroRuc || '').toLowerCase().trim();
+      if (ruc) listComp = listComp.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
+
+      razon = (this.filtroRazon || '').toLowerCase().trim();
+      if (razon) listComp = listComp.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
+
+      const numComp = (this.filtroNumero || '').trim();
+      if (numComp) {
+        const n = numComp.toLowerCase();
+        listComp = listComp.filter(
+          (v) =>
+            (v.compVenta || '').toLowerCase().includes(n) ||
+            String(v.idVenta).includes(numComp)
+        );
+      }
+
+      const tipo = (this.filtroTipoComprobante || '').trim();
+      if (tipo) listComp = listComp.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
+
+      this.ventasEmpresa = listComp;
     } else {
       let list = [...this.ventasEmpresaConst];
       if (this.filtroFecha === 'today') {
@@ -221,6 +271,7 @@ export class IndexVentasComponent implements OnInit {
 
   limpiarFiltros(): void {
     this.page = 1;
+    this.pageCompGestora = 1;
     this.filtroFecha = 'all';
     this.fechaDesde = '';
     this.fechaHasta = '';
@@ -230,6 +281,7 @@ export class IndexVentasComponent implements OnInit {
     this.filtroTipoComprobante = '';
     if (this.esGestora) {
       this.ventas = [...this.ventasConst];
+      this.ventasEmpresa = [...this.ventasEmpresaConst];
     } else {
       this.ventasEmpresa = [...this.ventasEmpresaConst];
     }
@@ -891,7 +943,7 @@ export class IndexVentasComponent implements OnInit {
 
   /** Exporta la lista actual (filtrada) de ventas a PDF (vista previa). */
   exportarListaPdf(): void {
-    if (this.esGestora && this.ventas.length === 0) return;
+    if (this.esGestora && this.ventas.length === 0 && this.ventasEmpresa.length === 0) return;
     if (!this.esGestora && this.ventasEmpresa.length === 0) return;
     const emp = this.empresa;
     const empresaPdf = {
@@ -902,21 +954,37 @@ export class IndexVentasComponent implements OnInit {
       telefono: emp?.telefono ?? ''
     };
     const datos = this.esGestora
-      ? {
-          empresa: empresaPdf,
-          titulo: 'Lista de Ventas Agrupadas',
-          columnas: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
-          filas: this.ventas.map((v, i) => [
-            i + 1,
-            this.formatearFecha(v.fEmision),
-            v.idVentaAgrupada || '—',
-            v.clienteRuc || '—',
-            v.clienteRazonSocial || '—',
-            v.sucursal || '—',
-            `S/ ${Number(v.total).toFixed(2)}`,
-            this.estadoPagoLabel(v.idEstadoPago)
-          ])
-        }
+      ? this.ventasEmpresa.length > 0
+        ? {
+            empresa: empresaPdf,
+            titulo: 'Comprobantes (gestora y empresas gestionadas)',
+            columnas: ['#', 'Empresa', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+            filas: this.ventasEmpresa.map((v, i) => [
+              i + 1,
+              (v.razonSocialEmpresa || '').trim() || '—',
+              this.formatearFecha(v.fEmision),
+              v.compVenta || '—',
+              v.clienteRuc || '—',
+              v.clienteRazonSocial || '—',
+              `S/ ${Number(v.total).toFixed(2)}`,
+              this.etiquetaEstadoSunatListado(v)
+            ])
+          }
+        : {
+            empresa: empresaPdf,
+            titulo: 'Lista de Ventas Agrupadas',
+            columnas: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+            filas: this.ventas.map((v, i) => [
+              i + 1,
+              this.formatearFecha(v.fEmision),
+              v.idVentaAgrupada || '—',
+              v.clienteRuc || '—',
+              v.clienteRazonSocial || '—',
+              v.sucursal || '—',
+              `S/ ${Number(v.total).toFixed(2)}`,
+              this.estadoPagoLabel(v.idEstadoPago)
+            ])
+          }
       : {
           empresa: empresaPdf,
           titulo: 'Lista de Ventas',
@@ -948,25 +1016,42 @@ export class IndexVentasComponent implements OnInit {
 
   /** Descarga la lista actual (filtrada) de ventas en Excel. */
   exportarListaExcel(): void {
-    if (this.esGestora && this.ventas.length === 0) return;
+    if (this.esGestora && this.ventas.length === 0 && this.ventasEmpresa.length === 0) return;
     if (!this.esGestora && this.ventasEmpresa.length === 0) return;
     const datosExcel = this.esGestora
-      ? {
-          title: 'Lista de Ventas Agrupadas',
-          filename: `ventas_${new Date().getTime()}`,
-          worksheetName: 'Ventas',
-          columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
-          rows: this.ventas.map((v, i) => [
-            i + 1,
-            this.formatearFecha(v.fEmision),
-            v.idVentaAgrupada || '—',
-            v.clienteRuc || '—',
-            v.clienteRazonSocial || '—',
-            v.sucursal || '—',
-            Number(v.total),
-            this.estadoPagoLabel(v.idEstadoPago)
-          ])
-        }
+      ? this.ventasEmpresa.length > 0
+        ? {
+            title: 'Comprobantes (gestora y gestionadas)',
+            filename: `ventas_${new Date().getTime()}`,
+            worksheetName: 'Ventas',
+            columns: ['#', 'Empresa', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+            rows: this.ventasEmpresa.map((v, i) => [
+              i + 1,
+              (v.razonSocialEmpresa || '').trim() || '—',
+              this.formatearFecha(v.fEmision),
+              v.compVenta || '—',
+              v.clienteRuc || '—',
+              v.clienteRazonSocial || '—',
+              Number(v.total),
+              this.etiquetaEstadoSunatListado(v)
+            ])
+          }
+        : {
+            title: 'Lista de Ventas Agrupadas',
+            filename: `ventas_${new Date().getTime()}`,
+            worksheetName: 'Ventas',
+            columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+            rows: this.ventas.map((v, i) => [
+              i + 1,
+              this.formatearFecha(v.fEmision),
+              v.idVentaAgrupada || '—',
+              v.clienteRuc || '—',
+              v.clienteRazonSocial || '—',
+              v.sucursal || '—',
+              Number(v.total),
+              this.estadoPagoLabel(v.idEstadoPago)
+            ])
+          }
       : {
           title: 'Lista de Ventas',
           filename: `ventas_${new Date().getTime()}`,

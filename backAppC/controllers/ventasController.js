@@ -86,7 +86,16 @@ const obtenerVentas = async function (req, res) {
   }
   try {
     const pool = await sql.connect(dbConfig);
-    let list = await ventasRepository.listarPorEmpresa(pool, idempresa);
+    let idsList = [idempresa];
+    try {
+      const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, idempresa);
+      if (esGestora) {
+        idsList = await idsEmpresaParaComprobanteVenta(pool, idempresa);
+      }
+    } catch (_) {
+      idsList = [idempresa];
+    }
+    let list = await ventasRepository.listarPorIdsEmpresas(pool, idsList);
     const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
     const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
     if (rutaFacturador) {

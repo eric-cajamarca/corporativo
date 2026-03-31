@@ -311,7 +311,18 @@ export interface ComprobantePdfData {
     eliminado?: boolean;
     cuotas?: Array<{ numeroCuota?: number; fechaPago?: string; total?: number }>;
   };
-  empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
+  empresa: {
+    nombre: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+    rubro?: string;
+    correo?: string;
+    logo?: string;
+    cuentasBancarias?: string;
+    pdfUsarColor?: boolean;
+    pdfColorPrimario?: string;
+  };
   cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string; tipoDocSunat?: string };
   items: Array<{
     idDetalle?: number;
@@ -379,6 +390,10 @@ export interface ComprobanteVAPdfData {
 
 export interface VentaListado {
   idVenta: number;
+  /** Empresa emisora del comprobante (consolidado gestora). */
+  idEmpresa?: string | null;
+  /** Razón social de la empresa emisora (consolidado gestora). */
+  razonSocialEmpresa?: string | null;
   compVenta: string;
   fEmision: string;
   total: number;

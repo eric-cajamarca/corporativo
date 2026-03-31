@@ -255,6 +255,125 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
   }));
 };
 
+/**
+ * Lista comprobantes de venta para varias empresas (gestora + gestionadas).
+ * Misma forma que listarPorEmpresa, con idEmpresa y razonSocialEmpresa.
+ */
+exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0) return [];
+  if (ids.length === 1) {
+    const rows = await exports.listarPorEmpresa(pool, ids[0]);
+    return rows.map((r) => ({ ...r, idEmpresa: ids[0], razonSocialEmpresa: '' }));
+  }
+  const req = pool.request();
+  const inList = bindUniqueIdentifiersIn(req, ids, 'empV');
+  let result;
+  try {
+    result = await req.query(`
+      SELECT
+        v.idEmpresa,
+        v.idVenta,
+        v.compVenta,
+        CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+        v.total,
+        v.idEstadoSunat,
+        v.serie,
+        v.numero,
+        v.idComprobante,
+        v.idCliente,
+        v.idMediosPago,
+        ISNULL(mp.descripcion, CAST(v.idMediosPago AS VARCHAR(20))) AS condicionPago,
+        c.nombre AS nombreComprobante,
+        c.codigo AS codigoComprobante,
+        COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRazonSocial,
+        COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRuc,
+        ce.idComprobanteElectronico,
+        ce.tipoComprobante,
+        e.ruc AS rucEmpresa,
+        ISNULL(e.razon_Social, '') AS razonSocialEmpresa,
+        ISNULL(v.eliminado, 0) AS eliminado,
+        CASE
+          WHEN aggfp.codigos IS NULL OR LTRIM(RTRIM(aggfp.codigos)) = '' THEN '{}'
+          ELSE '{' + aggfp.codigos + '}'
+        END AS formaPago
+      FROM Ventas v
+      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+      LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+      LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+      LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+      LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+      OUTER APPLY (
+        SELECT STUFF((
+          SELECT ',' + d.sigla
+          FROM (
+            SELECT DISTINCT UPPER(LEFT(LTRIM(RTRIM(ISNULL(fp2.descripcion, ''))), 3)) AS sigla
+            FROM MovimientosCaja mc
+            INNER JOIN FormasPago fp2 ON fp2.idFormaPago = mc.idMediosPago
+            WHERE mc.idVenta = v.idVenta AND mc.idEmpresa = v.idEmpresa
+          ) d
+          WHERE NULLIF(LTRIM(RTRIM(d.sigla)), '') IS NOT NULL
+          FOR XML PATH(''), TYPE
+        ).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS codigos
+      ) aggfp
+      WHERE v.idEmpresa IN (${inList})
+      ORDER BY v.fEmision DESC, v.idVenta DESC
+    `);
+  } catch (err) {
+    if (err.message && (err.message.includes('MediosPago') || err.message.includes('FormasPago') || err.message.includes('MovimientosCaja') || err.message.includes('Invalid object'))) {
+      const reqFb = pool.request();
+      const inListFb = bindUniqueIdentifiersIn(reqFb, ids, 'empV');
+      result = await reqFb.query(`
+        SELECT
+          v.idEmpresa,
+          v.idVenta,
+          v.compVenta,
+          CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+          v.total,
+          v.idEstadoSunat,
+          v.serie,
+          v.numero,
+          v.idComprobante,
+          v.idCliente,
+          v.idMediosPago AS condicionPago,
+          c.nombre AS nombreComprobante,
+          c.codigo AS codigoComprobante,
+          COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRazonSocial,
+          COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRuc,
+          ce.idComprobanteElectronico,
+          ce.tipoComprobante,
+          e.ruc AS rucEmpresa,
+          ISNULL(e.razon_Social, '') AS razonSocialEmpresa,
+          ISNULL(v.eliminado, 0) AS eliminado,
+          '' AS formaPago
+        FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+        LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+        WHERE v.idEmpresa IN (${inListFb})
+        ORDER BY v.fEmision DESC, v.idVenta DESC
+      `);
+    } else {
+      throw err;
+    }
+  }
+  const rows = result.recordset || [];
+  return rows.map((r) => ({
+    ...r,
+    idEmpresa: r.idEmpresa != null ? String(r.idEmpresa) : null,
+    idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
+    tipoComprobante: r.tipoComprobante != null ? String(r.tipoComprobante).trim() : null,
+    rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null,
+    razonSocialEmpresa: r.razonSocialEmpresa != null ? String(r.razonSocialEmpresa).trim() : '',
+    condicionPago: r.condicionPago != null ? String(r.condicionPago).trim() : (r.idMediosPago != null ? String(r.idMediosPago) : ''),
+    clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
+    clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : '',
+    eliminado: !!r.eliminado,
+    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}'
+  }));
+};
+
 /** Datos completos de una venta para generar comprobante PDF. idsEmpresa: JWT + gestionadas (gestora) o [una empresa].
  *  Logo, impuestos y productos corresponden a v.idEmpresa de la venta encontrada. */
 exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 'http://localhost:3000') => {
@@ -425,6 +544,29 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   }));
 
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
+  let configPdf = [];
+  try {
+    const configRes = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+      .query(`
+        SELECT clave, valor
+        FROM ConfiguracionEmpresa
+        WHERE idEmpresa = @idEmpresa
+          AND clave IN (
+            'PDF_CUENTAS_BANCARIAS',
+            'PDF_TEMA_COLOR_ACTIVO',
+            'PDF_COLOR_PRIMARIO'
+          )
+      `);
+    configPdf = configRes.recordset || [];
+  } catch (_) {
+    configPdf = [];
+  }
+  const cfgMap = configPdf.reduce((acc, row) => {
+    acc[String(row.clave || '').trim()] = row.valor != null ? String(row.valor).trim() : '';
+    return acc;
+  }, {});
   const detalle = items.recordset || [];
   const hashRow = hashResult.recordset && hashResult.recordset[0] ? hashResult.recordset[0] : null;
   const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
@@ -464,9 +606,23 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         telefono: (emp.celular != null && String(emp.celular).trim()) ? String(emp.celular).trim() : '',
         rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
         correo: (emp.correo != null && String(emp.correo).trim()) ? String(emp.correo).trim() : '',
-        logo: logoUrl
+        logo: logoUrl,
+        cuentasBancarias: cfgMap.PDF_CUENTAS_BANCARIAS || '',
+        pdfUsarColor: String(cfgMap.PDF_TEMA_COLOR_ACTIVO || 'true').toLowerCase() !== 'false',
+        pdfColorPrimario: cfgMap.PDF_COLOR_PRIMARIO || '#0B5FA5'
       }
-    : { nombre: '', ruc: '', direccion: '', telefono: '', rubro: '', correo: '', logo: `${base}/assets/img/01.jpg` };
+    : {
+        nombre: '',
+        ruc: '',
+        direccion: '',
+        telefono: '',
+        rubro: '',
+        correo: '',
+        logo: `${base}/assets/img/01.jpg`,
+        cuentasBancarias: cfgMap.PDF_CUENTAS_BANCARIAS || '',
+        pdfUsarColor: String(cfgMap.PDF_TEMA_COLOR_ACTIVO || 'true').toLowerCase() !== 'false',
+        pdfColorPrimario: cfgMap.PDF_COLOR_PRIMARIO || '#0B5FA5'
+      };
 
   return {
     venta: {

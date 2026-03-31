@@ -523,6 +523,61 @@
               </form>
             </div>
           </div>
+          <div class="card mt-3">
+            <div class="card-header">
+              <h5 class="card-title mb-0">PDF de comprobantes (Boleta/Factura/Nota de venta)</h5>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">Cuentas bancarias (una por línea)</label>
+                  <textarea
+                    class="form-control"
+                    rows="4"
+                    [(ngModel)]="pdfComprobante.cuentasBancarias"
+                    name="pdfCuentasBancarias"
+                    placeholder="Ej: BANCO BCP - CTA: 001-1234567-89&#10;CCI: 00200100012345678901"></textarea>
+                </div>
+                <div class="col-md-6 d-flex align-items-center">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="pdfUsarTemaColor" [(ngModel)]="pdfComprobante.usarTemaColor" name="pdfUsarTemaColor">
+                    <label class="form-check-label" for="pdfUsarTemaColor">
+                      Aplicar tema de color tecnológico (solo A4/A5)
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Color primario</label>
+                  <input
+                    type="color"
+                    class="form-control form-control-color"
+                    [(ngModel)]="pdfComprobante.colorPrimario"
+                    name="pdfColorPrimario"
+                    [disabled]="!pdfComprobante.usarTemaColor"
+                    title="Selecciona el color del tema">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Hex</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    [(ngModel)]="pdfComprobante.colorPrimario"
+                    name="pdfColorPrimarioHex"
+                    [disabled]="!pdfComprobante.usarTemaColor"
+                    placeholder="#0B5FA5">
+                </div>
+              </div>
+              <div class="mt-3">
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  (click)="guardarConfiguracionPdfComprobante()"
+                  [disabled]="pdfComprobanteGuardando">
+                  <i class="fas fa-save me-2"></i>{{ pdfComprobanteGuardando ? 'Guardando...' : 'Guardar configuración PDF' }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Configuración del Sistema -->

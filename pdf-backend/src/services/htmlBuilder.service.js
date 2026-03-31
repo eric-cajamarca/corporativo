@@ -1,4 +1,33 @@
 class HtmlBuilderService {
+  _escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  _normalizarCondicionPago(venta = {}) {
+    const codigo = String(venta.codigoCondicionPago || '').trim();
+    const raw = String(venta.condicionPago || '').trim().toLowerCase();
+    if (codigo === '010' || raw.includes('credito') || raw.includes('crédito')) return 'CRÉDITO';
+    if (codigo === '009' || raw.includes('contado')) return 'CONTADO';
+    return raw ? raw.toUpperCase() : 'CONTADO';
+  }
+
+  _parseCuentasBancarias(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value.map((x) => this._escapeHtml(x)).filter(Boolean);
+    }
+    const text = String(value).trim();
+    if (!text) return [];
+    return text
+      .split(/\r?\n|[;|]/)
+      .map((x) => this._escapeHtml(x.trim()))
+      .filter(Boolean);
+  }
   /**
    * Construye HTML completo para reportes con header de empresa
    * @param {Object} params - Parámetros de construcción
@@ -318,7 +347,7 @@ class HtmlBuilderService {
     const hashEsc = (resumenHash && String(resumenHash).trim())
       ? String(resumenHash).trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')
       : '—';
-    return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;">
+    return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;margin:0;padding:0;">
       <div>* Bienes transferidos en la Amazonía para ser consumidos en la misma</div>
       <div>* Representación impresa de ${titulo}</div>
       <div>* Generado desde el Factuador SUNAT</div>
@@ -341,6 +370,9 @@ class HtmlBuilderService {
       observaciones = '',
       tablaCuotasHtml = ''
     } = data;
+    const condicionPago = this._normalizarCondicionPago(venta);
+    const fVencimiento = venta && venta.fVencimiento ? String(venta.fVencimiento).trim() : '';
+    const cuentasBancarias = this._parseCuentasBancarias(empresa.cuentasBancarias);
     const total = Number(venta.total) || 0;
     return `<!DOCTYPE html>
 <html>
@@ -349,13 +381,13 @@ class HtmlBuilderService {
   <title>${titulo} ${compVenta}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 8px; margin: 0; padding: 4px; color: #000; width: 80mm; max-width: 80mm; }
+    body { font-family: Arial, sans-serif; font-size: 8px; margin: 0; padding: 1px; color: #000; width: 80mm; max-width: 80mm; }
     .ticket-center { text-align: center; }
     .ticket-logo { max-width: 50px; max-height: 40px; margin: 0 auto 2px; display: block; }
     .ticket-empresa { font-weight: bold; font-size: 9px; margin: 2px 0; line-height: 1.2; }
     .ticket-ruc { font-size: 7px; }
     .ticket-dir, .ticket-rubro, .ticket-cel, .ticket-correo { font-size: 6px; margin: 1px 0; }
-    .ticket-sep { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .ticket-sep { border: none; border-top: 1px dashed #000; margin: 3px 0; }
     .ticket-comprobante { font-weight: bold; font-size: 9px; margin: 2px 0; }
     .ticket-fecha { font-size: 7px; margin-bottom: 4px; }
     .ticket-cliente { text-align: left; font-size: 7px; line-height: 1.25; margin: 4px 0; }
@@ -368,15 +400,17 @@ class HtmlBuilderService {
     .ticket-totales td.num { text-align: right; }
     .ticket-totales tr.total-final { font-weight: bold; font-size: 8px; }
     .ticket-son { font-size: 7px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; }
-    .ticket-final { margin-top: 6px; padding: 4px 0; font-size: 6px; }
+    .ticket-final { margin-top: 2px; padding: 0; font-size: 6px; }
     .ticket-final .txt { margin-bottom: 2px; }
     .ticket-sunat-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 4px; margin-top: 4px; width: 100%; }
     .ticket-sunat-text { flex: 1; min-width: 0; text-align: left; }
     .ticket-sunat-text .pie-sunat-electronico { font-size: 5px !important; line-height: 1.35 !important; margin: 0 !important; }
     .ticket-sunat-qr { flex-shrink: 0; }
     .ticket-sunat-qr img { width: 56px; height: 56px; display: block; }
-    .ticket-final .barcode-venta { margin-top: 4px; text-align: center; }
+    .ticket-final .barcode-venta { margin-top: 1px; text-align: center; }
     .ticket-final .barcode-venta img { height: 28px; width: auto; max-width: 60mm; }
+    .ticket-qr-final { text-align: center; margin: 0; padding: 0; width: 100%; line-height: 0; }
+    .ticket-qr-final img { width: 111px; max-width: calc(100% - 2px); height: auto; aspect-ratio: 1; object-fit: contain; display: block; margin: 1px auto 0; }
   </style>
 </head>
 <body>
@@ -399,7 +433,10 @@ class HtmlBuilderService {
   <div class="ticket-cliente">
     <strong>RUC:</strong> ${rucCliente || '-'}<br>
     <strong>RAZÓN SOCIAL:</strong> ${razonSocial || '-'}<br>
-    <strong>DIRECCIÓN:</strong> ${dirCliente || '-'}
+    <strong>DIRECCIÓN:</strong> ${dirCliente || '-'}<br>
+    <strong>COND. PAGO:</strong> ${condicionPago}<br>
+    <strong>EMISIÓN:</strong> ${fEmision || '-'}
+    ${fVencimiento ? '<br><strong>VENCIMIENTO:</strong> ' + this._escapeHtml(fVencimiento) : ''}
   </div>
   <hr class="ticket-sep">
   <table class="ticket-detalle">
@@ -411,12 +448,13 @@ class HtmlBuilderService {
     ${lineasTotales}
   </table>
   <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+  ${cuentasBancarias.length > 0 ? '<hr class="ticket-sep"><div style="font-size:7px;"><strong>CUENTAS BANCARIAS:</strong><br>' + cuentasBancarias.join('<br>') + '</div>' : ''}
   ${observaciones ? '<hr class="ticket-sep"><div style="font-size:7px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
   ${tablaCuotasHtml || ''}
   <div class="ticket-final">
-    ${qrDataUri ? '<div class="qr-wrap"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
     ${pieSunatHtml || ''}
-    ${barcodeIdVentaUrl ? '<div class="barcode-venta">Venta (despacho):<br><img src="' + barcodeIdVentaUrl + '" alt="código"/></div>' : ''}
+    ${barcodeIdVentaUrl ? '<div class="barcode-venta"><img src="' + barcodeIdVentaUrl + '" alt="código"/></div>' : ''}
+    ${qrDataUri ? '<div class="ticket-qr-final"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
   </div>
 </body>
 </html>`;
@@ -466,7 +504,11 @@ class HtmlBuilderService {
     if (mostrarQrPie) {
       const qrString = this._buildQrString(empresa, venta, cliente);
       try {
-        qrDataUri = await QRCode.toDataURL(qrString, { width: formato === 'ticket' ? 80 : 120, margin: 1 });
+        qrDataUri = await QRCode.toDataURL(qrString, {
+          width: formato === 'ticket' ? 186 : 198,
+          margin: 0,
+          errorCorrectionLevel: 'M'
+        });
       } catch (e) {
         qrDataUri = '';
       }
@@ -482,6 +524,11 @@ class HtmlBuilderService {
 
     const razonSocial = cliente.rSocial || cliente.razonSocial || '';
     const dirCliente = cliente.direccion || '';
+    const condicionPago = this._normalizarCondicionPago(venta);
+    const fVencimiento = venta.fVencimiento ? String(venta.fVencimiento).trim() : '';
+    const cuentasBancarias = this._parseCuentasBancarias(empresa.cuentasBancarias);
+    const usarColorPdf = formato !== 'ticket' && empresa.pdfUsarColor !== false;
+    const colorPrimario = String(empresa.pdfColorPrimario || '#0B5FA5').trim() || '#0B5FA5';
 
     const lineasTotales = [
       { label: 'Subtotal', value: subtotal },
@@ -492,22 +539,46 @@ class HtmlBuilderService {
       { label: 'Descuentos', value: descuentos },
       { label: 'TOTAL (S/)', value: total, total: true }
     ];
-    const filasTotales = lineasTotales.map(l => `
-      <tr${l.total ? ' class="total-row"' : ''}><td>${l.label}</td><td class="text-end">${Number(l.value).toFixed(2)}</td></tr>`).join('');
+    const filasTotalesHtml = lineasTotales.map(l =>
+      `<tr${l.total ? ' class="total-row"' : ''}><td>${l.label}</td><td class="text-end">${Number(l.value).toFixed(2)}</td></tr>`
+    ).join('');
 
     const mostrarCuotasPdf = codigoComp === '01' || codigoComp === '03';
+    const esCredito = condicionPago === 'CRÉDITO';
 
     const observaciones = (venta.observaciones && String(venta.observaciones).trim()) || (venta.compRelacionado && String(venta.compRelacionado).trim()) || '';
     const cuotas = Array.isArray(venta.cuotas) ? venta.cuotas : [];
-    const tablaCuotasHtml = cuotas.length > 0 && mostrarCuotasPdf
-      ? `<div class="cuotas-section" style="margin-top:16px; page-break-inside:avoid;">
-          <strong>Detalle de cuotas a pagar</strong>
-          <table class="detalle" style="margin-top:6px;">
+    const mostrarTablaCuotasMitad = mostrarCuotasPdf && esCredito && cuotas.length > 0;
+    const tablaCuotasMitadHtml = mostrarTablaCuotasMitad
+      ? `<div class="cuotas-mitad-inner">
+          <div class="cuotas-mitad-titulo">Detalle de cuotas a pagar</div>
+          <table class="detalle tabla-cuotas-compacta">
             <thead><tr><th>Fecha de pago</th><th>Nro. cuota</th><th class="text-end">Total (S/)</th></tr></thead>
-            <tbody>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td class="text-center">${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="text-end">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</tbody>
+            <tbody>${cuotas.map(c => `<tr><td>${this._escapeHtml(c.fechaPago || '—')}</td><td class="text-center">${c.numeroCuota != null ? this._escapeHtml(String(c.numeroCuota)) : '—'}</td><td class="text-end">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</tbody>
           </table>
         </div>`
       : '';
+
+    const hayCuentasMitad = cuentasBancarias.length > 0;
+    const bloqueCuentasMitadHtml = hayCuentasMitad
+      ? `<div class="cuentas-bancarias">
+    <div class="titulo">CUENTAS BANCARIAS</div>
+    ${cuentasBancarias.map((c) => `<div class="linea">${c}</div>`).join('')}
+  </div>`
+      : '';
+    const partesColumnaAuxDer = [];
+    if (mostrarTablaCuotasMitad) {
+      partesColumnaAuxDer.push(tablaCuotasMitadHtml);
+    }
+    if (hayCuentasMitad) {
+      if (mostrarTablaCuotasMitad) {
+        partesColumnaAuxDer.push(`<div class="cuentas-bajo-cuotas">${bloqueCuentasMitadHtml}</div>`);
+      } else {
+        partesColumnaAuxDer.push(bloqueCuentasMitadHtml);
+      }
+    }
+    const auxDerContenidoHtml = partesColumnaAuxDer.join('');
+    const mostrarFilaQrAuxiliares = Boolean(qrDataUri || auxDerContenidoHtml);
 
     if (formato === 'ticket') {
       const rucCliente = cliente.ruc != null && String(cliente.ruc).trim() !== '' ? String(cliente.ruc).trim() : '';
@@ -544,39 +615,53 @@ class HtmlBuilderService {
   <meta charset="UTF-8">
   <title>${titulo} ${compVenta}</title>
   <style>
-    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 16px; color: #222; }
-    .header { border-bottom: 3px solid #0056b3; padding-bottom: 12px; margin-bottom: 14px; }
+    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 12px; color: #222; }
+    .header { border-bottom: 3px solid ${usarColorPdf ? colorPrimario : '#0056b3'}; padding-bottom: 12px; margin-bottom: 14px; }
     .logo-cell { width: 26%; vertical-align: top; }
     .logo { max-width: 150px; max-height: 95px; height: auto; display: block; object-fit: contain; }
     .datos-empresa { padding-left: 12px; }
-    .datos-empresa h3 { margin: 0 0 6px 0; color: #0056b3; font-size: 14px; font-weight: bold; }
+    .datos-empresa h3 { margin: 0 0 6px 0; color: ${usarColorPdf ? colorPrimario : '#0056b3'}; font-size: 14px; font-weight: bold; }
     .datos-empresa p { margin: 0; line-height: 1.4; font-size: 9px; color: #444; }
-    .comprobante-box { text-align: right; vertical-align: top; }
-    .comprobante-box .tipo { font-size: 14px; font-weight: bold; color: #0056b3; margin-bottom: 4px; }
+    .comprobante-box { text-align: right; vertical-align: top; border: none !important; outline: none; }
+    .comprobante-box .tipo { font-size: 14px; font-weight: bold; color: ${usarColorPdf ? colorPrimario : '#0056b3'}; margin-bottom: 4px; }
     .comprobante-box .numero { font-size: 12px; margin-bottom: 2px; }
     .comprobante-box .fecha { font-size: 9px; color: #555; }
-    .datos-cliente { margin: 12px 0; padding: 10px 12px; border: 1px solid #ccc; background: #fafafa; font-size: 9px; }
+    .datos-cliente { margin: 12px 0; padding: 10px 12px; border: none; background: ${usarColorPdf ? '#eef6ff' : '#fafafa'}; font-size: 9px; border-radius: 6px; }
     .datos-cliente .linea { margin: 2px 0; }
     table.detalle { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 9px; }
     table.detalle th, table.detalle td { border: 1px solid #bbb; padding: 6px 8px; }
-    table.detalle th { background: #e8e8e8; font-weight: bold; color: #333; }
+    table.detalle th { background: ${usarColorPdf ? '#e2eefc' : '#e8e8e8'}; font-weight: bold; color: #333; }
     table.detalle tbody tr:nth-child(even) { background: #f9f9f9; }
     .text-end { text-align: right; }
     .text-center { text-align: center; }
-    .totales-box { margin-top: 14px; width: 280px; margin-left: auto; }
+    .post-detalle-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 14px; margin-top: 10px; width: 100%; }
+    .post-detalle-izq { flex: 1; min-width: 0; text-align: left; align-self: flex-start; }
+    .post-detalle-der { flex-shrink: 0; width: 280px; max-width: 40%; align-self: flex-start; }
+    .son-bajo-total { margin-top: 0; font-size: 10px; padding: 0; border: none; background: transparent; line-height: 1.4; }
+    .son-bajo-total strong { color: ${usarColorPdf ? colorPrimario : '#0056b3'}; }
+    .totales-box { margin-top: 0; width: 100%; margin-left: 0; }
     .totales-box table { width: 100%; font-size: 10px; border-collapse: collapse; }
-    .totales-box td { padding: 4px 8px; border: 1px solid #ddd; }
-    .totales-box td:first-child { background: #f5f5f5; }
-    .totales-box .total-row td { font-weight: bold; background: #e8eef4; font-size: 11px; }
-    .son { margin-top: 14px; padding: 8px; font-size: 10px; border: 1px solid #eee; background: #fafafa; }
-    .son strong { color: #0056b3; }
-    .bloque-final { margin-top: 20px; border: 1px solid #333; padding: 10px 12px; overflow: hidden; }
-    .sunat-footer-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 14px; }
-    .sunat-footer-text { flex: 1; min-width: 0; }
-    .sunat-footer-text .pie-sunat-electronico { margin: 0 !important; }
-    .sunat-footer-qr { flex-shrink: 0; text-align: right; }
-    .sunat-footer-qr img { width: 100px; height: 100px; display: block; }
-    .bloque-final .barcode-venta { margin-top: 10px; clear: both; text-align: center; }
+    .totales-box td { padding: 4px 8px; border: 1px solid #ddd; background: #fff; }
+    .totales-box tr:not(.total-row):nth-child(odd) td:first-child { background: #f5f5f5; }
+    .totales-box tr:not(.total-row):nth-child(even) td:first-child { background: #fff; }
+    .totales-box .total-row td { font-weight: bold; background: ${usarColorPdf ? '#d7e8fb' : '#e8eef4'}; font-size: 11px; }
+    .pie-bajo-son { margin-top: 6px; }
+    .pie-bajo-son .pie-sunat-electronico { margin: 0 !important; padding: 0 !important; }
+    .fila-qr-auxiliares { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 6px; margin-top: 4px; width: 100%; page-break-inside: avoid; }
+    .qr-izq-col { flex: 1; min-width: 0; text-align: center; margin: 0; padding: 0; line-height: 0; }
+    .qr-izq-col img { width: 108px; height: auto; aspect-ratio: 1; object-fit: contain; display: block; margin: 6px auto 0; padding: 0; }
+    .aux-der-col { flex-shrink: 0; width: 280px; max-width: 40%; align-self: flex-start; }
+    .cuentas-bajo-cuotas { margin-top: 10px; }
+    .bloque-final { margin-top: 10px; border: none; padding: 0; overflow: visible; background: transparent; border-radius: 0; }
+    .cuentas-bancarias { padding: 8px 10px; border: none; background: ${usarColorPdf ? '#eef6ff' : '#fafafa'}; border-radius: 6px; font-size: 9px; }
+    .cuentas-bancarias .titulo { font-weight: bold; color: ${usarColorPdf ? colorPrimario : '#333'}; margin-bottom: 4px; }
+    .cuentas-bancarias .linea { margin: 2px 0; }
+    .cuotas-mitad-titulo { font-weight: bold; font-size: 9px; margin-bottom: 6px; color: ${usarColorPdf ? colorPrimario : '#333'}; }
+    table.tabla-cuotas-compacta { margin-top: 0; font-size: 8px; }
+    table.tabla-cuotas-compacta th, table.tabla-cuotas-compacta td { padding: 4px 6px; }
+    .pie-sunat-electronico > div { margin: 0 0 2px 0; padding: 0; }
+    .pie-sunat-electronico > div:last-child { margin-bottom: 0; }
+    .bloque-final .barcode-venta { margin: 6px 0 0 0; padding: 0; clear: both; text-align: center; }
     .bloque-final .barcode-venta img { height: 36px; width: auto; max-width: 180px; }
   </style>
 </head>
@@ -612,22 +697,31 @@ class HtmlBuilderService {
     <div class="linea"><strong>RUC:</strong> ${cliente.ruc != null && String(cliente.ruc).trim() !== '' ? String(cliente.ruc).trim() : '-'}</div>
     <div class="linea"><strong>RAZÓN SOCIAL:</strong> ${razonSocial || '-'}</div>
     <div class="linea"><strong>DIRECCIÓN:</strong> ${dirCliente || '-'}</div>
+    <div class="linea"><strong>CONDICIÓN DE PAGO:</strong> ${condicionPago}</div>
+    <div class="linea"><strong>FECHA DE EMISIÓN:</strong> ${fEmision || '-'}</div>
+    ${fVencimiento ? '<div class="linea"><strong>FECHA DE VENCIMIENTO:</strong> ' + this._escapeHtml(fVencimiento) + '</div>' : ''}
   </div>
   <table class="detalle">
     <thead><tr><th class="text-center" style="width:10%;">Cant.</th><th style="width:44%;">Descripción</th><th class="text-end" style="width:18%;">P. Unit. (S/)</th><th class="text-end" style="width:18%;">Importe (S/)</th></tr></thead>
     <tbody>${filas}</tbody>
   </table>
-  <div class="totales-box">
-    <table>${filasTotales}</table>
+  <div class="post-detalle-row">
+    <div class="post-detalle-izq">
+      <div class="son-bajo-total"><strong>SON:</strong> ${cantidadLetras || ''}</div>
+      ${pieSunatHtml ? `<div class="pie-bajo-son">${pieSunatHtml}</div>` : ''}
+    </div>
+    <div class="post-detalle-der">
+      <div class="totales-box">
+        <table>${filasTotalesHtml}</table>
+      </div>
+    </div>
   </div>
-  <div class="son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
   ${observaciones ? '<div class="observaciones" style="margin-top:12px;padding:8px;border:1px solid #eee;background:#fafafa;font-size:9px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
-  ${tablaCuotasHtml}
+  ${mostrarFilaQrAuxiliares ? `<div class="fila-qr-auxiliares">
+    <div class="qr-izq-col">${qrDataUri ? '<img src="' + qrDataUri + '" alt="QR"/>' : ''}</div>
+    <div class="aux-der-col">${auxDerContenidoHtml}</div>
+  </div>` : ''}
   <div class="bloque-final">
-    ${(pieSunatHtml || qrDataUri) ? `<div class="sunat-footer-row">
-      <div class="sunat-footer-text">${pieSunatHtml || ''}</div>
-      ${qrDataUri ? '<div class="sunat-footer-qr"><img src="' + qrDataUri + '" alt="QR"/></div>' : ''}
-    </div>` : ''}
     ${barcodeIdVentaUrl ? '<div class="barcode-venta"><img src="' + barcodeIdVentaUrl + '" alt=""/></div>' : ''}
   </div>
 </body>
