@@ -2,8 +2,9 @@
    SIDEBAR - Estilos principales
    ============================================= */
 
+/* Bloque contenedor estable (display:contents daba problemas de layout en algunas rutas) */
 :host {
-  display: contents;
+  display: block;
 }
 
 /* Sidebar principal */
@@ -20,6 +21,7 @@
   z-index: 1000;
   transition: width 0.3s ease, transform 0.3s ease;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
 
 .sidebar.collapsed {
@@ -156,9 +158,11 @@
 
 .sidebar-nav {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .nav-list {

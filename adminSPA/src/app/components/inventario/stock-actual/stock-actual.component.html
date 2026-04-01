@@ -1,0 +1,162 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  
+  <div class="content-wrap">
+    <div class="content-header">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h1 class="content-title mb-1">Stock actual</h1>
+          <p class="content-subtitle text-muted mb-0">Inventario consolidado por producto</p>
+        </div>
+        
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3 col-sm-6">
+            <label class="form-label small fw-semibold">Categoría</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
+              <button type="button" class="btn btn-outline-primary" (click)="todosCategoria()" title="Todas las categorías">
+                <i class="bi bi-check2"></i> Todos
+              </button>
+            </div>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label class="form-label small fw-semibold">Marca</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" placeholder="Marca" [(ngModel)]="filtroMarca" (blur)="cargar()" />
+              <button type="button" class="btn btn-outline-primary" (click)="todosMarca()" title="Todas las marcas">
+                <i class="bi bi-check2"></i> Todos
+              </button>
+            </div>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label class="form-label small fw-semibold">Sucursal</label>
+            <select class="form-select form-select-sm" [(ngModel)]="idSucursal" (ngModelChange)="onSucursalChange()">
+              <option value="">Todas las sucursales</option>
+              @for (s of sucursales; track s.idSucursal) {
+                <option [ngValue]="s.idSucursal">{{ s.nombre }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-md-3 col-sm-12">
+            <label class="form-label small fw-semibold">Stock</label>
+            <div class="btn-group btn-group-sm w-100 stock-toggle" role="group">
+              <button
+                type="button"
+                class="btn"
+                [class.btn-stock-active]="filtroStock === 'todos'"
+                [class.btn-outline-secondary]="filtroStock !== 'todos'"
+                (click)="setFiltroStock('todos')">
+                Todos
+              </button>
+              <button
+                type="button"
+                class="btn"
+                [class.btn-stock-active]="filtroStock === 'cero'"
+                [class.btn-outline-secondary]="filtroStock !== 'cero'"
+                (click)="setFiltroStock('cero')">
+                Cero
+              </button>
+              <button
+                type="button"
+                class="btn"
+                [class.btn-stock-active]="filtroStock === 'minimo'"
+                [class.btn-outline-secondary]="filtroStock !== 'minimo'"
+                (click)="setFiltroStock('minimo')">
+                Mínimo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body py-2 border-bottom bg-light">
+        <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
+          <div class="input-group input-group-sm stock-search">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input
+              type="search"
+              class="form-control"
+              placeholder="Buscar..."
+              [(ngModel)]="buscar"
+              (input)="onBuscarInput()" />
+          </div>
+          <div class="btn-toolbar gap-1">
+            <button type="button" class="btn btn-sm btn-primary" (click)="refrescar()" [disabled]="cargando" title="Refrescar">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-warning text-dark" (click)="sincronizar()" [disabled]="cargando" title="Sincronizar">
+              <i class="bi bi-arrow-repeat"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-success" (click)="exportarExcel()" [disabled]="!items.length" title="Excel">
+              <i class="bi bi-file-earmark-excel"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" (click)="exportarPdf()" [disabled]="!items.length" title="PDF">
+              <i class="bi bi-file-earmark-pdf"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-dark" (click)="limpiarFiltros()" title="Limpiar filtros">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0 stock-table">
+          <thead>
+            <tr>
+              <th class="text-center" style="width: 3rem">#</th>
+              <th>Código</th>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th>Marca</th>
+              @if (mostrarColumnaEmpresa) {
+                <th>Empresa</th>
+              }
+              <th class="text-end">Stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (cargando) {
+              <tr>
+                <td [attr.colspan]="mostrarColumnaEmpresa ? 7 : 6" class="text-center py-4 text-muted">Cargando…</td>
+              </tr>
+            } @else if (!items.length) {
+              <tr>
+                <td [attr.colspan]="mostrarColumnaEmpresa ? 7 : 6" class="text-center py-4 text-muted">Sin resultados</td>
+              </tr>
+            } @else {
+              @for (r of items; track r.idProducto + r.idEmpresa; let idx = $index) {
+                <tr>
+                  <td class="text-center">{{ idx + 1 }}</td>
+                  <td class="text-nowrap">{{ r.codigo }}</td>
+                  <td>{{ r.descripcion }}</td>
+                  <td>{{ r.categoria }}</td>
+                  <td>{{ r.marca }}</td>
+                  @if (mostrarColumnaEmpresa) {
+                    <td><small>{{ r.aliasEmpresa }}</small></td>
+                  }
+                  <td class="text-end fw-semibold">{{ r.stock | number: '1.0-3' }} <span class="text-muted small">{{ r.unidad || 'UND' }}</span></td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="stock-footer d-flex justify-content-end align-items-center gap-3 flex-wrap">
+        <span class="fw-semibold">{{ totalProductos }} producto(s)</span>
+        <span class="text-muted">Valorizado (costo):</span>
+        <span class="fs-5 fw-bold">{{ totalValorizado | number: '1.2-2' }}</span>
+      </div>
+    </div>
+  </div>
+</main>

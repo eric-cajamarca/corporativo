@@ -1,0 +1,71 @@
+/* Layout: espacio para sidebar (260px) y topnav (64px) */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+  display: flex;
+  justify-content: center;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+
+
+.stock-table thead th {
+  background: #1a3a5c;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: none;
+  vertical-align: middle;
+}
+
+.stock-table tbody td {
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.stock-footer {
+  background: #1a3a5c;
+  color: #fff;
+  padding: 0.75rem 1rem;
+}
+
+.stock-footer .text-muted {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.stock-toggle .btn-stock-active {
+  background-color: #d63384;
+  border-color: #d63384;
+  color: #fff;
+}
+
+.stock-toggle .btn-stock-active:hover {
+  background-color: #b02a5b;
+  border-color: #b02a5b;
+  color: #fff;
+}
+
+.stock-search {
+  max-width: 280px;
+  min-width: 180px;
+}

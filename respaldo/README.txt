@@ -2,11 +2,13 @@ RESPALDO - Scripts de base de datos SistemaInventario
 =====================================================
 
 Contenido:
-- base_datos_mejorada.sql   Base corregida (incluye tablas Concepto y catálogos antes de MovimientosCaja).
-- instalar_base_completa.sql   Script maestro que ejecuta la base y todas las migraciones en orden.
-- migrations_backAppC\   Migraciones del backend (catálogos, cotizaciones, créditos, comprobantes, etc.).
-- migrations_sjb\   Migraciones Factiliza y ProductosImagen.
-- generar_estructura_bd.ps1   Script PowerShell para exportar solo la estructura (schema) de la BD a un .sql.
+- base_datos_mejorada.sql   Esquema unificado (2026-03): incluye lo que antes estaba en
+  migrations_backAppC y migrations_sjb (Factiliza, ProductosImagen, Gastos, columnas extra, etc.).
+- instalar_base_completa.sql   Crea la base (sqlcmd) y ejecuta solo base_datos_mejorada.sql.
+- generar_estructura_bd.ps1   PowerShell para exportar solo la estructura (schema) de la BD a un .sql.
+
+Nota: Las migraciones incrementales sueltas del backend continúan en backAppC/migrations/
+para bases que ya existían antes del unificado.
 
 CÓMO GENERAR UN ARCHIVO CON TODA LA ESTRUCTURA DE LA BD (schema real, con referencias)
 --------------------------------------------------------------------------------------
@@ -28,7 +30,7 @@ Método 1 - SSMS (recomendado, más fiable):
 Método 2 - PowerShell (generar_estructura_bd.ps1):
   Requiere tener instalado SSMS o el SDK de SQL Server (para SMO). Ejecutar desde la carpeta respaldo:
 
-  cd c:\project172026\respaldo
+  cd c:\EFAF2026\respaldo
   .\generar_estructura_bd.ps1 -ServerInstance "." -Database "SistemaInventario" -OutputFile "estructura_bd_completa.sql"
 
   Si usas autenticación SQL (usuario/contraseña):

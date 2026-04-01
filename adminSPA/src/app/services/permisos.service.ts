@@ -71,7 +71,8 @@ export class PermisosService {
             { withCredentials: true }
         ).pipe(
             tap(response => {
-                if (response.data) {
+                // No reemplazar por []: vacía el sidebar en toda la app si la API falla o responde sin ítems.
+                if (response.data && response.data.length > 0) {
                     this._navegacion.set(response.data);
                 }
                 this._cargando.set(false);

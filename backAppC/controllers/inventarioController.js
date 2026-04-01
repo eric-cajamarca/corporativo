@@ -45,6 +45,44 @@ exports.listarMovimientos = async (req, res) => {
 };
 
 /**
+ * GET /api/inventario/movimientos-resumen
+ * Cabeceras agrupadas (pantalla Movimientos).
+ */
+exports.listarMovimientosResumen = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const lista = await inventarioService.listarMovimientosResumen(req.user.empresa, req.query);
+    return res.status(200).json(lista);
+  } catch (error) {
+    console.error('inventarioController listarMovimientosResumen:', error);
+    return res.status(500).json({ message: error.message || 'Error al listar movimientos' });
+  }
+};
+
+/**
+ * GET /api/inventario/movimientos/:id/lineas
+ * Detalle de líneas de una cabecera.
+ */
+exports.listarLineasMovimientoCabecera = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: 'Id de movimiento inválido' });
+    }
+    const lineas = await inventarioService.listarLineasMovimientoCabecera(req.user.empresa, id);
+    return res.status(200).json(lineas);
+  } catch (error) {
+    console.error('inventarioController listarLineasMovimientoCabecera:', error);
+    return res.status(500).json({ message: 'Error al obtener líneas del movimiento' });
+  }
+};
+
+/**
  * GET /api/inventario/movimientos/:id
  * Obtiene un movimiento por id (detalle para modal).
  */
@@ -102,5 +140,72 @@ exports.kardex = async (req, res) => {
   } catch (error) {
     console.error('inventarioController kardex:', error);
     return res.status(500).json({ message: error.message || 'Error al obtener kardex' });
+  }
+};
+
+/**
+ * GET /api/inventario/stock-actual
+ * Lista stock agregado por producto con filtros opcionales.
+ */
+exports.stockActual = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const resultado = await inventarioService.obtenerStockActual(req.user, req.query);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    if (error.message === 'NO_AUTH') {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    if (error.message === 'NO_PERMISO_STOCK_ACTUAL') {
+      return res.status(403).json({ message: 'No tiene permiso para ver stock actual' });
+    }
+    console.error('inventarioController stockActual:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener stock actual' });
+  }
+};
+
+/**
+ * GET /api/inventario/productos-vendidos
+ */
+exports.productosVendidos = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const resultado = await inventarioService.obtenerProductosVendidos(req.user, req.query);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    if (error.message === 'NO_AUTH') {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    if (error.message === 'NO_PERMISO_PRODUCTOS_VENDIDOS') {
+      return res.status(403).json({ message: 'No tiene permiso para ver productos vendidos' });
+    }
+    console.error('inventarioController productosVendidos:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener productos vendidos' });
+  }
+};
+
+/**
+ * GET /api/inventario/productos-comprados
+ */
+exports.productosComprados = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const resultado = await inventarioService.obtenerProductosComprados(req.user, req.query);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    if (error.message === 'NO_AUTH') {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    if (error.message === 'NO_PERMISO_PRODUCTOS_COMPRADOS') {
+      return res.status(403).json({ message: 'No tiene permiso para ver productos comprados' });
+    }
+    console.error('inventarioController productosComprados:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener productos comprados' });
   }
 };

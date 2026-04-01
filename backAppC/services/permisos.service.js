@@ -436,10 +436,14 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             visible: esAdmin || permisos.includes('VER_INVENTARIO'),
             submenu: [
                 { nombre: 'Stock General', ruta: '/inventario', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
+                { nombre: 'Stock Actual', ruta: '/inventario/stock-actual', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
+                { nombre: 'Productos vendidos', ruta: '/inventario/productos-vendidos', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
+                { nombre: 'Productos comprados', ruta: '/inventario/productos-comprados', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Ingresos y salidas', ruta: '/inventario/ingreso-salida', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Lotes', ruta: '/inventario/lotes', permiso: 'GESTIONAR_LOTES', visible: esAdmin || permisos.includes('GESTIONAR_LOTES') },
                 { nombre: 'Ubicaciones', ruta: '/inventario/ubicaciones', permiso: 'GESTIONAR_LOTES', visible: esAdmin || permisos.includes('GESTIONAR_LOTES') },
-                { nombre: 'Movimientos', ruta: '/inventario/movimientos', permiso: 'TRANSFERIR_STOCK', visible: esAdmin || permisos.includes('TRANSFERIR_STOCK') },
+                { nombre: 'Movimientos', ruta: '/inventario/movimientos', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
+                { nombre: 'Movimiento entre ubicaciones', ruta: '/inventario/movimiento-entre-ubicaciones', permiso: 'TRANSFERIR_STOCK', visible: esAdmin || permisos.includes('TRANSFERIR_STOCK') },
                 { nombre: 'Kardex', ruta: '/inventario/kardex', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') }
             ]
         },

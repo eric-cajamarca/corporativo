@@ -1,7 +1,7 @@
 -- =============================================
 -- BASE DE DATOS MEJORADA - SISTEMA MULTIEMPRESA
--- Fecha: 2026-01-24
--- Versión: 2.0 - Optimizada y Completa
+-- Fecha: 2026-03-31
+-- Versión: 2.1 - Esquema unificado (incluye migraciones anteriores de respaldo/Query/sjb)
 -- =============================================
 
 USE master;
@@ -298,6 +298,8 @@ CREATE TABLE Clientes (
     condicion VARCHAR(50) NULL,
     estado BIT NOT NULL DEFAULT 1,
     fCreacion DATETIME DEFAULT GETDATE(),
+    sujetoCredito BIT NOT NULL DEFAULT 0,
+    lineaCredito DECIMAL(18,2) NOT NULL DEFAULT 0,
 
     FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
     FOREIGN KEY (idDocumento) REFERENCES Documentos(idDocumento),
@@ -451,6 +453,24 @@ CREATE TABLE Productos (
 );
 GO
 
+-- Galería de imágenes por producto (antes migration_productos_imagen)
+CREATE TABLE ProductosImagen (
+    idImagen UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    idProducto UNIQUEIDENTIFIER NOT NULL,
+    rutaArchivo VARCHAR(255) NOT NULL,
+    orden TINYINT NOT NULL DEFAULT 1,
+    fRegistro DATETIME2(7) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT PK_ProductosImagen PRIMARY KEY CLUSTERED (idImagen),
+    CONSTRAINT FK_ProductosImagen_Empresas FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa),
+    CONSTRAINT FK_ProductosImagen_Productos FOREIGN KEY (idProducto) REFERENCES Productos(idProducto) ON DELETE CASCADE
+);
+GO
+
+CREATE INDEX IX_ProductosImagen_EmpresaProducto ON ProductosImagen(idEmpresa, idProducto);
+CREATE INDEX IX_ProductosImagen_Producto ON ProductosImagen(idProducto);
+GO
+
 -- Tabla de productos compuestos
 CREATE TABLE ProductosCompuestos (
     idProductoCompuesto INT PRIMARY KEY IDENTITY,
@@ -588,6 +608,19 @@ CREATE TABLE Comprobantes (
 );
 GO
 
+-- Recibos de caja (ingreso/egreso) por empresa — antes en migrations_backAppC
+INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
+SELECT e.idEmpresa, 'RI', 'Recibo de Ingreso', '0001', 0, 1, 0, 0
+FROM Empresas e
+WHERE NOT EXISTS (SELECT 1 FROM Comprobantes c WHERE c.idEmpresa = e.idEmpresa AND c.codigo = 'RI');
+GO
+
+INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
+SELECT e.idEmpresa, 'RE', 'Recibo de Egreso', '0001', 0, 1, 0, 0
+FROM Empresas e
+WHERE NOT EXISTS (SELECT 1 FROM Comprobantes c WHERE c.idEmpresa = e.idEmpresa AND c.codigo = 'RE');
+GO
+
 -- Tabla de secuencias para numeración automática
 CREATE TABLE Secuencias (
     idEmpresa UNIQUEIDENTIFIER NOT NULL,
@@ -646,18 +679,11 @@ CREATE TABLE Compras (
     FOREIGN KEY (idMediosPago) REFERENCES MediosPago(idMediosPago),
     FOREIGN KEY (idEstadoPago) REFERENCES EstadoPago(idEstadoPago),
     FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario),
-    CONSTRAINT UQ_Compras_EmpresaSerieNumero UNIQUE (idEmpresa, serie, numero)
+    CONSTRAINT UQ_Compras_EmpresaSerieNumero UNIQUE (idEmpresa, serie, numero),
+    numeroLote INT NULL
 );
 GO
 
---IF NOT EXISTS (
---    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
---    WHERE TABLE_NAME = 'Compras' AND COLUMN_NAME = 'numeroLote'
---)
---BEGIN
---    ALTER TABLE Compras ADD numeroLote INT NULL;
---END
---GO
 -- Tabla de detalle de compras mejorada
 CREATE TABLE DetalleCompras (
     idDetalleCompra INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
@@ -736,11 +762,12 @@ CREATE TABLE Ventas (
     CONSTRAINT FK_Ventas_EstadoPago FOREIGN KEY (idEstadoPago) REFERENCES EstadoPago(idEstadoPago),
     CONSTRAINT FK_Ventas_EstadoSunat FOREIGN KEY (idEstadoSunat) REFERENCES EstadoSunat(idEstadoSunat),
     CONSTRAINT UQ_Ventas_SerieNumero UNIQUE (idEmpresa, serie, numero)
-
-    CREATE INDEX IX_Ventas_idEstadoPedido ON Ventas(idEstadoPedido);
-    CREATE INDEX IX_Ventas_idEstadoPago ON Ventas(idEstadoPago);
-    CREATE INDEX IX_Ventas_idEstadoSunat ON Ventas(idEstadoSunat);
 );
+GO
+
+CREATE INDEX IX_Ventas_idEstadoPedido ON Ventas(idEstadoPedido);
+CREATE INDEX IX_Ventas_idEstadoPago ON Ventas(idEstadoPago);
+CREATE INDEX IX_Ventas_idEstadoSunat ON Ventas(idEstadoSunat);
 GO
 
 -- Tabla de detalle de venta mejorada
@@ -755,6 +782,8 @@ CREATE TABLE DetalleVenta (
     igv BIT NOT NULL DEFAULT 0,
     isc BIT NOT NULL DEFAULT 0,
     total DECIMAL(18,2) NOT NULL,
+    costoUnitario DECIMAL(18,6) NULL,
+    costoTotal DECIMAL(18,6) NULL,
     hVenta DATETIME NOT NULL DEFAULT GETDATE(),
     cantEntregada DECIMAL(18,3) NOT NULL DEFAULT 0,
     cantPendiente AS (cantidad - cantEntregada) PERSISTED,
@@ -812,6 +841,8 @@ CREATE TABLE MovimientosInventario (
     observaciones VARCHAR(255) NULL,
     costoUnitario DECIMAL(18,6) NULL,
     idLote UNIQUEIDENTIFIER NULL,
+    idGrupoMovimiento UNIQUEIDENTIFIER NULL,
+    codigoTipoMovimiento VARCHAR(32) NULL,
 
     CONSTRAINT PK_MovimientosInventario PRIMARY KEY CLUSTERED (idMovimiento),
     CONSTRAINT FK_MovimientosInventario_Empresas FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
@@ -1123,10 +1154,13 @@ BEGIN
         descripcion VARCHAR(100) NOT NULL,
         tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('INGRESO','EGRESO')),
         idClasificacionConcepto UNIQUEIDENTIFIER NULL,
+        idTipoMovimientoCaja INT NULL,
         CONSTRAINT FK_Concepto_idEmpresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-        CONSTRAINT FK_Concepto_idClasificacion FOREIGN KEY (idClasificacionConcepto) REFERENCES ClasificacionConcepto(idClasificacionConcepto)
+        CONSTRAINT FK_Concepto_idClasificacion FOREIGN KEY (idClasificacionConcepto) REFERENCES ClasificacionConcepto(idClasificacionConcepto),
+        CONSTRAINT FK_Concepto_idTipoMovimientoCaja FOREIGN KEY (idTipoMovimientoCaja) REFERENCES TiposMovimientoCaja(idTipoMovimientoCaja)
     );
     CREATE INDEX IX_Concepto_idEmpresa ON Concepto(idEmpresa);
+    CREATE INDEX IX_Concepto_idTipoMovimientoCaja ON Concepto(idTipoMovimientoCaja);
 END
 GO
 
@@ -2032,6 +2066,109 @@ CREATE TABLE DetallePresupuestos (
     FOREIGN KEY (idCuenta, idEmpresa) REFERENCES PlanCuentas(idCuenta, idEmpresa),
     FOREIGN KEY (idCentroCosto, idEmpresa) REFERENCES CentrosCosto(idCentroCosto, idEmpresa)
 );
+GO
+
+-- =============================================
+-- GASTOS (análisis financiero) — antes create_gastos_analisis.sql
+-- =============================================
+CREATE TABLE Gastos (
+    idGasto UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    fecha DATE NOT NULL,
+    tipo VARCHAR(30) NOT NULL DEFAULT 'ADMINISTRACION',
+    monto DECIMAL(18,2) NOT NULL,
+    descripcion VARCHAR(500) NULL,
+    idUsuario UNIQUEIDENTIFIER NULL,
+    fRegistro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Gastos_idEmpresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
+    CONSTRAINT FK_Gastos_idUsuario FOREIGN KEY (idUsuario) REFERENCES UsuarioWeb(idUsuario)
+);
+GO
+
+CREATE INDEX IX_Gastos_idEmpresa ON Gastos(idEmpresa);
+CREATE INDEX IX_Gastos_fecha ON Gastos(fecha);
+CREATE INDEX IX_Gastos_idEmpresa_fecha ON Gastos(idEmpresa, fecha);
+GO
+
+-- =============================================
+-- INTEGRACIÓN FACTILIZA (SUNAT / tipo cambio / WhatsApp) — migraciones migrations_sjb unificadas
+-- =============================================
+CREATE TABLE FactilizaConfig (
+    idFactilizaConfig INT IDENTITY(1,1) PRIMARY KEY NOT NULL,
+    nombre VARCHAR(100) NOT NULL DEFAULT 'Factiliza SUNAT',
+    urlApi VARCHAR(500) NOT NULL DEFAULT 'https://api.factiliza.com/v1/sunat/xml',
+    tokenDefault NVARCHAR(MAX) NULL,
+    parametroRuta VARCHAR(100) NULL,
+    estado BIT NOT NULL DEFAULT 1,
+    fRegistro DATETIME NOT NULL DEFAULT GETDATE(),
+    fModificacion DATETIME NULL
+);
+GO
+
+INSERT INTO FactilizaConfig (nombre, urlApi, tokenDefault, parametroRuta, estado)
+VALUES ('Factiliza SUNAT', 'https://api.factiliza.com/v1/sunat/xml', NULL, NULL, 1);
+GO
+
+INSERT INTO FactilizaConfig (nombre, urlApi, tokenDefault, parametroRuta, estado)
+SELECT 'Factiliza TIPO CAMBIO', 'https://api.factiliza.com/v1', NULL, NULL, 1
+WHERE NOT EXISTS (SELECT 1 FROM FactilizaConfig WHERE nombre = 'Factiliza TIPO CAMBIO');
+GO
+
+INSERT INTO FactilizaConfig (nombre, urlApi, tokenDefault, parametroRuta, estado)
+SELECT 'Factiliza WHATSAPP', 'https://apiwsp.factiliza.com/v1', NULL, NULL, 1
+WHERE NOT EXISTS (SELECT 1 FROM FactilizaConfig WHERE nombre = 'Factiliza WHATSAPP');
+GO
+
+CREATE TABLE EmpresaFactiliza (
+    idEmpresaFactiliza UNIQUEIDENTIFIER PRIMARY KEY NOT NULL DEFAULT NEWID(),
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    puedeUsar BIT NOT NULL DEFAULT 0,
+    tokenFactiliza NVARCHAR(MAX) NULL,
+    usuarioSol VARCHAR(100) NULL,
+    passwordSol NVARCHAR(MAX) NULL,
+    rucEmpresa VARCHAR(11) NULL,
+    numeroWhatsApp VARCHAR(20) NULL,
+    activo BIT NOT NULL DEFAULT 1,
+    fRegistro DATETIME NOT NULL DEFAULT GETDATE(),
+    fModificacion DATETIME NULL,
+    CONSTRAINT FK_EmpresaFactiliza_Empresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
+    CONSTRAINT UQ_EmpresaFactiliza_Empresa UNIQUE (idEmpresa)
+);
+GO
+
+CREATE INDEX IX_EmpresaFactiliza_idEmpresa ON EmpresaFactiliza(idEmpresa);
+CREATE INDEX IX_EmpresaFactiliza_puedeUsar ON EmpresaFactiliza(puedeUsar) WHERE activo = 1;
+GO
+
+CREATE TABLE EmpresaFactilizaServicio (
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    nombreServicio VARCHAR(100) NOT NULL,
+    puedeUsar BIT NOT NULL DEFAULT 1,
+    fRegistro DATETIME NOT NULL DEFAULT GETDATE(),
+    fModificacion DATETIME NULL,
+    CONSTRAINT PK_EmpresaFactilizaServicio PRIMARY KEY (idEmpresa, nombreServicio),
+    CONSTRAINT FK_EmpresaFactilizaServicio_Empresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE
+);
+GO
+
+CREATE INDEX IX_EmpresaFactilizaServicio_idEmpresa ON EmpresaFactilizaServicio(idEmpresa);
+CREATE INDEX IX_EmpresaFactilizaServicio_nombreServicio ON EmpresaFactilizaServicio(nombreServicio);
+GO
+
+-- Tabla legada por nombre (empresaFaciliza); misma idea que EmpresaFactilizaServicio
+CREATE TABLE empresaFaciliza (
+    idEmpresa UNIQUEIDENTIFIER NOT NULL,
+    nombreServicio VARCHAR(100) NOT NULL,
+    puedeUsar BIT NOT NULL DEFAULT 1,
+    fRegistro DATETIME NOT NULL DEFAULT GETDATE(),
+    fModificacion DATETIME NULL,
+    CONSTRAINT PK_empresaFaciliza PRIMARY KEY (idEmpresa, nombreServicio),
+    CONSTRAINT FK_empresaFaciliza_Empresa FOREIGN KEY (idEmpresa) REFERENCES Empresas(idEmpresa) ON DELETE CASCADE
+);
+GO
+
+CREATE INDEX IX_empresaFaciliza_idEmpresa ON empresaFaciliza(idEmpresa);
+CREATE INDEX IX_empresaFaciliza_nombreServicio ON empresaFaciliza(nombreServicio);
 GO
 
 -- =============================================

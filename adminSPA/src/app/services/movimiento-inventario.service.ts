@@ -2,6 +2,14 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { StockActualResponse } from '../models/stock-actual.model';
+import { ProductosVendidosResponse } from '../models/productos-vendidos.model';
+import { ProductosCompradosResponse } from '../models/productos-comprados.model';
+import {
+  MovimientoInventarioCabecera,
+  MovimientoInventarioLineaDetalle,
+  MovimientosResumenPaginados
+} from '../models/movimientos-inventario-resumen.model';
 
 export interface TipoMovimientoItem {
   codigo: string;
@@ -91,9 +99,113 @@ export class MovimientoInventarioService {
     });
   }
 
+  /** Cabeceras agrupadas (pantalla Movimientos). */
+  listarMovimientosResumen(filtros: {
+    fechaDesde?: string | null;
+    fechaHasta?: string | null;
+    idSucursal?: string | null;
+    codigoTipo?: string | null;
+    buscar?: string | null;
+    page?: number;
+    pageSize?: number;
+  }): Observable<MovimientosResumenPaginados> {
+    let params = new HttpParams();
+    if (filtros.fechaDesde) params = params.set('fechaDesde', filtros.fechaDesde);
+    if (filtros.fechaHasta) params = params.set('fechaHasta', filtros.fechaHasta);
+    if (filtros.idSucursal) params = params.set('idSucursal', filtros.idSucursal);
+    if (filtros.codigoTipo?.trim()) params = params.set('codigoTipo', filtros.codigoTipo.trim());
+    if (filtros.buscar?.trim()) params = params.set('buscar', filtros.buscar.trim());
+    if (filtros.page != null) params = params.set('page', String(filtros.page));
+    if (filtros.pageSize != null) params = params.set('pageSize', String(filtros.pageSize));
+    return this.http.get<MovimientosResumenPaginados>(this.baseUrl + 'movimientos-resumen', {
+      params,
+      withCredentials: true
+    });
+  }
+
+  listarLineasMovimientoCabecera(idMovimiento: number): Observable<MovimientoInventarioLineaDetalle[]> {
+    return this.http.get<MovimientoInventarioLineaDetalle[]>(this.baseUrl + 'movimientos/' + idMovimiento + '/lineas', {
+      withCredentials: true
+    });
+  }
+
   /** Obtiene un movimiento por id (para modal detalle). */
   obtenerMovimientoPorId(idMovimiento: number): Observable<MovimientoDetalle> {
     return this.http.get<MovimientoDetalle>(this.baseUrl + 'movimientos/' + idMovimiento, {
+      withCredentials: true
+    });
+  }
+
+  obtenerProductosVendidos(params: {
+    fechaDesde: string;
+    fechaHasta: string;
+    idCliente?: string | null;
+    clienteRuc?: string | null;
+    clienteRazon?: string | null;
+    categoria?: string | null;
+    producto?: string | null;
+    agrupar: boolean;
+    buscar?: string | null;
+  }): Observable<ProductosVendidosResponse> {
+    let hp = new HttpParams()
+      .set('fechaDesde', params.fechaDesde)
+      .set('fechaHasta', params.fechaHasta)
+      .set('agrupar', params.agrupar ? '1' : '0');
+    if (params.idCliente?.trim()) hp = hp.set('idCliente', params.idCliente.trim());
+    if (params.clienteRuc?.trim()) hp = hp.set('clienteRuc', params.clienteRuc.trim());
+    if (params.clienteRazon?.trim()) hp = hp.set('clienteRazon', params.clienteRazon.trim());
+    if (params.categoria?.trim()) hp = hp.set('categoria', params.categoria.trim());
+    if (params.producto?.trim()) hp = hp.set('producto', params.producto.trim());
+    if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
+    return this.http.get<ProductosVendidosResponse>(this.baseUrl + 'productos-vendidos', {
+      params: hp,
+      withCredentials: true
+    });
+  }
+
+  obtenerProductosComprados(params: {
+    fechaDesde: string;
+    fechaHasta: string;
+    idProveedor?: string | null;
+    proveedorRuc?: string | null;
+    proveedorRazon?: string | null;
+    idComprobante?: string | null;
+    producto?: string | null;
+    agrupar: boolean;
+    buscar?: string | null;
+  }): Observable<ProductosCompradosResponse> {
+    let hp = new HttpParams()
+      .set('fechaDesde', params.fechaDesde)
+      .set('fechaHasta', params.fechaHasta)
+      .set('agrupar', params.agrupar ? '1' : '0');
+    if (params.idProveedor?.trim()) hp = hp.set('idProveedor', params.idProveedor.trim());
+    if (params.proveedorRuc?.trim()) hp = hp.set('proveedorRuc', params.proveedorRuc.trim());
+    if (params.proveedorRazon?.trim()) hp = hp.set('proveedorRazon', params.proveedorRazon.trim());
+    if (params.idComprobante?.trim()) hp = hp.set('idComprobante', params.idComprobante.trim());
+    if (params.producto?.trim()) hp = hp.set('producto', params.producto.trim());
+    if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
+    return this.http.get<ProductosCompradosResponse>(this.baseUrl + 'productos-comprados', {
+      params: hp,
+      withCredentials: true
+    });
+  }
+
+  /** Stock actual agregado por producto (filtros en query). */
+  obtenerStockActual(params: {
+    idSucursal?: string | null;
+    categoria?: string | null;
+    marca?: string | null;
+    filtroStock?: 'todos' | 'cero' | 'minimo';
+    buscar?: string | null;
+  }): Observable<StockActualResponse> {
+    let hp = new HttpParams();
+    if (params.idSucursal) hp = hp.set('idSucursal', params.idSucursal);
+    if (params.categoria?.trim()) hp = hp.set('categoria', params.categoria.trim());
+    if (params.marca?.trim()) hp = hp.set('marca', params.marca.trim());
+    if (params.filtroStock) hp = hp.set('filtroStock', params.filtroStock);
+    if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
+    return this.http.get<StockActualResponse>(this.baseUrl + 'stock-actual', {
+      params: hp,
       withCredentials: true
     });
   }

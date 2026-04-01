@@ -234,14 +234,25 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private cargarNavegacion(): void {
     this.permisosService.cargarNavegacion().subscribe({
       next: (response) => {
-                if (response.data) {
-          this.menuItems.set(response.data);
+        const data = response?.data;
+        if (data && data.length > 0) {
+          this.menuItems.set(data);
+        } else {
+          const prev = this.permisosService.navegacion();
+          if (prev && prev.length > 0) {
+            this.menuItems.set(prev);
+          } else {
+            this.cargarNavegacionDefecto();
+          }
         }
       },
-      error: (error) => {
-        console.error('Error al cargar navegación:', error);
-        // Cargar navegación por defecto en caso de error
-        this.cargarNavegacionDefecto();
+      error: () => {
+        const prev = this.permisosService.navegacion();
+        if (prev && prev.length > 0) {
+          this.menuItems.set(prev);
+        } else {
+          this.cargarNavegacionDefecto();
+        }
       }
     });
   }

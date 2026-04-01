@@ -96,28 +96,32 @@
           
           <!-- Submenú -->
           <ul class="submenu" [class.show]="isSubmenuOpen(item.modulo || '') && !isCollapsed()">
-            <li 
-              *ngFor="let subItem of item.submenu" 
-              class="submenu-item"
-              [class.active]="isRouteActive(subItem.ruta)">
-              <a 
-                class="submenu-link" 
-                (click)="navigateTo(subItem.ruta); $event.preventDefault()">
-                <i class="bi bi-circle submenu-dot"></i>
-                <span>{{subItem.nombre}}</span>
-              </a>
-            </li>
+            <ng-container *ngFor="let subItem of item.submenu">
+              <li 
+                *ngIf="subItem.visible !== false"
+                class="submenu-item"
+                [class.active]="isRouteActive(subItem.ruta)">
+                <a 
+                  class="submenu-link" 
+                  (click)="navigateTo(subItem.ruta); $event.preventDefault()">
+                  <i class="bi bi-circle submenu-dot"></i>
+                  <span>{{subItem.nombre}}</span>
+                </a>
+              </li>
+            </ng-container>
           </ul>
 
           <!-- Tooltip con submenú cuando está colapsado -->
           <div class="submenu-tooltip" *ngIf="isCollapsed()">
             <div class="tooltip-header">{{item.nombre}}</div>
             <ul class="tooltip-menu">
-              <li *ngFor="let subItem of item.submenu">
-                <a (click)="navigateTo(subItem.ruta); $event.preventDefault()">
-                  {{subItem.nombre}}
-                </a>
-              </li>
+              <ng-container *ngFor="let subItem of item.submenu">
+                <li *ngIf="subItem.visible !== false">
+                  <a (click)="navigateTo(subItem.ruta); $event.preventDefault()">
+                    {{subItem.nombre}}
+                  </a>
+                </li>
+              </ng-container>
             </ul>
           </div>
         </li>
