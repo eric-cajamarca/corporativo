@@ -27,7 +27,10 @@ export interface ItemMovimiento {
 export interface MovimientoRequest {
   tipoMovimiento: string;
   idSucursal: string;
+  /** Obligatorio si tipoMovimiento === TRANSFERENCIA (sucursal que recibe). */
+  idSucursalDestino?: string | null;
   fechaMovimiento?: string;
+  idComprobante?: string | null;
   docRelacionado?: string;
   observaciones?: string;
   items: ItemMovimiento[];

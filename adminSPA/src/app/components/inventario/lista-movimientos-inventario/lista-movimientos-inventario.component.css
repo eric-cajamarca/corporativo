@@ -93,3 +93,12 @@
 .mi-modal-header .btn-close {
   filter: invert(1);
 }
+
+/* Detalle modal: filas por sentido inventario */
+tr.table-danger-subtle {
+  background-color: rgba(220, 53, 69, 0.07);
+}
+
+tr.table-success-subtle {
+  background-color: rgba(25, 135, 84, 0.07);
+}

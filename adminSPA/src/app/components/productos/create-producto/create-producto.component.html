@@ -112,7 +112,7 @@
           </div>
           <div class="col-12 mb-3">
             <label class="form-label">Descripción *</label>
-            <input type="text" class="form-control" formControlName="descripcion" [class.is-invalid]="hasError('descripcion')" placeholder="Nombre o descripciÃ³n del producto">
+            <input type="text" class="form-control" formControlName="descripcion" [class.is-invalid]="hasError('descripcion')" placeholder="Nombre o descripción del producto">
             @if (hasError('descripcion')) { <div class="invalid-feedback">{{ getError('descripcion') }}</div> }
           </div>
           <div class="col-md-4 mb-3">
@@ -141,7 +141,9 @@
             <label class="form-label">Presentación *</label>
             <select class="form-select" formControlName="idPresentacion" [class.is-invalid]="hasError('idPresentacion')">
               <option value="">Seleccione...</option>
-              @for (pres of presentaciones; track pres.idPresentacion) { <option [value]="pres.idPresentacion">{{ pres.descripcion }} ({{ pres.codigo }})</option> }
+              @for (pres of presentaciones; track pres.idPresentacion) {
+                <option [value]="pres.idPresentacion">{{ pres.descripcion || pres.codigo }}</option>
+              }
             </select>
             @if (hasError('idPresentacion')) { <div class="invalid-feedback">{{ getError('idPresentacion') }}</div> }
           </div>

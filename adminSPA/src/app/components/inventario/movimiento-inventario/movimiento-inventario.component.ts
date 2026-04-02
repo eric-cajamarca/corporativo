@@ -6,7 +6,8 @@ import { FormsModule } from '@angular/forms';
 import {
   MovimientoInventarioService,
   TipoMovimientoItem,
-  ItemMovimiento
+  ItemMovimiento,
+  MovimientoRequest
 } from '../../../services/movimiento-inventario.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -19,6 +20,17 @@ import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
+
+/** Código de comprobante (tabla Comprobantes) sugerido según tipo de movimiento en pantalla */
+const CODIGO_COMPROBANTE_POR_TIPO_MOVIMIENTO: Record<string, string> = {
+  INVENTARIO_INICIAL: 'II',
+  ENTRADA_VARIA: 'IN',
+  REAJUSTE_POSITIVO: 'IN',
+  REAJUSTE_NEGATIVO: 'SA',
+  SALIDA_MERMA: 'SA',
+  DEVOLUCION: 'IN',
+  TRANSFERENCIA: 'TF'
+};
 
 export interface FilaDetalle {
   idProducto: string;
@@ -70,6 +82,7 @@ export class MovimientoInventarioComponent implements OnInit {
     this.form = this.fb.group({
       tipoMovimiento: ['', [Validators.required]],
       idSucursal: ['', [Validators.required]],
+      idSucursalDestino: [''],
       fechaMovimiento: [this.fechaHoy(), [Validators.required]],
       idComprobante: [''],
       docRelacionado: [''],
@@ -87,6 +100,13 @@ export class MovimientoInventarioComponent implements OnInit {
     this.cargarSucursales();
     this.cargarProductos();
     this.cargarComprobantesInventario();
+    this.form.get('tipoMovimiento')?.valueChanges.subscribe((tipo) => {
+      const t = String(tipo || '');
+      if (t !== 'TRANSFERENCIA') {
+        this.form.patchValue({ idSucursalDestino: '' }, { emitEvent: false });
+      }
+      this.aplicarComprobanteSugeridoPorTipo(t);
+    });
     this.agregarFila();
   }
 
@@ -99,7 +119,9 @@ export class MovimientoInventarioComponent implements OnInit {
           { codigo: 'ENTRADA_VARIA', descripcion: 'Entrada varia' },
           { codigo: 'REAJUSTE_POSITIVO', descripcion: 'Reajuste de stock (positivo)' },
           { codigo: 'REAJUSTE_NEGATIVO', descripcion: 'Reajuste de stock (negativo)' },
-          { codigo: 'SALIDA_MERMA', descripcion: 'Salida / Merma' }
+          { codigo: 'SALIDA_MERMA', descripcion: 'Salida / Merma' },
+          { codigo: 'DEVOLUCION', descripcion: 'Devoluciones' },
+          { codigo: 'TRANSFERENCIA', descripcion: 'Transferencia entre sucursales' }
         ];
       }
     });
@@ -126,12 +148,46 @@ export class MovimientoInventarioComponent implements OnInit {
     this.comprobanteService.obtener_comprobantes().subscribe({
       next: (res) => {
         const data = res?.data || [];
-        const codigosValidos = new Set(['IV', 'II', 'IN', 'SA']);
+        const codigosValidos = new Set(['IV', 'II', 'IN', 'SA', 'TF']);
         this.comprobantesInventario = data.filter((c: any) => codigosValidos.has(String(c.codigo || '').toUpperCase()));
+        const tipo = String(this.form.get('tipoMovimiento')?.value || '');
+        this.aplicarComprobanteSugeridoPorTipo(tipo);
       },
       error: () => {
         this.comprobantesInventario = [];
       }
+    });
+  }
+
+  /** Serie-número mostrado en correlativo cuando hay comprobante elegido. */
+  private docRelacionadoDesdeComprobante(comp: { serie?: string; numero?: string | number }): string {
+    const serie = comp.serie || '';
+    const numero = comp.numero != null ? String(comp.numero) : '';
+    return serie && numero ? `${serie}-${numero}` : (serie || numero || '');
+  }
+
+  /**
+   * Al elegir tipo de movimiento, sugiere el comprobante alineado (II/IN/IV/SA).
+   * El usuario puede cambiar el comprobante después de forma manual.
+   */
+  private aplicarComprobanteSugeridoPorTipo(tipoCodigo: string): void {
+    if (!tipoCodigo || !this.comprobantesInventario.length) {
+      return;
+    }
+    const codigoComp = CODIGO_COMPROBANTE_POR_TIPO_MOVIMIENTO[tipoCodigo];
+    if (!codigoComp) {
+      return;
+    }
+    const comp = this.comprobantesInventario.find(
+      (c) => String(c.codigo || '').toUpperCase() === codigoComp
+    );
+    if (!comp) {
+      return;
+    }
+    const doc = this.docRelacionadoDesdeComprobante(comp);
+    this.form.patchValue({
+      idComprobante: String(comp.idComprobante),
+      docRelacionado: doc
     });
   }
 
@@ -143,15 +199,22 @@ export class MovimientoInventarioComponent implements OnInit {
       this.form.patchValue({ docRelacionado: '' });
       return;
     }
-    const serie = comp.serie || '';
-    const numero = comp.numero != null ? String(comp.numero) : '';
-    const doc = serie && numero ? `${serie}-${numero}` : (serie || numero || '');
-    this.form.patchValue({ docRelacionado: doc });
+    this.form.patchValue({ docRelacionado: this.docRelacionadoDesdeComprobante(comp) });
   }
 
   esEntrada(): boolean {
     const t = this.form.get('tipoMovimiento')?.value;
-    return t === 'INVENTARIO_INICIAL' || t === 'ENTRADA_VARIA' || t === 'REAJUSTE_POSITIVO';
+    return (
+      t === 'INVENTARIO_INICIAL' ||
+      t === 'ENTRADA_VARIA' ||
+      t === 'REAJUSTE_POSITIVO' ||
+      t === 'DEVOLUCION'
+    );
+  }
+
+  /** Traslado de mercadería entre almacenes/sucursales (comprobante TF; origen + destino). */
+  esTransferenciaSucursal(): boolean {
+    return this.form.get('tipoMovimiento')?.value === 'TRANSFERENCIA';
   }
 
   agregarFila(): void {
@@ -261,6 +324,29 @@ export class MovimientoInventarioComponent implements OnInit {
       iziToast.warning({ title: 'Datos incompletos', message: 'Seleccione tipo de movimiento y sucursal', position: 'topRight' });
       return;
     }
+    const tipo = this.form.get('tipoMovimiento')?.value;
+    if (tipo === 'TRANSFERENCIA') {
+      const idOrigen = String(this.form.get('idSucursal')?.value || '').trim();
+      const idDest = String(this.form.get('idSucursalDestino')?.value || '').trim();
+      if (!idDest) {
+        iziToast.warning({ title: 'Datos incompletos', message: 'Indique la sucursal de destino', position: 'topRight' });
+        return;
+      }
+      if (idOrigen === idDest) {
+        iziToast.warning({ title: 'Validación', message: 'Origen y destino deben ser sucursales distintas', position: 'topRight' });
+        return;
+      }
+      const idComp = String(this.form.get('idComprobante')?.value || '').trim();
+      const comp = this.comprobantesInventario.find((c) => String(c.idComprobante) === idComp);
+      if (!comp || String(comp.codigo || '').toUpperCase() !== 'TF') {
+        iziToast.warning({
+          title: 'Comprobante',
+          message: 'La transferencia requiere el comprobante TF (Transferencia). Ejecute el script SQL en empresas existentes si no lo tiene.',
+          position: 'topRight'
+        });
+        return;
+      }
+    }
     const itemsValidos = this.filas.filter(f => f.idProducto && f.cantidad > 0);
     if (itemsValidos.length === 0) {
       iziToast.warning({ title: 'Datos incompletos', message: 'Agregue al menos un producto con cantidad mayor a 0', position: 'topRight' });
@@ -275,7 +361,7 @@ export class MovimientoInventarioComponent implements OnInit {
       }
       return item;
     });
-    const body = {
+    const body: MovimientoRequest = {
       tipoMovimiento: this.form.get('tipoMovimiento')?.value,
       idSucursal: this.form.get('idSucursal')?.value,
       fechaMovimiento: this.form.get('fechaMovimiento')?.value || undefined,
@@ -284,6 +370,9 @@ export class MovimientoInventarioComponent implements OnInit {
       observaciones: this.form.get('observaciones')?.value || undefined,
       items
     };
+    if (tipo === 'TRANSFERENCIA') {
+      body.idSucursalDestino = this.form.get('idSucursalDestino')?.value || undefined;
+    }
     this.guardando = true;
     this.movimientoService.registrarMovimiento(body).subscribe({
       next: (resp) => {

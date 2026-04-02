@@ -169,6 +169,36 @@ export class ListaMovimientosInventarioComponent implements OnInit {
     return partes.length ? partes.join(' ') : '—';
   }
 
+  /** Resumen bajo el título del modal (transferencias involucran más de una sucursal). */
+  textoResumenModalCabecera(c: MovimientoInventarioCabecera): string {
+    const tipo = this.etiquetaTipo(c);
+    const doc = this.textoDocumento(c);
+    const fecha = c.fecha || '—';
+    const n = c.totalLineas ?? 0;
+    if (c.codigoTipoMovimiento === 'TRANSFERENCIA') {
+      return `${tipo} · ${doc} · ${fecha} · ${n} línea(s) — use las columnas «Sentido» y «Sucursal» (origen = salidas, destino = entradas).`;
+    }
+    return `${tipo} · ${doc} · ${fecha} · ${(c.sucursal || '').trim() || '—'} · ${n} línea(s)`;
+  }
+
+  /**
+   * Etiqueta humana del tipo de fila en BD (EN/SA/AJ).
+   */
+  etiquetaSentidoLinea(tipoBd: string | null | undefined): string {
+    const t = String(tipoBd || '').toUpperCase();
+    if (t === 'SA') return 'Salida';
+    if (t === 'EN') return 'Entrada';
+    if (t === 'AJ') return 'Ajuste';
+    return t || '—';
+  }
+
+  claseFilaPorSentido(tipoBd: string | null | undefined): string {
+    const t = String(tipoBd || '').toUpperCase();
+    if (t === 'SA') return 'table-danger-subtle';
+    if (t === 'EN') return 'table-success-subtle';
+    return '';
+  }
+
   textoReferencia(c: MovimientoInventarioCabecera): string {
     return (c.sucursal || '').trim() || '—';
   }
@@ -208,11 +238,18 @@ export class ListaMovimientosInventarioComponent implements OnInit {
       return;
     }
     const c = this.cabeceraModal;
-    const columnas = ['Producto', 'Cantidad', 'Costo u.', 'Importe'];
+    const columnas = ['Sentido', 'Sucursal', 'Producto', 'Cantidad', 'Costo u.', 'Importe'];
     const filas = this.lineasModal.map((l) => {
       const prod = [l.productoCodigo, l.productoDescripcion].filter(Boolean).join(' ').trim() || '—';
       const imp = (Number(l.cantidad) || 0) * (Number(l.costoUnitario) || 0);
-      return [prod, l.cantidad, l.costoUnitario ?? 0, imp];
+      return [
+        this.etiquetaSentidoLinea(l.tipoMovimiento),
+        (l.sucursal || '—').trim(),
+        prod,
+        l.cantidad,
+        l.costoUnitario ?? 0,
+        imp
+      ];
     });
     this.pdfService
       .generarPdfDinamico(

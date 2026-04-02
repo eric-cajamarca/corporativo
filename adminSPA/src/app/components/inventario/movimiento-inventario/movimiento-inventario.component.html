@@ -29,7 +29,10 @@
             </select>
           </div>
           <div class="col-md-4">
-            <label class="form-label">Sucursal <span class="text-danger">*</span></label>
+            <label class="form-label">
+              @if (esTransferenciaSucursal()) { Sucursal origen (sale mercadería) } @else { Sucursal }
+              <span class="text-danger">*</span>
+            </label>
             <select class="form-select" formControlName="idSucursal">
               <option value="">-- Seleccione sucursal --</option>
               @for (s of sucursales; track s.idSucursal) {
@@ -37,6 +40,18 @@
               }
             </select>
           </div>
+          @if (esTransferenciaSucursal()) {
+            <div class="col-md-4">
+              <label class="form-label">Sucursal destino (ingresa mercadería) <span class="text-danger">*</span></label>
+              <select class="form-select" formControlName="idSucursalDestino">
+                <option value="">-- Seleccione destino --</option>
+                @for (s of sucursales; track s.idSucursal) {
+                  <option [value]="s.idSucursal">{{ s.nombre }}</option>
+                }
+              </select>
+              <small class="text-muted">Use comprobante TF. El costo en destino sale del promedio ponderado de los lotes en origen.</small>
+            </div>
+          }
           <div class="col-md-4">
             <label class="form-label">Fecha movimiento <span class="text-danger">*</span></label>
             <input type="date" class="form-control" formControlName="fechaMovimiento" />
@@ -44,7 +59,14 @@
         </div>
         <div class="row mb-3">
           <div class="col-md-4">
-            <label class="form-label">Documento (opcional)</label>
+            <label class="form-label">
+              Documento
+              @if (esTransferenciaSucursal()) {
+                <span class="text-danger">*</span> (TF — transferencia)
+              } @else {
+                (opcional)
+              }
+            </label>
             <select class="form-select" formControlName="idComprobante" (change)="onComprobanteChange($event)">
               <option value="">-- Seleccione comprobante --</option>
               @for (c of comprobantesInventario; track c.idComprobante) {
@@ -64,7 +86,13 @@
 
         <h6 class="text-muted border-bottom pb-2 mb-3 mt-4">Detalle del movimiento</h6>
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="text-muted small">Agregue productos y cantidades. Para entradas puede indicar costo unitario, fecha vencimiento y nº de lote.</span>
+          <span class="text-muted small">
+            @if (esTransferenciaSucursal()) {
+              Indique cantidades a enviar desde la sucursal origen; el sistema descuenta allí y crea lote en destino con costo ponderado.
+            } @else {
+              Agregue productos y cantidades. Para entradas puede indicar costo unitario, fecha vencimiento y nº de lote.
+            }
+          </span>
           <div class="d-flex gap-2">
             <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFila()">
               <i class="bi bi-plus-circle me-1"></i> Agregar línea

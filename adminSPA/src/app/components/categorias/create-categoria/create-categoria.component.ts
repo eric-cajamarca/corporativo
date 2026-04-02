@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, Optional } from '@angular/core';
 import { CategoriaService } from '../../../services/categoria.service';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
@@ -20,13 +21,16 @@ export class CreateCategoriaComponent {
   public token: any = '';
   
   public btn_registrar = false;
+  esModal = false;
 
 
   constructor(
     private _categoriaService: CategoriaService,
-    private _router: Router
+    private _router: Router,
+    @Optional() public activeModal: NgbActiveModal
   ) { 
     //this.token = this._cookieService.get('token');
+    this.esModal = !!this.activeModal;
   }
 
   ngOnInit(): void {
@@ -48,10 +52,22 @@ export class CreateCategoriaComponent {
           });
 
           //redireccionar a la lista de marcas
-          this._router.navigate(['/categorias']);
+          if (this.activeModal) {
+            this.activeModal.close(true);
+          } else {
+            this._router.navigate(['/categorias']);
+          }
 
         }
       }
     );
-  } 
+  }
+
+  cancelar(): void {
+    if (this.activeModal) {
+      this.activeModal.dismiss();
+      return;
+    }
+    this._router.navigate(['/categorias']);
+  }
 }

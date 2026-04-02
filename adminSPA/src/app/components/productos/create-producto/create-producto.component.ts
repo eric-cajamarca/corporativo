@@ -2,7 +2,7 @@ import { Component, OnInit, Optional, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
 import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
@@ -16,8 +16,13 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
+import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
+import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 
 declare var iziToast: any;
+
+/** Presentación "Unidad" por defecto (catálogo en BD). */
+const ID_PRESENTACION_UNIDAD_DEFAULT = 10;
 
 interface Categoria {
   idCategoria: string;
@@ -118,6 +123,7 @@ export class CreateProductoComponent implements OnInit {
     private productosImagenService: ProductosImagenService,
     private comprasService: ComprasService,
     private preciosService: PreciosService,
+    private modalService: NgbModal,
     private router: Router,
     @Optional() public activeModal: NgbActiveModal,
     public sidebarState: SidebarStateService
@@ -148,7 +154,7 @@ export class CreateProductoComponent implements OnInit {
       descripcion: ['', [Validators.required, Validators.minLength(3)]],
       idCategoria: ['', Validators.required],
       idMarca: ['', Validators.required],
-      idPresentacion: ['', Validators.required],
+      idPresentacion: [String(ID_PRESENTACION_UNIDAD_DEFAULT), Validators.required],
       tipoProducto: ['S', Validators.required], // S: Simple, C: Compuesto, V: Variante
       
       // Control de stock
@@ -197,10 +203,32 @@ export class CreateProductoComponent implements OnInit {
       error: () => verificarCompletado()
     });
 
-    // Cargar presentaciones
+    // Cargar presentaciones (API devuelve Descripcion en PascalCase; se normaliza a descripcion)
     this.presentacionService.obtener_presentaciones().subscribe({
       next: (response) => {
-        this.presentaciones = response.data || [];
+        const raw = Array.isArray(response?.data) ? response.data : [];
+        this.presentaciones = this.normalizarPresentacionesDesdeApi(raw);
+        const ctrlPres = this.productoForm.get('idPresentacion');
+        if (ctrlPres && this.presentaciones.length > 0) {
+          const idDefault = String(ID_PRESENTACION_UNIDAD_DEFAULT);
+          const idsValidos = new Set(this.presentaciones.map((p) => p.idPresentacion));
+          const actual = String(ctrlPres.value ?? '').trim();
+          if (!actual || !idsValidos.has(actual)) {
+            if (idsValidos.has(idDefault)) {
+              ctrlPres.patchValue(idDefault);
+            } else {
+              const normTxt = (s: string) => (s || '').trim().toLowerCase();
+              const unidad =
+                this.presentaciones.find((p) => normTxt(p.descripcion) === 'unidad') ??
+                this.presentaciones.find((p) => normTxt(p.codigo) === 'un');
+              if (unidad) {
+                ctrlPres.patchValue(String(unidad.idPresentacion));
+              } else {
+                ctrlPres.patchValue(this.presentaciones[0].idPresentacion);
+              }
+            }
+          }
+        }
         verificarCompletado();
       },
       error: () => verificarCompletado()
@@ -393,6 +421,24 @@ export class CreateProductoComponent implements OnInit {
     });
   }
 
+  /** Une variantes de columnas del API/SQL (p. ej. Descripcion) al modelo del formulario. */
+  private normalizarPresentacionesDesdeApi(raw: unknown[]): Presentacion[] {
+    return raw
+      .map((item) => {
+        const p = item as Record<string, unknown>;
+        const id = p['idPresentacion'] ?? p['IdPresentacion'];
+        const codigo = p['codigo'] ?? p['Codigo'] ?? '';
+        const descripcion =
+          p['descripcion'] ?? p['Descripcion'] ?? p['DESCRIPCION'] ?? '';
+        return {
+          idPresentacion: id != null && id !== '' ? String(id) : '',
+          codigo: String(codigo ?? '').trim(),
+          descripcion: String(descripcion ?? '').trim()
+        };
+      })
+      .filter((p) => p.idPresentacion !== '' && (p.descripcion !== '' || p.codigo !== ''));
+  }
+
   buscarProductoBase(): void {
     const texto = this.textoBusqueda.trim().toLowerCase();
     if (texto.length < 2) {
@@ -464,11 +510,27 @@ export class CreateProductoComponent implements OnInit {
   }
 
   abrirNuevaCategoria(): void {
-    window.open('/categorias/create', '_blank');
+    const modalRef = this.modalService.open(CreateCategoriaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg'
+    });
+    modalRef.result.finally(() => {
+      this.recargarCategorias();
+    });
   }
 
   abrirNuevaMarca(): void {
-    window.open('/marcas/create', '_blank');
+    const modalRef = this.modalService.open(CreateMarcaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg'
+    });
+    modalRef.result.finally(() => {
+      this.recargarMarcas();
+    });
   }
 
   private marcarCamposComoTocados(): void {

@@ -166,10 +166,7 @@
           <button type="button" class="btn-close btn-close-white" (click)="cerrarModal()" aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
-          <p class="small text-muted mb-2">
-            <strong>{{ etiquetaTipo(cabeceraModal) }}</strong> · {{ textoDocumento(cabeceraModal) }} · {{ cabeceraModal.fecha }} ·
-            {{ cabeceraModal.sucursal }} · {{ cabeceraModal.totalLineas }} línea(s)
-          </p>
+          <p class="small text-muted mb-2">{{ textoResumenModalCabecera(cabeceraModal) }}</p>
           @if (cargandoLineas) {
             <p class="text-muted">Cargando líneas…</p>
           } @else if (!lineasModal.length) {
@@ -179,15 +176,26 @@
               <table class="table table-sm table-bordered">
                 <thead class="table-light">
                   <tr>
+                    <th style="width: 95px;">Sentido</th>
+                    <th style="min-width: 130px;">Sucursal</th>
                     <th>Producto</th>
-                    <th class="text-end">Cantidad</th>
-                    <th class="text-end">Costo u.</th>
-                    <th class="text-end">Importe</th>
+                    <th class="text-end" style="width: 90px;">Cantidad</th>
+                    <th class="text-end" style="width: 90px;">Costo u.</th>
+                    <th class="text-end" style="width: 90px;">Importe</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (l of lineasModal; track l.idMovimiento) {
-                    <tr>
+                    <tr [ngClass]="claseFilaPorSentido(l.tipoMovimiento)">
+                      <td>
+                        <span class="badge rounded-pill"
+                          [class.bg-danger]="l.tipoMovimiento === 'SA'"
+                          [class.bg-success]="l.tipoMovimiento === 'EN'"
+                          [class.bg-secondary]="l.tipoMovimiento === 'AJ'">
+                          {{ etiquetaSentidoLinea(l.tipoMovimiento) }}
+                        </span>
+                      </td>
+                      <td><small>{{ l.sucursal || '—' }}</small></td>
                       <td>
                         <small>{{ l.productoCodigo }} {{ l.productoDescripcion }}</small>
                       </td>

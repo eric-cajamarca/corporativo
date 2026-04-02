@@ -323,14 +323,17 @@ exports.listarLineasMovimientoPorCabecera = async (pool, idEmpresa, idMovimiento
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('idGrupo', sql.UniqueIdentifier, grupo)
       .query(`
-        SELECT m.idMovimiento, m.idProducto, m.tipoMovimiento, m.cantidad, m.costoUnitario,
+        SELECT m.idMovimiento, m.idSucursal, s.nombre AS sucursal,
+               m.idProducto, m.tipoMovimiento, m.cantidad, m.costoUnitario,
                CONVERT(VARCHAR(19), m.fMovimiento, 120) AS fMovimiento,
                m.docRelacionado, m.observaciones,
                p.codigo AS productoCodigo, p.descripcion AS productoDescripcion
         FROM MovimientosInventario m
+        INNER JOIN Sucursal s ON s.idSucursal = m.idSucursal AND s.idEmpresa = m.idEmpresa
         LEFT JOIN Productos p ON m.idProducto = p.idProducto AND p.idEmpresa = m.idEmpresa
         WHERE m.idEmpresa = @idEmpresa AND m.idGrupoMovimiento = @idGrupo
-        ORDER BY m.idMovimiento
+        ORDER BY CASE m.tipoMovimiento WHEN 'SA' THEN 1 WHEN 'EN' THEN 2 WHEN 'AJ' THEN 3 ELSE 4 END,
+                 m.idSucursal, m.idMovimiento
       `);
     return r.recordset || [];
   }
@@ -339,11 +342,13 @@ exports.listarLineasMovimientoPorCabecera = async (pool, idEmpresa, idMovimiento
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idMovimiento', sql.Int, idMovimiento)
     .query(`
-      SELECT m.idMovimiento, m.idProducto, m.tipoMovimiento, m.cantidad, m.costoUnitario,
+      SELECT m.idMovimiento, m.idSucursal, s.nombre AS sucursal,
+             m.idProducto, m.tipoMovimiento, m.cantidad, m.costoUnitario,
              CONVERT(VARCHAR(19), m.fMovimiento, 120) AS fMovimiento,
              m.docRelacionado, m.observaciones,
              p.codigo AS productoCodigo, p.descripcion AS productoDescripcion
       FROM MovimientosInventario m
+      INNER JOIN Sucursal s ON s.idSucursal = m.idSucursal AND s.idEmpresa = m.idEmpresa
       LEFT JOIN Productos p ON m.idProducto = p.idProducto AND p.idEmpresa = m.idEmpresa
       WHERE m.idEmpresa = @idEmpresa AND m.idMovimiento = @idMovimiento
       ORDER BY m.idMovimiento

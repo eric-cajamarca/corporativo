@@ -17,7 +17,9 @@ const TIPOS_MOVIMIENTO = {
   ENTRADA_VARIA: { tipoBD: 'EN', esEntrada: true },
   REAJUSTE_POSITIVO: { tipoBD: 'AJ', esEntrada: true },
   REAJUSTE_NEGATIVO: { tipoBD: 'AJ', esEntrada: false },
-  SALIDA_MERMA: { tipoBD: 'SA', esEntrada: false }
+  SALIDA_MERMA: { tipoBD: 'SA', esEntrada: false },
+  /** Devolución: ingreso (cat. TiposMovimiento DEVOLUCION, afectaStock +) */
+  DEVOLUCION: { tipoBD: 'EN', esEntrada: true }
 };
 
 function getConfig(configRows, clave, def) {
@@ -25,17 +27,237 @@ function getConfig(configRows, clave, def) {
   return row && row.valor != null ? row.valor : def;
 }
 
+const CODIGOS_COMP_INVENTARIO = new Set(['IV', 'II', 'IN', 'SA', 'TF']);
+
+async function validarSucursalesTransferencia(transaction, idEmpresa, idOrigen, idDestino) {
+  const r = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idOrigen', sql.UniqueIdentifier, idOrigen)
+    .input('idDestino', sql.UniqueIdentifier, idDestino)
+    .query(`
+      SELECT idSucursal, nombre
+      FROM Sucursal
+      WHERE idEmpresa = @idEmpresa AND idSucursal IN (@idOrigen, @idDestino)
+    `);
+  const rows = r.recordset || [];
+  if (rows.length !== 2) {
+    throw new Error('Las sucursales de origen y destino deben existir y pertenecer a la empresa');
+  }
+  const norm = (u) => String(u || '').toLowerCase();
+  const o = rows.find((x) => norm(x.idSucursal) === norm(idOrigen));
+  const d = rows.find((x) => norm(x.idSucursal) === norm(idDestino));
+  return {
+    nombreOrigen: o?.nombre || '',
+    nombreDestino: d?.nombre || ''
+  };
+}
+
+/**
+ * Transferencia entre sucursales: salida (SA) en origen por consumo de lotes, entrada (EN) en destino con costo ponderado.
+ * Body: { idSucursal (origen), idSucursalDestino, fechaMovimiento?, idComprobante (TF), docRelacionado?, observaciones?, items: [{ idProducto, cantidad }] }
+ */
+async function procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body) {
+  const {
+    idSucursal: idSucursalOrigen,
+    idSucursalDestino,
+    fechaMovimiento,
+    docRelacionado,
+    observaciones,
+    items,
+    idComprobante
+  } = body;
+
+  if (!idSucursalOrigen || !idSucursalDestino) {
+    throw new Error('Transferencia: indique sucursal de origen y sucursal de destino');
+  }
+  if (String(idSucursalOrigen) === String(idSucursalDestino)) {
+    throw new Error('La sucursal de origen y destino deben ser diferentes');
+  }
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new Error('Debe incluir al menos un ítem');
+  }
+
+  const pool = await sql.connect(dbConfig);
+  const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
+  const controlUbicaciones = String(getConfig(configRows, 'INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+
+  const transaction = new sql.Transaction(pool);
+  try {
+    await transaction.begin();
+
+    const { nombreOrigen, nombreDestino } = await validarSucursalesTransferencia(
+      transaction,
+      idEmpresa,
+      idSucursalOrigen,
+      idSucursalDestino
+      );
+
+    let docRelacionadoFinal = docRelacionado || null;
+    let comprobanteActual = null;
+    if (idComprobante != null && String(idComprobante).trim() !== '') {
+      const idComp = parseInt(idComprobante, 10);
+      if (Number.isNaN(idComp)) {
+        throw new Error('Comprobante inválido');
+      }
+      const compRes = await comprobantesRepository.obtenerComprobantePorIdEmpresa(transaction, idEmpresa, idComp);
+      comprobanteActual = compRes?.recordset?.[0];
+      if (!comprobanteActual) {
+        throw new Error('Comprobante no encontrado');
+      }
+      const codigo = String(comprobanteActual.codigo || '').toUpperCase();
+      if (codigo !== 'TF') {
+        throw new Error('La transferencia entre sucursales debe usar el comprobante TF (Transferencia)');
+      }
+      const serie = comprobanteActual.serie || '';
+      const numero = comprobanteActual.numero != null ? String(comprobanteActual.numero) : '';
+      docRelacionadoFinal = serie && numero ? `${serie}-${numero}` : (serie || numero || null);
+    } else {
+      throw new Error('La transferencia requiere comprobante TF');
+    }
+
+    const idGrupoMovimiento = randomUUID();
+    const fBatch = fechaMovimiento ? new Date(fechaMovimiento) : new Date();
+    if (Number.isNaN(fBatch.getTime())) {
+      throw new Error('Fecha de movimiento no válida');
+    }
+
+    const obsTraslado = `Traslado: ${nombreOrigen} → ${nombreDestino}`;
+    const obsBase = observaciones ? String(observaciones).trim() : '';
+    const observacionesLinea = obsBase ? `${obsBase} | ${obsTraslado}` : obsTraslado;
+    const obsCorta = observacionesLinea.length > 255 ? observacionesLinea.substring(0, 252) + '...' : observacionesLinea;
+
+    const idUbicacionDestino = await ubicacionesPrioridadRepository.getOrCreateDefaultForSucursal(idSucursalDestino);
+    let siguienteNumLote = await inventarioRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
+
+    let primerIdMovimiento = null;
+    const tipoCodigoUi = 'TRANSFERENCIA';
+
+    for (const item of items) {
+      const cantidad = parseFloat(item.cantidad) || 0;
+      if (cantidad <= 0) continue;
+
+      const disponible = await stockService.obtenerStockDisponible(
+        transaction,
+        idEmpresa,
+        item.idProducto,
+        idSucursalOrigen
+      );
+      if (disponible < cantidad) {
+        throw new Error(`Stock insuficiente en origen. Solicitado: ${cantidad}, disponible: ${disponible}`);
+      }
+
+      const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
+        idEmpresa,
+        idSucursal: idSucursalOrigen,
+        idProducto: item.idProducto,
+        cantidad
+      }, { controlUbicaciones });
+
+      const consumos = resultadoDescuento?.consumosPorLote || [];
+      if (consumos.length === 0) {
+        throw new Error('No se pudo descontar stock en sucursal origen (lotes/ubicaciones)');
+      }
+
+      let sumCant = 0;
+      let sumCosto = 0;
+      for (const c of consumos) {
+        const ct = Number(c.cantidadTomada) || 0;
+        const cu = Number(c.costoUnitario) || 0;
+        sumCant += ct;
+        sumCosto += ct * cu;
+      }
+      const costoUnitarioDestino = sumCant > 0 ? sumCosto / sumCant : 0;
+
+      for (const c of consumos) {
+        const cantTomada = Number(c.cantidadTomada) || 0;
+        if (cantTomada <= 0) continue;
+        const idMovSal = await inventarioRepository.insertarFilaMovimiento(transaction, {
+          idEmpresa,
+          idSucursal: idSucursalOrigen,
+          idProducto: item.idProducto,
+          tipoMovimiento: 'SA',
+          cantidad: cantTomada,
+          docRelacionado: docRelacionadoFinal,
+          idComprobante: comprobanteActual?.idComprobante || null,
+          idUsuario,
+          observaciones: obsCorta,
+          costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : null,
+          idLote: c.idLote || null,
+          idGrupoMovimiento,
+          codigoTipoMovimiento: tipoCodigoUi,
+          fMovimiento: fBatch
+        });
+        if (primerIdMovimiento == null) primerIdMovimiento = idMovSal;
+      }
+
+      const numeroLote =
+        item.numeroLote != null && item.numeroLote !== ''
+          ? String(item.numeroLote)
+          : String(siguienteNumLote++);
+
+      const idLoteDest = await inventarioRepository.crearLoteSinCompra(transaction, {
+        idEmpresa,
+        idProducto: item.idProducto,
+        idSucursal: idSucursalDestino,
+        costoUnitario: costoUnitarioDestino,
+        cantidad: sumCant,
+        fechaVencimiento: item.fechaVencimiento || null,
+        numeroLote,
+        idUbicacionDefault: idUbicacionDestino
+      });
+
+      const idMovEnt = await inventarioRepository.insertarFilaMovimiento(transaction, {
+        idEmpresa,
+        idSucursal: idSucursalDestino,
+        idProducto: item.idProducto,
+        tipoMovimiento: 'EN',
+        cantidad: sumCant,
+        docRelacionado: docRelacionadoFinal,
+        idComprobante: comprobanteActual?.idComprobante || null,
+        idUsuario,
+        observaciones: obsCorta,
+        costoUnitario: costoUnitarioDestino,
+        idLote: idLoteDest,
+        idGrupoMovimiento,
+        codigoTipoMovimiento: tipoCodigoUi,
+        fMovimiento: fBatch
+      });
+      if (primerIdMovimiento == null) primerIdMovimiento = idMovEnt;
+    }
+
+    if (comprobanteActual) {
+      const siguiente = (parseInt(comprobanteActual.numero, 10) || 0) + 1;
+      await comprobantesRepository.actualizarNumeroComprobante(
+        transaction,
+        idEmpresa,
+        comprobanteActual.idComprobante,
+        siguiente
+      );
+    }
+
+    await transaction.commit();
+    return { idMovimiento: primerIdMovimiento, message: 'Transferencia entre sucursales registrada correctamente' };
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+}
+
 /**
  * Registra un movimiento unificado (inventario inicial, entrada varia, reajuste, salida/merma).
- * Body: { tipoMovimiento, idSucursal, fechaMovimiento?, docRelacionado?, observaciones?, items: [{ idProducto, cantidad, costoUnitario?, fechaVencimiento?, numeroLote? }] }
- * tipoMovimiento: INVENTARIO_INICIAL | ENTRADA_VARIA | REAJUSTE_POSITIVO | REAJUSTE_NEGATIVO | SALIDA_MERMA
+ * Body: { tipoMovimiento, idSucursal, idSucursalDestino?, fechaMovimiento?, docRelacionado?, observaciones?, items: [{ idProducto, cantidad, costoUnitario?, fechaVencimiento?, numeroLote? }] }
+ * tipoMovimiento: ... | DEVOLUCION | TRANSFERENCIA (esta última usa idSucursal origen + idSucursalDestino + comprobante TF)
  */
 exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
   const { tipoMovimiento, idSucursal, fechaMovimiento, docRelacionado, observaciones, items, idComprobante } = body;
 
+  if (tipoMovimiento === 'TRANSFERENCIA') {
+    return procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body);
+  }
+
   const mapa = TIPOS_MOVIMIENTO[tipoMovimiento];
   if (!mapa) {
-    throw new Error('Tipo de movimiento no válido. Use: INVENTARIO_INICIAL, ENTRADA_VARIA, REAJUSTE_POSITIVO, REAJUSTE_NEGATIVO, SALIDA_MERMA');
+    throw new Error('Tipo de movimiento no válido. Use: INVENTARIO_INICIAL, ENTRADA_VARIA, REAJUSTE_POSITIVO, REAJUSTE_NEGATIVO, SALIDA_MERMA, DEVOLUCION, TRANSFERENCIA');
   }
   if (!idSucursal) throw new Error('Sucursal es obligatoria');
   if (!items || !Array.isArray(items) || items.length === 0) throw new Error('Debe incluir al menos un ítem');
@@ -66,8 +288,7 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
         throw new Error('Comprobante no encontrado');
       }
       const codigo = String(comprobanteActual.codigo || '').toUpperCase();
-      const codigosValidos = new Set(['IV', 'II', 'IN', 'SA']);
-      if (!codigosValidos.has(codigo)) {
+      if (!CODIGOS_COMP_INVENTARIO.has(codigo)) {
         throw new Error('Comprobante no válido para inventario');
       }
       const serie = comprobanteActual.serie || '';
@@ -244,7 +465,9 @@ exports.obtenerTiposMovimiento = () => {
     { codigo: 'ENTRADA_VARIA', descripcion: 'Entrada varia' },
     { codigo: 'REAJUSTE_POSITIVO', descripcion: 'Reajuste de stock (positivo)' },
     { codigo: 'REAJUSTE_NEGATIVO', descripcion: 'Reajuste de stock (negativo)' },
-    { codigo: 'SALIDA_MERMA', descripcion: 'Salida / Merma' }
+    { codigo: 'SALIDA_MERMA', descripcion: 'Salida / Merma' },
+    { codigo: 'DEVOLUCION', descripcion: 'Devoluciones' },
+    { codigo: 'TRANSFERENCIA', descripcion: 'Transferencia entre sucursales' }
   ];
 };
 

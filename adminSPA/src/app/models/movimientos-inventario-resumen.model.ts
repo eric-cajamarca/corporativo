@@ -24,7 +24,11 @@ export interface MovimientosResumenPaginados {
 
 export interface MovimientoInventarioLineaDetalle {
   idMovimiento: number;
+  idSucursal?: string;
+  /** Nombre de la sucursal donde aplica esta línea (salida o entrada). */
+  sucursal?: string | null;
   idProducto: string;
+  /** EN | SA | AJ (código en BD). */
   tipoMovimiento: string;
   cantidad: number;
   costoUnitario: number | null;
@@ -41,7 +45,9 @@ export const ETIQUETA_CODIGO_TIPO_MOVIMIENTO: Record<string, string> = {
   ENTRADA_VARIA: 'Entrada varia',
   REAJUSTE_POSITIVO: 'Reajuste de stock (positivo)',
   REAJUSTE_NEGATIVO: 'Reajuste de stock (negativo)',
-  SALIDA_MERMA: 'Salida / Merma'
+  SALIDA_MERMA: 'Salida / Merma',
+  DEVOLUCION: 'Devoluciones',
+  TRANSFERENCIA: 'Transferencia entre sucursales'
 };
 
 export function etiquetaTipoMovimiento(codigoTipo: string | null | undefined, tipoBd: string | null | undefined): string {
