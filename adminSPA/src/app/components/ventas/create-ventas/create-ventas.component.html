@@ -6,18 +6,18 @@
     <div class="container-fluid py-3">
       <div class="row">
         <!-- Pasos: Comprobante → Cliente → Pago → Registrar -->
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div class="create-ventas-toolbar d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 mb-3">
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-primary rounded-pill"
+            <button type="button" class="btn btn-outline-primary rounded-pill flex-grow-1 flex-lg-grow-0"
                     data-bs-toggle="modal" data-bs-target="#modalComprobante">
               <i class="bi bi-receipt me-2"></i>Datos del Comprobante
             </button>
-            <button type="button" class="btn btn-outline-secondary rounded-pill"
+            <button type="button" class="btn btn-outline-secondary rounded-pill flex-grow-1 flex-lg-grow-0"
                     data-bs-toggle="modal" data-bs-target="#modalCliente"
                     [disabled]="!ventas?.idComprobante">
               <i class="bi bi-person-lines-fill me-2"></i>Cliente
             </button>
-            <button type="button" class="btn btn-outline-warning rounded-pill"
+            <button type="button" class="btn btn-outline-warning rounded-pill flex-grow-1 flex-lg-grow-0"
                     *ngIf="ventas.idEstadoPago !== 1"
                     data-bs-toggle="modal" data-bs-target="#modalPago"
                     [disabled]="!tieneClienteParaVenta()"
@@ -25,46 +25,47 @@
               <i class="bi bi-cash-coin me-2"></i>Forma de pago
             </button>
           </div>
-          <button type="button" class="btn btn-outline-danger rounded-pill"
-                  (click)="anularVenta()"
-                  [disabled]="carrito.length === 0 && !ventas.idComprobante">
-            <i class="bi bi-x-circle me-2"></i>Anular venta
-          </button>
-          <button type="button" class="btn btn-outline-secondary rounded-pill"
-                  *ngIf="cuotasCreditoRequeridas()"
-                  (click)="abrirModalCuotasCredito()">
-            <i class="bi bi-calendar-week me-2"></i>Cuotas crédito
-          </button>
-          <button type="button" class="btn btn-success btn-lg rounded-pill"
-                  (click)="registrarVenta()"
-                  [disabled]="loading || carrito.length === 0">
-            <i class="bi bi-check2-circle me-2"></i>{{ loading ? 'Guardando...' : 'Registrar venta' }}
-          </button>
+          <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+            <button type="button" class="btn btn-outline-danger rounded-pill flex-grow-1 flex-lg-grow-0"
+                    (click)="anularVenta()"
+                    [disabled]="carrito.length === 0 && !ventas.idComprobante">
+              <i class="bi bi-x-circle me-2"></i>Anular venta
+            </button>
+            <button type="button" class="btn btn-outline-secondary rounded-pill flex-grow-1 flex-lg-grow-0"
+                    *ngIf="cuotasCreditoRequeridas()"
+                    (click)="abrirModalCuotasCredito()">
+              <i class="bi bi-calendar-week me-2"></i>Cuotas crédito
+            </button>
+            <button type="button" class="btn btn-success btn-lg rounded-pill w-100 w-lg-auto"
+                    (click)="registrarVenta()"
+                    [disabled]="loading || carrito.length === 0">
+              <i class="bi bi-check2-circle me-2"></i>{{ loading ? 'Guardando...' : 'Registrar venta' }}
+            </button>
+          </div>
         </div>
 
         <div class="col-12">
 
           <!-- CARD: Detalle de Venta -->
           <section class="cart-section card">
-            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-              <h5 class="mb-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
+            <div class="card-header bg-success text-white d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 py-2 py-lg-3">
+              <h5 class="mb-0 flex-shrink-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
 
-              <div class="align-items-center flex-wrap gap-2" style="display: inline-flex;">
-                <input type="text" class="form-control" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()" style="width: 150px; height: 40px;"
+              <div class="d-flex flex-wrap align-items-stretch align-items-lg-center gap-2 w-100 w-lg-auto justify-content-lg-end">
+                <input type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()"
                   placeholder="Buscar Código">
-                <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#buscadorModal">
+                <button class="btn btn-success btn-lg flex-grow-1 flex-lg-grow-0" data-bs-toggle="modal" data-bs-target="#buscadorModal">
                   <i class="bi bi-search"></i> Buscar
                 </button>
-                <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalCotizacion" (click)="abrirModalCotizacion()">
-                  <i class="bi bi-file-text me-1" title="Cargar desde cotización"></i> 
+                <button type="button" class="btn btn-outline-light btn-sm create-ventas-icon-btn" data-bs-toggle="modal" data-bs-target="#modalCotizacion" (click)="abrirModalCotizacion()">
+                  <i class="bi bi-file-text" title="Cargar desde cotización"></i>
                 </button>
                 @if (usaValeDespachoHabilitado) {
-                  <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#modalValeLiquidar" (click)="abrirModalValeLiquidar()">
-                    <i class="bi bi-ticket-perforated me-1" title="Convertir vale en venta"></i>                   </button>
+                  <button type="button" class="btn btn-outline-light btn-sm create-ventas-icon-btn" data-bs-toggle="modal" data-bs-target="#modalValeLiquidar" (click)="abrirModalValeLiquidar()">
+                    <i class="bi bi-ticket-perforated" title="Convertir vale en venta"></i>
+                  </button>
                 }
               </div>
-
-              
             </div>
 
             <div class="card-body" style="height: 70%; overflow-y:auto;">
@@ -75,10 +76,9 @@
                 <p class="mb-0">El carrito está vacío</p>
               </div>
 
-              <!-- Tabla de detalle -->
-              <div *ngIf="carrito.length > 0" class="table-responsive mx-auto"
-                style="max-height:80%;">
-                <table class="table table-hover align-middle mb-0 table-detalle" style="max-height: 60%;">
+              <!-- Tabla de detalle (escritorio) -->
+              <div *ngIf="carrito.length > 0" class="d-none d-lg-block table-responsive mx-auto create-ventas-table-wrap">
+                <table class="table table-hover align-middle mb-0 table-detalle">
                   <thead >
                     <tr>
                       <th>Item</th>
@@ -128,11 +128,6 @@
                         </div>
                       </td>
 
-
-
-
-
-
                       <td style="width: 80px; text-align: right;" >S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</td>
                       <td>{{ item.sucursal }}</td>
                       <td>
@@ -143,17 +138,54 @@
                   </tbody>
 
                 </table>
+              </div>
 
-
-
+              <!-- Detalle en tarjetas (móvil / tablet < lg) -->
+              <div *ngIf="carrito.length > 0" class="d-lg-none create-ventas-cart-cards">
+                <div class="create-ventas-cart-card" *ngFor="let item of carrito; let i = index">
+                  <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <span class="fw-semibold">#{{ i + 1 }} · {{ item.codigo }}</span>
+                    <button type="button" class="btn btn-outline-danger btn-sm create-ventas-touch-btn" (click)="eliminarDelCarrito(i)" title="Quitar">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                  <div *ngIf="esGestora" class="mb-2">
+                    <span class="badge bg-info text-dark">{{ item.aliasEmpresa || '' }}</span>
+                  </div>
+                  <div class="small text-muted mb-1">Producto</div>
+                  <div contenteditable="true" class="editable create-ventas-cart-desc mb-2" (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}</div>
+                  <div class="row g-2 small">
+                    <div class="col-6">
+                      <span class="text-muted">U.Medida</span>
+                      <div>{{ item.codigoPresentacion }}</div>
+                    </div>
+                    <div class="col-6">
+                      <span class="text-muted">Cantidad</span>
+                      <div contenteditable="true" class="editable d-inline-block min-w-0" (blur)="actualizaCantidad(item, $event)">{{ item?.cantidad }}</div>
+                    </div>
+                    <div class="col-12">
+                      <span class="text-muted">P. unit.</span>
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">{{ item.pVenta | number:'1.2-2' }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary create-ventas-touch-btn" (click)="abrirModalPrecios(item)" title="Otros precios">
+                          <i class="bi bi-chevron-down"></i>
+                        </button>
+                        <span class="ms-auto fw-semibold">S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</span>
+                      </div>
+                    </div>
+                    <div class="col-12" *ngIf="item.sucursal">
+                      <span class="text-muted">Sucursal</span>
+                      <div>{{ item.sucursal }}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="card-footer text-muted text-end" style="height:30%;">
+            <div class="card-footer text-muted text-end create-ventas-footer-resumen">
               <!-- Resumen -->
-              <!-- <div class="cart-summary mt-3"> -->
                 <div class="row">
                   <div class="col-12 d-flex justify-content-end">
-                    <div class="bg-light rounded p-2" style="min-width:260px;">
+                    <div class="bg-light rounded p-2 w-100 create-ventas-resumen-box" style="max-width: 360px;">
                       <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal:</span>
                         <span>S/ {{ ventas.subTotal | number:'1.2-2' }}</span>
@@ -234,33 +266,31 @@
 <!-- ------------------------------------------------------------------ -->
 <!---->
 <div class="modal fade" id="buscadorModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl">
+  <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-scrollable buscador-productos-compra-dialog">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
         <h5 class="modal-title">Buscar productos</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
-        <!-- Buscador -->
-        <div class="row mb-3">
-          <div class="col-md-8">
+        <div class="row g-2 mb-3">
+          <div class="col-12 col-lg-8">
             <input type="search" class="form-control" placeholder="Nombre o código..." [(ngModel)]="searchTerm"
               (input)="buscarProductos()">
           </div>
-          <div class="col-md-4">
-            <button class="btn btn-outline-success w-100" (click)="buscarProductos()">
+          <div class="col-12 col-lg-4">
+            <button type="button" class="btn btn-outline-light w-100" (click)="buscarProductos()">
               <i class="bi bi-search"></i> Buscar
             </button>
           </div>
         </div>
 
-        <!-- Tabla de resultados -->
-        <div class="table-responsive" style="max-height:300px;">
-          <table class="table table-hover align-middle">
-            <thead style="background-color:#20c997; color:white;">
+        <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="buscador-compra-thead">
               <tr>
                 <th *ngIf="productosConImagenes">Imagen</th>
-                <th *ngIf="esGestora">Empresa</th>
+                <th *ngIf="muestraEmpresaEnBuscadorVentas()">Empresa</th>
                 <th>Código</th>
                 <th>Categoría</th>
                 <th>Producto</th>
@@ -268,13 +298,10 @@
                 <th>Precio</th>
                 <th>Sucursal</th>
                 <th>Stock</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let p of productos_filtrados" role="button"
-                class="table-row-hover"
-                (click)="seleccionaProducto(p)">
+              <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover" (click)="seleccionaProducto(p)">
                 <td *ngIf="productosConImagenes" class="align-middle" (click)="$event.stopPropagation()">
                   <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
                     (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
@@ -282,7 +309,9 @@
                     <span class="spinner-border spinner-border-sm" *ngIf="idProductoCargandoImagenes === p.idProducto"></span>
                   </button>
                 </td>
-                <td *ngIf="esGestora"><span class="badge bg-info text-dark">{{ p.aliasEmpresa || '' }}</span></td>
+                <td *ngIf="muestraEmpresaEnBuscadorVentas()">
+                  <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
+                </td>
                 <td>{{ p.codigo }}</td>
                 <td>{{ p.categoria }}</td>
                 <td>{{ p.descripcion }}</td>
@@ -290,10 +319,36 @@
                 <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                 <td>{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</td>
                 <td>{{ p.stock }}</td>
-                
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="d-lg-none buscador-compra-cards">
+          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados">
+            <div class="d-flex gap-2 align-items-start">
+              <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
+                <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
+                  (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
+                  <i class="bi bi-images" *ngIf="idProductoCargandoImagenes !== p.idProducto"></i>
+                  <span class="spinner-border spinner-border-sm" *ngIf="idProductoCargandoImagenes === p.idProducto"></span>
+                </button>
+              </div>
+              <div class="flex-grow-1 min-w-0" role="button" (click)="seleccionaProducto(p)">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <span class="fw-semibold text-truncate">{{ p?.codigo }}</span>
+                  <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
+                </div>
+                <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorVentas()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
+                <div class="small mt-1">{{ p?.descripcion }}</div>
+                <div class="small text-muted mt-1">{{ p?.categoria }} · {{ p?.codigoPresentacion }}</div>
+                <div class="small d-flex justify-content-between mt-2">
+                  <span class="text-truncate me-1">{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</span>
+                  <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">

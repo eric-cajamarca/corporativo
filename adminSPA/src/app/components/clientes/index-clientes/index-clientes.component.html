@@ -9,8 +9,8 @@
     <div class="col-md-12">
       <ng-container *ngIf="!modoSelector">
         <hr>
-        <div class="col-md-6" style="margin-bottom: 20px;">
-          <a class="btn btn-primary" [routerLink]="['/cliente/create']" routerLinkActive="active">Nuevo Cliente</a>
+        <div class="col-12 col-lg-auto mb-3">
+          <a class="btn btn-primary w-100 w-lg-auto" [routerLink]="['/cliente/create']" routerLinkActive="active">Nuevo Cliente</a>
         </div>
       </ng-container>
 
@@ -29,19 +29,19 @@
       <ng-container *ngIf="clientes_const.length > 0">
         
         <div class="row">
-          
-          <div class="input-group input-group-merge">
-            <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
-              [(ngModel)]="filtro" (input)="filtrar()">
-            <div class="input-group-append">
-              <button class="btn btn-primary" (click)="filtrar()">
+          <div class="col-12">
+            <div class="input-group">
+              <input type="text" class="form-control" placeholder="Buscador general" name="filtro"
+                [(ngModel)]="filtro" (input)="filtrar()">
+              <button type="button" class="btn btn-primary" (click)="filtrar()">
                 Buscar
               </button>
             </div>
           </div>
         </div>
         <hr>
-        <table class="table table-hover">
+        <div class="table-responsive">
+        <table class="table table-hover table-clientes-responsive">
           <thead>
             <tr>
               <th>Ruc/Dni</th>
@@ -55,17 +55,17 @@
           <tbody class="font-size-base">
             <tr *ngFor="let item of clientes | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize"  style="cursor: pointer;"
     (click)="elegir(item)">
-              <td>{{item.ruc}}</td>
-              <td>{{item.rSocial}}</td>
-              <td>
+              <td data-label="RUC / DNI">{{item.ruc}}</td>
+              <td data-label="Razón social">{{item.rSocial}}</td>
+              <td data-label="Condición">
                 <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">Habido</span>
                 <span class="badge bg-danger" *ngIf="item.condicion === 'INACTIVO'">No habido</span>
               </td>
-              <td>
+              <td data-label="Estado">
                 <span class="badge bg-success" *ngIf="item.estado === true">Activo</span>
                 <span class="badge bg-danger" *ngIf="item.estado === false">Inactivo</span>
               </td>
-              <td (click)="$event.stopPropagation()" *ngIf="!modoSelector">
+              <td data-label="Acciones" (click)="$event.stopPropagation()" *ngIf="!modoSelector">
                 <!-- <a class="btn btn-outline-primary btn-sm" routerLink="/clientes/editar">Editar</a>
                             <a class="btn btn-outline-danger btn-sm" style="margin-left: 10px;">Eliminar</a> -->
 
@@ -174,6 +174,7 @@
           </tbody>
 
         </table>
+        </div>
       </ng-container>
 
 

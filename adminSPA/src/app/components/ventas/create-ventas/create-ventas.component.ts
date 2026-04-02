@@ -528,6 +528,16 @@ export class CreateVentasComponent implements OnInit {
 
 
 
+  /** Muestra columna Empresa si el API devuelve alias/razón social (gestora o gestionada con datos). */
+  muestraEmpresaEnBuscadorVentas(): boolean {
+    const list = Array.isArray(this.stockSucursales_const) ? this.stockSucursales_const : [];
+    return list.some(
+      (p: { aliasEmpresa?: string; razonSocialEmpresa?: string }) =>
+        !!(p?.aliasEmpresa && String(p.aliasEmpresa).trim()) ||
+        !!(p?.razonSocialEmpresa && String(p.razonSocialEmpresa).trim())
+    );
+  }
+
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
     if (term === '') {

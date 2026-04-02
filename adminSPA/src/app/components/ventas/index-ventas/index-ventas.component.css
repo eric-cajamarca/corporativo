@@ -58,9 +58,78 @@
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 }
 
+/* Breakpoint móvil/tablet alineado con Bootstrap lg (992px): estilos “compactos” solo bajo 992px */
 .ventas-filtros-row .form-control-sm,
 .ventas-filtros-row .form-select-sm {
   font-size: 0.875rem;
+}
+
+@media (min-width: 992px) {
+  .ventas-filtro-control {
+    min-width: 8rem;
+  }
+}
+
+/* Lista tipo tarjeta (< lg): no afecta escritorio */
+.ventas-card-list {
+  padding: 0.25rem 0;
+}
+
+.ventas-m-card {
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: var(--border-radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.ventas-m-card-muted {
+  opacity: 0.75;
+}
+
+.ventas-m-card-head {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.ventas-m-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.ventas-m-kv:last-of-type {
+  border-bottom: none;
+}
+
+.ventas-m-k {
+  color: #6c757d;
+  flex-shrink: 0;
+  max-width: 42%;
+}
+
+.ventas-m-v {
+  text-align: right;
+  word-break: break-word;
+}
+
+.ventas-m-total {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+.ventas-m-resumen .resumen-validos,
+.ventas-m-resumen .resumen-no-validos {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 /* ===== HEADER ACTIONS ===== */
@@ -304,6 +373,21 @@
 }
 
 /* ===== RESPONSIVE ===== */
+@media (max-width: 991.98px) {
+  .pagination-wrap ::ng-deep .pagination .page-link {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ventas-m-card .btn-sm {
+    min-height: 2.5rem;
+    padding: 0.35rem 0.65rem;
+  }
+}
+
 @media (max-width: 768px) {
   .ventas-container {
     padding: 1rem;

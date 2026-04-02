@@ -265,6 +265,154 @@
   }
 }
 
+/* Detalle de compra: tarjetas en móvil (< lg), tabla sin cambios en escritorio */
+@media (max-width: 991.98px) {
+  .compra-detalle-header-btn {
+    min-height: 2.75rem;
+  }
+
+  .create-compras-detalle-thead {
+    display: none;
+  }
+
+  .create-compras-detalle-table tbody tr.compra-detalle-mobile-tr {
+    background: transparent !important;
+    --bs-table-accent-bg: transparent !important;
+  }
+
+  .create-compras-detalle-table tbody tr.compra-detalle-mobile-tr > td {
+    border: none;
+  }
+}
+
+.compra-detalle-mobile-card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.625rem;
+  padding: 0.9375rem 1rem;
+  margin-bottom: 0.75rem;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.compra-detalle-mobile-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.compra-detalle-mobile-card__code {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #212529;
+  line-height: 1.2;
+}
+
+.compra-detalle-mobile-card__price {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #212529;
+  white-space: nowrap;
+}
+
+.compra-detalle-mobile-card__title {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  margin-bottom: 0.35rem;
+  color: #212529;
+}
+
+.compra-detalle-mobile-card__meta {
+  font-size: 0.8125rem;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+  line-height: 1.35;
+}
+
+.compra-detalle-mobile-card__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #495057;
+  margin-bottom: 0.35rem;
+}
+
+.compra-detalle-mobile-card__label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6c757d;
+  margin-bottom: 0.15rem;
+}
+
+.compra-detalle-mobile-card__sucursal-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.compra-detalle-mobile-card__sucursal-value {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #212529;
+}
+
+.compra-detalle-mobile-card__subtotal {
+  margin-bottom: 0.25rem;
+}
+
+.compra-detalle-mobile-card__dates {
+  margin-bottom: 0.5rem;
+}
+
+.compra-detalle-mobile-card__actions {
+  padding-top: 0.35rem;
+  border-top: 1px solid #f1f3f5;
+  margin-top: 0.25rem;
+}
+
+/* Dos <tr> por ítem (escritorio + móvil): restaurar rayas solo en filas de escritorio */
+@media (min-width: 992px) {
+  .create-compras-detalle-table.table-striped > tbody > tr.d-none.d-lg-table-row {
+    --bs-table-accent-bg: transparent;
+  }
+
+  .create-compras-detalle-table.table-striped > tbody > tr.d-none.d-lg-table-row:nth-child(4n + 1) {
+    --bs-table-accent-bg: var(--bs-table-striped-bg);
+  }
+}
+
+.buscador-compra-thead {
+  background-color: #20c997;
+  color: #fff;
+}
+
+.buscador-compra-thead th {
+  border: none;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.buscador-compra-table-wrap {
+  max-height: min(50vh, 420px);
+}
+
+@media (max-width: 991.98px) {
+  .buscador-productos-compra-dialog .modal-body {
+    padding-bottom: 1rem;
+  }
+
+  .buscador-compra-card {
+    min-height: 3.25rem;
+    border-radius: 0.5rem;
+  }
+}
+
 
 
 

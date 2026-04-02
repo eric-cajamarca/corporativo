@@ -199,8 +199,48 @@
   width: 80px;
 }
 
+@media (min-width: 992px) {
+  .compras-filtro-control {
+    min-width: 8rem;
+  }
+}
 
+/* Lista compras: celdas como tarjeta en < lg (mismos modales/dropdown) */
+@media (max-width: 991.98px) {
+  .table-compras-responsive thead {
+    display: none;
+  }
 
+  .table-compras-responsive tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
 
+  .table-compras-responsive tbody td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    padding: 0.65rem 1rem !important;
+    border-bottom: 1px solid #f1f3f5;
+    text-align: left !important;
+  }
 
+  .table-compras-responsive tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .table-compras-responsive tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}
 

@@ -314,21 +314,21 @@
 
         <div class="tabla-detalle">
             <div class="card" style="border: #94847c 1px solid !important; border-radius: 5px;">
-                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h5 class="mb-0"><i class="bi bi-cart-check"></i> Detalle de Compra</h5>
-                    <div class="d-flex align-items-center gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#buscadorModal" (click)="searchTerm = ''; buscarProductos()">
+                <div class="card-header bg-success text-white d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 py-2 py-lg-3">
+                    <h5 class="mb-0 flex-shrink-0"><i class="bi bi-cart-check"></i> Detalle de Compra</h5>
+                    <div class="d-flex flex-column flex-sm-row flex-wrap gap-2 w-100 w-lg-auto justify-content-lg-end">
+                        <button type="button" class="btn btn-sm btn-outline-light compra-detalle-header-btn flex-grow-1 flex-lg-grow-0" data-bs-toggle="modal" data-bs-target="#buscadorModal" (click)="searchTerm = ''; buscarProductos()">
                             <i class="bi bi-search"></i> Buscar productos
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#nuevoProductoModal">
+                        <button type="button" class="btn btn-sm btn-outline-light compra-detalle-header-btn flex-grow-1 flex-lg-grow-0" data-bs-toggle="modal" data-bs-target="#nuevoProductoModal">
                             Crear producto
                         </button>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive" style="background: white; max-height: 400px;">
-                        <table class="table table-striped table-hover align-middle">
-                            <thead class="table table-light" style="position: sticky; top: 0; z-index: 100;">
+                    <div class="table-responsive update-compras-detalle-wrap" style="background: white; max-height: 400px;">
+                        <table class="table table-striped table-hover align-middle update-compras-detalle-table">
+                            <thead class="table table-light update-compras-detalle-thead" style="position: sticky; top: 0; z-index: 100;">
                                 <tr>
                                     <th>Código</th>
                                     <th>Categ</th>
@@ -345,28 +345,71 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr *ngFor="let item of detalleCompras; let idx = index">
-                                    <td>{{ item?.codigo ?? item?.producto?.codigo ?? item?.producto?.Codigo }}</td>
-                                    <td>{{ item?.categoria?.nombre || '-' }}</td>
-                                    <td class="columna-descripcion">{{ item?.descripcion ?? item?.producto?.descripcion }}</td>
-                                    <td>{{ item?.marca?.nombre || '-' }}</td>
-                                    <td style="width: 60px; text-align: center;">{{ item?.presentacion?.codigo || item?.presentacion?.Descripcion || '-' }}</td>
-                                    <td style="width: 80px; text-align: right;">
-                                        <input type="number" [(ngModel)]="item.cantidad" style="width: 70px; text-align: center;" (change)="actualizarSubtotal(idx)">
-                                    </td>
-                                    <td style="width: 100px; text-align: right;">
-                                        <input type="number" [(ngModel)]="item.pUnitario" style="width: 80px; text-align: center;" (change)="actualizarSubtotal(idx)">
-                                    </td>
-                                    <td style="width: 80px; text-align: right;">{{ item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)) | number:'1.2-2' }}</td>
-                                    <td style="width: 60px; text-align: center;">{{ item?.fProduccion || item?.fproduccion || '-' }}</td>
-                                    <td style="width: 60px; text-align: center;">{{ item?.fVencimiento || item?.fvencimiento || '-' }}</td>
-                                    <td style="width: 60px; text-align: center;">{{ item?.sucursal?.nombre || '-' }}</td>
-                                    <td>
-                                        <a style="cursor: pointer;" class="text-danger" (click)="quitar(idx, item?.subtotal)" title="Eliminar">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
+                                <ng-container *ngFor="let item of detalleCompras; let idx = index">
+                                    <tr class="d-none d-lg-table-row">
+                                        <td>{{ item?.codigo ?? item?.producto?.codigo ?? item?.producto?.Codigo }}</td>
+                                        <td>{{ item?.categoria?.nombre || '-' }}</td>
+                                        <td class="columna-descripcion">{{ item?.descripcion ?? item?.producto?.descripcion }}</td>
+                                        <td>{{ textoMarcaDetalle(item) }}</td>
+                                        <td style="width: 60px; text-align: center;">{{ item?.presentacion?.codigo || item?.presentacion?.Descripcion || '-' }}</td>
+                                        <td style="width: 80px; text-align: right;">
+                                            <input type="number" class="form-control form-control-sm d-inline-block" [(ngModel)]="item.cantidad" style="max-width: 7rem; text-align: center;" (change)="actualizarSubtotal(idx)">
+                                        </td>
+                                        <td style="width: 100px; text-align: right;">
+                                            <input type="number" class="form-control form-control-sm d-inline-block" [(ngModel)]="item.pUnitario" style="max-width: 7rem; text-align: center;" (change)="actualizarSubtotal(idx)">
+                                        </td>
+                                        <td style="width: 80px; text-align: right;">{{ item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)) | number:'1.2-2' }}</td>
+                                        <td style="width: 60px; text-align: center;">{{ item?.fProduccion || item?.fproduccion || '-' }}</td>
+                                        <td style="width: 60px; text-align: center;">{{ item?.fVencimiento || item?.fvencimiento || '-' }}</td>
+                                        <td style="width: 60px; text-align: center;">{{ textoSucursalDetalle(item) }}</td>
+                                        <td>
+                                            <a style="cursor: pointer;" class="text-danger" (click)="quitar(idx, item?.subtotal)" title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr class="d-lg-none compra-detalle-mobile-tr">
+                                        <td colspan="12" class="p-0 border-0 bg-transparent">
+                                            <div class="compra-detalle-mobile-card">
+                                                <div class="compra-detalle-mobile-card__top">
+                                                    <span class="compra-detalle-mobile-card__code">{{ item?.codigo ?? item?.producto?.codigo ?? item?.producto?.Codigo }}</span>
+                                                    <span class="compra-detalle-mobile-card__price">S/ {{ (item?.cUnitario ?? item?.pUnitario ?? 0) | number:'1.2-2' }}</span>
+                                                </div>
+                                                <div class="compra-detalle-mobile-card__title">{{ item?.descripcion ?? item?.producto?.descripcion }}</div>
+                                                <div class="compra-detalle-mobile-card__meta">
+                                                    {{ item?.categoria?.nombre || '—' }}<ng-container *ngIf="textoMarcaDetalle(item) !== '—'"> · {{ textoMarcaDetalle(item) }}</ng-container> · {{ item?.presentacion?.codigo || item?.presentacion?.Descripcion || '—' }}
+                                                </div>
+                                                <div class="compra-detalle-mobile-card__inputs row g-2">
+                                                    <div class="col-6">
+                                                        <label class="form-label small text-muted mb-0">Cant.</label>
+                                                        <input type="number" class="form-control form-control-sm" [(ngModel)]="item.cantidad" (change)="actualizarSubtotal(idx)">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label small text-muted mb-0">P. unit.</label>
+                                                        <input type="number" class="form-control form-control-sm" [(ngModel)]="item.pUnitario" (change)="actualizarSubtotal(idx)">
+                                                    </div>
+                                                </div>
+                                                <div class="compra-detalle-mobile-card__foot">
+                                                    <div class="compra-detalle-mobile-card__sucursal-block min-w-0 me-2">
+                                                        <span class="compra-detalle-mobile-card__label">Sucursal</span>
+                                                        <span class="compra-detalle-mobile-card__sucursal-value text-truncate">{{ textoSucursalDetalle(item) }}</span>
+                                                    </div>
+                                                    <span class="text-nowrap fw-semibold align-self-end">Subt: S/ {{ item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)) | number:'1.2-2' }}</span>
+                                                </div>
+                                                <div class="compra-detalle-mobile-card__dates small text-muted" *ngIf="item?.fProduccion || item?.fproduccion || item?.fVencimiento || item?.fvencimiento">
+                                                    <span *ngIf="item?.fProduccion || item?.fproduccion">F. prod: {{ item?.fProduccion || item?.fproduccion }}</span>
+                                                    <span *ngIf="(item?.fProduccion || item?.fproduccion) && (item?.fVencimiento || item?.fvencimiento)"> · </span>
+                                                    <span *ngIf="item?.fVencimiento || item?.fvencimiento">F. venc: {{ item?.fVencimiento || item?.fvencimiento }}</span>
+                                                </div>
+                                                <div class="compra-detalle-mobile-card__actions">
+                                                    <button type="button" class="btn btn-outline-danger btn-sm" (click)="quitar(idx, item?.subtotal)" title="Eliminar">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </ng-container>
                             </tbody>
                         </table>
                     </div>
@@ -375,41 +418,44 @@
 
             <!-- Modal Buscador de productos -->
             <div class="modal fade" id="buscadorModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-xl">
+                <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-scrollable buscador-productos-compra-dialog">
                     <div class="modal-content">
                         <div class="modal-header bg-primary text-white">
                             <h5 class="modal-title">Buscar productos</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
-                            <div class="row mb-3">
-                                <div class="col-md-8">
+                            <div class="row g-2 mb-3">
+                                <div class="col-12 col-lg-8">
                                     <input type="search" class="form-control" placeholder="Nombre o código..."
                                         [(ngModel)]="searchTerm" (input)="buscarProductos()">
                                 </div>
-                                <div class="col-md-4">
-                                    <button class="btn btn-outline-primary w-100" (click)="buscarProductos()">
+                                <div class="col-12 col-lg-4">
+                                    <button type="button" class="btn btn-outline-light w-100" (click)="buscarProductos()">
                                         <i class="bi bi-search"></i> Buscar
                                     </button>
                                 </div>
                             </div>
-                            <div class="table-responsive" style="max-height: 300px;">
-                                <table class="table table-hover align-middle">
-                                    <thead style="background-color: #20c997; color: white;">
+                            <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="buscador-compra-thead">
                                         <tr>
+                                            <th *ngIf="muestraEmpresaEnBuscadorCompras()">Empresa</th>
                                             <th>Código</th>
                                             <th>Categoría</th>
                                             <th>Producto</th>
                                             <th>U.Medida</th>
-                                            <th>P.Unit</th>
+                                            <th>P. unit.</th>
                                             <th>Sucursal</th>
                                             <th>Stock</th>
-                                            <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover"
                                             (click)="seleccionaProducto(p)">
+                                            <td *ngIf="muestraEmpresaEnBuscadorCompras()">
+                                                <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
+                                            </td>
                                             <td>{{ p?.codigo }}</td>
                                             <td>{{ p?.categoria }}</td>
                                             <td>{{ p?.descripcion }}</td>
@@ -417,10 +463,25 @@
                                             <td>{{ (p?.cUnitario ?? p?.pUnitario) | number:'1.2-2' }}</td>
                                             <td>{{ p?.sucursal }}</td>
                                             <td>{{ p?.stock ?? '-' }}</td>
-                                            <td><i class="bi bi-plus-circle-fill text-success"></i></td>
                                         </tr>
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="d-lg-none buscador-compra-cards">
+                                <button type="button" class="btn btn-outline-secondary w-100 text-start mb-2 p-3 buscador-compra-card"
+                                    *ngFor="let p of productos_filtrados" (click)="seleccionaProducto(p)">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <span class="fw-semibold text-truncate">{{ p?.codigo }}</span>
+                                        <span class="text-nowrap">{{ (p?.cUnitario ?? p?.pUnitario) | number:'1.2-2' }}</span>
+                                    </div>
+                                    <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorCompras()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
+                                    <div class="small mt-1">{{ p?.descripcion }}</div>
+                                    <div class="small text-muted mt-1">{{ p?.categoria }} · {{ p?.codigoPresentacion || p?.descripcionPres || '-' }}</div>
+                                    <div class="small d-flex justify-content-between mt-2">
+                                        <span>{{ p?.sucursal }}</span>
+                                        <span>Stock: {{ p?.stock ?? '—' }}</span>
+                                    </div>
+                                </button>
                             </div>
                         </div>
                         <div class="modal-footer">

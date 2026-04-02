@@ -12,76 +12,106 @@
         </div>
         <div class="card-body">
           <!-- Filtro: idVentaAgrupada (código de barras) y cliente -->
-          <div class="row mb-3 align-items-end">
-            <div class="col-md-4">
+          <div class="row mb-3 align-items-end g-2">
+            <div class="col-12 col-md-6 col-lg-4">
               <label class="form-label small">ID Venta / Código de barras</label>
               <input type="text" class="form-control form-control-sm"
                      [(ngModel)]="filtroIdVenta"
                      (keydown)="onFiltroKeydown($event)"
                      [placeholder]="esGestora ? 'Buscar por comprobante VA o ID...' : 'Escanear o escribir idVenta'">
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-6 col-lg-4">
               <label class="form-label small">Cliente (nombre o RUC)</label>
               <input type="text" class="form-control form-control-sm"
                      [(ngModel)]="filtroCliente"
                      (keydown)="onFiltroKeydown($event)"
                      placeholder="Nombre o RUC">
             </div>
-            <div class="col-md-2">
+            <div class="col-12 col-lg-2">
               <button type="button" class="btn btn-primary btn-sm w-100" (click)="buscar()" [disabled]="loading">
                 <i class="bi bi-search me-1"></i>Buscar
               </button>
             </div>
           </div>
 
-          <div class="table-responsive" *ngIf="esGestora">
-            <table class="table table-hover table-bordered table-sm">
-              <thead class="table-light">
-                <tr>
-                  <th>Comprobante VA</th>
-                  <th>Tipo</th>
-                  <th>Fecha</th>
-                  <th>Cliente</th>
-                  <th>RUC</th>
-                  <th class="text-end">Total</th>
-                  <th class="text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let v of listPaginated">
-                  <td>{{ v.compVenta || '—' }}</td>
-                  <td>
-                    <ng-container [ngSwitch]="v.tipoComprobanteDestino">
-                      <span *ngSwitchCase="'NV'">Nota Venta</span>
-                      <span *ngSwitchCase="'01'">Factura</span>
-                      <span *ngSwitchCase="'03'">Boleta</span>
-                      <span *ngSwitchDefault>{{ v.tipoComprobanteDestino || '—' }}</span>
-                    </ng-container>
-                  </td>
-                  <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
-                  <td>{{ v.clienteRazonSocial }}</td>
-                  <td>{{ v.clienteRuc }}</td>
-                  <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
-                  <td class="text-center">
-                    <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
-                      <i class="bi bi-cash-coin"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm me-1" title="Ticket VA — imprimir" (click)="imprimirTicketVA(v.idVentaAgrupada)" [disabled]="imprimiendoVaId === v.idVentaAgrupada">
-                      <span *ngIf="imprimiendoVaId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
-                      <span *ngIf="imprimiendoVaId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#comprobantesModalPendientes" (click)="abrirModalComprobantes(v)" title="Ver comprobantes hijos">
-                      <i class="bi bi-receipt"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="list.length === 0 && !loading">
-                  <td colspan="7" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
-                </tr>
-              </tbody>
-            </table>
-            <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
-              <small class="text-muted">
+          <ng-container *ngIf="esGestora">
+            <div class="d-none d-lg-block table-responsive">
+              <table class="table table-hover table-bordered table-sm">
+                <thead class="table-light">
+                  <tr>
+                    <th>Comprobante VA</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>RUC</th>
+                    <th class="text-end">Total</th>
+                    <th class="text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let v of listPaginated">
+                    <td>{{ v.compVenta || '—' }}</td>
+                    <td>
+                      <ng-container [ngSwitch]="v.tipoComprobanteDestino">
+                        <span *ngSwitchCase="'NV'">Nota Venta</span>
+                        <span *ngSwitchCase="'01'">Factura</span>
+                        <span *ngSwitchCase="'03'">Boleta</span>
+                        <span *ngSwitchDefault>{{ v.tipoComprobanteDestino || '—' }}</span>
+                      </ng-container>
+                    </td>
+                    <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
+                    <td>{{ v.clienteRazonSocial }}</td>
+                    <td>{{ v.clienteRuc }}</td>
+                    <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
+                    <td class="text-center">
+                      <button type="button" class="btn btn-success btn-sm me-1" (click)="abrirModalCobrar(v)" title="Cobrar">
+                        <i class="bi bi-cash-coin"></i>
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm me-1" title="Ticket VA — imprimir" (click)="imprimirTicketVA(v.idVentaAgrupada)" [disabled]="imprimiendoVaId === v.idVentaAgrupada">
+                        <span *ngIf="imprimiendoVaId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
+                        <span *ngIf="imprimiendoVaId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
+                      </button>
+                      <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#comprobantesModalPendientes" (click)="abrirModalComprobantes(v)" title="Ver comprobantes hijos">
+                        <i class="bi bi-receipt"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="list.length === 0 && !loading">
+                    <td colspan="7" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="d-lg-none ventas-pend-m-list">
+              <div class="ventas-pend-m-card" *ngFor="let v of listPaginated">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="fw-semibold">{{ v.compVenta || '—' }}</span>
+                  <span class="text-end fw-semibold">S/ {{ formatNumber(v.total) }}</span>
+                </div>
+                <div class="small text-muted mb-1">
+                  <ng-container [ngSwitch]="v.tipoComprobanteDestino">
+                    <span *ngSwitchCase="'NV'">Nota Venta</span>
+                    <span *ngSwitchCase="'01'">Factura</span>
+                    <span *ngSwitchCase="'03'">Boleta</span>
+                    <span *ngSwitchDefault>{{ v.tipoComprobanteDestino || '—' }}</span>
+                  </ng-container>
+                  · {{ v.fEmision | date:'dd/MM/yyyy' }}
+                </div>
+                <div class="small mb-2">{{ v.clienteRazonSocial }} · {{ v.clienteRuc }}</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCobrar(v)"><i class="bi bi-cash-coin"></i> Cobrar</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="imprimirTicketVA(v.idVentaAgrupada)" [disabled]="imprimiendoVaId === v.idVentaAgrupada">
+                    <span *ngIf="imprimiendoVaId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
+                    <span *ngIf="imprimiendoVaId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
+                    VA
+                  </button>
+                  <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#comprobantesModalPendientes" (click)="abrirModalComprobantes(v)"><i class="bi bi-receipt"></i></button>
+                </div>
+              </div>
+              <div *ngIf="list.length === 0 && !loading" class="text-center text-muted py-4">No hay ventas pendientes de pago.</div>
+            </div>
+            <nav *ngIf="totalPaginas > 1" class="d-flex flex-column flex-sm-row justify-content-between align-items-center mt-2 flex-wrap gap-2 ventas-pend-pagination">
+              <small class="text-muted text-center text-sm-start">
                 Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
               </small>
               <ul class="pagination pagination-sm mb-0">
@@ -96,39 +126,53 @@
                 </li>
               </ul>
             </nav>
-          </div>
-          <div class="table-responsive" *ngIf="!esGestora">
-            <table class="table table-hover table-bordered table-sm">
-              <thead class="table-light">
-                <tr>
-                  <th>Comprobante</th>
-                  <th>Fecha</th>
-                  <th>Cliente</th>
-                  <th>RUC</th>
-                  <th class="text-end">Total</th>
-                  <th class="text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let v of listPaginatedEmpresa">
-                  <td>{{ v.compVenta || v.serie + '-' + v.numero }}</td>
-                  <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
-                  <td>{{ v.clienteRazonSocial }}</td>
-                  <td>{{ v.clienteRuc }}</td>
-                  <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
-                  <td class="text-center">
-                    <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCobrarEmpresa(v)" title="Cobrar">
-                      <i class="bi bi-cash-coin"></i>
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngIf="listEmpresa.length === 0 && !loading">
-                  <td colspan="6" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
-                </tr>
-              </tbody>
-            </table>
-            <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
-              <small class="text-muted">
+          </ng-container>
+          <ng-container *ngIf="!esGestora">
+            <div class="d-none d-lg-block table-responsive">
+              <table class="table table-hover table-bordered table-sm">
+                <thead class="table-light">
+                  <tr>
+                    <th>Comprobante</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>RUC</th>
+                    <th class="text-end">Total</th>
+                    <th class="text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let v of listPaginatedEmpresa">
+                    <td>{{ v.compVenta || v.serie + '-' + v.numero }}</td>
+                    <td>{{ v.fEmision | date:'dd/MM/yyyy' }}</td>
+                    <td>{{ v.clienteRazonSocial }}</td>
+                    <td>{{ v.clienteRuc }}</td>
+                    <td class="text-end">S/ {{ formatNumber(v.total) }}</td>
+                    <td class="text-center">
+                      <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCobrarEmpresa(v)" title="Cobrar">
+                        <i class="bi bi-cash-coin"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="listEmpresa.length === 0 && !loading">
+                    <td colspan="6" class="text-center text-muted py-4">No hay ventas pendientes de pago.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="d-lg-none ventas-pend-m-list">
+              <div class="ventas-pend-m-card" *ngFor="let v of listPaginatedEmpresa">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="fw-semibold">{{ v.compVenta || v.serie + '-' + v.numero }}</span>
+                  <span class="text-end fw-semibold">S/ {{ formatNumber(v.total) }}</span>
+                </div>
+                <div class="small text-muted mb-2">{{ v.fEmision | date:'dd/MM/yyyy' }}</div>
+                <div class="small mb-2">{{ v.clienteRazonSocial }} · {{ v.clienteRuc }}</div>
+                <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCobrarEmpresa(v)"><i class="bi bi-cash-coin"></i> Cobrar</button>
+              </div>
+              <div *ngIf="listEmpresa.length === 0 && !loading" class="text-center text-muted py-4">No hay ventas pendientes de pago.</div>
+            </div>
+            <nav *ngIf="totalPaginas > 1" class="d-flex flex-column flex-sm-row justify-content-between align-items-center mt-2 flex-wrap gap-2 ventas-pend-pagination">
+              <small class="text-muted text-center text-sm-start">
                 Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
               </small>
               <ul class="pagination pagination-sm mb-0">
@@ -143,7 +187,7 @@
                 </li>
               </ul>
             </nav>
-          </div>
+          </ng-container>
           <div *ngIf="loading" class="text-center py-3">
             <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
           </div>

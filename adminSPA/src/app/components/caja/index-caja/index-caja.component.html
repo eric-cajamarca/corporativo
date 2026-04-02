@@ -106,21 +106,21 @@
                 <div class="col-12">
                   <div class="card">
                     <div class="card-header bg-light">
-                      <div class="d-flex justify-content-between align-items-center">
+                      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2">
                         <h6 class="mb-0">
                           <i class="bi bi-history-fill me-2"></i>
                           Movimientos - {{cajaSeleccionada.nombre}}
                         </h6>
-                        <div class="d-flex gap-2">
-                          <input type="date" class="form-control form-control-sm"
+                        <div class="d-flex flex-column flex-sm-row flex-wrap gap-2 w-100 w-lg-auto">
+                          <input type="date" class="form-control form-control-sm flex-grow-1"
                                  [(ngModel)]="filtrosMovimientos.fechaDesde"
                                  (change)="cargarMovimientos()"
-                                 placeholder="Desde">
-                          <input type="date" class="form-control form-control-sm"
+                                 placeholder="Desde" title="Desde">
+                          <input type="date" class="form-control form-control-sm flex-grow-1"
                                  [(ngModel)]="filtrosMovimientos.fechaHasta"
                                  (change)="cargarMovimientos()"
-                                 placeholder="Hasta">
-                          <select class="form-select form-select-sm"
+                                 placeholder="Hasta" title="Hasta">
+                          <select class="form-select form-select-sm flex-grow-1"
                                   [(ngModel)]="filtrosMovimientos.idTipoMovimientoCaja"
                                   (change)="cargarMovimientos()">
                             <option value="0">Todos los tipos</option>
@@ -133,46 +133,69 @@
                       </div>
                     </div>
                     <div class="card-body">
-                      <div class="table-responsive" *ngIf="movimientos.length > 0; else noMovimientos">
-                        <table class="table table-hover">
-                          <thead class="table-light">
-                            <tr>
-                              <th>Fecha</th>
-                              <th *ngIf="mostrarColumnaEmpresaMovimiento">Empresa</th>
-                              <th>Tipo</th>
-                              <th>Descripción</th>
-                              <th>Monto</th>
-                              <th>Usuario</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr *ngFor="let movimiento of movimientosPaginated">
-                              <td>{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</td>
-                              <td *ngIf="mostrarColumnaEmpresaMovimiento" class="small text-muted">{{ movimiento.empresaMovimiento || '—' }}</td>
-                              <td>
-                                <span class="badge"
-                                      [ngClass]="{'bg-success': movimiento.tipoOperacion === 'I',
-                                                 'bg-danger': movimiento.tipoOperacion === 'E'}">
-                                  {{movimiento.tipoMovimiento || getTipoMovimientoNombre(movimiento.idTipoMovimientoCaja)}}
-                                </span>
-                              </td>
-                              <td>{{movimiento.concepto || movimiento.conceptoCatalogoDescripcion || movimiento.descripcion}}</td>
-                              <td class="text-end">
-                                <span [ngClass]="{'text-success': movimiento.tipoOperacion === 'I',
-                                               'text-danger': movimiento.tipoOperacion === 'E'}">
-                                  {{movimiento.tipoOperacion === 'I' ? '+' : '-'}}
-                                  S/ {{movimiento.monto | number:'1.2-2'}}
-                                </span>
-                              </td>
-                              <td>{{movimiento.usuario}}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                        <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
-                          <small class="text-muted">
+                      <ng-container *ngIf="movimientos.length > 0; else noMovimientos">
+                        <div class="d-none d-lg-block table-responsive">
+                          <table class="table table-hover">
+                            <thead class="table-light">
+                              <tr>
+                                <th>Fecha</th>
+                                <th *ngIf="mostrarColumnaEmpresaMovimiento">Empresa</th>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                                <th>Monto</th>
+                                <th>Usuario</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr *ngFor="let movimiento of movimientosPaginated">
+                                <td>{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</td>
+                                <td *ngIf="mostrarColumnaEmpresaMovimiento" class="small text-muted">{{ movimiento.empresaMovimiento || '—' }}</td>
+                                <td>
+                                  <span class="badge"
+                                        [ngClass]="{'bg-success': movimiento.tipoOperacion === 'I',
+                                                   'bg-danger': movimiento.tipoOperacion === 'E'}">
+                                    {{movimiento.tipoMovimiento || getTipoMovimientoNombre(movimiento.idTipoMovimientoCaja)}}
+                                  </span>
+                                </td>
+                                <td>{{movimiento.concepto || movimiento.conceptoCatalogoDescripcion || movimiento.descripcion}}</td>
+                                <td class="text-end">
+                                  <span [ngClass]="{'text-success': movimiento.tipoOperacion === 'I',
+                                                 'text-danger': movimiento.tipoOperacion === 'E'}">
+                                    {{movimiento.tipoOperacion === 'I' ? '+' : '-'}}
+                                    S/ {{movimiento.monto | number:'1.2-2'}}
+                                  </span>
+                                </td>
+                                <td>{{movimiento.usuario}}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div class="d-lg-none caja-mov-cards">
+                          <div class="caja-mov-card" *ngFor="let movimiento of movimientosPaginated">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                              <span class="small text-muted">{{movimiento.fechaMovimiento | date:'dd/MM/yyyy HH:mm'}}</span>
+                              <span class="badge"
+                                    [ngClass]="{'bg-success': movimiento.tipoOperacion === 'I',
+                                               'bg-danger': movimiento.tipoOperacion === 'E'}">
+                                {{movimiento.tipoMovimiento || getTipoMovimientoNombre(movimiento.idTipoMovimientoCaja)}}
+                              </span>
+                            </div>
+                            <div *ngIf="mostrarColumnaEmpresaMovimiento" class="small text-muted mb-1">{{ movimiento.empresaMovimiento || '—' }}</div>
+                            <div class="mb-1">{{movimiento.concepto || movimiento.conceptoCatalogoDescripcion || movimiento.descripcion}}</div>
+                            <div class="d-flex justify-content-between align-items-center">
+                              <span class="small">{{movimiento.usuario}}</span>
+                              <span class="fw-semibold" [ngClass]="{'text-success': movimiento.tipoOperacion === 'I',
+                                             'text-danger': movimiento.tipoOperacion === 'E'}">
+                                {{movimiento.tipoOperacion === 'I' ? '+' : '-'}} S/ {{movimiento.monto | number:'1.2-2'}}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <nav *ngIf="totalPaginas > 1" class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center mt-2 flex-wrap gap-2 index-caja-pagination">
+                          <small class="text-muted text-center text-sm-start">
                             Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
                           </small>
-                          <ul class="pagination pagination-sm mb-0">
+                          <ul class="pagination pagination-sm mb-0 justify-content-center">
                             <li class="page-item" [class.disabled]="page <= 1">
                               <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page - 1)" aria-label="Anterior">&laquo;</a>
                             </li>
@@ -184,7 +207,7 @@
                             </li>
                           </ul>
                         </nav>
-                      </div>
+                      </ng-container>
     
                       <ng-template #noMovimientos>
                         <div class="text-center py-4">

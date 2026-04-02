@@ -451,3 +451,91 @@
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.9rem;
 }
+
+/* Responsive venta: mismo breakpoint que sidebar (lg = 992px) */
+@media (min-width: 992px) {
+  .create-ventas-search-code {
+    width: 150px;
+    min-width: 150px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .create-ventas-search-code {
+    min-height: 40px;
+  }
+
+  .create-ventas-icon-btn {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .create-ventas-touch-btn {
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+  }
+
+  .create-ventas-cart-card {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .create-ventas-cart-desc {
+    min-height: 2.5rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+}
+
+.create-ventas-table-wrap {
+  max-height: 80%;
+}
+
+.create-ventas-footer-resumen {
+  min-height: auto;
+}
+
+@media (max-width: 991.98px) {
+  .create-ventas-resumen-box {
+    max-width: none !important;
+  }
+
+  .cart-section {
+    max-height: none;
+  }
+}
+
+/* Modal buscar productos: tabla escritorio + tarjetas móvil (mismo patrón que compras) */
+.buscador-compra-thead {
+  background-color: #20c997;
+  color: #fff;
+}
+
+.buscador-compra-thead th {
+  border: none;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.buscador-compra-table-wrap {
+  max-height: min(50vh, 420px);
+}
+
+@media (max-width: 991.98px) {
+  .buscador-productos-compra-dialog .modal-body {
+    padding-bottom: 1rem;
+  }
+
+  .buscador-compra-card {
+    min-height: 3.25rem;
+    border-radius: 0.5rem;
+  }
+}

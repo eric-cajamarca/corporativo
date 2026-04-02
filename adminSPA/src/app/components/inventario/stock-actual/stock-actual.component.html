@@ -17,7 +17,7 @@
     <div class="card shadow-sm mb-3">
       <div class="card-body py-3">
         <div class="row g-3 align-items-end">
-          <div class="col-md-3 col-sm-6">
+          <div class="col-12 col-md-6 col-lg-3">
             <label class="form-label small fw-semibold">Categoría</label>
             <div class="input-group input-group-sm">
               <input type="text" class="form-control" placeholder="Categoría" [(ngModel)]="filtroCategoria" (blur)="cargar()" />
@@ -35,7 +35,7 @@
               </button>
             </div>
           </div>
-          <div class="col-md-3 col-sm-6">
+          <div class="col-12 col-md-6 col-lg-3">
             <label class="form-label small fw-semibold">Sucursal</label>
             <select class="form-select form-select-sm" [(ngModel)]="idSucursal" (ngModelChange)="onSucursalChange()">
               <option value="">Todas las sucursales</option>
@@ -44,7 +44,7 @@
               }
             </select>
           </div>
-          <div class="col-md-3 col-sm-12">
+          <div class="col-12 col-lg-3">
             <label class="form-label small fw-semibold">Stock</label>
             <div class="btn-group btn-group-sm w-100 stock-toggle" role="group">
               <button
@@ -79,8 +79,8 @@
 
     <div class="card shadow-sm">
       <div class="card-body py-2 border-bottom bg-light">
-        <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
-          <div class="input-group input-group-sm stock-search">
+        <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center gap-2 justify-content-between">
+          <div class="input-group input-group-sm stock-search flex-grow-1">
             <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
             <input
               type="search"
@@ -110,7 +110,7 @@
       </div>
 
       <div class="table-responsive">
-        <table class="table table-hover table-striped mb-0 stock-table">
+        <table class="table table-hover table-striped mb-0 stock-table stock-table-mobile">
           <thead>
             <tr>
               <th class="text-center" style="width: 3rem">#</th>
@@ -136,15 +136,15 @@
             } @else {
               @for (r of items; track r.idProducto + r.idEmpresa; let idx = $index) {
                 <tr>
-                  <td class="text-center">{{ idx + 1 }}</td>
-                  <td class="text-nowrap">{{ r.codigo }}</td>
-                  <td>{{ r.descripcion }}</td>
-                  <td>{{ r.categoria }}</td>
-                  <td>{{ r.marca }}</td>
+                  <td class="text-center" data-label="N°">{{ idx + 1 }}</td>
+                  <td class="text-nowrap" data-label="Código">{{ r.codigo }}</td>
+                  <td data-label="Producto">{{ r.descripcion }}</td>
+                  <td data-label="Categoría">{{ r.categoria }}</td>
+                  <td data-label="Marca">{{ r.marca }}</td>
                   @if (mostrarColumnaEmpresa) {
-                    <td><small>{{ r.aliasEmpresa }}</small></td>
+                    <td data-label="Empresa"><small>{{ r.aliasEmpresa }}</small></td>
                   }
-                  <td class="text-end fw-semibold">{{ r.stock | number: '1.0-3' }} <span class="text-muted small">{{ r.unidad || 'UND' }}</span></td>
+                  <td class="text-end fw-semibold" data-label="Stock">{{ r.stock | number: '1.0-3' }} <span class="text-muted small">{{ r.unidad || 'UND' }}</span></td>
                 </tr>
               }
             }

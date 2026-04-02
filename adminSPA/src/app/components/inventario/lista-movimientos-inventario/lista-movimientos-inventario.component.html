@@ -4,12 +4,12 @@
 <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-wrap">
     <div class="content-header">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center flex-wrap gap-2">
         <div>
           <h1 class="content-title mb-1">Movimientos</h1>
           <p class="content-subtitle text-muted mb-0">Ingresos y salidas registrados desde el formulario de inventario</p>
         </div>
-        <a routerLink="/inventario" class="btn btn-outline-secondary btn-sm">
+        <a routerLink="/inventario" class="btn btn-outline-secondary btn-sm w-100 w-lg-auto flex-shrink-0">
           <i class="bi bi-arrow-left me-1"></i> Volver a inventario
         </a>
       </div>
@@ -44,8 +44,8 @@
               }
             </select>
           </div>
-          <div class="col-lg-3 col-md-6 d-flex justify-content-lg-end align-items-end gap-2">
-            <a routerLink="/inventario/ingreso-salida" class="btn btn-success btn-sm">
+          <div class="col-12 col-lg-3 d-flex flex-column flex-sm-row justify-content-lg-end align-items-stretch align-items-sm-end gap-2">
+            <a routerLink="/inventario/ingreso-salida" class="btn btn-success btn-sm flex-grow-1 flex-lg-grow-0">
               <i class="bi bi-plus-lg me-1"></i> Nuevo movimiento
             </a>
             <button type="button" class="btn btn-outline-dark btn-sm" (click)="limpiarFiltros()" title="Limpiar filtros">
@@ -58,8 +58,8 @@
 
     <div class="card shadow-sm">
       <div class="card-body py-2 border-bottom bg-light">
-        <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
-          <div class="input-group input-group-sm pv-search">
+        <div class="d-flex flex-column flex-md-row flex-wrap align-items-stretch align-items-md-center gap-2 justify-content-between">
+          <div class="input-group input-group-sm pv-search flex-grow-1">
             <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
             <input type="search" class="form-control" placeholder="Buscar documento, sucursal, usuario…" [(ngModel)]="buscar" (input)="onBuscarInput()" />
           </div>
@@ -73,7 +73,7 @@
       </div>
 
       <div class="pv-table-scroll table-responsive">
-        <table class="table table-hover table-striped mb-0 pv-table">
+        <table class="table table-hover table-striped mb-0 pv-table pv-table-mobile">
           <thead>
             <tr>
               <th class="text-center mi-th-acciones" style="width: 8rem">
@@ -101,7 +101,7 @@
             } @else {
               @for (r of items; track r.idMovimiento) {
                 <tr>
-                  <td class="text-center text-nowrap mi-td-acciones">
+                  <td class="text-center text-nowrap mi-td-acciones" data-label="Acciones">
                     <button type="button" class="btn btn-link btn-sm p-0 me-1 text-muted" disabled title="Edición no disponible">
                       <i class="bi bi-pencil"></i>
                     </button>
@@ -115,12 +115,12 @@
                       <i class="bi bi-printer"></i>
                     </button>
                   </td>
-                  <td class="text-nowrap small">{{ r.fecha || '—' }}</td>
-                  <td><small>{{ etiquetaTipo(r) }}</small></td>
-                  <td class="small">{{ textoDocumento(r) }}</td>
-                  <td><small>{{ textoReferencia(r) }}</small></td>
-                  <td class="text-end fw-semibold">{{ r.totalImporte | number: '1.2-2' }}</td>
-                  <td><small class="text-muted">{{ textoCondicionPago(r) }}</small></td>
+                  <td class="text-nowrap small" data-label="Fecha">{{ r.fecha || '—' }}</td>
+                  <td data-label="Tipo"><small>{{ etiquetaTipo(r) }}</small></td>
+                  <td class="small" data-label="Documento">{{ textoDocumento(r) }}</td>
+                  <td data-label="Sucursal"><small>{{ textoReferencia(r) }}</small></td>
+                  <td class="text-end fw-semibold" data-label="Total">{{ r.totalImporte | number: '1.2-2' }}</td>
+                  <td data-label="Nota"><small class="text-muted">{{ textoCondicionPago(r) }}</small></td>
                 </tr>
               }
             }

@@ -1616,6 +1616,58 @@ export class CreateComprasComponent {
     );
   }
 
+  /** True si el listado de productos trae empresa (gestora / multi-empresa en compras). */
+  muestraEmpresaEnBuscadorCompras(): boolean {
+    const list = Array.isArray(this.productos_const) ? this.productos_const : [];
+    return list.some(
+      (p: { aliasEmpresa?: string; razonSocialEmpresa?: string }) =>
+        !!(p?.aliasEmpresa && String(p.aliasEmpresa).trim()) ||
+        !!(p?.razonSocialEmpresa && String(p.razonSocialEmpresa).trim())
+    );
+  }
+
+  /** Marca para filas de detalle (objeto, string, producto o idMarca + catálogo). */
+  textoMarcaDetalle(item: any): string {
+    if (!item) return '—';
+    const m = item.marca ?? item.producto?.marca;
+    if (m != null && m !== '') {
+      if (typeof m === 'string') {
+        const t = m.trim();
+        if (t) return t;
+      } else {
+        const n = m.nombre ?? m.Nombre ?? m.descripcion ?? m.Descripcion;
+        if (n != null && String(n).trim()) return String(n).trim();
+      }
+    }
+    const idMarca = item.idMarca ?? item.producto?.idMarca;
+    if (idMarca != null && Array.isArray(this.marcas)) {
+      const found = this.marcas.find((x: any) => String(x.idMarca) === String(idMarca));
+      if (found?.nombre) return String(found.nombre).trim();
+    }
+    return '—';
+  }
+
+  /** Sucursal del ítem (objeto, string, producto o idSucursal + catálogo). */
+  textoSucursalDetalle(item: any): string {
+    if (!item) return '—';
+    const s = item.sucursal ?? item.producto?.sucursal;
+    if (s != null && s !== '') {
+      if (typeof s === 'string') {
+        const t = s.trim();
+        if (t) return t;
+      } else {
+        const n = s.nombre ?? s.Nombre ?? s.descripcion ?? s.Descripcion;
+        if (n != null && String(n).trim()) return String(n).trim();
+      }
+    }
+    const idSucursal = item.idSucursal ?? item.producto?.idSucursal;
+    if (idSucursal != null && Array.isArray(this.sucursales)) {
+      const found = this.sucursales.find((x: any) => String(x.idSucursal) === String(idSucursal));
+      if (found?.nombre) return String(found.nombre).trim();
+    }
+    return '—';
+  }
+
   buscarProductos(): void {
     const term: string = this.searchTerm.toLowerCase().trim();
         
