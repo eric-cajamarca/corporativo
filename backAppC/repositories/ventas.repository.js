@@ -463,7 +463,12 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ISNULL(e.rubro, '') AS rubro,
           ISNULL(e.celular, '') AS celular,
           ISNULL(e.correo, '') AS correo,
-          ISNULL(de.direccion, '') AS direccion
+          ISNULL(de.direccion, '') AS direccion,
+          ISNULL(de.ubigeo, '') AS ubigeo,
+          ISNULL(de.region, '') AS region,
+          ISNULL(de.provincia, '') AS provincia,
+          ISNULL(de.distrito, '') AS distrito,
+          ISNULL(de.urbanizacion, '') AS urbanizacion
         FROM Empresas e
         LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
         WHERE e.idEmpresa = @idEmpresa
@@ -603,6 +608,11 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         nombre: emp.nombre,
         ruc: emp.ruc,
         direccion: (emp.direccion != null && String(emp.direccion).trim()) ? String(emp.direccion).trim() : '',
+        ubigeo: (emp.ubigeo != null && String(emp.ubigeo).trim()) ? String(emp.ubigeo).trim() : '',
+        region: (emp.region != null && String(emp.region).trim()) ? String(emp.region).trim() : '',
+        provincia: (emp.provincia != null && String(emp.provincia).trim()) ? String(emp.provincia).trim() : '',
+        distrito: (emp.distrito != null && String(emp.distrito).trim()) ? String(emp.distrito).trim() : '',
+        urbanizacion: (emp.urbanizacion != null && String(emp.urbanizacion).trim()) ? String(emp.urbanizacion).trim() : '',
         telefono: (emp.celular != null && String(emp.celular).trim()) ? String(emp.celular).trim() : '',
         rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
         correo: (emp.correo != null && String(emp.correo).trim()) ? String(emp.correo).trim() : '',

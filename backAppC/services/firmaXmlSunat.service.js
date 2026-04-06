@@ -9,7 +9,7 @@ const { SignedXml } = require("xml-crypto");
 const crypto = require("crypto");
 
 const XPATH_EXTENSION_CONTENT = "//*[local-name()='ExtensionContent']";
-// Facturador SUNAT: Reference URI="" (firma todo el documento), un solo Transform (enveloped-signature), SHA1/RSA-SHA1, c14n 20010315
+// SUNAT: Reference URI=""; transforms enveloped-signature + C14N 20010315; SHA1/RSA-SHA1
 const ALGORITHM_SHA1 = "http://www.w3.org/2000/09/xmldsig#sha1";
 const ALGORITHM_RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
 const TRANSFORM_ENVELOPED = "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
@@ -62,7 +62,7 @@ function extraerCertificadoDePfx(pfxBuffer, password) {
 /**
  * Firma un XML UBL (Invoice) y devuelve el XML con la firma insertada en ExtensionContent.
  * Estructura alineada con Facturador SUNAT: Reference URI="" (todo el documento), Id="SignSUNAT" en la firma,
- * un solo Transform (enveloped-signature), SHA1/RSA-SHA1, Canonicalization 20010315.
+ * Transforms: enveloped-signature + C14N 20010315 (digest coherente con validadores), SHA1/RSA-SHA1.
  * @param {string} xmlUbl - XML UBL completo (sin firma en ExtensionContent)
  * @param {Buffer} certificadoContenido - Buffer del archivo .pfx
  * @param {string} claveCertificado - Contraseña del PFX
@@ -83,14 +83,15 @@ function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
     signatureAlgorithm: ALGORITHM_RSA_SHA1,
     canonicalizationAlgorithm: CANONICALIZATION_FACTURADOR
   });
-  // Facturador: Reference URI="" (firma todo el documento), un solo Transform.
-  // xml-crypto requiere xpath explícito para createReferences; con uri vacío no asigna xpath y falla el parse.
+  // Reference URI="": debe aplicarse enveloped-signature y luego C14N 20010315 sobre el resultado.
+  // xml-crypto en firma solo ejecuta los transforms listados; si falta C14N, el digest se calcula con
+  // node.toString() (xmldom), mientras que en verificación loadReference añade C14N implícito → SUNAT 2335.
   sig.addReference({
     xpath: "//*[local-name()='Invoice']",
     uri: "",
     isEmptyUri: true,
     digestAlgorithm: ALGORITHM_SHA1,
-    transforms: [TRANSFORM_ENVELOPED]
+    transforms: [TRANSFORM_ENVELOPED, CANONICALIZATION_FACTURADOR]
   });
   sig.computeSignature(xmlUbl, {
     prefix: "ds",
@@ -107,6 +108,21 @@ function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
   let signed = sig.getSignedXml();
   // Facturador usa Id="SignSUNAT" en el elemento ds:Signature
   signed = signed.replace(/(<ds:Signature)(\s|>)/, "$1 Id=\"SignSUNAT\"$2");
+  // #region agent log
+  fetch("http://127.0.0.1:7615/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "20164e" },
+    body: JSON.stringify({
+      sessionId: "20164e",
+      runId: "post-fix",
+      hypothesisId: "H_c14n",
+      location: "firmaXmlSunat.service.js:firmarXmlUbl",
+      message: "firma con transforms enveloped+c14n",
+      data: { refTransforms: ["enveloped", "c14n-20010315"] },
+      timestamp: Date.now()
+    })
+  }).catch(() => {});
+  // #endregion
   return signed;
 }
 

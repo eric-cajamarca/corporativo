@@ -18,11 +18,19 @@ exports.obtenerProductosTodosService = async (pool, user) => {
     throw new Error("NO_PERMISSIONS");
   }
 
-  const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
-  const idsEmpresa = [
-    user.empresa,
-    ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)
-  ];
+  // Solo la empresa gestora (origen activo en Gestores_Empresas) ve stock de las empresas que gestiona.
+  // Empresa gestionada o independiente: únicamente productos de su propia empresa (token).
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  let idsEmpresa;
+  if (esGestora) {
+    const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
+    idsEmpresa = [
+      user.empresa,
+      ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)
+    ];
+  } else {
+    idsEmpresa = [user.empresa];
+  }
   const productos = await ProductosRepository.obtenerProductosTodosMultiEmpresaRepo(pool, idsEmpresa);
   return productos;
 };

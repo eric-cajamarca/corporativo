@@ -432,6 +432,7 @@ export class CreateVentasComponent implements OnInit {
           this.productos = response.data;
           this.productos_const = this.productos;
           this.stockSucursales_const = this.productos;
+          this.productos_filtrados = Array.isArray(this.stockSucursales_const) ? [...this.stockSucursales_const] : [];
         }
       },
       (error: any) => {
@@ -528,14 +529,23 @@ export class CreateVentasComponent implements OnInit {
 
 
 
-  /** Muestra columna Empresa si el API devuelve alias/razón social (gestora o gestionada con datos). */
+  /** Columna Empresa en el modal Buscar productos: solo tiene sentido para empresa gestora (listado multi-empresa). */
   muestraEmpresaEnBuscadorVentas(): boolean {
-    const list = Array.isArray(this.stockSucursales_const) ? this.stockSucursales_const : [];
-    return list.some(
-      (p: { aliasEmpresa?: string; razonSocialEmpresa?: string }) =>
-        !!(p?.aliasEmpresa && String(p.aliasEmpresa).trim()) ||
-        !!(p?.razonSocialEmpresa && String(p.razonSocialEmpresa).trim())
-    );
+    return this.esGestora;
+  }
+
+  /**
+   * Cotización "agrupada" (corporativa / multi-empresa): solo empresa gestora y solo si el carrito
+   * mezcla productos de más de una empresa. Evita marcar agrupada en gestionadas (todas las líneas llevan idEmpresa propio).
+   */
+  private cotizacionDebeMarcarseAgrupada(): boolean {
+    if (!this.esGestora || !this.carrito?.length) return false;
+    const ids = new Set<string>();
+    for (const item of this.carrito) {
+      const id = item?.idEmpresa != null && String(item.idEmpresa).trim() !== '' ? String(item.idEmpresa) : null;
+      if (id) ids.add(id);
+    }
+    return ids.size > 1;
   }
 
   buscarProductos(): void {
@@ -1808,7 +1818,7 @@ abrirModalPrecios(item: any) {
         moneda: null,
         idCondicionPago: null,
         total: totalVenta,
-        esCotizacionAgrupada: !!(this.esGestora || this.carrito.some((item: { idEmpresa?: string }) => !!item.idEmpresa))
+        esCotizacionAgrupada: this.cotizacionDebeMarcarseAgrupada()
       },
       detalles: this.carrito.map((item: any) => {
         const cant = Number(item.cantidad) || 0;

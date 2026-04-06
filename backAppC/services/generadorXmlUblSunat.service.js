@@ -37,6 +37,20 @@ function escXml(s) {
   return t;
 }
 
+/** Ubigeo PE (SUNAT): 6 dígitos en cbc:CountrySubentityCode del domicilio fiscal. */
+function normalizarUbigeoSunat(ubigeo) {
+  const d = toStr(ubigeo).replace(/\D/g, "");
+  if (d.length >= 6) return d.slice(0, 6);
+  if (d.length > 0) return d.padStart(6, "0");
+  return "000000";
+}
+
+/** Valor UBL para campos de dirección; si no hay dato en BD se mantiene "-" como antes. */
+function textoUblDir(v) {
+  const t = toStr(v).trim();
+  return t || "-";
+}
+
 function fechaParte(fechaStr) {
   if (!fechaStr) return { fecha: "", hora: "00:00:00" };
   const s = String(fechaStr).trim();
@@ -178,6 +192,11 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   const dueDateInvoice = pagoUbl.dueDate || fecha;
   const dirEmisor = toStr(empresa.direccion) || "-";
   const dirCliente = toStr(cliente.direccion) || "-";
+  const ubigeoEmisor = normalizarUbigeoSunat(empresa.ubigeo);
+  const emisorRegion = textoUblDir(empresa.region);
+  const emisorProvincia = textoUblDir(empresa.provincia);
+  const emisorDistrito = textoUblDir(empresa.distrito);
+  const emisorUrbanizacion = textoUblDir(empresa.urbanizacion);
 
   const lineas = [];
   let idx = 1;
@@ -273,11 +292,11 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
         <cbc:RegistrationName>${razonEmisor}</cbc:RegistrationName>
         <cac:RegistrationAddress>
           <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
-          <cbc:CitySubdivisionName>-</cbc:CitySubdivisionName>
-          <cbc:CityName>-</cbc:CityName>
-          <cbc:CountrySubentity>-</cbc:CountrySubentity>
-          <cbc:CountrySubentityCode>000000</cbc:CountrySubentityCode>
-          <cbc:District>-</cbc:District>
+          <cbc:CitySubdivisionName>${escXml(emisorUrbanizacion)}</cbc:CitySubdivisionName>
+          <cbc:CityName>${escXml(emisorProvincia)}</cbc:CityName>
+          <cbc:CountrySubentity>${escXml(emisorRegion)}</cbc:CountrySubentity>
+          <cbc:CountrySubentityCode>${escXml(ubigeoEmisor)}</cbc:CountrySubentityCode>
+          <cbc:District>${escXml(emisorDistrito)}</cbc:District>
           <cac:AddressLine>
             <cbc:Line>${escXml(dirEmisor)}</cbc:Line>
           </cac:AddressLine>

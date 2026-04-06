@@ -190,6 +190,306 @@ const calcularTotales = (detalles) => {
   };
 };
 
+/**
+ * Venta estándar (una sola empresa): sin comprobante VA ni VentaAgrupada.
+ * Empresas gestionadas e independientes. Usa idCliente e idComprobante de la cabecera en la misma empresa del JWT.
+ */
+async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
+  const { venta, detalles, detallePago, idApertura, cuotasCredito } = payload || {};
+  if (!venta || !Array.isArray(detalles) || detalles.length === 0) {
+    throw new Error('Venta y detalles son requeridos.');
+  }
+  const idComprobanteSolicitado = venta.idComprobante != null ? parseInt(String(venta.idComprobante), 10) : NaN;
+  if (!Number.isFinite(idComprobanteSolicitado)) {
+    throw new Error('Comprobante de venta no válido.');
+  }
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
+    const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
+    const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
+    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+
+    let idSucursalEmpresa = venta.idSucursal || null;
+    if (!idSucursalEmpresa) {
+      idSucursalEmpresa = await obtenerSucursalPorEmpresa(transaction, user.empresa);
+    }
+    if (!idSucursalEmpresa) {
+      throw new Error('No se pudo determinar la sucursal de la venta.');
+    }
+
+    const fechaEmisionConHora = fechaEmisionConHoraActual(venta.fEmision);
+    const fVencimientoSQL = getFechaSoloSQLString(venta.fVencimiento) || fechaEmisionConHora;
+    const ventaConHora = { ...venta, fEmision: fechaEmisionConHora, fVencimiento: fVencimientoSQL };
+    let idEstadoPago = venta.idEstadoPago != null ? parseInt(venta.idEstadoPago, 10) : 1;
+    const idEstadoPedidoVenta = venta.idEstadoPedido != null ? parseInt(venta.idEstadoPedido, 10) : 1;
+    const esEstadoPendiente = (idEstadoPedidoVenta === 1);
+
+    const medPagoValido = ventaConHora.idMediosPago != null && String(ventaConHora.idMediosPago).trim() !== '';
+    if (!medPagoValido) {
+      const rContado = await transaction.request().query(`SELECT TOP 1 idMediosPago FROM MediosPago WHERE RTRIM(LTRIM(ISNULL(codigo,''))) = '009'`);
+      const rCualquiera = await transaction.request().query('SELECT TOP 1 idMediosPago FROM MediosPago');
+      const fallbackId = rContado.recordset?.[0]?.idMediosPago ?? rCualquiera.recordset?.[0]?.idMediosPago;
+      ventaConHora.idMediosPago = fallbackId != null ? String(fallbackId) : '1';
+    }
+
+    try {
+      const ventaCreditoPostVentaService = require('./ventaCreditoPostVenta.service');
+      const idsCredCab = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
+      const idMpCab = Number(ventaConHora.idMediosPago);
+      if (idsCredCab.has(idMpCab)) {
+        idEstadoPago = 2;
+      }
+    } catch (err) {
+      console.error('contexto: idEstadoPago crédito cabecera (venta simple)', err);
+    }
+
+    const idsProducto = [...new Set(detalles.map(d => d.idProducto).filter(Boolean).map(String))];
+    const mapaProductos = await obtenerMapaProductosEmpresa(transaction, idsProducto);
+    if (mapaProductos.size !== idsProducto.length) {
+      throw new Error('Uno o más productos no existen.');
+    }
+
+    const idEmpresaJwt = String(user.empresa).toLowerCase();
+    const dets = [];
+    for (const det of detalles) {
+      const idProducto = String(det.idProducto);
+      const idEmpProd = mapaProductos.get(idProducto);
+      if (!idEmpProd || String(idEmpProd).toLowerCase() !== idEmpresaJwt) {
+        throw new Error(`Producto ${det.descripcion || idProducto} no pertenece a su empresa.`);
+      }
+      dets.push({
+        ...det,
+        idEmpresaProducto: idEmpProd,
+        idSucursalEmpresa: det.idSucursalEmpresa || det.idSucursal || null
+      });
+    }
+
+    const clienteSeleccionado = await ventasRepository.obtenerClientePorIdEnEmpresas(
+      transaction,
+      venta.idCliente,
+      [user.empresa]
+    );
+    if (!clienteSeleccionado) {
+      throw new Error('Cliente no encontrado.');
+    }
+    const idClienteEmpresa = clienteSeleccionado.idCliente;
+    const idUsuarioEmpresa = user.sub;
+
+    const rCompDestino = await transaction.request()
+      .input('idComprobante', sql.Int, idComprobanteSolicitado)
+      .input('idEmpresa', sql.UniqueIdentifier, user.empresa)
+      .query('SELECT idComprobante, codigo FROM Comprobantes WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa');
+    const idComprobanteDestino = rCompDestino.recordset?.[0]?.idComprobante;
+    const codigoComprobante = (rCompDestino.recordset?.[0]?.codigo || '').trim().toUpperCase();
+    if (!idComprobanteDestino) {
+      throw new Error('El comprobante seleccionado no existe en su empresa o no está autorizado.');
+    }
+    const esNotaVenta = codigoComprobante === 'NV';
+
+    const sucursalesUnicas = new Set(dets.map(d => d.idSucursalEmpresa).filter(Boolean));
+    if (sucursalesUnicas.size > 1) {
+      throw new Error('No se permite más de una sucursal en una misma venta.');
+    }
+    let idSucursalLinea = sucursalesUnicas.size === 1 ? Array.from(sucursalesUnicas)[0] : null;
+    if (!idSucursalLinea) {
+      const primero = dets.find((d) => d.idProducto);
+      idSucursalLinea = primero
+        ? await obtenerSucursalPreferentePorProducto(transaction, user.empresa, String(primero.idProducto))
+        : null;
+    }
+    if (!idSucursalLinea) {
+      idSucursalLinea = idSucursalEmpresa;
+    }
+    if (!idSucursalLinea) {
+      throw new Error('No se pudo determinar la sucursal para el detalle.');
+    }
+    if (!(await validarSucursalEmpresa(transaction, user.empresa, idSucursalLinea))) {
+      throw new Error('La sucursal de la venta no pertenece a su empresa.');
+    }
+
+    const { numero, serie } = await ventasRepository.obtenerSiguienteNumeroComprobante(
+      transaction,
+      user.empresa,
+      idComprobanteDestino
+    );
+    const compVenta = serie + '-' + numero;
+
+    const totalesEmpresa = calcularTotales(dets);
+
+    const ventaDatos = {
+      idSucursal: idSucursalLinea,
+      serie,
+      numero,
+      compVenta,
+      idComprobante: idComprobanteDestino,
+      fEmision: fechaEmisionConHora,
+      fVencimiento: fVencimientoSQL,
+      idCliente: idClienteEmpresa,
+      idMoneda: venta.idMoneda || 1,
+      tCambio: venta.tCambio || 1,
+      subtotal: totalesEmpresa.subtotal,
+      igv: totalesEmpresa.igv,
+      exonerado: totalesEmpresa.exonerado,
+      gratuito: totalesEmpresa.gratuito,
+      otrosCargos: totalesEmpresa.otrosCargos,
+      descuentos: totalesEmpresa.descuentos,
+      total: totalesEmpresa.total,
+      idMediosPago: ventaConHora.idMediosPago,
+      idEstadoPedido: idEstadoPedidoVenta,
+      idEstadoPago,
+      idEstadoSunat: esNotaVenta ? 0 : (venta.idEstadoSunat || 0),
+      compRelacionado: venta.compRelacionado || null,
+      observaciones: venta.observaciones || null
+    };
+
+    const ventaResult = await ventasRepository.insertar(transaction, ventaDatos, user.empresa, idUsuarioEmpresa);
+    const idVenta = ventaResult.recordset[0].idVenta;
+
+    const avisoStockInsuficiente = [];
+
+    for (const det of dets) {
+      const cantPedida = parseFloat(det.cantidad) || 0;
+      const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
+
+      const stockDisponible = await stockService.obtenerStockDisponible(transaction, user.empresa, det.idProducto, idSucursalLinea);
+      if (stockDisponible < cantPedida) {
+        if (!permitirVentasNegativas) {
+          throw new Error(`Stock insuficiente para "${det.descripcion || det.idProducto}". Disponible: ${stockDisponible}, solicitado: ${cantPedida}.`);
+        }
+        avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
+      }
+
+      const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPedida, stockDisponible) : cantPedida;
+      let consumosPorLote = [];
+      if (cantidadADescontar > 0) {
+        const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
+          idEmpresa: user.empresa,
+          idSucursal: idSucursalLinea,
+          idProducto: det.idProducto,
+          cantidad: cantidadADescontar
+        }, { controlUbicaciones });
+        consumosPorLote = resultadoDescuento?.consumosPorLote || [];
+      }
+
+      const costoTotalLinea = Array.isArray(consumosPorLote)
+        ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
+        : 0;
+      const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
+
+      await detalleVentaService.crearDetalle(transaction, {
+        ...det,
+        idVenta,
+        cantEntregada,
+        idEstadoPedido: idEstadoPedidoVenta,
+        hVenta: getNowLocalSQLString(),
+        costoUnitario: costoUnitarioProm,
+        costoTotal: costoTotalLinea
+      });
+      det._costoUnitario = costoUnitarioProm;
+      det._costoTotal = costoTotalLinea;
+      det._cantEntregada = cantEntregada;
+
+      if (cantidadADescontar > 0) {
+        if (Array.isArray(consumosPorLote) && consumosPorLote.length > 0) {
+          for (const c of consumosPorLote) {
+            const cantTomada = Number(c.cantidadTomada) || 0;
+            if (cantTomada <= 0) continue;
+            await inventarioRepository.insertarFilaMovimiento(transaction, {
+              idEmpresa: user.empresa,
+              idSucursal: idSucursalLinea,
+              idProducto: det.idProducto,
+              tipoMovimiento: 'SA',
+              cantidad: cantTomada,
+              docRelacionado: compVenta,
+              idComprobante: idComprobanteDestino,
+              idUsuario: idUsuarioEmpresa,
+              observaciones: 'Venta',
+              costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
+              idLote: c.idLote || null
+            });
+          }
+        } else {
+          await inventarioRepository.insertarFilaMovimiento(transaction, {
+            idEmpresa: user.empresa,
+            idSucursal: idSucursalLinea,
+            idProducto: det.idProducto,
+            tipoMovimiento: 'SA',
+            cantidad: cantidadADescontar,
+            docRelacionado: compVenta,
+            idComprobante: idComprobanteDestino,
+            idUsuario: idUsuarioEmpresa,
+            observaciones: 'Venta',
+            costoUnitario: costoUnitarioProm,
+            idLote: null
+          });
+        }
+      }
+    }
+
+    if (!esNotaVenta) {
+      await facturacionRepository.registrarComprobanteElectronicoPorVentaRepo(
+        transaction, user.empresa, idVenta, idComprobanteDestino, serie, numero, fechaEmisionConHora
+      );
+    }
+
+    const ventasEmpresa = [{
+      idEmpresa: String(user.empresa),
+      idVenta,
+      idCliente: idClienteEmpresa,
+      codigoComprobante,
+      compVenta,
+      total: totalesEmpresa.total,
+      idSucursal: idSucursalLinea,
+    }];
+
+    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0 && ventasEmpresa.length > 0) {
+      const ventaCreditoPostVentaService = require('./ventaCreditoPostVenta.service');
+      await ventaCreditoPostVentaService.crearCreditosDesdeVentaAgrupada(transaction, {
+        ventasEmpresa,
+        detallePago,
+        cuotasCredito: Array.isArray(cuotasCredito) ? cuotasCredito : [],
+        userSub: user.sub,
+        fVencimientoCabecera: venta.fVencimiento,
+      });
+    }
+
+    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
+      const ventaAgrupadaCobroService = require('./ventaAgrupadaCobro.service');
+      await ventaAgrupadaCobroService.aplicarCobroVentasAgrupadasMulticompania(pool, transaction, {
+        lineasVenta: ventasEmpresa.map((v) => ({
+          idVenta: v.idVenta,
+          idEmpresa: v.idEmpresa,
+          compVenta: v.compVenta,
+          total: v.total,
+          idSucursal: v.idSucursal,
+        })),
+        detallePago,
+        idEmpresaCobradora: user.empresa,
+        idUsuario: user.sub,
+        compVentaVA: compVenta,
+        idAperturaGestoraOpcional: idApertura || null,
+        idSucursalGestoraFallback: idSucursalLinea,
+      });
+    }
+
+    await transaction.commit();
+    return {
+      idVentaAgrupada: null,
+      compVentaVA: null,
+      ventasEmpresa,
+      avisoStockInsuficiente: avisoStockInsuficiente.length > 0
+        ? 'Stock insuficiente para uno o más productos. Se descontó solo el disponible.'
+        : null
+    };
+  } catch (error) {
+    try { await transaction.rollback(); } catch (_) {}
+    throw error;
+  }
+}
+
 exports.crearVentaCorporativaCompleta = async (payload, user) => {
   if (!user || !user.empresa || !user.sub) {
     throw new Error('Usuario no autorizado.');
@@ -199,9 +499,14 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     throw new Error('Venta y detalles son requeridos.');
   }
 
+  const pool = await sql.connect(dbConfig);
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  if (!esGestora) {
+    return crearVentaSimpleCompletaWithPool(payload, user, pool);
+  }
+
   const tipoComprobanteDestino = (venta.tipoComprobanteDestino || 'NV').trim().toUpperCase();
 
-  const pool = await sql.connect(dbConfig);
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
