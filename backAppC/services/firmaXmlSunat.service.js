@@ -9,6 +9,9 @@ const { SignedXml } = require("xml-crypto");
 const crypto = require("crypto");
 
 const XPATH_EXTENSION_CONTENT = "//*[local-name()='ExtensionContent']";
+/** Raíz UBL 2.1: factura/boleta (Invoice), nota crédito (CreditNote), nota débito (DebitNote). */
+const XPATH_DOCUMENTO_UBL =
+  "//*[local-name()='Invoice' or local-name()='CreditNote' or local-name()='DebitNote']";
 // SUNAT: Reference URI=""; transforms enveloped-signature + C14N 20010315; SHA1/RSA-SHA1
 const ALGORITHM_SHA1 = "http://www.w3.org/2000/09/xmldsig#sha1";
 const ALGORITHM_RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
@@ -60,7 +63,7 @@ function extraerCertificadoDePfx(pfxBuffer, password) {
 }
 
 /**
- * Firma un XML UBL (Invoice) y devuelve el XML con la firma insertada en ExtensionContent.
+ * Firma un XML UBL (Invoice / CreditNote / DebitNote) y devuelve el XML con la firma insertada en ExtensionContent.
  * Estructura alineada con Facturador SUNAT: Reference URI="" (todo el documento), Id="SignSUNAT" en la firma,
  * Transforms: enveloped-signature + C14N 20010315 (digest coherente con validadores), SHA1/RSA-SHA1.
  * @param {string} xmlUbl - XML UBL completo (sin firma en ExtensionContent)
@@ -87,7 +90,7 @@ function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
   // xml-crypto en firma solo ejecuta los transforms listados; si falta C14N, el digest se calcula con
   // node.toString() (xmldom), mientras que en verificación loadReference añade C14N implícito → SUNAT 2335.
   sig.addReference({
-    xpath: "//*[local-name()='Invoice']",
+    xpath: XPATH_DOCUMENTO_UBL,
     uri: "",
     isEmptyUri: true,
     digestAlgorithm: ALGORITHM_SHA1,

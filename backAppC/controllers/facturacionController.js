@@ -619,6 +619,9 @@ const crearNotaCreditoDebito = async (req, res, next) => {
     });
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message && String(error.message).includes("No hay comprobante configurado para nota")) {
+      return res.status(400).send({ message: error.message, data: undefined });
+    }
     console.error("Error crear nota crédito/débito:", error);
     return next(error);
   }

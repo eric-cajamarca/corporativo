@@ -173,7 +173,8 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
     igv = Math.round((toNum(venta.total) - toNum(venta.subtotal)) * 100) / 100;
   }
   const total = toNum(venta.total);
-  const descuentos = toNum(venta.descuentos);
+  /** Descuentos de cabecera no se envían en UBL a SUNAT (montos ya reflejados en líneas / total). */
+  const descuentos = 0;
   const { fecha, hora } = fechaParte(venta.fEmision);
   const tipoCod = String(tipoComprobante || "01").trim();
   const tributo = resolverTributoPrincipal(payload.impuestos || [], igv);

@@ -53,7 +53,7 @@
           <button class="nav-link" id="nav-inventario-tab" data-bs-toggle="tab" data-bs-target="#nav-inventario" type="button" role="tab" aria-controls="nav-inventario" aria-selected="false">
             <i class="fas fa-boxes me-2"></i>Inventario
           </button>
-          <button class="nav-link" id="nav-ventas-tab" data-bs-toggle="tab" data-bs-target="#nav-ventas" type="button" role="tab" aria-controls="nav-ventas" aria-selected="false">
+          <button class="nav-link" id="nav-ventas-tab" data-bs-toggle="tab" data-bs-target="#nav-ventas" type="button" role="tab" aria-controls="nav-ventas" aria-selected="false" (click)="cargarConfiguracionVentas()">
             <i class="fas fa-shopping-cart me-2"></i>Ventas
           </button>
           <button class="nav-link" id="nav-comprobante-defecto-tab" data-bs-toggle="tab" data-bs-target="#nav-comprobante-defecto" type="button" role="tab" aria-controls="nav-comprobante-defecto" aria-selected="false" (click)="cargarVentasDefaults()">
@@ -498,6 +498,14 @@
                       </label>
                     </div>
                   </div>
+                  <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="usarDescuentoEnTotal" [(ngModel)]="ventas.usarDescuentoEnTotal" name="usarDescuentoEnTotal">
+                      <label class="form-check-label" for="usarDescuentoEnTotal">
+                        Usar descuento en el total de la venta (precio lista vs. precio vendido).
+                      </label>
+                    </div>
+                  </div>
                   <div class="col-md-6">
                     <label for="diasCreditoMaximo" class="form-label">Días de crédito máximo</label>
                     <input type="number" class="form-control" id="diasCreditoMaximo" [(ngModel)]="ventas.diasCreditoMaximo" name="diasCreditoMaximo">
@@ -516,8 +524,8 @@
                   </div>
                 </div>
                 <div class="mt-3">
-                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionVentas()">
-                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionVentas()" [disabled]="ventasGuardando">
+                    <i class="fas fa-save me-2"></i>{{ ventasGuardando ? 'Guardando...' : 'Guardar Cambios' }}
                   </button>
                 </div>
               </form>

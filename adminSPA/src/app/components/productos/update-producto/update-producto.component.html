@@ -134,6 +134,12 @@
             <label class="form-check-label" for="estadoEdit">Activo</label>
           </div>
         </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" formControlName="permiteDescripcionEnVenta" id="permiteDescVentaEdit" />
+            <label class="form-check-label" for="permiteDescVentaEdit">Permitir cambiar la descripción al vender (ej. productos varios); no actualiza el catálogo.</label>
+          </div>
+        </div>
 
         @if (productosConImagenes) {
           <div class="col-12 mt-3">

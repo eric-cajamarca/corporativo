@@ -22,11 +22,47 @@
 
 .content-wrap {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1280px;
   margin-left: auto;
   margin-right: auto;
   overflow-x: hidden;
   min-width: 0;
+}
+
+/* Encabezado columna Acciones: botón verde como referencia de UI */
+.notas-th-acciones {
+  background-color: #198754 !important;
+  color: #fff !important;
+  vertical-align: middle !important;
+  border-color: #157347 !important;
+}
+
+.notas-btn-acciones-header {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.notas-btn-acciones-header:hover {
+  background-color: #157347 !important;
+  border-color: #146c43 !important;
+  color: #fff !important;
+}
+
+.notas-emitidas-table thead.table-light th:not(.notas-th-acciones) {
+  background-color: #f8f9fa;
+}
+
+.notas-td-acciones .btn-link {
+  text-decoration: none;
+}
+
+.notas-td-acciones .btn-link:hover {
+  opacity: 0.85;
+}
+
+.notas-buscar-wrap {
+  max-width: 320px;
+  min-width: 200px;
 }
 
 .content-header {

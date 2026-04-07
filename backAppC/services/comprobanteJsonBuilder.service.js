@@ -37,7 +37,8 @@ function buildFacturaBoletaJson(payload, tipoComprobante) {
 
   const totalGravada = toNum(venta.subtotal);
   const totalIgv = toNum(venta.igv);
-  const totalDescuento = toNum(venta.descuentos);
+  /** JSON Facturador SUNAT: total descuento en cabecera en 0 (no duplicar frente a líneas / SUNAT). */
+  const totalDescuento = 0;
   const total = toNum(venta.total);
 
   const codFp =
@@ -160,8 +161,10 @@ function buildNotaJson(payload, tipoComprobante, documentoReferencia = {}) {
  */
 function buildComprobanteJson(payload, tipoComprobante, documentoReferencia) {
   const tt = String(tipoComprobante || "01").trim();
-  if (tt === "07" || tt === "08") {
-    return buildNotaJson(payload, tt, documentoReferencia || {});
+  const esNc = tt === "07" || tt === "F7" || tt === "B7";
+  const esNd = tt === "08" || tt === "F8" || tt === "B8";
+  if (esNc || esNd) {
+    return buildNotaJson(payload, esNc ? "07" : "08", documentoReferencia || {});
   }
   return buildFacturaBoletaJson(payload, tt === "03" ? "03" : "01");
 }

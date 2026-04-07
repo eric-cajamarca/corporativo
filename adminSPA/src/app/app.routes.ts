@@ -282,7 +282,7 @@ export const routes: Routes = [
      { path: 'catalogos/motivo-traslado', component: IndexMotivoTrasladoComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Motivo Traslado' },
      { path: 'catalogos/motivo-nota-credito', component: IndexMotivoNotaCreditoComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Motivo Nota Credito' },
      { path: 'facturacion/resumenes-diarios', component: ResumenesDiariosComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Resúmenes diarios SUNAT' },
-    { path: 'facturacion/notas-credito-debito', component: NotasCreditoDebitoComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Notas de crédito / débito' },
+    { path: 'facturacion/notas-credito-debito', component: NotasCreditoDebitoComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Emisión de notas' },
     { path: 'facturacion/comunicacion-baja', component: ComunicacionBajaComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Comunicación de baja' },
     { path: 'facturacion/guias/configuracion', component: GuiasConfiguracionComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Configuración de guías' },
     { path: 'facturacion/guias-remision', component: GuiasRemisionComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Guías de remisión' },

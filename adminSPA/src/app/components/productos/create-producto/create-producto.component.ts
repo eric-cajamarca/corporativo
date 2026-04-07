@@ -167,6 +167,7 @@ export class CreateProductoComponent implements OnInit {
       
       // Estado
       estado: [true],
+      permiteDescripcionEnVenta: [false],
 
       // Precio
       idListaPrecio: [null]
@@ -326,7 +327,8 @@ export class CreateProductoComponent implements OnInit {
         ubicacion: this.loteData.ubicacion
       } : null,
       precioVenta: this.precioVenta && this.precioVenta > 0 ? this.precioVenta : 0,
-      idListaPrecio: v.idListaPrecio != null && v.idListaPrecio !== '' ? Number(v.idListaPrecio) : null
+      idListaPrecio: v.idListaPrecio != null && v.idListaPrecio !== '' ? Number(v.idListaPrecio) : null,
+      permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta
     };
 
     this.productoService.crearProducto(producto).subscribe({

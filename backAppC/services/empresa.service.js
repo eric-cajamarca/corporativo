@@ -75,8 +75,10 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
     const comprobantesPredeterminados = [
         { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1 },
         { codigo: '03', nombre: 'Boleta Electrónica', serie: 'B001', numero: 0, activo: 1 },
-        { codigo: '07', nombre: 'Nota de Crédito Electrónica', serie: 'FC01', numero: 0, activo: 1 },
-        { codigo: '08', nombre: 'Nota de Débito Electrónica', serie: 'FD01', numero: 0, activo: 1 },
+        { codigo: 'F7', nombre: 'N.C. Electrónica (Factura)', serie: 'FC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+        { codigo: 'B7', nombre: 'N.C. Electrónica (Boleta)', serie: 'BC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+        { codigo: 'F8', nombre: 'N.D. Electrónica (Factura)', serie: 'FD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+        { codigo: 'B8', nombre: 'N.D. Electrónica (Boleta)', serie: 'BD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
         { codigo: '09', nombre: 'Guía de Remisión Electrónica', serie: 'T001', numero: 0, activo: 1 },
         { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1 },
         { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1 },
@@ -99,6 +101,8 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
 
     try {
         for (const comp of comprobantesPredeterminados) {
+            const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
+            const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
             const result = await pool.request()
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('codigo', sql.VarChar(2), comp.codigo)
@@ -106,10 +110,12 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
                 .input('serie', sql.VarChar(4), comp.serie)
                 .input('numero', sql.Int, comp.numero)
                 .input('activo', sql.Bit, comp.activo)
+                .input('usarEnVenta', sql.Bit, usarEnVenta)
+                .input('usarEnCompra', sql.Bit, usarEnCompra)
                 .query(`
-                    INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo)
+                    INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
                     OUTPUT INSERTED.idComprobante
-                    VALUES (@idEmpresa, @codigo, @nombre, @serie, @numero, @activo)
+                    VALUES (@idEmpresa, @codigo, @nombre, @serie, @numero, @activo, @usarEnVenta, @usarEnCompra)
                 `);
 
             const idComprobante = result.recordset[0].idComprobante;

@@ -97,6 +97,19 @@ export class VentasService {
     return this._http.get<{ data: VentaListado[] }>(this.url + 'ventas/listar', { withCredentials: true });
   }
 
+  /** Notas de crédito y débito emitidas (paginado). Query: buscar, pagina, porPagina. */
+  listarNotasCreditoDebito(params?: { buscar?: string; pagina?: number; porPagina?: number }): Observable<{ data: NotaCreditoDebitoListado[]; total: number }> {
+    const q = new URLSearchParams();
+    if (params?.buscar != null && String(params.buscar).trim() !== '') q.set('buscar', String(params.buscar).trim());
+    if (params?.pagina != null) q.set('pagina', String(params.pagina));
+    if (params?.porPagina != null) q.set('porPagina', String(params.porPagina));
+    const qs = q.toString();
+    return this._http.get<{ data: NotaCreditoDebitoListado[]; total: number }>(
+      this.url + 'ventas/listar-notas' + (qs ? '?' + qs : ''),
+      { withCredentials: true }
+    );
+  }
+
   /** Lista comprobantes asociados a una venta agrupada. */
   listarComprobantesVentaAgrupada(idVentaAgrupada: string): Observable<{ data: ComprobanteVentaAgrupada[] }> {
     return this._http.get<{ data: ComprobanteVentaAgrupada[] }>(
@@ -284,6 +297,8 @@ export interface DetalleVentaEdicionPayload {
   total: number;
   igv?: boolean;
   isc?: boolean;
+  /** Texto distinto al catálogo; se guarda en DetalleVenta.descripcionLinea */
+  descripcionLinea?: string | null;
 }
 
 export interface ComprobantePdfData {
@@ -306,6 +321,8 @@ export interface ComprobantePdfData {
     gratuito?: number;
     otrosCargos?: number;
     descuentos: number;
+    /** Monto a mostrar en PDF (0 si la empresa desactivó descuentos en total). */
+    descuentosImpresion?: number;
     total: number;
     resumenHash?: string;
     eliminado?: boolean;
@@ -329,6 +346,8 @@ export interface ComprobantePdfData {
     idProducto?: string;
     codigo?: string;
     descripcion: string;
+    descripcionProducto?: string;
+    permiteDescripcionEnVenta?: boolean;
     cantidad: number;
     cantEntregada?: number;
     pVenta: number;
@@ -363,6 +382,7 @@ export interface ComprobanteVAPdfData {
     subtotal: number;
     igv: number;
     descuentos: number;
+    descuentosImpresion?: number;
     total: number;
     idEstadoPago?: number;
     tipoComprobanteDestino?: string;
@@ -386,6 +406,21 @@ export interface ComprobanteVAPdfData {
     sucursal?: string;
     idEmpresaProducto?: string;
   }>;
+}
+
+/** Fila del listado de notas de crédito/débito (GET ventas/listar-notas). */
+export interface NotaCreditoDebitoListado {
+  idVenta: number;
+  idEmpresa?: string | null;
+  compVenta: string;
+  fEmision: string;
+  total: number;
+  idEstadoSunat?: number | null;
+  serie?: string;
+  numero?: string;
+  codigoComprobante?: string;
+  idComprobanteElectronico?: string | null;
+  clienteRazonSocial?: string;
 }
 
 export interface VentaListado {

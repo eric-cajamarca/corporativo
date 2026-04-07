@@ -100,7 +100,8 @@
                         <span class="badge bg-info text-dark">{{ item.aliasEmpresa || '' }}</span>
                       </td>
                       <td>{{ item.codigo }}</td>
-                      <td style="width: 400px; text-align: left; " contenteditable="true" class="editable" 
+                      <td style="width: 400px; text-align: left; " [attr.contenteditable]="item.permiteDescripcionEnVenta ? true : null" class="editable"
+                      [class.text-muted]="!item.permiteDescripcionEnVenta"
                       (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}
                       </td>
                       <td style="width: 60px; text-align: center;">{{ item.codigoPresentacion }}</td>
@@ -153,7 +154,7 @@
                     <span class="badge bg-info text-dark">{{ item.aliasEmpresa || '' }}</span>
                   </div>
                   <div class="small text-muted mb-1">Producto</div>
-                  <div contenteditable="true" class="editable create-ventas-cart-desc mb-2" (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}</div>
+                  <div [attr.contenteditable]="item.permiteDescripcionEnVenta ? true : null" class="editable create-ventas-cart-desc mb-2" [class.text-muted]="!item.permiteDescripcionEnVenta" (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}</div>
                   <div class="row g-2 small">
                     <div class="col-6">
                       <span class="text-muted">U.Medida</span>

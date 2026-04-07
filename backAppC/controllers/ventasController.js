@@ -931,6 +931,38 @@ const crearVentaDesdeVale = async (req, res) => {
   }
 };
 
+/** GET /ventas/listar-notas — Notas de crédito y débito emitidas (paginado). Misma ámbito de empresas que el listado de ventas. */
+const listarNotasCreditoDebito = async (req, res) => {
+  const idempresa = req.user.empresa;
+  if (!req.user || !idempresa) {
+    return res.status(401).json({ message: "No Access" });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    let idsList = [idempresa];
+    try {
+      const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, idempresa);
+      if (esGestora) {
+        idsList = await idsEmpresaParaComprobanteVenta(pool, idempresa);
+      }
+    } catch (_) {
+      idsList = [idempresa];
+    }
+    const buscar = req.query.buscar != null ? String(req.query.buscar) : "";
+    const pagina = req.query.pagina != null ? String(req.query.pagina) : "1";
+    const porPagina = req.query.porPagina != null ? String(req.query.porPagina) : "20";
+    const { rows, total } = await ventasRepository.listarVentasNotasCreditoDebitoRepo(pool, idsList, {
+      buscar,
+      pagina,
+      porPagina
+    });
+    return res.json({ data: rows, total });
+  } catch (error) {
+    console.error("Error listarNotasCreditoDebito:", error);
+    return res.status(500).json({ message: error.message || "Error al listar notas" });
+  }
+};
+
 /** DELETE /ventas/anular/:idVenta - Anula lógicamente una venta (eliminado=1). Restaura stock. No permitido si ya enviado a SUNAT. */
 const anularVenta = async (req, res) => {
   if (!req.user || !req.user.empresa) {
@@ -961,6 +993,7 @@ module.exports = {
     obtenerVentas,
     obtenerVentasAgrupadas,
     obtenerVentasEmpresa,
+    listarNotasCreditoDebito,
     obtenerDetalleVentaAgrupada,
     obtenerComprobantesVentaAgrupada,
     obtenerComprobanteParaPdf,

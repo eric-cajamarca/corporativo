@@ -12,6 +12,7 @@ api.post('/ventas/entregas', auth.auth, detalleVentaEntregaController.crear);
 
 api.get('/ventas', auth.auth, dventasController.obtenerDetalleVentas);
 api.get('/ventas/listar', auth.auth, ventasController.obtenerVentas);
+api.get('/ventas/listar-notas', auth.auth, ventasController.listarNotasCreditoDebito);
 api.get('/ventas/agrupadas', auth.auth, ventasController.obtenerVentasAgrupadas);
 api.get('/ventas/agrupadas/:idVentaAgrupada/detalle', auth.auth, ventasController.obtenerDetalleVentaAgrupada);
 api.get('/ventas/agrupadas/:idVentaAgrupada/comprobantes', auth.auth, ventasController.obtenerComprobantesVentaAgrupada);

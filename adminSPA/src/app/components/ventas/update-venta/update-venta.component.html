@@ -73,7 +73,7 @@
               <tbody>
                 <tr *ngFor="let d of detalles; let i = index">
                   <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.codigo" readonly></td>
-                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" readonly></td>
+                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" [readonly]="!d.permiteDescripcionEnVenta"></td>
                   <td>
                     <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.cantidad" (ngModelChange)="recalcularTotal()" step="0.001" min="0">
                   </td>

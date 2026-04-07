@@ -335,6 +335,7 @@ const crear_producto = async (req, res) => {
     precioVenta,
     idListaPrecio,
     useCorrelativo,
+    permiteDescripcionEnVenta,
   } = req.body;
 
   const idEmpresa = req.user.empresa;
@@ -381,6 +382,7 @@ const crear_producto = async (req, res) => {
     alertaMaximo: alertaMax,
     tipoProducto: tipoProd,
     VecesVendidas: 0,
+    permiteDescripcionEnVenta: permiteDescripcionEnVenta === true || permiteDescripcionEnVenta === 1 || permiteDescripcionEnVenta === 'true' ? 1 : 0,
   };
 
   const usarCorrelativo = useCorrelativo === true || useCorrelativo === 'true';
@@ -471,8 +473,9 @@ const crear_producto = async (req, res) => {
         .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
         .input("estado", sql.Bit, datosProducto.estado)
         .input("tipoProducto", sql.Char(1), datosProducto.tipoProducto)
+        .input("permiteDescripcionEnVenta", sql.Bit, datosProducto.permiteDescripcionEnVenta ? 1 : 0)
         .query(
-          "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto)"
+          "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta)"
         );
 
       if (lote && lote.idSucursal && (lote.cantidadIngresada > 0 || lote.costoUnitario != null)) {
@@ -635,6 +638,7 @@ const actualizar_producto = async function (req, res) {
     alertaMaximo,
     estado,
     tipoProducto,
+    permiteDescripcionEnVenta,
   } = req.body;
 
   const detalle = {
@@ -651,6 +655,12 @@ const actualizar_producto = async function (req, res) {
     alertaMaximo: alertaMaximo != null ? parseFloat(alertaMaximo) : undefined,
     estado: estado !== undefined ? (estado ? 1 : 0) : undefined,
     tipoProducto: tipoProducto === 'C' || tipoProducto === 'S' ? tipoProducto : undefined,
+    permiteDescripcionEnVenta:
+      permiteDescripcionEnVenta === true || permiteDescripcionEnVenta === 1 || permiteDescripcionEnVenta === 'true'
+        ? 1
+        : permiteDescripcionEnVenta === false || permiteDescripcionEnVenta === 0 || permiteDescripcionEnVenta === 'false'
+          ? 0
+          : undefined,
     idEmpresa: req.user.empresa,
   };
 
@@ -688,6 +698,10 @@ const actualizar_producto = async function (req, res) {
     if (detalle.estado !== undefined) {
       request.input("estado", sql.Bit, detalle.estado);
       updateSql += ", estado = @estado";
+    }
+    if (detalle.permiteDescripcionEnVenta !== undefined) {
+      request.input("permiteDescripcionEnVenta", sql.Bit, detalle.permiteDescripcionEnVenta);
+      updateSql += ", permiteDescripcionEnVenta = @permiteDescripcionEnVenta";
     }
 
     updateSql += " WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa";

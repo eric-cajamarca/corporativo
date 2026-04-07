@@ -2,11 +2,16 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { FacturacionService, OrigenParaNota, ComprobanteOrigenItem } from '../../../services/facturacion.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { VentasService, NotaCreditoDebitoListado } from '../../../services/ventas.service';
+import { PdfService } from '../../../services/pdf.service';
+import { numeroALetras } from '../../../utils/numeroALetras';
+import { Empresa } from '../../../interfaces/pdf-interface';
 
 declare var iziToast: any;
 
@@ -22,7 +27,7 @@ interface ItemEditable {
 @Component({
   selector: 'app-notas-credito-debito',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterLink, SidebarComponent, TopnavComponent, NgbPagination],
   templateUrl: './notas-credito-debito.component.html',
   styleUrl: './notas-credito-debito.component.css'
 })
@@ -30,34 +35,44 @@ export class NotasCreditoDebitoComponent implements OnInit {
 
   sidebarState = inject(SidebarStateService);
   origen: OrigenParaNota | null = null;
-  /** Búsqueda por serie-número */
   serie = '';
   numero = '';
   tipoComprobanteRef = '01';
-  /** Búsqueda por RUC o razón social del cliente */
   rucCliente = '';
   razonSocialCliente = '';
   listadoBusqueda: ComprobanteOrigenItem[] = [];
   loadingOrigen = false;
   loadingListado = false;
-  /** Tipo de nota a emitir */
   tipoNota: '07' | '08' = '07';
   codigoMotivoNotaCredito = '01';
   motivosNotaCredito: { codigoSunat: string; descripcion: string }[] = [];
-  /** Ítems editables (copia del origen) */
   items: ItemEditable[] = [];
   guardando = false;
   creado: { idVenta: string; idComprobanteElectronico: string } | null = null;
   enviandoId: string | null = null;
 
+  /** Tabla de notas emitidas */
+  notasEmitidas: NotaCreditoDebitoListado[] = [];
+  loadingNotasEmitidas = false;
+  totalNotasEmitidas = 0;
+  buscarNotasInput = '';
+  buscarNotasFiltro = '';
+  paginaNotas = 1;
+  porPaginaNotas = 15;
+  pdfNotaCargandoId: number | null = null;
+  eliminandoIdVenta: number | null = null;
+
   constructor(
     private _facturacionService: FacturacionService,
     private _catalogosService: CatalogosService,
+    private _ventasService: VentasService,
+    private _pdfService: PdfService,
     private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     this.cargarMotivosNotaCredito();
+    this.cargarNotasEmitidas();
     this.route.queryParams.subscribe((params) => {
       const serie = (params['serie'] || '').trim();
       const numero = (params['numero'] || '').trim().replace(/\D/g, '');
@@ -69,6 +84,164 @@ export class NotasCreditoDebitoComponent implements OnInit {
         this.cargarOrigen({ serie, numero, tipoComprobante: this.tipoComprobanteRef || '01' });
       }
     });
+  }
+
+  cargarNotasEmitidas(): void {
+    this.loadingNotasEmitidas = true;
+    this._ventasService
+      .listarNotasCreditoDebito({
+        buscar: this.buscarNotasFiltro || undefined,
+        pagina: this.paginaNotas,
+        porPagina: this.porPaginaNotas
+      })
+      .subscribe({
+        next: (res) => {
+          this.loadingNotasEmitidas = false;
+          this.notasEmitidas = res?.data ?? [];
+          this.totalNotasEmitidas = typeof res?.total === 'number' ? res.total : this.notasEmitidas.length;
+        },
+        error: (err) => {
+          this.loadingNotasEmitidas = false;
+          this.notasEmitidas = [];
+          this.totalNotasEmitidas = 0;
+          const msg = err?.error?.message || err?.message || 'Error al cargar el listado de notas.';
+          if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: msg });
+        }
+      });
+  }
+
+  aplicarBusquedaNotas(): void {
+    this.buscarNotasFiltro = (this.buscarNotasInput || '').trim();
+    this.paginaNotas = 1;
+    this.cargarNotasEmitidas();
+  }
+
+  onPaginaNotasChange(p: number): void {
+    this.paginaNotas = p;
+    this.cargarNotasEmitidas();
+  }
+
+  scrollToEmitir(): void {
+    const el = document.getElementById('notas-emitir-bloque');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  prefijoTipoNota(row: NotaCreditoDebitoListado): string {
+    const c = (row.codigoComprobante || '').toUpperCase();
+    if (['F8', 'B8', '08'].includes(c)) return 'ND';
+    return 'NC';
+  }
+
+  textoDocumento(row: NotaCreditoDebitoListado): string {
+    const serie = (row.serie || '').trim();
+    const num = String(row.numero || '').replace(/\D/g, '').padStart(8, '0');
+    return `${this.prefijoTipoNota(row)} ${serie}-${num}`;
+  }
+
+  formatearFechaCorta(f: string | undefined): string {
+    if (!f) return '—';
+    const s = f.trim().slice(0, 10);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(f);
+    if (m2) return `${m2[3]}/${m2[2]}/${m2[1]}`;
+    return s;
+  }
+
+  estadoNotaEtiqueta(idEstadoSunat: number | null | undefined): string {
+    if (idEstadoSunat == null) return 'PENDIENTE';
+    if (idEstadoSunat === 7) return 'PEND. ENVÍO';
+    if (idEstadoSunat === 1 || idEstadoSunat === 2) return 'CONFIRMADO';
+    if (idEstadoSunat === 3) return 'CONFIRMADO (OBS.)';
+    if (idEstadoSunat === 6) return 'ERROR ENVÍO';
+    if (idEstadoSunat === 4) return 'RECHAZADO';
+    return 'PENDIENTE';
+  }
+
+  puedeEliminarNota(row: NotaCreditoDebitoListado): boolean {
+    const id = row.idEstadoSunat;
+    if (id === 1 || id === 2 || id === 3) return false;
+    return true;
+  }
+
+  verNota(idVenta: number): void {
+    this.abrirPdfNota(idVenta, 'A4');
+  }
+
+  imprimirNota(idVenta: number): void {
+    this.abrirPdfNota(idVenta, 'A4');
+  }
+
+  private abrirPdfNota(idVenta: number, formato: 'A4' | 'A5' | 'ticket'): void {
+    this.pdfNotaCargandoId = idVenta;
+    this._ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        if (!d) {
+          this.pdfNotaCargandoId = null;
+          return;
+        }
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'nota').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          cantidadLetras,
+          nombreArchivo
+        };
+        this._pdfService.generarPdfComprobanteVenta(datos, formato, nombreArchivo).subscribe({
+          next: (blob) => {
+            this._pdfService.previsualizar(blob);
+            this.pdfNotaCargandoId = null;
+          },
+          error: () => {
+            this.pdfNotaCargandoId = null;
+            if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudo generar el PDF.' });
+          }
+        });
+      },
+      error: () => {
+        this.pdfNotaCargandoId = null;
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudieron cargar los datos del comprobante.' });
+      }
+    });
+  }
+
+  confirmarEliminarNota(row: NotaCreditoDebitoListado): void {
+    if (!this.puedeEliminarNota(row)) return;
+    const doc = this.textoDocumento(row);
+    if (!confirm(`¿Eliminar la nota ${doc}? Se restaurará el stock. Solo use esta opción si la nota no fue enviada o aceptada en SUNAT.`)) {
+      return;
+    }
+    this.eliminandoIdVenta = row.idVenta;
+    this._ventasService.anularVenta(row.idVenta).subscribe({
+      next: (res) => {
+        this.eliminandoIdVenta = null;
+        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Listo', message: res.message || 'Nota anulada.' });
+        this.cargarNotasEmitidas();
+      },
+      error: (err) => {
+        this.eliminandoIdVenta = null;
+        const msg = err?.error?.error || err?.error?.message || err?.message || 'No se pudo eliminar.';
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: msg });
+      }
+    });
+  }
+
+  min(a: number, b: number): number {
+    return Math.min(a, b);
   }
 
   cargarMotivosNotaCredito(): void {
@@ -208,6 +381,8 @@ export class NotasCreditoDebitoComponent implements OnInit {
         if (typeof iziToast !== 'undefined') {
           iziToast.success({ title: 'Creado', message: this.tipoNota === '07' ? 'Nota de crédito creada.' : 'Nota de débito creada.' });
         }
+        this.paginaNotas = 1;
+        this.cargarNotasEmitidas();
       },
       error: (err) => {
         this.guardando = false;
@@ -230,6 +405,7 @@ export class NotasCreditoDebitoComponent implements OnInit {
         this.creado = null;
         this.origen = null;
         this.items = [];
+        this.cargarNotasEmitidas();
       },
       error: (err) => {
         this.enviandoId = null;

@@ -493,7 +493,10 @@ class HtmlBuilderService {
     const exonerado = Number(venta.exonerado) || 0;
     const gratuito = Number(venta.gratuito) || 0;
     const otrosCargos = Number(venta.otrosCargos) || 0;
-    const descuentos = Number(venta.descuentos) || 0;
+    const descuentos =
+      venta.descuentosImpresion != null && venta.descuentosImpresion !== ''
+        ? Number(venta.descuentosImpresion) || 0
+        : Number(venta.descuentos) || 0;
     const total = Number(venta.total) || 0;
     const mostrarQrPie = this._debeMostrarQrYPieSunat(esCotizacion, codigoComp);
     const resumenHash = mostrarQrPie ? ((venta.resumenHash && String(venta.resumenHash).trim()) || '') : '';

@@ -1,6 +1,13 @@
 // repositories/detalle-venta.repository.js
 const sql = require('mssql');
 
+function normalizarDescripcionLinea(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  return s.length > 500 ? s.slice(0, 500) : s;
+}
+
 exports.insertar = async (transaction, detalleData) => {
   const {
     idVenta,
@@ -16,13 +23,17 @@ exports.insertar = async (transaction, detalleData) => {
     cantEntregada,
     idEstadoPedido,
     costoUnitario,
-    costoTotal
+    costoTotal,
+    descripcionLinea
   } = detalleData;
 
   const cantidadNum = cantidad != null ? Number(cantidad) : 0;
   const costoUnitVal = costoUnitario != null ? Number(costoUnitario) : 0;
   const costoTotalVal =
     costoTotal != null ? Number(costoTotal) : (costoUnitVal * cantidadNum);
+  const descripcionLineaVal = normalizarDescripcionLinea(
+    descripcionLinea != null ? descripcionLinea : detalleData.descripcionVenta
+  );
 
   const result = await transaction
     .request()
@@ -40,10 +51,11 @@ exports.insertar = async (transaction, detalleData) => {
     .input('idEstadoPedido', sql.Int, idEstadoPedido)
     .input('costoUnitario', sql.Decimal(18, 6), costoUnitVal)
     .input('costoTotal', sql.Decimal(18, 6), costoTotalVal)
+    .input('descripcionLinea', sql.NVarChar(500), descripcionLineaVal)
     .query(`INSERT INTO DetalleVenta 
-      (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, hVenta, cantEntregada, idEstadoPedido, costoUnitario, costoTotal)
+      (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, hVenta, cantEntregada, idEstadoPedido, costoUnitario, costoTotal, descripcionLinea)
       VALUES 
-      (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @hVenta, @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal)`);
+      (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @hVenta, @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal, @descripcionLinea)`);
 
   return result;
 };

@@ -47,10 +47,13 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVenta
 
   const sub = Number(d.venta.subtotal);
   const igv = Number(d.venta.igv);
-  const desc = Number(d.venta.descuentos);
+  const descImpRaw = (d.venta as { descuentosImpresion?: number }).descuentosImpresion;
+  const desc =
+    descImpRaw != null && String(descImpRaw).trim() !== ''
+      ? Number(descImpRaw)
+      : Number(d.venta.descuentos);
   const showSub = !Number.isNaN(sub) && sub > 0;
   const showIgv = !Number.isNaN(igv) && igv > 0;
-  const showDesc = !Number.isNaN(desc) && desc > 0;
 
   const barcodeUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(idVentaAgrupada)}&code=Code128&translate-esc=true&dpi=96`;
 
@@ -167,7 +170,7 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVenta
     <div class="totales">
       ${showSub ? `<div class="row"><span>Subtotal</span><span>S/ ${fmtN(d.venta.subtotal)}</span></div>` : ''}
       ${showIgv ? `<div class="row"><span>IGV</span><span>S/ ${fmtN(d.venta.igv)}</span></div>` : ''}
-      ${showDesc ? `<div class="row"><span>Descuentos</span><span>S/ ${fmtN(d.venta.descuentos)}</span></div>` : ''}
+      <div class="row"><span>Descuentos</span><span>S/ ${fmtN(desc)}</span></div>
       <div class="row total-final"><span>TOTAL</span><span>S/ ${fmtN(d.venta.total)}</span></div>
     </div>
     <div class="barcode">

@@ -1,6 +1,7 @@
 // repositories/ventas.repository.js
 const sql = require('mssql');
 const { getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 
 /** IN (@p0,@p1,...) para UUIDs en requests de consulta PDF / multiempresa */
 const bindUniqueIdentifiersIn = (request, idsEmpresa, prefix) => {
@@ -374,6 +375,102 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
   }));
 };
 
+/**
+ * Lista paginada de ventas que son nota de crédito o débito (códigos F7/B7/F8/B8 o legado 07/08).
+ * @param {import('mssql').ConnectionPool} pool
+ * @param {string|string[]} idsEmpresa - Una empresa o varias (gestora + gestionadas)
+ * @param {{ buscar?: string, pagina?: number, porPagina?: number }} opts
+ * @returns {Promise<{ rows: object[], total: number }>}
+ */
+exports.listarVentasNotasCreditoDebitoRepo = async (pool, idsEmpresa, opts = {}) => {
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0) return { rows: [], total: 0 };
+
+  const buscarRaw = opts.buscar != null ? String(opts.buscar).trim() : "";
+  const pagina = Math.max(1, parseInt(String(opts.pagina), 10) || 1);
+  const porPagina = Math.min(100, Math.max(1, parseInt(String(opts.porPagina), 10) || 20));
+  const offset = (pagina - 1) * porPagina;
+
+  const reqCount = pool.request();
+  const inList = bindUniqueIdentifiersIn(reqCount, ids, "notaEmp");
+  let whereBuscar = "";
+  if (buscarRaw.length > 0) {
+    const pat = `%${buscarRaw.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+    reqCount.input("buscar", sql.NVarChar(200), pat);
+    whereBuscar = ` AND (
+      v.compVenta LIKE @buscar ESCAPE '\\'
+      OR v.serie LIKE @buscar ESCAPE '\\'
+      OR CAST(v.numero AS NVARCHAR(20)) LIKE @buscar ESCAPE '\\'
+      OR cl.rSocial LIKE @buscar ESCAPE '\\'
+      OR cl.ruc LIKE @buscar ESCAPE '\\'
+    )`;
+  }
+
+  const countSql = `
+    SELECT COUNT(*) AS total
+    FROM Ventas v
+    INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+    LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+    WHERE v.idEmpresa IN (${inList})
+      AND ISNULL(v.eliminado, 0) = 0
+      AND UPPER(LTRIM(RTRIM(c.codigo))) IN ('F7','B7','F8','B8','07','08')
+    ${whereBuscar}
+  `;
+  const countRes = await reqCount.query(countSql);
+  const total = countRes.recordset && countRes.recordset[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+  const reqData = pool.request();
+  const inListData = bindUniqueIdentifiersIn(reqData, ids, "notaD");
+  reqData.input("offset", sql.Int, offset);
+  reqData.input("limite", sql.Int, porPagina);
+  if (buscarRaw.length > 0) {
+    const pat = `%${buscarRaw.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+    reqData.input("buscar", sql.NVarChar(200), pat);
+  }
+
+  const dataSql = `
+    SELECT
+      v.idEmpresa,
+      v.idVenta,
+      v.compVenta,
+      CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+      v.total,
+      v.idEstadoSunat,
+      v.serie,
+      v.numero,
+      UPPER(LTRIM(RTRIM(c.codigo))) AS codigoComprobante,
+      ce.idComprobanteElectronico,
+      COALESCE(LTRIM(RTRIM(cl.rSocial)), '') AS clienteRazonSocial
+    FROM Ventas v
+    INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+    LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+    LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+    WHERE v.idEmpresa IN (${inListData})
+      AND ISNULL(v.eliminado, 0) = 0
+      AND UPPER(LTRIM(RTRIM(c.codigo))) IN ('F7','B7','F8','B8','07','08')
+    ${whereBuscar}
+    ORDER BY v.fEmision DESC, v.idVenta DESC
+    OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+  `;
+
+  const dataRes = await reqData.query(dataSql);
+  const rows = (dataRes.recordset || []).map((r) => ({
+    idEmpresa: r.idEmpresa != null ? String(r.idEmpresa) : null,
+    idVenta: r.idVenta,
+    compVenta: r.compVenta != null ? String(r.compVenta).trim() : "",
+    fEmision: r.fEmision != null ? String(r.fEmision).trim() : "",
+    total: r.total != null ? Number(r.total) : 0,
+    idEstadoSunat: r.idEstadoSunat != null ? Number(r.idEstadoSunat) : null,
+    serie: r.serie != null ? String(r.serie).trim() : "",
+    numero: r.numero != null ? String(r.numero).trim() : "",
+    codigoComprobante: r.codigoComprobante != null ? String(r.codigoComprobante).trim().toUpperCase() : "",
+    idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
+    clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : ""
+  }));
+
+  return { rows, total };
+};
+
 /** Datos completos de una venta para generar comprobante PDF. idsEmpresa: JWT + gestionadas (gestora) o [una empresa].
  *  Logo, impuestos y productos corresponden a v.idEmpresa de la venta encontrada. */
 exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 'http://localhost:3000') => {
@@ -488,7 +585,15 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     .input('idVenta', sql.Int, idVenta)
     .input('idEmpresaVenta', sql.UniqueIdentifier, idEmpresaVenta)
     .query(`
-      SELECT dv.idDetalle, dv.idProducto, dv.cantidad, ISNULL(dv.cantEntregada, 0) AS cantEntregada, dv.pVenta, dv.subtotal, dv.total, p.descripcion, p.codigo
+      SELECT dv.idDetalle, dv.idProducto, dv.cantidad, ISNULL(dv.cantEntregada, 0) AS cantEntregada, dv.pVenta, dv.subtotal, dv.total,
+        ISNULL(p.permiteDescripcionEnVenta, 0) AS permiteDescripcionEnVenta,
+        p.descripcion AS descripcionProducto,
+        CASE
+          WHEN NULLIF(LTRIM(RTRIM(ISNULL(dv.descripcionLinea, ''))), '') IS NOT NULL
+          THEN LTRIM(RTRIM(dv.descripcionLinea))
+          ELSE p.descripcion
+        END AS descripcion,
+        p.codigo
       FROM DetalleVenta dv
       INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = @idEmpresaVenta
       WHERE dv.idVenta = @idVenta
@@ -561,7 +666,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           AND clave IN (
             'PDF_CUENTAS_BANCARIAS',
             'PDF_TEMA_COLOR_ACTIVO',
-            'PDF_COLOR_PRIMARIO'
+            'PDF_COLOR_PRIMARIO',
+            'VENTAS_USAR_DESCUENTO_EN_TOTAL'
           )
       `);
     configPdf = configRes.recordset || [];
@@ -572,6 +678,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     acc[String(row.clave || '').trim()] = row.valor != null ? String(row.valor).trim() : '';
     return acc;
   }, {});
+  const usarDescuentoEnTotalPdf = interpretarBooleanoConfig(
+    cfgMap.VENTAS_USAR_DESCUENTO_EN_TOTAL || 'true',
+    true
+  );
   const detalle = items.recordset || [];
   const hashRow = hashResult.recordset && hashResult.recordset[0] ? hashResult.recordset[0] : null;
   const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
@@ -602,6 +712,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   const exonerado = cab.exonerado != null ? Number(cab.exonerado) : 0;
   const gratuito = cab.gratuito != null ? Number(cab.gratuito) : 0;
   const otrosCargos = cab.otrosCargos != null ? Number(cab.otrosCargos) : 0;
+  const descuentosCabeceraNum = cab.descuentos != null ? Number(cab.descuentos) : 0;
+  const descuentosImpresion = usarDescuentoEnTotalPdf ? descuentosCabeceraNum : 0;
 
   const empresaPayload = emp
     ? {
@@ -656,6 +768,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       gratuito,
       otrosCargos,
       descuentos: cab.descuentos,
+      descuentosImpresion,
       total: cab.total,
       resumenHash,
       cuotas: cuotasVenta,
@@ -679,6 +792,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       idProducto: d.idProducto,
       codigo: d.codigo,
       descripcion: d.descripcion,
+      descripcionProducto: d.descripcionProducto != null ? String(d.descripcionProducto) : '',
+      permiteDescripcionEnVenta: !!(d.permiteDescripcionEnVenta === true || d.permiteDescripcionEnVenta === 1),
       cantidad: d.cantidad,
       cantEntregada: d.cantEntregada != null ? Number(d.cantEntregada) : 0,
       pVenta: d.pVenta,
@@ -776,6 +891,12 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       const isc = d.isc != null ? (d.isc ? 1 : 0) : 0;
       let costoUnitario = Number(d.costoUnitario) || 0;
       let costoTotal = Number(d.costoTotal) || 0;
+      const rawLinea = d.descripcionLinea != null ? d.descripcionLinea : d.descripcionVenta;
+      let descripcionLineaIns = null;
+      if (rawLinea != null) {
+        const t = String(rawLinea).trim();
+        descripcionLineaIns = t ? (t.length > 500 ? t.slice(0, 500) : t) : null;
+      }
       if (costoTotal === 0 && cantidad > 0) {
         const rLote = await transaction.request()
           .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -805,9 +926,10 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         .input('idEstadoPedido', sql.Int, 1)
         .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
         .input('costoTotal', sql.Decimal(18, 6), costoTotal)
+        .input('descripcionLinea', sql.NVarChar(500), descripcionLineaIns)
         .query(`
-          INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido, costoUnitario, costoTotal)
-          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal)
+          INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido, costoUnitario, costoTotal, descripcionLinea)
+          VALUES (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal, @descripcionLinea)
         `);
     }
     await transaction.commit();
@@ -1462,6 +1584,25 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
     ? `${base}/logos/${logoFileName.trim()}`
     : `${base}/assets/img/01.jpg`;
 
+  let usarDescVa = true;
+  try {
+    const cfgVa = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaCobradora)
+      .query(`
+        SELECT valor FROM ConfiguracionEmpresa
+        WHERE idEmpresa = @idEmpresa AND clave = 'VENTAS_USAR_DESCUENTO_EN_TOTAL'
+      `);
+    const rowV = cfgVa.recordset && cfgVa.recordset[0];
+    if (rowV && rowV.valor != null) {
+      usarDescVa = interpretarBooleanoConfig(rowV.valor, true);
+    }
+  } catch (_) {
+    usarDescVa = true;
+  }
+  const descVaNum = cab.descuentos != null ? Number(cab.descuentos) : 0;
+  const descuentosImpresionVa = usarDescVa ? descVaNum : 0;
+
   const tipoDestLabels = { 'NV': 'Nota de Venta', '01': 'Factura', '03': 'Boleta' };
 
   return {
@@ -1474,6 +1615,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       subtotal: cab.subtotal,
       igv: cab.igv,
       descuentos: cab.descuentos,
+      descuentosImpresion: descuentosImpresionVa,
       total: cab.total,
       idEstadoPago: cab.idEstadoPago,
       tipoComprobanteDestino: cab.tipoComprobanteDestino,

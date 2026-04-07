@@ -25,6 +25,8 @@ export interface Producto {
   tipoProducto?: string;
   vecesVendidas?: number;
   facturar?: string;
+  /** Si true, en el POS se puede cambiar el texto del ítem en el comprobante sin tocar el catálogo. */
+  permiteDescripcionEnVenta?: boolean;
 }
 
 export interface LoteInicialCreate {
@@ -50,6 +52,7 @@ export interface ProductoCreate {
   tipoProducto?: string;
   lote?: LoteInicialCreate | null;
   precioVenta?: number;
+  permiteDescripcionEnVenta?: boolean;
 }
 
 export interface ProductoResponse {

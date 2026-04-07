@@ -32,6 +32,7 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
+import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 import { VentaSesionService } from '../../../services/venta-sesion.service';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
@@ -144,6 +145,12 @@ export class CreateVentasComponent implements OnInit {
     descuentos: 0,
   };
 
+  /** Config empresa: si false, no acumular descuentos por diferencia de precio y el backend guarda descuentos 0. */
+  usarDescuentoEnTotal = true;
+
+  /** Hasta que llegue gestores/config, no aplicar descuento lista vs vendido (evita total erróneo con default true). */
+  private descuentoEnTotalConfigListo = false;
+
   public direccionCliente: any;
 
   /** Valores por defecto de estado pedido y estado pago (según configuración). */
@@ -231,8 +238,20 @@ export class CreateVentasComponent implements OnInit {
           ? (item as { valor?: string; Valor?: string }).valor
           : (item as { valor?: string; Valor?: string }).Valor;
         this.productosConImagenes = valor ? String(valor).toLowerCase() === 'true' : false;
+        const itemDesc = lista.find((c: { clave?: string; Clave?: string }) =>
+          (c.clave || c.Clave || '') === 'VENTAS_USAR_DESCUENTO_EN_TOTAL'
+        );
+        const vDesc =
+          itemDesc && (itemDesc as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemDesc as { valor?: string; Valor?: string }).valor
+            : (itemDesc as { valor?: string; Valor?: string })?.Valor;
+        this.usarDescuentoEnTotal = interpretarBooleanoConfig(vDesc, true);
+        this.descuentoEnTotalConfigListo = true;
+        this.actualizaTotales();
       },
-      error: () => {}
+      error: () => {
+        this.descuentoEnTotalConfigListo = true;
+      }
     });
     this._documentosService.obtener_documento1().subscribe({
       next: (response) => { this.documento = response.data || []; },
@@ -313,14 +332,19 @@ export class CreateVentasComponent implements OnInit {
   aplicarPreloadDesdeHabitacion(): void {
     const preload = this.hotelPreloadVentaService.getAndClearPreload();
     if (!preload?.lineas?.length) return;
-    this.carrito = preload.lineas.map((lin: { idProducto: string; codigo: string; descripcion: string; codigoPresentacion?: string; cantidad: number; pVenta: number }) => ({
-      idProducto: lin.idProducto,
-      codigo: lin.codigo,
-      descripcion: lin.descripcion,
-      codigoPresentacion: lin.codigoPresentacion ?? '',
-      cantidad: lin.cantidad,
-      pVenta: lin.pVenta
-    }));
+    this.carrito = preload.lineas.map((lin: { idProducto: string; codigo: string; descripcion: string; codigoPresentacion?: string; cantidad: number; pVenta: number; permiteDescripcionEnVenta?: boolean }) => {
+      const desc = (lin.descripcion ?? '').toString().trim();
+      return {
+        idProducto: lin.idProducto,
+        codigo: lin.codigo,
+        descripcion: lin.descripcion,
+        descripcionOriginal: desc,
+        permiteDescripcionEnVenta: !!(lin as { permiteDescripcionEnVenta?: boolean }).permiteDescripcionEnVenta,
+        codigoPresentacion: lin.codigoPresentacion ?? '',
+        cantidad: lin.cantidad,
+        pVenta: lin.pVenta
+      };
+    });
     this.actualizaTotales();
   }
 
@@ -724,9 +748,12 @@ export class CreateVentasComponent implements OnInit {
     if (existe) {
       existe.cantidad += 1;
     } else {
+      const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
         ...producto,
-        cantidad: 1
+        cantidad: 1,
+        descripcionOriginal: descCat,
+        permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1)
       });
       
             }
@@ -802,18 +829,25 @@ export class CreateVentasComponent implements OnInit {
     this.ventas.igvMonto = 0;
     this.ventas.total = 0;
 
+    const aplicarDescuentoLista = this.descuentoEnTotalConfigListo && this.usarDescuentoEnTotal;
+
     this.carrito.forEach(item => {
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
       const subtotalItem = Math.round(pVenta * cant * 100) / 100;
       this.ventas.subTotal += subtotalItem;
-      const precioPrincipal = this.obtenerPrecioPrincipal(item);
-      if (precioPrincipal > pVenta) {
-        this.ventas.descuentos += Math.round((precioPrincipal - pVenta) * cant * 100) / 100;
+      if (aplicarDescuentoLista) {
+        const precioPrincipal = this.obtenerPrecioPrincipal(item);
+        if (precioPrincipal > pVenta) {
+          this.ventas.descuentos += Math.round((precioPrincipal - pVenta) * cant * 100) / 100;
+        }
       }
     });
 
     this.ventas.subTotal = Math.round(this.ventas.subTotal * 100) / 100;
+    if (!aplicarDescuentoLista) {
+      this.ventas.descuentos = 0;
+    }
     this.ventas.descuentos = Math.round(this.ventas.descuentos * 100) / 100;
     const neto = Math.round((this.ventas.subTotal - this.ventas.descuentos) * 100) / 100;
 
@@ -922,7 +956,22 @@ abrirModalPrecios(item: any) {
     this.actualizaTotales();
   }
 
+  private descripcionLineaParaDetalle(item: {
+    permiteDescripcionEnVenta?: boolean;
+    descripcion?: string;
+    descripcionOriginal?: string;
+  }): string | undefined {
+    if (!item.permiteDescripcionEnVenta) return undefined;
+    const cur = (item.descripcion ?? '').toString().trim();
+    const orig = (item.descripcionOriginal ?? '').toString().trim();
+    if (!cur || cur === orig) return undefined;
+    return cur.length > 500 ? cur.slice(0, 500) : cur;
+  }
+
   actualizaDescripcion(item: any, el: any) {
+    if (!item.permiteDescripcionEnVenta) {
+      return;
+    }
     // Obtener el texto editado y normalizar
     const texto = ((el.target as HTMLElement)?.innerText ?? '').trim();
 
@@ -1434,7 +1483,7 @@ abrirModalPrecios(item: any) {
     if (id == null || id === '') return false;
     const comp = this.comprobantes?.find((c: any) => Number(c.idComprobante) === Number(id));
     const codigo = String(comp?.codigo ?? '').trim();
-    return ['01', '03', '07', '08'].includes(codigo);
+    return ['01', '03', '07', '08', 'F7', 'B7', 'F8', 'B8'].includes(codigo);
   }
 
   /** True si el comprobante seleccionado es Cotización (CT). */
@@ -1946,7 +1995,8 @@ abrirModalPrecios(item: any) {
         aliasEmpresa: item.aliasEmpresa || undefined,
         sucursal: item.sucursal || undefined,
         descripcion: item.descripcion || undefined,
-        codigo: item.codigo || undefined
+        codigo: item.codigo || undefined,
+        descripcionLinea: this.descripcionLineaParaDetalle(item)
       };
     });
 

@@ -357,7 +357,7 @@ export class IndexVentasComponent implements OnInit {
 
   private esCodigoTipoSunat(codigo: string | undefined | null): boolean {
     const c = (codigo || '').trim().toUpperCase();
-    return c === '01' || c === '03' || c === '07' || c === '08';
+    return c === '01' || c === '03' || c === '07' || c === '08' || c === 'F7' || c === 'B7' || c === 'F8' || c === 'B8';
   }
 
   esCotizacionONotaVenta(v: VentaListado): boolean {

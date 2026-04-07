@@ -4,11 +4,100 @@
 <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-wrap">
     <div class="content-header">
-      <h1 class="content-title">Notas de crédito / Notas de débito</h1>
-      <p class="content-subtitle text-muted mb-0">Emita notas de crédito o débito a partir de una factura o boleta aceptada. Busque por serie-número, RUC o razón social del cliente.</p>
+      <h1 class="content-title">Emisión de notas</h1>
+      <p class="content-subtitle text-muted mb-0">Listado de notas de crédito y débito emitidas; emisión nueva a partir de factura o boleta aceptada.</p>
     </div>
 
-    <div class="card shadow-sm mb-3">
+    <!-- Listado notas emitidas (similar a módulo referencia) -->
+    <div class="card shadow-sm mb-4 notas-listado-card">
+      <div class="card-header bg-white border-bottom py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h6 class="mb-0 fw-semibold">Notas de crédito y débito emitidas</h6>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="input-group input-group-sm notas-buscar-wrap">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" [(ngModel)]="buscarNotasInput" (keydown.enter)="aplicarBusquedaNotas()"
+                   placeholder="Buscar documento, cliente, RUC…">
+            <button type="button" class="btn btn-outline-secondary" (click)="aplicarBusquedaNotas()">Buscar</button>
+          </div>
+          <!--<span class="text-muted small fw-medium">{{ totalNotasEmitidas }}</span>-->
+        </div>
+      </div>
+      <div class="card-body p-0">
+        @if (loadingNotasEmitidas) {
+          <p class="text-muted small p-3 mb-0"><i class="bi bi-hourglass-split"></i> Cargando…</p>
+        } @else if (notasEmitidas.length === 0) {
+          <p class="text-muted small p-3 mb-0">No hay notas registradas con los filtros actuales.</p>
+        } @else {
+          <div class="table-responsive">
+            <table class="table table-hover table-bordered mb-0 notas-emitidas-table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="notas-th-acciones text-center text-nowrap">
+                    <button type="button" class="btn btn-success btn-sm notas-btn-acciones-header" (click)="scrollToEmitir()" title="Ir a emitir una nueva nota">
+                      <i class="bi bi-plus-lg"></i> Acciones
+                    </button>
+                  </th>
+                  <th>Fecha</th>
+                  <th>Documento</th>
+                  <th>Cliente</th>
+                  <th class="text-end">Total</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of notasEmitidas; track row.idVenta) {
+                  <tr>
+                    <td class="text-center text-nowrap notas-td-acciones">
+                      <button type="button" class="btn btn-link btn-sm p-1 text-primary" (click)="verNota(row.idVenta)"
+                              [disabled]="pdfNotaCargandoId === row.idVenta" title="Ver">
+                        <i class="bi bi-search"></i>
+                      </button>
+                      <button type="button" class="btn btn-link btn-sm p-1 text-warning" (click)="imprimirNota(row.idVenta)"
+                              [disabled]="pdfNotaCargandoId === row.idVenta" title="Imprimir PDF">
+                        <i class="bi bi-printer"></i>
+                      </button>
+                      @if (puedeEliminarNota(row)) {
+                        <button type="button" class="btn btn-link btn-sm p-1 text-danger" (click)="confirmarEliminarNota(row)"
+                                [disabled]="eliminandoIdVenta === row.idVenta" title="Eliminar (solo si no fue enviada/aceptada en SUNAT)">
+                          @if (eliminandoIdVenta === row.idVenta) {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                          } @else {
+                            <i class="bi bi-trash"></i>
+                          }
+                        </button>
+                      }
+                    </td>
+                    <td class="small">{{ formatearFechaCorta(row.fEmision) }}</td>
+                    <td class="small fw-medium">{{ textoDocumento(row) }}</td>
+                    <td class="small text-truncate" style="max-width: 220px" [title]="row.clienteRazonSocial">{{ row.clienteRazonSocial || '—' }}</td>
+                    <td class="text-end small">{{ row.total | number:'1.2-2' }}</td>
+                    <td class="small fw-semibold text-uppercase">{{ estadoNotaEtiqueta(row.idEstadoSunat) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 border-top">
+            <span class="text-muted small">
+              Mostrando {{ min((paginaNotas - 1) * porPaginaNotas + 1, totalNotasEmitidas) }}
+              – {{ min(paginaNotas * porPaginaNotas, totalNotasEmitidas) }} de {{ totalNotasEmitidas }}
+            </span>
+            <ngb-pagination
+              class="mb-0"
+              [(page)]="paginaNotas"
+              [pageSize]="porPaginaNotas"
+              [collectionSize]="totalNotasEmitidas"
+              [maxSize]="5"
+              [rotate]="true"
+              [boundaryLinks]="true"
+              (pageChange)="onPaginaNotasChange($event)">
+            </ngb-pagination>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div id="notas-emitir-bloque" class="card shadow-sm mb-3">
       <div class="card-header bg-light">
         <h6 class="mb-0">Buscar comprobante origen (Factura o Boleta aceptada)</h6>
       </div>

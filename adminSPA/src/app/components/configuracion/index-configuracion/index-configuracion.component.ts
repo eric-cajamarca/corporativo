@@ -14,6 +14,7 @@ import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { GestoresService } from '../../../services/gestores.service';
+import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 
 declare var iziToast: any;
 
@@ -99,8 +100,11 @@ export class IndexConfiguracionComponent implements OnInit {
     diasCreditoMaximo: 30,
     interesMoratorio: 2.5,
     descuentoMaximo: 15,
-    comisionVendedor: 5
+    comisionVendedor: 5,
+    /** Si es false, no se acumula descuento en el POS y en PDF el monto de descuentos se muestra 0.00 */
+    usarDescuentoEnTotal: true
   };
+  public ventasGuardando = false;
 
   // Configuración de sistema
   public sistema = {
@@ -193,6 +197,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cargarVentasDefaults();
     this.cargarConfiguracionInventario();
     this.cargarConfiguracionPdfComprobante();
+    this.cargarConfiguracionVentas();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;
@@ -524,8 +529,52 @@ export class IndexConfiguracionComponent implements OnInit {
     });
   }
 
+  cargarConfiguracionVentas(): void {
+    this._gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = res?.data ?? [];
+        const getVal = (clave: string, def: string) =>
+          (lista.find((c: { clave: string; valor: string }) => c.clave === clave)?.valor ?? def);
+        this.ventas.permitirCreditos = String(getVal('VENTAS_PERMITIR_CREDITOS', 'true')).toLowerCase() === 'true';
+        this.ventas.diasCreditoMaximo = parseInt(getVal('VENTAS_DIAS_CREDITO_MAXIMO', '30'), 10) || 30;
+        this.ventas.interesMoratorio = parseFloat(getVal('VENTAS_INTERES_MORATORIO', '2.5')) || 0;
+        this.ventas.descuentoMaximo = parseFloat(getVal('VENTAS_DESCUENTO_MAXIMO_PCT', '15')) || 0;
+        this.ventas.comisionVendedor = parseFloat(getVal('VENTAS_COMISION_VENDEDOR_PCT', '5')) || 0;
+        this.ventas.usarDescuentoEnTotal = interpretarBooleanoConfig(getVal('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
+      },
+      error: () => {}
+    });
+  }
+
   guardarConfiguracionVentas(): void {
-        // Llamada al backend para guardar
+    this.ventasGuardando = true;
+    const configs: Array<{ clave: string; valor: string; descripcion: string; tipoDato: string }> = [
+      { clave: 'VENTAS_PERMITIR_CREDITOS', valor: this.ventas.permitirCreditos ? 'true' : 'false', descripcion: 'Permitir ventas a crédito', tipoDato: 'BOOLEAN' },
+      { clave: 'VENTAS_DIAS_CREDITO_MAXIMO', valor: String(this.ventas.diasCreditoMaximo ?? 30), descripcion: 'Días de crédito máximo', tipoDato: 'NUMBER' },
+      { clave: 'VENTAS_INTERES_MORATORIO', valor: String(this.ventas.interesMoratorio ?? 0), descripcion: 'Interés moratorio (%)', tipoDato: 'NUMBER' },
+      { clave: 'VENTAS_DESCUENTO_MAXIMO_PCT', valor: String(this.ventas.descuentoMaximo ?? 0), descripcion: 'Descuento máximo (%)', tipoDato: 'NUMBER' },
+      { clave: 'VENTAS_COMISION_VENDEDOR_PCT', valor: String(this.ventas.comisionVendedor ?? 0), descripcion: 'Comisión vendedor (%)', tipoDato: 'NUMBER' },
+      {
+        clave: 'VENTAS_USAR_DESCUENTO_EN_TOTAL',
+        valor: this.ventas.usarDescuentoEnTotal ? 'true' : 'false',
+        descripcion: 'Usar y mostrar descuento en total de venta (PDF); XML SUNAT sin descuento en cabecera',
+        tipoDato: 'BOOLEAN'
+      }
+    ];
+    this._gestoresService.guardarConfiguracion(configs).subscribe({
+      next: () => {
+        this.ventasGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Guardado', message: 'Configuración de ventas guardada.', position: 'topRight' });
+        }
+      },
+      error: () => {
+        this.ventasGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración de ventas.', position: 'topRight' });
+        }
+      }
+    });
   }
 
   guardarConfiguracionSistema(): void {

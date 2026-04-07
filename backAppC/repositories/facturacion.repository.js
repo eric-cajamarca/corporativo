@@ -12,6 +12,11 @@ const generadorXmlUblSunat = require("../services/generadorXmlUblSunat.service")
 const firmaXmlSunat = require("../services/firmaXmlSunat.service");
 const envioDirectoSunat = require("../services/envioDirectoSunat.service");
 const consultaSunat = require("../services/consultaSunat.service");
+const {
+  tipoSunatDesdeCodigoComprobante,
+  codigoInternoNotaCreditoPorOrigen,
+  codigoInternoNotaDebitoPorOrigen
+} = require("../utils/sunatCodigoComprobante.util");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -494,8 +499,8 @@ exports.generarComprobanteElectronicoRepo = async (pool, user, datos, configurac
   }
 };
 
-/** Códigos SUNAT que se registran en ComprobantesElectronicos: Factura, Boleta, Nota de crédito, Nota de débito */
-const TIPOS_COMPROBANTE_ELECTRONICO = ["01", "03", "07", "08"];
+/** Tipos que generan fila en ComprobantesElectronicos (F7/B7 se guardan como tipo SUNAT 07). */
+const TIPOS_COMPROBANTE_ELECTRONICO = ["01", "03", "07", "08", "F7", "B7", "F8", "B8"];
 
 /**
  * Registra el comprobante en ComprobantesElectronicos al crear una venta.
@@ -524,12 +529,13 @@ exports.registrarComprobanteElectronicoPorVentaRepo = async (
   if (!TIPOS_COMPROBANTE_ELECTRONICO.includes(codigoStr)) {
     return;
   }
+  const tipoSunatCe = tipoSunatDesdeCodigoComprobante(codigoStr);
   const numeroStr = numero != null ? String(numero).padStart(8, "0") : "";
   const requestInsert = transaction.request();
   await requestInsert
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("idVenta", sql.Int, idVenta)
-    .input("tipoComprobante", sql.VarChar(2), codigoStr)
+    .input("tipoComprobante", sql.VarChar(2), tipoSunatCe)
     .input("serie", sql.VarChar(10), serie != null ? String(serie).trim() : "")
     .input("numero", sql.VarChar(10), numeroStr)
     .input("fechaEmision", sql.VarChar(23), typeof fechaEmision === 'string' ? fechaEmision : fechaEmision)
@@ -747,7 +753,7 @@ exports.obtenerComprobanteOrigenParaNotaRepo = async (pool, idComprobanteElectro
   };
 };
 
-/** Obtiene idComprobante por codigo (07 NC, 08 ND) de la empresa. */
+/** Obtiene idComprobante por codigo (F7/B7 NC, F8/B8 ND internos) de la empresa. */
 exports.obtenerIdComprobantePorCodigoRepo = async (pool, idEmpresa, codigo) => {
   const result = await pool
     .request()
@@ -804,10 +810,17 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
       return null;
     }
 
-    const compNota = await exports.obtenerIdComprobantePorCodigoRepo(pool, idEmpresa, tipoNota);
+    const tn = String(tipoNota).trim();
+    const codigoInterno =
+      tn === "08"
+        ? codigoInternoNotaDebitoPorOrigen(ceOrigen.tipoComprobante)
+        : codigoInternoNotaCreditoPorOrigen(ceOrigen.tipoComprobante);
+    const compNota = await exports.obtenerIdComprobantePorCodigoRepo(pool, idEmpresa, codigoInterno);
     if (!compNota) {
       await transaction.rollback();
-      return null;
+      throw new Error(
+        `No hay comprobante configurado para nota (${codigoInterno}). Ejecute la migración F7/B7/F8/B8 o cree el comprobante en catálogo.`
+      );
     }
     const { numero: numeroStr, serie: serieStr } = await ventasRepository.obtenerSiguienteNumeroComprobante(transaction, idEmpresa, compNota.idComprobante);
     const compVenta = `${serieStr}-${numeroStr}`;

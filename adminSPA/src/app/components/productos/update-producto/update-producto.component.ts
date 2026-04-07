@@ -88,7 +88,8 @@ export class UpdateProductoComponent implements OnInit {
       fVencimiento: [''],
       alertaMinimo: [0, Validators.min(0)],
       alertaMaximo: [0, Validators.min(0)],
-      estado: [true]
+      estado: [true],
+      permiteDescripcionEnVenta: [false]
     });
   }
 
@@ -158,7 +159,8 @@ export class UpdateProductoComponent implements OnInit {
       fVencimiento: this.toDateInput(p.fechaVencimiento ?? p.fVencimiento),
       alertaMinimo: p.alertaMinimo ?? 0,
       alertaMaximo: p.alertaMaximo ?? 0,
-      estado: !!p.estado
+      estado: !!p.estado,
+      permiteDescripcionEnVenta: !!p.permiteDescripcionEnVenta
     });
   }
 
@@ -196,7 +198,8 @@ export class UpdateProductoComponent implements OnInit {
       alertaMinimo: Number(v.alertaMinimo),
       alertaMaximo: Number(v.alertaMaximo),
       estado: !!v.estado,
-      tipoProducto: v.tipoProducto || 'S'
+      tipoProducto: v.tipoProducto || 'S',
+      permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta
     };
 
     this.productoService.actualizarProducto(this.idProducto, payload).subscribe({

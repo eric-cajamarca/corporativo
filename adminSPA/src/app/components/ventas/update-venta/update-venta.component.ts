@@ -23,6 +23,8 @@ interface DetalleEdicion {
   idProducto: string;
   codigo: string;
   descripcion: string;
+  descripcionProducto?: string;
+  permiteDescripcionEnVenta?: boolean;
   cantidad: number;
   pVenta: number;
   descuento: number;
@@ -109,16 +111,22 @@ export class UpdateVentaComponent implements OnInit {
         this.total = Number(v.total) || 0;
         this.cargarClientes();
         this.idSucursal = v.idSucursal != null ? String(v.idSucursal) : null;
-        this.detalles = (data.items || []).map((d: any) => ({
-          idDetalle: d.idDetalle,
-          idProducto: d.idProducto != null ? String(d.idProducto) : '',
-          codigo: d.codigo || '',
-          descripcion: d.descripcion || '',
-          cantidad: Number(d.cantidad) || 0,
-          pVenta: Number(d.pVenta) || 0,
-          descuento: 0,
-          total: Number(d.total) || 0
-        }));
+        this.detalles = (data.items || []).map((d: any) => {
+          const descProd = (d.descripcionProducto ?? d.descripcion ?? '').toString();
+          const descLin = (d.descripcion ?? '').toString();
+          return {
+            idDetalle: d.idDetalle,
+            idProducto: d.idProducto != null ? String(d.idProducto) : '',
+            codigo: d.codigo || '',
+            descripcion: descLin,
+            descripcionProducto: descProd,
+            permiteDescripcionEnVenta: !!(d.permiteDescripcionEnVenta === true || d.permiteDescripcionEnVenta === 1),
+            cantidad: Number(d.cantidad) || 0,
+            pVenta: Number(d.pVenta) || 0,
+            descuento: 0,
+            total: Number(d.total) || 0
+          };
+        });
         this.recalcularTotal();
         this.loading = false;
       },
@@ -179,15 +187,27 @@ export class UpdateVentaComponent implements OnInit {
     }
   }
 
+  private descripcionLineaEdicion(d: DetalleEdicion): string | undefined {
+    if (!d.permiteDescripcionEnVenta) return undefined;
+    const cur = (d.descripcion ?? '').trim();
+    const orig = (d.descripcionProducto ?? '').trim();
+    if (!cur || cur === orig) return undefined;
+    return cur.length > 500 ? cur.slice(0, 500) : cur;
+  }
+
   agregarProductos(): void {
     const idSucursal = this.idSucursal || undefined;
     this.buscadorProductosModal.abrir(idSucursal).then((producto: ProductoSeleccionado | null) => {
       if (producto == null) return;
       const pVenta = Number(producto.pVenta) || 0;
+      const desc = (producto.descripcion ?? '').toString();
+      const perm = !!(producto as { permiteDescripcionEnVenta?: boolean }).permiteDescripcionEnVenta;
       this.detalles.push({
         idProducto: producto.idProducto ?? '',
         codigo: producto.codigo ?? '',
-        descripcion: producto.descripcion ?? '',
+        descripcion: desc,
+        descripcionProducto: desc,
+        permiteDescripcionEnVenta: perm,
         cantidad: 1,
         pVenta,
         descuento: 0,
@@ -221,7 +241,8 @@ export class UpdateVentaComponent implements OnInit {
       cantidad: d.cantidad,
       pVenta: d.pVenta,
       descuento: d.descuento,
-      total: d.total
+      total: d.total,
+      descripcionLinea: this.descripcionLineaEdicion(d)
     }));
     this.ventasService.actualizarVenta(this.idVenta, { venta: ventaPayload, detalles: detallesPayload }).subscribe({
       next: () => {

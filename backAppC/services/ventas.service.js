@@ -10,6 +10,7 @@ const gestoresRepository = require('../repositories/gestores.repository');
 const stockService = require('./stock.service');
 const inventarioRepository = require('../repositories/inventario.repository');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 
 exports.crearVenta = async (datosVenta, idEmpresa, idUsuario) => {
   // El Service solo extrae datos y llama al Repository
@@ -211,6 +212,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
     const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
     const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+    const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
 
     let idSucursalEmpresa = venta.idSucursal || null;
     if (!idSucursalEmpresa) {
@@ -287,6 +289,9 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     if (!idComprobanteDestino) {
       throw new Error('El comprobante seleccionado no existe en su empresa o no está autorizado.');
     }
+    if (codigoComprobante === 'F7' || codigoComprobante === 'B7' || codigoComprobante === 'F8' || codigoComprobante === 'B8') {
+      throw new Error('Las notas de crédito/débito (F7/B7/F8/B8) no se emiten desde el punto de venta; use el módulo de notas de crédito / débito.');
+    }
     const esNotaVenta = codigoComprobante === 'NV';
 
     const sucursalesUnicas = new Set(dets.map(d => d.idSucursalEmpresa).filter(Boolean));
@@ -318,6 +323,13 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const compVenta = serie + '-' + numero;
 
     const totalesEmpresa = calcularTotales(dets);
+    const descuentosCliente = Number(venta.descuentos);
+    let descuentosCabeceraFinal = totalesEmpresa.descuentos;
+    if (!usarDescuentoEnTotal) {
+      descuentosCabeceraFinal = 0;
+    } else if (Number.isFinite(descuentosCliente) && descuentosCliente >= 0) {
+      descuentosCabeceraFinal = Math.round(descuentosCliente * 100) / 100;
+    }
 
     const ventaDatos = {
       idSucursal: idSucursalLinea,
@@ -335,7 +347,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       exonerado: totalesEmpresa.exonerado,
       gratuito: totalesEmpresa.gratuito,
       otrosCargos: totalesEmpresa.otrosCargos,
-      descuentos: totalesEmpresa.descuentos,
+      descuentos: descuentosCabeceraFinal,
       total: totalesEmpresa.total,
       idMediosPago: ventaConHora.idMediosPago,
       idEstadoPedido: idEstadoPedidoVenta,
@@ -514,6 +526,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
     const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
     const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+    const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
 
     let idSucursalCobradora = venta.idSucursal || null;
     if (!idSucursalCobradora) {
@@ -604,6 +617,13 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const compVentaVA = vaCorrelativo.serie + '-' + vaCorrelativo.numero;
 
     const totalesAgrupados = calcularTotales(detalles);
+    const descuentosClienteAgr = Number(venta.descuentos);
+    let descuentosCabeceraVA = totalesAgrupados.descuentos;
+    if (!usarDescuentoEnTotal) {
+      descuentosCabeceraVA = 0;
+    } else if (Number.isFinite(descuentosClienteAgr) && descuentosClienteAgr >= 0) {
+      descuentosCabeceraVA = Math.round(descuentosClienteAgr * 100) / 100;
+    }
     const ventaAgrupada = await ventasRepository.insertarVentaAgrupada(transaction, {
       idEmpresaCobradora: user.empresa,
       idSucursal: idSucursalCobradora,
@@ -611,7 +631,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       fEmision: fechaEmisionConHora,
       subtotal: totalesAgrupados.subtotal,
       igv: totalesAgrupados.igv,
-      descuentos: totalesAgrupados.descuentos,
+      descuentos: descuentosCabeceraVA,
       total: totalesAgrupados.total,
       idEstadoPago,
       idUsuario: user.sub,
@@ -699,6 +719,18 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
 
       const totalesEmpresa = calcularTotales(dets);
       sumaHijasTotal += totalesEmpresa.total;
+      let descuentosHija = totalesEmpresa.descuentos;
+      if (!usarDescuentoEnTotal) {
+        descuentosHija = 0;
+      } else if (
+        Number.isFinite(descuentosClienteAgr) &&
+        descuentosClienteAgr >= 0 &&
+        (Number(totalesAgrupados.subtotal) || 0) > 0
+      ) {
+        const prop =
+          (Number(totalesEmpresa.subtotal) || 0) / (Number(totalesAgrupados.subtotal) || 1);
+        descuentosHija = Math.round(descuentosClienteAgr * prop * 100) / 100;
+      }
 
       const ventaDatos = {
         idSucursal: idSucursalEmpresa,
@@ -714,7 +746,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         exonerado: totalesEmpresa.exonerado,
         gratuito: totalesEmpresa.gratuito,
         otrosCargos: totalesEmpresa.otrosCargos,
-        descuentos: totalesEmpresa.descuentos,
+        descuentos: descuentosHija,
         total: totalesEmpresa.total,
         idMediosPago: ventaConHora.idMediosPago,
         idEstadoPedido: idEstadoPedidoVenta,
