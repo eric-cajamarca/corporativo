@@ -97,15 +97,33 @@
   margin-bottom: 8px;
 }
 
+@media (min-width: 992px) {
+  .tabla-detalle .card-header {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+}
+
 .tabla-detalle .card-body {
   padding: 0.75rem 1rem;
 }
 
+.tabla-detalle-card-body {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
 .tabla-detalle .table-responsive {
-  min-height: 320px;
-  max-height: min(420px, calc(100vh - 420px));
+  min-height: 0;
+  max-height: min(52vh, 480px);
   overflow: auto;
   background: #fff;
+}
+
+@media (min-width: 992px) {
+  .tabla-detalle .table-responsive {
+    max-height: min(58vh, 560px);
+  }
 }
 
 /* Eliminar márgenes en inputs y selects */
@@ -183,73 +201,82 @@
 }
 
 
-/* Ajustes para las columnas de la tabla */
-.tabla-detalle table {
-  table-layout: fixed;
-  width: 100%;
-  font-size: 12px;
+/* Tabla detalle escritorio: 12 columnas (código… acción). En móvil las filas duplicadas usan cards. */
+@media (min-width: 992px) {
+  .tabla-detalle .create-compras-detalle-table {
+    table-layout: fixed;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  .tabla-detalle .create-compras-detalle-table th,
+  .tabla-detalle .create-compras-detalle-table td {
+    padding: 4px 6px !important;
+    vertical-align: middle;
+  }
+
+  .tabla-detalle .create-compras-detalle-table th:nth-child(1),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(1) {
+    width: 6%;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(2),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(2) {
+    width: 6%;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(3),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(3) {
+    width: 22%;
+    white-space: normal !important;
+    word-break: break-word;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(4),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(4) {
+    width: 8%;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(5),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(5) {
+    width: 6%;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(6),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(6) {
+    width: 5%;
+    text-align: right;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(7),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(7) {
+    width: 7%;
+    text-align: right;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(8),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(8) {
+    width: 7%;
+    text-align: right;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(9),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(9) {
+    width: 6%;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(10),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(10) {
+    width: 6%;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(11),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(11) {
+    width: 12%;
+    white-space: normal !important;
+    word-break: break-word;
+  }
+  .tabla-detalle .create-compras-detalle-table th:nth-child(12),
+  .tabla-detalle .create-compras-detalle-table td:nth-child(12) {
+    width: 9%;
+    white-space: nowrap;
+  }
+
+  .tabla-detalle .col-sucursal-detalle {
+    font-size: 11px;
+    line-height: 1.25;
+  }
 }
-
-.tabla-detalle th, 
-.tabla-detalle td {
-  padding: 2px 2px !important;
-}
-
-/* Columnas específicas */
-/* Columnas específicas */
-.tabla-detalle th:nth-child(1),
-.tabla-detalle td:nth-child(1) { /* Código */
-  width: 100px;
-}
-
-.tabla-detalle th:nth-child(2),
-.tabla-detalle td:nth-child(2) { /* Categoría */
-  width: 80px;
-}
-
-.tabla-detalle th:nth-child(3),
-.tabla-detalle td:nth-child(3) { /* Descripción */
-  width: 300px;
-  white-space: normal !important;
-}
-
-.tabla-detalle th:nth-child(4),
-.tabla-detalle td:nth-child(4) { /* marca */
-  width: 80px;
-}
-
-.tabla-detalle th:nth-child(5),
-.tabla-detalle td:nth-child(5) { /* presentacion */
-  width: 100px;
-}
-
-.tabla-detalle th:nth-child(6),
-.tabla-detalle td:nth-child(6) { /* Cantidad */
-  width: 80px;
-}
-
-.tabla-detalle th:nth-child(7),
-.tabla-detalle td:nth-child(7) { /* C.unitario */
-  width: 80px;
-}
-
-.tabla-detalle th:nth-child(8),
-.tabla-detalle td:nth-child(8) { /* F.Prod */
-  width: 90px;
-}
-
-.tabla-detalle th:nth-child(9),
-.tabla-detalle td:nth-child(9) { /* FVrnc */
-  width: 90px;
-}
-
-
-.tabla-detalle th:nth-child(10),
-.tabla-detalle td:nth-child(10) { /* sucursal */
-  width: 90px;
-}
-
-/* ... (continuar con los demás nth-child según necesites) */
 
 /* Responsive para pantallas pequeñas */
 @media (max-width: 768px) {

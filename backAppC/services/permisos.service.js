@@ -538,7 +538,8 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             submenu: [
                 { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
                 { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
-                { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') }
+                { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') },
+                { nombre: 'Emisión de guías', ruta: '/facturacion/emision-guias', permiso: 'VER_CONFIGURACION', visible: esAdmin || permisos.includes('VER_CONFIGURACION') }
             ]
         },
         {

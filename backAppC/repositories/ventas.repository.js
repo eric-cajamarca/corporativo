@@ -164,6 +164,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.total,
           v.idEstadoSunat,
+          es.codigo AS codigoEstadoSunat,
           v.serie,
           v.numero,
           v.idComprobante,
@@ -183,6 +184,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             ELSE '{' + aggfp.codigos + '}'
           END AS formaPago
         FROM Ventas v
+        LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
@@ -216,6 +218,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
             v.total,
             v.idEstadoSunat,
+            es.codigo AS codigoEstadoSunat,
             v.serie,
             v.numero,
             v.idComprobante,
@@ -231,6 +234,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             ISNULL(v.eliminado, 0) AS eliminado,
             '' AS formaPago
           FROM Ventas v
+          LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
           LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
           LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
           LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
@@ -252,7 +256,8 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
     clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
     clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : '',
     eliminado: !!r.eliminado,
-    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}'
+    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}',
+    codigoEstadoSunat: r.codigoEstadoSunat != null ? String(r.codigoEstadoSunat).trim() : null
   }));
 };
 
@@ -279,6 +284,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
         CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
         v.total,
         v.idEstadoSunat,
+        es.codigo AS codigoEstadoSunat,
         v.serie,
         v.numero,
         v.idComprobante,
@@ -299,6 +305,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           ELSE '{' + aggfp.codigos + '}'
         END AS formaPago
       FROM Ventas v
+      LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
       LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
       LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
       LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
@@ -332,6 +339,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.total,
           v.idEstadoSunat,
+          es.codigo AS codigoEstadoSunat,
           v.serie,
           v.numero,
           v.idComprobante,
@@ -348,6 +356,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           ISNULL(v.eliminado, 0) AS eliminado,
           '' AS formaPago
         FROM Ventas v
+        LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
@@ -371,7 +380,8 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
     clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
     clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : '',
     eliminado: !!r.eliminado,
-    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}'
+    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}',
+    codigoEstadoSunat: r.codigoEstadoSunat != null ? String(r.codigoEstadoSunat).trim() : null
   }));
 };
 
@@ -436,12 +446,14 @@ exports.listarVentasNotasCreditoDebitoRepo = async (pool, idsEmpresa, opts = {})
       CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
       v.total,
       v.idEstadoSunat,
+      es.codigo AS codigoEstadoSunat,
       v.serie,
       v.numero,
       UPPER(LTRIM(RTRIM(c.codigo))) AS codigoComprobante,
       ce.idComprobanteElectronico,
       COALESCE(LTRIM(RTRIM(cl.rSocial)), '') AS clienteRazonSocial
     FROM Ventas v
+    LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
     INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
     LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
     LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
@@ -461,6 +473,7 @@ exports.listarVentasNotasCreditoDebitoRepo = async (pool, idsEmpresa, opts = {})
     fEmision: r.fEmision != null ? String(r.fEmision).trim() : "",
     total: r.total != null ? Number(r.total) : 0,
     idEstadoSunat: r.idEstadoSunat != null ? Number(r.idEstadoSunat) : null,
+    codigoEstadoSunat: r.codigoEstadoSunat != null ? String(r.codigoEstadoSunat).trim() : null,
     serie: r.serie != null ? String(r.serie).trim() : "",
     numero: r.numero != null ? String(r.numero).trim() : "",
     codigoComprobante: r.codigoComprobante != null ? String(r.codigoComprobante).trim().toUpperCase() : "",

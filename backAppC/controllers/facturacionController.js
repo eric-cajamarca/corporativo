@@ -459,6 +459,30 @@ const listarResumenesDiarios = async (req, res, next) => {
   }
 };
 
+const listarGuiasEmitidas = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const { pagina, porPagina } = req.query;
+    const result = await FacturacionServices.listarGuiasEmitidasService(pool, req.user, {
+      pagina: pagina ? parseInt(pagina, 10) : 1,
+      porPagina: porPagina ? parseInt(porPagina, 10) : 10
+    });
+    res.status(200).send({ data: result.items, total: result.total });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    const msg = error.message || String(error);
+    if (/Invalid object name ['\"]GuiasElectronicasEmitidas['\"]/i.test(msg)) {
+      return res.status(503).send({
+        message: "Ejecute la migración create_guias_electronicas_emitidas.sql para habilitar el listado de guías.",
+        data: [],
+        total: 0
+      });
+    }
+    console.error("Error listar guías emitidas:", error);
+    return next(error);
+  }
+};
+
 // Resumen diario: enviar resumen para una fecha (POST body: fechaResumen YYYY-MM-DD)
 const enviarResumenDiario = async (req, res, next) => {
   try {
@@ -689,6 +713,38 @@ const enviarComunicacionBaja = async (req, res, next) => {
   }
 };
 
+const obtenerXmlComunicacionBaja = async (req, res, next) => {
+  try {
+    const { idComunicacionBaja } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const contenido = await FacturacionServices.obtenerXmlComunicacionBajaService(pool, req.user, idComunicacionBaja);
+    res.status(200).send({ data: { content: contenido } });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "XML_COMUNICACION_BAJA_NO_DISPONIBLE") {
+      return res.status(404).send({ message: "XML no disponible (comunicación anterior a la migración o sin guardado).", data: undefined });
+    }
+    console.error("Error obtener XML comunicación de baja:", error);
+    return next(error);
+  }
+};
+
+const obtenerCdrComunicacionBaja = async (req, res, next) => {
+  try {
+    const { idComunicacionBaja } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const contenido = await FacturacionServices.obtenerCdrComunicacionBajaService(pool, req.user, idComunicacionBaja);
+    res.status(200).send({ data: { content: contenido } });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "CDR_COMUNICACION_BAJA_NO_DISPONIBLE") {
+      return res.status(404).send({ message: "CDR no disponible. Consulte el estado en SUNAT primero.", data: undefined });
+    }
+    console.error("Error obtener CDR comunicación de baja:", error);
+    return next(error);
+  }
+};
+
 const consultarEstadoComunicacionBaja = async (req, res, next) => {
   try {
     const { idComunicacionBaja } = req.params;
@@ -727,6 +783,7 @@ module.exports = {
   obtenerXmlComprobanteDescarga,
   obtenerCdrComprobante,
   listarResumenesDiarios,
+  listarGuiasEmitidas,
   obtenerBoletasPendientesResumen,
   enviarResumenDiario,
   consultarEstadoResumenDiario,
@@ -738,5 +795,7 @@ module.exports = {
   listarMotivosBaja,
   listarComunicacionesBaja,
   enviarComunicacionBaja,
-  consultarEstadoComunicacionBaja
+  consultarEstadoComunicacionBaja,
+  obtenerXmlComunicacionBaja,
+  obtenerCdrComunicacionBaja
 };

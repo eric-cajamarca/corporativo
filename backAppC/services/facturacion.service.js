@@ -1,4 +1,5 @@
 const FacturacionRepository = require('../repositories/facturacion.repository');
+const guiaElectronicaRepository = require('../repositories/guiaElectronica.repository');
 const facturadorSunatService = require('./facturadorSunat.service');
 const firmaXmlSunat = require('./firmaXmlSunat.service');
 const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
@@ -227,6 +228,22 @@ exports.obtenerCdrComprobanteService = async (pool, user, idComprobanteElectroni
   return result.contenido;
 };
 
+/** XML firmado guardado al enviar la RA (requiere columna xmlEnviado). */
+exports.obtenerXmlComunicacionBajaService = async (pool, user, idComunicacionBaja) => {
+  if (!user?.empresa) throw new Error("NO_ACCESS");
+  const row = await FacturacionRepository.obtenerComunicacionBajaPorIdRepo(pool, user.empresa, idComunicacionBaja);
+  if (!row || !row.xmlEnviado) throw new Error("XML_COMUNICACION_BAJA_NO_DISPONIBLE");
+  return row.xmlEnviado;
+};
+
+/** CDR / ApplicationResponse tras consultar getStatus (rechazo o aceptación). */
+exports.obtenerCdrComunicacionBajaService = async (pool, user, idComunicacionBaja) => {
+  if (!user?.empresa) throw new Error("NO_ACCESS");
+  const row = await FacturacionRepository.obtenerComunicacionBajaPorIdRepo(pool, user.empresa, idComunicacionBaja);
+  if (!row || !row.cdr) throw new Error("CDR_COMUNICACION_BAJA_NO_DISPONIBLE");
+  return row.cdr;
+};
+
 exports.obtenerEstadisticasFacturacionService = async (pool, user, periodo) => {
   if (!user) {
     throw new Error("NO_ACCESS");
@@ -399,6 +416,12 @@ exports.listarBoletasPendientesPorFechaService = async (pool, user, fechaDesde, 
 exports.obtenerComprobanteOrigenParaGuiaService = async (pool, user, serie, numero) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
   return FacturacionRepository.obtenerComprobanteOrigenParaGuiaRepo(pool, user.empresa, serie, numero);
+};
+
+/** Lista guías electrónicas emitidas (paginado). Requiere tabla GuiasElectronicasEmitidas (migración). */
+exports.listarGuiasEmitidasService = async (pool, user, opts) => {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  return guiaElectronicaRepository.listarGuiasEmitidasPaginadoRepo(pool, user.empresa, opts || {});
 };
 
 /** Obtiene comprobante origen (Factura/Boleta aceptada) para emitir NC/ND. Por id o por serie/numero/tipo. */

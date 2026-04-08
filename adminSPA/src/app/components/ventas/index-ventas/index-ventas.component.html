@@ -231,8 +231,8 @@
                   <td>
                     <span *ngIf="v.eliminado" class="badge bg-secondary">Anulado</span>
                     <span *ngIf="!v.eliminado && esNotaVentaSinSunat(v)" class="text-muted">—</span>
-                    <span *ngIf="!v.eliminado && !esNotaVentaSinSunat(v)" class="badge badge-estado-sunat" [ngClass]="estadoSunatClass(v.idEstadoSunat)">
-                      {{ estadoSunatLabel(v.idEstadoSunat) }}
+                    <span *ngIf="!v.eliminado && !esNotaVentaSinSunat(v)" class="badge badge-estado-sunat" [ngClass]="estadoSunatClassVenta(v)">
+                      {{ etiquetaEstadoSunatListado(v) }}
                     </span>
                   </td>
                   <td class="text-center acciones-cell">
@@ -347,7 +347,7 @@
                 <span class="fw-semibold">#{{ v.idVenta }} · {{ v.compVenta || '—' }}</span>
                 <span *ngIf="v.eliminado" class="badge bg-secondary">Anulado</span>
                 <span *ngIf="!v.eliminado && esNotaVentaSinSunat(v)" class="text-muted small">SUNAT —</span>
-                <span *ngIf="!v.eliminado && !esNotaVentaSinSunat(v)" class="badge badge-estado-sunat" [ngClass]="estadoSunatClass(v.idEstadoSunat)">{{ estadoSunatLabel(v.idEstadoSunat) }}</span>
+                <span *ngIf="!v.eliminado && !esNotaVentaSinSunat(v)" class="badge badge-estado-sunat" [ngClass]="estadoSunatClassVenta(v)">{{ etiquetaEstadoSunatListado(v) }}</span>
               </div>
               <div class="ventas-m-kv" *ngIf="esGestora"><span class="ventas-m-k">Empresa</span><span class="ventas-m-v small">{{ v.razonSocialEmpresa || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Emisión</span><span class="ventas-m-v">{{ formatearFecha(v.fEmision) }}</span></div>

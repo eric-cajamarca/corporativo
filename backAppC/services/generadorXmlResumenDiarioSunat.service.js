@@ -3,7 +3,8 @@
  * Referencia: FE Primer - Resumen diario, nomenclatura {RUC}-RC-{YYYYMMDD}-{CORRELATIVO}.xml
  */
 
-const NS_SAC = "urn:sunat:names:specification:ubl:peru:schema:xsd:SummaryDocuments-1";
+const NS_SUMMARY = "urn:sunat:names:specification:ubl:peru:schema:xsd:SummaryDocuments-1";
+const NS_SAC_AGG = "urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1";
 const NS_CAC = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
 const NS_CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
 const NS_EXT = "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2";
@@ -108,7 +109,7 @@ function generarXmlResumenDiario(datos, lineas) {
   const issueDate = fechaResumen.slice(0, 4) + "-" + fechaResumen.slice(4, 6) + "-" + fechaResumen.slice(6, 8);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<SummaryDocuments xmlns="${NS_SAC}" xmlns:cac="${NS_CAC}" xmlns:cbc="${NS_CBC}" xmlns:ext="${NS_EXT}">
+<SummaryDocuments xmlns="${NS_SUMMARY}" xmlns:sac="${NS_SAC_AGG}" xmlns:cac="${NS_CAC}" xmlns:cbc="${NS_CBC}" xmlns:ext="${NS_EXT}">
   <ext:UBLExtensions>
     <ext:UBLExtension>
       <ext:ExtensionContent/>

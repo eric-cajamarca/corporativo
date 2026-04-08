@@ -350,7 +350,7 @@ class HtmlBuilderService {
     return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;margin:0;padding:0;">
       <div>* Bienes transferidos en la Amazonía para ser consumidos en la misma</div>
       <div>* Representación impresa de ${titulo}</div>
-      <div>* Generado desde el Factuador SUNAT</div>
+      <div>* Generado desde el sistema del contribuyente</div>
       <div>* Resumen código H: ${hashEsc}</div>
       <div>* Consultar el comprobante en el portal SUNAT con su CLAVE SOL</div>
     </div>`;

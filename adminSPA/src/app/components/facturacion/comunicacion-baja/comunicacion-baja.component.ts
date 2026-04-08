@@ -35,6 +35,7 @@ export class ComunicacionBajaComponent implements OnInit {
   pagina = 1;
   porPagina = 20;
   consultandoId: string | null = null;
+  abriendoArchivoId: string | null = null;
 
   constructor(private _facturacionService: FacturacionService) {}
 
@@ -190,6 +191,68 @@ export class ComunicacionBajaComponent implements OnInit {
     if (item?.descripcionEstadoSunat) return item.descripcionEstadoSunat;
     if (item?.idEstadoSunat == null) return 'Pendiente de consulta';
     return 'Estado ' + item.idEstadoSunat;
+  }
+
+  private abrirContenidoXmlEnPestana(content: string, nombreDescarga: string): void {
+    if (!content) return;
+    const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if (!w) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombreDescarga;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  }
+
+  verXmlEnviado(item: any): void {
+    const id = item?.idComunicacionBaja;
+    if (!id) return;
+    this.abriendoArchivoId = id + '-xml';
+    this._facturacionService.obtenerXmlComunicacionBaja(id).subscribe({
+      next: (res) => {
+        this.abriendoArchivoId = null;
+        const content = res?.data?.content ?? '';
+        this.abrirContenidoXmlEnPestana(content, `ra-${id}.xml`);
+      },
+      error: (err) => {
+        this.abriendoArchivoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo cargar el XML.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'XML', message: msg });
+        }
+      }
+    });
+  }
+
+  verCdrSunat(item: any): void {
+    const id = item?.idComunicacionBaja;
+    if (!id) return;
+    this.abriendoArchivoId = id + '-cdr';
+    this._facturacionService.obtenerCdrComunicacionBaja(id).subscribe({
+      next: (res) => {
+        this.abriendoArchivoId = null;
+        const content = res?.data?.content ?? '';
+        this.abrirContenidoXmlEnPestana(content, `cdr-ra-${id}.xml`);
+      },
+      error: (err) => {
+        this.abriendoArchivoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo cargar el CDR.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'CDR', message: msg });
+        }
+      }
+    });
+  }
+
+  tieneXmlEnviado(item: any): boolean {
+    return item?.tieneXmlEnviado === 1 || item?.tieneXmlEnviado === true;
+  }
+
+  tieneCdr(item: any): boolean {
+    return item?.tieneCdr === 1 || item?.tieneCdr === true;
   }
 
   onSidebarToggle(collapsed: boolean): void {

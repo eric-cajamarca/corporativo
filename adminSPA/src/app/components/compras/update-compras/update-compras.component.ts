@@ -15,6 +15,9 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
+import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -108,7 +111,8 @@ export class UpdateComprasComponent {
     private _marcaService: variosService,
     private _router: Router,
     private _cdr: ChangeDetectorRef,
-    public sidebarState: SidebarStateService
+    public sidebarState: SidebarStateService,
+    private modalService: NgbModal
   ) {
     //this.token = this._cookieService.get('token');
   }
@@ -1205,14 +1209,28 @@ export class UpdateComprasComponent {
       }
 
 
-  agregarNuevaCategoria() {
-        //this._router.navigate(['/categorias/create']);
-    window.open('/categorias/create', '_blank');
-
+  agregarNuevaCategoria(): void {
+    const modalRef = this.modalService.open(CreateCategoriaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg',
+    });
+    modalRef.result.finally(() => {
+      this.cargarCategorias();
+    });
   }
 
-  agregarNuevaMarca() {
-        window.open('/marcas/create', '_blank');
+  agregarNuevaMarca(): void {
+    const modalRef = this.modalService.open(CreateMarcaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg',
+    });
+    modalRef.result.finally(() => {
+      this.cargarMarcas();
+    });
   }
 
 

@@ -366,8 +366,10 @@ export class IndexComprasComponent {
 
   
   set_eliminar(id: any) {
+    this.load_estado = true;
         this._comprasService.eliminar_idcompra_empresa(id).subscribe(
       response => {
+        this.load_estado = false;
                         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -375,7 +377,7 @@ export class IndexComprasComponent {
             color: '#FFF',
             class: 'text-danger',
             position: 'topRight',
-            message: 'Usted no tiene acceso a compras'
+            message: response?.message || 'No se pudo eliminar la compra'
           });
 
         } else {
@@ -401,7 +403,17 @@ export class IndexComprasComponent {
 
       },
       error => {
-              }
+        this.load_estado = false;
+        const msg = error?.error?.message || 'Error al eliminar la compra';
+        iziToast.show({
+          title: 'ERROR',
+          titleColor: '#FF0000',
+          color: '#FFF',
+          class: 'text-danger',
+          position: 'topRight',
+          message: msg
+        });
+      }
     );
 
 

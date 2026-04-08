@@ -1,0 +1,107 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="content-header d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div>
+        <h1 class="content-title mb-1">Emisión de guías</h1>
+        <p class="content-subtitle text-muted mb-0">
+          Guías electrónicas emitidas (remitente y transportista). Use <strong>Agregar</strong> para registrar una nueva guía de remisión.
+        </p>
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <a class="btn btn-success btn-sm" routerLink="/facturacion/guias-remision">
+          <i class="bi bi-plus-lg me-1"></i>
+          Agregar
+        </a>
+        <a class="btn btn-outline-primary btn-sm" routerLink="/facturacion/guias/configuracion">
+          <i class="bi bi-gear me-1"></i>
+          Configuración de guías electrónicas
+        </a>
+      </div>
+    </div>
+
+    @if (!autorizado) {
+      <div class="alert alert-warning">
+        <p class="mb-2">La emisión de guías electrónicas no está habilitada.</p>
+        <p class="mb-0 small">Active la opción en <strong>Configuración</strong> → <strong>Facturación</strong> o use el botón de configuración de guías.</p>
+        <button type="button" class="btn btn-sm btn-primary mt-2" routerLink="/facturacion/guias/configuracion">
+          Ir a configuración de guías
+        </button>
+      </div>
+    } @else {
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <p class="text-muted small mb-2" *ngIf="!loading">
+            Total: <strong>{{ total }}</strong> guía(s). Se muestran {{ pageSize }} por página.
+          </p>
+
+          @if (loading) {
+            <p class="text-muted mb-0"><i class="bi bi-hourglass-split"></i> Cargando...</p>
+          } @else if (items.length === 0) {
+            <div class="alert alert-info mb-0">
+              <i class="bi bi-info-circle me-2"></i>
+              No hay guías registradas. Cuando implemente el envío a SUNAT, las guías aparecerán aquí. Use <strong>Agregar</strong> para ir a guías de remisión.
+            </div>
+          } @else {
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0 table-guias">
+                <thead class="table-dark">
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Rol</th>
+                    <th>Serie-Número</th>
+                    <th>Fecha emisión</th>
+                    <th>Estado</th>
+                    <th>Doc. origen</th>
+                    <th>Ticket</th>
+                    <th class="text-end text-nowrap">
+                      <div class="d-inline-flex align-items-center gap-2 justify-content-end">
+                        <span>Acciones</span>
+                        <a class="btn btn-sm btn-success" routerLink="/facturacion/guias-remision" title="Nueva guía de remisión">
+                          <i class="bi bi-plus-lg"></i> Agregar
+                        </a>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of items; track row.idGuiaElectronica) {
+                    <tr>
+                      <td>{{ etiquetaTipoDocumento(row.tipoDocumento) }}</td>
+                      <td>{{ row.tipoRol || '—' }}</td>
+                      <td><code class="small">{{ row.serie }}-{{ row.numero }}</code></td>
+                      <td>{{ row.fechaEmision || '—' }}</td>
+                      <td>{{ etiquetaEstado(row) }}</td>
+                      <td>{{ docOrigen(row) }}</td>
+                      <td><span class="small font-monospace">{{ row.ticketSunat || '—' }}</span></td>
+                      <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Próximamente">
+                          <i class="bi bi-eye"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <ngb-pagination
+            *ngIf="!loading && total > pageSize"
+            [(page)]="page"
+            [pageSize]="pageSize"
+            [collectionSize]="total"
+            [maxSize]="maxSize"
+            [rotate]="true"
+            [boundaryLinks]="true"
+            (pageChange)="onPageChange($event)"
+            class="d-flex justify-content-end mt-3 mb-0"
+            aria-label="Paginación guías">
+          </ngb-pagination>
+        </div>
+      </div>
+    }
+  </div>
+</main>

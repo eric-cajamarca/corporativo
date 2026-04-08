@@ -4,7 +4,10 @@
  * Comprobantes permitidos: 01 Factura, 07 NC, 08 ND (solo aceptados).
  */
 
-const NS_SAC = "urn:sunat:names:specification:ubl:peru:schema:xsd:VoidedDocuments-1";
+/** Raíz del documento RA (UBL Perú). */
+const NS_VOIDED = "urn:sunat:names:specification:ubl:peru:schema:xsd:VoidedDocuments-1";
+/** sac:VoidedDocumentsLine / VoidedReasonDescription (SUNAT aggregate). Sin esto el prefijo sac: queda sin declarar y el XML no es válido. */
+const NS_SAC_AGG = "urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1";
 const NS_CAC = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
 const NS_CBC = "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
 const NS_EXT = "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2";
@@ -21,39 +24,50 @@ function escXml(s) {
 
 /**
  * Genera el XML VoidedDocuments (comunicación de baja RA) sin firma.
- * @param {object} datos - { rucEmisor, razonSocialEmisor, fechaComunicacion (YYYYMMDD), correlativo }
+ * @param {object} datos - { rucEmisor, razonSocialEmisor, fechaReferencia (YYYYMMDD), fechaComunicacion (YYYYMMDD), correlativo }
  * @param {Array} lineas - Array de { tipoComprobante, serie, numero, motivoBaja }
  * @returns {string} XML
  */
 function generarXmlVoidedDocuments(datos, lineas) {
   const ruc = String(datos.rucEmisor || "").replace(/\D/g, "").padStart(11, "0");
   const razon = escXml(datos.razonSocialEmisor || "");
+  // fechaComunicacion: fecha de hoy (para ID e IssueDate)
   const fechaCom = String(datos.fechaComunicacion || "").replace(/\D/g, "").slice(0, 8);
+  // fechaReferencia: fecha de emisión del comprobante a anular (para ReferenceDate)
+  const fechaRef = String(datos.fechaReferencia || fechaCom).replace(/\D/g, "").slice(0, 8);
   const correlativo = String(datos.correlativo || "1").slice(0, 5);
+  // ID usa la fecha de COMUNICACIÓN según documentación SUNAT: RA-{YYYYMMDD de comunicación}-{correlativo}
   const idDoc = `RA-${fechaCom}-${correlativo}`;
+  // ReferenceDate: fecha de emisión de los comprobantes
+  const referenceDate = fechaRef.slice(0, 4) + "-" + fechaRef.slice(4, 6) + "-" + fechaRef.slice(6, 8);
+  // IssueDate: fecha de la comunicación de baja (hoy)
   const issueDate = fechaCom.slice(0, 4) + "-" + fechaCom.slice(4, 6) + "-" + fechaCom.slice(6, 8);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'generadorXmlVoidedDocuments.js:31',message:'Generando XML VoidedDocuments',data:{ruc,razon:razon.substring(0,50),fechaCom,fechaRef,correlativo,idDoc,referenceDate,issueDate,lineasCount:lineas?.length||0,lineas:lineas?.slice(0,3)},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
 
   const lineasXml = [];
   let idx = 1;
   for (const lin of lineas) {
     const tipo = String(lin.tipoComprobante || "01").trim();
     const serie = escXml(lin.serie || "");
-    const numero = String(lin.numero || "").replace(/\D/g, "").padStart(8, "0");
+    // DocumentNumberID: número sin padding de ceros según ejemplo oficial
+    const numero = String(lin.numero || "").replace(/\D/g, "");
     const motivo = escXml(lin.motivoBaja || "Anulación de la operación");
     lineasXml.push(`
-    <sac:VoidedDocumentsLine>
-      <cbc:LineID>${idx}</cbc:LineID>
-      <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipo}</cbc:DocumentTypeCode>
-      <cbc:DocumentSerialID>${serie}</cbc:DocumentSerialID>
-      <cbc:DocumentNumberStart>${numero}</cbc:DocumentNumberStart>
-      <cbc:DocumentNumberEnd>${numero}</cbc:DocumentNumberEnd>
-      <sac:VoidedReasonDescription>${motivo}</sac:VoidedReasonDescription>
-    </sac:VoidedDocumentsLine>`);
+  <sac:VoidedDocumentsLine>
+    <cbc:LineID>${idx}</cbc:LineID>
+    <cbc:DocumentTypeCode>${tipo}</cbc:DocumentTypeCode>
+    <sac:DocumentSerialID>${serie}</sac:DocumentSerialID>
+    <sac:DocumentNumberID>${numero}</sac:DocumentNumberID>
+    <sac:VoidReasonDescription>${motivo}</sac:VoidReasonDescription>
+  </sac:VoidedDocumentsLine>`);
     idx++;
   }
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<VoidedDocuments Id="SUNAT" xmlns="${NS_SAC}" xmlns:cac="${NS_CAC}" xmlns:cbc="${NS_CBC}" xmlns:ext="${NS_EXT}">
+  const result = `<?xml version="1.0" encoding="UTF-8"?>
+<VoidedDocuments xmlns="${NS_VOIDED}" xmlns:sac="${NS_SAC_AGG}" xmlns:cac="${NS_CAC}" xmlns:cbc="${NS_CBC}" xmlns:ext="${NS_EXT}">
   <ext:UBLExtensions>
     <ext:UBLExtension>
       <ext:ExtensionContent/>
@@ -62,7 +76,7 @@ function generarXmlVoidedDocuments(datos, lineas) {
   <cbc:UBLVersionID>2.0</cbc:UBLVersionID>
   <cbc:CustomizationID>1.0</cbc:CustomizationID>
   <cbc:ID>${escXml(idDoc)}</cbc:ID>
-  <cbc:ReferenceDate>${issueDate}</cbc:ReferenceDate>
+  <cbc:ReferenceDate>${referenceDate}</cbc:ReferenceDate>
   <cbc:IssueDate>${issueDate}</cbc:IssueDate>
   <cac:Signature>
     <cbc:ID>${escXml(ruc)}</cbc:ID>
@@ -76,12 +90,13 @@ function generarXmlVoidedDocuments(datos, lineas) {
     </cac:SignatoryParty>
     <cac:DigitalSignatureAttachment>
       <cac:ExternalReference>
-        <cbc:URI>#SUNAT</cbc:URI>
+        <cbc:URI>${escXml(ruc)}</cbc:URI>
       </cac:ExternalReference>
     </cac:DigitalSignatureAttachment>
   </cac:Signature>
   <cac:AccountingSupplierParty>
-    <cbc:CustomerAccountID>${escXml(ruc)}</cbc:CustomerAccountID>
+    <cbc:CustomerAssignedAccountID>${escXml(ruc)}</cbc:CustomerAssignedAccountID>
+    <cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
     <cac:Party>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razon}</cbc:RegistrationName>
@@ -90,6 +105,12 @@ function generarXmlVoidedDocuments(datos, lineas) {
   </cac:AccountingSupplierParty>
   ${lineasXml.join("")}
 </VoidedDocuments>`;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'generadorXmlVoidedDocuments.js:95',message:'XML VoidedDocuments generado',data:{xmlLength:result?.length||0,xmlFirst500:result?.substring(0,500)||'',xmlContainsVoidedDocuments:result?.includes('<VoidedDocuments'),xmlContainsSac:result?.includes('xmlns:sac=')},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+
+  return result;
 }
 
 module.exports = { generarXmlVoidedDocuments };

@@ -331,6 +331,11 @@ export class IndexVentasComponent implements OnInit {
     });
   }
 
+  /** True si el comprobante fue anulado ante SUNAT (comunicación de baja aceptada). */
+  esComprobanteAnuladoSunat(v: VentaListado): boolean {
+    return (v.codigoEstadoSunat || '').trim() === '08';
+  }
+
   /** 7 = Pendiente de envío; 1 = Aceptado; 3 = Aceptado con obs.; 4 = Rechazado; 6 = Error envío. */
   estadoSunatLabel(idEstadoSunat: number | undefined): string {
     if (idEstadoSunat == null) return 'Pendiente';
@@ -338,7 +343,8 @@ export class IndexVentasComponent implements OnInit {
     if (idEstadoSunat === 1 || idEstadoSunat === 2) return 'Aceptado';
     if (idEstadoSunat === 3) return 'Aceptado con obs.';
     if (idEstadoSunat === 6) return 'Error envío';
-    return 'Rechazado';
+    if (idEstadoSunat === 4) return 'Rechazado';
+    return 'Otro estado';
   }
 
   /** Id del comprobante electrónico como string (para comparaciones y API). */
@@ -350,6 +356,7 @@ export class IndexVentasComponent implements OnInit {
   /** True si se debe mostrar el botón Enviar a SUNAT. */
   puedeEnviarSunat(v: VentaListado): boolean {
     if (v.eliminado) return false;
+    if (this.esComprobanteAnuladoSunat(v)) return false;
     if (this.idComprobanteStr(v) === '') return false;
     if (this.useResumenDiarioBoletas && (v.tipoComprobante === '03' || (v.nombreComprobante || '').toLowerCase().includes('boleta'))) return false;
     return true;
@@ -389,6 +396,7 @@ export class IndexVentasComponent implements OnInit {
   etiquetaEstadoSunatListado(v: VentaListado): string {
     if (v.eliminado) return 'Anulado';
     if (this.esNotaVentaSinSunat(v)) return '—';
+    if (this.esComprobanteAnuladoSunat(v)) return 'Anulado (SUNAT)';
     return this.estadoSunatLabel(v.idEstadoSunat);
   }
 
@@ -402,6 +410,7 @@ export class IndexVentasComponent implements OnInit {
 
   puedeEditarVenta(v: VentaListado): boolean {
     if (v.eliminado) return false;
+    if (this.esComprobanteAnuladoSunat(v)) return false;
     const id = v?.idEstadoSunat;
     if (!this.esNotaVentaSinSunat(v) && (id === 1 || id === 2 || id === 3)) return false;
     if (this.esCotizacionONotaVenta(v) && !this.dentro24HorasDesdeEmision(v)) return false;
@@ -410,6 +419,7 @@ export class IndexVentasComponent implements OnInit {
 
   puedeEliminarVenta(v: VentaListado): boolean {
     if (v.eliminado) return false;
+    if (this.esComprobanteAnuladoSunat(v)) return false;
     const id = v?.idEstadoSunat;
     if (!this.esNotaVentaSinSunat(v) && (id === 1 || id === 2 || id === 3)) return false;
     return true;
@@ -509,7 +519,15 @@ export class IndexVentasComponent implements OnInit {
     if (idEstadoSunat == null) return 'bg-secondary';
     if (idEstadoSunat === 7) return 'bg-warning text-dark';
     if (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3) return 'bg-info';
+    if (idEstadoSunat === 6) return 'bg-secondary';
     return 'bg-danger';
+  }
+
+  /** Clase del badge según venta (incluye baja SUNAT código 08). */
+  estadoSunatClassVenta(v: VentaListado): string {
+    if (v.eliminado) return 'bg-secondary';
+    if (this.esComprobanteAnuladoSunat(v)) return 'bg-dark';
+    return this.estadoSunatClass(v.idEstadoSunat);
   }
 
   abrirModalArchivo(v: VentaListado, tipo: 'xml' | 'cdr'): void {
@@ -862,7 +880,13 @@ export class IndexVentasComponent implements OnInit {
 
   get resumenNoValidosSunat(): { cantidad: number; total: number } {
     const list = this.ventasEmpresa.filter(
-      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && v.idEstadoSunat !== 1 && v.idEstadoSunat !== 2 && v.idEstadoSunat !== 3
+      (v) =>
+        !v.eliminado &&
+        !this.esNotaVentaSinSunat(v) &&
+        !this.esComprobanteAnuladoSunat(v) &&
+        v.idEstadoSunat !== 1 &&
+        v.idEstadoSunat !== 2 &&
+        v.idEstadoSunat !== 3
     );
     const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
     return { cantidad: list.length, total };

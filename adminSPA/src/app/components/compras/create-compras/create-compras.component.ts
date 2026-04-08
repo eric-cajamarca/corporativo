@@ -28,6 +28,9 @@ import { ProveedoresService } from '../../../services/proveedores.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
+import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -72,6 +75,8 @@ export class CreateComprasComponent {
   
 
   public consultManual = false;
+  /** Si la consulta SUNAT/Factiliza llega antes que carguen comprobantes, se mapea el id al tener la lista. */
+  private codigoSunatCompraPendiente: string | null = null;
   public idCompra: any = '';
   public indexDetalle: any = 0;
   /** Si true, al registrar cada ítem se asigna a ubicación por defecto. Si false, podrá gestionar ubicaciones manualmente después. */
@@ -165,6 +170,7 @@ export class CreateComprasComponent {
     private _marcaService: variosService,
     private inventarioModal: InventarioModalService,
     private _router: Router,
+    private modalService: NgbModal,
 
     // consultarxml
     private fb: FormBuilder,
@@ -241,6 +247,8 @@ export class CreateComprasComponent {
           return;
         }
 
+        this.consultManual = true;
+
         const info = this.comprobante.informacionGeneral || {};
         const emisor = this.comprobante.emisor || {};
         const totales = this.comprobante.totales || {};
@@ -254,10 +262,18 @@ export class CreateComprasComponent {
           this.compras.serie = '';
           this.compras.numero = '';
         }
-        this.compras.idComprobante = info.tipoDocumento || '1';
+        const tipoSunat = String(info.tipoDocumento ?? this.consultaForm?.value?.tipo_doc ?? '01').trim().padStart(2, '0');
+        this.asignarIdComprobantePorCodigoSunat(tipoSunat);
         this.compras.ruc = emisor.ruc || '';
-        this.compras.fEmision = this.formatFecha(info.fechaEmision) || '';
-        this.compras.fVencimiento = this.formatFecha(info.fechaVencimiento) || '';
+        this.aplicarSucursalPrincipalSiVacia();
+
+        const emisionIso = this.formatFechaParaInputDate(info.fechaEmision);
+        this.compras.fEmision = emisionIso || '';
+        let vencIso = this.formatFechaParaInputDate(info.fechaVencimiento);
+        if (!vencIso && emisionIso) {
+          vencIso = emisionIso;
+        }
+        this.compras.fVencimiento = vencIso || '';
         this.compras.observacion = this.comprobante.observacion || '';
 
         const sub = parseFloat(String(totales.totalValorVenta || 0).replace(',', '.')) || 0;
@@ -271,7 +287,10 @@ export class CreateComprasComponent {
 
         const detalles = this.comprobante.detalles;
         if (Array.isArray(detalles) && detalles.length > 0) {
-          const idSucursalDefault = this.compras.idSucursal || (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
+          const idSucursalDefault =
+            this.compras.idSucursal ||
+            this.obtenerIdSucursalPrincipal() ||
+            (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
           const sucursalObj = idSucursalDefault ? this.sucursales?.find((s: any) => s.idSucursal === idSucursalDefault) : null;
 
           this.detalleCompras = detalles
@@ -306,7 +325,6 @@ export class CreateComprasComponent {
         } else {
           iziToast.warning({ title: 'Aviso', message: 'El comprobante no tiene líneas de detalle', position: 'topRight' });
         }
-        this.consultManual = true;
       },
       error: (err) => {
         this.loading = false;
@@ -392,6 +410,124 @@ export class CreateComprasComponent {
     //     }
     //   });
 
+  /**
+   * Convierte a yyyy-MM-dd para <input type="date"> (consulta Factiliza/SUNAT u hoy).
+   */
+  private formatFechaParaInputDate(input: string | Date | null | undefined): string {
+    if (input == null || input === '') return '';
+    if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}/.test(input.trim())) {
+      return input.trim().slice(0, 10);
+    }
+    if (input instanceof Date && !isNaN(input.getTime())) {
+      const y = input.getFullYear();
+      const m = String(input.getMonth() + 1).padStart(2, '0');
+      const d = String(input.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (typeof input === 'string') {
+      const ddmm = input.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (ddmm) {
+        let y = ddmm[3];
+        if (y.length === 2) y = '20' + y;
+        const m = ddmm[2].padStart(2, '0');
+        const d = ddmm[1].padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    }
+    const fromFormat = this.formatFecha(input as string | Date | null);
+    if (fromFormat && /^\d{2}\/\d{2}\/\d{4}$/.test(fromFormat)) {
+      const [d, m, y] = fromFormat.split('/');
+      return `${y}-${m}-${d}`;
+    }
+    return '';
+  }
+
+  private fechaHoyInputDate(): string {
+    const h = new Date();
+    const y = h.getFullYear();
+    const m = String(h.getMonth() + 1).padStart(2, '0');
+    const d = String(h.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private obtenerIdSucursalPrincipal(): string | null {
+    const list = Array.isArray(this.sucursales) ? this.sucursales : [];
+    if (list.length === 0) return null;
+    const principal = list.find(
+      (s: any) =>
+        s.esPrincipal === true ||
+        s.esPrincipal === 1 ||
+        s.esPrincipal === '1' ||
+        String(s.nombre || '')
+          .toLowerCase()
+          .includes('principal')
+    );
+    return (principal || list[0])?.idSucursal ?? null;
+  }
+
+  /** Sucursal principal cuando el campo sigue vacío (manual o tras cargar catálogo). */
+  aplicarSucursalPrincipalSiVacia(): void {
+    if (!this.consultManual) return;
+    if (this.compras.idSucursal != null && String(this.compras.idSucursal).trim() !== '') return;
+    const id = this.obtenerIdSucursalPrincipal();
+    if (id) {
+      this.compras.idSucursal = id;
+    }
+  }
+
+  /** Fechas de emisión/vencimiento por defecto (hoy) cuando se entra sin consulta API. */
+  aplicarFechasDefaultSiSinConsulta(): void {
+    if (!this.consultManual) return;
+    const hoy = this.fechaHoyInputDate();
+    if (!this.compras.fEmision || String(this.compras.fEmision).trim() === '') {
+      this.compras.fEmision = hoy;
+    }
+    if (!this.compras.fVencimiento || String(this.compras.fVencimiento).trim() === '') {
+      this.compras.fVencimiento = this.compras.fEmision || hoy;
+    }
+  }
+
+  asignarIdComprobantePorCodigoSunat(codigoSunatRaw: string | null | undefined): void {
+    const cod = String(codigoSunatRaw ?? '')
+      .trim()
+      .padStart(2, '0');
+    const lista = Array.isArray(this.comprobantes) ? this.comprobantes : [];
+    if (lista.length === 0) {
+      this.codigoSunatCompraPendiente = cod;
+      this.compras.idComprobante = '';
+      return;
+    }
+    this.codigoSunatCompraPendiente = null;
+    const found =
+      lista.find((c: any) => String(c.codigo ?? '').trim().padStart(2, '0') === cod) ||
+      lista.find((c: any) => String(c.codigo ?? '').trim() === cod.trim());
+    if (found && found.idComprobante != null) {
+      this.compras.idComprobante = String(found.idComprobante);
+    } else {
+      this.compras.idComprobante = '';
+    }
+  }
+
+  etiquetaTipoComprobanteCabecera(): string {
+    const id = this.compras.idComprobante;
+    const lista = Array.isArray(this.comprobantes) ? this.comprobantes : [];
+    const comp = lista.find((c: any) => String(c.idComprobante) === String(id));
+    const codigo = comp?.codigo != null ? String(comp.codigo).trim() : '';
+    if (codigo) return this.getTipoComprobanteLabel(codigo);
+    if (id != null && String(id).trim() !== '') return this.getTipoComprobanteLabel(String(id));
+    return '-';
+  }
+
+  etiquetaFechaMostrar(fechaIsoODdMm: string | null | undefined): string {
+    if (!fechaIsoODdMm || String(fechaIsoODdMm).trim() === '') return '-';
+    const s = String(fechaIsoODdMm).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return s;
+  }
+
   private formatFecha(input: string | Date | null): string {
     if (!input) return '';
     // Si ya es Date
@@ -423,6 +559,10 @@ export class CreateComprasComponent {
     this._comprobanteService.obtenerComprobantesCompra().subscribe(
       (response) => {
         this.comprobantes = response.data;
+        if (this.codigoSunatCompraPendiente) {
+          this.asignarIdComprobantePorCodigoSunat(this.codigoSunatCompraPendiente);
+          this.codigoSunatCompraPendiente = null;
+        }
               },
       (error) => {
               }
@@ -495,6 +635,7 @@ export class CreateComprasComponent {
     this._sucursalService.obtener_sucursal_idempresa().subscribe(
       (response) => {
         this.sucursales = response.data;
+        this.aplicarSucursalPrincipalSiVacia();
               },
       (error) => {
               }
@@ -602,6 +743,7 @@ export class CreateComprasComponent {
     this._sucursalService.obtener_sucursal_idempresa().subscribe(
       (response) => {
         this.sucursales = response.data;
+        this.aplicarSucursalPrincipalSiVacia();
               },
       (error) => {
               }
@@ -1125,24 +1267,22 @@ export class CreateComprasComponent {
           const idSucursalDetalle = element.sucursal?.idSucursal ?? element.idSucursal ?? idSucursalCompra;
           const idPresentacionDetalle = element.presentacion?.idPresentacion ?? element.idPresentacion;
           const subtotalDetalle = element.subtotal ?? (Number(element.cantidad) * Number(element.cUnitario ?? element.pUnitario ?? 0));
+          const usarCorrelativoLinea = !!element.useCorrelativo;
+          const codigoLinea = usarCorrelativoLinea
+            ? ''
+            : String(element.codigo ?? element.Codigo ?? '').trim();
 
-          const nuevoProducto = {
-            idProducto: element.idProducto,
-            Codigo: element.codigo ?? element.Codigo,
-            idCategoria: element.idCategoria ?? element.categoria?.idCategoria,
+          const nuevoProducto: ProductoCreate = {
+            ...(element.idProducto ? { idProducto: String(element.idProducto) } : {}),
+            Codigo: codigoLinea,
+            useCorrelativo: usarCorrelativoLinea,
+            idCategoria: Number(element.idCategoria ?? element.categoria?.idCategoria),
             descripcion: element.descripcion,
-            idPresentacion: idPresentacionDetalle,
-            cUnitario: element.cUnitario ?? element.pUnitario,
+            idPresentacion: Number(idPresentacionDetalle),
+            cUnitario: Number(element.cUnitario ?? element.pUnitario ?? 0),
             fProduccion: element.fProduccion ?? element.fproduccion,
             fVencimiento: element.fVencimiento ?? element.fvencimiento,
-            cantidad: element.cantidad,
-            cantidadAnterior: element.cantidadAnterior,
-            facturar: 'SI',
-            idStockSucursal: element.idStockSucursal,
-            idEmpresa: element.idEmpresa,
-            idMarca: element.idMarca ?? element.marca?.idMarca,
-            idSucursal: idSucursalDetalle,
-            ubicacion: element.ubicacion ?? '',
+            idMarca: Number(element.idMarca ?? element.marca?.idMarca),
           };
 
           const nuevoDetalleCompra = {
@@ -1166,23 +1306,47 @@ export class CreateComprasComponent {
                     nuevoDetalleCompra.idProducto = pr.data;
                     return this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra);
                   }
-                  return of(null);
+                  return throwError(
+                    () => new Error('El servidor no devolvió el id del producto nuevo.')
+                  );
                 }),
-                catchError((err) => {
+                catchError((err: unknown) => {
                   console.error('Error creando producto:', err);
-                  iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', position: 'topRight', message: 'No se pudo crear el producto.' });
-                  return of(null);
+                  const msg =
+                    (err as { error?: { message?: string } })?.error?.message ||
+                    (err as Error)?.message ||
+                    'No se pudo crear el producto.';
+                  iziToast.show({
+                    title: 'ERROR',
+                    titleColor: '#FF0000',
+                    color: '#FFF',
+                    position: 'topRight',
+                    message: msg,
+                  });
+                  return throwError(() => err);
                 })
               )
             );
           } else {
+            const payloadActualizar: ProductoCreate = { ...nuevoProducto };
+            delete (payloadActualizar as { useCorrelativo?: boolean }).useCorrelativo;
             observables.push(
-              this._productoService.actualizarProducto(element.idProducto, nuevoProducto).pipe(
+              this._productoService.actualizarProducto(element.idProducto, payloadActualizar).pipe(
                 switchMap(() => this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra)),
-                catchError((err) => {
+                catchError((err: unknown) => {
                   console.error('Error actualizando producto:', err);
-                  iziToast.show({ title: 'ERROR', titleColor: '#FF0000', color: '#FFF', position: 'topRight', message: 'No se pudo actualizar el producto.' });
-                  return of(null);
+                  const msg =
+                    (err as { error?: { message?: string } })?.error?.message ||
+                    (err as Error)?.message ||
+                    'No se pudo actualizar el producto.';
+                  iziToast.show({
+                    title: 'ERROR',
+                    titleColor: '#FF0000',
+                    color: '#FFF',
+                    position: 'topRight',
+                    message: msg,
+                  });
+                  return throwError(() => err);
                 })
               )
             );
@@ -1540,13 +1704,28 @@ export class CreateComprasComponent {
 
   ///hasta aqui el registro de las compras
 
-  agregarNuevaCategoria() {
-        //this._router.navigate(['/categorias/create']);
-    window.open('/categorias/create', '_blank');
+  agregarNuevaCategoria(): void {
+    const modalRef = this.modalService.open(CreateCategoriaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg',
+    });
+    modalRef.result.finally(() => {
+      this.cargarCategorias();
+    });
   }
 
-  agregarNuevaMarca() {
-        window.open('/marcas/create', '_blank');
+  agregarNuevaMarca(): void {
+    const modalRef = this.modalService.open(CreateMarcaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg',
+    });
+    modalRef.result.finally(() => {
+      this.cargarMarcas();
+    });
   }
 
   agregarNuevoProveedor() {
@@ -1569,6 +1748,8 @@ export class CreateComprasComponent {
 
   consultarManual() {
     this.consultManual = true;
+    this.aplicarSucursalPrincipalSiVacia();
+    this.aplicarFechasDefaultSiSinConsulta();
   }
 
   /** Etiqueta del tipo de comprobante según código SUNAT (01=Factura, 03=Boleta, etc.) */
@@ -1693,7 +1874,10 @@ export class CreateComprasComponent {
       }
 
   agregarDetallesCompra(producto: any): void {
-    const idSucursal = this.compras.idSucursal || (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
+    const idSucursal =
+      this.compras.idSucursal ||
+      this.obtenerIdSucursalPrincipal() ||
+      (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
     const idPresentacion = producto.idPresentacion ?? producto.presentacion?.idPresentacion;
     const pUnitario = Number(producto.cUnitario ?? producto.pUnitario ?? 0);
     const existe = this.detalleCompras.find((p: { idProducto: any }) => p.idProducto === producto.idProducto);

@@ -11,6 +11,7 @@ const stockService = require('./stock.service');
 const inventarioRepository = require('../repositories/inventario.repository');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
+const sunatPostPagoService = require('./sunatPostPago.service');
 
 exports.crearVenta = async (datosVenta, idEmpresa, idUsuario) => {
   // El Service solo extrae datos y llama al Repository
@@ -488,6 +489,11 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     }
 
     await transaction.commit();
+    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
+      for (const ve of ventasEmpresa) {
+        sunatPostPagoService.encolarTrasConfirmarPago(pool, ve.idVenta, ve.idEmpresa);
+      }
+    }
     return {
       idVentaAgrupada: null,
       compVentaVA: null,
@@ -952,6 +958,11 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     }
 
     await transaction.commit();
+    if (detallePago && Array.isArray(detallePago) && detallePago.length > 0) {
+      for (const ve of ventasEmpresa) {
+        sunatPostPagoService.encolarTrasConfirmarPago(pool, ve.idVenta, ve.idEmpresa);
+      }
+    }
     return {
       idVentaAgrupada,
       compVentaVA,

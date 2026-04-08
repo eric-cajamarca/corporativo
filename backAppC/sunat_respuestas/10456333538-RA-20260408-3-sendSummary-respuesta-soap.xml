@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.sunat.gob.pe"><soapenv:Header/><soapenv:Body><ser:sendSummaryResponse><ticket>202620345635942</ticket></ser:sendSummaryResponse></soapenv:Body></soapenv:Envelope>

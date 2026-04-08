@@ -38,6 +38,8 @@ export interface LoteInicialCreate {
 
 export interface ProductoCreate {
   Codigo: string;
+  /** Si true, el servidor asigna el siguiente código desde Correlativos (ignorar el valor mostrado en pantalla). */
+  useCorrelativo?: boolean;
   idCategoria: number;
   idMarca: number;
   descripcion: string;

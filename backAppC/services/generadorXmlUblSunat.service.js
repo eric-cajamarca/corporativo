@@ -59,11 +59,16 @@ function fechaParte(fechaStr) {
   return { fecha, hora };
 }
 
-/** Catálogo forma de pago SUNAT (ej. 009 contado, 010 crédito). */
+/** Normaliza código interno de condición de pago a 009=contado / 010=crédito (solo lógica de negocio). */
 function normalizarCodigoFormaPagoSunat(cod) {
   const s = toStr(cod);
   if (s === "10") return "010";
   return s;
+}
+
+/** Texto UBL en cbc:PaymentMeansID (nodo FormaPago). SUNAT no acepta códigos tipo "009" — exige literales Contado/Credito. */
+function paymentMeansIdUblFormaPago(ventaCredito) {
+  return ventaCredito ? "Credito" : "Contado";
 }
 
 /**
@@ -81,7 +86,7 @@ function resolverPagoFacturaBoletaUbl(venta, fechaEmisionYmd) {
   const cuotas = cuotasRaw.filter((c) => toNum(c.total) > 0.001);
   const emitirCuotasUbl = esFacturaOBoleta && ventaCredito && cuotas.length > 0;
 
-  const paymentMeansId = ventaCredito ? "010" : "009";
+  const paymentMeansId = paymentMeansIdUblFormaPago(ventaCredito);
 
   let dueDate = fechaEmisionYmd;
   if (emitirCuotasUbl) {

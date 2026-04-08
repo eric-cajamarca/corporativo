@@ -4,6 +4,7 @@
 
 const sql = require("mssql");
 const FacturacionRepository = require("../repositories/facturacion.repository");
+const comprobantesRepository = require("../repositories/comprobantes.repository");
 const generadorXmlVoidedDocuments = require("./generadorXmlVoidedDocumentsSunat.service");
 const firmaXmlSunat = require("./firmaXmlSunat.service");
 const envioDirectoSunat = require("./envioDirectoSunat.service");
@@ -43,8 +44,31 @@ async function enviarComunicacionBajaService(pool, user, datos) {
   }
 
   const rucStr = String(config.rucEmpresa || "").replace(/\D/g, "").padStart(11, "0");
-  const fechaCom = new Date().toISOString().slice(0, 10).replace(/\D/g, "");
-  const correlativo = await FacturacionRepository.obtenerSiguienteCorrelativoBajaRepo(pool, user.empresa, fechaCom.slice(0, 4) + "-" + fechaCom.slice(4, 6) + "-" + fechaCom.slice(6, 8));
+  
+  // SUNAT VoidedDocuments según documentación oficial:
+  // - ID y nombre archivo: RA-{YYYYMMDD de COMUNICACIÓN}-{correlativo} (fecha de HOY)
+  // - ReferenceDate: fecha de EMISIÓN de los comprobantes a anular
+  // - IssueDate: fecha de COMUNICACIÓN (hoy)
+  // IMPORTANTE: Usar zona horaria de Perú (America/Lima, UTC-5) para la fecha
+  const fechaComunicacion = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }).replace(/\D/g, ""); // YYYYMMDD de hoy en Perú
+  
+  // Obtener fecha de emisión de los comprobantes para ReferenceDate
+  const fechasCp = comps.map((c) => (c.fechaEmision || "").slice(0, 10)).filter(Boolean);
+  const fechasUnicas = [...new Set(fechasCp)];
+  if (fechasUnicas.length === 0) {
+    return { ok: false, error: "No se pudo obtener la fecha de emisión de los comprobantes." };
+  }
+  if (fechasUnicas.length > 1) {
+    return { ok: false, error: "Los comprobantes a dar de baja deben tener la misma fecha de emisión. Envíe comunicaciones separadas por fecha." };
+  }
+  const fechaReferencia = fechasUnicas[0].replace(/\D/g, ""); // YYYYMMDD de emisión del comprobante
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'comunicacionBaja.service.js:55',message:'Fechas calculadas',data:{fechaComunicacion,fechaReferencia,compsCount:comps?.length||0},timestamp:Date.now(),hypothesisId:'FECHA'})}).catch(()=>{});
+  // #endregion
+  
+  // El correlativo se calcula por fecha de COMUNICACIÓN (hoy), no por fecha de emisión
+  const correlativo = await FacturacionRepository.obtenerSiguienteCorrelativoBajaRepo(pool, user.empresa, fechaComunicacion.slice(0, 4) + "-" + fechaComunicacion.slice(4, 6) + "-" + fechaComunicacion.slice(6, 8));
 
   const motivoPorId = {};
   comprobantes.forEach((c) => {
@@ -66,7 +90,8 @@ async function enviarComunicacionBajaService(pool, user, datos) {
   const datosXml = {
     rucEmisor: emp.ruc,
     razonSocialEmisor: emp.razon_Social,
-    fechaComunicacion: fechaCom,
+    fechaReferencia,      // Fecha de emisión de los comprobantes (para ReferenceDate y ID)
+    fechaComunicacion,    // Fecha de hoy (para IssueDate)
     correlativo
   };
 
@@ -78,7 +103,7 @@ async function enviarComunicacionBajaService(pool, user, datos) {
     return { ok: false, error: err.message || "Error al firmar el XML." };
   }
 
-  const nombreBase = `${rucStr}-RA-${fechaCom}-${correlativo}`;
+  const nombreBase = `${rucStr}-RA-${fechaComunicacion}-${correlativo}`;
   const usuarioSOAP = (config.usuarioSunat.length >= 20 || /^\d+/.test(config.usuarioSunat))
     ? config.usuarioSunat
     : rucStr + String(config.usuarioSunat).trim();
@@ -96,13 +121,14 @@ async function enviarComunicacionBajaService(pool, user, datos) {
     return { ok: false, error: resultadoSend.error || "SUNAT no devolvió ticket." };
   }
 
-  const fechaComDate = `${fechaCom.slice(0, 4)}-${fechaCom.slice(4, 6)}-${fechaCom.slice(6, 8)}`;
+  const fechaComDate = `${fechaComunicacion.slice(0, 4)}-${fechaComunicacion.slice(4, 6)}-${fechaComunicacion.slice(6, 8)}`;
   const idComunicacionBaja = await FacturacionRepository.insertarComunicacionBajaRepo(
     pool,
     user.empresa,
     fechaComDate,
     correlativo,
-    resultadoSend.ticket
+    resultadoSend.ticket,
+    xml
   );
   for (const c of comprobantes) {
     await FacturacionRepository.insertarComunicacionBajaDetalleRepo(
@@ -111,6 +137,22 @@ async function enviarComunicacionBajaService(pool, user, datos) {
       c.idComprobanteElectronico,
       c.motivoBaja || "Anulación de la operación"
     );
+  }
+
+  try {
+    const rRa = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
+      .query(`SELECT idComprobante FROM Comprobantes WHERE idEmpresa = @idEmpresa AND codigo = 'RA'`);
+    const idRaComp = rRa.recordset && rRa.recordset[0] ? rRa.recordset[0].idComprobante : null;
+    if (idRaComp != null) {
+      const numCorr = parseInt(String(correlativo).replace(/\D/g, ""), 10);
+      if (!Number.isNaN(numCorr) && numCorr >= 0) {
+        await comprobantesRepository.actualizarNumeroComprobante(pool, user.empresa, idRaComp, numCorr);
+      }
+    }
+  } catch (err) {
+    console.error("comunicacionBaja: no se pudo sincronizar correlativo RA en Comprobantes:", err.message);
   }
 
   return {
@@ -172,37 +214,65 @@ async function consultarEstadoComunicacionBajaService(pool, user, idComunicacion
       const zipBuffer = Buffer.from(status.content, "base64");
       const cdr = await envioDirectoSunat.extraerCdrDeZipBuffer(zipBuffer);
       const idEstadoSunat = envioDirectoSunat.responseCodeToIdEstadoSunat(cdr ? cdr.codigo : "99");
+      
+      console.error("comunicacionBaja: CDR procesado", { idEstadoSunat, codigo: cdr?.codigo, descripcion: cdr?.descripcion?.substring(0, 100) });
+      
       await FacturacionRepository.actualizarComunicacionBajaResultadoRepo(pool, idComunicacionBaja, {
         idEstadoSunat,
         codigoRespuesta: cdr ? cdr.codigo : null,
         descripcionRespuesta: cdr ? cdr.descripcion : null,
         cdr: cdr ? cdr.xml : null
       });
+      
+      // Si la comunicación fue aceptada, actualizar estado de los comprobantes a "Baja Aceptada"
       if (idEstadoSunat === 1 || idEstadoSunat === 3) {
         const idBajaAceptada = await FacturacionRepository.obtenerIdEstadoSunatPorCodigoRepo(pool, "08");
         const idsComp = await FacturacionRepository.listarComprobantesDeComunicacionBajaRepo(pool, idComunicacionBaja);
-        await FacturacionRepository.actualizarEstadoComprobantesRepo(
-          pool,
-          idsComp,
-          idBajaAceptada != null ? idBajaAceptada : idEstadoSunat,
-          cdr ? cdr.xml : null,
-          cdr ? cdr.codigo : null,
-          cdr ? cdr.descripcion : null
-        );
+        
+        console.error("comunicacionBaja: actualizando comprobantes", { idBajaAceptada, idsCompCount: idsComp?.length, idsComp });
+        
+        if (idsComp && idsComp.length > 0) {
+          // Si no existe estado "08", usar idEstadoSunat (1=Aceptado)
+          const estadoFinal = idBajaAceptada != null ? idBajaAceptada : idEstadoSunat;
+          await FacturacionRepository.actualizarEstadoComprobantesRepo(
+            pool,
+            idsComp,
+            estadoFinal,
+            cdr ? cdr.xml : null,
+            cdr ? cdr.codigo : null,
+            cdr ? `Baja aceptada: ${cdr.descripcion || ''}`.trim() : "Baja aceptada"
+          );
+          console.error("comunicacionBaja: comprobantes actualizados a estado", estadoFinal);
+        } else {
+          console.error("comunicacionBaja: ADVERTENCIA - No se encontraron comprobantes para actualizar en ComunicacionBajaDetalle");
+        }
       }
       return { ok: true, statusCode: 0, idEstadoSunat, mensaje: cdr ? cdr.descripcion : "Procesado" };
     } catch (err) {
-      console.error("comunicacionBaja: error al procesar CDR:", err.message);
+      console.error("comunicacionBaja: error al procesar CDR:", err.message, err.stack);
       return { ok: false, error: err.message };
     }
   }
 
   if (status.statusCode === 99) {
+    let codigoRespuesta = null;
+    let descripcionRespuesta = status.error || "Rechazado";
+    let cdrXml = null;
+    if (status.content) {
+      const cdr = await envioDirectoSunat.extraerCdrDesdeContentBase64(status.content);
+      if (cdr) {
+        codigoRespuesta = cdr.codigo;
+        descripcionRespuesta = (cdr.descripcion && cdr.descripcion.trim()) ? cdr.descripcion : descripcionRespuesta;
+        cdrXml = cdr.xml;
+      }
+    }
     await FacturacionRepository.actualizarComunicacionBajaResultadoRepo(pool, idComunicacionBaja, {
       idEstadoSunat: 4,
-      descripcionRespuesta: status.error || "Rechazado"
+      codigoRespuesta,
+      descripcionRespuesta,
+      cdr: cdrXml
     });
-    return { ok: false, statusCode: 99, error: status.error || "SUNAT rechazó la comunicación de baja." };
+    return { ok: false, statusCode: 99, idEstadoSunat: 4, error: descripcionRespuesta };
   }
 
   return { ok: false, statusCode: status.statusCode, error: status.error || "Error al consultar estado." };

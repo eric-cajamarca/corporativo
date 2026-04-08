@@ -20,8 +20,8 @@
                         <p class="mb-0 small text-muted mt-1">Complete los datos del proveedor, comprobante y detalle de productos.</p>
                         <ng-container *ngIf="compras.idComprobante || compras.fEmision">
                             <p class="mb-0 small mt-2">
-                                <span class="text-primary fw-medium">Tipo comprobante:</span> {{ getTipoComprobanteLabel(compras.idComprobante) }}
-                                <span class="ms-3 text-primary fw-medium">Fecha emisión:</span> {{ compras.fEmision || '-' }}
+                                <span class="text-primary fw-medium">Tipo comprobante:</span> {{ etiquetaTipoComprobanteCabecera() }}
+                                <span class="ms-3 text-primary fw-medium">Fecha emisión:</span> {{ etiquetaFechaMostrar(compras.fEmision) }}
                             </p>
                         </ng-container>
                     </div>
@@ -215,7 +215,8 @@
                                         </button>
                                     </div>
         
-                                    <div class="modal fade" id="nuevoProductoModal" tabindex="-1" aria-hidden="true">
+                                    <div class="modal fade" id="nuevoProductoModal" tabindex="-1" aria-hidden="true"
+                                        data-bs-focus="false">
                                         <div class="modal-dialog">
                                             <div class="modal-content" style="color: #858585;">
                                                 <div class="modal-header bg-success text-white">
@@ -455,7 +456,8 @@
                                                         <i class="bi bi-plus-circle-fill"></i>
                                                     </a>
                                                 </td>
-                                                <div class="modal fade" id="addProducto" tabindex="-1" aria-hidden="true">
+                                                <div class="modal fade" id="addProducto" tabindex="-1" aria-hidden="true"
+                                                    data-bs-focus="false">
                                                     <div class="modal-dialog">
                                                         <div class="modal-content">
                                                             <div class="modal-header">
@@ -717,7 +719,7 @@
         
         
         
-                        <div class="card-body">
+                        <div class="card-body tabla-detalle-card-body">
                             <div class="table-responsive create-compras-detalle-wrap">
                                 <table class="table table-striped table-hover create-compras-detalle-table">
                                     <thead class="table table-light create-compras-detalle-thead" style="position: sticky; top: 0; z-index: 100;">
@@ -752,7 +754,7 @@
                                                 <td style="width: 80px; text-align: right;">{{ ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)) | number:'1.2-2' }}</td>
                                                 <td style="width: 60px; text-align: center;">{{ item?.fproduccion || '-' }}</td>
                                                 <td style="width: 60px; text-align: center;">{{ item?.fvencimiento || '-' }}</td>
-                                                <td style="width: 60px; text-align: center;">{{ textoSucursalDetalle(item) }}</td>
+                                                <td class="col-sucursal-detalle">{{ textoSucursalDetalle(item) }}</td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm" role="group">
                                                         <a style="cursor: pointer;" class="text-danger"
@@ -835,7 +837,8 @@
 
                     <!-- MODAL EDITAR DETALLE (único, fuera del *ngFor) -->
 
-                    <div class="modal fade" id="addProductoDetalle" tabindex="-1" aria-hidden="true">
+                    <div class="modal fade" id="addProductoDetalle" tabindex="-1" aria-hidden="true"
+                        data-bs-focus="false">
 
                         <div class="modal-dialog modal-dialog-scrollable modal-lg">
 
@@ -935,9 +938,9 @@
 
         
 
-                                                                <button type="button" class="btn btn-primary"
+                                                                <button type="button" class="btn btn-success"
 
-                                                                    (click)="agregarNuevaMarca()">Nueva
+                                                                    (click)="agregarNuevaMarca()">+
 
                                                                 </button>
 
@@ -999,9 +1002,9 @@
 
         
 
-                                                                <button type="button" class="btn btn-primary"
+                                                                <button type="button" class="btn btn-success"
 
-                                                                    (click)="agregarNuevaCategoria()">Nueva</button>
+                                                                    (click)="agregarNuevaCategoria()">+</button>
 
                                                             </div>
 
@@ -1305,12 +1308,12 @@
                         </div>
                     </div>
                     <!-- MODAL NUEVO PRODUCTO -->
-                    <div class="modal fade" id="addProducto" tabindex="-1" aria-hidden="true">
+                    <div class="modal fade" id="addProducto" tabindex="-1" aria-hidden="true"
+                        data-bs-focus="false">
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <div class="modal-header bg-success text-white">
-                                    <h5 class="modal-title" id="addProductoLabel">Agregar
-                                        Producto existente</h5>
+                                    <h5 class="modal-title" id="addProductoLabel">Agregar nuevo producto</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
@@ -1356,8 +1359,8 @@
                                                                     </select>
                                                                 </div>
         
-                                                                <button type="button" class="btn btn-primary"
-                                                                    (click)="agregarNuevaMarca()">Nueva
+                                                                <button type="button" class="btn btn-success"
+                                                                    (click)="agregarNuevaMarca()">+
                                                                 </button>
         
                                                             </div>
@@ -1388,8 +1391,8 @@
                                                                     </select>
                                                                 </div>
         
-                                                                <button type="button" class="btn btn-primary"
-                                                                    (click)="agregarNuevaCategoria()">Nueva</button>
+                                                                <button type="button" class="btn btn-success"
+                                                                    (click)="agregarNuevaCategoria()">+</button>
                                                             </div>
                                                             <div>
                                                                 <label for="descripcion">Descripción

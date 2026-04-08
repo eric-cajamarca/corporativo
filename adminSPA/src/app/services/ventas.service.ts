@@ -433,6 +433,8 @@ export interface VentaListado {
   fEmision: string;
   total: number;
   idEstadoSunat?: number;
+  /** Código catálogo EstadosSunat (ej. 08 = baja aceptada por comunicación de baja). */
+  codigoEstadoSunat?: string | null;
   serie?: string;
   numero?: string;
   nombreComprobante?: string;

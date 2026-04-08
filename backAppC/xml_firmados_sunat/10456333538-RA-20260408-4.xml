@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VoidedDocuments Id="SUNAT" xmlns="urn:sunat:names:specification:ubl:peru:schema:xsd:VoidedDocuments-1" xmlns:sac="urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+  <ext:UBLExtensions>
+    <ext:UBLExtension>
+      <ext:ExtensionContent><ds:Signature Id="SignSUNAT" xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><ds:Reference URI=""><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><ds:DigestValue>lGBsYzvKcJ8Gw1yvDizBQvy2+fA=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>ST0IVDwHkUznJ1ubk1af0TIsDT1r36BBU908KBCSK6O9kBOl2ljxRsYLNo2G5dQNyecPutqHvq/BYPzBkDxrj2iPA7KPAdbx3lm4PvAl51XiFCFT2VbOENhUCp0ls7ChsWCTL7sPM/9D39d+86EH+hYa5XA22jnt4LelsX4icPf6JzkOnNrA9CLM48Z4XkouLtslxPQKzXe731uBlo8C+GvAwig7kPcrMDyKbeYyjEjV2rlIla5+jnD0yL6tXfs9Kv9SwQnStyN9gNXvj7miOqyHND3YdK6JEb+7jSabvo/n6O25BSW37weOZKteu1xCaqndJGotAAUCnEdQd6dV5Q==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>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</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></ext:ExtensionContent>
+    </ext:UBLExtension>
+  </ext:UBLExtensions>
+  <cbc:UBLVersionID>2.0</cbc:UBLVersionID>
+  <cbc:CustomizationID>1.0</cbc:CustomizationID>
+  <cbc:ID>RA-20260408-4</cbc:ID>
+  <cbc:ReferenceDate>2026-04-08</cbc:ReferenceDate>
+  <cbc:IssueDate>2026-04-08</cbc:IssueDate>
+  <cac:Signature>
+    <cbc:ID>10456333538</cbc:ID>
+    <cac:SignatoryParty>
+      <cac:PartyIdentification>
+        <cbc:ID>10456333538</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>ORTIZ GUEVARA ERIC</cbc:Name>
+      </cac:PartyName>
+    </cac:SignatoryParty>
+    <cac:DigitalSignatureAttachment>
+      <cac:ExternalReference>
+        <cbc:URI>#SUNAT</cbc:URI>
+      </cac:ExternalReference>
+    </cac:DigitalSignatureAttachment>
+  </cac:Signature>
+  <cac:AccountingSupplierParty>
+    <cbc:CustomerAccountID>10456333538</cbc:CustomerAccountID>
+    <cac:Party>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>ORTIZ GUEVARA ERIC</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  
+    <sac:VoidedDocumentsLine>
+      <cbc:LineID>1</cbc:LineID>
+      <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">01</cbc:DocumentTypeCode>
+      <cbc:DocumentSerialID>F001</cbc:DocumentSerialID>
+      <cbc:DocumentNumberStart>00000029</cbc:DocumentNumberStart>
+      <cbc:DocumentNumberEnd>00000029</cbc:DocumentNumberEnd>
+      <sac:VoidedReasonDescription>Anulación de la operación</sac:VoidedReasonDescription>
+    </sac:VoidedDocumentsLine>
+</VoidedDocuments>

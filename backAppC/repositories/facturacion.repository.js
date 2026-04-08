@@ -17,6 +17,7 @@ const {
   codigoInternoNotaCreditoPorOrigen,
   codigoInternoNotaDebitoPorOrigen
 } = require("../utils/sunatCodigoComprobante.util");
+const { extraerCodigoHashDesdeXmlFirmado } = require("../utils/sunatCodigoHash.util");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -1152,7 +1153,8 @@ exports.obtenerComprobantesParaBajaPorIdsRepo = async (pool, idEmpresa, idsCompr
   req.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
   ids.forEach((id, i) => req.input(`id${i}`, sql.UniqueIdentifier, id));
   const r = await req.query(`
-    SELECT idComprobanteElectronico, tipoComprobante, serie, numero
+    SELECT idComprobanteElectronico, tipoComprobante, serie, numero,
+           CONVERT(VARCHAR(10), fechaEmision, 120) AS fechaEmision
     FROM ComprobantesElectronicos
     WHERE idEmpresa = @idEmpresa AND tipoComprobante IN ('01','07','08') AND idEstadoSunat IN (1, 2, 3)
       AND idComprobanteElectronico IN (${placeholders})
@@ -1194,8 +1196,8 @@ exports.obtenerSiguienteCorrelativoBajaRepo = async (pool, idEmpresa, fechaComun
   return String(next).slice(0, 5);
 };
 
-/** Inserta cabecera ComunicacionesBaja y devuelve idComunicacionBaja. */
-exports.insertarComunicacionBajaRepo = async (pool, idEmpresa, fechaComunicacion, numeroCorrelativo, ticketSunat) => {
+/** Inserta cabecera ComunicacionesBaja y devuelve idComunicacionBaja. Requiere columna xmlEnviado (migración add_comunicaciones_baja_xml_enviado.sql). */
+exports.insertarComunicacionBajaRepo = async (pool, idEmpresa, fechaComunicacion, numeroCorrelativo, ticketSunat, xmlEnviado) => {
   const nowStr = getNowLocalSQLString();
   const fechaStr = typeof fechaComunicacion === "string" ? fechaComunicacion.slice(0, 10) : fechaComunicacion;
   const r = await pool
@@ -1205,10 +1207,11 @@ exports.insertarComunicacionBajaRepo = async (pool, idEmpresa, fechaComunicacion
     .input("numeroCorrelativo", sql.VarChar(5), String(numeroCorrelativo).slice(0, 5))
     .input("ticketSunat", sql.VarChar(50), ticketSunat || null)
     .input("fechaEnvio", sql.VarChar(23), nowStr)
+    .input("xmlEnviado", sql.NVarChar, xmlEnviado || null)
     .query(`
-      INSERT INTO ComunicacionesBaja (idEmpresa, fechaComunicacion, numeroCorrelativo, ticketSunat, fechaEnvio)
+      INSERT INTO ComunicacionesBaja (idEmpresa, fechaComunicacion, numeroCorrelativo, ticketSunat, fechaEnvio, xmlEnviado)
       OUTPUT INSERTED.idComunicacionBaja
-      VALUES (@idEmpresa, @fechaComunicacion, @numeroCorrelativo, @ticketSunat, @fechaEnvio)
+      VALUES (@idEmpresa, @fechaComunicacion, @numeroCorrelativo, @ticketSunat, @fechaEnvio, @xmlEnviado)
     `);
   return r.recordset && r.recordset[0] ? r.recordset[0].idComunicacionBaja : null;
 };
@@ -1234,8 +1237,8 @@ exports.actualizarComunicacionBajaResultadoRepo = async (pool, idComunicacionBaj
     .input("idComunicacionBaja", sql.UniqueIdentifier, idComunicacionBaja)
     .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat ?? null)
     .input("fechaRespuesta", sql.VarChar(23), nowStr)
-    .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
-    .input("descripcionRespuesta", sql.VarChar, (resultado.descripcionRespuesta || resultado.error || "").slice(0, 500))
+    .input("codigoRespuesta", sql.VarChar(20), resultado.codigoRespuesta != null ? String(resultado.codigoRespuesta).slice(0, 20) : null)
+    .input("descripcionRespuesta", sql.NVarChar, (resultado.descripcionRespuesta || resultado.error || "").trim() || null)
     .input("cdr", sql.NVarChar, resultado.cdr || null)
     .query(`
       UPDATE ComunicacionesBaja
@@ -1244,6 +1247,21 @@ exports.actualizarComunicacionBajaResultadoRepo = async (pool, idComunicacionBaj
           cdr = @cdr, fechaModificacion = GETDATE()
       WHERE idComunicacionBaja = @idComunicacionBaja
     `);
+};
+
+/** Una comunicación de baja por id (idEmpresa); incluye xmlEnviado y cdr para descarga/diagnóstico. */
+exports.obtenerComunicacionBajaPorIdRepo = async (pool, idEmpresa, idComunicacionBaja) => {
+  const r = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("idComunicacionBaja", sql.UniqueIdentifier, idComunicacionBaja)
+    .query(`
+      SELECT c.idComunicacionBaja, c.fechaComunicacion, c.numeroCorrelativo, c.ticketSunat, c.idEstadoSunat,
+             c.fechaEnvio, c.fechaRespuesta, c.codigoRespuesta, c.descripcionRespuesta, c.xmlEnviado, c.cdr
+      FROM ComunicacionesBaja c
+      WHERE c.idComunicacionBaja = @idComunicacionBaja AND c.idEmpresa = @idEmpresa
+    `);
+  return r.recordset && r.recordset[0] ? r.recordset[0] : null;
 };
 
 /** Lista IDs de comprobantes incluidos en una comunicación de baja (para actualizar estado cuando CDR aceptado). */
@@ -1291,7 +1309,9 @@ exports.listarComunicacionesBajaRepo = async (pool, idEmpresa, filtros = {}) => 
   const listResult = await reqList.query(`
     SELECT c.idComunicacionBaja, c.fechaComunicacion, c.numeroCorrelativo, c.ticketSunat, c.idEstadoSunat,
            c.fechaEnvio, c.fechaRespuesta, c.codigoRespuesta, c.descripcionRespuesta,
-           es.codigo AS codigoEstadoSunat, es.descripcion AS descripcionEstadoSunat
+           es.codigo AS codigoEstadoSunat, es.descripcion AS descripcionEstadoSunat,
+           CASE WHEN c.xmlEnviado IS NOT NULL AND LEN(c.xmlEnviado) > 0 THEN 1 ELSE 0 END AS tieneXmlEnviado,
+           CASE WHEN c.cdr IS NOT NULL AND LEN(c.cdr) > 0 THEN 1 ELSE 0 END AS tieneCdr
     FROM ComunicacionesBaja c
     LEFT JOIN EstadosSunat es ON es.idEstadoSunat = c.idEstadoSunat
     ${where}
@@ -1365,6 +1385,41 @@ exports.listarResumenesDiariosRepo = async (pool, idEmpresa, filtros = {}) => {
   `);
 
   return { items: listResult.recordset || [], total };
+};
+
+/**
+ * Guarda el código hash (DigestValue del XML firmado) para PDF/QR. No modifica otros campos.
+ */
+exports.actualizarHashComprobanteElectronicoRepo = async (pool, idComprobanteElectronico, hash) => {
+  const h = hash != null ? String(hash).trim() : "";
+  if (!h || !idComprobanteElectronico) {
+    return;
+  }
+  await pool
+    .request()
+    .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
+    .input("hash", sql.VarChar(200), h.slice(0, 200))
+    .query(`
+      UPDATE ComprobantesElectronicos
+      SET hash = @hash
+      WHERE idComprobanteElectronico = @idComprobanteElectronico
+    `);
+};
+
+/**
+ * Tras firmar el XML, persiste hash y opcionalmente el XML completo (útil para trazabilidad / PDF si se amplía el payload).
+ */
+exports.persistirHashXmlComprobanteElectronicoRepo = async (pool, idComprobanteElectronico, xmlFirmado) => {
+  const codigoHash = extraerCodigoHashDesdeXmlFirmado(xmlFirmado);
+  if (!codigoHash) {
+    console.error("[SUNAT] No se pudo extraer DigestValue del XML firmado (hash vacío).");
+    return;
+  }
+  try {
+    await exports.actualizarHashComprobanteElectronicoRepo(pool, idComprobanteElectronico, codigoHash);
+  } catch (err) {
+    console.error("[SUNAT] Error al guardar hash en ComprobantesElectronicos:", err);
+  }
 };
 
 /** Actualiza ComprobantesElectronicos y Ventas con el resultado del envío (mismo idEstadoSunat). Solo se guarda CDR en BD. */
@@ -1449,6 +1504,7 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
     console.error("[SUNAT] Error al firmar XML:", err);
     return { ok: false, mensaje: err.message || "Error al firmar XML con el certificado" };
   }
+  await exports.persistirHashXmlComprobanteElectronicoRepo(pool, idComprobanteElectronico, xml);
   return { xml, nombreBase: base };
 };
 
@@ -1609,6 +1665,7 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
           mensaje: err.message || "Error al firmar XML con el certificado"
         };
       }
+      await exports.persistirHashXmlComprobanteElectronicoRepo(pool, idComprobanteElectronico, xml);
     }
     const writeXml = escribirXmlFirma(config.rutaCarpetaFacturadorSunat, base, xml);
     if (!writeXml.ok) {

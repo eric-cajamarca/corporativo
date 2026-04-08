@@ -206,6 +206,19 @@ export class FacturacionService {
     });
   }
 
+  /** Guías electrónicas emitidas (paginación servidor, por defecto 10 por página). */
+  listarGuiasEmitidas(params?: { pagina?: number; porPagina?: number }): Observable<{ data: GuiaEmitidaListItem[]; total: number }> {
+    const p = new URLSearchParams();
+    if (params?.pagina != null) p.append('pagina', String(params.pagina));
+    if (params?.porPagina != null) p.append('porPagina', String(params.porPagina));
+    const query = p.toString() ? '?' + p.toString() : '';
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.get<{ data: GuiaEmitidaListItem[]; total: number }>(
+      this.url + 'facturacion/guias/emitidas' + query,
+      { headers, withCredentials: true }
+    );
+  }
+
   // Resúmenes diarios (RC)
   /** Boletas/notas pendientes de envío por fecha en el rango (para aviso en resúmenes diarios). */
   listarBoletasPendientesPorFecha(fechaDesde: string, fechaHasta: string): Observable<{ data: { fechaResumen: string; cantidad: number }[] }> {
@@ -351,6 +364,24 @@ export class FacturacionService {
     );
   }
 
+  /** XML firmado de la RA enviada (tras migración y nuevo envío). */
+  obtenerXmlComunicacionBaja(idComunicacionBaja: string): Observable<{ data: { content: string } }> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<{ data: { content: string } }>(
+      this.url + 'facturacion/comunicacion-baja/' + encodeURIComponent(idComunicacionBaja) + '/xml',
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** CDR devuelto por getStatus (aceptación o rechazo). */
+  obtenerCdrComunicacionBaja(idComunicacionBaja: string): Observable<{ data: { content: string } }> {
+    const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get<{ data: { content: string } }>(
+      this.url + 'facturacion/comunicacion-baja/' + encodeURIComponent(idComunicacionBaja) + '/cdr',
+      { headers, withCredentials: true }
+    );
+  }
+
   crearNotaCreditoDebito(body: {
     idComprobanteElectronicoOrigen: string;
     tipoNota: '07' | '08';
@@ -391,6 +422,23 @@ export interface ComprobanteOrigenItem {
   fechaEmision: string;
   clienteRuc: string;
   clienteRazonSocial: string;
+}
+
+/** Fila de listado GET guias/emitidas. */
+export interface GuiaEmitidaListItem {
+  idGuiaElectronica: string;
+  tipoDocumento: string;
+  tipoRol: string;
+  serie: string;
+  numero: string;
+  fechaEmision: string;
+  idEstadoSunat: number | null;
+  descripcionEstado: string | null;
+  ticketSunat: string | null;
+  comprobanteOrigenSerie: string | null;
+  comprobanteOrigenNumero: string | null;
+  motivoTraslado: string | null;
+  fechaCreacion: string;
 }
 
 /** Respuesta de GET origen-para-nota. */

@@ -104,12 +104,20 @@
     white-space: nowrap;
 }
 
-/* Columna N. Precio: ancho fijo 100px */
+/* Columna N. Precio: ancho para input-group (S/. + número + botón). Ajusta px aquí si quieres más o menos. */
 .table-precios-productos th.col-n-precio,
 .table-precios-productos td.col-n-precio {
-    width: 100px;
-    min-width: 100px;
-    max-width: 100px;
+    width: 175px;
+    min-width: 175px;
+    max-width: 200px;
+}
+
+.table-precios-productos td.col-n-precio .input-group {
+    width: 100%;
+}
+
+.table-precios-productos td.col-n-precio .input-group .form-control {
+    min-width: 4.5rem;
 }
 
 @media (max-width: 991.98px) {

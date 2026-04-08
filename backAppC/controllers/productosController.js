@@ -249,7 +249,6 @@ const gestionProductos_Compras = async (req, res) => {
 
   //Validación básica
   if (
-    !datosProducto.Codigo ||
     !datosProducto.idCategoria ||
     !datosProducto.idMarca ||
     !datosProducto.descripcion ||
@@ -259,7 +258,7 @@ const gestionProductos_Compras = async (req, res) => {
     res
       .status(400)
       .send({
-        message: "Todos los campos obligatorios deben ser completados",
+        message: "Todos los campos obligatorios deben ser completados (excepto código, que puede autogenerarse).",
         data: undefined,
       });
     return;
@@ -310,6 +309,57 @@ const resolverIdUsuarioParaProducto = async (pool, idEmpresa, subFromToken) => {
     console.error('resolverIdUsuarioParaProducto:', e.message);
   }
   return null;
+};
+
+const obtenerSiguienteCodigoCorrelativoDisponible = async (transaction, idEmpresa) => {
+  const maxIntentos = 500;
+  for (let intento = 0; intento < maxIntentos; intento += 1) {
+    const corrResult = await transaction.request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        UPDATE Correlativos WITH (UPDLOCK, HOLDLOCK)
+        SET numero = numero + 1
+        OUTPUT INSERTED.numero
+        WHERE idEmpresa = @idEmpresa
+      `);
+
+    const row = corrResult.recordset && corrResult.recordset[0];
+    let candidato = null;
+
+    if (row && row.numero != null) {
+      candidato = String(row.numero).trim();
+    } else {
+      const fallback = await transaction.request()
+        .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT ISNULL(MAX(TRY_CAST(RTRIM(LTRIM(Codigo)) AS INT)), 10000) + 1 AS siguiente
+          FROM Productos WITH (UPDLOCK, HOLDLOCK)
+          WHERE idEmpresa = @idEmpresa
+        `);
+      candidato = String(fallback.recordset?.[0]?.siguiente || "").trim();
+    }
+
+    if (!candidato) {
+      continue;
+    }
+
+    const chk = await transaction.request()
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("Codigo", sql.VarChar(50), candidato)
+      .query(`
+        SELECT COUNT(1) AS n
+        FROM Productos
+        WHERE idEmpresa = @idEmpresa
+          AND RTRIM(LTRIM(Codigo)) = @Codigo
+      `);
+
+    const ocupado = Number(chk.recordset?.[0]?.n) > 0;
+    if (!ocupado) {
+      return candidato;
+    }
+  }
+
+  return `P-${String(Date.now()).slice(-10)}`;
 };
 
 const crear_producto = async (req, res) => {
@@ -385,7 +435,11 @@ const crear_producto = async (req, res) => {
     permiteDescripcionEnVenta: permiteDescripcionEnVenta === true || permiteDescripcionEnVenta === 1 || permiteDescripcionEnVenta === 'true' ? 1 : 0,
   };
 
-  const usarCorrelativo = useCorrelativo === true || useCorrelativo === 'true';
+  const usarCorrelativo =
+    useCorrelativo === true ||
+    useCorrelativo === 'true' ||
+    useCorrelativo === 1 ||
+    useCorrelativo === '1';
 
   if (
     (!usarCorrelativo && !datosProducto.Codigo) ||
@@ -418,114 +472,121 @@ const crear_producto = async (req, res) => {
       });
     }
 
-    const transaction = new sql.Transaction(pool);
-    await transaction.begin();
+    let committed = false;
+    let lastDupErr = null;
+    const maxIntentosCodigo = 12;
 
-    try {
-      if (usarCorrelativo) {
-        const maxIntentos = 500;
-        let codigoAsignado = null;
-        for (let intento = 0; intento < maxIntentos && !codigoAsignado; intento += 1) {
-          const corrResult = await transaction.request()
+    for (let attempt = 1; attempt <= maxIntentosCodigo && !committed; attempt += 1) {
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      try {
+        if (usarCorrelativo) {
+          datosProducto.Codigo = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpresa);
+        } else if (attempt === 1) {
+          const chkCodigo = await transaction.request()
             .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+            .input("Codigo", sql.VarChar(50), String(datosProducto.Codigo || "").trim())
             .query(`
-              UPDATE Correlativos WITH (UPDLOCK, HOLDLOCK)
-              SET numero = numero + 1
-              OUTPUT INSERTED.numero
+              SELECT COUNT(1) AS n
+              FROM Productos
               WHERE idEmpresa = @idEmpresa
+                AND RTRIM(LTRIM(Codigo)) = @Codigo
             `);
-          const row = corrResult.recordset && corrResult.recordset[0];
-          if (!row) {
-            codigoAsignado = `P-${String(Date.now()).slice(-10)}`;
-            break;
-          }
-          const candidato = String(row.numero);
-          const chk = await transaction.request()
-            .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-            .input("Codigo", sql.VarChar(50), candidato)
-            .query(
-              "SELECT COUNT(1) AS n FROM Productos WHERE idEmpresa = @idEmpresa AND RTRIM(LTRIM(Codigo)) = @Codigo"
-            );
-          const ocupado = Number(chk.recordset?.[0]?.n) > 0;
-          if (!ocupado) {
-            codigoAsignado = candidato;
-          }
-        }
-        datosProducto.Codigo = codigoAsignado || `P-${String(Date.now()).slice(-10)}`;
-      }
-
-      await transaction.request()
-        .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
-        .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)
-        .input("Codigo", sql.VarChar, datosProducto.Codigo)
-        .input("idCategoria", sql.Int, datosProducto.idCategoria)
-        .input("descripcion", sql.VarChar, datosProducto.descripcion)
-        .input("idMarca", sql.Int, datosProducto.idMarca)
-        .input("idPresentacion", sql.Int, datosProducto.idPresentacion)
-        .input("cUnitario", sql.Decimal(18, 5), datosProducto.cUnitario)
-        .input("fProduccion", sql.VarChar, datosProducto.fProduccion)
-        .input("fVencimiento", sql.VarChar, datosProducto.fVencimiento)
-        .input("alertaMinimo", sql.Decimal(18, 2), datosProducto.alertaMinimo)
-        .input("alertaMaximo", sql.Decimal(18, 2), datosProducto.alertaMaximo)
-        .input("VecesVendidas", sql.Int, 0)
-        .input("facturar", sql.VarChar, datosProducto.facturar)
-        .input("idUsuario", sql.UniqueIdentifier, datosProducto.idUsuario)
-        .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
-        .input("estado", sql.Bit, datosProducto.estado)
-        .input("tipoProducto", sql.Char(1), datosProducto.tipoProducto)
-        .input("permiteDescripcionEnVenta", sql.Bit, datosProducto.permiteDescripcionEnVenta ? 1 : 0)
-        .query(
-          "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta)"
-        );
-
-      if (lote && lote.idSucursal && (lote.cantidadIngresada > 0 || lote.costoUnitario != null)) {
-        const cantidad = Math.max(0, parseInt(lote.cantidadIngresada, 10) || 0);
-        const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
-        await transaction.request()
-          .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-          .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
-          .input("idSucursal", sql.UniqueIdentifier, lote.idSucursal)
-          .input("costoUnitario", sql.Decimal(18, 6), costoLote)
-          .input("cantidadIngresada", sql.Decimal(18, 2), cantidad)
-          .input("cantidadDisponible", sql.Decimal(18, 2), cantidad)
-          .query(
-            "INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible) VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)"
-          );
-      }
-
-      const precioVal = parseFloat(precioVenta);
-      if (!Number.isNaN(precioVal) && precioVal > 0) {
-        let lista = null;
-        if (idListaPrecio != null && idListaPrecio !== '') {
-          const listaResult = await preciosVRepository.obtenerListaPorId(
-            transaction,
-            parseInt(idListaPrecio, 10),
-            idEmpresa
-          );
-          lista = listaResult && listaResult.recordset && listaResult.recordset[0];
-          if (!lista) {
-            await transaction.rollback();
-            return res.status(400).send({ message: "Lista de precios inválida", data: undefined });
+          const codigoOcupado = Number(chkCodigo.recordset?.[0]?.n) > 0;
+          if (codigoOcupado) {
+            datosProducto.Codigo = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpresa);
           }
         } else {
-          const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
-          lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
+          datosProducto.Codigo = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpresa);
         }
-        if (lista && lista.idLista && lista.idMoneda) {
-          await preciosVRepository.crearPrecioProducto(transaction, {
-            idLista: lista.idLista,
-            idProducto: datosProducto.idProducto,
-            precio: precioVal,
-            idMoneda: lista.idMoneda,
-            idUsuario: datosProducto.idUsuario,
-          });
-        }
-      }
 
-      await transaction.commit();
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
+        await transaction.request()
+          .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
+          .input("idEmpresa", sql.UniqueIdentifier, datosProducto.idEmpresa)
+          .input("Codigo", sql.VarChar, datosProducto.Codigo)
+          .input("idCategoria", sql.Int, datosProducto.idCategoria)
+          .input("descripcion", sql.VarChar, datosProducto.descripcion)
+          .input("idMarca", sql.Int, datosProducto.idMarca)
+          .input("idPresentacion", sql.Int, datosProducto.idPresentacion)
+          .input("cUnitario", sql.Decimal(18, 5), datosProducto.cUnitario)
+          .input("fProduccion", sql.VarChar, datosProducto.fProduccion)
+          .input("fVencimiento", sql.VarChar, datosProducto.fVencimiento)
+          .input("alertaMinimo", sql.Decimal(18, 2), datosProducto.alertaMinimo)
+          .input("alertaMaximo", sql.Decimal(18, 2), datosProducto.alertaMaximo)
+          .input("VecesVendidas", sql.Int, 0)
+          .input("facturar", sql.VarChar, datosProducto.facturar)
+          .input("idUsuario", sql.UniqueIdentifier, datosProducto.idUsuario)
+          .input("FIngreso", sql.DateTime, datosProducto.FIngreso)
+          .input("estado", sql.Bit, datosProducto.estado)
+          .input("tipoProducto", sql.Char(1), datosProducto.tipoProducto)
+          .input("permiteDescripcionEnVenta", sql.Bit, datosProducto.permiteDescripcionEnVenta ? 1 : 0)
+          .query(
+            "INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta)"
+          );
+
+        if (lote && lote.idSucursal && (lote.cantidadIngresada > 0 || lote.costoUnitario != null)) {
+          const cantidad = Math.max(0, parseInt(lote.cantidadIngresada, 10) || 0);
+          const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
+          await transaction.request()
+            .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+            .input("idProducto", sql.UniqueIdentifier, datosProducto.idProducto)
+            .input("idSucursal", sql.UniqueIdentifier, lote.idSucursal)
+            .input("costoUnitario", sql.Decimal(18, 6), costoLote)
+            .input("cantidadIngresada", sql.Decimal(18, 2), cantidad)
+            .input("cantidadDisponible", sql.Decimal(18, 2), cantidad)
+            .query(
+              "INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible) VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)"
+            );
+        }
+
+        const precioVal = parseFloat(precioVenta);
+        if (!Number.isNaN(precioVal) && precioVal > 0) {
+          let lista = null;
+          if (idListaPrecio != null && idListaPrecio !== '') {
+            const listaResult = await preciosVRepository.obtenerListaPorId(
+              transaction,
+              parseInt(idListaPrecio, 10),
+              idEmpresa
+            );
+            lista = listaResult && listaResult.recordset && listaResult.recordset[0];
+            if (!lista) {
+              await transaction.rollback();
+              return res.status(400).send({ message: "Lista de precios inválida", data: undefined });
+            }
+          } else {
+            const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
+            lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
+          }
+          if (lista && lista.idLista && lista.idMoneda) {
+            await preciosVRepository.crearPrecioProducto(transaction, {
+              idLista: lista.idLista,
+              idProducto: datosProducto.idProducto,
+              precio: precioVal,
+              idMoneda: lista.idMoneda,
+              idUsuario: datosProducto.idUsuario,
+            });
+          }
+        }
+
+        await transaction.commit();
+        committed = true;
+      } catch (err) {
+        await transaction.rollback();
+        const msg = String(err.message || "");
+        const dupCodigo =
+          err.number === 2627 &&
+          (/codigo/i.test(msg) || /duplicate key/i.test(msg) || /UNIQUE KEY/i.test(msg));
+        if (dupCodigo && attempt < maxIntentosCodigo) {
+          lastDupErr = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!committed) {
+      throw lastDupErr || new Error("No se pudo asignar un código de producto único.");
     }
 
     res.status(200).send({ data: datosProducto.idProducto });
@@ -588,28 +649,58 @@ const crear_producto_compra = async (datosProducto, user) => {
 
   try {
     let pool = await sql.connect(dbConfig);
-    let productos = await pool
-      .request()
-      .input("idProducto", sql.UniqueIdentifier, detalle.idProducto)
-      .input("idEmpresa", sql.UniqueIdentifier, detalle.idEmpresa)
-      .input("Codigo", sql.VarChar, detalle.Codigo.toString())
-      .input("idCategoria", sql.Int, detalle.idCategoria)
-      .input("descripcion", sql.VarChar, detalle.descripcion)
-      .input("idMarca", sql.Int, detalle.idMarca) //idMarca
-      .input("idPresentacion", sql.Int, detalle.idPresentacion)
-      .input("cUnitario", sql.Decimal(18, 5), detalle.cUnitario)
-      .input("fProduccion", sql.VarChar, detalle.fProduccion)
-      .input("fVencimiento", sql.VarChar, detalle.fVencimiento)
-      .input("alertaMinimo", sql.Decimal, detalle.alertaMinimo)
-      .input("alertaMaximo", sql.Decimal, detalle.alertaMaximo)
-      .input("VecesVendidas", sql.Int, detalle.VecesVendidas)
-      .input("facturar", sql.VarChar, detalle.facturar.toString())
-      .input("idUsuario", sql.UniqueIdentifier, detalle.idUsuario)
-      .input("FIngreso", sql.DateTime, detalle.FIngreso)
-      .input("estado", sql.Bit, detalle.estado) //estado
-      .query(
-        "INSERT INTO Productos VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)"
-      );
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      const codigoIngresado = String(detalle.Codigo || "").trim();
+      let codigoFinal = codigoIngresado;
+
+      if (!codigoFinal) {
+        codigoFinal = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, detalle.idEmpresa);
+      } else {
+        const existe = await transaction.request()
+          .input("idEmpresa", sql.UniqueIdentifier, detalle.idEmpresa)
+          .input("Codigo", sql.VarChar(50), codigoFinal)
+          .query(`
+            SELECT COUNT(1) AS n
+            FROM Productos
+            WHERE idEmpresa = @idEmpresa
+              AND RTRIM(LTRIM(Codigo)) = @Codigo
+          `);
+        if (Number(existe.recordset?.[0]?.n) > 0) {
+          codigoFinal = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, detalle.idEmpresa);
+        }
+      }
+
+      await transaction
+        .request()
+        .input("idProducto", sql.UniqueIdentifier, detalle.idProducto)
+        .input("idEmpresa", sql.UniqueIdentifier, detalle.idEmpresa)
+        .input("Codigo", sql.VarChar, codigoFinal)
+        .input("idCategoria", sql.Int, detalle.idCategoria)
+        .input("descripcion", sql.VarChar, detalle.descripcion)
+        .input("idMarca", sql.Int, detalle.idMarca) //idMarca
+        .input("idPresentacion", sql.Int, detalle.idPresentacion)
+        .input("cUnitario", sql.Decimal(18, 5), detalle.cUnitario)
+        .input("fProduccion", sql.VarChar, detalle.fProduccion)
+        .input("fVencimiento", sql.VarChar, detalle.fVencimiento)
+        .input("alertaMinimo", sql.Decimal, detalle.alertaMinimo)
+        .input("alertaMaximo", sql.Decimal, detalle.alertaMaximo)
+        .input("VecesVendidas", sql.Int, detalle.VecesVendidas)
+        .input("facturar", sql.VarChar, detalle.facturar.toString())
+        .input("idUsuario", sql.UniqueIdentifier, detalle.idUsuario)
+        .input("FIngreso", sql.DateTime, detalle.FIngreso)
+        .input("estado", sql.Bit, detalle.estado) //estado
+        .query(
+          "INSERT INTO Productos VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)"
+        );
+
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
 
     //if(productos.rowsAffected == 1){
         return detalle.idProducto;

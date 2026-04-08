@@ -117,7 +117,7 @@
                 <th>Ticket</th>
                 <th>Estado</th>
                 <th>Descripción</th>
-                <th></th>
+                <th class="text-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -129,12 +129,26 @@
                   <td>{{ descripcionEstado(item) }}</td>
                   <td class="small">{{ item.descripcionRespuesta || '—' }}</td>
                   <td>
-                    @if (item.idEstadoSunat == null || item.idEstadoSunat === 7) {
-                      <button type="button" class="btn btn-sm btn-outline-primary" (click)="consultarEstado(item)"
-                              [disabled]="consultandoId === item.idComunicacionBaja">
-                        @if (consultandoId === item.idComunicacionBaja) { Consultando... } @else { Consultar estado }
-                      </button>
-                    }
+                    <div class="d-flex flex-wrap gap-1">
+                      @if (tieneXmlEnviado(item)) {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="verXmlEnviado(item)"
+                                [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-xml'">
+                          @if (abriendoArchivoId === item.idComunicacionBaja + '-xml') { … } @else { Ver XML }
+                        </button>
+                      }
+                      @if (tieneCdr(item)) {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="verCdrSunat(item)"
+                                [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-cdr'">
+                          @if (abriendoArchivoId === item.idComunicacionBaja + '-cdr') { … } @else { Ver CDR }
+                        </button>
+                      }
+                      @if (item.idEstadoSunat == null || item.idEstadoSunat === 7) {
+                        <button type="button" class="btn btn-sm btn-outline-primary" (click)="consultarEstado(item)"
+                                [disabled]="consultandoId === item.idComunicacionBaja">
+                          @if (consultandoId === item.idComunicacionBaja) { Consultando... } @else { Consultar estado }
+                        </button>
+                      }
+                    </div>
                   </td>
                 </tr>
               }

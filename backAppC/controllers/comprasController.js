@@ -128,16 +128,31 @@ const eliminar_idcompra_empresa = async (req, res, next) => {
     if (!req.user) {
         return res.status(401).send({ message: 'No autorizado', data: undefined });
     }
-    if (req.user.rol !== 'Administrador') {
-        return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     const idCompra = req.params.id;
     const idEmpresa = req.user.empresa;
     try {
         const rowsAffected = await comprasService.eliminarCompra(idEmpresa, idCompra);
+        if (!rowsAffected) {
+            return res.status(404).send({ message: 'Compra no encontrada para esta empresa', data: 0 });
+        }
         res.status(200).send({ message: 'Compra eliminada correctamente', data: rowsAffected });
     } catch (error) {
         console.error('eliminar_idcompra_empresa:', error);
+        if (error && error.message === 'NO_SE_PUEDE_ELIMINAR_COMPRA_STOCK_YA_CONSUMIDO') {
+            return res.status(400).send({
+                message: 'No se puede eliminar la compra porque su stock ya fue consumido o movido. Primero revierta esos movimientos de inventario.',
+                data: undefined
+            });
+        }
+        if (error && Number(error.number) === 547) {
+            return res.status(400).send({
+                message: 'No se puede eliminar la compra porque tiene registros relacionados. Elimine primero los registros dependientes.',
+                data: undefined
+            });
+        }
         return next(error);
     }
 };

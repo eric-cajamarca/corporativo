@@ -119,17 +119,33 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
     if (tieneMenuConSubmenus && navegacionDesdeApi && navegacionDesdeApi.length > 0) {
       const items: MenuItem[] = navegacionDesdeApi.map((i: MenuItem) => {
-        if (i.submenu && i.modulo === 'facturacion') {
-          const base: SubMenuItem[] = i.submenu.filter((s: SubMenuItem) =>
-            s.ruta !== '/facturacion/guias/configuracion' &&
+        const mod = (i.modulo || '').toString().toLowerCase();
+        if (i.submenu && mod === 'facturacion') {
+          let base: SubMenuItem[] = i.submenu.filter((s: SubMenuItem) =>
             s.ruta !== '/facturacion/guias-remision' &&
             s.ruta !== '/facturacion/guias-transportista'
           );
-          const guiasItems: SubMenuItem[] = estado.habilitarGuiasElectronicas ? [
-            { nombre: 'Emisión de guías – Configuración', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
-            { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
-            { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
-          ] : [];
+          const tieneEmision = base.some((s) => s.ruta === '/facturacion/emision-guias');
+          if (!tieneEmision) {
+            const idxCom = base.findIndex((s) => s.ruta === '/facturacion/comunicacion-baja');
+            const emisionItem: SubMenuItem = {
+              nombre: 'Emisión de guías',
+              ruta: '/facturacion/emision-guias',
+              permiso: '',
+              visible: true
+            };
+            base =
+              idxCom >= 0
+                ? [...base.slice(0, idxCom + 1), emisionItem, ...base.slice(idxCom + 1)]
+                : [...base, emisionItem];
+          }
+          const guiasItems: SubMenuItem[] = estado.habilitarGuiasElectronicas
+            ? [
+                //{ nombre: 'Configuración de guías electrónicas', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
+                { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
+                { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+              ]
+            : [];
           return { ...i, submenu: [...base, ...guiasItems] };
         }
         return i;
@@ -191,16 +207,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.menuItems.set(navegacionCompleta);
   }
 
-  /** Submenú Facturación: ítems base + ítems de guías solo si están habilitados. */
+  /** Submenú Facturación: emisión de guías siempre visible; resto de guías si están habilitadas en empresa. */
   private buildSubmenuFacturacion(estado: any): SubMenuItem[] {
     const base: SubMenuItem[] = [
       { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
       { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
-      { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true }
+      { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true },
+      { nombre: 'Emisión de guías', ruta: '/facturacion/emision-guias', permiso: '', visible: true }
     ];
     if (estado?.habilitarGuiasElectronicas) {
       base.push(
-        { nombre: 'Emisión de guías – Configuración', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
+        //{ nombre: 'Configuración de guías electrónicas', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
         { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
         { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
       );
@@ -265,7 +282,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { nombre: 'Resumen diario', ruta: '/facturacion/resumenes-diarios', permiso: '', visible: true },
       { nombre: 'Emisión de notas', ruta: '/facturacion/notas-credito-debito', permiso: '', visible: true },
       { nombre: 'Comunicación de baja', ruta: '/facturacion/comunicacion-baja', permiso: '', visible: true },
-      { nombre: 'Emisión de guías – Configuración', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
+      { nombre: 'Emisión de guías', ruta: '/facturacion/emision-guias', permiso: '', visible: true },
       { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
       { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
     ];

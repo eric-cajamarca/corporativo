@@ -88,6 +88,7 @@ import { ComunicacionBajaComponent } from './components/facturacion/comunicacion
 import { GuiasRemisionComponent } from './components/facturacion/guias-remision/guias-remision.component';
 import { GuiasConfiguracionComponent } from './components/facturacion/guias-configuracion/guias-configuracion.component';
 import { GuiasTransportistaComponent } from './components/facturacion/guias-transportista/guias-transportista.component';
+import { EmisionGuiasComponent } from './components/facturacion/emision-guias/emision-guias.component';
 import { LogAuditoriaComponent } from './components/auditoria/log-auditoria/log-auditoria.component';
 import { IndexRubrosComponent } from './components/rubros/index-rubros/index-rubros.component';
 import { IndexValesDespachoComponent } from './components/vales-despacho/index-vales-despacho/index-vales-despacho.component';
@@ -284,6 +285,7 @@ export const routes: Routes = [
      { path: 'facturacion/resumenes-diarios', component: ResumenesDiariosComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Resúmenes diarios SUNAT' },
     { path: 'facturacion/notas-credito-debito', component: NotasCreditoDebitoComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Emisión de notas' },
     { path: 'facturacion/comunicacion-baja', component: ComunicacionBajaComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Comunicación de baja' },
+    { path: 'facturacion/emision-guias', component: EmisionGuiasComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Emisión de guías' },
     { path: 'facturacion/guias/configuracion', component: GuiasConfiguracionComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Configuración de guías' },
     { path: 'facturacion/guias-remision', component: GuiasRemisionComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Guías de remisión' },
     { path: 'facturacion/guias-transportista', component: GuiasTransportistaComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Guías transportista' },

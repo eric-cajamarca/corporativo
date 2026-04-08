@@ -31,9 +31,14 @@ router.get('/comunicacion-baja/comprobantes', facturacionController.listarCompro
 router.get('/comunicacion-baja/motivos', facturacionController.listarMotivosBaja);
 router.get('/comunicacion-baja', facturacionController.listarComunicacionesBaja);
 router.post('/comunicacion-baja/enviar', facturacionController.enviarComunicacionBaja);
+router.get('/comunicacion-baja/:idComunicacionBaja/xml', facturacionController.obtenerXmlComunicacionBaja);
+router.get('/comunicacion-baja/:idComunicacionBaja/cdr', facturacionController.obtenerCdrComunicacionBaja);
 router.post('/comunicacion-baja/:idComunicacionBaja/consultar-estado', facturacionController.consultarEstadoComunicacionBaja);
 router.post('/enviar-lote', facturacionController.enviarLoteSunat);
 router.get('/comprobantes/:idComprobanteElectronico/estado', facturacionController.consultarEstadoSunat);
+
+// Guías electrónicas emitidas (listado paginado)
+router.get('/guias/emitidas', facturacionController.listarGuiasEmitidas);
 
 // Resumen diario (RC)
 router.get('/resumenes-diarios', facturacionController.listarResumenesDiarios);

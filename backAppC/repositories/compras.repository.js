@@ -193,11 +193,106 @@ exports.actualizarCompra = async (pool, params) => {
  * Elimina una compra por idEmpresa e idCompra. Retorna rowsAffected.
  */
 exports.eliminarCompra = async (pool, idEmpresa, idCompra) => {
-    const result = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('idCompra', sql.UniqueIdentifier, idCompra)
-        .query('DELETE FROM Compras WHERE idEmpresa = @idEmpresa AND idCompra = @idCompra');
-    return result.rowsAffected?.[0] ?? 0;
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+        const lotesAsociados = await transaction.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idCompra', sql.UniqueIdentifier, idCompra)
+            .query(`
+                SELECT DISTINCT l.idLote, l.cantidadIngresada, l.cantidadDisponible
+                FROM Compras c
+                INNER JOIN DetalleCompras dc
+                    ON dc.idEmpresa = c.idEmpresa
+                   AND dc.idCompra = c.idCompra
+                INNER JOIN Lotes l
+                    ON l.idEmpresa = dc.idEmpresa
+                   AND l.idProducto = dc.idProducto
+                   AND l.idSucursal = dc.idSucursal
+                   AND (
+                        (c.numeroLote IS NOT NULL AND l.numeroLote = CONVERT(VARCHAR(50), c.numeroLote))
+                        OR (
+                            c.numeroLote IS NULL
+                            AND CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(dc.cantidad, 0))
+                            AND CONVERT(DECIMAL(18,6), ISNULL(l.costoUnitario, 0)) = CONVERT(DECIMAL(18,6), ISNULL(dc.pUnitario, 0))
+                        )
+                   )
+                WHERE c.idEmpresa = @idEmpresa
+                  AND c.idCompra = @idCompra
+            `);
+
+        const lotesConsumidos = (lotesAsociados.recordset || []).filter((r) => {
+            const ingresada = Number(r.cantidadIngresada) || 0;
+            const disponible = Number(r.cantidadDisponible) || 0;
+            return disponible < ingresada;
+        });
+        if (lotesConsumidos.length > 0) {
+            throw new Error('NO_SE_PUEDE_ELIMINAR_COMPRA_STOCK_YA_CONSUMIDO');
+        }
+
+        for (const lote of lotesAsociados.recordset || []) {
+            await transaction.request()
+                .input('idLote', sql.UniqueIdentifier, lote.idLote)
+                .query('DELETE FROM LotesUbicacion WHERE idLote = @idLote');
+        }
+
+        if ((lotesAsociados.recordset || []).length > 0) {
+            await transaction.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idCompra', sql.UniqueIdentifier, idCompra)
+                .query(`
+                    DELETE l
+                    FROM Lotes l
+                    INNER JOIN Compras c
+                        ON c.idEmpresa = l.idEmpresa
+                    INNER JOIN DetalleCompras dc
+                        ON dc.idEmpresa = c.idEmpresa
+                       AND dc.idCompra = c.idCompra
+                       AND dc.idProducto = l.idProducto
+                       AND dc.idSucursal = l.idSucursal
+                    WHERE c.idEmpresa = @idEmpresa
+                      AND c.idCompra = @idCompra
+                      AND (
+                            (c.numeroLote IS NOT NULL AND l.numeroLote = CONVERT(VARCHAR(50), c.numeroLote))
+                            OR (
+                                c.numeroLote IS NULL
+                                AND CONVERT(DECIMAL(18,3), ISNULL(l.cantidadIngresada, 0)) = CONVERT(DECIMAL(18,3), ISNULL(dc.cantidad, 0))
+                                AND CONVERT(DECIMAL(18,6), ISNULL(l.costoUnitario, 0)) = CONVERT(DECIMAL(18,6), ISNULL(dc.pUnitario, 0))
+                            )
+                      )
+                `);
+        }
+
+        await transaction.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idCompra', sql.UniqueIdentifier, idCompra)
+            .query(`
+                DELETE FROM ComprobantesElectronicos
+                WHERE idEmpresa = @idEmpresa AND idCompra = @idCompra
+            `);
+
+        await transaction.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idCompra', sql.UniqueIdentifier, idCompra)
+            .query(`
+                DELETE FROM DetalleCompras
+                WHERE idEmpresa = @idEmpresa AND idCompra = @idCompra
+            `);
+
+        const result = await transaction.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idCompra', sql.UniqueIdentifier, idCompra)
+            .query(`
+                DELETE FROM Compras
+                WHERE idEmpresa = @idEmpresa AND idCompra = @idCompra
+            `);
+
+        await transaction.commit();
+        return result.rowsAffected?.[0] ?? 0;
+    } catch (error) {
+        await transaction.rollback();
+        throw error;
+    }
 };
 
 /**

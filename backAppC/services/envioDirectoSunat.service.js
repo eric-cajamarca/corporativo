@@ -11,6 +11,8 @@ const JSZip = require("jszip");
 
 /** Carpeta donde se guardan el ZIP y la respuesta SOAP de SUNAT para depuración. */
 const CARPETA_RESPUESTAS_SUNAT = path.join(process.cwd(), "sunat_respuestas");
+/** XML firmado enviado por sendSummary (RC/RA), mismo criterio que comprobantes. */
+const CARPETA_XML_FIRMADOS_SUNAT = path.join(process.cwd(), "xml_firmados_sunat");
 
 const NS_SOAP = "http://schemas.xmlsoap.org/soap/envelope/";
 const NS_WS = "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd";
@@ -167,19 +169,57 @@ async function enviarResumenDirectoSunat(xmlFirmado, nombreBase, usuarioSOAP, cl
   // Lineamiento SUNAT: ZIP con carpeta dummy (vacía) + XML; ej. 20100066603-RC-20110522-1.ZIP
   const fileNameZip = `${nombreBase}.ZIP`;
 
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'envioDirectoSunat.service.js:167',message:'ENTRADA enviarResumenDirectoSunat',data:{nombreBase,fileNameZip,xmlFirmadoLength:xmlFirmado?.length||0,xmlFirmadoFirst200:xmlFirmado?.substring(0,200)||'',xmlFirmadoLast100:xmlFirmado?.substring(xmlFirmado.length-100)||'',urlBillService:url},timestamp:Date.now(),hypothesisId:'A,B,D'})}).catch(()=>{});
+  // #endregion
+
   let zipBase64;
+  let zipBuffer;
   try {
     const zip = new JSZip();
-    zip.file("dummy/", Buffer.alloc(0));
-    zip.file(`${nombreBase}.XML`, xmlFirmado, { binary: false });
-    const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+    // NOTA: Para VoidedDocuments (RA) NO se usa carpeta dummy según pruebas actualizadas
+    // Solo el XML dentro del ZIP, igual que sendBill
+    const xmlFileName = `${nombreBase}.XML`;
+    // Usar Buffer directamente para evitar problemas de encoding
+    const xmlBuffer = Buffer.from(xmlFirmado, 'utf8');
+    zip.file(xmlFileName, xmlBuffer, { binary: true });
+    zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 9 } });
     zipBase64 = zipBuffer.toString("base64");
+
+    // #region agent log - verificación post-ZIP
+    const zipVerify = await JSZip.loadAsync(zipBuffer);
+    const zipFilesVerify = Object.keys(zipVerify.files);
+    let extractedXmlLength = 0;
+    let extractedXmlFirst200 = '';
+    let extractedXmlLast100 = '';
+    for (const fn of zipFilesVerify) {
+      if (fn.toLowerCase().endsWith('.xml')) {
+        const extractedContent = await zipVerify.files[fn].async('string');
+        extractedXmlLength = extractedContent.length;
+        extractedXmlFirst200 = extractedContent.substring(0, 200);
+        extractedXmlLast100 = extractedContent.substring(extractedContent.length - 100);
+      }
+    }
+    fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'envioDirectoSunat.service.js:180',message:'ZIP generado y verificado',data:{xmlFileName,zipFilesVerify,zipBufferLength:zipBuffer?.length||0,zipBase64Length:zipBase64?.length||0,originalXmlLength:xmlFirmado?.length||0,extractedXmlLength,extractedXmlFirst200,extractedXmlLast100,xmlsMatch:xmlFirmado?.length===extractedXmlLength},timestamp:Date.now(),hypothesisId:'A,B,C,D'})}).catch(()=>{});
+    // #endregion
   } catch (err) {
     console.error("envioDirectoSunat: sendSummary error al comprimir:", err.message);
     return { ok: false, error: "Error al comprimir el XML para envío" };
   }
 
   const soapBody = buildSendSummarySoap(usuarioSOAP, claveSOAP, fileNameZip, zipBase64);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'envioDirectoSunat.service.js:190',message:'SOAP body generado',data:{soapBodyLength:soapBody?.length||0,soapBodyFirst300:soapBody?.substring(0,300)||'',soapBodyContainsContentFile:soapBody?.includes('<contentFile>')},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+
+  try {
+    if (!fs.existsSync(CARPETA_XML_FIRMADOS_SUNAT)) fs.mkdirSync(CARPETA_XML_FIRMADOS_SUNAT, { recursive: true });
+    const rutaXml = path.join(CARPETA_XML_FIRMADOS_SUNAT, `${nombreBase}.xml`);
+    fs.writeFileSync(rutaXml, xmlFirmado, "utf8");
+    console.error("envioDirectoSunat: XML sendSummary guardado:", rutaXml);
+  } catch (err) {
+    console.error("envioDirectoSunat: no se pudo guardar XML sendSummary:", err.message);
+  }
 
   let response;
   try {
@@ -196,6 +236,20 @@ async function enviarResumenDirectoSunat(xmlFirmado, nombreBase, usuarioSOAP, cl
   }
 
   const responseXml = response.data && typeof response.data === "string" ? response.data : String(response.data || "");
+
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'envioDirectoSunat.service.js:220',message:'Respuesta SUNAT recibida',data:{httpStatus:response?.status,responseXmlLength:responseXml?.length||0,responseXmlContent:responseXml?.substring(0,1000)||''},timestamp:Date.now(),hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
+  // #endregion
+
+  try {
+    if (!fs.existsSync(CARPETA_RESPUESTAS_SUNAT)) fs.mkdirSync(CARPETA_RESPUESTAS_SUNAT, { recursive: true });
+    const rutaSoap = path.join(CARPETA_RESPUESTAS_SUNAT, `${nombreBase}-sendSummary-respuesta-soap.xml`);
+    fs.writeFileSync(rutaSoap, responseXml, "utf8");
+    console.error("envioDirectoSunat: sendSummary respuesta SOAP guardada:", rutaSoap);
+  } catch (err) {
+    console.error("envioDirectoSunat: no se pudo guardar SOAP sendSummary:", err.message);
+  }
+
   const faultMatch = responseXml.match(/<faultstring[^>]*>([^<]*)<\/faultstring>/i);
   if (faultMatch) {
     const faultMsg = faultMatch[1].trim();
@@ -231,13 +285,24 @@ async function consultarEstadoResumenSunat(ticket, usuarioSOAP, claveSOAP, urlBi
     });
   } catch (err) {
     console.error("envioDirectoSunat: getStatus error de conexión:", err.message);
-    return { statusCode: -1, error: err.message };
+    return { statusCode: -1, error: err.message, responseXml: undefined };
   }
 
   const responseXml = response.data && typeof response.data === "string" ? response.data : String(response.data || "");
+
+  try {
+    if (!fs.existsSync(CARPETA_RESPUESTAS_SUNAT)) fs.mkdirSync(CARPETA_RESPUESTAS_SUNAT, { recursive: true });
+    const safeTicket = String(ticket || "sin-ticket").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80);
+    const rutaSoap = path.join(CARPETA_RESPUESTAS_SUNAT, `getStatus-${safeTicket}-respuesta-soap.xml`);
+    fs.writeFileSync(rutaSoap, responseXml, "utf8");
+    console.error("envioDirectoSunat: getStatus respuesta SOAP guardada:", rutaSoap);
+  } catch (err) {
+    console.error("envioDirectoSunat: no se pudo guardar SOAP getStatus:", err.message);
+  }
+
   const faultMatch = responseXml.match(/<faultstring[^>]*>([^<]*)<\/faultstring>/i);
   if (faultMatch) {
-    return { statusCode: 99, error: faultMatch[1].trim() };
+    return { statusCode: 99, error: faultMatch[1].trim(), responseXml };
   }
 
   const statusMatch = responseXml.match(/<statusCode[^>]*>([^<]*)<\/statusCode>/i);
@@ -246,7 +311,7 @@ async function consultarEstadoResumenSunat(ticket, usuarioSOAP, claveSOAP, urlBi
   const contentMatch = responseXml.match(/<content[^>]*>([^<]*)<\/content>/i);
   const content = contentMatch && contentMatch[1] ? contentMatch[1].trim().replace(/\s/g, "") : undefined;
 
-  return { statusCode, content };
+  return { statusCode, content, responseXml };
 }
 
 /**
@@ -429,11 +494,27 @@ async function enviarComprobanteDirectoSunat(xmlFirmado, nombreBase, usuarioSOAP
   }
 }
 
+/**
+ * Intenta extraer CDR (código + descripción + XML) desde el content base64 de getStatus (ZIP).
+ * Sirve para statusCode 0 (aceptado) y 99 (rechazo con ZIP de error).
+ */
+async function extraerCdrDesdeContentBase64(contentBase64) {
+  if (!contentBase64 || typeof contentBase64 !== "string") return null;
+  try {
+    const zipBuffer = Buffer.from(contentBase64, "base64");
+    return await extraerCdrDeZipBuffer(zipBuffer);
+  } catch (err) {
+    console.error("envioDirectoSunat: extraerCdrDesdeContentBase64:", err.message);
+    return null;
+  }
+}
+
 module.exports = {
   enviarComprobanteDirectoSunat,
   enviarResumenDirectoSunat,
   consultarEstadoResumenSunat,
   extraerCdrDeZipBuffer,
+  extraerCdrDesdeContentBase64,
   URL_BETA,
   URL_PRODUCCION,
   responseCodeToIdEstadoSunat

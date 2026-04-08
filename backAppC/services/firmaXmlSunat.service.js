@@ -9,9 +9,9 @@ const { SignedXml } = require("xml-crypto");
 const crypto = require("crypto");
 
 const XPATH_EXTENSION_CONTENT = "//*[local-name()='ExtensionContent']";
-/** Raíz UBL 2.1: factura/boleta (Invoice), nota crédito (CreditNote), nota débito (DebitNote). */
+/** Raíz UBL / SUNAT-PE: comprobantes (Invoice, CreditNote, DebitNote) + RA (VoidedDocuments) + RC (SummaryDocuments). */
 const XPATH_DOCUMENTO_UBL =
-  "//*[local-name()='Invoice' or local-name()='CreditNote' or local-name()='DebitNote']";
+  "//*[local-name()='Invoice' or local-name()='CreditNote' or local-name()='DebitNote' or local-name()='VoidedDocuments' or local-name()='SummaryDocuments']";
 // SUNAT: Reference URI=""; transforms enveloped-signature + C14N 20010315; SHA1/RSA-SHA1
 const ALGORITHM_SHA1 = "http://www.w3.org/2000/09/xmldsig#sha1";
 const ALGORITHM_RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
@@ -63,7 +63,7 @@ function extraerCertificadoDePfx(pfxBuffer, password) {
 }
 
 /**
- * Firma un XML UBL (Invoice / CreditNote / DebitNote) y devuelve el XML con la firma insertada en ExtensionContent.
+ * Firma un XML UBL (comprobantes + comunicación de baja RA + resumen diario RC) y devuelve el XML con la firma insertada en ExtensionContent.
  * Estructura alineada con Facturador SUNAT: Reference URI="" (todo el documento), Id="SignSUNAT" en la firma,
  * Transforms: enveloped-signature + C14N 20010315 (digest coherente con validadores), SHA1/RSA-SHA1.
  * @param {string} xmlUbl - XML UBL completo (sin firma en ExtensionContent)
@@ -105,27 +105,13 @@ function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
     existingPrefixes: {
       ext: "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
       cac: "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
-      cbc: "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+      cbc: "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+      sac: "urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1"
     }
   });
   let signed = sig.getSignedXml();
   // Facturador usa Id="SignSUNAT" en el elemento ds:Signature
   signed = signed.replace(/(<ds:Signature)(\s|>)/, "$1 Id=\"SignSUNAT\"$2");
-  // #region agent log
-  fetch("http://127.0.0.1:7615/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "20164e" },
-    body: JSON.stringify({
-      sessionId: "20164e",
-      runId: "post-fix",
-      hypothesisId: "H_c14n",
-      location: "firmaXmlSunat.service.js:firmarXmlUbl",
-      message: "firma con transforms enveloped+c14n",
-      data: { refTransforms: ["enveloped", "c14n-20010315"] },
-      timestamp: Date.now()
-    })
-  }).catch(() => {});
-  // #endregion
   return signed;
 }
 
