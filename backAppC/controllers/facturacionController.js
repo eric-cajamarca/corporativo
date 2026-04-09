@@ -3,6 +3,7 @@ const sql = require('mssql');
 const FacturacionServices = require('../services/facturacion.service');
 const ResumenDiarioSunatService = require('../services/resumenDiarioSunat.service');
 const ComunicacionBajaService = require('../services/comunicacionBaja.service');
+const GuiaElectronicaService = require('../services/guiaElectronica.service');
 const debugSunatLog = require('../utils/debugSunatLog.util');
 
 // Obtener configuración de facturación electrónica
@@ -459,6 +460,188 @@ const listarResumenesDiarios = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/facturacion/guias/:id/preview-xml
+ * - JSON por defecto: { data: { xmlSinFirmar, xmlFirmado?, nomArchivo, ... } }
+ * - ?firmado=1 incluye firma PFX (mismo XML que se comprime y envía a SUNAT).
+ * - ?raw=1 devuelve el cuerpo como application/xml (firmado si firmado=1; si no, sin firmar).
+ */
+const previewXmlGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const incluirFirmado =
+      String(req.query.firmado || "") === "1" ||
+      String(req.query.firmado || "").toLowerCase() === "true";
+    const rawXml =
+      String(req.query.raw || "") === "1" ||
+      String(req.query.raw || "").toLowerCase() === "true";
+    const result = await GuiaElectronicaService.previewXmlGuiaService(pool, req.user, req.params.id, {
+      incluirFirmado
+    });
+    if (rawXml) {
+      const body = incluirFirmado ? result.xmlFirmado : result.xmlSinFirmar;
+      if (!body) {
+        return res.status(400).send({
+          message:
+            result.errorFirma ||
+            "No hay XML firmado. Use firmado=1 y configure certificado, o quite raw=1 para ver JSON."
+        });
+      }
+      const nameBase = (result.nomArchivo || "guia").replace(/\.xml$/i, "");
+      const filename = incluirFirmado ? `${nameBase}-firmado.xml` : result.nomArchivo || "guia.xml";
+      res.setHeader("Content-Type", "application/xml; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.status(200).send(Buffer.from(body, "utf8"));
+    }
+    res.status(200).send({ data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    console.error("Error preview XML guía:", error);
+    return res.status(400).send({ message: msg });
+  }
+};
+
+/** GET /api/facturacion/guias/:id/xml-firmado — Descarga el último XML firmado guardado (no regenera). */
+const descargarXmlFirmadoGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const row = await GuiaElectronicaService.obtenerGuiaService(pool, req.user, req.params.id);
+    const xml = row.xmlFirmado;
+    if (!xml || typeof xml !== "string" || !String(xml).trim()) {
+      return res.status(404).send({
+        message:
+          "No hay XML firmado almacenado. Ejecute la migración add_guias_emitidas_xml_firmado.sql y reenvíe la guía, o use preview-xml?firmado=1."
+      });
+    }
+    const safeName = `${row.serie || "GUIA"}-${String(row.numero || "").replace(/\s/g, "")}-firmado.xml`.replace(
+      /[^A-Za-z0-9._-]/g,
+      "_"
+    );
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    return res.status(200).send(Buffer.from(xml, "utf8"));
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    if (/Invalid column name ['"]xmlFirmado['"]/i.test(msg)) {
+      return res.status(503).send({
+        message: "Ejecute la migración add_guias_emitidas_xml_firmado.sql para habilitar el almacenamiento del XML."
+      });
+    }
+    console.error("Error descargar XML firmado guía:", error);
+    return next(error);
+  }
+};
+
+/** PUT /api/facturacion/guias/:id — Actualiza una guía pendiente o con error SUNAT (conserva serie/número). */
+const actualizarGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await GuiaElectronicaService.actualizarGuiaService(pool, req.user, req.params.id, req.body);
+    res.status(200).send({ message: result.mensaje, data: result.guia });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    console.error("Error actualizar guía:", error);
+    return res.status(400).send({ message: msg });
+  }
+};
+
+/** GET /api/facturacion/guias/:id — Detalle completo de una guía electrónica. */
+const obtenerGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const row = await GuiaElectronicaService.obtenerGuiaService(pool, req.user, req.params.id);
+    const data = { ...row };
+    const tieneXmlFirmado = Boolean(data.xmlFirmado && String(data.xmlFirmado).trim());
+    delete data.xmlFirmado;
+    res.status(200).send({ data: { ...data, tieneXmlFirmado } });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    console.error("Error obtener guía:", error);
+    return next(error);
+  }
+};
+
+/** POST /api/facturacion/guias/:id/enviar — Reenvía guía pendiente/error a SUNAT. */
+const reenviarGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await GuiaElectronicaService.reenviarGuiaService(pool, req.user, req.params.id);
+    res.status(200).send({ message: result.mensaje, data: result });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    console.error("Error reenviar guía:", error);
+    return res.status(400).send({ message: msg });
+  }
+};
+
+/** DELETE /api/facturacion/guias/:id — Elimina una guía no aceptada. */
+const eliminarGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    await GuiaElectronicaService.eliminarGuiaService(pool, req.user, req.params.id);
+    res.status(200).send({ message: "Guía eliminada correctamente." });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    console.error("Error eliminar guía:", error);
+    return res.status(400).send({ message: msg });
+  }
+};
+
+/** GET /api/facturacion/guias/:id/ticket — Consulta el ticket pendiente de una GRE en SUNAT. */
+const consultarTicketGuia = async (req, res, next) => {
+  try {
+    const pool   = await sql.connect(dbConfig);
+    const result = await GuiaElectronicaService.consultarTicketGuiaService(pool, req.user, req.params.id);
+    res.status(200).send(result);
+  } catch (error) {
+    if (error.message === "NO_ACCESS")      return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    console.error("Error consultar ticket guía:", error);
+    return res.status(400).send({ message: msg });
+  }
+};
+
+/** POST /api/facturacion/guias/registrar — Registra la GRE en BD y la envía a SUNAT si hay credenciales. */
+const registrarGuia = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await GuiaElectronicaService.registrarGuiaService(pool, req.user, req.body);
+    if (!result.ok) {
+      return res.status(400).send({ message: result.mensaje || "Error al registrar la guía", data: result });
+    }
+    return res.status(201).send({
+      message: result.mensaje,
+      advertencia: result.advertencia,
+      data: result.guia,
+      enviado: result.enviado,
+      aceptado: result.aceptado
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    const msg = error.message || String(error);
+    if (/Invalid object name ['"](GuiasElectronicas|GuiasElectronicasEmitidas)['"]/i.test(msg)) {
+      return res.status(503).send({
+        message: "Ejecute la migración create_guias_electronicas_emitidas.sql antes de usar esta función.",
+        data: null
+      });
+    }
+    console.error("Error registrar guía electrónica:", error);
+    return next(error);
+  }
+};
+
 const listarGuiasEmitidas = async (req, res, next) => {
   try {
     const pool = await sql.connect(dbConfig);
@@ -797,5 +980,13 @@ module.exports = {
   enviarComunicacionBaja,
   consultarEstadoComunicacionBaja,
   obtenerXmlComunicacionBaja,
-  obtenerCdrComunicacionBaja
+  obtenerCdrComunicacionBaja,
+  registrarGuia,
+  actualizarGuia,
+  obtenerGuia,
+  previewXmlGuia,
+  descargarXmlFirmadoGuia,
+  reenviarGuia,
+  eliminarGuia,
+  consultarTicketGuia
 };

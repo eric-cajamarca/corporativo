@@ -27,13 +27,31 @@
           <h2 class="h6 mb-0">Credenciales API guías de remisión (no SOAP)</h2>
         </div>
         <div class="card-body">
-          <p class="text-muted small mb-3">Flujo: generar XML GRE → firmar XML → enviar por API. Endpoint: <strong>POST /v1/contribuyente/gem</strong>.</p>
+          <div class="alert alert-info small py-2 mb-3">
+            <strong>Nueva Plataforma GRE (REST):</strong> Flujo: generar XML UBL 2.1 → comprimir en ZIP → calcular hash SHA-256 → enviar por API REST.<br>
+            Endpoint: <code>POST /v1/contribuyente/gem/comprobantes/&#123;ruc&#125;-&#123;tipo&#125;-&#123;serie&#125;-&#123;numero&#125;</code><br>
+            La <strong>URL base</strong> debe ser <code>https://api-cpe.sunat.gob.pe</code> (producción) o
+            <code>https://e-beta.sunat.gob.pe</code> (pruebas).<br>
+            <span class="text-danger fw-semibold">⚠ No usar URL SOAP (<code>e-guiaremision.sunat.gob.pe/.../billService?wsdl</code>), esa es la plataforma antigua.</span><br>
+            <span class="text-muted">App <strong>Web</strong> en SUNAT: el token OAuth2 usa en la URL el <strong>ID</strong> (UUID) de la aplicación; el backend prueba ese path y también el del RUC por compatibilidad.</span>
+          </div>
           <div class="mb-3">
             <label for="urlBaseApiGuias" class="form-label">URL base API guías</label>
             <input id="urlBaseApiGuias" type="text" class="form-control"
                   [(ngModel)]="configuracionGuias.urlBaseApiGuias"
-                  placeholder="https://e-beta.sunat.gob.pe/...">
-            <small class="text-muted">Solo la URL base (sin /v1/contribuyente/gem). El path es fijo.</small>
+                  placeholder="https://api-cpe.sunat.gob.pe">
+            <small class="text-muted">Solo la URL base. Producción: <code>https://api-cpe.sunat.gob.pe</code></small>
+          </div>
+          <div class="mb-3">
+            <label for="rucApiGuias" class="form-label">RUC registrado en SUNAT API</label>
+            <input id="rucApiGuias" type="text" class="form-control" maxlength="11"
+                  [(ngModel)]="configuracionGuias.rucApiGuias"
+                  placeholder="RUC con que ingresaste al portal api-seguridad.sunat.gob.pe">
+            <small class="text-muted">
+              RUC que usaste para crear la app en
+              <code>api-seguridad.sunat.gob.pe</code>. Si es distinto al RUC de la empresa, ingrésalo aquí.
+              Si es el mismo déjalo en blanco.
+            </small>
           </div>
           <div class="mb-3">
             <label for="idApiGuias" class="form-label">ID (credencial API)</label>

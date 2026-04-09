@@ -25,8 +25,9 @@ export class GuiasConfiguracionComponent implements OnInit {
   private router = inject(Router);
 
   /** Solo campos de API guías (no SOAP). Endpoint: POST {urlBaseApiGuias}/v1/contribuyente/gem */
-  configuracionGuias: { urlBaseApiGuias: string; idApiGuias: string; claveApiGuias: string } = {
+  configuracionGuias: { urlBaseApiGuias: string; rucApiGuias: string; idApiGuias: string; claveApiGuias: string } = {
     urlBaseApiGuias: '',
+    rucApiGuias: '',
     idApiGuias: '',
     claveApiGuias: ''
   };
@@ -63,6 +64,7 @@ export class GuiasConfiguracionComponent implements OnInit {
         const c = res?.data || {};
         this.configuracionCompleta = c;
         this.configuracionGuias.urlBaseApiGuias = c.urlBaseApiGuias || '';
+        this.configuracionGuias.rucApiGuias = c.rucApiGuias || '';
         this.configuracionGuias.idApiGuias = c.idApiGuias || '';
         this.configuracionGuias.claveApiGuias = '';
       },
@@ -85,6 +87,7 @@ export class GuiasConfiguracionComponent implements OnInit {
     const payload = {
       ...this.configuracionCompleta,
       urlBaseApiGuias: this.configuracionGuias.urlBaseApiGuias || undefined,
+      rucApiGuias: this.configuracionGuias.rucApiGuias?.trim() || undefined,
       idApiGuias: this.configuracionGuias.idApiGuias || undefined,
       claveApiGuias: this.configuracionGuias.claveApiGuias || undefined
     };

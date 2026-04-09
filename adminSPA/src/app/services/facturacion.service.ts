@@ -395,6 +395,73 @@ export class FacturacionService {
       { headers, withCredentials: true }
     );
   }
+
+  /** Registra la GRE en BD y la envía a SUNAT si las credenciales API GRE están configuradas. */
+  registrarGuia(datos: RegistrarGuiaPayload): Observable<RegistrarGuiaResponse> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.post<RegistrarGuiaResponse>(
+      this.url + 'facturacion/guias/registrar',
+      datos,
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Actualiza una guía pendiente o con error SUNAT (mismo cuerpo que registrar, sin nuevo correlativo). */
+  actualizarGuia(id: string, datos: RegistrarGuiaPayload): Observable<ActualizarGuiaResponse> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.put<ActualizarGuiaResponse>(
+      this.url + 'facturacion/guias/' + encodeURIComponent(id),
+      datos,
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Detalle de una guía electrónica (incluye datosGuia JSON si existe la columna). */
+  obtenerGuia(id: string): Observable<{ data: GuiaDetalle }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.get<{ data: GuiaDetalle }>(
+      this.url + 'facturacion/guias/' + encodeURIComponent(id),
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Reenvía una guía pendiente/con error a SUNAT. */
+  reenviarGuia(id: string): Observable<{ message: string; data: any }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.post<{ message: string; data: any }>(
+      this.url + 'facturacion/guias/' + encodeURIComponent(id) + '/enviar',
+      {},
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Elimina una guía que no esté aceptada. */
+  eliminarGuia(id: string): Observable<{ message: string }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.delete<{ message: string }>(
+      this.url + 'facturacion/guias/' + encodeURIComponent(id),
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** Consulta el ticket pendiente de una guía EN_PROCESO. */
+  consultarTicketGuia(id: string): Observable<{ ok: boolean; aceptado?: boolean; enProceso?: boolean; error?: boolean; mensaje: string }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.get<{ ok: boolean; aceptado?: boolean; enProceso?: boolean; error?: boolean; mensaje: string }>(
+      this.url + 'facturacion/guias/' + encodeURIComponent(id) + '/ticket',
+      { headers, withCredentials: true }
+    );
+  }
+
+  /** GET último XML firmado almacenado en BD (mismo que se envió en ZIP a SUNAT). */
+  descargarXmlFirmadoGuia(id: string): Observable<Blob> {
+    const headers = new HttpHeaders({ Authorization: '' });
+    return this._http.get(this.url + 'facturacion/guias/' + encodeURIComponent(id) + '/xml-firmado', {
+      headers,
+      withCredentials: true,
+      responseType: 'blob'
+    });
+  }
 }
 
 /** Comprobante aceptado listado para comunicación de baja. */
@@ -422,6 +489,110 @@ export interface ComprobanteOrigenItem {
   fechaEmision: string;
   clienteRuc: string;
   clienteRazonSocial: string;
+}
+
+/** Detalle completo de una guía (incluye datosGuia JSON). */
+export interface GuiaDetalle extends GuiaEmitidaListItem {
+  /** Indica si existe XML firmado guardado (el cuerpo no se envía en JSON; use descargarXmlFirmadoGuia). */
+  tieneXmlFirmado?: boolean;
+  datosGuia?: {
+    tipoGuia?: string;
+    tipoDocumento?: string;
+    serie?: string;
+    fechaEmision?: string;
+    horaInicioTraslado?: string;
+    motivoTraslado?: string;
+    descripcionMotivo?: string;
+    modalidadTransporte?: string;
+    cantidadPeso?: number | null;
+    unidadMedidaPeso?: string;
+    emisorRuc?: string;
+    emisorNombre?: string;
+    dirOrigen?: string;
+    ubigeoOrigen?: string;
+    dirDestino?: string;
+    ubigeoDestino?: string;
+    tipoDocDestinatario?: string;
+    numDocDestinatario?: string;
+    nomDestinatario?: string;
+    telefonoDestinatario?: string;
+    placaVehiculo?: string;
+    placaSecundaria?: string;
+    tipoDocConductor?: string;
+    numeroDocConductor?: string;
+    nombreConductor?: string;
+    licenciaConductor?: string;
+    rucTransportista?: string;
+    razonSocialTransportista?: string;
+    items?: { codigo?: string; descripcion?: string; cantidad: number; unidad?: string }[];
+    observaciones?: string;
+    comprobanteOrigenSerie?: string;
+    comprobanteOrigenNumero?: string;
+    tipoComprobanteOrigen?: string;
+    rucEmisorDocumentoRelacionado?: string;
+  } | null;
+}
+
+/** Payload para POST /facturacion/guias/registrar. */
+export interface RegistrarGuiaPayload {
+  tipoGuia: 'REMITENTE' | 'TRANSPORTISTA';
+  motivoTraslado: string;
+  descripcionMotivo?: string;
+  fechaEmision: string;
+  horaInicioTraslado?: string;
+  cantidadPeso?: number | null;
+  unidadMedidaPeso?: string;
+  modalidadTransporte: string;
+  // Transporte privado
+  placaVehiculo?: string;
+  placaSecundaria?: string;
+  tipoDocConductor?: string;
+  numeroDocConductor?: string;
+  nombreConductor?: string;
+  licenciaConductor?: string;
+  // Transporte público
+  rucTransportista?: string;
+  razonSocialTransportista?: string;
+  // Origen / Destino
+  dirOrigen?: string;
+  ubigeoOrigen?: string;
+  dirDestino?: string;
+  ubigeoDestino?: string;
+  // Destinatario
+  tipoDocDestinatario?: string;
+  numDocDestinatario?: string;
+  nomDestinatario?: string;
+  // Comprobante origen
+  comprobanteOrigenSerie?: string;
+  comprobanteOrigenNumero?: string;
+  tipoComprobanteOrigen?: string;
+  /** RUC de quien emitió el comprobante relacionado (SUNAT 3380). Por defecto el backend usa el RUC de la empresa. */
+  rucEmisorDocumentoRelacionado?: string;
+  items?: { codigo?: string; descripcion?: string; cantidad: number; unidad?: string }[];
+  observaciones?: string;
+}
+
+/** Respuesta de POST /facturacion/guias/registrar. */
+export interface RegistrarGuiaResponse {
+  message: string;
+  advertencia?: string;
+  enviado?: boolean;
+  aceptado?: boolean;
+  data: {
+    idGuiaElectronica: string;
+    serie: string;
+    numero: string;
+    tipoDocumento: string;
+    tipoRol: string;
+    idEstadoSunat?: number | null;
+    descripcionEstado?: string;
+  };
+}
+
+/** Respuesta de PUT /facturacion/guias/:id. */
+export interface ActualizarGuiaResponse {
+  message: string;
+  data: RegistrarGuiaResponse['data'];
 }
 
 /** Fila de listado GET guias/emitidas. */

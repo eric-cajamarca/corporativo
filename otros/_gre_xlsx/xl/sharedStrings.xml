@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="352" uniqueCount="146"><si><t>Descripción</t></si><si><t>FORMATO DE ESPECIFICACION DE SERVICIO REST</t></si><si><t>Descripción del Recurso</t></si><si><t>Operación</t></si><si><t>Método HTTP</t></si><si><t>GET</t></si><si><t>URI pública</t></si><si><t>Valor</t></si><si><t>REQUEST</t></si><si><t>Request URI</t></si><si><t>Parámetros de   Entrada</t></si><si><t>Descripcion</t></si><si><t>Formato</t></si><si><t>Tipo dato</t></si><si><t>Condición</t></si><si><t>alfanumerico</t></si><si><t>string</t></si><si><t>Request Header</t></si><si><t>Parámetros</t></si><si><t>valor</t></si><si><t>Content-Type</t></si><si><t>application/json</t></si><si><t>Request Body</t></si><si><t>Ejemplo Request</t></si><si><t>JSON en el body</t></si><si><t>RESPONSE</t></si><si><t>Response Header</t></si><si><t>HTTP status</t></si><si><t>Response Body</t></si><si><t>Parámetros de Salida</t></si><si><t>Ejemplo JSON Response Body</t></si><si><t>Formato de mensaje de ERROR 500</t></si><si><t>Revisar la tabla de codigos de Error</t></si><si><t>cod</t></si><si><t>codigo de error(Revisar la tabla de codigos de Error)</t></si><si><t>String</t></si><si><t>msg</t></si><si><t>mensaje de error para el usuario</t></si><si><t>exc</t></si><si><t>traza del error</t></si><si><t>Ejemplo de Response</t></si><si><t>{
+  "cod":"500",
+  "msg":"Internal Server Error - Se presento una condicion inesperada que impidio completar el Request",
+  "exc":"java.lang.NullPointerException at ..." 
+ }</t></si><si><t>Formato de mensaje de ERROR 422</t></si><si><t xml:space="preserve"> </t></si><si><t>errors</t></si><si><t>array de errores y descripcion del error</t></si><si><t>Cuadro de mensajes de Error</t></si><si><t>campo</t></si><si><t>Validación</t></si><si><t>Ámbito</t></si><si><t>codigo y descripcion del mensaje de error</t></si><si><t>Validaciones de forma</t></si><si><t>RUC del contribuyente Emisor</t></si><si><t>M</t></si><si><t>codCpe</t></si><si><t>object</t></si><si><t>number</t></si><si><t>Validaciones de obligatoriedad</t></si><si><t>Validaciones de negocio</t></si><si><t>Obs</t></si><si><t>POST</t></si><si><t>Parámetros de Entrada</t></si><si><t>numSerie</t></si><si><t>numCpe</t></si><si><t>El valor no enviado o es vacio</t></si><si><t>numRucEmisor</t></si><si><t>numTicket</t></si><si><t>archivo</t></si><si><t>Solo se permite
+09: Guía de Remisión Remitente - Electrónica
+31: Guía de Remisión Transportista - Electrónica</t></si><si><t>Numero de serie de comprobante:
+Solo se permite:
+Si codCpe 09:
+T###
+Si codCpe 31:
+V###</t></si><si><t>archivo.nomArchivo</t></si><si><t>archivo.arcGreZip</t></si><si><t>archivo.hashZip</t></si><si><t>Base 64 del archivo zip enviado</t></si><si><t>fecRecepcion</t></si><si><t>Número de ticket (UUID) generado por el envío realizado.
+UUID se expresa mediante 32 dígitos hexadecimales divididos en cinco grupos separados por guiones de la forma 8-4-4-4-12. Ejemplo:
+550e8400-e29b-41d4-a716-446655440026</t></si><si><t>Date</t></si><si><t>Fecha de recepción de envío del comprobante.
+Formato: 'yyyy-mm-dd,'T','hh:ii:ss'</t></si><si><t>{
+    "numTicket": "7f7b00ab-4fee-4ae2-9e04-fbd16ca18677",
+    "fecRecepcion": "2022-04-11T15:37:41"
+}</t></si><si><t>El valor Hash no coincide con el archivo zip enviado</t></si><si><t>Hash del archivo zip enviado
+Debe calcularse el hash del archivo zip haciendo uso del algoritmo SHA-256.</t></si><si><t xml:space="preserve">Debe tener el siguiente formato:
+{numRucEmisor}-{codCpe}-{numSerie}-{numCpe}.zip
+La extension ".zip" en minusculas, y
+Debe coincidir con los datos del comprobante que viene en la URL del servicio.
+</t></si><si><t>El archivo ZIP esta vacío</t></si><si><t>El archivo ZIP esta corrupto</t></si><si><t>El archivo ZIP no tiene archivos</t></si><si><t>El archivo ZIP tiene más de un archivo</t></si><si><t>El archivo XML esta vacío</t></si><si><t>El nombre del archivo XML no coincide con el nombre del archivo ZIP</t></si><si><t>El nombre del archivo XML no tiene la estructura RRRRRRRRRRR-09-SSSS-NNNNNNNN.xml o RRRRRRRRRRR-31-SSSS-NNNNNNNN.XML
+(Donde: RRRRRRRRRR: RUC, SSSS: Serie, NNNNNNNN: Número)</t></si><si><t>alfanumerico (11)</t></si><si><t>alfanumerico (2)</t></si><si><t>alfanumerico (4)</t></si><si><t>numérico (1..8)</t></si><si><t>Número de comprobante
+De 1 hasta 8 valores numéricos</t></si><si><t>{
+    "archivo" : {
+        "nomArchivo" : "20480072872-31-VA28-407.zip",
+        "arcGreZip" : "UEsDBBQAAAAIAHd8i1QWA3AR2QwAAPVNAAAbAAAAMjA0ODAwNzI4NzItMzEtVkEyOC00MDcueG1s7RztcqM28Hc703dQ3T/tD59t",
+        "hashZip" : "bAAAAMjA0ODAwNzI4NzItMzEtVkEyOC00MDcueG1s7RztcqM28Hc703dQ3T/tD59t"
+    }
+}</t></si><si><t>Nombre del archivo zip enviado.
+Estructura: RRRRRRRRRRR-TT-SSSS-NNNNNNNN.zip
+Donde: 
+RRRRRRRRRR: Número de RUC, de 11 valores numéricos
+TT: Tipo de comprobante, solo se permite 09 y 31
+SSSS: Serie del comprobante, solo se permite T### y V###
+NNNNNNNN: Número de comprobante, se permite de 1 hasta 8 valores numéricos</t></si><si><t>Permite realizar la consulta del envío realizado</t></si><si><t>consultarTicket</t></si><si><t>alfanumerico (32)</t></si><si><t>codRespuesta</t></si><si><t>error</t></si><si><t>error.numError</t></si><si><t>error.desError</t></si><si><t>arcCdr</t></si><si><t>indCdrGenerado</t></si><si><t>Número de error encontrado para el envío realizado</t></si><si><t>Detalle del error encontrado para el envío realizado</t></si><si><t>Solo se generará este nodo si codRespuesta es 99</t></si><si><t>Base64 del CDR generado (Constancia de Recepción)
+Solo se generará este campo si codRespuesta es 0 o 99 e indCdrGenerado es 1</t></si><si><t>Codigo de respuesta.
+98: en proceso, 99: envío con error, 0: envío OK</t></si><si><t xml:space="preserve">Indicador de generación de CDR.
+1: Si genera CDR, 0: No genera CDR </t></si><si><t>response 1: Envío en proceso
+{
+  "codRespuesta": "98"
+}
+
+response 2: Envio ok 
+{
+  "codRespuesta": "0",
+  "arcCdr": "nhjn898bunun9niniini9",
+  "indCdrGenerado": "1"
+}
+
+response 3: Envío con Error, con generación de CDR
+{
+  "codRespuesta": "99",
+  "error": {
+    "numError":"2345",
+    "desError":"El RUC no valido"
+  },
+  "arcCdr": "nhjn898bunun9niniini9", 
+  "indCdrGenerado": "1"
+}
+
+response 4: Envío con Error, no genera CDR
+{
+  "codRespuesta": "99",
+  "error": {
+    "numError":"1345",
+    "desError":"El RUC no valido"
+  },
+  "indCdrGenerado": "0"
+}</t></si><si><t>0508 : Número de ticket no válido o no cumple con el formato establecido</t></si><si><t>El número de ticket no existe o no fue enviado por el RUC que realizó el envío</t></si><si><t>0509 : Número de ticket no existe o no fue enviado por el RUC que realizó el envío</t></si><si><t>Permite realizar el envío del comprobante</t></si><si><t>https://api-cpe.sunat.gob.pe/v1/contribuyente/gem/comprobantes/{numRucEmisor}-{codCpe}-{numSerie}-{numCpe}</t></si><si><t>https://api-cpe.sunat.gob.pe/v1/contribuyente/gem/comprobantes/envios/{numTicket}</t></si><si><t>Authorization</t></si><si><r><t>Bearer + token</t></r><r><rPr><sz val="8"/><color rgb="FF000000"/><rFont val="Arial"/><family val="2"/></rPr><t>(*)</t></r></si><si><t>(*) El token debe ser obtenido a través de la invocación del servicio api-seguridad descrito en el "Manual de servicios web Plataforma Nueva GRE"</t></si><si><t>Código y descripción del mensaje de error</t></si><si><t>Campo</t></si><si><t>Código de error(Revisar la tabla de codigos de Error)</t></si><si><t>Mensaje de error para el usuario</t></si><si><t>Array de errores y descripcion del error</t></si><si><t>{
+  "cod": 422,
+  "msg": "Unprocessable Entity - Se presentaron errores de validación que impidieron completar el Request",
+  "errors": [
+  {
+  "cod": 501,
+  "msg": "El valor de codCpe no permitido o no válido"
+  }
+  ]
+ }</t></si><si><t>501 : El valor de codCpe no permitido o no válido</t></si><si><t>502 : El valor de numSerie no permitido o no válido</t></si><si><t>503 : El campo nomArchivo no enviado o es vacío</t></si><si><t>504 : El campo nomArchivo no cumple con el formato establecido o nombre incorrecto</t></si><si><t>505 : El campo arcGreZip no enviado o es vacío</t></si><si><t>506 : El campo hashZip no enviado o es vacío</t></si><si><t>507 : El valor Hash no coincide con el archivo zip enviado</t></si><si><t>155 : El archivo ZIP esta vacio</t></si><si><t>156 : El archivo ZIP esta corrupto</t></si><si><t>157 : El archivo ZIP no contiene comprobantes</t></si><si><t>158 : El archivo ZIP contiene demasiados comprobantes para este tipo de envío</t></si><si><t>159 : El nombre del archivo XML es incorrecto</t></si><si><t>160 : El archivo XML esta vacio</t></si><si><t>161 : El nombre del archivo XML no coincide con el nombre del archivo ZIP</t></si><si><t>errors.cod</t></si><si><t>errors.msg</t></si><si><t>Código de error encontrado</t></si><si><t>Descripción de error encontrado</t></si><si><t>{
+  "cod": "422",
+  "msg": "Unprocessable Entity - Se presentaron errores de validación que impidieron completar el Request",
+  "exc": null,
+  "errors": [
+  {
+  "codError": "508",
+  "desError": "Número de ticket no válido o no cumple con el formato establecido"
+  }
+  ]
+ }</t></si></sst>

@@ -13,6 +13,22 @@
       </div>
     </div>
 
+    @if (cargandoEdicion) {
+      <div class="alert alert-info d-flex align-items-center mb-3">
+        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        Cargando guía para edición…
+      </div>
+    }
+    @if (idGuiaEdicion && !cargandoEdicion) {
+      <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <span class="small mb-0">
+          <i class="bi bi-pencil-square me-2"></i>
+          Editando <strong>{{ etiquetaEdicion }}</strong>. El correlativo no cambia. Después de guardar, envíe de nuevo a SUNAT desde <strong>Emisión de guías</strong>.
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-dark flex-shrink-0" (click)="salirModoEdicion()">Cancelar edición</button>
+      </div>
+    }
+
     @if (!autorizado) {
       <div class="alert alert-warning">
         <p class="mb-2">La emisión de guías electrónicas no está habilitada para su empresa.</p>
@@ -316,6 +332,14 @@
                 <label class="form-label">Razón social transportista</label>
                 <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.razonSocialTransportista" placeholder="Nombre de la empresa">
               </div>
+              <div class="col-md-2">
+                <label class="form-label">Placa vehículo principal <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.placaVehiculo" placeholder="SUNAT 2566" title="Obligatorio para GRE; se puede rellenar al elegir transportista si tiene placa registrada">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Placa secundaria</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.placaSecundaria" placeholder="Opcional">
+              </div>
             </div>
 
             <div class="row g-2 mt-2">
@@ -331,11 +355,15 @@
               Motivo según catálogo SUNAT. Peso: Kilogramo o Tonelada + cantidad. Conductor con DNI/pasaporte y licencia. Consulta DNI/RUC vía Factiliza.
             </div>
             <div class="btn-group">
-              <button class="btn btn-sm btn-primary" (click)="guardarGuia()">
-                <i class="bi bi-save me-1"></i> Guardar guía
+              <button class="btn btn-sm btn-primary" (click)="guardarGuia()" [disabled]="guardandoGuia || cargandoEdicion">
+                <span *ngIf="guardandoGuia" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <i *ngIf="!guardandoGuia" class="bi bi-save me-1"></i>
+                {{ guardandoGuia ? (idGuiaEdicion ? 'Actualizando...' : 'Registrando...') : (idGuiaEdicion ? 'Actualizar guía' : 'Guardar guía') }}
               </button>
-              <button class="btn btn-sm btn-outline-secondary" (click)="descargarPdf()">
-                <i class="bi bi-file-earmark-pdf me-1"></i> Descargar PDF
+              <button class="btn btn-sm btn-outline-secondary" (click)="descargarPdf()" [disabled]="generandoPdf || !ultimaGuiaRegistrada">
+                <span *ngIf="generandoPdf" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <i *ngIf="!generandoPdf" class="bi bi-file-earmark-pdf me-1"></i>
+                {{ generandoPdf ? 'Generando...' : 'Imprimir PDF A4' }}
               </button>
               <button class="btn btn-sm btn-success" (click)="enviarWhatsapp()">
                 <i class="bi bi-whatsapp me-1"></i> Enviar por WhatsApp

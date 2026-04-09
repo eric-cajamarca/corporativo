@@ -54,6 +54,7 @@ exports.obtenerConfiguracionFacturacionRepo = async (pool, idEmpresa) => {
         c.urlBaseApiGuias,
         c.idApiGuias,
         c.claveApiGuias,
+        ISNULL(c.rucApiGuias, e.ruc) AS rucApiGuias,
         e.ruc AS rucEmpresa
       FROM ConfiguracionFacturacionElectronica c
       LEFT JOIN Empresas e ON e.idEmpresa = c.idEmpresa
@@ -202,6 +203,7 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("urlBaseApiGuias", sql.VarChar, datos.urlBaseApiGuias || null)
       .input("idApiGuias", sql.VarChar, datos.idApiGuias || null)
       .input("claveApiGuias", sql.VarChar(256), claveApiGuiasVal)
+      .input("rucApiGuias", sql.VarChar(11), datos.rucApiGuias?.trim() || null)
       .query(`
         UPDATE ConfiguracionFacturacionElectronica
         SET certificadoDigital = @certificadoDigital,
@@ -227,7 +229,8 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
             usaGuiasElectronicas = @usaGuiasElectronicas,
             urlBaseApiGuias = @urlBaseApiGuias,
             idApiGuias = @idApiGuias,
-            claveApiGuias = @claveApiGuias
+            claveApiGuias = @claveApiGuias,
+            rucApiGuias = @rucApiGuias
         WHERE idEmpresa = @idEmpresa
       `);
   } else {
@@ -278,6 +281,7 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
       .input("urlBaseApiGuias", sql.VarChar, datos.urlBaseApiGuias || null)
       .input("idApiGuias", sql.VarChar, datos.idApiGuias || null)
       .input("claveApiGuias", sql.VarChar(256), claveApiGuiasNueva)
+      .input("rucApiGuias", sql.VarChar(11), datos.rucApiGuias?.trim() || null)
       .query(`
         INSERT INTO ConfiguracionFacturacionElectronica (
           idEmpresa, certificadoDigital, claveCertificado, usuarioSunat,
@@ -285,14 +289,14 @@ exports.actualizarConfiguracionFacturacionRepo = async (pool, user, datos) => {
           serieNotaCredito, serieNotaDebito, rutaCarpetaFacturadorSunat, urlFacturadorSunat,
           urlEnvio, envioDirectoSunat, envioAutomatico, minutosEnvioAutomatico, envioPorLotes, programacionEnvioLotes,
           modoEnvioSunat, horaEnvioSunat, useResumenDiarioBoletas, usaGuiasElectronicas,
-          urlBaseApiGuias, idApiGuias, claveApiGuias
+          urlBaseApiGuias, idApiGuias, claveApiGuias, rucApiGuias
         ) VALUES (
           @idEmpresa, @certificadoDigital, @claveCertificado, @usuarioSunat,
           @claveSunat, @modoPrueba, @serieFactura, @serieBoleta,
           @serieNotaCredito, @serieNotaDebito, @rutaCarpetaFacturadorSunat, @urlFacturadorSunat,
           @urlEnvio, @envioDirectoSunat, @envioAutomatico, @minutosEnvioAutomatico, @envioPorLotes, @programacionEnvioLotes,
           @modoEnvioSunat, CASE WHEN @horaEnvioSunat IS NULL OR LTRIM(RTRIM(@horaEnvioSunat)) = '' THEN NULL ELSE CAST(@horaEnvioSunat AS TIME) END, @useResumenDiarioBoletas, @usaGuiasElectronicas,
-          @urlBaseApiGuias, @idApiGuias, @claveApiGuias
+          @urlBaseApiGuias, @idApiGuias, @claveApiGuias, @rucApiGuias
         )
       `);
   }

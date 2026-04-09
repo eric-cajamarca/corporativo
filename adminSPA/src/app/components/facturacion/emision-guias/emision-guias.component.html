@@ -7,17 +7,15 @@
       <div>
         <h1 class="content-title mb-1">Emisión de guías</h1>
         <p class="content-subtitle text-muted mb-0">
-          Guías electrónicas emitidas (remitente y transportista). Use <strong>Agregar</strong> para registrar una nueva guía de remisión.
+          Guías electrónicas emitidas (remitente y transportista).
         </p>
       </div>
       <div class="d-flex flex-wrap gap-2 align-items-center">
         <a class="btn btn-success btn-sm" routerLink="/facturacion/guias-remision">
-          <i class="bi bi-plus-lg me-1"></i>
-          Agregar
+          <i class="bi bi-plus-lg me-1"></i> Agregar
         </a>
         <a class="btn btn-outline-primary btn-sm" routerLink="/facturacion/guias/configuracion">
-          <i class="bi bi-gear me-1"></i>
-          Configuración de guías electrónicas
+          <i class="bi bi-gear me-1"></i> Configuración
         </a>
       </div>
     </div>
@@ -25,81 +23,252 @@
     @if (!autorizado) {
       <div class="alert alert-warning">
         <p class="mb-2">La emisión de guías electrónicas no está habilitada.</p>
-        <p class="mb-0 small">Active la opción en <strong>Configuración</strong> → <strong>Facturación</strong> o use el botón de configuración de guías.</p>
+        <p class="mb-0 small">Active la opción en <strong>Configuración → Facturación</strong>.</p>
         <button type="button" class="btn btn-sm btn-primary mt-2" routerLink="/facturacion/guias/configuracion">
-          Ir a configuración de guías
+          Ir a configuración
         </button>
       </div>
     } @else {
       <div class="card shadow-sm">
-        <div class="card-body">
-          <p class="text-muted small mb-2" *ngIf="!loading">
-            Total: <strong>{{ total }}</strong> guía(s). Se muestran {{ pageSize }} por página.
-          </p>
+        <div class="card-body p-0">
 
-          @if (loading) {
-            <p class="text-muted mb-0"><i class="bi bi-hourglass-split"></i> Cargando...</p>
-          } @else if (items.length === 0) {
-            <div class="alert alert-info mb-0">
-              <i class="bi bi-info-circle me-2"></i>
-              No hay guías registradas. Cuando implemente el envío a SUNAT, las guías aparecerán aquí. Use <strong>Agregar</strong> para ir a guías de remisión.
+          <!-- Panel detalle inline -->
+          <div *ngIf="guiaSeleccionada" class="border-bottom bg-light p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="mb-0 fw-bold">
+                <i class="bi bi-info-circle me-2 text-primary"></i>
+                Detalle: {{ guiaSeleccionada.serie }}-{{ guiaSeleccionada.numero }}
+              </h6>
+              <button type="button" class="btn-close btn-sm" (click)="cerrarDetalle()"></button>
             </div>
-          } @else {
-            <div class="table-responsive">
-              <table class="table table-sm table-hover mb-0 table-guias">
-                <thead class="table-dark">
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Rol</th>
-                    <th>Serie-Número</th>
-                    <th>Fecha emisión</th>
-                    <th>Estado</th>
-                    <th>Doc. origen</th>
-                    <th>Ticket</th>
-                    <th class="text-end text-nowrap">
-                      <div class="d-inline-flex align-items-center gap-2 justify-content-end">
-                        <span>Acciones</span>
-                        <a class="btn btn-sm btn-success" routerLink="/facturacion/guias-remision" title="Nueva guía de remisión">
-                          <i class="bi bi-plus-lg"></i> Agregar
-                        </a>
+
+            <div class="row g-2 small">
+              <div class="col-md-6">
+                <div class="card h-100 border-0 shadow-sm">
+                  <div class="card-header bg-primary text-white py-1 small fw-bold">Datos del traslado</div>
+                  <div class="card-body py-2">
+                    <div class="row">
+                      <div class="col-6"><span class="text-muted">Tipo:</span> {{ etiquetaTipoDocumento(guiaSeleccionada.tipoDocumento) }}</div>
+                      <div class="col-6"><span class="text-muted">Fecha:</span> {{ guiaSeleccionada.fechaEmision.slice(0,10) }}</div>
+                      <div class="col-6 mt-1"><span class="text-muted">Motivo:</span> {{ guiaSeleccionada.datosGuia?.motivoTraslado }} {{ guiaSeleccionada.datosGuia?.descripcionMotivo }}</div>
+                      <div class="col-6 mt-1"><span class="text-muted">Modalidad:</span> {{ guiaSeleccionada.datosGuia?.modalidadTransporte === '01' ? 'Público' : 'Privado' }}</div>
+                      <div class="col-6 mt-1"><span class="text-muted">Peso:</span> {{ guiaSeleccionada.datosGuia?.cantidadPeso }} {{ guiaSeleccionada.datosGuia?.unidadMedidaPeso }}</div>
+                      <div class="col-6 mt-1"><span class="text-muted">Estado:</span> <span [class]="claseEstado(guiaSeleccionada)">{{ etiquetaEstado(guiaSeleccionada) }}</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card h-100 border-0 shadow-sm">
+                  <div class="card-header bg-secondary text-white py-1 small fw-bold">Destinatario y direcciones</div>
+                  <div class="card-body py-2">
+                    <div class="row">
+                      <div class="col-12"><span class="text-muted">Destinatario:</span> {{ guiaSeleccionada.datosGuia?.nomDestinatario }}</div>
+                      <div class="col-6 mt-1"><span class="text-muted">Doc.:</span> {{ guiaSeleccionada.datosGuia?.numDocDestinatario }}</div>
+                      <div class="col-12 mt-1"><span class="text-muted">Origen:</span> {{ guiaSeleccionada.datosGuia?.dirOrigen }}</div>
+                      <div class="col-12 mt-1"><span class="text-muted">Destino:</span> {{ guiaSeleccionada.datosGuia?.dirDestino }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <ng-container *ngIf="guiaSeleccionada.datosGuia?.modalidadTransporte === '02'">
+                <div class="col-md-6">
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-warning text-dark py-1 small fw-bold">Conductor / Vehículo</div>
+                    <div class="card-body py-2">
+                      <div class="row">
+                        <div class="col-6"><span class="text-muted">Conductor:</span> {{ guiaSeleccionada.datosGuia?.nombreConductor }}</div>
+                        <div class="col-6"><span class="text-muted">DNI:</span> {{ guiaSeleccionada.datosGuia?.numeroDocConductor }}</div>
+                        <div class="col-6 mt-1"><span class="text-muted">Licencia:</span> {{ guiaSeleccionada.datosGuia?.licenciaConductor || '—' }}</div>
+                        <div class="col-6 mt-1"><span class="text-muted">Placa:</span> {{ guiaSeleccionada.datosGuia?.placaVehiculo }}{{ guiaSeleccionada.datosGuia?.placaSecundaria ? ' / ' + guiaSeleccionada.datosGuia?.placaSecundaria : '' }}</div>
                       </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of items; track row.idGuiaElectronica) {
-                    <tr>
-                      <td>{{ etiquetaTipoDocumento(row.tipoDocumento) }}</td>
-                      <td>{{ row.tipoRol || '—' }}</td>
-                      <td><code class="small">{{ row.serie }}-{{ row.numero }}</code></td>
-                      <td>{{ row.fechaEmision || '—' }}</td>
-                      <td>{{ etiquetaEstado(row) }}</td>
-                      <td>{{ docOrigen(row) }}</td>
-                      <td><span class="small font-monospace">{{ row.ticketSunat || '—' }}</span></td>
-                      <td class="text-end">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Próximamente">
-                          <i class="bi bi-eye"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
 
-          <ngb-pagination
-            *ngIf="!loading && total > pageSize"
-            [(page)]="page"
-            [pageSize]="pageSize"
-            [collectionSize]="total"
-            [maxSize]="maxSize"
-            [rotate]="true"
-            [boundaryLinks]="true"
-            (pageChange)="onPageChange($event)"
-            class="d-flex justify-content-end mt-3 mb-0"
-            aria-label="Paginación guías">
-          </ngb-pagination>
+              <ng-container *ngIf="guiaSeleccionada.datosGuia?.modalidadTransporte === '01'">
+                <div class="col-md-6">
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-info text-white py-1 small fw-bold">Transportista</div>
+                    <div class="card-body py-2">
+                      <div><span class="text-muted">Razón social:</span> {{ guiaSeleccionada.datosGuia?.razonSocialTransportista }}</div>
+                      <div class="mt-1"><span class="text-muted">RUC:</span> {{ guiaSeleccionada.datosGuia?.rucTransportista }}</div>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <div class="col-12" *ngIf="guiaSeleccionada.datosGuia?.items?.length">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-header bg-dark text-white py-1 small fw-bold">Bienes trasladados</div>
+                  <div class="card-body p-0">
+                    <table class="table table-sm mb-0 small">
+                      <thead class="table-secondary">
+                        <tr><th>#</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>Unidad</th></tr>
+                      </thead>
+                      <tbody>
+                        @for (it of guiaSeleccionada.datosGuia?.items ?? []; track $index) {
+                          <tr>
+                            <td>{{ $index + 1 }}</td>
+                            <td>{{ it.codigo }}</td>
+                            <td>{{ it.descripcion }}</td>
+                            <td>{{ it.cantidad }}</td>
+                            <td>{{ it.unidad }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12" *ngIf="guiaSeleccionada.datosGuia?.observaciones">
+                <div class="alert alert-light py-2 mb-0 small">
+                  <strong>Observaciones:</strong> {{ guiaSeleccionada.datosGuia?.observaciones }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- /Panel detalle -->
+
+          <div class="p-3">
+            <p class="text-muted small mb-2" *ngIf="!loading">
+              Total: <strong>{{ total }}</strong> guía(s). Se muestran {{ pageSize }} por página.
+            </p>
+
+            @if (loading) {
+              <p class="text-muted mb-0"><i class="bi bi-hourglass-split"></i> Cargando...</p>
+            } @else if (items.length === 0) {
+              <div class="alert alert-info mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                No hay guías registradas. Use <strong>Agregar</strong> para crear una nueva guía de remisión.
+              </div>
+            } @else {
+              <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                  <thead class="table-dark">
+                    <tr>
+                      <th>Tipo</th>
+                      <th>Rol</th>
+                      <th>Serie-Número</th>
+                      <th>Fecha</th>
+                      <th>Estado</th>
+                      <th>Doc. origen</th>
+                      <th class="text-end text-nowrap">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of items; track row.idGuiaElectronica) {
+                      <tr [class.table-active]="guiaSeleccionada?.idGuiaElectronica === row.idGuiaElectronica">
+                        <td class="small">{{ etiquetaTipoDocumento(row.tipoDocumento) }}</td>
+                        <td class="small">{{ row.tipoRol || '—' }}</td>
+                        <td><code class="small">{{ row.serie }}-{{ row.numero }}</code></td>
+                        <td class="small">{{ row.fechaEmision.slice(0,10) || '—' }}</td>
+                        <td><span [class]="claseEstado(row)">{{ etiquetaEstado(row) }}</span></td>
+                        <td class="small">{{ docOrigen(row) }}</td>
+                        <td class="text-end text-nowrap">
+                          <!-- Editar: pendiente o error -->
+                          <a
+                            *ngIf="esEditable(row)"
+                            class="btn btn-sm btn-outline-warning me-1"
+                            [routerLink]="['/facturacion/guias-remision']"
+                            [queryParams]="{ editar: row.idGuiaElectronica }"
+                            title="Editar datos de la guía (mismo correlativo)">
+                            <i class="bi bi-pencil"></i>
+                          </a>
+
+                          <!-- Enviar: solo si pendiente/error -->
+                          <button
+                            *ngIf="esPendiente(row)"
+                            type="button"
+                            class="btn btn-sm btn-outline-primary me-1"
+                            (click)="enviar(row)"
+                            [disabled]="enviandoId === row.idGuiaElectronica"
+                            title="Enviar a SUNAT">
+                            <span *ngIf="enviandoId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
+                            <i *ngIf="enviandoId !== row.idGuiaElectronica" class="bi bi-send"></i>
+                          </button>
+
+                          <!-- Consultar ticket: solo si EN_PROCESO -->
+                          <button
+                            *ngIf="esEnProceso(row)"
+                            type="button"
+                            class="btn btn-sm btn-warning me-1"
+                            (click)="consultarTicket(row)"
+                            [disabled]="consultandoTicketId === row.idGuiaElectronica"
+                            title="Consultar estado en SUNAT">
+                            <span *ngIf="consultandoTicketId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
+                            <i *ngIf="consultandoTicketId !== row.idGuiaElectronica" class="bi bi-arrow-clockwise"></i>
+                          </button>
+
+                          <!-- Ver detalle -->
+                          <button
+                            type="button"
+                            class="btn btn-sm me-1"
+                            [class.btn-info]="guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica"
+                            [class.btn-secondary]="guiaSeleccionada?.idGuiaElectronica === row.idGuiaElectronica"
+                            (click)="verDetalle(row)"
+                            [disabled]="cargandoDetalle"
+                            title="Ver detalle">
+                            <span *ngIf="cargandoDetalle && guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
+                            <i *ngIf="!(cargandoDetalle && guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica)" class="bi bi-eye"></i>
+                          </button>
+
+                          <!-- Imprimir PDF A4 -->
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary me-1"
+                            (click)="imprimirPdf(row)"
+                            [disabled]="imprimiendoId === row.idGuiaElectronica"
+                            title="Imprimir A4">
+                            <span *ngIf="imprimiendoId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
+                            <i *ngIf="imprimiendoId !== row.idGuiaElectronica" class="bi bi-printer"></i>
+                          </button>
+
+                          <!-- WhatsApp -->
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-success me-1"
+                            (click)="enviarWhatsapp(row)"
+                            title="Enviar por WhatsApp">
+                            <i class="bi bi-whatsapp"></i>
+                          </button>
+
+                          <!-- Eliminar: solo si no está aceptada -->
+                          <button
+                            *ngIf="row.idEstadoSunat !== 1"
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            (click)="eliminar(row)"
+                            [disabled]="eliminandoId === row.idGuiaElectronica"
+                            title="Eliminar">
+                            <span *ngIf="eliminandoId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
+                            <i *ngIf="eliminandoId !== row.idGuiaElectronica" class="bi bi-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+
+            <ngb-pagination
+              *ngIf="!loading && total > pageSize"
+              [(page)]="page"
+              [pageSize]="pageSize"
+              [collectionSize]="total"
+              [maxSize]="maxSize"
+              [rotate]="true"
+              [boundaryLinks]="true"
+              (pageChange)="onPageChange($event)"
+              class="d-flex justify-content-end mt-3 mb-0"
+              aria-label="Paginación guías">
+            </ngb-pagination>
+          </div>
+
         </div>
       </div>
     }

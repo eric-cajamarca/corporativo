@@ -230,6 +230,12 @@ app.listen(PORT, () => {
     const envioSunatJob = require('./jobs/envioSunat.job');
     envioSunatJob.iniciar();
   } catch (e) {
-    console.error('No se pudo iniciar job env?o autom?tico SUNAT:', e.message);
+    console.error('No se pudo iniciar job envío automático SUNAT:', e.message);
+  }
+  try {
+    const guiasTicketJob = require('./jobs/guiasTicket.job');
+    guiasTicketJob.iniciar();
+  } catch (e) {
+    console.error('No se pudo iniciar job guiasTicket:', e.message);
   }
 });

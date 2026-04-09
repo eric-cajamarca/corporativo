@@ -9,12 +9,15 @@ const { SignedXml } = require("xml-crypto");
 const crypto = require("crypto");
 
 const XPATH_EXTENSION_CONTENT = "//*[local-name()='ExtensionContent']";
-/** Raíz UBL / SUNAT-PE: comprobantes (Invoice, CreditNote, DebitNote) + RA (VoidedDocuments) + RC (SummaryDocuments). */
+/** Raíz UBL / SUNAT-PE: comprobantes + RA + RC + GRE (DespatchAdvice). */
 const XPATH_DOCUMENTO_UBL =
-  "//*[local-name()='Invoice' or local-name()='CreditNote' or local-name()='DebitNote' or local-name()='VoidedDocuments' or local-name()='SummaryDocuments']";
-// SUNAT: Reference URI=""; transforms enveloped-signature + C14N 20010315; SHA1/RSA-SHA1
+  "//*[local-name()='Invoice' or local-name()='CreditNote' or local-name()='DebitNote' or local-name()='VoidedDocuments' or local-name()='SummaryDocuments' or local-name()='DespatchAdvice']";
+// SUNAT: Reference URI=""; transforms enveloped-signature + C14N 20010315; SHA1/RSA-SHA1 (facturación histórica)
 const ALGORITHM_SHA1 = "http://www.w3.org/2000/09/xmldsig#sha1";
 const ALGORITHM_RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+// GRE / recomendación SUNAT: digest y firma RSA-SHA256
+const ALGORITHM_SHA256 = "http://www.w3.org/2001/04/xmlenc#sha256";
+const ALGORITHM_RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
 const TRANSFORM_ENVELOPED = "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
 const CANONICALIZATION_FACTURADOR = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315";
 
@@ -63,18 +66,22 @@ function extraerCertificadoDePfx(pfxBuffer, password) {
 }
 
 /**
- * Firma un XML UBL (comprobantes + comunicación de baja RA + resumen diario RC) y devuelve el XML con la firma insertada en ExtensionContent.
+ * Firma un XML UBL (comprobantes + RA + RC + guía GRE DespatchAdvice) y devuelve el XML con la firma en ExtensionContent.
  * Estructura alineada con Facturador SUNAT: Reference URI="" (todo el documento), Id="SignSUNAT" en la firma,
- * Transforms: enveloped-signature + C14N 20010315 (digest coherente con validadores), SHA1/RSA-SHA1.
+ * Transforms: enveloped-signature + C14N 20010315 (digest coherente con validadores), SHA1/RSA-SHA1 por defecto.
  * @param {string} xmlUbl - XML UBL completo (sin firma en ExtensionContent)
  * @param {Buffer} certificadoContenido - Buffer del archivo .pfx
  * @param {string} claveCertificado - Contraseña del PFX
+ * @param {{ useSha256?: boolean }} [options] - useSha256: true para GRE (recomendación SUNAT)
  * @returns {string} XML firmado (firma dentro de ext:ExtensionContent)
  */
-function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
+function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado, options = {}) {
   if (!xmlUbl || !certificadoContenido || !claveCertificado) {
     throw new Error("XML, certificado y clave son requeridos para firmar");
   }
+  const useSha256 = Boolean(options.useSha256);
+  const digestAlgorithm = useSha256 ? ALGORITHM_SHA256 : ALGORITHM_SHA1;
+  const signatureAlgorithm = useSha256 ? ALGORITHM_RSA_SHA256 : ALGORITHM_RSA_SHA1;
   const privateKeyPem = extraerClavePrivadaDePfx(
     certificadoContenido,
     claveCertificado
@@ -83,7 +90,7 @@ function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
   const sig = new SignedXml({
     privateKey: privateKeyPem,
     publicCert: publicCertPem || undefined,
-    signatureAlgorithm: ALGORITHM_RSA_SHA1,
+    signatureAlgorithm,
     canonicalizationAlgorithm: CANONICALIZATION_FACTURADOR
   });
   // Reference URI="": debe aplicarse enveloped-signature y luego C14N 20010315 sobre el resultado.
@@ -93,7 +100,7 @@ function firmarXmlUbl(xmlUbl, certificadoContenido, claveCertificado) {
     xpath: XPATH_DOCUMENTO_UBL,
     uri: "",
     isEmptyUri: true,
-    digestAlgorithm: ALGORITHM_SHA1,
+    digestAlgorithm,
     transforms: [TRANSFORM_ENVELOPED, CANONICALIZATION_FACTURADOR]
   });
   sig.computeSignature(xmlUbl, {

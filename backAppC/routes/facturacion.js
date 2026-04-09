@@ -37,8 +37,16 @@ router.post('/comunicacion-baja/:idComunicacionBaja/consultar-estado', facturaci
 router.post('/enviar-lote', facturacionController.enviarLoteSunat);
 router.get('/comprobantes/:idComprobanteElectronico/estado', facturacionController.consultarEstadoSunat);
 
-// Guías electrónicas emitidas (listado paginado)
+// Guías electrónicas
+router.post('/guias/registrar', facturacionController.registrarGuia);
+router.put('/guias/:id', facturacionController.actualizarGuia);
 router.get('/guias/emitidas', facturacionController.listarGuiasEmitidas);
+router.get('/guias/:id/ticket', facturacionController.consultarTicketGuia);
+router.get('/guias/:id/preview-xml', facturacionController.previewXmlGuia);
+router.get('/guias/:id/xml-firmado', facturacionController.descargarXmlFirmadoGuia);
+router.get('/guias/:id', facturacionController.obtenerGuia);
+router.post('/guias/:id/enviar', facturacionController.reenviarGuia);
+router.delete('/guias/:id', facturacionController.eliminarGuia);
 
 // Resumen diario (RC)
 router.get('/resumenes-diarios', facturacionController.listarResumenesDiarios);
