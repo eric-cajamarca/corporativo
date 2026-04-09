@@ -417,7 +417,9 @@ function completarUbigeosGreLegacy(d) {
       d.ubigeoDest,
       d.codUbigeoDestino,
       d.ubigeo_destinatario,
-      d.ubigeoDestinoCliente
+      d.ubigeoDestinoCliente,
+      d.ubigeoCliente,
+      d.destinatarioUbigeo
     );
     if (fromAlt) d.ubigeoDestino = fromAlt;
   }
@@ -445,8 +447,45 @@ function partirNombrePersonaGre(nombreCompleto) {
   const s = String(nombreCompleto || "").trim().replace(/\s+/g, " ");
   if (!s) return { firstName: "", familyName: "" };
   const parts = s.split(" ");
-  if (parts.length === 1) return { firstName: parts[0], familyName: parts[0] };
+  if (parts.length === 1) return { firstName: parts[0], familyName: "" };
   return { firstName: parts[0], familyName: parts.slice(1).join(" ") };
+}
+
+function textoUbicacionGre(val) {
+  const t = String(val || "").trim();
+  if (!t) return "";
+  // Evita enviar códigos numéricos en campos descriptivos (CityName, District, etc.).
+  if (/^\d+$/.test(t)) return "";
+  return t;
+}
+
+/**
+ * SUNAT GRE: IssueTime en formato HH:mm:ss.
+ * Acepta HH:mm, HH:mm:ss o HH:mm:ss con zona y siempre normaliza sin zona.
+ */
+function normalizarIssueTimeGre(val) {
+  const raw = String(val == null ? "" : val).trim();
+  if (!raw) return "00:00:00";
+  const m = raw.match(/^(\d{2}):(\d{2})(?::(\d{2}))?(?:([zZ]|[+\-]\d{2}:\d{2}))?$/);
+  if (!m) return "00:00:00";
+  const hh = m[1];
+  const mm = m[2];
+  const ss = m[3] || "00";
+  return `${hh}:${mm}:${ss}`;
+}
+
+/**
+ * Normaliza licencia del conductor para GRE.
+ * Evita enviar DNI u otros valores inválidos en IdentityDocumentReference (SUNAT 2573).
+ */
+function normalizarLicenciaConductorGre(licenciaRaw, numeroDocConductorRaw) {
+  const lic = String(licenciaRaw || "").toUpperCase().replace(/[^A-Z0-9]/g, "").trim();
+  if (!lic) return "";
+  const docNum = String(numeroDocConductorRaw || "").replace(/\D/g, "").trim();
+  if (/^\d{8}$/.test(lic)) return "";
+  if (docNum && lic === docNum) return "";
+  if (lic.length < 9 || lic.length > 15) return "";
+  return lic;
 }
 
 /**
@@ -493,6 +532,28 @@ function fusionarDatosGuiaParaDetalle(row, empresa) {
   }
   completarUbigeosGreLegacy(base);
   return base;
+}
+
+/**
+ * Si falta ubigeo destino en una guía ya guardada, intenta recuperarlo
+ * del comprobante origen (cliente/dirección cliente) para reenvío GRE.
+ */
+async function completarUbigeoDestinoDesdeComprobanteOrigen(pool, idEmpresa, d) {
+  if (!d || typeof d !== "object") return;
+  if (ubigeoValidoGre(d.ubigeoDestino)) return;
+  const serie = String(d.comprobanteOrigenSerie || "").trim();
+  const numero = String(d.comprobanteOrigenNumero || "").trim();
+  if (!serie || !numero) return;
+  try {
+    const origen = await facturacionRepo.obtenerComprobanteOrigenParaGuiaRepo(pool, idEmpresa, serie, numero);
+    if (!origen || typeof origen !== "object") return;
+    const ubigeo = ubigeoValidoGre(origen.ubigeoCliente);
+    if (ubigeo) {
+      d.ubigeoDestino = ubigeo;
+    }
+  } catch (error) {
+    console.error("guiaElectronica.service completarUbigeoDestinoDesdeComprobanteOrigen:", error);
+  }
 }
 
 /**
@@ -599,11 +660,11 @@ function emisorFiscalDesdeEmpresaGre(empresa) {
 function registrationAddressEmisorGreXml(em) {
   if (!em || typeof em !== "object") return "";
   const ug = ubigeoValidoGre(em.ubigeo) || "";
-  const dep = String(em.departamento || "").trim();
-  const prov = String(em.provincia || "").trim();
-  const dist = String(em.distrito || "").trim();
+  const dep = textoUbicacionGre(em.departamento);
+  const prov = textoUbicacionGre(em.provincia);
+  const dist = textoUbicacionGre(em.distrito);
   const dir = String(em.direccion || "").trim();
-  const urb = String(em.urbanizacion || "").trim();
+  const urb = textoUbicacionGre(em.urbanizacion);
   if (!ug && !dep && !prov && !dist && !dir && !urb) return "";
   const lineText = dir ? (urb ? `${urb} — ${dir}` : dir) : urb || "-";
   const subCode = ug || "000000";
@@ -646,11 +707,7 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
   const tipoDoc = d.tipoDocumento || "09";   // "09" remitente, "31" transportista
   const numStr  = String(numero).padStart(8, "0");
   const idDoc   = `${serie}-${numStr}`;
-  const hora    = (() => {
-    const raw = String(d.horaInicioTraslado ?? "00:00:00").trim();
-    const h = raw || "00:00:00";
-    return h.length === 5 ? `${h}:00` : h;
-  })();
+  const hora    = normalizarIssueTimeGre(d.horaInicioTraslado);
   const modalidadGre = normalizarModalidadTransporteGre(d.modalidadTransporte);
   const esPrivado = modalidadGre === "02";
   const startTrasladoYmd =
@@ -667,7 +724,13 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
       : "false";
   const ubigeoDestNorm = ubigeoValidoGre(d.ubigeoDestino);
   const ubigeoOriNorm  = ubigeoValidoGre(d.ubigeoOrigen);
-  const regAddrEmisorXml = registrationAddressEmisorGreXml(emisorFiscal);
+  const emisorFiscalConFallbackUbigeo = {
+    ...(emisorFiscal && typeof emisorFiscal === "object" ? emisorFiscal : {}),
+    ubigeo:
+      ubigeoValidoGre(emisorFiscal?.ubigeo) ||
+      ubigeoOriNorm
+  };
+  const regAddrEmisorXml = registrationAddressEmisorGreXml(emisorFiscalConFallbackUbigeo);
 
   // ── Comprobante origen (SUNAT 3380: RUC emisor del documento relacionado en IssuerParty, UBL DocumentReference) ──
   const rucEmisorDocRelacionado =
@@ -705,14 +768,16 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
         <cbc:StartDate>${x(startTrasladoYmd)}</cbc:StartDate>
       </cac:TransitPeriod>`;
 
-  if (!esPrivado && d.rucTransportista) {
+  // SUNAT regla GRE: CarrierParty corresponde a transporte público (01), no a privado (02).
+  const rucCarrier = String(d.rucTransportista || "").trim();
+  if (!esPrivado && rucCarrier) {
     transXml += `
       <cac:CarrierParty>
         <cac:PartyIdentification>
-          <cbc:ID schemeAgencyName="PE:SUNAT" schemeName="RUC" schemeID="6">${x(d.rucTransportista)}</cbc:ID>
+          <cbc:ID schemeAgencyName="PE:SUNAT" schemeName="RUC" schemeID="6">${x(rucCarrier)}</cbc:ID>
         </cac:PartyIdentification>
         <cac:PartyLegalEntity>
-          <cbc:RegistrationName>${x(d.razonSocialTransportista || "")}</cbc:RegistrationName>
+          <cbc:RegistrationName>${x(d.razonSocialTransportista || razonSocialEmisor || "")}</cbc:RegistrationName>
         </cac:PartyLegalEntity>
       </cac:CarrierParty>`;
   }
@@ -731,9 +796,9 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
   // UBL 2.1 PersonType (DriverPerson): ID = documento; licencia en cac:IdentityDocumentReference/cbc:ID; JobTitle = cargo.
   if (esPrivado && d.numeroDocConductor) {
     const schemeConductor = { "4": "4", "7": "7" }[d.tipoDocConductor] || "1";
-    const docNum = String(d.numeroDocConductor || "").trim();
+    const docNum = String(d.numeroDocConductor || "").replace(/\D/g, "").trim();
     const { firstName, familyName } = partirNombrePersonaGre(d.nombreConductor);
-    const lic = String(d.licenciaConductor || "").trim();
+    const lic = normalizarLicenciaConductorGre(d.licenciaConductor, docNum);
     const idAttrs = ` schemeAgencyName="PE:SUNAT" schemeID="${schemeConductor}" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"`;
     const licXml = lic
       ? `
@@ -745,8 +810,8 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
       <cac:DriverPerson>
         <cbc:ID${idAttrs}>${x(docNum)}</cbc:ID>
         <cbc:FirstName>${x(firstName)}</cbc:FirstName>
-        <cbc:FamilyName>${x(familyName)}</cbc:FamilyName>
-        <cbc:JobTitle>CONDUCTOR</cbc:JobTitle>${licXml}
+        <cbc:FamilyName>${x(familyName || "-")}</cbc:FamilyName>
+        <cbc:JobTitle>Principal</cbc:JobTitle>${licXml}
       </cac:DriverPerson>`;
   }
 
@@ -757,6 +822,23 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
       <cbc:ID>${x(ubigeoDestNorm)}</cbc:ID>
     </cac:FirstArrivalPortLocation>`
     : "";
+
+  // Estructura adicional de vehículo principal en Shipment (compatible con XSD UBL 2.1):
+  // Shipment -> TransportHandlingUnit -> TransportEquipment/ID + TransportMeans/RoadTransport/LicensePlateID.
+  const transportHandlingUnitXml =
+    String(tipoDoc || "09").trim() === "09" && placaPrincipal
+      ? `
+    <cac:TransportHandlingUnit>
+      <cac:TransportEquipment>
+        <cbc:ID>${x(placaPrincipal)}</cbc:ID>
+      </cac:TransportEquipment>
+      <cac:TransportMeans>
+        <cac:RoadTransport>
+          <cbc:LicensePlateID>${x(placaPrincipal)}</cbc:LicensePlateID>
+        </cac:RoadTransport>
+      </cac:TransportMeans>
+    </cac:TransportHandlingUnit>`
+      : "";
 
   // ── Líneas de detalle ──────────────────────────────────────
   const items = Array.isArray(d.items) && d.items.length > 0
@@ -837,7 +919,7 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
           <cbc:Line>${x(d.dirDestino || "")}</cbc:Line>
         </cac:AddressLine>
       </cac:DeliveryAddress>
-    </cac:Delivery>
+    </cac:Delivery>${transportHandlingUnitXml}
     <cac:OriginAddress>
       <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI">${x(ubigeoOriNorm)}</cbc:ID>
       <cbc:StreetName>${x(d.dirOrigen || "")}</cbc:StreetName>
@@ -1340,6 +1422,7 @@ exports.previewXmlGuiaService = async (pool, user, idGuiaElectronica, options = 
   }
 
   const d = fusionarDatosGuiaParaDetalle(guia, empresa);
+  await completarUbigeoDestinoDesdeComprobanteOrigen(pool, idEmpresa, d);
   if (!normalizarFechaEmisionGreYmd(d.fechaEmision) && guia.fechaEmision) {
     d.fechaEmision = guia.fechaEmision;
   }
@@ -1417,6 +1500,7 @@ exports.reenviarGuiaService = async (pool, user, idGuiaElectronica) => {
   }
 
   const d = fusionarDatosGuiaParaDetalle(guia, empresa);
+  await completarUbigeoDestinoDesdeComprobanteOrigen(pool, idEmpresa, d);
   if (!normalizarFechaEmisionGreYmd(d.fechaEmision) && guia.fechaEmision) {
     d.fechaEmision = guia.fechaEmision;
   }

@@ -99,14 +99,20 @@ const listarDireccionesClientes_idCliente = async function (req, res) {
     
     if (req.user) {
         if (req.user.rol == 'Administrador') {
-            //aqui permito que todas las empresas puedan ver las direcciones de los clientes
             try {
-                // let idEmpresa = req.user.empresa;
+                const idEmpresa = req.user.empresa;
 
                 let pool = await sql.connect(dbConfig);
                 let listaDireccionClientes = await pool.request()
+                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                     .input('idCliente', sql.Int, idCliente)
-                    .query('select * from DireccionClientes where idCliente = @idCliente');
+                    .query(`
+                      SELECT *
+                      FROM DireccionClientes
+                      WHERE idEmpresa = @idEmpresa
+                        AND idCliente = @idCliente
+                      ORDER BY CASE WHEN principal = 1 THEN 0 ELSE 1 END, idDireccionClientes ASC
+                    `);
 
                 
                 res.status(200).send({ message: 'Lista de DireccionClientes', data: listaDireccionClientes.recordset });

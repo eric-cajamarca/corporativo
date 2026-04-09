@@ -703,10 +703,33 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
     numeroLinea: idx + 1,
     unidad: it.unidad || "NIU"
   }));
+  let ubigeoCliente = "";
+  const idCliente = payload.venta?.idCliente != null ? Number(payload.venta.idCliente) : null;
+  if (idCliente != null && Number.isFinite(idCliente) && idCliente > 0) {
+    try {
+      const dirClienteResult = await pool
+        .request()
+        .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+        .input("idCliente", sql.Int, idCliente)
+        .query(`
+          SELECT TOP 1
+            ISNULL(dc.ubigeo, '') AS ubigeo
+          FROM DireccionClientes dc
+          WHERE dc.idEmpresa = @idEmpresa
+            AND dc.idCliente = @idCliente
+          ORDER BY CASE WHEN dc.principal = 1 THEN 0 ELSE 1 END, dc.idDireccionClientes ASC
+        `);
+      const dirRow = dirClienteResult.recordset && dirClienteResult.recordset[0];
+      ubigeoCliente = dirRow?.ubigeo != null ? String(dirRow.ubigeo).trim() : "";
+    } catch (error) {
+      console.error("facturacion.repository obtenerComprobanteOrigenParaGuiaRepo ubigeoCliente:", error);
+    }
+  }
 
   return {
     idComprobanteElectronico: ce ? ce.idComprobanteElectronico : null,
     idVenta,
+    idCliente: payload.venta?.idCliente != null ? Number(payload.venta.idCliente) : null,
     tipoComprobante: tipoComprobante || "01",
     serie: venta.serie || serieStr,
     numero: venta.numero || numeroNorm,
@@ -718,6 +741,7 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
     rucCliente: cliente.ruc || "",
     total: venta.total,
     clienteDireccion: cliente.direccion || "",
+    ubigeoCliente,
     rucEmpresa: (empresa && empresa.ruc) ? empresa.ruc : "",
     rucEmisor: (empresa && empresa.ruc) ? empresa.ruc : "",
     items: itemsWithMeta

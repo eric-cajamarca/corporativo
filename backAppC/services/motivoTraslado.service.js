@@ -35,4 +35,4 @@ async function eliminar(pool, idMotivoTraslado, idEmpresa) {
     await motivoTrasladoRepository.eliminar(pool, idMotivoTraslado, idEmpresa);
 }
 
-module.exports = { listar, obtenerPorId, crear, actualizar, eliminar };
+module.exports = { listarCodigosSunat, listar, obtenerPorId, crear, actualizar, eliminar };

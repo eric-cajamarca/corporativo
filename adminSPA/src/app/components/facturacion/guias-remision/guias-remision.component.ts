@@ -10,6 +10,7 @@ import {
 } from '../../../services/facturacion.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { FactilizaService } from '../../../services/factiliza.service';
+import { ClienteService } from '../../../services/cliente.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { EnviosService } from '../../../services/envios.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -67,6 +68,71 @@ function extraerNumeroLicenciaConductor(raw: unknown): string {
   return extraerNumeroLicenciaDesdeObjeto(inner, 0);
 }
 
+/**
+ * Construye nombre completo priorizando nombres + apellidos del DNI.
+ * Si el proveedor no envía partes separadas, usa nombre como fallback.
+ */
+function extraerNombreCompletoDesdeDni(raw: unknown): string {
+  const normalizarTexto = (value: unknown): string => {
+    const txt = String(value ?? '').replace(/\s+/g, ' ').trim();
+    return txt;
+  };
+
+  const tomarPrimero = (obj: Record<string, unknown>, keys: string[]): string => {
+    for (const key of keys) {
+      const val = obj[key];
+      if (typeof val === 'string' || typeof val === 'number') {
+        const limpio = normalizarTexto(val);
+        if (limpio) return limpio;
+      }
+    }
+    return '';
+  };
+
+  const extraerDesdeObjeto = (obj: Record<string, unknown>, depth: number): string => {
+    if (depth > 6) return '';
+
+    const apellidoPaterno = tomarPrimero(obj, ['apellidoPaterno', 'apellido_paterno', 'paterno', 'ApellidoPaterno']);
+    const apellidoMaterno = tomarPrimero(obj, ['apellidoMaterno', 'apellido_materno', 'materno', 'ApellidoMaterno']);
+    const nombres = tomarPrimero(obj, ['nombres', 'Nombres', 'prenombres']);
+    const compuesto = [nombres, apellidoPaterno, apellidoMaterno].filter(Boolean).join(' ').trim();
+    if (compuesto) return compuesto;
+
+    const nombreCompleto = tomarPrimero(obj, ['nombreCompleto', 'nombre_completo', 'fullName', 'nombre', 'razonSocial']);
+    if (nombreCompleto) return nombreCompleto;
+
+    // Factiliza puede devolver payload en data/resultado/result/persona u otros objetos anidados.
+    const nestedKeys = ['data', 'resultado', 'result', 'persona', 'reniec', 'cliente'];
+    for (const key of nestedKeys) {
+      const nested = obj[key];
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        const nombre = extraerDesdeObjeto(nested as Record<string, unknown>, depth + 1);
+        if (nombre) return nombre;
+      }
+    }
+
+    for (const val of Object.values(obj)) {
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        const nombre = extraerDesdeObjeto(val as Record<string, unknown>, depth + 1);
+        if (nombre) return nombre;
+      }
+      if (Array.isArray(val)) {
+        for (const item of val) {
+          if (item && typeof item === 'object') {
+            const nombre = extraerDesdeObjeto(item as Record<string, unknown>, depth + 1);
+            if (nombre) return nombre;
+          }
+        }
+      }
+    }
+    return '';
+  };
+
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!o) return '';
+  return extraerDesdeObjeto(o, 0);
+}
+
 /** Tipos de documento SUNAT (catálogo 06): 1=DNI, 6=RUC, 7=Pasaporte */
 const TIPOS_DOC = [
   { value: '1', label: 'DNI' },
@@ -100,6 +166,7 @@ export class GuiasRemisionComponent implements OnInit {
   private facturacionService = inject(FacturacionService);
   private empresaService = inject(EmpresaService);
   private factilizaService = inject(FactilizaService);
+  private clienteService = inject(ClienteService);
   private catalogosService = inject(CatalogosService);
   private enviosService = inject(EnviosService);
   private pdfService = inject(PdfService);
@@ -305,12 +372,18 @@ export class GuiasRemisionComponent implements OnInit {
 
     const ubiO = String(d.ubigeoOrigen || '').replace(/\D/g, '');
     const dirO = (d.dirOrigen || '').trim();
+    const origenMatchExacto = this.direccionesEmpresa.find(
+      (x: any) =>
+        String(x.ubigeo || '')
+          .replace(/\D/g, '') === ubiO && String(x.direccion || '').trim() === dirO
+    );
+    const origenMatchDireccion = this.direccionesEmpresa.find(
+      (x: any) => String(x.direccion || '').trim() === dirO
+    );
     this.direccionOrigenSeleccionada =
-      this.direccionesEmpresa.find(
-        (x: any) =>
-          String(x.ubigeo || '')
-            .replace(/\D/g, '') === ubiO && String(x.direccion || '').trim() === dirO
-      ) || (dirO ? { direccion: dirO, ubigeo: ubiO, referencia: 'Desde guía guardada' } : null);
+      origenMatchExacto ||
+      origenMatchDireccion ||
+      (dirO ? { direccion: dirO, ubigeo: ubiO, referencia: 'Desde guía guardada' } : null);
 
     const ubiD = String(d.ubigeoDestino || '').replace(/\D/g, '');
     const dirD = (d.dirDestino || '').trim();
@@ -345,16 +418,47 @@ export class GuiasRemisionComponent implements OnInit {
           next: (res: any) => {
             if (res?.data) {
               this.comprobanteOrigen = res.data;
+              this.cargarDireccionesDestinoLocal(res.data);
+              this.prefillDestinatarioDesdeComprobante(res.data);
+              this.intentarAutocompletarUbigeoOrigen();
             } else {
               this.comprobanteOrigen = this.comprobanteOrigenSinteticoDesdeGuia(g, d);
+              this.intentarAutocompletarUbigeoOrigen();
             }
           },
           error: () => {
             this.comprobanteOrigen = this.comprobanteOrigenSinteticoDesdeGuia(g, d);
+            this.intentarAutocompletarUbigeoOrigen();
           }
         });
     } else {
       this.comprobanteOrigen = this.comprobanteOrigenSinteticoDesdeGuia(g, d);
+      this.intentarAutocompletarUbigeoOrigen();
+    }
+  }
+
+  private intentarAutocompletarUbigeoOrigen(): void {
+    const ubigeoActual = String(this.direccionOrigenSeleccionada?.ubigeo || '').replace(/\D/g, '');
+    if (ubigeoActual.length === 6) return;
+
+    const direccionActual = String(this.direccionOrigenSeleccionada?.direccion || '').trim();
+    const porDireccion = this.direccionesEmpresa.find(
+      (x: any) =>
+        String(x.direccion || '').trim() === direccionActual &&
+        String(x.ubigeo || '').replace(/\D/g, '').length === 6
+    );
+    if (porDireccion) {
+      this.direccionOrigenSeleccionada = porDireccion;
+      return;
+    }
+
+    const principalValido = this.direccionesEmpresa.find(
+      (x: any) =>
+        (x?.principal === true || x?.principal === 1) &&
+        String(x.ubigeo || '').replace(/\D/g, '').length === 6
+    );
+    if (principalValido) {
+      this.direccionOrigenSeleccionada = principalValido;
     }
   }
 
@@ -420,14 +524,52 @@ export class GuiasRemisionComponent implements OnInit {
   }
 
   private cargarDireccionesDestinoLocal(comprobante: any): void {
+    const idClienteRaw = comprobante?.idCliente;
+    const idCliente = Number(idClienteRaw);
+    if (Number.isFinite(idCliente) && idCliente > 0) {
+      this.cargarDireccionesDestinoDesdeTabla(idCliente, comprobante);
+      return;
+    }
+    this.cargarDireccionDestinoFallback(comprobante);
+  }
+
+  private cargarDireccionesDestinoDesdeTabla(idCliente: number, comprobante?: any): void {
+    this.clienteService.obtener_direccionesCliente_idCliente(idCliente).subscribe({
+      next: (res: any) => {
+        const listaRaw = Array.isArray(res?.data) ? res.data : [];
+        const lista = listaRaw
+          .filter((d: any) => String(d?.direccion || '').trim().length > 0)
+          .map((d: any) => ({
+            idDireccionClientes: d.idDireccionClientes,
+            direccion: String(d?.direccion || '').trim(),
+            ubigeo: String(d?.ubigeo || '').replace(/\D/g, ''),
+            referencia: String(d?.referencia || '').trim(),
+            codLocal: String(d?.codLocal || '').trim(),
+            principal: d?.principal === true || d?.principal === 1
+          }));
+
+        if (lista.length > 0) {
+          this.direccionesDestinoLocal = lista;
+          this.direccionDestinoSeleccionada = lista.find((x: any) => x.principal) || lista[0];
+          return;
+        }
+        this.cargarDireccionDestinoFallback(comprobante);
+      },
+      error: () => {
+        this.cargarDireccionDestinoFallback(comprobante);
+      }
+    });
+  }
+
+  private cargarDireccionDestinoFallback(comprobante: any): void {
     this.direccionesDestinoLocal = [];
     this.direccionDestinoSeleccionada = null;
     const dir = (comprobante?.clienteDireccion || '').toString().trim();
-    if (dir) {
-      const destino = { direccion: dir, referencia: 'Dirección del cliente' };
-      this.direccionesDestinoLocal.push(destino);
-      this.direccionDestinoSeleccionada = destino;
-    }
+    const ubigeo = String(comprobante?.ubigeoCliente || '').replace(/\D/g, '');
+    if (!dir) return;
+    const destino = { direccion: dir, ubigeo, referencia: 'Dirección del cliente' };
+    this.direccionesDestinoLocal.push(destino);
+    this.direccionDestinoSeleccionada = destino;
   }
 
   private prefillDestinatarioDesdeComprobante(comprobante: any): void {
@@ -465,10 +607,7 @@ export class GuiasRemisionComponent implements OnInit {
       lic: licReq
     }).subscribe({
       next: ({ dni: res, lic: licRes }: { dni: any; lic: any }) => {
-        const nombre =
-          res?.data?.nombre ||
-          res?.nombre ||
-          `${res?.data?.apellidoPaterno || ''} ${res?.data?.apellidoMaterno || ''} ${res?.data?.nombres || ''}`.trim();
+        const nombre = extraerNombreCompletoDesdeDni(res);
         if (nombre) {
           this.guia.nombreConductor = nombre;
         } else {
@@ -524,7 +663,7 @@ export class GuiasRemisionComponent implements OnInit {
     this.consultandoDestinatario = true;
     this.factilizaService.getDni(num).subscribe({
       next: (res: any) => {
-        const nombre = res?.data?.nombre || res?.nombre || `${res?.data?.apellidoPaterno || ''} ${res?.data?.apellidoMaterno || ''} ${res?.data?.nombres || ''}`.trim();
+        const nombre = extraerNombreCompletoDesdeDni(res);
         if (nombre) this.destinatario.razonSocial = nombre;
         this.consultandoDestinatario = false;
       },
