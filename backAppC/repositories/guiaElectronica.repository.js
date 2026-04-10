@@ -13,6 +13,7 @@ exports.obtenerDatosEmpresaParaGuiaRepo = async (pool, idEmpresa) => {
         e.ruc,
         ISNULL(e.razon_Social, ISNULL(e.nombreComercial, '')) AS razonSocial,
         d.ubigeo        AS emisorUbigeo,
+        d.codLocal      AS emisorCodLocal,
         d.region        AS emisorDepartamento,
         d.provincia     AS emisorProvincia,
         d.distrito      AS emisorDistrito,
@@ -22,6 +23,7 @@ exports.obtenerDatosEmpresaParaGuiaRepo = async (pool, idEmpresa) => {
       OUTER APPLY (
         SELECT TOP 1
           de.ubigeo,
+          de.codLocal,
           de.region,
           de.provincia,
           de.distrito,

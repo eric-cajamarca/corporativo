@@ -16,4 +16,4 @@ s = s.replace(
   '$1return next(error);'
 );
 fs.writeFileSync(p, s, 'utf8');
-console.log('empresasController parcheado');
+// console.log('empresasController parcheado');

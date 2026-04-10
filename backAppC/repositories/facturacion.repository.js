@@ -704,6 +704,7 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
     unidad: it.unidad || "NIU"
   }));
   let ubigeoCliente = "";
+  let codLocalCliente = "";
   const idCliente = payload.venta?.idCliente != null ? Number(payload.venta.idCliente) : null;
   if (idCliente != null && Number.isFinite(idCliente) && idCliente > 0) {
     try {
@@ -713,7 +714,8 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
         .input("idCliente", sql.Int, idCliente)
         .query(`
           SELECT TOP 1
-            ISNULL(dc.ubigeo, '') AS ubigeo
+            ISNULL(dc.ubigeo, '') AS ubigeo,
+            ISNULL(dc.codLocal, '') AS codLocal
           FROM DireccionClientes dc
           WHERE dc.idEmpresa = @idEmpresa
             AND dc.idCliente = @idCliente
@@ -721,6 +723,7 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
         `);
       const dirRow = dirClienteResult.recordset && dirClienteResult.recordset[0];
       ubigeoCliente = dirRow?.ubigeo != null ? String(dirRow.ubigeo).trim() : "";
+      codLocalCliente = dirRow?.codLocal != null ? String(dirRow.codLocal).trim() : "";
     } catch (error) {
       console.error("facturacion.repository obtenerComprobanteOrigenParaGuiaRepo ubigeoCliente:", error);
     }
@@ -742,6 +745,7 @@ exports.obtenerComprobanteOrigenParaGuiaRepo = async (pool, idEmpresa, serie, nu
     total: venta.total,
     clienteDireccion: cliente.direccion || "",
     ubigeoCliente,
+    codLocalCliente,
     rucEmpresa: (empresa && empresa.ruc) ? empresa.ruc : "",
     rucEmisor: (empresa && empresa.ruc) ? empresa.ruc : "",
     items: itemsWithMeta

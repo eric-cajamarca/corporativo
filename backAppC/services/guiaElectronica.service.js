@@ -40,6 +40,12 @@ const ESTADO_EN_PROCESO = 2;    // Ticket recibido, esperando resolución SUNAT
 const ESTADO_ACEPTADO   = 1;    // Aceptado por SUNAT (codRespuesta "0")
 const ESTADO_ERROR      = 98;   // Rechazado o error (codRespuesta "99")
 
+/**
+ * Ubigeo en cbc:ID (Address / Location). Solo atributos permitidos por XSD UBL 2.1 para Identifier:
+ * listAgencyName/listName/listURI en cbc:ID rechazan validación GEM (error 0306 cvc-complex-type.3.2.2).
+ */
+const ATTRS_ID_UBIGEO_GRE = ' schemeName="Ubigeos" schemeAgencyName="PE:INEI"';
+
 /** Misma convención que el ZIP GEM: `{ruc}-{tipo}-{serie}-{numero}.xml` */
 const DIR_XML_FIRMADOS_SUNAT = path.join(__dirname, "..", "xml_firmados_sunat");
 
@@ -382,6 +388,8 @@ function placaPrincipalVehiculoGre(d) {
 function ubigeoValidoGre(val) {
   let s = String(val == null ? "" : val).replace(/\D/g, "");
   if (s.length === 7 && s.startsWith("0")) s = s.slice(1);
+  // JSON numérico suele perder ceros a la izquierda (060801 → 60801): rellenar a 6 dígitos.
+  if (s.length > 0 && s.length < 6) s = s.padStart(6, "0");
   return s.length === 6 ? s : "";
 }
 
@@ -440,6 +448,12 @@ function completarUbigeosGreLegacy(d) {
     const fromDir = extraerUbigeoSeisDigitosEnTexto(d.dirOrigen);
     if (fromDir) d.ubigeoOrigen = fromDir;
   }
+  if (!String(d.codLocalOrigen || "").trim() && d.cod_local_origen) {
+    d.codLocalOrigen = String(d.cod_local_origen).trim();
+  }
+  if (!String(d.codLocalDestino || "").trim() && d.cod_local_destino) {
+    d.codLocalDestino = String(d.cod_local_destino).trim();
+  }
 }
 
 /** Divide nombre completo en cbc:FirstName y cbc:FamilyName (orden UBL PersonType). */
@@ -451,12 +465,19 @@ function partirNombrePersonaGre(nombreCompleto) {
   return { firstName: parts[0], familyName: parts.slice(1).join(" ") };
 }
 
-function textoUbicacionGre(val) {
-  const t = String(val || "").trim();
-  if (!t) return "";
-  // Evita enviar códigos numéricos en campos descriptivos (CityName, District, etc.).
-  if (/^\d+$/.test(t)) return "";
-  return t;
+/**
+ * Fragmento cac:DeliveryAddress / cac:DespatchAddress (estructura simplificada GRE válida).
+ * Solo ubigeo + AddressLine. Elimina campos extendidos no requeridos.
+ */
+function xmlDireccionShipmentGre({ ubigeo, street }) {
+  const u = ubigeoValidoGre(ubigeo);
+  if (!u) return "";
+  const line = String(street || "").trim();
+  return `
+          <cbc:ID${ATTRS_ID_UBIGEO_GRE}>${x(u)}</cbc:ID>
+          <cac:AddressLine>
+            <cbc:Line>${x(line)}</cbc:Line>
+          </cac:AddressLine>`;
 }
 
 /**
@@ -531,6 +552,14 @@ function fusionarDatosGuiaParaDetalle(row, empresa) {
     base.tipoDocDestinatario = String(base.destinatarioTipoDoc).trim();
   }
   completarUbigeosGreLegacy(base);
+  if (!String(base.codLocalOrigen || "").trim() && empresa?.emisorCodLocal != null) {
+    base.codLocalOrigen = String(empresa.emisorCodLocal).trim();
+  }
+  // Reenvío / preview: si datosGuia perdió ceros (número JSON) o viene vacío, usar ubigeo del domicilio fiscal.
+  if (!ubigeoValidoGre(base.ubigeoOrigen) && empresa?.emisorUbigeo != null) {
+    const uEm = ubigeoValidoGre(empresa.emisorUbigeo);
+    if (uEm) base.ubigeoOrigen = uEm;
+  }
   return base;
 }
 
@@ -582,7 +611,7 @@ function validarDatosGuiaMinimosEnvio(d) {
     throw new Error("Falta documento del destinatario en los datos de la guía.");
   }
   const tipoDocGuia = String(d.tipoDocumento || "09").trim();
-  if (tipoDocGuia === "09") {
+  if (tipoDocGuia === "09" || tipoDocGuia === "31") {
     if (!ubigeoValidoGre(d.ubigeoDestino)) {
       throw new Error(
         "El ubigeo de destino es obligatorio (6 dígitos INEI). SUNAT rechaza la GRE si DeliveryAddress/cbc:ID está vacío. " +
@@ -596,23 +625,52 @@ function validarDatosGuiaMinimosEnvio(d) {
     }
   }
   const modalidad = normalizarModalidadTransporteGre(d.modalidadTransporte);
-  if (tipoDocGuia === "09" && modalidad === "02") {
+  const esVehiculoM1L = Boolean(d.vehiculoM1L);
+
+  // GRE transportista (31): remitente de la carga en DespatchParty (SUNAT 3383)
+  if (tipoDocGuia === "31") {
+    if (!String(d.nomRemitente || "").trim()) {
+      throw new Error("Guía transportista: ingrese el nombre o razón social del remitente de la mercadería.");
+    }
+    if (!String(d.numDocRemitente || "").trim()) {
+      throw new Error("Guía transportista: ingrese el documento del remitente de la mercadería.");
+    }
+    if (!String(d.tipoDocRemitente || "").trim()) {
+      throw new Error("Guía transportista: seleccione el tipo de documento del remitente.");
+    }
+  }
+
+  // Transporte privado (09): requiere conductor y placa EXCEPTO si es vehículo M1/L
+  if (tipoDocGuia === "09" && modalidad === "02" && !esVehiculoM1L) {
     if (!String(d.numeroDocConductor || "").trim()) {
-      throw new Error("Transporte privado: ingrese el documento del conductor.");
+      throw new Error("Transporte privado: ingrese el documento del conductor. (Si es vehículo M1/L, marque la opción correspondiente)");
     }
     if (!String(d.nombreConductor || "").trim()) {
       throw new Error(
-        "Transporte privado: ingrese el nombre completo del conductor (nombres y apellidos) para el XML UBL."
+        "Transporte privado: ingrese el nombre completo del conductor. (Si es vehículo M1/L, marque la opción correspondiente)"
+      );
+    }
+    if (!placaPrincipalVehiculoGre(d)) {
+      throw new Error(
+        "SUNAT exige la placa del vehículo principal (código 2566). (Si es vehículo M1/L, marque la opción correspondiente)"
       );
     }
   }
-  // SUNAT 2566: guía remitente (09) exige placa del vehículo principal también en transporte público (01).
-  if (tipoDocGuia === "09" && !placaPrincipalVehiculoGre(d)) {
-    throw new Error(
-      "SUNAT exige la placa del vehículo principal (código 2566). En transporte público, regístrela en el transportista o complétela en el formulario; en privado use el campo placa principal."
-    );
+
+  // GRE transportista (31): conductor y placa obligatorios salvo M1/L (misma lógica que remitente privado)
+  if (tipoDocGuia === "31" && !esVehiculoM1L) {
+    if (!String(d.numeroDocConductor || "").trim()) {
+      throw new Error("Guía transportista: ingrese el documento del conductor principal.");
+    }
+    if (!String(d.nombreConductor || "").trim()) {
+      throw new Error("Guía transportista: ingrese el nombre completo del conductor.");
+    }
+    if (!placaPrincipalVehiculoGre(d)) {
+      throw new Error("Guía transportista: ingrese la placa del vehículo principal (SUNAT 2566).");
+    }
   }
-  if (modalidad === "01") {
+
+  if (tipoDocGuia === "09" && modalidad === "01") {
     if (!String(d.rucTransportista || "").trim()) {
       throw new Error("Transporte público (modalidad 01): ingrese el RUC del transportista.");
     }
@@ -646,45 +704,13 @@ function emisorFiscalDesdeEmpresaGre(empresa) {
   if (!empresa || typeof empresa !== "object") return {};
   return {
     ubigeo: empresa.emisorUbigeo,
+    codLocal: empresa.emisorCodLocal,
     departamento: empresa.emisorDepartamento,
     provincia: empresa.emisorProvincia,
     distrito: empresa.emisorDistrito,
     direccion: empresa.emisorDireccion,
     urbanizacion: empresa.emisorUrbanizacion
   };
-}
-
-/**
- * cac:PartyLegalEntity/cac:RegistrationAddress del remitente (catálogo INEI / UBL SUNAT).
- */
-function registrationAddressEmisorGreXml(em) {
-  if (!em || typeof em !== "object") return "";
-  const ug = ubigeoValidoGre(em.ubigeo) || "";
-  const dep = textoUbicacionGre(em.departamento);
-  const prov = textoUbicacionGre(em.provincia);
-  const dist = textoUbicacionGre(em.distrito);
-  const dir = String(em.direccion || "").trim();
-  const urb = textoUbicacionGre(em.urbanizacion);
-  if (!ug && !dep && !prov && !dist && !dir && !urb) return "";
-  const lineText = dir ? (urb ? `${urb} — ${dir}` : dir) : urb || "-";
-  const subCode = ug || "000000";
-  const citySub = urb || "-";
-  return `
-      <cac:RegistrationAddress>
-        <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI">${x(ug)}</cbc:ID>
-        <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
-        <cbc:CitySubdivisionName>${x(citySub)}</cbc:CitySubdivisionName>
-        <cbc:CityName>${x(prov || "-")}</cbc:CityName>
-        <cbc:CountrySubentity>${x(dep || "-")}</cbc:CountrySubentity>
-        <cbc:CountrySubentityCode>${x(subCode)}</cbc:CountrySubentityCode>
-        <cbc:District>${x(dist || "-")}</cbc:District>
-        <cac:AddressLine>
-          <cbc:Line>${x(lineText)}</cbc:Line>
-        </cac:AddressLine>
-        <cac:Country>
-          <cbc:IdentificationCode>PE</cbc:IdentificationCode>
-        </cac:Country>
-      </cac:RegistrationAddress>`;
 }
 
 /**
@@ -705,6 +731,7 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
     );
   }
   const tipoDoc = d.tipoDocumento || "09";   // "09" remitente, "31" transportista
+  const esGreTransportista = String(tipoDoc).trim() === "31";
   const numStr  = String(numero).padStart(8, "0");
   const idDoc   = `${serie}-${numStr}`;
   const hora    = normalizarIssueTimeGre(d.horaInicioTraslado);
@@ -718,31 +745,62 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
     tipoDocDest === "6"
       ? (normalizarRucSunatGre(numDocDestRaw) || numDocDestRaw.replace(/\D/g, "").slice(0, 11))
       : numDocDestRaw;
-  const splitConsignment =
-    d.transbordoProgramado === true || d.transbordoProgramado === "true"
-      ? "true"
-      : "false";
   const ubigeoDestNorm = ubigeoValidoGre(d.ubigeoDestino);
-  const ubigeoOriNorm  = ubigeoValidoGre(d.ubigeoOrigen);
-  const emisorFiscalConFallbackUbigeo = {
-    ...(emisorFiscal && typeof emisorFiscal === "object" ? emisorFiscal : {}),
-    ubigeo:
-      ubigeoValidoGre(emisorFiscal?.ubigeo) ||
-      ubigeoOriNorm
-  };
-  const regAddrEmisorXml = registrationAddressEmisorGreXml(emisorFiscalConFallbackUbigeo);
+  const ubigeoOriNorm =
+    ubigeoValidoGre(d.ubigeoOrigen) ||
+    ubigeoValidoGre(emisorFiscal?.ubigeo) ||
+    "";
+  const deliveryAddrInner = xmlDireccionShipmentGre({
+    ubigeo: ubigeoDestNorm,
+    street: d.dirDestino
+  });
+  const despatchAddrInner = xmlDireccionShipmentGre({
+    ubigeo: ubigeoOriNorm,
+    street: d.dirOrigen
+  });
+
+  // GRE transportista (31): remitente de la carga en cac:Despatch/cac:DespatchParty (plantilla Greenter / SUNAT)
+  const tipoDocRemit = String(d.tipoDocRemitente || "6").trim() || "6";
+  const numDocRemitRaw = String(d.numDocRemitente || "").trim();
+  const numDocRemitGre =
+    tipoDocRemit === "6"
+      ? (normalizarRucSunatGre(numDocRemitRaw) || numDocRemitRaw.replace(/\D/g, "").slice(0, 11))
+      : numDocRemitRaw;
+  const despatchPartyXml = esGreTransportista && numDocRemitGre
+    ? `
+        <cac:DespatchParty>
+          <cac:PartyIdentification>
+            <cbc:ID schemeID="${x(tipoDocRemit)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(numDocRemitGre)}</cbc:ID>
+          </cac:PartyIdentification>
+          <cac:PartyLegalEntity>
+            <cbc:RegistrationName><![CDATA[${d.nomRemitente || ""}]]></cbc:RegistrationName>
+          </cac:PartyLegalEntity>
+        </cac:DespatchParty>`
+    : "";
 
   // ── Comprobante origen (SUNAT 3380: RUC emisor del documento relacionado en IssuerParty, UBL DocumentReference) ──
+  // Usar catálogo 61 (Documento relacionado al transporte) y agregar DocumentType
   const rucEmisorDocRelacionado =
     normalizarRucSunatGre(d.rucEmisorDocumentoRelacionado || d.emisorRuc || "") || rucEmisor;
+  const tipoCompOrigen = String(d.tipoComprobanteOrigen || "01").trim();
+  const nombreDocRelacionado =
+    {
+      "01": "FACTURA",
+      "03": "BOLETA DE VENTA",
+      "12": "TICKET",
+      "50": "DAM",
+      "09": "GUIA DE REMISION",
+      "31": "GUÍA DE REMISION TRANSPORTISTA"
+    }[tipoCompOrigen] || "FACTURA";
   const docRefXml = (d.comprobanteOrigenSerie && d.comprobanteOrigenNumero)
     ? `
   <cac:AdditionalDocumentReference>
     <cbc:ID>${x(d.comprobanteOrigenSerie)}-${String(d.comprobanteOrigenNumero).padStart(8, "0")}</cbc:ID>
-    <cbc:DocumentTypeCode listName="Tipo de Documento" listAgencyName="PE:SUNAT">${x(d.tipoComprobanteOrigen || "01")}</cbc:DocumentTypeCode>
+    <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Documento relacionado al transporte" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo61">${x(tipoCompOrigen)}</cbc:DocumentTypeCode>
+    <cbc:DocumentType>${x(nombreDocRelacionado)}</cbc:DocumentType>
     <cac:IssuerParty>
       <cac:PartyIdentification>
-        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="6" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(rucEmisorDocRelacionado)}</cbc:ID>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(rucEmisorDocRelacionado)}</cbc:ID>
       </cac:PartyIdentification>
     </cac:IssuerParty>
   </cac:AdditionalDocumentReference>`
@@ -753,91 +811,56 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
     ? `\n  <cbc:Note languageLocaleID="1000">${x(d.descripcionMotivo)}</cbc:Note>`
     : "";
 
-  // SUNAT 3418: en Shipment, cbc:Information es el sustento de diferencia de peso; solo aplica a import/export/traslado merc. extranjera (cat. 20: 08, 09, 19). No enviar en venta ni otros motivos.
-  const motivoTrasladoCod = String(d.motivoTraslado || "").trim();
-  const shipmentInformationPermitida = motivoTrasladoCod === "08" || motivoTrasladoCod === "09" || motivoTrasladoCod === "19";
-  const textoSustentoPeso = String(d.descripcionMotivo || d.observaciones || "").trim();
-  const shipmentInformationXml =
-    shipmentInformationPermitida && textoSustentoPeso
-      ? `\n    <cbc:Information>${x(textoSustentoPeso)}</cbc:Information>`
+  // ── Datos de transporte ──
+  const esVehiculoM1L = Boolean(d.vehiculoM1L);
+  const placaPrincipal = placaPrincipalVehiculoGre(d);
+  
+  if ((esPrivado || esGreTransportista) && !esVehiculoM1L && !placaPrincipal) {
+    throw new Error(
+      "La placa del vehículo es obligatoria (Error SUNAT 2566). Use vehículo M1/L si aplica."
+    );
+  }
+  
+  // Datos del conductor para transporte privado
+  const schemeConductor = { "4": "4", "7": "7" }[d.tipoDocConductor] || "1";
+  const docNumConductor = String(d.numeroDocConductor || "").replace(/\D/g, "").trim();
+  const { firstName: conductorFirstName, familyName: conductorFamilyName } = partirNombrePersonaGre(d.nombreConductor);
+  const licenciaConductor = normalizarLicenciaConductorGre(d.licenciaConductor, docNumConductor) || d.licenciaConductor || "";
+  const licenciaConductorXml = String(licenciaConductor || "").trim()
+    ? `
+        <cac:IdentityDocumentReference>
+          <cbc:ID>${x(licenciaConductor)}</cbc:ID>
+        </cac:IdentityDocumentReference>`
+    : "";
+  
+  // Transportista para transporte público
+  const rucCarrier = String(d.rucTransportista || "").trim();
+  const mtcCarrier = String(d.nroMtcTransportista || d.inscripcionMtc || "").trim();
+  const companyIdXml = mtcCarrier ? `\n          <cbc:CompanyID>${x(mtcCarrier)}</cbc:CompanyID>` : "";
+
+  /** GRE transportista (31): inscripción MTC del transportista (solo CompanyID, sin RUC en PartyIdentification). */
+  const carrierPartyTransportista31Xml =
+    esGreTransportista && mtcCarrier
+      ? `
+      <cac:CarrierParty>
+        <cac:PartyLegalEntity>
+          <cbc:CompanyID>${x(mtcCarrier)}</cbc:CompanyID>
+        </cac:PartyLegalEntity>
+      </cac:CarrierParty>`
       : "";
 
-  // ── Transporte (SUNAT Guía GRE: TransitPeriod/StartDate dentro de ShipmentStage) ──
-  let transXml = `      <cbc:TransportModeCode listAgencyName="PE:SUNAT" listName="Modalidad de transporte" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">${x(modalidadGre)}</cbc:TransportModeCode>
-      <cac:TransitPeriod>
-        <cbc:StartDate>${x(startTrasladoYmd)}</cbc:StartDate>
-      </cac:TransitPeriod>`;
-
-  // SUNAT regla GRE: CarrierParty corresponde a transporte público (01), no a privado (02).
-  const rucCarrier = String(d.rucTransportista || "").trim();
-  if (!esPrivado && rucCarrier) {
-    transXml += `
+  // XML de transporte público (CarrierParty)
+  const carrierPartyXml =
+    !esGreTransportista && !esPrivado && rucCarrier
+      ? `
       <cac:CarrierParty>
         <cac:PartyIdentification>
-          <cbc:ID schemeAgencyName="PE:SUNAT" schemeName="RUC" schemeID="6">${x(rucCarrier)}</cbc:ID>
+          <cbc:ID schemeID="6">${x(rucCarrier)}</cbc:ID>
         </cac:PartyIdentification>
         <cac:PartyLegalEntity>
-          <cbc:RegistrationName>${x(d.razonSocialTransportista || razonSocialEmisor || "")}</cbc:RegistrationName>
+          <cbc:RegistrationName><![CDATA[${d.razonSocialTransportista || razonSocialEmisor || ""}]]></cbc:RegistrationName>${companyIdXml}
         </cac:PartyLegalEntity>
-      </cac:CarrierParty>`;
-  }
-
-  // SUNAT 2566: LicensePlateID del vehículo principal en guía remitente (09), público o privado.
-  const placaPrincipal = placaPrincipalVehiculoGre(d);
-  if (String(tipoDoc || "09").trim() === "09" && placaPrincipal) {
-    transXml += `
-      <cac:TransportMeans>
-        <cac:RoadTransport>
-          <cbc:LicensePlateID>${x(placaPrincipal)}</cbc:LicensePlateID>
-        </cac:RoadTransport>
-      </cac:TransportMeans>`;
-  }
-
-  // UBL 2.1 PersonType (DriverPerson): ID = documento; licencia en cac:IdentityDocumentReference/cbc:ID; JobTitle = cargo.
-  if (esPrivado && d.numeroDocConductor) {
-    const schemeConductor = { "4": "4", "7": "7" }[d.tipoDocConductor] || "1";
-    const docNum = String(d.numeroDocConductor || "").replace(/\D/g, "").trim();
-    const { firstName, familyName } = partirNombrePersonaGre(d.nombreConductor);
-    const lic = normalizarLicenciaConductorGre(d.licenciaConductor, docNum);
-    const idAttrs = ` schemeAgencyName="PE:SUNAT" schemeID="${schemeConductor}" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"`;
-    const licXml = lic
-      ? `
-      <cac:IdentityDocumentReference>
-        <cbc:ID>${x(lic)}</cbc:ID>
-      </cac:IdentityDocumentReference>`
-      : "";
-    transXml += `
-      <cac:DriverPerson>
-        <cbc:ID${idAttrs}>${x(docNum)}</cbc:ID>
-        <cbc:FirstName>${x(firstName)}</cbc:FirstName>
-        <cbc:FamilyName>${x(familyName || "-")}</cbc:FamilyName>
-        <cbc:JobTitle>Principal</cbc:JobTitle>${licXml}
-      </cac:DriverPerson>`;
-  }
-
-  // ── Punto de llegada (solo transporte público) ─────────────
-  const firstArrival = !esPrivado
-    ? `
-    <cac:FirstArrivalPortLocation>
-      <cbc:ID>${x(ubigeoDestNorm)}</cbc:ID>
-    </cac:FirstArrivalPortLocation>`
-    : "";
-
-  // Estructura adicional de vehículo principal en Shipment (compatible con XSD UBL 2.1):
-  // Shipment -> TransportHandlingUnit -> TransportEquipment/ID + TransportMeans/RoadTransport/LicensePlateID.
-  const transportHandlingUnitXml =
-    String(tipoDoc || "09").trim() === "09" && placaPrincipal
-      ? `
-    <cac:TransportHandlingUnit>
-      <cac:TransportEquipment>
-        <cbc:ID>${x(placaPrincipal)}</cbc:ID>
-      </cac:TransportEquipment>
-      <cac:TransportMeans>
-        <cac:RoadTransport>
-          <cbc:LicensePlateID>${x(placaPrincipal)}</cbc:LicensePlateID>
-        </cac:RoadTransport>
-      </cac:TransportMeans>
-    </cac:TransportHandlingUnit>`
+      </cac:CarrierParty>`
       : "";
 
   // ── Líneas de detalle ──────────────────────────────────────
@@ -845,17 +868,61 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
     ? d.items
     : [{ codigo: "00", descripcion: "Bienes trasladados", unidad: "NIU", cantidad: 1 }];
 
+  // ── HandlingInstructions (descripción del motivo de traslado) ──
+  const descMotivos = {
+    "01": "VENTA", "02": "COMPRA", "03": "VENTA CON ENTREGA A TERCEROS",
+    "04": "TRASLADO ENTRE ESTABLECIMIENTOS", "05": "CONSIGNACION",
+    "06": "DEVOLUCION", "07": "RECOJO DE BIENES", "08": "IMPORTACION",
+    "09": "EXPORTACION", "13": "OTROS", "14": "VENTA SUJETA A CONFIRMACION",
+    "17": "TRASLADO DE ZONA PRIMARIA", "18": "TRASLADO A ZONA PRIMARIA",
+    "19": "TRASLADO DE MERC. EXTRANJERA"
+  };
+  const motivoTrasladoCodNorm = String(d.motivoTraslado || "01").trim();
+  const handlingInstructionsTxt = descMotivos[motivoTrasladoCodNorm] || "VENTA";
+
+  // ── TotalTransportHandlingUnitQuantity (número de bultos) ──
+  const numBultos = Number(d.numeroBultos || d.totalBultos || items.length || 1);
+
+  // ── Indicadores especiales (SpecialInstructions) ──
+  // Indicador M1/L: exime datos de conductor y placa para vehículos categoría M1 o L
+  const indicadores = [];
+  if ((esPrivado || esGreTransportista) && esVehiculoM1L) {
+    indicadores.push("SUNAT_Envio_IndicadorTrasladoVehiculoM1L");
+  }
+  const pagadorFleteSunat = {
+    REMITENTE: "SUNAT_Envio_IndicadorPagadorFlete_Remitente",
+    DESTINATARIO: "SUNAT_Envio_IndicadorPagadorFlete_Destinatario",
+    TRANSPORTISTA: "SUNAT_Envio_IndicadorPagadorFlete_Transportista"
+  };
+  const pagClave = String(d.indicadorPagadorFlete || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  if (pagadorFleteSunat[pagClave]) {
+    indicadores.push(pagadorFleteSunat[pagClave]);
+  }
+  const indicadoresXml = indicadores.map(ind => `
+    <cbc:SpecialInstructions>${x(ind)}</cbc:SpecialInstructions>`).join("");
+
+  const registroMtcVehStr = String(d.registroMtcVehiculo || d.inscripcionMtcVehiculo || "").trim();
+  const applicableTransportMeansXml = registroMtcVehStr
+    ? `
+        <cac:ApplicableTransportMeans>
+          <cbc:RegistrationNationalityID>${x(registroMtcVehStr)}</cbc:RegistrationNationalityID>
+        </cac:ApplicableTransportMeans>`
+    : "";
+
   const lineasXml = items.map((it, i) => {
     const n = String(i + 1);
     return `
   <cac:DespatchLine>
     <cbc:ID>${n}</cbc:ID>
-    <cbc:DeliveredQuantity unitCode="${x(it.unidad || "NIU")}">${Number(it.cantidad || 1).toFixed(3)}</cbc:DeliveredQuantity>
+    <cbc:DeliveredQuantity unitCode="${x(it.unidad || "NIU")}">${Number(it.cantidad || 1).toFixed(2)}</cbc:DeliveredQuantity>
     <cac:OrderLineReference>
       <cbc:LineID>${n}</cbc:LineID>
     </cac:OrderLineReference>
     <cac:Item>
-      <cbc:Description>${x(it.descripcion || "Bien")}</cbc:Description>
+      <cbc:Description><![CDATA[${it.descripcion || "Bien"}]]></cbc:Description>
       <cac:SellersItemIdentification>
         <cbc:ID>${x(it.codigo || n)}</cbc:ID>
       </cac:SellersItemIdentification>
@@ -863,9 +930,29 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
   </cac:DespatchLine>`;
   }).join("");
 
+  // ── cac:Signature (bloque de firma para el servicio de firmado) ──
+  const signatureXml = `
+  <cac:Signature>
+    <cbc:ID>${x(rucEmisor)}</cbc:ID>
+    <cac:SignatoryParty>
+      <cac:PartyIdentification>
+        <cbc:ID>${x(rucEmisor)}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name><![CDATA[${razonSocialEmisor}]]></cbc:Name>
+      </cac:PartyName>
+    </cac:SignatoryParty>
+    <cac:DigitalSignatureAttachment>
+      <cac:ExternalReference>
+        <cbc:URI>#GREENTER-SIGN</cbc:URI>
+      </cac:ExternalReference>
+    </cac:DigitalSignatureAttachment>
+  </cac:Signature>`;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <DespatchAdvice
   xmlns="urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2"
+  xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
   xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
   xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
   xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
@@ -879,54 +966,58 @@ function construirXmlGre(d, rucEmisor, razonSocialEmisor, serie, numero, emisorF
   <cbc:ID>${idDoc}</cbc:ID>
   <cbc:IssueDate>${x(issueYmd)}</cbc:IssueDate>
   <cbc:IssueTime>${hora}</cbc:IssueTime>
-  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipoDoc}</cbc:DespatchAdviceTypeCode>${noteXml}${docRefXml}
+  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipoDoc}</cbc:DespatchAdviceTypeCode>${noteXml}${docRefXml}${signatureXml}
   <cac:DespatchSupplierParty>
-    <cbc:CustomerAssignedAccountID schemeAgencyName="PE:SUNAT" schemeID="6" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(rucEmisor)}</cbc:CustomerAssignedAccountID>
-    <cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="6" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(rucEmisor)}</cbc:ID>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(rucEmisor)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>${x(razonSocialEmisor)}</cbc:RegistrationName>${regAddrEmisorXml}
+        <cbc:RegistrationName><![CDATA[${razonSocialEmisor}]]></cbc:RegistrationName>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:DespatchSupplierParty>
   <cac:DeliveryCustomerParty>
-    <cbc:CustomerAssignedAccountID schemeAgencyName="PE:SUNAT" schemeID="${x(tipoDocDest)}" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(numDocDestGre)}</cbc:CustomerAssignedAccountID>
-    <cbc:AdditionalAccountID>${x(tipoDocDest)}</cbc:AdditionalAccountID>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="${x(tipoDocDest)}" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(numDocDestGre)}</cbc:ID>
+        <cbc:ID schemeID="${x(tipoDocDest)}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(numDocDestGre)}</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyLegalEntity>
-        <cbc:RegistrationName>${x(d.nomDestinatario || "")}</cbc:RegistrationName>
+        <cbc:RegistrationName><![CDATA[${d.nomDestinatario || ""}]]></cbc:RegistrationName>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:DeliveryCustomerParty>
   <cac:Shipment>
-    <cbc:ID>1</cbc:ID>
-    <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">${x(d.motivoTraslado || "13")}</cbc:HandlingCode>${shipmentInformationXml}
+    <cbc:ID>SUNAT_Envio</cbc:ID>${!esGreTransportista ? `
+    <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">${x(motivoTrasladoCodNorm || "01")}</cbc:HandlingCode>
+    <cbc:HandlingInstructions>${x(handlingInstructionsTxt)}</cbc:HandlingInstructions>` : ""}
     <cbc:GrossWeightMeasure unitCode="${x(d.unidadMedidaPeso || "KGM")}">${Number(d.cantidadPeso || 0).toFixed(3)}</cbc:GrossWeightMeasure>
-    <cbc:SplitConsignmentIndicator>${splitConsignment}</cbc:SplitConsignmentIndicator>
-    <cac:ShipmentStage>${transXml}
+    <cbc:TotalTransportHandlingUnitQuantity>${numBultos}</cbc:TotalTransportHandlingUnitQuantity>${indicadoresXml}
+    <cac:ShipmentStage>${!esGreTransportista ? `
+      <cbc:TransportModeCode listName="Modalidad de traslado" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">${x(modalidadGre)}</cbc:TransportModeCode>` : ""}
+      <cac:TransitPeriod>
+        <cbc:StartDate>${x(startTrasladoYmd)}</cbc:StartDate>
+      </cac:TransitPeriod>${(esPrivado || esGreTransportista) && docNumConductor ? `
+      <cac:DriverPerson>
+        <cbc:ID schemeID="${schemeConductor}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${x(docNumConductor)}</cbc:ID>
+        <cbc:FirstName>${x(conductorFirstName)}</cbc:FirstName>
+        <cbc:FamilyName>${x(conductorFamilyName || "-")}</cbc:FamilyName>
+        <cbc:JobTitle>Principal</cbc:JobTitle>${licenciaConductorXml}
+      </cac:DriverPerson>` : ""}${!esPrivado ? carrierPartyXml : ""}${carrierPartyTransportista31Xml}
     </cac:ShipmentStage>
     <cac:Delivery>
-      <cac:DeliveryAddress>
-        <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI">${x(ubigeoDestNorm)}</cbc:ID>
-        <cbc:StreetName>${x(d.dirDestino || "")}</cbc:StreetName>
-        <cac:AddressLine>
-          <cbc:Line>${x(d.dirDestino || "")}</cbc:Line>
-        </cac:AddressLine>
+      <cac:DeliveryAddress>${deliveryAddrInner}
       </cac:DeliveryAddress>
-    </cac:Delivery>${transportHandlingUnitXml}
-    <cac:OriginAddress>
-      <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI">${x(ubigeoOriNorm)}</cbc:ID>
-      <cbc:StreetName>${x(d.dirOrigen || "")}</cbc:StreetName>
-      <cac:AddressLine>
-        <cbc:Line>${x(d.dirOrigen || "")}</cbc:Line>
-      </cac:AddressLine>
-    </cac:OriginAddress>${firstArrival}
+      <cac:Despatch>
+        <cac:DespatchAddress>${despatchAddrInner}
+        </cac:DespatchAddress>${despatchPartyXml}
+      </cac:Despatch>
+    </cac:Delivery>${(esPrivado || esGreTransportista) && placaPrincipal ? `
+    <cac:TransportHandlingUnit>
+      <cac:TransportEquipment>
+        <cbc:ID>${x(placaPrincipal)}</cbc:ID>${applicableTransportMeansXml}
+      </cac:TransportEquipment>
+    </cac:TransportHandlingUnit>` : ""}
   </cac:Shipment>${lineasXml}
 </DespatchAdvice>`;
 }
@@ -1071,21 +1162,43 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
     emisorRuc: rucEmisor,
     emisorNombre: empresa.razonSocial,
     dirOrigen: datos.dirOrigen || "",
-    ubigeoOrigen: tipoDoc === "09" ? ubigeoValidoGre(datos.ubigeoOrigen) : String(datos.ubigeoOrigen || "").trim(),
+    ubigeoOrigen:
+      tipoDoc === "09" || tipoDoc === "31"
+        ? ubigeoValidoGre(datos.ubigeoOrigen)
+        : String(datos.ubigeoOrigen || "").trim(),
+    codLocalOrigen: String(datos.codLocalOrigen || "").trim(),
+    departamentoOrigen: String(datos.departamentoOrigen || datos.regionOrigen || "").trim(),
+    provinciaOrigen: String(datos.provinciaOrigen || "").trim(),
+    distritoOrigen: String(datos.distritoOrigen || "").trim(),
     dirDestino: datos.dirDestino || "",
-    ubigeoDestino: tipoDoc === "09" ? ubigeoValidoGre(datos.ubigeoDestino) : String(datos.ubigeoDestino || "").trim(),
+    ubigeoDestino:
+      tipoDoc === "09" || tipoDoc === "31"
+        ? ubigeoValidoGre(datos.ubigeoDestino)
+        : String(datos.ubigeoDestino || "").trim(),
+    codLocalDestino: String(datos.codLocalDestino || "").trim(),
+    departamentoDestino: String(datos.departamentoDestino || datos.regionDestino || "").trim(),
+    provinciaDestino: String(datos.provinciaDestino || "").trim(),
+    distritoDestino: String(datos.distritoDestino || "").trim(),
     tipoDocDestinatario: datos.tipoDocDestinatario || "",
     numDocDestinatario: datos.numDocDestinatario || "",
     nomDestinatario: datos.nomDestinatario || "",
     telefonoDestinatario: datos.telefonoDestinatario || "",
     placaVehiculo: datos.placaVehiculo || "",
     placaSecundaria: datos.placaSecundaria || "",
+    vehiculoM1L: Boolean(datos.vehiculoM1L),
+    tipoDocRemitente: String(datos.tipoDocRemitente || "").trim(),
+    numDocRemitente: String(datos.numDocRemitente || "").trim(),
+    nomRemitente: String(datos.nomRemitente || "").trim(),
+    idVehiculoEmpresa: String(datos.idVehiculoEmpresa || "").trim() || null,
     tipoDocConductor: datos.tipoDocConductor || "",
     numeroDocConductor: datos.numeroDocConductor || "",
     nombreConductor: datos.nombreConductor || "",
     licenciaConductor: datos.licenciaConductor || "",
     rucTransportista: datos.rucTransportista || "",
     razonSocialTransportista: datos.razonSocialTransportista || "",
+    nroMtcTransportista: datos.nroMtcTransportista || datos.inscripcionMtc || "",
+    registroMtcVehiculo: String(datos.registroMtcVehiculo || datos.inscripcionMtcVehiculo || "").trim(),
+    indicadorPagadorFlete: String(datos.indicadorPagadorFlete || "").trim(),
     items: Array.isArray(datos.items) ? datos.items : [],
     observaciones: datos.observaciones || "",
     comprobanteOrigenSerie: datos.comprobanteOrigenSerie || "",
@@ -1172,21 +1285,43 @@ exports.registrarGuiaService = async (pool, user, datos) => {
     emisorRuc         : rucEmisor,
     emisorNombre      : empresa.razonSocial,
     dirOrigen         : datos.dirOrigen || "",
-    ubigeoOrigen      : tipoDoc === "09" ? ubigeoValidoGre(datos.ubigeoOrigen) : String(datos.ubigeoOrigen || "").trim(),
+    ubigeoOrigen:
+      tipoDoc === "09" || tipoDoc === "31"
+        ? ubigeoValidoGre(datos.ubigeoOrigen)
+        : String(datos.ubigeoOrigen || "").trim(),
+    codLocalOrigen    : String(datos.codLocalOrigen || "").trim(),
+    departamentoOrigen: String(datos.departamentoOrigen || datos.regionOrigen || "").trim(),
+    provinciaOrigen   : String(datos.provinciaOrigen || "").trim(),
+    distritoOrigen    : String(datos.distritoOrigen || "").trim(),
     dirDestino        : datos.dirDestino || "",
-    ubigeoDestino     : tipoDoc === "09" ? ubigeoValidoGre(datos.ubigeoDestino) : String(datos.ubigeoDestino || "").trim(),
+    ubigeoDestino:
+      tipoDoc === "09" || tipoDoc === "31"
+        ? ubigeoValidoGre(datos.ubigeoDestino)
+        : String(datos.ubigeoDestino || "").trim(),
+    codLocalDestino   : String(datos.codLocalDestino || "").trim(),
+    departamentoDestino: String(datos.departamentoDestino || datos.regionDestino || "").trim(),
+    provinciaDestino  : String(datos.provinciaDestino || "").trim(),
+    distritoDestino   : String(datos.distritoDestino || "").trim(),
     tipoDocDestinatario: datos.tipoDocDestinatario || "",
     numDocDestinatario : datos.numDocDestinatario || "",
     nomDestinatario    : datos.nomDestinatario || "",
     telefonoDestinatario: datos.telefonoDestinatario || "",
+    tipoDocRemitente: String(datos.tipoDocRemitente || "").trim(),
+    numDocRemitente: String(datos.numDocRemitente || "").trim(),
+    nomRemitente: String(datos.nomRemitente || "").trim(),
+    idVehiculoEmpresa: String(datos.idVehiculoEmpresa || "").trim() || null,
     placaVehiculo      : datos.placaVehiculo || "",
     placaSecundaria    : datos.placaSecundaria || "",
+    vehiculoM1L        : Boolean(datos.vehiculoM1L), // Vehículo categoría M1 o L (exime conductor y placa)
     tipoDocConductor   : datos.tipoDocConductor || "",
     numeroDocConductor : datos.numeroDocConductor || "",
     nombreConductor    : datos.nombreConductor || "",
     licenciaConductor  : datos.licenciaConductor || "",
     rucTransportista   : datos.rucTransportista || "",
     razonSocialTransportista: datos.razonSocialTransportista || "",
+    nroMtcTransportista: datos.nroMtcTransportista || datos.inscripcionMtc || "",
+    registroMtcVehiculo: String(datos.registroMtcVehiculo || datos.inscripcionMtcVehiculo || "").trim(),
+    indicadorPagadorFlete: String(datos.indicadorPagadorFlete || "").trim(),
     items              : Array.isArray(datos.items) ? datos.items : [],
     observaciones      : datos.observaciones || "",
     comprobanteOrigenSerie  : datos.comprobanteOrigenSerie || "",

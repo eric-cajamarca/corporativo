@@ -32,9 +32,9 @@ for (const name of files) {
   );
 
   if (s === orig) {
-    console.log('Sin cambios:', name);
+    // console.log('Sin cambios:', name);
     continue;
   }
   fs.writeFileSync(p, s, 'utf8');
-  console.log('Parcheado:', name);
+  // console.log('Parcheado:', name);
 }

@@ -12,7 +12,10 @@
       </div>
       <div class="d-flex flex-wrap gap-2 align-items-center">
         <a class="btn btn-success btn-sm" routerLink="/facturacion/guias-remision">
-          <i class="bi bi-plus-lg me-1"></i> Agregar
+          <i class="bi bi-plus-lg me-1"></i> Guía remitente
+        </a>
+        <a class="btn btn-outline-success btn-sm" routerLink="/facturacion/guias-transportista">
+          <i class="bi bi-truck me-1"></i> Guía transportista
         </a>
         <a class="btn btn-outline-primary btn-sm" routerLink="/facturacion/guias/configuracion">
           <i class="bi bi-gear me-1"></i> Configuración
@@ -173,7 +176,7 @@
                           <a
                             *ngIf="esEditable(row)"
                             class="btn btn-sm btn-outline-warning me-1"
-                            [routerLink]="['/facturacion/guias-remision']"
+                            [routerLink]="row.tipoDocumento === '31' ? ['/facturacion/guias-transportista'] : ['/facturacion/guias-remision']"
                             [queryParams]="{ editar: row.idGuiaElectronica }"
                             title="Editar datos de la guía (mismo correlativo)">
                             <i class="bi bi-pencil"></i>

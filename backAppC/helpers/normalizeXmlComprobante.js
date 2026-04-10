@@ -88,8 +88,17 @@ function normalizeData(xmlParsed) {
       razonSocial: getVal(invoice, 'cac:AccountingSupplierParty.cac:Party.cac:PartyName.cbc:Name') || getV('cac:AccountingSupplierParty.cac:Party.cac:PartyName.cbc:Name')
     },
     cliente: {
-      numeroDocumento: invoice['cac:AccountingCustomerParty'] && getVal(invoice['cac:AccountingCustomerParty'], 'cac:Party', 'cac:PartyIdentification', 'cbc:ID'),
-      razonSocial: invoice['cac:AccountingCustomerParty'] && getVal(invoice['cac:AccountingCustomerParty'], 'cac:Party', 'cac:PartyLegalEntity', 'cbc:RegistrationName')
+      // Ruta completa desde Invoice (getVal con varios strings cortos no recorría el árbol).
+      numeroDocumento: getValInvoice(
+        invoice,
+        'cac:AccountingCustomerParty.cac:Party.cac:PartyIdentification.cbc:ID'
+      ),
+      razonSocial:
+        getValInvoice(
+          invoice,
+          'cac:AccountingCustomerParty.cac:Party.cac:PartyLegalEntity.cbc:RegistrationName'
+        ) ||
+        getValInvoice(invoice, 'cac:AccountingCustomerParty.cac:Party.cac:PartyName.cbc:Name')
     },
     totales: {
       totalValorVenta: getV('cac:LegalMonetaryTotal', 'cbc:LineExtensionAmount') || (invoice['cac:LegalMonetaryTotal'] && getVal(invoice['cac:LegalMonetaryTotal'], 'cbc:LineExtensionAmount')),

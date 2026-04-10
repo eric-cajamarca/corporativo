@@ -38,25 +38,25 @@ async function probar(etiqueta, url, body, headers = {}) {
     const h = { "Content-Type": CT, Accept: "application/json", ...headers };
     const r = await axios.post(url, body, { headers: h, timeout: 12000, validateStatus: () => true });
     const ok = r.status === 200 && r.data?.access_token;
-    console.log(`${ok ? "✅ ÉXITO" : "❌"} [${r.status}] ${etiqueta}`);
-    if (!ok) console.log(`   → ${JSON.stringify(r.data).slice(0, 150)}`);
-    if (ok)  console.log(`   token: ${r.data.access_token.slice(0, 30)}...`);
+    // console.log(`${ok ? "✅ ÉXITO" : "❌"} [${r.status}] ${etiqueta}`);
+    if (!ok) { /* console.log(`   → ${JSON.stringify(r.data).slice(0, 150)}`); */ }
+    if (ok)  { /* console.log(`   token: ${r.data.access_token.slice(0, 30)}...`); */ }
     return ok ? r.data.access_token : null;
   } catch (e) {
-    console.log(`⛔ RED  ${etiqueta}: ${e.message}`);
+    // console.log(`⛔ RED  ${etiqueta}: ${e.message}`);
     return null;
   }
 }
 
 (async () => {
-  console.log("=".repeat(65));
-  console.log("  DIAGNÓSTICO OAuth2 SUNAT GRE v2");
-  console.log(`  RUC:    ${RUC}`);
-  console.log(`  ID:     ${cid}`);
-  console.log(`  SECRET: ${csc.slice(0,6)}...${csc.slice(-4)} (len=${csc.length})`);
-  console.log(`  SECRET URL-encoded: ${cscE.slice(0,10)}...`);
-  console.log("=".repeat(65));
-  console.log("  Orden: primero path con client_id (estándar Web SUNAT), luego con RUC.");
+  // console.log("=".repeat(65));
+  // console.log("  DIAGNÓSTICO OAuth2 SUNAT GRE v2");
+  // console.log(`  RUC:    ${RUC}`);
+  // console.log(`  ID:     ${cid}`);
+  // console.log(`  SECRET: ${csc.slice(0,6)}...${csc.slice(-4)} (len=${csc.length})`);
+  // console.log(`  SECRET URL-encoded: ${cscE.slice(0,10)}...`);
+  // console.log("=".repeat(65));
+  // console.log("  Orden: primero path con client_id (estándar Web SUNAT), luego con RUC.");
 
   for (const { name, seg } of PATH_SEGMENTS) {
     const URL_C = `${BASE}/v1/clientesextranet/${seg}/oauth2/token/`;
@@ -80,10 +80,10 @@ async function probar(etiqueta, url, body, headers = {}) {
     }
   }
 
-  console.log("\n" + "=".repeat(65));
-  console.log("  TODAS LAS VARIANTES FALLARON.");
-  console.log("");
-  console.log("  Revise: ID+CLAVE del mismo registro Web; servicio GRE en la app;");
-  console.log("  path del token suele ser .../clientesextranet/{client_id}/ no {ruc}/.");
-  console.log("=".repeat(65));
+  // console.log("\n" + "=".repeat(65));
+  // console.log("  TODAS LAS VARIANTES FALLARON.");
+  // console.log("");
+  // console.log("  Revise: ID+CLAVE del mismo registro Web; servicio GRE en la app;");
+  // console.log("  path del token suele ser .../clientesextranet/{client_id}/ no {ruc}/.");
+  // console.log("=".repeat(65));
 })();

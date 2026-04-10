@@ -17,8 +17,15 @@ import { PdfService } from '../../../services/pdf.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { ConsultaXMLService } from '../../../services/consulta-xml.service';
+import { mapearSunatCompraNormalizadoAComprobanteOrigenGre } from '../utils/gre-consulta-compra-sunat.mapper';
+import { ProveedoresService } from '../../../services/proveedores.service';
+import {
+  ProveedorGreListado,
+  SeleccionarProveedorGreModalComponent
+} from '../seleccionar-proveedor-gre-modal/seleccionar-proveedor-gre-modal.component';
 
 declare const iziToast: any;
 
@@ -155,7 +162,14 @@ const UNIDADES_PESO = [
 @Component({
   selector: 'app-guias-remision',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    SidebarComponent,
+    TopnavComponent,
+    SeleccionarProveedorGreModalComponent
+  ],
   templateUrl: './guias-remision.component.html',
   styleUrl: './guias-remision.component.css'
 })
@@ -169,6 +183,8 @@ export class GuiasRemisionComponent implements OnInit {
   private clienteService = inject(ClienteService);
   private catalogosService = inject(CatalogosService);
   private enviosService = inject(EnviosService);
+  private consultaXmlService = inject(ConsultaXMLService);
+  private proveedoresService = inject(ProveedoresService);
   private pdfService = inject(PdfService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -184,6 +200,22 @@ export class GuiasRemisionComponent implements OnInit {
   motivosTraslado: { codigoSunat: string; descripcion: string }[] = [];
   /** Transportistas de la empresa (para transporte público) */
   transportistas: any[] = [];
+
+  /** Motivo 02 (compra): consulta factura/boleta del proveedor en SUNAT vía Factiliza (clave SOL). */
+  compraSunat = {
+    rucMiEmpresa: '',
+    usuarioSol: '',
+    passwordSol: '',
+    rucProveedor: '',
+    tipoDocCompra: '01' as '01' | '03'
+  };
+  consultandoCompraSunat = false;
+
+  /** Modal catálogo proveedores (compra SUNAT). */
+  modalProveedorGreVisible = false;
+  /** Direcciones del proveedor elegido → punto de partida en motivo compra. */
+  direccionesOrigenProveedorGre: any[] = [];
+  usarOrigenDireccionesProveedor = false;
 
   // Selección de comprobante origen
   buscarSerie = '';
@@ -256,13 +288,26 @@ export class GuiasRemisionComponent implements OnInit {
         forkJoin({
           dir: this.empresaService.getDireccionEmpresa_id().pipe(catchError(() => of({ data: [] }))),
           mot: this.catalogosService.codigosSunatMotivoTraslado().pipe(catchError(() => of({ data: [] }))),
-          trans: this.enviosService.obtenerTransportistas().pipe(catchError(() => of({ data: [] })))
+          trans: this.enviosService.obtenerTransportistas().pipe(catchError(() => of({ data: [] }))),
+          cfg: this.facturacionService.obtenerConfiguracion().pipe(catchError(() => of({ data: null })))
         }).subscribe({
-          next: ({ dir, mot, trans }) => {
+          next: ({ dir, mot, trans, cfg }) => {
             this.direccionesEmpresa = dir?.data || [];
             const m = mot?.data || [];
             this.motivosTraslado = m.length > 0 ? m : this.motivosTrasladoFallback();
             this.transportistas = trans?.data || [];
+            const c = cfg?.data;
+            if (c) {
+              const rucEmp = String(c.rucEmpresa || '')
+                .replace(/\D/g, '')
+                .slice(0, 11);
+              if (rucEmp.length === 11) {
+                this.compraSunat.rucMiEmpresa = rucEmp;
+              }
+              if (c.usuarioSunat) {
+                this.compraSunat.usuarioSol = String(c.usuarioSunat).trim();
+              }
+            }
             this.tryCargarEdicionDesdeQuery();
           },
           error: () => {
@@ -308,6 +353,15 @@ export class GuiasRemisionComponent implements OnInit {
       next: (res) => {
         this.cargandoEdicion = false;
         const g = res.data;
+        if (String(g.tipoDocumento || '') === '31') {
+          iziToast.info({
+            title: 'Redirigiendo',
+            message: 'Esta guía es transportista (31). Se abrirá el formulario correspondiente.',
+            position: 'topRight'
+          });
+          void this.router.navigate(['/facturacion/guias-transportista'], { queryParams: { editar: id }, replaceUrl: true });
+          return;
+        }
         const st = g.idEstadoSunat;
         if (st === 1 || st === 2) {
           iziToast.warning({
@@ -383,13 +437,31 @@ export class GuiasRemisionComponent implements OnInit {
     this.direccionOrigenSeleccionada =
       origenMatchExacto ||
       origenMatchDireccion ||
-      (dirO ? { direccion: dirO, ubigeo: ubiO, referencia: 'Desde guía guardada' } : null);
+      (dirO
+        ? {
+            direccion: dirO,
+            ubigeo: ubiO,
+            codLocal: String(d.codLocalOrigen || '').trim(),
+            region: d.departamentoOrigen || '',
+            provincia: d.provinciaOrigen || '',
+            distrito: d.distritoOrigen || '',
+            referencia: 'Desde guía guardada'
+          }
+        : null);
 
     const ubiD = String(d.ubigeoDestino || '').replace(/\D/g, '');
     const dirD = (d.dirDestino || '').trim();
     this.direccionesDestinoLocal = [];
     if (dirD) {
-      const dest = { direccion: dirD, ubigeo: ubiD, referencia: 'Desde guía guardada' };
+      const dest = {
+        direccion: dirD,
+        ubigeo: ubiD,
+        codLocal: String(d.codLocalDestino || '').trim(),
+        region: d.departamentoDestino || '',
+        provincia: d.provinciaDestino || '',
+        distrito: d.distritoDestino || '',
+        referencia: 'Desde guía guardada'
+      };
       this.direccionesDestinoLocal.push(dest);
       this.direccionDestinoSeleccionada = dest;
     } else {
@@ -424,20 +496,26 @@ export class GuiasRemisionComponent implements OnInit {
             } else {
               this.comprobanteOrigen = this.comprobanteOrigenSinteticoDesdeGuia(g, d);
               this.intentarAutocompletarUbigeoOrigen();
+              this.sincronizarDestinoAlmacenSiCompra();
             }
           },
           error: () => {
             this.comprobanteOrigen = this.comprobanteOrigenSinteticoDesdeGuia(g, d);
             this.intentarAutocompletarUbigeoOrigen();
+            this.sincronizarDestinoAlmacenSiCompra();
           }
         });
     } else {
       this.comprobanteOrigen = this.comprobanteOrigenSinteticoDesdeGuia(g, d);
       this.intentarAutocompletarUbigeoOrigen();
+      this.sincronizarDestinoAlmacenSiCompra();
     }
   }
 
   private intentarAutocompletarUbigeoOrigen(): void {
+    if (this.esMotivoCompraGre()) {
+      return;
+    }
     const ubigeoActual = String(this.direccionOrigenSeleccionada?.ubigeo || '').replace(/\D/g, '');
     if (ubigeoActual.length === 6) return;
 
@@ -478,6 +556,8 @@ export class GuiasRemisionComponent implements OnInit {
       rucCliente: d.numDocDestinatario,
       cliente: d.nomDestinatario,
       clienteDireccion: d.dirDestino || '',
+      ubigeoCliente: d.ubigeoDestino || '',
+      codLocalCliente: d.codLocalDestino || '',
       items: items.map((it) => ({
         codigo: it.codigo || '',
         descripcion: it.descripcion || '',
@@ -487,11 +567,397 @@ export class GuiasRemisionComponent implements OnInit {
     };
   }
 
+  /**
+   * Factura/boleta de compra registrada en SUNAT (emisor = proveedor).
+   * Usa POST consultar-comprobante-sunat; credenciales SOL pueden ir en el formulario o en Configuración → Facturación.
+   */
+  consultarFacturaCompraSunat(): void {
+    if (!this.esMotivoCompraGre()) {
+      iziToast.warning({
+        title: 'Motivo',
+        message: 'La consulta SUNAT de compra solo aplica con motivo 02 — Compra.',
+        position: 'topRight'
+      });
+      return;
+    }
+    const proveedor = String(this.compraSunat.rucProveedor || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    if (proveedor.length !== 11) {
+      iziToast.warning({
+        title: 'Proveedor',
+        message: 'Ingrese el RUC del proveedor (emisor de la factura de compra), 11 dígitos.',
+        position: 'topRight'
+      });
+      return;
+    }
+    if (!this.buscarSerie.trim() || !this.buscarNumero.trim()) {
+      iziToast.warning({
+        title: 'Comprobante',
+        message: 'Ingrese serie y número del comprobante de compra.',
+        position: 'topRight'
+      });
+      return;
+    }
+    const rucMi = String(this.compraSunat.rucMiEmpresa || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    if (rucMi.length !== 11) {
+      iziToast.warning({
+        title: 'RUC empresa',
+        message: 'Indique el RUC de su empresa (titular de la clave SOL). Se puede precargar desde Configuración → Facturación.',
+        position: 'topRight'
+      });
+      return;
+    }
+
+    this.consultandoCompraSunat = true;
+    const body: {
+      proveedor: string;
+      tipo_doc: string;
+      serie: string;
+      correlativo: string;
+      ruc?: string;
+      usuario?: string;
+      password?: string;
+    } = {
+      proveedor,
+      tipo_doc: this.compraSunat.tipoDocCompra,
+      serie: this.buscarSerie.trim(),
+      correlativo: this.buscarNumero.trim()
+    };
+    body.ruc = rucMi;
+    const u = this.compraSunat.usuarioSol.trim();
+    const p = this.compraSunat.passwordSol;
+    if (u) {
+      body.usuario = u;
+    }
+    if (p) {
+      body.password = p;
+    }
+
+    this.consultaXmlService.consultarComprobanteSunat(body).subscribe({
+      next: (res) => {
+        const raw = res?.data;
+        if (!raw) {
+          this.consultandoCompraSunat = false;
+          iziToast.error({ title: 'Error', message: 'SUNAT no devolvió datos del comprobante.', position: 'topRight' });
+          return;
+        }
+        const { comprobanteOrigen, buscarSerie, buscarNumero } =
+          mapearSunatCompraNormalizadoAComprobanteOrigenGre(raw);
+        this.buscarSerie = buscarSerie;
+        this.buscarNumero = buscarNumero;
+        this.comprobanteOrigen = comprobanteOrigen as any;
+        this.guia.motivoTraslado = '02';
+        this.enriquecerComprobanteCompraSunatYPrefill(this.comprobanteOrigen);
+      },
+      error: (err) => {
+        this.consultandoCompraSunat = false;
+        const msg =
+          err?.error?.message ||
+          err?.error?.msg ||
+          (typeof err?.error === 'string' ? err.error : '') ||
+          'No se pudo consultar el comprobante en SUNAT.';
+        iziToast.error({ title: 'Consulta SUNAT', message: msg, position: 'topRight', timeout: 9000 });
+      }
+    });
+  }
+
+  abrirModalSeleccionProveedorGre(): void {
+    this.modalProveedorGreVisible = true;
+  }
+
+  onModalProveedorGreCerrado(): void {
+    this.modalProveedorGreVisible = false;
+  }
+
+  /**
+   * Proveedor desde catálogo: RUC para SUNAT, direcciones como origen del traslado (compra) y datos en resumen si ya hay comprobante.
+   */
+  aplicarProveedorGreDesdeModal(p: ProveedorGreListado): void {
+    const ruc = String(p.ruc || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    if (ruc.length !== 11) {
+      iziToast.warning({
+        title: 'Proveedor',
+        message: 'El proveedor no tiene un RUC válido de 11 dígitos.',
+        position: 'topRight'
+      });
+      return;
+    }
+    this.compraSunat.rucProveedor = ruc;
+    this.proveedoresService.obtener_direccionesProveedor_idProveedor(p.idProveedor).subscribe({
+      next: (res: { data?: unknown[] }) => {
+        const raw = Array.isArray(res?.data) ? res.data : [];
+        const lista = raw.map((d) => this.mapDireccionProveedorGreRow(d as Record<string, unknown>));
+        this.direccionesOrigenProveedorGre = lista;
+        this.usarOrigenDireccionesProveedor = lista.length > 0;
+        if (lista.length > 0) {
+          const principal = lista.find((x: any) => x.principal) || lista[0];
+          this.direccionOrigenSeleccionada = principal;
+        } else {
+          this.direccionOrigenSeleccionada = null;
+          this.intentarAutocompletarUbigeoOrigen();
+          iziToast.info({
+            title: 'Sin direcciones de proveedor',
+            message:
+              'Registre direcciones del proveedor en Compras o use «Buscar anexos RUC» con el RUC indicado.',
+            position: 'topRight'
+          });
+        }
+        if (this.comprobanteOrigen) {
+          this.comprobanteOrigen.rucEmisor = ruc;
+          this.comprobanteOrigen.rucEmpresa = ruc;
+          const nom = String(p.rSocial || '').trim();
+          if (nom) {
+            this.comprobanteOrigen.nombreEmisor = nom;
+          }
+        }
+        iziToast.success({
+          title: 'Proveedor',
+          message: `${p.rSocial || ruc} seleccionado. ${lista.length ? 'Origen cargado desde sus direcciones.' : 'Indique origen manualmente o anexos SUNAT.'}`,
+          position: 'topRight'
+        });
+        this.sincronizarDestinoAlmacenSiCompra();
+      },
+      error: () => {
+        iziToast.error({
+          title: 'Error',
+          message: 'No se pudieron cargar las direcciones del proveedor.',
+          position: 'topRight'
+        });
+      }
+    });
+  }
+
+  private mapDireccionProveedorGreRow(d: Record<string, unknown>): Record<string, unknown> {
+    return {
+      idDireccionProveedor: d['idDireccionProveedor'],
+      direccion: String(d['direccion'] || '').trim(),
+      ubigeo: String(d['ubigeo'] || '')
+        .replace(/\D/g, '')
+        .slice(0, 6),
+      codLocal: String(d['codLocal'] || '').trim(),
+      region: String(d['region'] || '').trim(),
+      provincia: String(d['provincia'] || '').trim(),
+      distrito: String(d['distrito'] || '').trim(),
+      referencia: String(d['referencia'] || 'Proveedor').trim(),
+      principal: d['principal'] === true || d['principal'] === 1
+    };
+  }
+
+  private limpiarOrigenProveedorGre(): void {
+    this.usarOrigenDireccionesProveedor = false;
+    this.direccionesOrigenProveedorGre = [];
+    this.intentarAutocompletarUbigeoOrigen();
+  }
+
+  /** Si el XML de SUNAT trae otro RUC emisor que el catálogo de direcciones, se revierte el origen por proveedor. */
+  private sincronizarOrigenProveedorConRucComprobante(co: any): void {
+    if (!this.usarOrigenDireccionesProveedor) {
+      return;
+    }
+    const rucXml = String(co?.rucEmisor || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    const rucForm = String(this.compraSunat.rucProveedor || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    if (rucXml.length === 11 && rucForm.length === 11 && rucXml !== rucForm) {
+      this.limpiarOrigenProveedorGre();
+    }
+  }
+
+  /** Motivo 02 (compra): origen = proveedor, destino = almacén empresa. Resto (p. ej. 01 venta): origen = empresa, destino = cliente. */
+  esMotivoCompraGre(): boolean {
+    return this.guia.motivoTraslado === '02';
+  }
+
+  listaDireccionesOrigenGre(): any[] {
+    return this.esMotivoCompraGre() ? this.direccionesOrigenProveedorGre : this.direccionesEmpresa;
+  }
+
+  listaDireccionesDestinoGre(): any[] {
+    return this.esMotivoCompraGre() ? this.direccionesEmpresa : this.direccionesDestinoLocal;
+  }
+
+  onMotivoTrasladoGreChange(): void {
+    const co = this.comprobanteOrigen;
+    if (co && this.guia.motivoTraslado) {
+      const coEsCompraSunat = !!co.origenDesdeCompraSunat;
+      if (this.esMotivoCompraGre() !== coEsCompraSunat) {
+        this.comprobanteOrigen = null;
+        this.buscarSerie = '';
+        this.buscarNumero = '';
+        iziToast.info({
+          title: 'Comprobante',
+          message: 'El comprobante cargado no coincide con el motivo. Busque o consulte de nuevo según corresponda.',
+          position: 'topRight'
+        });
+      }
+    }
+    if (this.esMotivoCompraGre()) {
+      this.direccionesDestinoLocal = [];
+      this.direccionOrigenSeleccionada = null;
+      if (this.usarOrigenDireccionesProveedor && this.direccionesOrigenProveedorGre.length > 0) {
+        this.direccionOrigenSeleccionada =
+          this.direccionesOrigenProveedorGre.find((x: any) => x.principal) ||
+          this.direccionesOrigenProveedorGre[0];
+      }
+      this.anexosDestino = [];
+      this.sincronizarDestinoAlmacenSiCompra();
+    } else {
+      this.limpiarOrigenProveedorGre();
+      this.direccionOrigenSeleccionada = null;
+      this.intentarAutocompletarUbigeoOrigen();
+      this.anexosDestino = [];
+      if (this.comprobanteOrigen) {
+        this.cargarDireccionesDestinoLocal(this.comprobanteOrigen);
+      } else {
+        this.direccionesDestinoLocal = [];
+        this.direccionDestinoSeleccionada = null;
+      }
+    }
+  }
+
+  private rucMiEmpresaNormalizado(): string {
+    const r = String(this.empresaService.getEmpresaActual()?.ruc || this.compraSunat.rucMiEmpresa || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    return r.length === 11 ? r : '';
+  }
+
+  /** Si motivo compra, el destino del traslado es el almacén (direcciones de la empresa). */
+  private sincronizarDestinoAlmacenSiCompra(): void {
+    if (!this.esMotivoCompraGre()) {
+      return;
+    }
+    if (!this.direccionesEmpresa?.length) {
+      return;
+    }
+    const principal = this.direccionesEmpresa.find(
+      (x: any) => x.principal === true || x.principal === 1
+    ) || this.direccionesEmpresa[0];
+    this.direccionDestinoSeleccionada = principal;
+  }
+
+  private rucParaAnexosOrigenGre(): string {
+    if (this.esMotivoCompraGre()) {
+      const r = String(
+        this.comprobanteOrigen?.rucEmpresa ||
+          this.comprobanteOrigen?.rucEmisor ||
+          this.compraSunat.rucProveedor ||
+          ''
+      )
+        .replace(/\D/g, '')
+        .slice(0, 11);
+      return r.length === 11 ? r : '';
+    }
+    const rEmp = this.rucMiEmpresaNormalizado();
+    if (rEmp) {
+      return rEmp;
+    }
+    const r = String(this.comprobanteOrigen?.rucEmisor || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    return r.length === 11 ? r : '';
+  }
+
+  /** Tras consulta SUNAT compra: marca origen, completa RUC receptor si falta, Factiliza RUC para nombres y prefill destinatario. */
+  private enriquecerComprobanteCompraSunatYPrefill(co: any): void {
+    this.sincronizarOrigenProveedorConRucComprobante(co);
+    co.origenDesdeCompraSunat = true;
+    const rMi = String(this.compraSunat.rucMiEmpresa || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    if (rMi.length === 11 && !String(co.documento_cliente || co.rucCliente || '').trim()) {
+      co.documento_cliente = rMi;
+      co.rucCliente = rMi;
+    }
+    const rProv = String(co.rucEmisor || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    const needProvNombre = rProv.length === 11 && !String(co.nombreEmisor || '').trim();
+    const needRecNombre =
+      rMi.length === 11 && !String(co.cliente || co.razon_social || '').trim();
+
+    const finish = () => {
+      this.consultandoCompraSunat = false;
+      this.cargarDireccionesDestinoLocal(co);
+      this.prefillDestinatarioDesdeComprobante(co);
+      iziToast.success({
+        title: 'Comprobante cargado',
+        message: 'Detalle desde SUNAT. Revise proveedor, receptor, direcciones y ubigeo.',
+        position: 'topRight'
+      });
+    };
+
+    if (!needProvNombre && !needRecNombre) {
+      finish();
+      return;
+    }
+
+    const reqs: Record<string, Observable<unknown>> = {};
+    if (needProvNombre) {
+      reqs['prov'] = this.factilizaService.getRuc(rProv).pipe(catchError(() => of(null)));
+    }
+    if (needRecNombre) {
+      reqs['rec'] = this.factilizaService.getRuc(rMi).pipe(catchError(() => of(null)));
+    }
+
+    forkJoin(reqs).subscribe({
+      next: (out) => {
+        const rzP = this.extraerRazonSocialRucFactiliza(out['prov']);
+        const rzR = this.extraerRazonSocialRucFactiliza(out['rec']);
+        if (rzP) {
+          co.nombreEmisor = rzP;
+        }
+        if (rzR) {
+          co.cliente = rzR;
+          co.razon_social = rzR;
+        }
+        finish();
+      },
+      error: () => finish()
+    });
+  }
+
+  private extraerRazonSocialRucFactiliza(res: unknown): string {
+    const o = res && typeof res === 'object' ? (res as Record<string, unknown>) : null;
+    if (!o) return '';
+    const d = o['data'];
+    if (d && typeof d === 'object') {
+      const dr = d as Record<string, unknown>;
+      const r = String(dr['razonSocial'] || dr['nombre'] || '').trim();
+      if (r) return r;
+    }
+    return String(o['razonSocial'] || '').trim();
+  }
+
   buscarComprobanteOrigen(): void {
+    if (!this.guia.motivoTraslado) {
+      iziToast.warning({
+        title: 'Motivo',
+        message: 'Seleccione primero el motivo de traslado.',
+        position: 'topRight'
+      });
+      return;
+    }
     if (!this.buscarSerie.trim() || !this.buscarNumero.trim()) {
       iziToast.warning({
         title: 'Datos incompletos',
         message: 'Ingrese serie y número del comprobante',
+        position: 'topRight'
+      });
+      return;
+    }
+    if (this.guia.motivoTraslado === '02') {
+      iziToast.info({
+        title: 'Motivo compra',
+        message:
+          'La búsqueda interna solo lista comprobantes de venta emitidos por su empresa. Para una compra use «Consultar en SUNAT (Factiliza)» abajo.',
         position: 'topRight'
       });
       return;
@@ -503,6 +969,8 @@ export class GuiasRemisionComponent implements OnInit {
       next: (res: any) => {
         if (res?.data) {
           this.comprobanteOrigen = res.data;
+          delete this.comprobanteOrigen.origenDesdeCompraSunat;
+          this.limpiarOrigenProveedorGre();
           this.cargarDireccionesDestinoLocal(res.data);
           this.prefillDestinatarioDesdeComprobante(res.data);
         } else {
@@ -524,6 +992,11 @@ export class GuiasRemisionComponent implements OnInit {
   }
 
   private cargarDireccionesDestinoLocal(comprobante: any): void {
+    if (this.esMotivoCompraGre()) {
+      this.direccionesDestinoLocal = [];
+      this.sincronizarDestinoAlmacenSiCompra();
+      return;
+    }
     const idClienteRaw = comprobante?.idCliente;
     const idCliente = Number(idClienteRaw);
     if (Number.isFinite(idCliente) && idCliente > 0) {
@@ -567,7 +1040,13 @@ export class GuiasRemisionComponent implements OnInit {
     const dir = (comprobante?.clienteDireccion || '').toString().trim();
     const ubigeo = String(comprobante?.ubigeoCliente || '').replace(/\D/g, '');
     if (!dir) return;
-    const destino = { direccion: dir, ubigeo, referencia: 'Dirección del cliente' };
+    const codLocal = String(comprobante?.codLocalCliente || '').trim();
+    const destino = {
+      direccion: dir,
+      ubigeo,
+      codLocal,
+      referencia: 'Dirección del cliente'
+    };
     this.direccionesDestinoLocal.push(destino);
     this.direccionDestinoSeleccionada = destino;
   }
@@ -716,11 +1195,13 @@ export class GuiasRemisionComponent implements OnInit {
   }
 
   consultarAnexosOrigenPorRuc(): void {
-    const ruc = this.comprobanteOrigen?.rucEmpresa || this.comprobanteOrigen?.rucEmisor;
+    const ruc = this.rucParaAnexosOrigenGre();
     if (!ruc) {
       iziToast.warning({
-        title: 'Sin RUC emisor',
-        message: 'No hay RUC de emisor en el comprobante origen',
+        title: 'Sin RUC',
+        message: this.esMotivoCompraGre()
+          ? 'Indique RUC proveedor, elija proveedor desde el catálogo o cargue el comprobante de compra.'
+          : 'No se pudo obtener el RUC de su empresa para anexos del almacén de origen.',
         position: 'topRight'
       });
       return;
@@ -747,11 +1228,17 @@ export class GuiasRemisionComponent implements OnInit {
   }
 
   consultarAnexosDestinoPorRuc(): void {
-    const ruc = this.comprobanteOrigen?.documento_cliente || this.comprobanteOrigen?.rucCliente;
-    if (!ruc) {
+    const ruc = this.esMotivoCompraGre()
+      ? this.rucMiEmpresaNormalizado()
+      : String(this.comprobanteOrigen?.documento_cliente || this.comprobanteOrigen?.rucCliente || '')
+          .replace(/\D/g, '')
+          .slice(0, 11);
+    if (!ruc || String(ruc).length !== 11) {
       iziToast.warning({
-        title: 'Sin RUC destino',
-        message: 'El comprobante no tiene RUC del destinatario',
+        title: 'Sin RUC',
+        message: this.esMotivoCompraGre()
+          ? 'No hay RUC de su empresa para consultar anexos del almacén de destino.'
+          : 'El comprobante no tiene RUC del cliente destinatario.',
         position: 'topRight'
       });
       return;
@@ -861,8 +1348,16 @@ export class GuiasRemisionComponent implements OnInit {
       // Origen / Destino
       dirOrigen: this.direccionOrigenSeleccionada?.direccion || '',
       ubigeoOrigen: this.direccionOrigenSeleccionada?.ubigeo || '',
+      codLocalOrigen: String(this.direccionOrigenSeleccionada?.codLocal || '').trim(),
+      departamentoOrigen: String(this.direccionOrigenSeleccionada?.region || '').trim(),
+      provinciaOrigen: String(this.direccionOrigenSeleccionada?.provincia || '').trim(),
+      distritoOrigen: String(this.direccionOrigenSeleccionada?.distrito || '').trim(),
       dirDestino: this.direccionDestinoSeleccionada?.direccion || '',
       ubigeoDestino: this.direccionDestinoSeleccionada?.ubigeo || '',
+      codLocalDestino: String(this.direccionDestinoSeleccionada?.codLocal || '').trim(),
+      departamentoDestino: String(this.direccionDestinoSeleccionada?.region || '').trim(),
+      provinciaDestino: String(this.direccionDestinoSeleccionada?.provincia || '').trim(),
+      distritoDestino: String(this.direccionDestinoSeleccionada?.distrito || '').trim(),
       // Destinatario
       tipoDocDestinatario: this.destinatario.tipoDoc || '6',
       numDocDestinatario: this.destinatario.numeroDoc || '',

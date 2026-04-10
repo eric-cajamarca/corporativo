@@ -42,15 +42,15 @@ function canonInvoiceBody(xmlStr) {
 
 const a = canonInvoiceBody(miniInvoice("<ext:ExtensionContent/>"));
 const b = canonInvoiceBody(miniInvoice("<ext:ExtensionContent></ext:ExtensionContent>"));
-console.log("self-close length", a.length, "explicit empty length", b.length);
-console.log("equal", a === b);
+// console.log("self-close length", a.length, "explicit empty length", b.length);
+// console.log("equal", a === b);
 if (a !== b) {
   const la = a.length;
   const lb = b.length;
   const n = Math.min(la, lb);
   for (let i = 0; i < n; i++) {
     if (a[i] !== b[i]) {
-      console.log("first diff at", i, JSON.stringify(a.slice(i, i + 80)), "vs", JSON.stringify(b.slice(i, i + 80)));
+      // console.log("first diff at", i, JSON.stringify(a.slice(i, i + 80)), "vs", JSON.stringify(b.slice(i, i + 80)));
       break;
     }
   }

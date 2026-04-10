@@ -90,5 +90,5 @@ function verify(signedXml, publicCertPem) {
 
 const bad = firmar([TRANSFORM_ENVELOPED]);
 const good = firmar([TRANSFORM_ENVELOPED, C14N]);
-console.log("solo enveloped -> checkSignature:", verify(bad.signed, bad.publicCertPem));
-console.log("enveloped + c14n -> checkSignature:", verify(good.signed, good.publicCertPem));
+// console.log("solo enveloped -> checkSignature:", verify(bad.signed, bad.publicCertPem));
+// console.log("enveloped + c14n -> checkSignature:", verify(good.signed, good.publicCertPem));

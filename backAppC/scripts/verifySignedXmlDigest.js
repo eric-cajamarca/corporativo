@@ -27,9 +27,9 @@ try {
   console.error("checkSignature threw:", e.message);
   process.exit(1);
 }
-console.log("checkSignature:", ok);
+// console.log("checkSignature:", ok);
 sig.getReferences().forEach((r, i) => {
   if (r.validationError) {
-    console.log("ref", i, r.validationError.message);
+    // console.log("ref", i, r.validationError.message);
   }
 });

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DespatchAdvice xmlns="urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
+  <ext:UBLExtensions>
+    <ext:UBLExtension>
+      <ext:ExtensionContent><ds:Signature Id="SignSUNAT" xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI=""><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>YJmk8S3thnQaq+T3kPNFBL4eXPlaWmPlizfAfCRVhag=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>TbNQpWsIuWUESHTe1LGxnF6E7AyyAfME2KUwCSLmCYnvvjUiSmDHIk7Av8SpxzIeGSenSAM8ppivCB7nwh4XwD0LplEWl2661uOm0LxNKHju6jBoDjs2R0fGu4MG5kSURd7MfVWK2vM6V1rhzqELTI2dP5lxj8QJKHBoog/WSm9N0PT8CZkkV5lF8tgV1B5YgQvkbBzonWSoB8gYIY/UQN2zPPPyDCOYDyEHg0Zn9++yI3wYRs+qpZyWtTLgbfdWuf5k+dL4sQcvgBQdFoN8H/69LvdFh4TZXtWf2ZX4gKi+YaErNKzgJVOmNBP/z4ZoehjTgEYXwgDq8XS3pDw+Ew==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>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</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></ext:ExtensionContent>
+    </ext:UBLExtension>
+  </ext:UBLExtensions>
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>2.0</cbc:CustomizationID>
+  <cbc:ID>T001-00000004</cbc:ID>
+  <cbc:IssueDate>2026-04-09</cbc:IssueDate>
+  <cbc:IssueTime>16:44:37</cbc:IssueTime>
+  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">09</cbc:DespatchAdviceTypeCode>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>F001-00000030</cbc:ID>
+    <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Documento relacionado al transporte" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo61">01</cbc:DocumentTypeCode>
+    <cbc:DocumentType>FACTURA</cbc:DocumentType>
+    <cac:IssuerParty>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">10456333538</cbc:ID>
+      </cac:PartyIdentification>
+    </cac:IssuerParty>
+  </cac:AdditionalDocumentReference>
+  <cac:Signature>
+    <cbc:ID>10456333538</cbc:ID>
+    <cac:SignatoryParty>
+      <cac:PartyIdentification>
+        <cbc:ID>10456333538</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name><![CDATA[ORTIZ GUEVARA ERIC]]></cbc:Name>
+      </cac:PartyName>
+    </cac:SignatoryParty>
+    <cac:DigitalSignatureAttachment>
+      <cac:ExternalReference>
+        <cbc:URI>#GREENTER-SIGN</cbc:URI>
+      </cac:ExternalReference>
+    </cac:DigitalSignatureAttachment>
+  </cac:Signature>
+  <cac:DespatchSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">10456333538</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName><![CDATA[ORTIZ GUEVARA ERIC]]></cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DespatchSupplierParty>
+  <cac:DeliveryCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">20615033341</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName><![CDATA[T&N CORPORACION ITZEL S.A.C]]></cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:DeliveryCustomerParty>
+  <cac:Shipment>
+    <cbc:ID>SUNAT_Envio</cbc:ID>
+    <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">01</cbc:HandlingCode>
+    <cbc:HandlingInstructions>VENTA</cbc:HandlingInstructions>
+    <cbc:GrossWeightMeasure unitCode="KGM">2.000</cbc:GrossWeightMeasure>
+    <cbc:TotalTransportHandlingUnitQuantity>1</cbc:TotalTransportHandlingUnitQuantity>
+    <cac:ShipmentStage>
+      <cbc:TransportModeCode listName="Modalidad de traslado" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">02</cbc:TransportModeCode>
+      <cac:TransitPeriod>
+        <cbc:StartDate>2026-04-09</cbc:StartDate>
+      </cac:TransitPeriod>
+      <cac:DriverPerson>
+        <cbc:ID schemeID="1" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">27286084</cbc:ID>
+        <cbc:FirstName>JOSE</cbc:FirstName>
+        <cbc:FamilyName>OLIVERA MERA</cbc:FamilyName>
+        <cbc:JobTitle>Principal</cbc:JobTitle>
+        <cac:IdentityDocumentReference>
+          <cbc:ID>L27286084</cbc:ID>
+        </cac:IdentityDocumentReference>
+      </cac:DriverPerson>
+    </cac:ShipmentStage>
+    <cac:Delivery>
+      <cac:DeliveryAddress>
+          <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI">060801</cbc:ID>
+          <cac:AddressLine>
+            <cbc:Line>AV. PAKAMUROS NRO. 1801 OTR. VIA PAKAMUROS</cbc:Line>
+          </cac:AddressLine>
+      </cac:DeliveryAddress>
+      <cac:Despatch>
+        <cac:DespatchAddress>
+          <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI">060801</cbc:ID>
+          <cac:AddressLine>
+            <cbc:Line>MZA. B LOTE. 14 LOS LIBERTADORES</cbc:Line>
+          </cac:AddressLine>
+        </cac:DespatchAddress>
+      </cac:Despatch>
+    </cac:Delivery>
+    <cac:TransportHandlingUnit>
+      <cac:TransportEquipment>
+        <cbc:ID>P1H875</cbc:ID>
+      </cac:TransportEquipment>
+    </cac:TransportHandlingUnit>
+  </cac:Shipment>
+  <cac:DespatchLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:DeliveredQuantity unitCode="NIU">1.00</cbc:DeliveredQuantity>
+    <cac:OrderLineReference>
+      <cbc:LineID>1</cbc:LineID>
+    </cac:OrderLineReference>
+    <cac:Item>
+      <cbc:Description><![CDATA[CAMARA WI-FI TRIPLE LENTE DE 11MP (3MP + 3MP + 5MP) FULL COLOR IMOU CRUISER DUAL (IPC-S7UN-11M0WED)]]></cbc:Description>
+      <cac:SellersItemIdentification>
+        <cbc:ID>10004</cbc:ID>
+      </cac:SellersItemIdentification>
+    </cac:Item>
+  </cac:DespatchLine>
+</DespatchAdvice>

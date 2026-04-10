@@ -510,8 +510,16 @@ export interface GuiaDetalle extends GuiaEmitidaListItem {
     emisorNombre?: string;
     dirOrigen?: string;
     ubigeoOrigen?: string;
+    codLocalOrigen?: string;
+    departamentoOrigen?: string;
+    provinciaOrigen?: string;
+    distritoOrigen?: string;
     dirDestino?: string;
     ubigeoDestino?: string;
+    codLocalDestino?: string;
+    departamentoDestino?: string;
+    provinciaDestino?: string;
+    distritoDestino?: string;
     tipoDocDestinatario?: string;
     numDocDestinatario?: string;
     nomDestinatario?: string;
@@ -524,12 +532,20 @@ export interface GuiaDetalle extends GuiaEmitidaListItem {
     licenciaConductor?: string;
     rucTransportista?: string;
     razonSocialTransportista?: string;
+    vehiculoM1L?: boolean;
+    tipoDocRemitente?: string;
+    numDocRemitente?: string;
+    nomRemitente?: string;
+    idVehiculoEmpresa?: string;
     items?: { codigo?: string; descripcion?: string; cantidad: number; unidad?: string }[];
     observaciones?: string;
     comprobanteOrigenSerie?: string;
     comprobanteOrigenNumero?: string;
     tipoComprobanteOrigen?: string;
     rucEmisorDocumentoRelacionado?: string;
+    indicadorPagadorFlete?: string;
+    registroMtcVehiculo?: string;
+    nroMtcTransportista?: string;
   } | null;
 }
 
@@ -543,6 +559,14 @@ export interface RegistrarGuiaPayload {
   cantidadPeso?: number | null;
   unidadMedidaPeso?: string;
   modalidadTransporte: string;
+  /** GRE transportista (31): vehículo categoría M1/L exime conductor y placa en validación SUNAT. */
+  vehiculoM1L?: boolean;
+  /** Remitente de la carga (DespatchParty) — obligatorio en tipo 31. */
+  tipoDocRemitente?: string;
+  numDocRemitente?: string;
+  nomRemitente?: string;
+  /** Vehículo del catálogo empresa (opcional; referencia para placa). */
+  idVehiculoEmpresa?: string;
   // Transporte privado
   placaVehiculo?: string;
   placaSecundaria?: string;
@@ -553,11 +577,28 @@ export interface RegistrarGuiaPayload {
   // Transporte público
   rucTransportista?: string;
   razonSocialTransportista?: string;
+  /** Inscripción MTC del transportista (GRE 31: CarrierParty/CompanyID). */
+  nroMtcTransportista?: string;
+  /** Inscripción/registro MTC del vehículo (ApplicableTransportMeans/RegistrationNationalityID). */
+  registroMtcVehiculo?: string;
+  /** REMITENTE | DESTINATARIO | TRANSPORTISTA → SpecialInstructions SUNAT pagador de flete. */
+  indicadorPagadorFlete?: string;
   // Origen / Destino
   dirOrigen?: string;
   ubigeoOrigen?: string;
+  /** Código de establecimiento SUNAT (4 dígitos) — AddressTypeCode en OriginAddress / RegistrationAddress */
+  codLocalOrigen?: string;
+  /** Departamento (o region de DireccionEmpresa) para XML partida */
+  departamentoOrigen?: string;
+  provinciaOrigen?: string;
+  distritoOrigen?: string;
   dirDestino?: string;
   ubigeoDestino?: string;
+  codLocalDestino?: string;
+  /** Departamento (o region de DireccionClientes) para XML llegada */
+  departamentoDestino?: string;
+  provinciaDestino?: string;
+  distritoDestino?: string;
   // Destinatario
   tipoDocDestinatario?: string;
   numDocDestinatario?: string;

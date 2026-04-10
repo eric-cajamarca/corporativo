@@ -62,13 +62,13 @@ const sigNode = xpath.select1(
 const xmlWithSig = new XMLSerializer().serializeToString(docB);
 const canonB = getInvoiceCanon(xmlWithSig, sigNode);
 
-console.log("canonA === canonB", canonA === canonB);
-console.log("len A", canonA.length, "len B", canonB.length);
+// console.log("canonA === canonB", canonA === canonB);
+// console.log("len A", canonA.length, "len B", canonB.length);
 if (canonA !== canonB) {
   for (let i = 0; i < Math.min(canonA.length, canonB.length); i++) {
     if (canonA[i] !== canonB[i]) {
-      console.log("diff@", i, canonA.slice(i, i + 120));
-      console.log("    ", canonB.slice(i, i + 120));
+      // console.log("diff@", i, canonA.slice(i, i + 120));
+      // console.log("    ", canonB.slice(i, i + 120));
       break;
     }
   }

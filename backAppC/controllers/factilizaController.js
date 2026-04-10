@@ -4,7 +4,44 @@ const JSZip = require('jszip');
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const factilizaRepository = require('../repositories/factiliza.repository');
+const facturacionRepo = require('../repositories/facturacion.repository');
+const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
 const { normalizeData } = require('../helpers/normalizeXmlComprobante');
+
+/**
+ * Completa RUC/usuario/clave SOL desde Configuración facturación si faltan en body o EmpresaFactiliza.
+ */
+async function completarCredencialesSolDesdeFacturacion(pool, idEmpresa, ruc, usuario, password) {
+  let rucF = String(ruc || '')
+    .replace(/\D/g, '')
+    .slice(0, 11);
+  let u = String(usuario || '').trim();
+  let p = String(password || '').trim();
+  if (rucF.length === 11 && u && p) {
+    return { ruc: rucF, usuario: u, password: p };
+  }
+  const cfg = await facturacionRepo.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
+  if (!cfg) {
+    return { ruc: rucF, usuario: u, password: p };
+  }
+  const rucEmp = String(cfg.rucEmpresa || '')
+    .replace(/\D/g, '')
+    .slice(0, 11);
+  if (rucF.length !== 11 && rucEmp.length === 11) {
+    rucF = rucEmp;
+  }
+  if (!u && cfg.usuarioSunat) {
+    u = String(cfg.usuarioSunat).trim();
+  }
+  if (!p && cfg.claveSunat) {
+    try {
+      p = (cifradoClaveCertificado.descifrar(cfg.claveSunat) || '').trim();
+    } catch (err) {
+      console.error('completarCredencialesSolDesdeFacturacion descifrar:', err.message);
+    }
+  }
+  return { ruc: rucF, usuario: u, password: p };
+}
 
 const NOMBRE_SERVICIO_FACTILIZA_PDF = 'Factiliza SUNAT PDF';
 
@@ -373,13 +410,19 @@ const consultarComprobanteSunat = async function (req, res) {
     const pool = await sql.connect(dbConfig);
     const acceso = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
 
-    const rucFinal = ruc || acceso.rucEmpresa;
-    const usuarioFinal = usuario || acceso.usuarioSol;
-    const passwordFinal = password || acceso.passwordSol;
+    let rucFinal = ruc || acceso.rucEmpresa;
+    let usuarioFinal = usuario || acceso.usuarioSol;
+    let passwordFinal = password || acceso.passwordSol;
+    const creds = await completarCredencialesSolDesdeFacturacion(pool, idEmpresa, rucFinal, usuarioFinal, passwordFinal);
+    rucFinal = creds.ruc;
+    usuarioFinal = creds.usuario;
+    passwordFinal = creds.password;
 
-    if (!rucFinal || !usuarioFinal || !passwordFinal) {
+    if (!rucFinal || String(rucFinal).replace(/\D/g, '').length !== 11 || !usuarioFinal || !passwordFinal) {
       return res.status(400).json({
-        message: 'Configure Factiliza para su empresa (ruc, usuario, contraseña SOL) o envíelos en el body'
+        message:
+          'Indique RUC de su empresa, usuario y contraseña SOL (o guárdelos en Configuración → Facturación y en Factiliza para la empresa). ' +
+          'Para facturas de compra, el campo proveedor debe ser el RUC del emisor del comprobante.'
       });
     }
 
@@ -389,7 +432,8 @@ const consultarComprobanteSunat = async function (req, res) {
     }
 
     const urlApi = acceso.urlApi || 'https://api.factiliza.com/v1/sunat/xml';
-    const apiBody = { ruc: rucFinal, usuario: usuarioFinal, password: passwordFinal, proveedor, tipo_doc, serie, correlativo };
+    const ruc11 = String(rucFinal).replace(/\D/g, '').slice(0, 11);
+    const apiBody = { ruc: ruc11, usuario: usuarioFinal, password: passwordFinal, proveedor, tipo_doc, serie, correlativo };
 
     const response = await fetch(urlApi, {
       method: 'POST',
@@ -454,13 +498,18 @@ const consultarComprobantePdf = async function (req, res) {
 
     const acceso = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
 
-    const rucFinal = ruc || acceso.rucEmpresa;
-    const usuarioFinal = usuario || acceso.usuarioSol;
-    const passwordFinal = password || acceso.passwordSol;
+    let rucFinal = ruc || acceso.rucEmpresa;
+    let usuarioFinal = usuario || acceso.usuarioSol;
+    let passwordFinal = password || acceso.passwordSol;
+    const credsPdf = await completarCredencialesSolDesdeFacturacion(pool, idEmpresa, rucFinal, usuarioFinal, passwordFinal);
+    rucFinal = credsPdf.ruc;
+    usuarioFinal = credsPdf.usuario;
+    passwordFinal = credsPdf.password;
 
-    if (!rucFinal || !usuarioFinal || !passwordFinal) {
+    if (!rucFinal || String(rucFinal).replace(/\D/g, '').length !== 11 || !usuarioFinal || !passwordFinal) {
       return res.status(400).json({
-        message: 'Configure Factiliza para su empresa (ruc, usuario, contraseña SOL) o envíelos en el body'
+        message:
+          'Indique RUC de su empresa, usuario y contraseña SOL, o configúrelos en Facturación / Factiliza para su empresa.'
       });
     }
 
@@ -469,8 +518,9 @@ const consultarComprobantePdf = async function (req, res) {
       return res.status(403).json({ message: 'No hay token Factiliza configurado para su empresa' });
     }
 
+    const ruc11Pdf = String(rucFinal).replace(/\D/g, '').slice(0, 11);
     const apiBody = {
-      ruc: rucFinal,
+      ruc: ruc11Pdf,
       usuario: usuarioFinal,
       password: passwordFinal,
       proveedor,

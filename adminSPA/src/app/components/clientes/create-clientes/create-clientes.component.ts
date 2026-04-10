@@ -59,8 +59,8 @@ export class CreateClientesComponent {
     region: '',
     provincia: '',
     distrito: '',
-    principal: false,
-    codLocal: '0',
+    principal: true,
+    codLocal: '0000',
     urbanizacion: '',
   };
   public data: any = {};
@@ -301,6 +301,8 @@ private async handleRucSearch(): Promise<void> {
     this.direccionClientes.region = dep ? this.findLocationId(this.regiones, dep, 'departamento') : undefined;
     this.direccionClientes.provincia = prov ? this.findLocationId(this.provincias, prov, 'provincia') : undefined;
     this.direccionClientes.distrito = dist ? this.findLocationId(this.distritos, dist, 'distrito') : undefined;
+    this.direccionClientes.principal = true;
+    this.direccionClientes.codLocal = '0000';
   } catch (error) {
     console.error('Error en búsqueda RUC:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar RUC');
@@ -489,6 +491,15 @@ private showError(message: string): void {
     this.closeModalEstablecimientos();
   }
 
+  /**
+   * Primera dirección al crear cliente (DNI/RUC): siempre principal y código de local domicilio SUNAT.
+   * Los establecimientos adicionales del modal conservan su codigo y principal = false.
+   */
+  private prepararPrimeraDireccionAltaCliente(): void {
+    this.direccionClientes.principal = true;
+    this.direccionClientes.codLocal = '0000';
+  }
+
   /** Construye payload para POST direccionClientes a partir de un establecimiento normalizado (region/provincia/distrito como IDs). */
   private buildDireccionFromEstablecimiento(e: any, idCliente: number): any {
     const dep = (e.departamento ?? '').trim();
@@ -625,6 +636,7 @@ private showError(message: string): void {
                 }
                 this.direccionClientes.idCliente = row.idCliente;
                 const idCliente = row.idCliente;
+                this.prepararPrimeraDireccionAltaCliente();
                 const pendientes = this.establecimientosPendientes || [];
                 const crearSiguienteDireccion = (idx: number) => {
                   if (idx === 0) {
