@@ -13,6 +13,66 @@ const bindUniqueIdentifiersIn = (request, idsEmpresa, prefix) => {
   }).join(', ');
 };
 
+/** Comprobante de venta NC/ND (catálogo interno B7/F7/B8/F8, no el tipo SUNAT 07/08). */
+const CODIGOS_VENTA_NOTA_CREDITO_DEBITO = new Set(["B7", "F7", "B8", "F8"]);
+
+/**
+ * Copia cliente desde la factura/boleta indicada en compRelacionado cuando la NC/ND no tiene receptor válido.
+ * Evita enviar 00000000 si la boleta original sí tenía cliente en BD.
+ */
+async function enriquecerClienteDesdeVentaOrigenSiNota(pool, cab) {
+  if (!cab || !cab.idEmpresa) return;
+  const cod = String(cab.codigoComprobante || "").trim().toUpperCase();
+  if (!CODIGOS_VENTA_NOTA_CREDITO_DEBITO.has(cod)) return;
+  const rel = String(cab.compRelacionado || "").trim();
+  const dash = rel.indexOf("-");
+  if (dash < 1) return;
+  const serieOrigen = rel.slice(0, dash).trim();
+  const numPart = rel.slice(dash + 1).replace(/\D/g, "");
+  if (!serieOrigen || !numPart) return;
+  const numInt = parseInt(numPart, 10);
+  if (!Number.isFinite(numInt) || numInt < 0) return;
+  const rucN = String(cab.clienteRuc ?? "").replace(/\D/g, "");
+  const sinClienteValido = cab.idCliente == null || !rucN || rucN === "00000000";
+  if (!sinClienteValido) return;
+  try {
+    const q = await pool
+      .request()
+      .input("idEmpresa", sql.UniqueIdentifier, cab.idEmpresa)
+      .input("serie", sql.VarChar(20), serieOrigen.slice(0, 20))
+      .input("numero", sql.Int, numInt)
+      .query(`
+        SELECT TOP 1
+          cl.idCliente,
+          cl.rSocial AS clienteRazonSocial,
+          cl.ruc AS clienteRuc,
+          cl.idDocumento AS clienteTipoDoc,
+          (SELECT TOP 1 ISNULL(dc.direccion, '') FROM DireccionClientes dc
+           WHERE dc.idCliente = cl.idCliente AND dc.idEmpresa = v.idEmpresa
+           ORDER BY dc.idDireccionClientes) AS clienteDireccion
+        FROM Ventas v
+        INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        WHERE v.idEmpresa = @idEmpresa
+          AND LTRIM(RTRIM(v.serie)) = LTRIM(RTRIM(@serie))
+          AND v.numero = @numero
+          AND c.codigo IN (N'01', N'03')
+        ORDER BY v.idVenta DESC
+      `);
+    const row = q.recordset && q.recordset[0];
+    if (!row || !String(row.clienteRuc || "").trim()) return;
+    cab.idCliente = row.idCliente != null ? row.idCliente : cab.idCliente;
+    cab.clienteRazonSocial = row.clienteRazonSocial || cab.clienteRazonSocial;
+    cab.clienteRuc = row.clienteRuc || cab.clienteRuc;
+    cab.clienteTipoDoc = row.clienteTipoDoc != null ? String(row.clienteTipoDoc).trim() : cab.clienteTipoDoc;
+    if (row.clienteDireccion != null && String(row.clienteDireccion).trim() !== "") {
+      cab.clienteDireccion = String(row.clienteDireccion).trim();
+    }
+  } catch (err) {
+    console.error("enriquecerClienteDesdeVentaOrigenSiNota:", err);
+  }
+}
+
 exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
   const {
     idSucursal,
@@ -561,6 +621,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
 
   const cab = cabecera.recordset && cabecera.recordset[0] ? cabecera.recordset[0] : null;
   if (!cab || !cab.idEmpresa) return null;
+  await enriquecerClienteDesdeVentaOrigenSiNota(pool, cab);
   const idEmpresaVenta = cab.idEmpresa;
 
   let empresaResult;

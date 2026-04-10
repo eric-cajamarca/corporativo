@@ -1,7 +1,15 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FacturacionService, GuiaEmitidaListItem, GuiaDetalle } from '../../../services/facturacion.service';
+import { htmlBloqueQrSunatGre, qrDataUrlParaPdfGuia } from '../../../utils/guia-representacion-impresa-qr.util';
+import {
+  estilosGrePdfInline,
+  greItemsTablaHtml,
+  htmlFirmasGreTransportista,
+  type GrePdfFormato
+} from '../../../utils/guia-pdf-html.util';
+import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { EmpresaService } from '../../../services/empresa.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
@@ -25,6 +33,12 @@ export class EmisionGuiasComponent implements OnInit {
   private empresaService     = inject(EmpresaService);
   private pdfService         = inject(PdfService);
   private whatsappService    = inject(WhatsappService);
+  private modalService       = inject(NgbModal);
+
+  @ViewChild('modalFormatoGrePdf') modalFormatoGrePdfTpl!: TemplateRef<unknown>;
+
+  /** Fila elegida en el modal A4 / Ticket antes de generar el PDF. */
+  private guiaImpresionPendiente: GuiaEmitidaListItem | null = null;
 
   autorizado = true;
   loading    = false;
@@ -193,24 +207,41 @@ export class EmisionGuiasComponent implements OnInit {
     this.guiaSeleccionada = null;
   }
 
-  // ─── Acción: Imprimir PDF A4 ─────────────────────────────────────────────────
+  // ─── Acción: Imprimir PDF (modal A4 / Ticket) ───────────────────────────────
 
-  imprimirPdf(row: GuiaEmitidaListItem): void {
+  abrirModalFormatoImpresion(row: GuiaEmitidaListItem): void {
+    this.guiaImpresionPendiente = row;
+    this.modalService.open(this.modalFormatoGrePdfTpl, { centered: true, backdrop: true });
+  }
+
+  confirmarImpresionGre(formato: GrePdfFormato, modal: NgbActiveModal): void {
+    modal.close();
+    const row = this.guiaImpresionPendiente;
+    this.guiaImpresionPendiente = null;
+    if (!row) return;
+    this.ejecutarImpresionPdf(row, formato);
+  }
+
+  private ejecutarImpresionPdf(row: GuiaEmitidaListItem, formato: GrePdfFormato): void {
     this.imprimiendoId = row.idGuiaElectronica;
+    const fontSize = formato === 'ticket' ? 7 : 10;
     this.facturacionService.obtenerGuia(row.idGuiaElectronica).subscribe({
       next: (res) => {
-        const guia = res.data;
-        const html = this.generarHtmlGuia(guia);
-        this.pdfService.generarPdfDinamico({ html }, 'guia-remision', 10, 'A4').subscribe({
-          next: (blob) => {
-            this.imprimiendoId = null;
-            this.pdfService.previsualizar(blob);
-          },
-          error: () => {
-            this.imprimiendoId = null;
-            iziToast.error({ title: 'Error', message: 'No se pudo generar el PDF.', position: 'topRight' });
-          }
-        });
+        void (async () => {
+          const guia = res.data;
+          const qrUrl = await qrDataUrlParaPdfGuia(guia);
+          const html = this.generarHtmlGuia(guia, qrUrl, formato);
+          this.pdfService.generarPdfDinamico({ html }, 'guia-remision', fontSize, formato).subscribe({
+            next: (blob) => {
+              this.imprimiendoId = null;
+              this.pdfService.previsualizar(blob);
+            },
+            error: () => {
+              this.imprimiendoId = null;
+              iziToast.error({ title: 'Error', message: 'No se pudo generar el PDF.', position: 'topRight' });
+            }
+          });
+        })();
       },
       error: () => {
         this.imprimiendoId = null;
@@ -226,10 +257,12 @@ export class EmisionGuiasComponent implements OnInit {
     if (!tel || !tel.trim()) return;
     this.facturacionService.obtenerGuia(row.idGuiaElectronica).subscribe({
       next: (res) => {
-        const guia = res.data;
-        const html = this.generarHtmlGuia(guia);
-        this.pdfService.generarPdfDinamico({ html }, 'guia-remision', 10, 'A4').subscribe({
-          next: (blob) => {
+        void (async () => {
+          const guia = res.data;
+          const qrUrl = await qrDataUrlParaPdfGuia(guia);
+          const html = this.generarHtmlGuia(guia, qrUrl, 'A4');
+          this.pdfService.generarPdfDinamico({ html }, 'guia-remision', 10, 'A4').subscribe({
+            next: (blob) => {
             const reader = new FileReader();
             reader.onloadend = () => {
               const base64 = (reader.result as string).split(',')[1];
@@ -244,6 +277,7 @@ export class EmisionGuiasComponent implements OnInit {
           },
           error: () => iziToast.error({ title: 'Error PDF', message: 'No se pudo generar el PDF para WhatsApp.', position: 'topRight' })
         });
+        })();
       },
       error: () => iziToast.error({ title: 'Error', message: 'No se pudo obtener la guía.', position: 'topRight' })
     });
@@ -284,75 +318,67 @@ export class EmisionGuiasComponent implements OnInit {
     };
   }
 
-  generarHtmlGuia(guia: GuiaDetalle): string {
+  generarHtmlGuia(guia: GuiaDetalle, qrDataUrl: string | null = null, formato: GrePdfFormato = 'A4'): string {
     const d = this.vistaDatosGuiaParaPdf(guia);
-    const serie  = guia.serie  ?? '';
+    const serie = guia.serie ?? '';
     const numero = guia.numero ?? '';
-    const tipoDoc = guia.tipoDocumento === '31' ? 'GUÍA DE REMISIÓN TRANSPORTISTA' : 'GUÍA DE REMISIÓN REMITENTE';
-    const codSunat = guia.tipoDocumento === '31' ? '31' : '09';
+    const es31 = guia.tipoDocumento === '31';
+    const tipoDoc = es31 ? 'GUÍA DE REMISIÓN TRANSPORTISTA' : 'GUÍA DE REMISIÓN REMITENTE';
+    const codSunat = es31 ? '31' : '09';
     const fecha = (guia.fechaEmision ?? '').slice(0, 10);
     const motivoMap: Record<string, string> = {
-      '01': 'Venta', '02': 'Compra', '04': 'Traslado entre establecimientos',
-      '08': 'Importación', '09': 'Exportación', '13': 'Otros'
+      '01': 'Venta',
+      '02': 'Compra',
+      '04': 'Traslado entre establecimientos',
+      '08': 'Importación',
+      '09': 'Exportación',
+      '13': 'Otros'
     };
     const motivo = motivoMap[d.motivoTraslado ?? ''] || d.motivoTraslado || '—';
     const modalidad = d.modalidadTransporte === '01' ? 'Público' : 'Privado';
     const peso = d.cantidadPeso != null ? `${d.cantidadPeso} ${d.unidadMedidaPeso ?? 'KGM'}` : '—';
 
-    const itemsRows = (d.items ?? []).map((it, i) =>
-      `<tr>
-        <td>${i + 1}</td>
-        <td>${it.codigo ?? ''}</td>
-        <td>${it.descripcion ?? ''}</td>
-        <td>${it.cantidad ?? ''}</td>
-        <td>${it.unidad ?? 'NIU'}</td>
-      </tr>`
-    ).join('') || `<tr><td colspan="5" style="text-align:center;color:#888">Sin detalle de bienes</td></tr>`;
-
-    const conductorBloque = d.modalidadTransporte === '02' ? `
+    const mostrarConductorPdf = !d.vehiculoM1L && (es31 ? true : d.modalidadTransporte === '02');
+    const conductorBloque = mostrarConductorPdf
+      ? `
       <tr><td style="font-weight:600">Conductor</td><td>${d.nombreConductor ?? '—'}</td><td style="font-weight:600">Doc. conductor</td><td>${d.tipoDocConductor === '1' ? 'DNI' : 'PASAPORTE'}: ${d.numeroDocConductor ?? '—'}</td></tr>
-      <tr><td style="font-weight:600">Licencia</td><td>${d.licenciaConductor ?? '—'}</td><td style="font-weight:600">Placa vehículo</td><td>${d.placaVehiculo ?? '—'}${d.placaSecundaria ? ' / ' + d.placaSecundaria : ''}</td></tr>
-    ` : '';
-    const transportistaBloque = d.modalidadTransporte === '01' ? `
-      <tr><td style="font-weight:600">Transportista</td><td>${d.razonSocialTransportista ?? '—'}</td><td style="font-weight:600">RUC transportista</td><td>${d.rucTransportista ?? '—'}</td></tr>
-    ` : '';
+      <tr><td style="font-weight:600">Licencia</td><td>${d.licenciaConductor ?? '—'}</td><td style="font-weight:600">Placa vehículo</td><td>${d.placaVehiculo ?? '—'}${d.placaSecundaria ? ' / ' + d.placaSecundaria : ''}</td></tr>`
+      : d.vehiculoM1L
+        ? `<tr><td colspan="4" style="font-style:italic;color:#666">Vehículo M1/L — sin conductor/placa obligatorios en SUNAT</td></tr>`
+        : '';
+    const transportistaBloque =
+      !es31 && d.modalidadTransporte === '01'
+        ? `
+      <tr><td style="font-weight:600">Transportista</td><td>${d.razonSocialTransportista ?? '—'}</td><td style="font-weight:600">RUC transportista</td><td>${d.rucTransportista ?? '—'}</td></tr>`
+        : '';
 
-    const estadoBadge = guia.idEstadoSunat === 1
-      ? `<span style="color:#15803d;font-weight:700">ACEPTADA</span>`
-      : guia.idEstadoSunat === 2
-        ? `<span style="color:#b45309;font-weight:700">EN PROCESO</span>`
-        : guia.idEstadoSunat === 98
-          ? `<span style="color:#b91c1c;font-weight:700">ERROR SUNAT</span>`
-          : `<span style="color:#78716c;font-weight:700">PENDIENTE</span>`;
+    const remitenteBloque =
+      es31 && (d.nomRemitente || d.numDocRemitente)
+        ? `<div class="sec">REMITENTE DE LA CARGA</div>
+<table class="info">
+  <tr><td>Nombre</td><td colspan="3">${d.nomRemitente ?? '—'}</td></tr>
+  <tr><td>Tipo doc.</td><td>${d.tipoDocRemitente === '6' ? 'RUC' : d.tipoDocRemitente === '1' ? 'DNI' : d.tipoDocRemitente ?? '—'}</td><td>Nº</td><td>${d.numDocRemitente ?? '—'}</td></tr>
+</table>`
+        : '';
+
+    const estadoBadge =
+      guia.idEstadoSunat === 1
+        ? `<span style="color:#15803d;font-weight:700">ACEPTADA</span>`
+        : guia.idEstadoSunat === 2
+          ? `<span style="color:#b45309;font-weight:700">EN PROCESO</span>`
+          : guia.idEstadoSunat === 98
+            ? `<span style="color:#b91c1c;font-weight:700">ERROR SUNAT</span>`
+            : `<span style="color:#78716c;font-weight:700">PENDIENTE</span>`;
+
+    const mostrarFirmas = es31;
+    const tamQr = formato === 'ticket' ? '2.4cm' : '2.6cm';
+    const itemsHtml = greItemsTablaHtml(d.items, formato);
 
     return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a;padding:16px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1d4ed8;padding-bottom:10px;margin-bottom:12px}
-  .empresa h2{font-size:13px;color:#1d4ed8;margin-bottom:4px}
-  .empresa p{font-size:9px;color:#555;line-height:1.5}
-  .doc-box{border:2px solid #1d4ed8;border-radius:6px;padding:8px 14px;text-align:center;min-width:160px}
-  .doc-box .tipo{font-size:9px;font-weight:700;color:#1d4ed8;letter-spacing:0.5px}
-  .doc-box .cod{font-size:7px;color:#666;margin:2px 0}
-  .doc-box .serie{font-size:16px;font-weight:900;color:#1a1a1a;letter-spacing:1px}
-  .doc-box .estado{margin-top:4px;font-size:9px}
-  table.info{width:100%;border-collapse:collapse;margin-bottom:10px}
-  table.info td{padding:3px 6px;border:1px solid #e5e7eb;vertical-align:top;font-size:9px}
-  table.info td:first-child,table.info td:nth-child(3){width:18%;background:#f1f5f9;font-weight:600;color:#374151}
-  .section-title{background:#1d4ed8;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;margin:8px 0 4px;border-radius:3px}
-  table.items{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}
-  table.items th{background:#1d4ed8;color:#fff;padding:4px 6px;text-align:left}
-  table.items td{padding:3px 6px;border-bottom:1px solid #e5e7eb}
-  table.items tr:nth-child(even) td{background:#f8fafc}
-  .obs{font-size:9px;color:#555;margin-top:6px;padding:6px 8px;background:#fafafa;border:1px solid #e5e7eb;border-radius:3px}
-  .footer{margin-top:14px;text-align:center;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:6px}
-  .firma-box{margin-top:28px;display:flex;justify-content:space-around;text-align:center;font-size:9px}
-  .firma-box div{border-top:1px solid #374151;padding-top:4px;min-width:140px}
-</style>
+<style>${estilosGrePdfInline(formato)}</style>
 </head>
 <body>
 <div class="header">
@@ -369,7 +395,7 @@ export class EmisionGuiasComponent implements OnInit {
   </div>
 </div>
 
-<div class="section-title">DATOS DEL TRASLADO</div>
+<div class="sec">DATOS DEL TRASLADO</div>
 <table class="info">
   <tr>
     <td>Fecha emisión</td><td>${fecha}</td>
@@ -385,7 +411,7 @@ export class EmisionGuiasComponent implements OnInit {
   </tr>
 </table>
 
-<div class="section-title">DESTINATARIO</div>
+<div class="sec">DESTINATARIO</div>
 <table class="info">
   <tr>
     <td>Nombre / Razón social</td><td colspan="3">${d.nomDestinatario ?? '—'}</td>
@@ -395,37 +421,23 @@ export class EmisionGuiasComponent implements OnInit {
     <td>Nº documento</td><td>${d.numDocDestinatario ?? '—'}</td>
   </tr>
 </table>
-
-<div class="section-title">DIRECCIONES</div>
+${remitenteBloque}
+<div class="sec">DIRECCIONES</div>
 <table class="info">
   <tr><td>Punto de partida</td><td colspan="3">${d.dirOrigen ?? '—'}</td></tr>
   <tr><td>Punto de llegada</td><td colspan="3">${d.dirDestino ?? '—'}</td></tr>
 </table>
 
-<div class="section-title">TRANSPORTE</div>
+<div class="sec">TRANSPORTE</div>
 <table class="info">
   ${conductorBloque}
   ${transportistaBloque}
 </table>
 
-<div class="section-title">BIENES TRASLADADOS</div>
-<table class="items">
-  <thead>
-    <tr><th>#</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Unidad</th></tr>
-  </thead>
-  <tbody>${itemsRows}</tbody>
-</table>
-
-${d.observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${d.observaciones}</div>` : ''}
-
-<div class="firma-box">
-  <div>Firma y sello emisor</div>
-  <div>Firma receptor conforme</div>
-</div>
-
-<div class="footer">
-  Documento generado electrónicamente. ${guia.idEstadoSunat === 1 ? 'Comprobante aceptado por SUNAT.' : 'Estado: ' + this.etiquetaEstado(guia)}
-</div>
+<div class="sec">BIENES TRASLADADOS</div>
+${itemsHtml}
+${mostrarFirmas ? htmlFirmasGreTransportista() : ''}
+${htmlBloqueQrSunatGre(qrDataUrl, { soloDatoQr: true, tamanoQr: tamQr })}
 </body>
 </html>`;
   }

@@ -495,6 +495,10 @@ export interface ComprobanteOrigenItem {
 export interface GuiaDetalle extends GuiaEmitidaListItem {
   /** Indica si existe XML firmado guardado (el cuerpo no se envía en JSON; use descargarXmlFirmadoGuia). */
   tieneXmlFirmado?: boolean;
+  /** DigestValue (Base64) del XML firmado — noveno campo del QR representación impresa. */
+  codigoHashSunat?: string;
+  /** Cadena del QR PDF: RUC|tipo|serie|numero|fecha|tipoDocDest|nroDocDest|hash. */
+  cadenaQrSunat?: string;
   datosGuia?: {
     tipoGuia?: string;
     tipoDocumento?: string;

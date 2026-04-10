@@ -219,13 +219,13 @@
                             <i *ngIf="!(cargandoDetalle && guiaSeleccionada?.idGuiaElectronica !== row.idGuiaElectronica)" class="bi bi-eye"></i>
                           </button>
 
-                          <!-- Imprimir PDF A4 -->
+                          <!-- Imprimir PDF (A4 o Ticket) -->
                           <button
                             type="button"
                             class="btn btn-sm btn-outline-secondary me-1"
-                            (click)="imprimirPdf(row)"
+                            (click)="abrirModalFormatoImpresion(row)"
                             [disabled]="imprimiendoId === row.idGuiaElectronica"
-                            title="Imprimir A4">
+                            title="Imprimir (elegir formato)">
                             <span *ngIf="imprimiendoId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
                             <i *ngIf="imprimiendoId !== row.idGuiaElectronica" class="bi bi-printer"></i>
                           </button>
@@ -277,3 +277,21 @@
     }
   </div>
 </main>
+
+<ng-template #modalFormatoGrePdf let-modal>
+  <div class="modal-header">
+    <h4 class="modal-title mb-0">Formato de impresión</h4>
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p class="text-muted small mb-3">Elija el formato del PDF de la guía electrónica.</p>
+    <div class="d-grid gap-2">
+      <button type="button" class="btn btn-primary" (click)="confirmarImpresionGre('A4', modal)">
+        <i class="bi bi-file-earmark me-1"></i> A4
+      </button>
+      <button type="button" class="btn btn-outline-primary" (click)="confirmarImpresionGre('ticket', modal)">
+        <i class="bi bi-receipt me-1"></i> Ticket (80&nbsp;mm)
+      </button>
+    </div>
+  </div>
+</ng-template>

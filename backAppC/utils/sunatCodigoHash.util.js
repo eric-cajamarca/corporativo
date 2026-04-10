@@ -9,13 +9,14 @@ function extraerCodigoHashDesdeXmlFirmado(xml) {
     return "";
   }
   const s = xml.replace(/^\uFEFF/, "").trim();
-  // Primer DigestValue típico: referencia enveloped al documento (Invoice, CreditNote, etc.)
-  const re = /<(?:ds:)?DigestValue>\s*([^<\s]+)\s*<\/(?:ds:)?DigestValue>/i;
+  // Primer DigestValue típico: referencia al documento (Invoice, DespatchAdvice, etc.)
+  // xml-crypto puede dejar el Base64 en varias líneas; [^<\s]+ truncaba el hash.
+  const re = /<(?:ds:)?DigestValue>\s*([\s\S]*?)<\/(?:ds:)?DigestValue>/i;
   const m = s.match(re);
   if (!m || !m[1]) {
     return "";
   }
-  return String(m[1]).trim().slice(0, 200);
+  return String(m[1]).replace(/\s+/g, "").trim().slice(0, 200);
 }
 
 module.exports = {

@@ -432,10 +432,10 @@
                 <i *ngIf="!guardandoGuia" class="bi bi-save me-1"></i>
                 {{ guardandoGuia ? (idGuiaEdicion ? 'Actualizando...' : 'Registrando...') : (idGuiaEdicion ? 'Actualizar guía' : 'Guardar guía') }}
               </button>
-              <button class="btn btn-sm btn-outline-secondary" (click)="descargarPdf()" [disabled]="generandoPdf || !ultimaGuiaRegistrada">
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirModalFormatoImpresionGre()" [disabled]="generandoPdf || !ultimaGuiaRegistrada">
                 <span *ngIf="generandoPdf" class="spinner-border spinner-border-sm me-1" role="status"></span>
                 <i *ngIf="!generandoPdf" class="bi bi-file-earmark-pdf me-1"></i>
-                {{ generandoPdf ? 'Generando...' : 'Imprimir PDF A4' }}
+                {{ generandoPdf ? 'Generando...' : 'Imprimir PDF' }}
               </button>
               <button class="btn btn-sm btn-success" (click)="enviarWhatsapp()">
                 <i class="bi bi-whatsapp me-1"></i> Enviar por WhatsApp
@@ -453,5 +453,23 @@
     (closed)="onModalProveedorGreCerrado()"
     (proveedorElegido)="aplicarProveedorGreDesdeModal($event)">
   </app-seleccionar-proveedor-gre-modal>
+
+  <ng-template #modalFormatoGrePdf let-modal>
+    <div class="modal-header">
+      <h4 class="modal-title mb-0">Formato de impresión</h4>
+      <button type="button" class="btn-close" aria-label="Cerrar" (click)="modal.dismiss()"></button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted small mb-3">Elija el formato del PDF de la guía remitente.</p>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-primary" (click)="confirmarFormatoImpresionGre('A4', modal)">
+          <i class="bi bi-file-earmark me-1"></i> A4
+        </button>
+        <button type="button" class="btn btn-outline-primary" (click)="confirmarFormatoImpresionGre('ticket', modal)">
+          <i class="bi bi-receipt me-1"></i> Ticket (80&nbsp;mm)
+        </button>
+      </div>
+    </div>
+  </ng-template>
 
 </main>

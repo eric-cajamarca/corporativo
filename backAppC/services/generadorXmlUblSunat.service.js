@@ -158,6 +158,19 @@ function resolverTributoPrincipal(impuestos, igv) {
 }
 
 /**
+ * Catálogo SUNAT 01: tipo del documento relacionado en BillingReference (NC/ND).
+ * Si `tipoComprobanteRef` no viene o no es 01/03, infiere: serie B* → boleta 03, F* → factura 01.
+ */
+function resolverTipoComprobanteRefSunat(documentoReferencia) {
+  const raw = String(documentoReferencia.tipoComprobanteRef || "").trim();
+  if (raw === "01" || raw === "03") return raw;
+  const serie = String(documentoReferencia.serieRef || "").trim().toUpperCase();
+  if (/^B/.test(serie)) return "03";
+  if (/^F/.test(serie)) return "01";
+  return raw || "01";
+}
+
+/**
  * Genera el XML UBL 2.1 Invoice (Factura 01 o Boleta 03) sin firma.
  * La firma debe aplicarse con el certificado (Facturador o módulo de firma).
  * @param {object} payload - { venta, empresa, cliente, items }
@@ -282,7 +295,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
     </cac:SignatoryParty>
     <cac:DigitalSignatureAttachment>
       <cac:ExternalReference>
-        <cbc:URI>SIGN</cbc:URI>
+        <cbc:URI>#SignSUNAT</cbc:URI>
       </cac:ExternalReference>
     </cac:DigitalSignatureAttachment>
   </cac:Signature>
@@ -385,12 +398,19 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
   const total = toNum(venta.total);
   const { fecha, hora } = fechaParte(venta.fEmision);
   const tributo = resolverTributoPrincipal(payload.impuestos || [], igv);
-  const tipoRef = String(documentoReferencia.tipoComprobanteRef || "01").trim();
   const serieRef = toStr(documentoReferencia.serieRef);
   const numeroRef = toStr(documentoReferencia.numeroRef).replace(/\D/g, "");
+  const tipoRef = resolverTipoComprobanteRefSunat({ ...documentoReferencia, serieRef });
   const docRefId = serieRef && numeroRef ? `${serieRef}-${numeroRef.padStart(8, "0")}` : "";
   const codigoMotivo = toStr(motivo.codigo) || "01";
   const descripcionMotivo = escXml(motivo.descripcion || "Anulación de la operación");
+  const dirEmisorNc = toStr(empresa.direccion) || "-";
+  const dirClienteNc = toStr(cliente.direccion) || "-";
+  const ubigeoEmisorNc = normalizarUbigeoSunat(empresa.ubigeo);
+  const emisorRegionNc = textoUblDir(empresa.region);
+  const emisorProvinciaNc = textoUblDir(empresa.provincia);
+  const emisorDistritoNc = textoUblDir(empresa.distrito);
+  const emisorUrbanizacionNc = textoUblDir(empresa.urbanizacion);
 
   const lineas = [];
   let idx = 1;
@@ -419,8 +439,8 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
           <cac:TaxCategory>
             <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
             <cbc:Name>${tributo.nombreTributo}</cbc:Name>
-            <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
             <cbc:Percent>${tributo.porcentajeIgv}</cbc:Percent>
+            <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
             <cac:TaxScheme>
               <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
               <cbc:Name>${tributo.nombreTributo}</cbc:Name>
@@ -444,7 +464,7 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
 
   const NS_CN = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2";
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<CreditNote xmlns="${NS_CN}" xmlns:cac="${NS.CAC}" xmlns:cbc="${NS.CBC}" xmlns:ext="${NS.EXT}" Id="SUNAT">
+<CreditNote xmlns="${NS_CN}" xmlns:cac="${NS.CAC}" xmlns:cbc="${NS.CBC}" xmlns:ext="${NS.EXT}">
   <ext:UBLExtensions>
     <ext:UBLExtension>
       <ext:ExtensionContent/>
@@ -457,6 +477,17 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
   <cbc:IssueTime>${hora}</cbc:IssueTime>
   <cbc:CreditNoteTypeCode listAgencyName="PE:SUNAT" listName="Motivo de nota de credito" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo09">${codigoMotivo}</cbc:CreditNoteTypeCode>
   <cbc:DocumentCurrencyCode listName="Tipo de Moneda" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo02">PEN</cbc:DocumentCurrencyCode>
+  <cac:DiscrepancyResponse>
+    <cbc:ReferenceID>${escXml(docRefId || codigoMotivo)}</cbc:ReferenceID>
+    <cbc:ResponseCode>${escXml(codigoMotivo)}</cbc:ResponseCode>
+    <cbc:Description>${descripcionMotivo}</cbc:Description>
+  </cac:DiscrepancyResponse>
+  ${docRefId ? `<cac:BillingReference>
+    <cac:InvoiceDocumentReference>
+      <cbc:ID>${escXml(docRefId)}</cbc:ID>
+      <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipoRef}</cbc:DocumentTypeCode>
+    </cac:InvoiceDocumentReference>
+  </cac:BillingReference>` : ""}
   <cac:Signature>
     <cbc:ID>${rucEmisor}-${numeroComprobante}</cbc:ID>
     <cac:SignatoryParty>
@@ -469,39 +500,61 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
     </cac:SignatoryParty>
     <cac:DigitalSignatureAttachment>
       <cac:ExternalReference>
-        <cbc:URI>#SIGN-${rucEmisor}</cbc:URI>
+        <cbc:URI>#SignSUNAT</cbc:URI>
       </cac:ExternalReference>
     </cac:DigitalSignatureAttachment>
   </cac:Signature>
   <cac:AccountingSupplierParty>
-    <cbc:CustomerAssignedAccountID>${rucEmisor}</cbc:CustomerAssignedAccountID>
-    <cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
     <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="6" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${rucEmisor}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>${razonEmisor}</cbc:Name>
+      </cac:PartyName>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonEmisor}</cbc:RegistrationName>
+        <cac:RegistrationAddress>
+          <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
+          <cbc:CitySubdivisionName>${escXml(emisorUrbanizacionNc)}</cbc:CitySubdivisionName>
+          <cbc:CityName>${escXml(emisorProvinciaNc)}</cbc:CityName>
+          <cbc:CountrySubentity>${escXml(emisorRegionNc)}</cbc:CountrySubentity>
+          <cbc:CountrySubentityCode>${escXml(ubigeoEmisorNc)}</cbc:CountrySubentityCode>
+          <cbc:District>${escXml(emisorDistritoNc)}</cbc:District>
+          <cac:AddressLine>
+            <cbc:Line>${escXml(dirEmisorNc)}</cbc:Line>
+          </cac:AddressLine>
+          <cac:Country>
+            <cbc:IdentificationCode>PE</cbc:IdentificationCode>
+          </cac:Country>
+        </cac:RegistrationAddress>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
-    <cbc:CustomerAssignedAccountID>${numDoc}</cbc:CustomerAssignedAccountID>
-    <cbc:AdditionalAccountID>${tipoDoc}</cbc:AdditionalAccountID>
     <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="${tipoDoc}" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${numDoc}</cbc:ID>
+      </cac:PartyIdentification>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonCliente}</cbc:RegistrationName>
+        <cac:RegistrationAddress>
+          <cbc:AddressTypeCode>-</cbc:AddressTypeCode>
+          <cbc:CitySubdivisionName>-</cbc:CitySubdivisionName>
+          <cbc:CityName>-</cbc:CityName>
+          <cbc:CountrySubentity>-</cbc:CountrySubentity>
+          <cbc:CountrySubentityCode>220901</cbc:CountrySubentityCode>
+          <cbc:District>-</cbc:District>
+          <cac:AddressLine>
+            <cbc:Line>${escXml(dirClienteNc)}</cbc:Line>
+          </cac:AddressLine>
+          <cac:Country>
+            <cbc:IdentificationCode>PE</cbc:IdentificationCode>
+          </cac:Country>
+        </cac:RegistrationAddress>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>
-  ${docRefId ? `<cac:BillingReference>
-    <cac:InvoiceDocumentReference>
-      <cbc:ID>${escXml(docRefId)}</cbc:ID>
-      <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipoRef}</cbc:DocumentTypeCode>
-    </cac:InvoiceDocumentReference>
-  </cac:BillingReference>` : ""}
-  <cac:DiscrepancyResponse>
-    <cbc:ReferenceID>${escXml(codigoMotivo)}</cbc:ReferenceID>
-    <cbc:ResponseCode>${escXml(codigoMotivo)}</cbc:ResponseCode>
-    <cbc:Description>${descripcionMotivo}</cbc:Description>
-  </cac:DiscrepancyResponse>
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="PEN">${igv.toFixed(2)}</cbc:TaxAmount>
     <cac:TaxSubtotal>
@@ -510,8 +563,8 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
       <cac:TaxCategory>
         <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
         <cbc:Name>${tributo.nombreTributo}</cbc:Name>
-        <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
         <cbc:Percent>${tributo.porcentajeIgv}</cbc:Percent>
+        <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
         <cac:TaxScheme>
           <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
           <cbc:Name>${tributo.nombreTributo}</cbc:Name>
@@ -549,11 +602,19 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
   const total = toNum(venta.total);
   const { fecha, hora } = fechaParte(venta.fEmision);
   const tributo = resolverTributoPrincipal(payload.impuestos || [], igv);
-  const tipoRef = String(documentoReferencia.tipoComprobanteRef || "01").trim();
   const serieRef = toStr(documentoReferencia.serieRef);
   const numeroRef = toStr(documentoReferencia.numeroRef).replace(/\D/g, "");
+  const tipoRef = resolverTipoComprobanteRefSunat({ ...documentoReferencia, serieRef });
   const docRefId = serieRef && numeroRef ? `${serieRef}-${numeroRef.padStart(8, "0")}` : "";
+  const codigoMotivoNd = toStr(motivo.codigo) || "01";
   const descripcionMotivo = escXml(motivo.descripcion || "Otros conceptos");
+  const dirEmisorNd = toStr(empresa.direccion) || "-";
+  const dirClienteNd = toStr(cliente.direccion) || "-";
+  const ubigeoEmisorNd = normalizarUbigeoSunat(empresa.ubigeo);
+  const emisorRegionNd = textoUblDir(empresa.region);
+  const emisorProvinciaNd = textoUblDir(empresa.provincia);
+  const emisorDistritoNd = textoUblDir(empresa.distrito);
+  const emisorUrbanizacionNd = textoUblDir(empresa.urbanizacion);
 
   const lineas = [];
   let idx = 1;
@@ -582,8 +643,8 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
           <cac:TaxCategory>
             <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
             <cbc:Name>${tributo.nombreTributo}</cbc:Name>
-            <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
             <cbc:Percent>${tributo.porcentajeIgv}</cbc:Percent>
+            <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
             <cac:TaxScheme>
               <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
               <cbc:Name>${tributo.nombreTributo}</cbc:Name>
@@ -607,7 +668,7 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
 
   const NS_DN = "urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2";
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<DebitNote xmlns="${NS_DN}" xmlns:cac="${NS.CAC}" xmlns:cbc="${NS.CBC}" xmlns:ext="${NS.EXT}" Id="SUNAT">
+<DebitNote xmlns="${NS_DN}" xmlns:cac="${NS.CAC}" xmlns:cbc="${NS.CBC}" xmlns:ext="${NS.EXT}">
   <ext:UBLExtensions>
     <ext:UBLExtension>
       <ext:ExtensionContent/>
@@ -619,6 +680,17 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
   <cbc:IssueDate>${fecha}</cbc:IssueDate>
   <cbc:IssueTime>${hora}</cbc:IssueTime>
   <cbc:DocumentCurrencyCode listName="Tipo de Moneda" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo02">PEN</cbc:DocumentCurrencyCode>
+  <cac:DiscrepancyResponse>
+    <cbc:ReferenceID>${escXml(docRefId || codigoMotivoNd)}</cbc:ReferenceID>
+    <cbc:ResponseCode>${escXml(codigoMotivoNd)}</cbc:ResponseCode>
+    <cbc:Description>${descripcionMotivo}</cbc:Description>
+  </cac:DiscrepancyResponse>
+  ${docRefId ? `<cac:BillingReference>
+    <cac:InvoiceDocumentReference>
+      <cbc:ID>${escXml(docRefId)}</cbc:ID>
+      <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipoRef}</cbc:DocumentTypeCode>
+    </cac:InvoiceDocumentReference>
+  </cac:BillingReference>` : ""}
   <cac:Signature>
     <cbc:ID>${rucEmisor}-${numeroComprobante}</cbc:ID>
     <cac:SignatoryParty>
@@ -631,37 +703,61 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
     </cac:SignatoryParty>
     <cac:DigitalSignatureAttachment>
       <cac:ExternalReference>
-        <cbc:URI>#SIGN-${rucEmisor}</cbc:URI>
+        <cbc:URI>#SignSUNAT</cbc:URI>
       </cac:ExternalReference>
     </cac:DigitalSignatureAttachment>
   </cac:Signature>
   <cac:AccountingSupplierParty>
-    <cbc:CustomerAssignedAccountID>${rucEmisor}</cbc:CustomerAssignedAccountID>
-    <cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
     <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="6" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${rucEmisor}</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>${razonEmisor}</cbc:Name>
+      </cac:PartyName>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonEmisor}</cbc:RegistrationName>
+        <cac:RegistrationAddress>
+          <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
+          <cbc:CitySubdivisionName>${escXml(emisorUrbanizacionNd)}</cbc:CitySubdivisionName>
+          <cbc:CityName>${escXml(emisorProvinciaNd)}</cbc:CityName>
+          <cbc:CountrySubentity>${escXml(emisorRegionNd)}</cbc:CountrySubentity>
+          <cbc:CountrySubentityCode>${escXml(ubigeoEmisorNd)}</cbc:CountrySubentityCode>
+          <cbc:District>${escXml(emisorDistritoNd)}</cbc:District>
+          <cac:AddressLine>
+            <cbc:Line>${escXml(dirEmisorNd)}</cbc:Line>
+          </cac:AddressLine>
+          <cac:Country>
+            <cbc:IdentificationCode>PE</cbc:IdentificationCode>
+          </cac:Country>
+        </cac:RegistrationAddress>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
-    <cbc:CustomerAssignedAccountID>${numDoc}</cbc:CustomerAssignedAccountID>
-    <cbc:AdditionalAccountID>${tipoDoc}</cbc:AdditionalAccountID>
     <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeAgencyName="PE:SUNAT" schemeID="${tipoDoc}" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${numDoc}</cbc:ID>
+      </cac:PartyIdentification>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonCliente}</cbc:RegistrationName>
+        <cac:RegistrationAddress>
+          <cbc:AddressTypeCode>-</cbc:AddressTypeCode>
+          <cbc:CitySubdivisionName>-</cbc:CitySubdivisionName>
+          <cbc:CityName>-</cbc:CityName>
+          <cbc:CountrySubentity>-</cbc:CountrySubentity>
+          <cbc:CountrySubentityCode>220901</cbc:CountrySubentityCode>
+          <cbc:District>-</cbc:District>
+          <cac:AddressLine>
+            <cbc:Line>${escXml(dirClienteNd)}</cbc:Line>
+          </cac:AddressLine>
+          <cac:Country>
+            <cbc:IdentificationCode>PE</cbc:IdentificationCode>
+          </cac:Country>
+        </cac:RegistrationAddress>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>
-  ${docRefId ? `<cac:BillingReference>
-    <cac:InvoiceDocumentReference>
-      <cbc:ID>${escXml(docRefId)}</cbc:ID>
-      <cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${tipoRef}</cbc:DocumentTypeCode>
-    </cac:InvoiceDocumentReference>
-  </cac:BillingReference>` : ""}
-  <cac:DiscrepancyResponse>
-    <cbc:Description>${descripcionMotivo}</cbc:Description>
-  </cac:DiscrepancyResponse>
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="PEN">${igv.toFixed(2)}</cbc:TaxAmount>
     <cac:TaxSubtotal>
@@ -670,8 +766,8 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
       <cac:TaxCategory>
         <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
         <cbc:Name>${tributo.nombreTributo}</cbc:Name>
-        <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
         <cbc:Percent>${tributo.porcentajeIgv}</cbc:Percent>
+        <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">${tributo.afectacionIgv}</cbc:TaxExemptionReasonCode>
         <cac:TaxScheme>
           <cbc:ID schemeName="Codigo de tributos" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo05">${tributo.codTributo}</cbc:ID>
           <cbc:Name>${tributo.nombreTributo}</cbc:Name>

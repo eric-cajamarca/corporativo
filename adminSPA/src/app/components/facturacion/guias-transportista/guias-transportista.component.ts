@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -14,6 +14,14 @@ import { ClienteService } from '../../../services/cliente.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { VehiculosService, VehiculoRegistro } from '../../../services/vehiculos.service';
 import { PdfService } from '../../../services/pdf.service';
+import { htmlBloqueQrSunatGre, qrDataUrlParaPdfGuia } from '../../../utils/guia-representacion-impresa-qr.util';
+import {
+  estilosGrePdfInline,
+  greItemsTablaHtml,
+  htmlFirmasGreTransportista,
+  type GrePdfFormato
+} from '../../../utils/guia-pdf-html.util';
+import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -28,6 +36,14 @@ import {
 } from '../seleccionar-proveedor-gre-modal/seleccionar-proveedor-gre-modal.component';
 
 declare const iziToast: any;
+
+/** Línea de bien trasladado cargada manualmente (sin comprobante de venta/compra). */
+export interface ItemManualGreTransportista {
+  codigo: string;
+  descripcion: string;
+  cantidad: number | null;
+  unidad: string;
+}
 
 const CLAVES_NUMERO_LICENCIA = [
   'numeroLicencia',
@@ -194,7 +210,10 @@ export class GuiasTransportistaComponent implements OnInit {
   private consultaXmlService = inject(ConsultaXMLService);
   private proveedoresService = inject(ProveedoresService);
   private pdfService = inject(PdfService);
+  private modalService = inject(NgbModal);
   private router = inject(Router);
+
+  @ViewChild('modalFormatoGrePdf') modalFormatoGrePdfTpl!: TemplateRef<unknown>;
   private route = inject(ActivatedRoute);
 
   readonly tiposDoc = TIPOS_DOC;
@@ -214,6 +233,16 @@ export class GuiasTransportistaComponent implements OnInit {
   buscarSerie = '';
   buscarNumero = '';
   comprobanteOrigen: any = null;
+
+  /**
+   * desde_comprobante: venta interna o compra SUNAT (flujo previo).
+   * manual: ítems ingresados a mano; serie/número de documento relacionado (cat. 61) opcionales.
+   */
+  modoItemsTransportista: 'desde_comprobante' | 'manual' = 'desde_comprobante';
+
+  itemsManualesGre: ItemManualGreTransportista[] = [
+    { codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' }
+  ];
 
   /** Factura/boleta de compra vía Factiliza (tipo doc. relacionado 01 o 03). */
   compraSunat = {
@@ -513,7 +542,39 @@ export class GuiasTransportistaComponent implements OnInit {
     this.buscarSerie = serieC;
     this.buscarNumero = numRaw.replace(/^0+/, '') || numRaw;
 
+    const itemsD = Array.isArray(d.items) ? d.items : [];
+    const soloLineaGre09 =
+      itemsD.length === 1 &&
+      String((itemsD[0] as { unidad?: string })?.unidad || '')
+        .toUpperCase()
+        .trim() === 'ZZ' &&
+      /SEGUN\s+DOCUMENTOS/i.test(String((itemsD[0] as { descripcion?: string })?.descripcion || ''));
+    const tieneDocRelacion = Boolean(serieC && numRaw);
+
     this.comprobanteOrigen = null;
+
+    if (!tieneDocRelacion && itemsD.length > 0 && !soloLineaGre09) {
+      this.modoItemsTransportista = 'manual';
+      this.itemsManualesGre = itemsD.map((it: { codigo?: string; descripcion?: string; cantidad?: unknown; unidad?: string }) => ({
+        codigo: String(it.codigo ?? ''),
+        descripcion: String(it.descripcion ?? ''),
+        cantidad:
+          it.cantidad != null && it.cantidad !== ''
+            ? Number(it.cantidad)
+            : null,
+        unidad: String(it.unidad ?? 'NIU').trim() || 'NIU'
+      }));
+      if (this.itemsManualesGre.length === 0) {
+        this.itemsManualesGre = [{ codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' }];
+      }
+      this.intentarAutocompletarUbigeoOrigen();
+      this.sincronizarDestinoAlmacenSiCompra();
+      return;
+    }
+
+    this.modoItemsTransportista = 'desde_comprobante';
+    this.itemsManualesGre = [{ codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' }];
+
     if (serieC && numRaw) {
       this.facturacionService
         .buscarComprobanteOrigenParaGuia({ serie: serieC, numero: this.buscarNumero })
@@ -570,6 +631,73 @@ export class GuiasTransportistaComponent implements OnInit {
     if (principalValido) {
       this.direccionOrigenSeleccionada = principalValido;
     }
+  }
+
+  seccionesTransportistaVisibles(): boolean {
+    if (!this.guia.motivoTraslado) {
+      return false;
+    }
+    if (this.guia.tipoComprobanteOrigen === '09') {
+      return true;
+    }
+    return this.modoItemsTransportista === 'manual' || !!this.comprobanteOrigen;
+  }
+
+  setModoItemsTransportista(modo: 'desde_comprobante' | 'manual'): void {
+    if (this.guia.tipoComprobanteOrigen === '09') {
+      return;
+    }
+    this.modoItemsTransportista = modo;
+    if (modo === 'manual') {
+      this.comprobanteOrigen = null;
+    } else {
+      this.itemsManualesGre = [{ codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' }];
+    }
+  }
+
+  onTipoComprobanteOrigenGreChange(): void {
+    if (this.guia.tipoComprobanteOrigen === '09') {
+      this.modoItemsTransportista = 'desde_comprobante';
+      this.itemsManualesGre = [{ codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' }];
+    }
+  }
+
+  nuevaFilaItemManual(): ItemManualGreTransportista {
+    return { codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' };
+  }
+
+  agregarFilaItemManual(): void {
+    this.itemsManualesGre = [...this.itemsManualesGre, this.nuevaFilaItemManual()];
+  }
+
+  eliminarFilaItemManual(index: number): void {
+    if (this.itemsManualesGre.length <= 1) {
+      this.itemsManualesGre = [this.nuevaFilaItemManual()];
+      return;
+    }
+    this.itemsManualesGre = this.itemsManualesGre.filter((_, i) => i !== index);
+  }
+
+  private construirItemsPayloadManual(): { codigo: string; descripcion: string; cantidad: number; unidad: string }[] {
+    const out: { codigo: string; descripcion: string; cantidad: number; unidad: string }[] = [];
+    for (const row of this.itemsManualesGre) {
+      const desc = String(row.descripcion || '').trim();
+      const cant = Number(row.cantidad);
+      if (!desc || !Number.isFinite(cant) || cant <= 0) {
+        continue;
+      }
+      const u = String(row.unidad || 'NIU')
+        .trim()
+        .toUpperCase()
+        .slice(0, 6);
+      out.push({
+        codigo: String(row.codigo || '').trim(),
+        descripcion: desc,
+        cantidad: cant,
+        unidad: u || 'NIU'
+      });
+    }
+    return out;
   }
 
   private comprobanteOrigenSinteticoDesdeGuia(
@@ -699,6 +827,8 @@ export class GuiasTransportistaComponent implements OnInit {
           mapearSunatCompraNormalizadoAComprobanteOrigenGre(raw);
         this.buscarSerie = buscarSerie;
         this.buscarNumero = buscarNumero;
+        this.modoItemsTransportista = 'desde_comprobante';
+        this.itemsManualesGre = [this.nuevaFilaItemManual()];
         this.comprobanteOrigen = comprobanteOrigen as any;
         this.guia.tipoComprobanteOrigen = String(comprobanteOrigen.tipoComprobante || '01').trim();
         this.guia.motivoTraslado = '02';
@@ -1031,6 +1161,8 @@ export class GuiasTransportistaComponent implements OnInit {
     }).subscribe({
       next: (res: any) => {
         if (res?.data) {
+          this.modoItemsTransportista = 'desde_comprobante';
+          this.itemsManualesGre = [this.nuevaFilaItemManual()];
           this.comprobanteOrigen = res.data;
           delete this.comprobanteOrigen.origenDesdeCompraSunat;
           this.limpiarOrigenProveedorGre();
@@ -1303,17 +1435,27 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   consultarAnexosDestinoPorRuc(): void {
+    const rucClienteDesdeComprobante = String(
+      this.comprobanteOrigen?.documento_cliente || this.comprobanteOrigen?.rucCliente || ''
+    )
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    const rucDestinatarioForm = String(this.destinatario.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
     const ruc = this.esMotivoCompraGre()
       ? this.rucMiEmpresaNormalizado()
-      : String(this.comprobanteOrigen?.documento_cliente || this.comprobanteOrigen?.rucCliente || '')
-          .replace(/\D/g, '')
-          .slice(0, 11);
+      : this.modoItemsTransportista === 'manual' || !this.comprobanteOrigen
+        ? rucDestinatarioForm
+        : rucClienteDesdeComprobante;
     if (!ruc || String(ruc).length !== 11) {
       iziToast.warning({
         title: 'Sin RUC',
         message: this.esMotivoCompraGre()
           ? 'No hay RUC de su empresa para consultar anexos del almacén de destino.'
-          : 'El comprobante no tiene RUC del cliente destinatario.',
+          : this.modoItemsTransportista === 'manual' || !this.comprobanteOrigen
+            ? 'Ingrese el RUC o DNI del destinatario (sección 4) para consultar anexos SUNAT.'
+            : 'El comprobante no tiene RUC del cliente destinatario.',
         position: 'topRight'
       });
       return;
@@ -1361,10 +1503,43 @@ export class GuiasTransportistaComponent implements OnInit {
         });
         return;
       }
+    } else if (this.modoItemsTransportista === 'manual') {
+      const sRel = this.buscarSerie.trim();
+      const nRel = this.buscarNumero.trim();
+      if ((sRel && !nRel) || (!sRel && nRel)) {
+        iziToast.warning({
+          title: 'Documento relacionado',
+          message: 'Indique serie y número del documento relacionado, o deje ambos vacíos si no aplica.',
+          position: 'topRight'
+        });
+        return;
+      }
+      if (sRel && nRel) {
+        const rucDoc = String(this.guia.rucEmisorDocumentoRelacionado || '')
+          .replace(/\D/g, '')
+          .slice(0, 11);
+        if (rucDoc.length !== 11) {
+          iziToast.warning({
+            title: 'RUC emisor',
+            message: 'Si informa serie y número del documento relacionado, indique el RUC del emisor (11 dígitos).',
+            position: 'topRight'
+          });
+          return;
+        }
+      }
+      const itemsManuales = this.construirItemsPayloadManual();
+      if (itemsManuales.length === 0) {
+        iziToast.warning({
+          title: 'Ítems',
+          message: 'Agregue al menos una línea con descripción y cantidad mayor a cero.',
+          position: 'topRight'
+        });
+        return;
+      }
     } else if (!this.comprobanteOrigen) {
       iziToast.warning({
         title: 'Sin comprobante',
-        message: 'Busque el comprobante de origen (factura o boleta).',
+        message: 'Busque el comprobante de origen (factura o boleta) o use «Carga manual de ítems».',
         position: 'topRight'
       });
       return;
@@ -1439,24 +1614,34 @@ export class GuiasTransportistaComponent implements OnInit {
     const comprobanteSerie =
       tipoRel === '09'
         ? this.buscarSerie.trim()
-        : String(this.comprobanteOrigen?.serie || '').trim();
+        : this.modoItemsTransportista === 'manual'
+          ? this.buscarSerie.trim()
+          : String(this.comprobanteOrigen?.serie || '').trim();
     const comprobanteNumeroRaw =
-      tipoRel === '09' ? this.buscarNumero.trim() : String(this.comprobanteOrigen?.numero || '').trim();
+      tipoRel === '09'
+        ? this.buscarNumero.trim()
+        : this.modoItemsTransportista === 'manual'
+          ? this.buscarNumero.trim()
+          : String(this.comprobanteOrigen?.numero || '').trim();
     const rucEmisorRel =
       tipoRel === '09'
         ? String(this.guia.rucEmisorDocumentoRelacionado || '').replace(/\D/g, '').slice(0, 11)
-        : String(
-            this.comprobanteOrigen?.rucEmpresa || this.comprobanteOrigen?.rucEmisor || ''
-          ).trim();
+        : this.modoItemsTransportista === 'manual'
+          ? String(this.guia.rucEmisorDocumentoRelacionado || '').replace(/\D/g, '').slice(0, 11)
+          : String(
+              this.comprobanteOrigen?.rucEmpresa || this.comprobanteOrigen?.rucEmisor || ''
+            ).trim();
     const itemsPayload =
       tipoRel === '09'
         ? itemsGre09
-        : (this.comprobanteOrigen?.items || []).map((it: any) => ({
-            codigo: it.codigo || '',
-            descripcion: it.descripcion || '',
-            cantidad: Number(it.cantidad) || 1,
-            unidad: it.unidad || 'NIU'
-          }));
+        : this.modoItemsTransportista === 'manual'
+          ? this.construirItemsPayloadManual()
+          : (this.comprobanteOrigen?.items || []).map((it: any) => ({
+              codigo: it.codigo || '',
+              descripcion: it.descripcion || '',
+              cantidad: Number(it.cantidad) || 1,
+              unidad: it.unidad || 'NIU'
+            }));
 
     const payload: RegistrarGuiaPayload = {
       tipoGuia: 'TRANSPORTISTA',
@@ -1569,27 +1754,40 @@ export class GuiasTransportistaComponent implements OnInit {
     });
   }
 
-  descargarPdf(): void {
+  abrirModalFormatoImpresionGre(): void {
     if (!this.ultimaGuiaRegistrada?.idGuiaElectronica) {
       iziToast.warning({ title: 'Sin guía', message: 'Primero guarde la guía para poder imprimir el PDF.', position: 'topRight' });
       return;
     }
+    this.modalService.open(this.modalFormatoGrePdfTpl, { centered: true, backdrop: true });
+  }
+
+  confirmarFormatoImpresionGre(formato: GrePdfFormato, modal: NgbActiveModal): void {
+    modal.close();
+    this.ejecutarDescargarPdfGre(formato);
+  }
+
+  private ejecutarDescargarPdfGre(formato: GrePdfFormato): void {
+    if (!this.ultimaGuiaRegistrada?.idGuiaElectronica) return;
     this.generandoPdf = true;
+    const fontSize = formato === 'ticket' ? 7 : 10;
     this.facturacionService.obtenerGuia(this.ultimaGuiaRegistrada.idGuiaElectronica).subscribe({
       next: (res) => {
-        // Reutilizamos el mismo método de generación HTML del componente emision-guias
-        const guia = res.data;
-        const html = this.construirHtmlGuia(guia);
-        this.pdfService.generarPdfDinamico({ html }, 'guia-remision', 10, 'A4').subscribe({
-          next: (blob) => {
-            this.generandoPdf = false;
-            this.pdfService.previsualizar(blob);
-          },
-          error: () => {
-            this.generandoPdf = false;
-            iziToast.error({ title: 'Error PDF', message: 'No se pudo generar el PDF. Verifique que el servicio de reportes esté activo.', position: 'topRight' });
-          }
-        });
+        void (async () => {
+          const guia = res.data;
+          const qrUrl = await qrDataUrlParaPdfGuia(guia);
+          const html = this.construirHtmlGuia(guia, qrUrl, formato);
+          this.pdfService.generarPdfDinamico({ html }, 'guia-remision', fontSize, formato).subscribe({
+            next: (blob) => {
+              this.generandoPdf = false;
+              this.pdfService.previsualizar(blob);
+            },
+            error: () => {
+              this.generandoPdf = false;
+              iziToast.error({ title: 'Error PDF', message: 'No se pudo generar el PDF. Verifique que el servicio de reportes esté activo.', position: 'topRight' });
+            }
+          });
+        })();
       },
       error: () => {
         this.generandoPdf = false;
@@ -1598,7 +1796,7 @@ export class GuiasTransportistaComponent implements OnInit {
     });
   }
 
-  private construirHtmlGuia(guia: any): string {
+  private construirHtmlGuia(guia: any, qrDataUrl: string | null = null, formato: GrePdfFormato = 'A4'): string {
     const d = guia?.datosGuia ?? {};
     const serie  = guia?.serie  ?? '';
     const numero = guia?.numero ?? '';
@@ -1613,11 +1811,10 @@ export class GuiasTransportistaComponent implements OnInit {
     const modalidad = d.modalidadTransporte === '01' ? 'Público' : 'Privado';
     const peso = d.cantidadPeso != null ? `${d.cantidadPeso} ${d.unidadMedidaPeso ?? 'KGM'}` : '—';
 
-    const itemsRows = (d.items ?? []).map((it: any, i: number) =>
-      `<tr><td>${i + 1}</td><td>${it.codigo ?? ''}</td><td>${it.descripcion ?? ''}</td><td>${it.cantidad ?? ''}</td><td>${it.unidad ?? 'NIU'}</td></tr>`
-    ).join('') || `<tr><td colspan="5" style="text-align:center;color:#888">Sin detalle de bienes</td></tr>`;
-
     const es31 = guia?.tipoDocumento === '31';
+    const mostrarFirmas = es31;
+    const tamQr = formato === 'ticket' ? '2.4cm' : '2.6cm';
+    const itemsHtml = greItemsTablaHtml(d.items, formato);
     const mostrarConductorPdf =
       !d.vehiculoM1L && (es31 ? true : d.modalidadTransporte === '02');
     const conductorBloque = mostrarConductorPdf
@@ -1642,25 +1839,11 @@ export class GuiasTransportistaComponent implements OnInit {
       : '<span style="color:#78716c;font-weight:700">PENDIENTE</span>';
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a;padding:16px}
-.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1d4ed8;padding-bottom:10px;margin-bottom:12px}
-.empresa h2{font-size:13px;color:#1d4ed8;margin-bottom:4px}.empresa p{font-size:9px;color:#555;line-height:1.5}
-.doc-box{border:2px solid #1d4ed8;border-radius:6px;padding:8px 14px;text-align:center;min-width:160px}
-.doc-box .tipo{font-size:9px;font-weight:700;color:#1d4ed8}.doc-box .serie{font-size:16px;font-weight:900}
-table.info{width:100%;border-collapse:collapse;margin-bottom:10px}
-table.info td{padding:3px 6px;border:1px solid #e5e7eb;font-size:9px}
-table.info td:first-child,table.info td:nth-child(3){width:18%;background:#f1f5f9;font-weight:600;color:#374151}
-.sec{background:#1d4ed8;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;margin:8px 0 4px;border-radius:3px}
-table.items{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}
-table.items th{background:#1d4ed8;color:#fff;padding:4px 6px;text-align:left}
-table.items td{padding:3px 6px;border-bottom:1px solid #e5e7eb}
-.footer{margin-top:14px;text-align:center;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:6px}
-.firma-box{margin-top:28px;display:flex;justify-content:space-around;text-align:center;font-size:9px}
-.firma-box div{border-top:1px solid #374151;padding-top:4px;min-width:140px}</style></head><body>
+<style>${estilosGrePdfInline(formato)}</style></head><body>
 <div class="header">
   <div class="empresa"><h2>${d.emisorNombre ?? 'Empresa'}</h2><p>RUC: ${d.emisorRuc ?? '—'}</p><p>${d.dirOrigen ?? ''}</p></div>
-  <div class="doc-box"><div class="tipo">${tipoDoc}</div><div style="font-size:7px;color:#666">Tipo doc.: ${codSunat}</div>
-    <div class="serie">${serie}-${numero}</div><div style="margin-top:4px;font-size:9px">${estadoLabel}</div></div>
+  <div class="doc-box"><div class="tipo">${tipoDoc}</div><div class="cod">Tipo doc.: ${codSunat}</div>
+    <div class="serie">${serie}-${numero}</div><div class="estado">${estadoLabel}</div></div>
 </div>
 <div class="sec">DATOS DEL TRASLADO</div>
 <table class="info">
@@ -1682,11 +1865,9 @@ ${remitenteBloque}
 <div class="sec">TRANSPORTE</div>
 <table class="info">${conductorBloque}${transportistaBloque}</table>
 <div class="sec">BIENES TRASLADADOS</div>
-<table class="items"><thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Unidad</th></tr></thead>
-<tbody>${itemsRows}</tbody></table>
-${d.observaciones ? `<div style="font-size:9px;color:#555;margin-top:6px;padding:6px 8px;background:#fafafa;border:1px solid #e5e7eb;border-radius:3px"><strong>Obs.:</strong> ${d.observaciones}</div>` : ''}
-<div class="firma-box"><div>Firma y sello emisor</div><div>Firma receptor conforme</div></div>
-<div class="footer">Documento generado electrónicamente — Estado: ${guia?.descripcionEstado ?? 'Pendiente'}</div>
+${itemsHtml}
+${mostrarFirmas ? htmlFirmasGreTransportista() : ''}
+${htmlBloqueQrSunatGre(qrDataUrl, { soloDatoQr: true, tamanoQr: tamQr })}
 </body></html>`;
   }
 

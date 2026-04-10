@@ -5,6 +5,7 @@ const ResumenDiarioSunatService = require('../services/resumenDiarioSunat.servic
 const ComunicacionBajaService = require('../services/comunicacionBaja.service');
 const GuiaElectronicaService = require('../services/guiaElectronica.service');
 const debugSunatLog = require('../utils/debugSunatLog.util');
+const { construirDatosQrRepresentacionImpresaGre } = require('../utils/sunatCadenaQrGre.util');
 
 // Obtener configuración de facturación electrónica
 const obtenerConfiguracionFacturacion = async (req, res, next) => {
@@ -558,8 +559,9 @@ const obtenerGuia = async (req, res, next) => {
     const row = await GuiaElectronicaService.obtenerGuiaService(pool, req.user, req.params.id);
     const data = { ...row };
     const tieneXmlFirmado = Boolean(data.xmlFirmado && String(data.xmlFirmado).trim());
+    const { codigoHashSunat, cadenaQrSunat } = construirDatosQrRepresentacionImpresaGre(data);
     delete data.xmlFirmado;
-    res.status(200).send({ data: { ...data, tieneXmlFirmado } });
+    res.status(200).send({ data: { ...data, tieneXmlFirmado, codigoHashSunat, cadenaQrSunat } });
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
     if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });

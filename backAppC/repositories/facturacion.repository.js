@@ -1144,7 +1144,7 @@ exports.actualizarResumenDiarioResultadoRepo = async (pool, idResumenDiarioSunat
     .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat ?? null)
     .input("fechaRespuesta", sql.VarChar(23), nowStr)
     .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
-    .input("descripcionRespuesta", sql.VarChar, (resultado.descripcionRespuesta || resultado.error || "").slice(0, 500))
+    .input("descripcionRespuesta", sql.VarChar(500), (resultado.descripcionRespuesta || resultado.error || "").slice(0, 500))
     .input("cdr", sql.NVarChar, resultado.cdr || null)
     .query(`
       UPDATE ResumenesDiariosSunat
@@ -1362,7 +1362,7 @@ exports.actualizarEstadoComprobantesRepo = async (pool, idsComprobanteElectronic
       .input("idEstadoSunat", sql.Int, idEstadoSunat)
       .input("fechaRespuesta", sql.VarChar(23), nowStr)
       .input("codigoRespuesta", sql.VarChar, codigoRespuesta || null)
-      .input("descripcionRespuesta", sql.VarChar, (descripcionRespuesta || "").slice(0, 500))
+      .input("descripcionRespuesta", sql.VarChar(500), (descripcionRespuesta || "").slice(0, 500))
       .input("cdr", sql.NVarChar, cdr || null)
       .query(`
         UPDATE ComprobantesElectronicos SET idEstadoSunat = @idEstadoSunat, fechaRespuesta = @fechaRespuesta,
@@ -1463,7 +1463,13 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
     .input("fechaEnvio", sql.VarChar(23), nowStr)
     .input("fechaRespuesta", sql.VarChar(23), nowStr)
     .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
-    .input("descripcionRespuesta", sql.VarChar, resultado.descripcionRespuesta || null)
+    .input(
+      "descripcionRespuesta",
+      sql.VarChar(500),
+      resultado.descripcionRespuesta != null
+        ? String(resultado.descripcionRespuesta).slice(0, 500)
+        : null
+    )
     .input("cdr", sql.NVarChar, resultado.cdr || null)
     .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat)
     .input("intentosEnvio", sql.Int, 1)

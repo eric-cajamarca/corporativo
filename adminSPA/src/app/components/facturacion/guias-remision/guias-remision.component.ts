@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -14,6 +14,14 @@ import { ClienteService } from '../../../services/cliente.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { EnviosService } from '../../../services/envios.service';
 import { PdfService } from '../../../services/pdf.service';
+import { htmlBloqueQrSunatGre, qrDataUrlParaPdfGuia } from '../../../utils/guia-representacion-impresa-qr.util';
+import {
+  estilosGrePdfInline,
+  greItemsTablaHtml,
+  htmlFirmasGreTransportista,
+  type GrePdfFormato
+} from '../../../utils/guia-pdf-html.util';
+import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -186,7 +194,10 @@ export class GuiasRemisionComponent implements OnInit {
   private consultaXmlService = inject(ConsultaXMLService);
   private proveedoresService = inject(ProveedoresService);
   private pdfService = inject(PdfService);
+  private modalService = inject(NgbModal);
   private router = inject(Router);
+
+  @ViewChild('modalFormatoGrePdf') modalFormatoGrePdfTpl!: TemplateRef<unknown>;
   private route = inject(ActivatedRoute);
 
   readonly tiposDoc = TIPOS_DOC;
@@ -1438,27 +1449,40 @@ export class GuiasRemisionComponent implements OnInit {
     });
   }
 
-  descargarPdf(): void {
+  abrirModalFormatoImpresionGre(): void {
     if (!this.ultimaGuiaRegistrada?.idGuiaElectronica) {
       iziToast.warning({ title: 'Sin guía', message: 'Primero guarde la guía para poder imprimir el PDF.', position: 'topRight' });
       return;
     }
+    this.modalService.open(this.modalFormatoGrePdfTpl, { centered: true, backdrop: true });
+  }
+
+  confirmarFormatoImpresionGre(formato: GrePdfFormato, modal: NgbActiveModal): void {
+    modal.close();
+    this.ejecutarDescargarPdfGre(formato);
+  }
+
+  private ejecutarDescargarPdfGre(formato: GrePdfFormato): void {
+    if (!this.ultimaGuiaRegistrada?.idGuiaElectronica) return;
     this.generandoPdf = true;
+    const fontSize = formato === 'ticket' ? 7 : 10;
     this.facturacionService.obtenerGuia(this.ultimaGuiaRegistrada.idGuiaElectronica).subscribe({
       next: (res) => {
-        // Reutilizamos el mismo método de generación HTML del componente emision-guias
-        const guia = res.data;
-        const html = this.construirHtmlGuia(guia);
-        this.pdfService.generarPdfDinamico({ html }, 'guia-remision', 10, 'A4').subscribe({
-          next: (blob) => {
-            this.generandoPdf = false;
-            this.pdfService.previsualizar(blob);
-          },
-          error: () => {
-            this.generandoPdf = false;
-            iziToast.error({ title: 'Error PDF', message: 'No se pudo generar el PDF. Verifique que el servicio de reportes esté activo.', position: 'topRight' });
-          }
-        });
+        void (async () => {
+          const guia = res.data;
+          const qrUrl = await qrDataUrlParaPdfGuia(guia);
+          const html = this.construirHtmlGuia(guia, qrUrl, formato);
+          this.pdfService.generarPdfDinamico({ html }, 'guia-remision', fontSize, formato).subscribe({
+            next: (blob) => {
+              this.generandoPdf = false;
+              this.pdfService.previsualizar(blob);
+            },
+            error: () => {
+              this.generandoPdf = false;
+              iziToast.error({ title: 'Error PDF', message: 'No se pudo generar el PDF. Verifique que el servicio de reportes esté activo.', position: 'topRight' });
+            }
+          });
+        })();
       },
       error: () => {
         this.generandoPdf = false;
@@ -1467,7 +1491,7 @@ export class GuiasRemisionComponent implements OnInit {
     });
   }
 
-  private construirHtmlGuia(guia: any): string {
+  private construirHtmlGuia(guia: any, qrDataUrl: string | null = null, formato: GrePdfFormato = 'A4'): string {
     const d = guia?.datosGuia ?? {};
     const serie  = guia?.serie  ?? '';
     const numero = guia?.numero ?? '';
@@ -1482,9 +1506,9 @@ export class GuiasRemisionComponent implements OnInit {
     const modalidad = d.modalidadTransporte === '01' ? 'Público' : 'Privado';
     const peso = d.cantidadPeso != null ? `${d.cantidadPeso} ${d.unidadMedidaPeso ?? 'KGM'}` : '—';
 
-    const itemsRows = (d.items ?? []).map((it: any, i: number) =>
-      `<tr><td>${i + 1}</td><td>${it.codigo ?? ''}</td><td>${it.descripcion ?? ''}</td><td>${it.cantidad ?? ''}</td><td>${it.unidad ?? 'NIU'}</td></tr>`
-    ).join('') || `<tr><td colspan="5" style="text-align:center;color:#888">Sin detalle de bienes</td></tr>`;
+    const mostrarFirmas = guia?.tipoDocumento === '31';
+    const tamQr = formato === 'ticket' ? '2.4cm' : '2.6cm';
+    const itemsHtml = greItemsTablaHtml(d.items, formato);
 
     const conductorBloque = d.modalidadTransporte === '02' ? `
       <tr><td style="font-weight:600">Conductor</td><td>${d.nombreConductor ?? '—'}</td><td style="font-weight:600">Doc.</td><td>${d.numeroDocConductor ?? '—'}</td></tr>
@@ -1497,25 +1521,11 @@ export class GuiasRemisionComponent implements OnInit {
       : '<span style="color:#78716c;font-weight:700">PENDIENTE</span>';
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10px;color:#1a1a1a;padding:16px}
-.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1d4ed8;padding-bottom:10px;margin-bottom:12px}
-.empresa h2{font-size:13px;color:#1d4ed8;margin-bottom:4px}.empresa p{font-size:9px;color:#555;line-height:1.5}
-.doc-box{border:2px solid #1d4ed8;border-radius:6px;padding:8px 14px;text-align:center;min-width:160px}
-.doc-box .tipo{font-size:9px;font-weight:700;color:#1d4ed8}.doc-box .serie{font-size:16px;font-weight:900}
-table.info{width:100%;border-collapse:collapse;margin-bottom:10px}
-table.info td{padding:3px 6px;border:1px solid #e5e7eb;font-size:9px}
-table.info td:first-child,table.info td:nth-child(3){width:18%;background:#f1f5f9;font-weight:600;color:#374151}
-.sec{background:#1d4ed8;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;margin:8px 0 4px;border-radius:3px}
-table.items{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:8px}
-table.items th{background:#1d4ed8;color:#fff;padding:4px 6px;text-align:left}
-table.items td{padding:3px 6px;border-bottom:1px solid #e5e7eb}
-.footer{margin-top:14px;text-align:center;font-size:8px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:6px}
-.firma-box{margin-top:28px;display:flex;justify-content:space-around;text-align:center;font-size:9px}
-.firma-box div{border-top:1px solid #374151;padding-top:4px;min-width:140px}</style></head><body>
+<style>${estilosGrePdfInline(formato)}</style></head><body>
 <div class="header">
   <div class="empresa"><h2>${d.emisorNombre ?? 'Empresa'}</h2><p>RUC: ${d.emisorRuc ?? '—'}</p><p>${d.dirOrigen ?? ''}</p></div>
-  <div class="doc-box"><div class="tipo">${tipoDoc}</div><div style="font-size:7px;color:#666">Tipo doc.: ${codSunat}</div>
-    <div class="serie">${serie}-${numero}</div><div style="margin-top:4px;font-size:9px">${estadoLabel}</div></div>
+  <div class="doc-box"><div class="tipo">${tipoDoc}</div><div class="cod">Tipo doc.: ${codSunat}</div>
+    <div class="serie">${serie}-${numero}</div><div class="estado">${estadoLabel}</div></div>
 </div>
 <div class="sec">DATOS DEL TRASLADO</div>
 <table class="info">
@@ -1536,11 +1546,9 @@ table.items td{padding:3px 6px;border-bottom:1px solid #e5e7eb}
 <div class="sec">TRANSPORTE</div>
 <table class="info">${conductorBloque}${transportistaBloque}</table>
 <div class="sec">BIENES TRASLADADOS</div>
-<table class="items"><thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>Cantidad</th><th>Unidad</th></tr></thead>
-<tbody>${itemsRows}</tbody></table>
-${d.observaciones ? `<div style="font-size:9px;color:#555;margin-top:6px;padding:6px 8px;background:#fafafa;border:1px solid #e5e7eb;border-radius:3px"><strong>Obs.:</strong> ${d.observaciones}</div>` : ''}
-<div class="firma-box"><div>Firma y sello emisor</div><div>Firma receptor conforme</div></div>
-<div class="footer">Documento generado electrónicamente — Estado: ${guia?.descripcionEstado ?? 'Pendiente'}</div>
+${itemsHtml}
+${mostrarFirmas ? htmlFirmasGreTransportista() : ''}
+${htmlBloqueQrSunatGre(qrDataUrl, { soloDatoQr: true, tamanoQr: tamQr })}
 </body></html>`;
   }
 

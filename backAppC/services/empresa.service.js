@@ -79,7 +79,9 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
         { codigo: 'B7', nombre: 'N.C. Electrónica (Boleta)', serie: 'BC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
         { codigo: 'F8', nombre: 'N.D. Electrónica (Factura)', serie: 'FD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
         { codigo: 'B8', nombre: 'N.D. Electrónica (Boleta)', serie: 'BD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-        { codigo: '09', nombre: 'Guía de Remisión Electrónica', serie: 'T001', numero: 0, activo: 1 },
+        // SUNAT Catálogo 01 (tipo de comprobante): 09 GRE Remitente, 31 GRE Transportista
+        { codigo: '09', nombre: 'Guía de Remisión Electrónica - Remitente', serie: 'T001', numero: 0, activo: 1 },
+        { codigo: '31', nombre: 'Guía de Remisión Electrónica - Transportista', serie: 'V001', numero: 0, activo: 1 },
         { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1 },
         { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1 },
         { codigo: 'NV', nombre: 'Nota de venta', serie: 'NV01', numero: 0, activo: 1 },
