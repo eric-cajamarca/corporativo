@@ -18,6 +18,7 @@ const {
   codigoInternoNotaDebitoPorOrigen
 } = require("../utils/sunatCodigoComprobante.util");
 const { extraerCodigoHashDesdeXmlFirmado } = require("../utils/sunatCodigoHash.util");
+const notaCreditoSunatStockService = require("../services/notaCreditoSunatStock.service");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -1296,6 +1297,20 @@ exports.obtenerComunicacionBajaPorIdRepo = async (pool, idEmpresa, idComunicacio
   return r.recordset && r.recordset[0] ? r.recordset[0] : null;
 };
 
+/** Elimina cabecera ComunicacionesBaja (detalle en cascada). No modifica Comprobantes ni correlativo RA. */
+exports.eliminarComunicacionBajaPorIdRepo = async (pool, idEmpresa, idComunicacionBaja) => {
+  const r = await pool
+    .request()
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("idComunicacionBaja", sql.UniqueIdentifier, idComunicacionBaja)
+    .query(`
+      DELETE FROM ComunicacionesBaja
+      OUTPUT DELETED.idComunicacionBaja
+      WHERE idComunicacionBaja = @idComunicacionBaja AND idEmpresa = @idEmpresa
+    `);
+  return !!(r.recordset && r.recordset.length > 0);
+};
+
 /** Lista IDs de comprobantes incluidos en una comunicación de baja (para actualizar estado cuando CDR aceptado). */
 exports.listarComprobantesDeComunicacionBajaRepo = async (pool, idComunicacionBaja) => {
   const r = await pool
@@ -1343,9 +1358,17 @@ exports.listarComunicacionesBajaRepo = async (pool, idEmpresa, filtros = {}) => 
            c.fechaEnvio, c.fechaRespuesta, c.codigoRespuesta, c.descripcionRespuesta,
            es.codigo AS codigoEstadoSunat, es.descripcion AS descripcionEstadoSunat,
            CASE WHEN c.xmlEnviado IS NOT NULL AND LEN(c.xmlEnviado) > 0 THEN 1 ELSE 0 END AS tieneXmlEnviado,
-           CASE WHEN c.cdr IS NOT NULL AND LEN(c.cdr) > 0 THEN 1 ELSE 0 END AS tieneCdr
+           CASE WHEN c.cdr IS NOT NULL AND LEN(c.cdr) > 0 THEN 1 ELSE 0 END AS tieneCdr,
+           CASE
+             WHEN c.idEstadoSunat = 8 THEN 0
+             WHEN c.idEstadoSunat = 4 THEN 1
+             WHEN TRY_CAST(NULLIF(LTRIM(RTRIM(c.numeroCorrelativo)), '') AS INT) IS NULL THEN 1
+             WHEN TRY_CAST(NULLIF(LTRIM(RTRIM(c.numeroCorrelativo)), '') AS INT) <> ISNULL(compRa.numero, 0) THEN 1
+             ELSE 0
+           END AS puedeEliminarCorrelativoIncorrecto
     FROM ComunicacionesBaja c
     LEFT JOIN EstadosSunat es ON es.idEstadoSunat = c.idEstadoSunat
+    LEFT JOIN Comprobantes compRa ON compRa.idEmpresa = c.idEmpresa AND compRa.codigo = 'RA'
     ${where}
     ORDER BY c.fechaComunicacion DESC, c.numeroCorrelativo DESC
     OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
@@ -1356,26 +1379,54 @@ exports.listarComunicacionesBajaRepo = async (pool, idEmpresa, filtros = {}) => 
 /** Actualiza estado de varios comprobantes electrónicos (y sus ventas) a idEstadoSunat. */
 exports.actualizarEstadoComprobantesRepo = async (pool, idsComprobanteElectronico, idEstadoSunat, cdr, codigoRespuesta, descripcionRespuesta) => {
   const nowStr = getNowLocalSQLString();
-  for (const id of idsComprobanteElectronico) {
-    await pool.request()
-      .input("idComprobanteElectronico", sql.UniqueIdentifier, id)
-      .input("idEstadoSunat", sql.Int, idEstadoSunat)
-      .input("fechaRespuesta", sql.VarChar(23), nowStr)
-      .input("codigoRespuesta", sql.VarChar, codigoRespuesta || null)
-      .input("descripcionRespuesta", sql.VarChar(500), (descripcionRespuesta || "").slice(0, 500))
-      .input("cdr", sql.NVarChar, cdr || null)
-      .query(`
-        UPDATE ComprobantesElectronicos SET idEstadoSunat = @idEstadoSunat, fechaRespuesta = @fechaRespuesta,
-          codigoRespuesta = @codigoRespuesta, descripcionRespuesta = @descripcionRespuesta, cdr = @cdr
-        WHERE idComprobanteElectronico = @idComprobanteElectronico
-      `);
-    await pool.request()
-      .input("idComprobanteElectronico", sql.UniqueIdentifier, id)
-      .input("idEstadoSunat", sql.Int, idEstadoSunat)
-      .query(`
-        UPDATE Ventas SET idEstadoSunat = @idEstadoSunat
-        WHERE idVenta = (SELECT idVenta FROM ComprobantesElectronicos WHERE idComprobanteElectronico = @idComprobanteElectronico)
-      `);
+  const transaction = pool.transaction();
+  await transaction.begin();
+  try {
+    for (const id of idsComprobanteElectronico) {
+      const prevRs = await transaction.request()
+        .input("idComprobanteElectronico", sql.UniqueIdentifier, id)
+        .query(`
+          SELECT idEstadoSunat FROM ComprobantesElectronicos
+          WHERE idComprobanteElectronico = @idComprobanteElectronico
+        `);
+      const idEstadoAnterior =
+        prevRs.recordset && prevRs.recordset[0] != null ? prevRs.recordset[0].idEstadoSunat : null;
+
+      await transaction
+        .request()
+        .input("idComprobanteElectronico", sql.UniqueIdentifier, id)
+        .input("idEstadoSunat", sql.Int, idEstadoSunat)
+        .input("fechaRespuesta", sql.VarChar(23), nowStr)
+        .input("codigoRespuesta", sql.VarChar, codigoRespuesta || null)
+        .input("descripcionRespuesta", sql.VarChar(500), (descripcionRespuesta || "").slice(0, 500))
+        .input("cdr", sql.NVarChar, cdr || null)
+        .query(`
+          UPDATE ComprobantesElectronicos SET idEstadoSunat = @idEstadoSunat, fechaRespuesta = @fechaRespuesta,
+            codigoRespuesta = @codigoRespuesta, descripcionRespuesta = @descripcionRespuesta, cdr = @cdr
+          WHERE idComprobanteElectronico = @idComprobanteElectronico
+        `);
+      await transaction
+        .request()
+        .input("idComprobanteElectronico", sql.UniqueIdentifier, id)
+        .input("idEstadoSunat", sql.Int, idEstadoSunat)
+        .query(`
+          UPDATE Ventas SET idEstadoSunat = @idEstadoSunat
+          WHERE idVenta = (SELECT idVenta FROM ComprobantesElectronicos WHERE idComprobanteElectronico = @idComprobanteElectronico)
+        `);
+
+      await notaCreditoSunatStockService.aplicarStockPorNotaCreditoSiCorresponde(
+        transaction,
+        id,
+        idEstadoAnterior,
+        idEstadoSunat
+      );
+    }
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
   }
 };
 
@@ -1457,39 +1508,66 @@ exports.persistirHashXmlComprobanteElectronicoRepo = async (pool, idComprobanteE
 /** Actualiza ComprobantesElectronicos y Ventas con el resultado del envío (mismo idEstadoSunat). Solo se guarda CDR en BD. */
 exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, resultado) => {
   const nowStr = getNowLocalSQLString();
-  const req1 = pool.request();
-  await req1
-    .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
-    .input("fechaEnvio", sql.VarChar(23), nowStr)
-    .input("fechaRespuesta", sql.VarChar(23), nowStr)
-    .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
-    .input(
-      "descripcionRespuesta",
-      sql.VarChar(500),
-      resultado.descripcionRespuesta != null
-        ? String(resultado.descripcionRespuesta).slice(0, 500)
-        : null
-    )
-    .input("cdr", sql.NVarChar, resultado.cdr || null)
-    .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat)
-    .input("intentosEnvio", sql.Int, 1)
-    .input("ultimoIntento", sql.VarChar(23), nowStr)
-    .query(`
-      UPDATE ComprobantesElectronicos
-      SET fechaEnvio = @fechaEnvio, fechaRespuesta = @fechaRespuesta,
-          codigoRespuesta = @codigoRespuesta, descripcionRespuesta = @descripcionRespuesta,
-          cdr = @cdr, idEstadoSunat = @idEstadoSunat,
-          intentosEnvio = ISNULL(intentosEnvio, 0) + @intentosEnvio, ultimoIntento = @ultimoIntento
-      WHERE idComprobanteElectronico = @idComprobanteElectronico
-    `);
-  const req2 = pool.request();
-  await req2
-    .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
-    .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat)
-    .query(`
-      UPDATE Ventas SET idEstadoSunat = @idEstadoSunat
-      WHERE idVenta = (SELECT idVenta FROM ComprobantesElectronicos WHERE idComprobanteElectronico = @idComprobanteElectronico)
-    `);
+  const transaction = pool.transaction();
+  await transaction.begin();
+  try {
+    const prevRs = await transaction.request()
+      .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
+      .query(`
+        SELECT idEstadoSunat FROM ComprobantesElectronicos
+        WHERE idComprobanteElectronico = @idComprobanteElectronico
+      `);
+    const idEstadoAnterior =
+      prevRs.recordset && prevRs.recordset[0] != null ? prevRs.recordset[0].idEstadoSunat : null;
+
+    await transaction
+      .request()
+      .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
+      .input("fechaEnvio", sql.VarChar(23), nowStr)
+      .input("fechaRespuesta", sql.VarChar(23), nowStr)
+      .input("codigoRespuesta", sql.VarChar, resultado.codigoRespuesta || null)
+      .input(
+        "descripcionRespuesta",
+        sql.VarChar(500),
+        resultado.descripcionRespuesta != null
+          ? String(resultado.descripcionRespuesta).slice(0, 500)
+          : null
+      )
+      .input("cdr", sql.NVarChar, resultado.cdr || null)
+      .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat)
+      .input("intentosEnvio", sql.Int, 1)
+      .input("ultimoIntento", sql.VarChar(23), nowStr)
+      .query(`
+        UPDATE ComprobantesElectronicos
+        SET fechaEnvio = @fechaEnvio, fechaRespuesta = @fechaRespuesta,
+            codigoRespuesta = @codigoRespuesta, descripcionRespuesta = @descripcionRespuesta,
+            cdr = @cdr, idEstadoSunat = @idEstadoSunat,
+            intentosEnvio = ISNULL(intentosEnvio, 0) + @intentosEnvio, ultimoIntento = @ultimoIntento
+        WHERE idComprobanteElectronico = @idComprobanteElectronico
+      `);
+    await transaction
+      .request()
+      .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
+      .input("idEstadoSunat", sql.Int, resultado.idEstadoSunat)
+      .query(`
+        UPDATE Ventas SET idEstadoSunat = @idEstadoSunat
+        WHERE idVenta = (SELECT idVenta FROM ComprobantesElectronicos WHERE idComprobanteElectronico = @idComprobanteElectronico)
+      `);
+
+    await notaCreditoSunatStockService.aplicarStockPorNotaCreditoSiCorresponde(
+      transaction,
+      idComprobanteElectronico,
+      idEstadoAnterior,
+      resultado.idEstadoSunat
+    );
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
 };
 
 /**

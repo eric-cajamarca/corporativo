@@ -206,6 +206,17 @@
                             <i *ngIf="consultandoTicketId !== row.idGuiaElectronica" class="bi bi-arrow-clockwise"></i>
                           </button>
 
+                          <button
+                            *ngIf="puedeConsultarEstadoSol(row)"
+                            type="button"
+                            class="btn btn-sm btn-outline-dark me-1"
+                            (click)="consultarEstadoSol(row)"
+                            [disabled]="sincronizandoSolId === row.idGuiaElectronica"
+                            title="Sincronizar estado con SUNAT (CLAVE SOL). Use si dio de baja la guía en el portal y aquí sigue como aceptada.">
+                            <span *ngIf="sincronizandoSolId === row.idGuiaElectronica" class="spinner-border spinner-border-sm"></span>
+                            <i *ngIf="sincronizandoSolId !== row.idGuiaElectronica" class="bi bi-cloud-arrow-down"></i>
+                          </button>
+
                           <!-- Ver detalle -->
                           <button
                             type="button"

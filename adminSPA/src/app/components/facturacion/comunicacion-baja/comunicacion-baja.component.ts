@@ -1,17 +1,19 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { FacturacionService, ComprobanteParaBaja, MotivoBaja } from '../../../services/facturacion.service';
+import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
+import { FacturacionService, ComprobanteParaBaja, ComunicacionBajaHistorialItem, MotivoBaja } from '../../../services/facturacion.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
+declare var bootstrap: any;
 
 @Component({
   selector: 'app-comunicacion-baja',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, SidebarComponent, TopnavComponent, NgbPagination],
   templateUrl: './comunicacion-baja.component.html',
   styleUrl: './comunicacion-baja.component.css'
 })
@@ -27,15 +29,19 @@ export class ComunicacionBajaComponent implements OnInit {
   motivoDefault = '01';
   loadingComprobantes = false;
   enviando = false;
-  listado: any[] = [];
+  listado: ComunicacionBajaHistorialItem[] = [];
   totalListado = 0;
   fechaDesde = '';
   fechaHasta = '';
   idEstadoSunat: number | null = null;
   pagina = 1;
-  porPagina = 20;
+  /** Tamaño de página del historial (sincronizado con API). */
+  readonly porPagina = 10;
+  /** Texto completo de descripción SUNAT en el modal. */
+  descripcionModalTexto = '';
   consultandoId: string | null = null;
   abriendoArchivoId: string | null = null;
+  eliminandoId: string | null = null;
 
   constructor(private _facturacionService: FacturacionService) {}
 
@@ -103,6 +109,66 @@ export class ComunicacionBajaComponent implements OnInit {
     });
   }
 
+  /** Filtros: vuelve a la primera página y recarga. */
+  onFiltroHistorialChange(): void {
+    this.pagina = 1;
+    this.cargarListado();
+  }
+
+  min(a: number, b: number): number {
+    return Math.min(a, b);
+  }
+
+  /** Vista corta de la descripción SUNAT para la tabla. */
+  previewDescripcion(text: string | null | undefined, max = 72): string {
+    const t = (text ?? '').trim();
+    if (!t) return '—';
+    if (t.length <= max) return t;
+    return t.slice(0, max) + '…';
+  }
+
+  puedeMostrarBotonEliminar(item: ComunicacionBajaHistorialItem): boolean {
+    const f = item.puedeEliminarCorrelativoIncorrecto;
+    return f === 1 || f === true;
+  }
+
+  eliminarDelHistorial(item: ComunicacionBajaHistorialItem, ev?: Event): void {
+    ev?.stopPropagation();
+    ev?.preventDefault();
+    const id = item?.idComunicacionBaja;
+    if (!id || !this.puedeMostrarBotonEliminar(item)) return;
+    const ok = confirm(
+      '¿Eliminar esta comunicación del historial? El correlativo del catálogo RA (Comprobantes) no se modificará.'
+    );
+    if (!ok) return;
+    this.eliminandoId = id;
+    this._facturacionService.eliminarComunicacionBaja(id).subscribe({
+      next: (res) => {
+        this.eliminandoId = null;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Eliminado', message: res?.message ?? 'Registro eliminado.' });
+        }
+        this.cargarListado();
+      },
+      error: (err) => {
+        this.eliminandoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo eliminar.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg });
+        }
+      }
+    });
+  }
+
+  abrirModalDescripcion(item: ComunicacionBajaHistorialItem): void {
+    const raw = item?.descripcionRespuesta != null ? String(item.descripcionRespuesta).trim() : '';
+    this.descripcionModalTexto = raw || 'Sin descripción';
+    const el = document.getElementById('modalDescripcionBaja');
+    if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(el).show();
+    }
+  }
+
   toggleSeleccion(id: string): void {
     if (this.seleccionados.has(id)) {
       this.seleccionados.delete(id);
@@ -144,6 +210,7 @@ export class ComunicacionBajaComponent implements OnInit {
           iziToast.success({ title: 'Enviado', message: res?.message ?? 'Comunicación de baja enviada. Consulte el estado.' });
         }
         this.cargarComprobantes();
+        this.pagina = 1;
         this.cargarListado();
       },
       error: (err) => {

@@ -62,13 +62,20 @@ async function enviarComunicacionBajaService(pool, user, datos) {
     return { ok: false, error: "Los comprobantes a dar de baja deben tener la misma fecha de emisión. Envíe comunicaciones separadas por fecha." };
   }
   const fechaReferencia = fechasUnicas[0].replace(/\D/g, ""); // YYYYMMDD de emisión del comprobante
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'comunicacionBaja.service.js:55',message:'Fechas calculadas',data:{fechaComunicacion,fechaReferencia,compsCount:comps?.length||0},timestamp:Date.now(),hypothesisId:'FECHA'})}).catch(()=>{});
-  // #endregion
-  
-  // El correlativo se calcula por fecha de COMUNICACIÓN (hoy), no por fecha de emisión
-  const correlativo = await FacturacionRepository.obtenerSiguienteCorrelativoBajaRepo(pool, user.empresa, fechaComunicacion.slice(0, 4) + "-" + fechaComunicacion.slice(4, 6) + "-" + fechaComunicacion.slice(6, 8));
+
+  const fechaComDateStr = `${fechaComunicacion.slice(0, 4)}-${fechaComunicacion.slice(4, 6)}-${fechaComunicacion.slice(6, 8)}`;
+  // Correlativo: máximo entre (siguiente por historial del día en ComunicacionesBaja) y (último en catálogo RA + 1),
+  // igual que en ventas (Comprobantes.numero = último correlativo usado).
+  const correlativoHistorialStr = await FacturacionRepository.obtenerSiguienteCorrelativoBajaRepo(pool, user.empresa, fechaComDateStr);
+  let nHistorial = parseInt(String(correlativoHistorialStr).replace(/\D/g, ""), 10);
+  if (Number.isNaN(nHistorial) || nHistorial < 1) nHistorial = 1;
+  nHistorial = Math.min(99999, nHistorial);
+
+  const raCatalogo = await comprobantesRepository.obtenerComprobantePorCodigoRepo(pool, user.empresa, "RA");
+  const ultimoCatalogo = parseInt(String(raCatalogo?.numero ?? "0").replace(/\D/g, ""), 10);
+  const nCatalogo = Math.min(99999, (Number.isNaN(ultimoCatalogo) ? 0 : ultimoCatalogo) + 1);
+
+  const correlativo = String(Math.min(99999, Math.max(nHistorial, nCatalogo)));
 
   const motivoPorId = {};
   comprobantes.forEach((c) => {
@@ -121,11 +128,10 @@ async function enviarComunicacionBajaService(pool, user, datos) {
     return { ok: false, error: resultadoSend.error || "SUNAT no devolvió ticket." };
   }
 
-  const fechaComDate = `${fechaComunicacion.slice(0, 4)}-${fechaComunicacion.slice(4, 6)}-${fechaComunicacion.slice(6, 8)}`;
   const idComunicacionBaja = await FacturacionRepository.insertarComunicacionBajaRepo(
     pool,
     user.empresa,
-    fechaComDate,
+    fechaComDateStr,
     correlativo,
     resultadoSend.ticket,
     xml
@@ -140,11 +146,7 @@ async function enviarComunicacionBajaService(pool, user, datos) {
   }
 
   try {
-    const rRa = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
-      .query(`SELECT idComprobante FROM Comprobantes WHERE idEmpresa = @idEmpresa AND codigo = 'RA'`);
-    const idRaComp = rRa.recordset && rRa.recordset[0] ? rRa.recordset[0].idComprobante : null;
+    const idRaComp = raCatalogo?.idComprobante != null ? raCatalogo.idComprobante : null;
     if (idRaComp != null) {
       const numCorr = parseInt(String(correlativo).replace(/\D/g, ""), 10);
       if (!Number.isNaN(numCorr) && numCorr >= 0) {
@@ -278,7 +280,43 @@ async function consultarEstadoComunicacionBajaService(pool, user, idComunicacion
   return { ok: false, statusCode: status.statusCode, error: status.error || "Error al consultar estado." };
 }
 
+/**
+ * Permite borrar historial que no alinea con el correlativo RA del catálogo (Comprobantes), o comunicaciones rechazadas.
+ * No aplica a baja aceptada (8). No modifica Comprobantes.numero.
+ */
+function puedeEliminarComunicacionBajaPorCorrelativo(row, numeroUltimoRaCatalogo) {
+  const estado = row.idEstadoSunat;
+  if (estado === 8) return false;
+  if (estado === 4) return true;
+  const c = parseInt(String(row.numeroCorrelativo ?? "").replace(/\D/g, ""), 10);
+  const cat = parseInt(String(numeroUltimoRaCatalogo ?? "0"), 10);
+  const catNorm = Number.isNaN(cat) ? 0 : cat;
+  if (Number.isNaN(c)) return true;
+  return c !== catNorm;
+}
+
+async function eliminarComunicacionBajaDesalineadaService(pool, user, idComunicacionBaja) {
+  if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  const id = String(idComunicacionBaja || "").trim();
+  if (!id) throw new Error("COMUNICACION_BAJA_NO_ENCONTRADA");
+
+  const row = await FacturacionRepository.obtenerComunicacionBajaPorIdRepo(pool, user.empresa, id);
+  if (!row) throw new Error("COMUNICACION_BAJA_NO_ENCONTRADA");
+
+  const ra = await comprobantesRepository.obtenerComprobantePorCodigoRepo(pool, user.empresa, "RA");
+  const numeroCat = ra != null ? ra.numero : null;
+
+  if (!puedeEliminarComunicacionBajaPorCorrelativo(row, numeroCat)) {
+    throw new Error("COMUNICACION_BAJA_NO_ELIMINABLE");
+  }
+
+  const ok = await FacturacionRepository.eliminarComunicacionBajaPorIdRepo(pool, user.empresa, id);
+  if (!ok) throw new Error("COMUNICACION_BAJA_NO_ENCONTRADA");
+  return { ok: true, mensaje: "Comunicación de baja eliminada del historial. El correlativo del catálogo RA no se modificó." };
+}
+
 module.exports = {
   enviarComunicacionBajaService,
-  consultarEstadoComunicacionBajaService
+  consultarEstadoComunicacionBajaService,
+  eliminarComunicacionBajaDesalineadaService
 };

@@ -238,18 +238,19 @@
 }
 
 .table-ventas {
-   margin-bottom: 0;
-  font-size: 0.9rem;
+  margin-bottom: 0;
+  font-size: 0.8125rem;
 }
 
 .table-card .table-ventas,
 .table-card .table-ventas thead th,
 .table-card .table-ventas tbody td {
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
 }
 
+/* Encabezado alineado al tema (primary Bootstrap / botones del listado) */
 .table-ventas-thead {
-  background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
   color: #fff;
 }
 
@@ -257,10 +258,11 @@
   border: none;
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  padding: 1rem 0.75rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  padding: 0.4rem 0.45rem;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .table-ventas tbody tr {
@@ -273,11 +275,11 @@
 }
 
 .table-ventas-row:hover {
-  background-color: rgba(44, 62, 80, 0.06);
+  background-color: rgba(13, 110, 253, 0.06);
 }
 
 .table-ventas td {
-  padding: 0.85rem 0.75rem;
+  padding: 0.35rem 0.45rem;
   vertical-align: middle;
 }
 
@@ -290,9 +292,9 @@
 }
 
 .badge-estado-sunat {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  padding: 0.35em 0.65em;
+  padding: 0.25em 0.5em;
 }
 
 .acciones-cell {
@@ -311,7 +313,9 @@
 
 .table-ventas-tfoot .resumen-row td {
   border-bottom: none;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .resumen-item {

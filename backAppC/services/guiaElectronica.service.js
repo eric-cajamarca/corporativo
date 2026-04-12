@@ -1446,6 +1446,93 @@ exports.registrarGuiaService = async (pool, user, datos) => {
 };
 
 /**
+ * GET GEM .../comprobantes/envios/{ticket} — misma consulta que al emitir la guía y que guiasTicket.job.
+ * @returns {Promise<object>} tuvoTicket, sinCredencialesGre, enProceso, aceptado, errorSunat, actualizado, mensaje, arcCdr, httpError, inesperado
+ */
+async function consultarGemEnvioPorTicketYActualizarBd(pool, idGuiaElectronica, idEmpresa, guia, config, empresa) {
+  const ticketRaw = guia.ticketSunat != null ? String(guia.ticketSunat).trim() : "";
+  if (!ticketRaw) {
+    return { tuvoTicket: false, mensaje: "Sin ticket SUNAT almacenado." };
+  }
+
+  if (!empresa?.ruc) {
+    return { tuvoTicket: true, sinCredencialesGre: true, mensaje: "No se encontró el RUC de la empresa." };
+  }
+  const rucEmisor = normalizarRucSunatGre(empresa.ruc);
+  if (!rucEmisor || rucEmisor.length !== 11) {
+    return { tuvoTicket: true, sinCredencialesGre: true, mensaje: "RUC de empresa inválido para GRE." };
+  }
+
+  const { urlBase, clientId, clientSecret, rucApiGuias } = extraerCredencialesGre(config || {}, rucEmisor);
+  if (!urlBase || !clientId || !clientSecret) {
+    return {
+      tuvoTicket: true,
+      sinCredencialesGre: true,
+      mensaje: "Faltan credenciales API GRE (URL, ID o clave)."
+    };
+  }
+
+  const token = await obtenerTokenOauth2(rucApiGuias || rucEmisor, clientId, clientSecret, config || {});
+  const consultaUrl = `${urlBase.replace(/\/$/, "")}/v1/contribuyente/gem/comprobantes/envios/${ticketRaw}`;
+  const resp = await gemGet(consultaUrl, token);
+
+  if (resp.status !== 200) {
+    return {
+      tuvoTicket: true,
+      httpError: true,
+      mensaje: `SUNAT GEM respondió HTTP ${resp.status}: ${JSON.stringify(resp.data || {}).slice(0, 200)}`
+    };
+  }
+
+  const { codRespuesta, error, arcCdr } = resp.data || {};
+
+  if (String(codRespuesta) === "98") {
+    return {
+      tuvoTicket: true,
+      enProceso: true,
+      mensaje: "SUNAT aún está procesando el envío. Intente en unos segundos."
+    };
+  }
+
+  if (String(codRespuesta) === "0") {
+    await guiaRepo.actualizarEstadoGuiaRepo(pool, idGuiaElectronica, idEmpresa, {
+      idEstadoSunat: ESTADO_ACEPTADO,
+      descripcionEstado: "ACEPTADO por SUNAT",
+      ticketSunat: ticketRaw
+    });
+    return {
+      tuvoTicket: true,
+      actualizado: true,
+      aceptado: true,
+      mensaje: `Guía ${guia.serie}-${guia.numero} ACEPTADA por SUNAT.`,
+      arcCdr: arcCdr || null
+    };
+  }
+
+  if (String(codRespuesta) === "99") {
+    const numError = error?.numError || "";
+    const desError = error?.desError || "";
+    await guiaRepo.actualizarEstadoGuiaRepo(pool, idGuiaElectronica, idEmpresa, {
+      idEstadoSunat: ESTADO_ERROR,
+      descripcionEstado: `${numError}: ${desError}`.slice(0, 200),
+      ticketSunat: ticketRaw
+    });
+    return {
+      tuvoTicket: true,
+      actualizado: true,
+      errorSunat: true,
+      mensaje: `Error SUNAT ${numError}: ${desError}`
+    };
+  }
+
+  return {
+    tuvoTicket: true,
+    inesperado: true,
+    mensaje: `Respuesta inesperada de SUNAT: ${JSON.stringify(resp.data).slice(0, 200)}`
+  };
+}
+
+/**
  * Consulta el ticket de una guía EN_PROCESO y actualiza el estado.
  * Llamado manualmente (endpoint) o por el job guiasTicket.job.js.
  */
@@ -1462,61 +1549,276 @@ exports.consultarTicketGuiaService = async (pool, user, idGuiaElectronica) => {
     guiaRepo.obtenerDatosEmpresaParaGuiaRepo(pool, idEmpresa)
   ]);
   if (!empresa) throw new Error("No se encontraron datos de la empresa.");
-  const rucEmisor = normalizarRucSunatGre(empresa.ruc);
-  if (!rucEmisor || rucEmisor.length !== 11) {
-    throw new Error("RUC de empresa inválido para GRE (revise Empresas).");
-  }
-  const { urlBase, clientId, clientSecret, rucApiGuias } = extraerCredencialesGre(config || {}, rucEmisor);
 
-  if (!urlBase || !clientId || !clientSecret) {
+  const r = await consultarGemEnvioPorTicketYActualizarBd(pool, idGuiaElectronica, idEmpresa, guia, config, empresa);
+  if (r.sinCredencialesGre) {
     throw new Error("Configure las credenciales API GRE para consultar el ticket.");
   }
+  if (r.httpError || r.inesperado) {
+    throw new Error(r.mensaje);
+  }
 
-  const token = await obtenerTokenOauth2(rucApiGuias || rucEmisor, clientId, clientSecret, config || {});
+  if (r.enProceso) {
+    return { ok: true, enProceso: true, mensaje: r.mensaje };
+  }
+  if (r.aceptado) {
+    return { ok: true, aceptado: true, mensaje: r.mensaje, arcCdr: r.arcCdr };
+  }
+  if (r.errorSunat) {
+    return { ok: false, error: true, mensaje: r.mensaje };
+  }
+  throw new Error(r.mensaje || "Respuesta no reconocida al consultar el ticket.");
+};
 
-  const consultaUrl = `${urlBase.replace(/\/$/, "")}/v1/contribuyente/gem/comprobantes/envios/${guia.ticketSunat}`;
-  const resp = await gemGet(consultaUrl, token);
+/**
+ * Consulta estado de la GRE vía API REST GEM (mismo path que el envío, con GET + OAuth).
+ * Los servicios SOAP billConsult/billValid no aplican a guías 09/31 y suelen responder HTTP 404.
+ * @returns {Promise<{ aceptado: boolean, mensaje: string }|{ skip: true, razon?: string }|{ aceptado: null, mensaje: string }|{ error: string }>}
+ */
+async function consultarGreEstadoPorGemApi(pool, idEmpresa, rucEmisor, tipoDoc, serie, numStr) {
+  const config = await facturacionRepo.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
+  if (!config) return { skip: true, razon: "Sin configuración de facturación" };
+  const { urlBase, clientId, clientSecret, rucApiGuias } = extraerCredencialesGre(config, rucEmisor);
+  if (!urlBase || !clientId || !clientSecret) {
+    return { skip: true, razon: "Configure URL, ID y clave API GRE (mismo que para enviar la guía)." };
+  }
+  let token;
+  try {
+    token = await obtenerTokenOauth2(rucApiGuias || rucEmisor, clientId, clientSecret, config);
+  } catch (e) {
+    return { error: `Token GEM: ${e.message || String(e)}` };
+  }
+  const url = `${urlBase.replace(/\/$/, "")}/v1/contribuyente/gem/comprobantes/${rucEmisor}-${tipoDoc}-${serie}-${numStr}`;
+  let resp;
+  try {
+    resp = await gemGet(url, token);
+  } catch (e) {
+    return { error: `Red GEM: ${e.message || String(e)}` };
+  }
 
-  const { codRespuesta, error, arcCdr } = resp.data || {};
-
-  // "98" = en proceso todavía
-  if (String(codRespuesta) === "98") {
+  if (resp.status === 404) {
     return {
-      ok: true, enProceso: true,
-      mensaje: "SUNAT aún está procesando el envío. Intente en unos segundos."
+      aceptado: false,
+      mensaje:
+        "SUNAT GEM no devolvió el comprobante (HTTP 404). Suele indicar que no está registrado, fue dado de baja o los datos no coinciden."
     };
   }
 
-  // "0" = aceptado
-  if (String(codRespuesta) === "0") {
+  if (resp.status !== 200) {
+    const hint = resp.data && typeof resp.data === "object" ? JSON.stringify(resp.data).slice(0, 280) : String(resp.data || "").slice(0, 200);
+    return { error: `GEM HTTP ${resp.status}: ${hint}` };
+  }
+
+  const d = resp.data && typeof resp.data === "object" ? resp.data : {};
+  const texto = JSON.stringify(d).toLowerCase();
+
+  if (d.codRespuesta === "0" || d.codRespuesta === 0) {
+    return { aceptado: true, mensaje: d.msg || d.mensaje || d.descripcion || "GEM: código 0 (aceptado)." };
+  }
+  if (d.codRespuesta === "99" || d.codRespuesta === 99) {
+    const err = d.error || d.errors;
+    const des = Array.isArray(err) ? err.map((x) => x.msg || x.desError).filter(Boolean).join("; ") : (err?.desError || err?.msg || "");
+    return { aceptado: false, mensaje: (des || "GEM: rechazo o estado no aceptado.").slice(0, 200) };
+  }
+  if (d.arcCdr || d.arcXml) {
+    return { aceptado: true, mensaje: "GEM devolvió datos del comprobante (XML/CDR presente)." };
+  }
+  if (/baja|anul|inactiv|cancel|revoc/i.test(texto)) {
+    return { aceptado: false, mensaje: "GEM: la respuesta sugiere baja o anulación." };
+  }
+
+  console.error("[GRE GEM] GET estado comprobante — cuerpo (recorte):", JSON.stringify(d).slice(0, 500));
+  return {
+    aceptado: null,
+    mensaje:
+      "GEM respondió 200 pero el formato no es el esperado. Revise logs del servidor o documentación SUNAT. Recorte: " +
+      JSON.stringify(d).slice(0, 350)
+  };
+}
+
+/**
+ * Sincroniza estado con SUNAT usando la misma consulta GEM que al emitir la guía:
+ * GET .../comprobantes/envios/{ticket}. Si no hay ticket o la respuesta no es útil, intenta GET por RUC-tipo-serie-número.
+ * Requiere credenciales API GRE (no usa billValid/billConsult SOL).
+ */
+exports.consultarEstadoGuiaSolService = async (pool, user, idGuiaElectronica) => {
+  if (!user?.empresa) throw new Error("NO_ACCESS");
+  const idEmpresa = user.empresa;
+
+  const guia = await guiaRepo.obtenerGuiaPorIdRepo(pool, idGuiaElectronica, idEmpresa);
+  if (!guia) throw new Error("GUIA_NOT_FOUND");
+
+  const [config, empresa] = await Promise.all([
+    facturacionRepo.obtenerConfiguracionFacturacionRepo(pool, idEmpresa),
+    guiaRepo.obtenerDatosEmpresaParaGuiaRepo(pool, idEmpresa)
+  ]);
+  if (!empresa) throw new Error("No se encontraron datos de la empresa.");
+
+  const rucStr = normalizarRucSunatGre(empresa.ruc);
+  if (!rucStr || rucStr.length !== 11) throw new Error("RUC de empresa inválido.");
+
+  const tipoDoc = String(guia.tipoDocumento || "09").trim();
+  const serie = String(guia.serie || "").trim();
+  const numStr = String(guia.numero || "").replace(/\D/g, "").padStart(8, "0");
+  if (!serie || !numStr) throw new Error("La guía no tiene serie o número válido.");
+
+  const ticketPreservar =
+    guia.ticketSunat != null && String(guia.ticketSunat).trim() !== "" ? String(guia.ticketSunat).trim() : null;
+  const localAceptada = guia.idEstadoSunat === ESTADO_ACEPTADO;
+  const localError = guia.idEstadoSunat === ESTADO_ERROR;
+
+  const aplicarAceptado = async (descripcionEstado) => {
     await guiaRepo.actualizarEstadoGuiaRepo(pool, idGuiaElectronica, idEmpresa, {
-      idEstadoSunat    : ESTADO_ACEPTADO,
-      descripcionEstado: "ACEPTADO por SUNAT",
-      ticketSunat      : guia.ticketSunat
+      idEstadoSunat: ESTADO_ACEPTADO,
+      descripcionEstado: String(descripcionEstado || "ACEPTADO por SUNAT").slice(0, 200),
+      ticketSunat: ticketPreservar
     });
-    return {
-      ok: true, aceptado: true,
-      mensaje: `Guía ${guia.serie}-${guia.numero} ACEPTADA por SUNAT.`,
-      arcCdr: arcCdr || null
-    };
-  }
+  };
 
-  // "99" = rechazado con error
-  if (String(codRespuesta) === "99") {
-    const numError = error?.numError || "";
-    const desError = error?.desError || "";
+  const aplicarError = async (descripcionEstado) => {
     await guiaRepo.actualizarEstadoGuiaRepo(pool, idGuiaElectronica, idEmpresa, {
-      idEstadoSunat    : ESTADO_ERROR,
-      descripcionEstado: `${numError}: ${desError}`.slice(0, 200),
-      ticketSunat      : guia.ticketSunat
+      idEstadoSunat: ESTADO_ERROR,
+      descripcionEstado: String(descripcionEstado || "Error / no válido en SUNAT").slice(0, 200),
+      ticketSunat: ticketPreservar
     });
+  };
+
+  const tr = await consultarGemEnvioPorTicketYActualizarBd(pool, idGuiaElectronica, idEmpresa, guia, config, empresa);
+  if (tr.sinCredencialesGre) {
+    throw new Error(
+      "Configure las credenciales API GRE (URL, ID y clave) en Configuración > Facturación, las mismas que usa el envío de la guía."
+    );
+  }
+
+  if (tr.tuvoTicket && !tr.httpError && !tr.inesperado) {
+    if (tr.enProceso) {
+      return {
+        ok: true,
+        actualizado: false,
+        idEstadoSunat: guia.idEstadoSunat,
+        mensaje: tr.mensaje,
+        fuente: "gem_envios_ticket"
+      };
+    }
+    if (tr.aceptado) {
+      return {
+        ok: true,
+        actualizado: !!tr.actualizado,
+        idEstadoSunat: ESTADO_ACEPTADO,
+        mensaje: tr.mensaje,
+        fuente: "gem_envios_ticket"
+      };
+    }
+    if (tr.errorSunat) {
+      return {
+        ok: true,
+        actualizado: !!tr.actualizado,
+        idEstadoSunat: ESTADO_ERROR,
+        mensaje: tr.mensaje,
+        fuente: "gem_envios_ticket"
+      };
+    }
+  }
+
+  const intentarGemClave = tipoDoc === "09" || tipoDoc === "31";
+  let gemConsultaClave = null;
+  if (intentarGemClave) {
+    if (tr.httpError || tr.inesperado) {
+      console.error("consultarEstadoGuiaSolService: ticket GEM no concluyente, se intenta GET por clave:", tr.mensaje);
+    }
+    gemConsultaClave = await consultarGreEstadoPorGemApi(pool, idEmpresa, rucStr, tipoDoc, serie, numStr);
+    const gem = gemConsultaClave;
+    if (gem.error) {
+      console.error("consultarEstadoGuiaSolService: GET GEM por clave:", gem.error);
+    }
+    if (!gem.skip && !gem.error) {
+      if (gem.aceptado === true) {
+        await aplicarAceptado(`ACEPTADO (API GEM)${gem.mensaje ? ": " + gem.mensaje : ""}`);
+        return {
+          ok: true,
+          actualizado: true,
+          idEstadoSunat: ESTADO_ACEPTADO,
+          mensaje: gem.mensaje || "La guía consta aceptada/registrada en SUNAT (API GEM).",
+          fuente: "gem_comprobante_clave"
+        };
+      }
+      if (gem.aceptado === false) {
+        if (localAceptada || localError) {
+          await aplicarError(gem.mensaje);
+          return {
+            ok: true,
+            actualizado: true,
+            idEstadoSunat: ESTADO_ERROR,
+            mensaje: gem.mensaje,
+            fuente: "gem_comprobante_clave"
+          };
+        }
+        return {
+          ok: true,
+          actualizado: false,
+          idEstadoSunat: guia.idEstadoSunat,
+          mensaje:
+            gem.mensaje +
+            " No se modificó el estado local (la guía no estaba como aceptada o error).",
+          fuente: "gem_comprobante_clave"
+        };
+      }
+      return {
+        ok: true,
+        actualizado: false,
+        idEstadoSunat: guia.idEstadoSunat,
+        mensaje: gem.mensaje || "GEM respondió sin un código de estado claro para esta guía.",
+        fuente: "gem_comprobante_clave"
+      };
+    }
+  }
+
+  if (!tr.tuvoTicket && intentarGemClave && gemConsultaClave?.skip) {
     return {
-      ok: false, error: true,
-      mensaje: `Error SUNAT ${numError}: ${desError}`
+      ok: true,
+      actualizado: false,
+      idEstadoSunat: guia.idEstadoSunat,
+      mensaje:
+        "Sin ticket GEM en BD. " +
+        (gemConsultaClave.razon ||
+          "Configure credenciales GRE para consultar por RUC-tipo-serie-número."),
+      fuente: "gem_comprobante_clave"
     };
   }
 
-  throw new Error(`Respuesta inesperada de SUNAT (HTTP ${resp.status}): ${JSON.stringify(resp.data).slice(0, 200)}`);
+  if (!tr.tuvoTicket && intentarGemClave && gemConsultaClave?.error) {
+    return {
+      ok: true,
+      actualizado: false,
+      idEstadoSunat: guia.idEstadoSunat,
+      mensaje: "Sin ticket GEM en BD. Error al consultar por clave: " + gemConsultaClave.error,
+      fuente: "gem_comprobante_clave"
+    };
+  }
+
+  if (tr.tuvoTicket && (tr.httpError || tr.inesperado)) {
+    return {
+      ok: true,
+      actualizado: false,
+      idEstadoSunat: guia.idEstadoSunat,
+      mensaje:
+        tr.mensaje +
+        (intentarGemClave
+          ? " No se pudo completar la consulta alternativa por RUC-tipo-serie-número."
+          : ""),
+      fuente: "gem_envios_ticket"
+    };
+  }
+
+  return {
+    ok: true,
+    actualizado: false,
+    idEstadoSunat: guia.idEstadoSunat,
+    mensaje:
+      "No hay ticket de envío guardado para consultar en GEM (mismo flujo que al emitir). " +
+      "Si la guía se envió desde este sistema, debería existir ticketSunat en BD; si no, use envío o revise el registro.",
+    fuente: "gem_envios_ticket"
+  };
 };
 
 /**

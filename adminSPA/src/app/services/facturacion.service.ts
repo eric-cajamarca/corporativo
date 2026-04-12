@@ -325,8 +325,17 @@ export class FacturacionService {
     );
   }
 
+  /** Elimina una comunicación del historial si el correlativo no coincide con catálogo RA o está rechazada; no altera Comprobantes.numero. */
+  eliminarComunicacionBaja(idComunicacionBaja: string): Observable<{ message: string }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.delete<{ message: string }>(
+      this.url + 'facturacion/comunicacion-baja/' + encodeURIComponent(idComunicacionBaja),
+      { headers, withCredentials: true }
+    );
+  }
+
   /** Lista comunicaciones de baja enviadas. */
-  listarComunicacionesBaja(params?: { fechaDesde?: string; fechaHasta?: string; idEstadoSunat?: number; pagina?: number; porPagina?: number }): Observable<{ data: any[]; total: number }> {
+  listarComunicacionesBaja(params?: { fechaDesde?: string; fechaHasta?: string; idEstadoSunat?: number; pagina?: number; porPagina?: number }): Observable<{ data: ComunicacionBajaHistorialItem[]; total: number }> {
     let query = '';
     if (params) {
       const p = new URLSearchParams();
@@ -338,7 +347,7 @@ export class FacturacionService {
       query = '?' + p.toString();
     }
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get<{ data: any[]; total: number }>(
+    return this._http.get<{ data: ComunicacionBajaHistorialItem[]; total: number }>(
       this.url + 'facturacion/comunicacion-baja' + query,
       { headers, withCredentials: true }
     );
@@ -453,6 +462,31 @@ export class FacturacionService {
     );
   }
 
+  /**
+   * Consulta estado actual en SUNAT con CLAVE SOL (getStatusCdr / validez) y sincroniza BD.
+   * Útil si la guía se dio de baja en el portal y aquí sigue como aceptada.
+   */
+  consultarEstadoGuiaSol(id: string): Observable<{
+    ok: boolean;
+    actualizado?: boolean;
+    idEstadoSunat?: number;
+    mensaje: string;
+    fuente?: string;
+  }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.post<{
+      ok: boolean;
+      actualizado?: boolean;
+      idEstadoSunat?: number;
+      mensaje: string;
+      fuente?: string;
+    }>(
+      this.url + 'facturacion/guias/' + encodeURIComponent(id) + '/consultar-estado-sol',
+      {},
+      { headers, withCredentials: true }
+    );
+  }
+
   /** GET último XML firmado almacenado en BD (mismo que se envió en ZIP a SUNAT). */
   descargarXmlFirmadoGuia(id: string): Observable<Blob> {
     const headers = new HttpHeaders({ Authorization: '' });
@@ -478,6 +512,22 @@ export interface MotivoBaja {
   idMotivoBaja: string;
   codigoSunat: string;
   descripcion: string;
+}
+
+/** Fila del historial de comunicaciones de baja (RA). */
+export interface ComunicacionBajaHistorialItem {
+  idComunicacionBaja: string;
+  fechaComunicacion: string;
+  numeroCorrelativo: string;
+  ticketSunat?: string | null;
+  idEstadoSunat: number | null;
+  codigoEstadoSunat?: string | null;
+  descripcionEstadoSunat?: string | null;
+  descripcionRespuesta?: string | null;
+  tieneXmlEnviado?: number | boolean;
+  tieneCdr?: number | boolean;
+  /** 1 = se puede usar eliminar (rechazada, correlativo ≠ catálogo RA o inválido); nunca si baja aceptada (8). */
+  puedeEliminarCorrelativoIncorrecto?: number | boolean;
 }
 
 /** Item de listado GET buscar-origen. */

@@ -1,5 +1,23 @@
 const sql = require('mssql');
 
+/** Número correlativo guardado en catálogo (último usado) para un código de comprobante (ej. RA). */
+exports.obtenerComprobantePorCodigoRepo = async (pool, idEmpresa, codigo) => {
+  try {
+    const result = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('codigo', sql.VarChar(10), String(codigo || '').trim())
+      .query(`
+        SELECT TOP 1 idComprobante, codigo, numero
+        FROM Comprobantes
+        WHERE idEmpresa = @idEmpresa AND codigo = @codigo
+      `);
+    const row = result.recordset && result.recordset[0];
+    return row || null;
+  } catch (error) {
+    throw new Error(`Repository Error: ${error.message}`);
+  }
+};
+
 exports.obtenerComprobantePorIdEmpresa = async (pool, idEmpresa, idComprobante) => {
   try {
     const result = await pool.request()

@@ -615,6 +615,21 @@ const consultarTicketGuia = async (req, res, next) => {
   }
 };
 
+/** POST /api/facturacion/guias/:id/consultar-estado-sol — Sincroniza estado en SUNAT vía GEM (envíos/ticket y fallback por clave); actualiza BD. */
+const consultarEstadoGuiaSol = async (req, res, next) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await GuiaElectronicaService.consultarEstadoGuiaSolService(pool, req.user, req.params.id);
+    res.status(200).send(result);
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado" });
+    if (error.message === "GUIA_NOT_FOUND") return res.status(404).send({ message: "Guía no encontrada" });
+    const msg = error.message || String(error);
+    console.error("Error consultar estado guía (GEM):", error);
+    return res.status(400).send({ message: msg });
+  }
+};
+
 /** POST /api/facturacion/guias/registrar — Registra la GRE en BD y la envía a SUNAT si hay credenciales. */
 const registrarGuia = async (req, res, next) => {
   try {
@@ -930,6 +945,29 @@ const obtenerCdrComunicacionBaja = async (req, res, next) => {
   }
 };
 
+const eliminarComunicacionBaja = async (req, res, next) => {
+  try {
+    const { idComunicacionBaja } = req.params;
+    const pool = await sql.connect(dbConfig);
+    const result = await ComunicacionBajaService.eliminarComunicacionBajaDesalineadaService(pool, req.user, idComunicacionBaja);
+    res.status(200).send({ message: result.mensaje || "Eliminado.", data: undefined });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
+    if (error.message === "COMUNICACION_BAJA_NO_ENCONTRADA") {
+      return res.status(404).send({ message: "Comunicación de baja no encontrada.", data: undefined });
+    }
+    if (error.message === "COMUNICACION_BAJA_NO_ELIMINABLE") {
+      return res.status(400).send({
+        message:
+          "No se puede eliminar: solo registros rechazados por SUNAT, con correlativo distinto al último guardado en catálogo RA, o con correlativo inválido. No se eliminan comunicaciones con baja aceptada.",
+        data: undefined
+      });
+    }
+    console.error("Error eliminar comunicación de baja:", error);
+    return next(error);
+  }
+};
+
 const consultarEstadoComunicacionBaja = async (req, res, next) => {
   try {
     const { idComunicacionBaja } = req.params;
@@ -981,6 +1019,7 @@ module.exports = {
   listarComunicacionesBaja,
   enviarComunicacionBaja,
   consultarEstadoComunicacionBaja,
+  eliminarComunicacionBaja,
   obtenerXmlComunicacionBaja,
   obtenerCdrComunicacionBaja,
   registrarGuia,
@@ -990,5 +1029,6 @@ module.exports = {
   descargarXmlFirmadoGuia,
   reenviarGuia,
   eliminarGuia,
-  consultarTicketGuia
+  consultarTicketGuia,
+  consultarEstadoGuiaSol
 };

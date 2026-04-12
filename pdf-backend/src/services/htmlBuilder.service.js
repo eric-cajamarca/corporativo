@@ -308,7 +308,8 @@ class HtmlBuilderService {
    */
   _buildQrString(empresa, venta, cliente) {
     const rucEmisor = (empresa && empresa.ruc) ? String(empresa.ruc).trim() : '';
-    const codigo = (venta && venta.codigoComprobante) ? String(venta.codigoComprobante).trim() : '01';
+    const codigoRaw = (venta && venta.codigoComprobante) ? String(venta.codigoComprobante).trim() : '01';
+    const codigo = this._normalizarCodigoTipoSunatParaQr(codigoRaw);
     const serieNum = (venta && venta.compVenta) ? String(venta.compVenta).trim() : '';
     const igv = (venta && venta.igv != null) ? Number(venta.igv).toFixed(2) : '0.00';
     const total = (venta && venta.total != null) ? Number(venta.total).toFixed(2) : '0.00';
@@ -324,14 +325,25 @@ class HtmlBuilderService {
     return new Set(['01', '03', '07', '08']);
   }
 
+  /**
+   * Códigos internos de NC/ND (F7/B7, F8/B8) → tipo SUNAT para QR y leyenda impresa.
+   */
+  _normalizarCodigoTipoSunatParaQr(codigoComp) {
+    const c = String(codigoComp || '').trim().toUpperCase();
+    if (c === 'F7' || c === 'B7') return '07';
+    if (c === 'F8' || c === 'B8') return '08';
+    return String(codigoComp || '').trim() || '01';
+  }
+
   _debeMostrarQrYPieSunat(esCotizacion, codigoComprobante) {
     const cod = String(codigoComprobante || '').trim();
     if (esCotizacion || cod === 'CT' || cod === 'NV') return false;
-    return this._codigosComprobanteConQrSunat().has(cod);
+    const codNorm = this._normalizarCodigoTipoSunatParaQr(cod);
+    return this._codigosComprobanteConQrSunat().has(codNorm);
   }
 
   _tituloRepresentacionElectronica(codigo) {
-    const c = String(codigo || '').trim();
+    const c = this._normalizarCodigoTipoSunatParaQr(codigo);
     const map = {
       '01': 'FACTURA ELECTRÓNICA',
       '03': 'BOLETA DE VENTA ELECTRÓNICA',
@@ -339,6 +351,93 @@ class HtmlBuilderService {
       '08': 'NOTA DE DÉBITO ELECTRÓNICA'
     };
     return map[c] || 'COMPROBANTE DE PAGO ELECTRÓNICO';
+  }
+
+  /** Códigos internos (F7/B7/F8/B8) o SUNAT (07/08) para NC y ND en PDF. */
+  _esNotaCreditoDebitoElectronica(codigoComp) {
+    const c = String(codigoComp || '').trim().toUpperCase();
+    return new Set(['07', '08', 'F7', 'B7', 'F8', 'B8']).has(c);
+  }
+
+  _esNotaCreditoPdf(codigoComp) {
+    const c = String(codigoComp || '').trim().toUpperCase();
+    return c === '07' || c === 'F7' || c === 'B7';
+  }
+
+  _normalizarCodigoMotivoSunat(codigo, defaultCode = '01') {
+    const s = String(codigo != null ? codigo : '').trim();
+    if (!s) return defaultCode;
+    const n = parseInt(String(s).replace(/\D/g, '') || defaultCode, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 99) return defaultCode;
+    return String(n).padStart(2, '0');
+  }
+
+  /** Catálogo SUNAT 01: documento de referencia de la NC/ND. */
+  _etiquetaTipoComprobanteRefSunat(tipo) {
+    const t = String(tipo || '01').trim();
+    if (t === '03') return 'Boleta de venta electrónica';
+    if (t === '01') return 'Factura electrónica';
+    return `Comprobante (${t})`;
+  }
+
+  /** Catálogo SUNAT 09 — motivo de nota de crédito. */
+  _descripcionMotivoNotaCreditoSunat(codigo) {
+    const c = this._normalizarCodigoMotivoSunat(codigo, '01');
+    const map = {
+      '01': 'Anulación de la operación',
+      '02': 'Anulación por error en el RUC',
+      '03': 'Corrección por error en la descripción',
+      '04': 'Descuento global',
+      '05': 'Descuento por ítem',
+      '06': 'Devolución total',
+      '07': 'Devolución por ítem',
+      '08': 'Disminución en el valor',
+      '09': 'Otros conceptos',
+      '10': 'Ajustes de operaciones de exportación',
+      '11': 'Ajustes afectos al IVAP',
+      '12': 'Beneficio al consumidor — decremento de precio',
+      '13': 'Beneficio al consumidor — venta con beneficio'
+    };
+    return map[c] || 'Motivo de nota de crédito';
+  }
+
+  /** Catálogo SUNAT 10 — motivo de nota de débito. */
+  _descripcionMotivoNotaDebitoSunat(codigo) {
+    const c = this._normalizarCodigoMotivoSunat(codigo, '01');
+    const map = {
+      '01': 'Intereses por mora',
+      '02': 'Aumento en el valor',
+      '03': 'Penalidades / otros'
+    };
+    return map[c] || 'Motivo de nota de débito';
+  }
+
+  /**
+   * Bloque HTML (líneas en datos del cliente) con documento modificado y motivo; solo NC/ND.
+   * @returns {{ bloqueA4: string, bloqueTicket: string }}
+   */
+  _htmlDocumentoYMotivoNotaCreditoDebito(venta, codigoComp) {
+    if (!this._esNotaCreditoDebitoElectronica(codigoComp)) {
+      return { bloqueA4: '', bloqueTicket: '' };
+    }
+    const compRel = (venta.compRelacionado && String(venta.compRelacionado).trim()) || '—';
+    const tipoRef = venta.tipoComprobanteRef != null ? String(venta.tipoComprobanteRef).trim() : '01';
+    const tipoLbl = this._etiquetaTipoComprobanteRefSunat(tipoRef);
+    const codMotRaw = venta.codigoMotivoNotaCredito != null ? String(venta.codigoMotivoNotaCredito).trim() : '';
+    const codMot = this._normalizarCodigoMotivoSunat(codMotRaw, '01');
+    const esNc = this._esNotaCreditoPdf(codigoComp);
+    const descMot = esNc
+      ? this._descripcionMotivoNotaCreditoSunat(codMot)
+      : this._descripcionMotivoNotaDebitoSunat(codMot);
+    const escComp = this._escapeHtml(compRel);
+    const escTipo = this._escapeHtml(tipoLbl);
+    const escCod = this._escapeHtml(codMot);
+    const escDesc = this._escapeHtml(descMot);
+    const bloqueA4 = `
+    <div class="linea"><strong>DOCUMENTO QUE MODIFICA (${escTipo}):</strong> ${escComp}</div>
+    <div class="linea"><strong>MOTIVO:</strong> ${escCod} — ${escDesc}</div>`;
+    const bloqueTicket = `<br><strong>DOC. QUE MODIFICA (${escTipo}):</strong> ${escComp}<br><strong>MOTIVO:</strong> ${escCod} — ${escDesc}<br>`;
+    return { bloqueA4, bloqueTicket };
   }
 
   /** Pie legal SUNAT al final del PDF (hash viene de ComprobantesElectronicos al generar XML). */
@@ -368,6 +467,7 @@ class HtmlBuilderService {
       qrDataUri, pieSunatHtml = '',
       barcodeIdVentaUrl = '',
       observaciones = '',
+      notaCreditoDebitoClienteExtra = '',
       tablaCuotasHtml = ''
     } = data;
     const condicionPago = this._normalizarCondicionPago(venta);
@@ -437,6 +537,7 @@ class HtmlBuilderService {
     <strong>COND. PAGO:</strong> ${condicionPago}<br>
     <strong>EMISIÓN:</strong> ${fEmision || '-'}
     ${fVencimiento ? '<br><strong>VENCIMIENTO:</strong> ' + this._escapeHtml(fVencimiento) : ''}
+    ${notaCreditoDebitoClienteExtra || ''}
   </div>
   <hr class="ticket-sep">
   <table class="ticket-detalle">
@@ -549,7 +650,16 @@ class HtmlBuilderService {
     const mostrarCuotasPdf = codigoComp === '01' || codigoComp === '03';
     const esCredito = condicionPago === 'CRÉDITO';
 
-    const observaciones = (venta.observaciones && String(venta.observaciones).trim()) || (venta.compRelacionado && String(venta.compRelacionado).trim()) || '';
+    const esNcNd = this._esNotaCreditoDebitoElectronica(codigoComp);
+    const { bloqueA4: htmlDocMotivoNcNd, bloqueTicket: htmlDocMotivoNcNdTicket } = this._htmlDocumentoYMotivoNotaCreditoDebito(
+      venta,
+      codigoComp
+    );
+    const observaciones = esNcNd
+      ? ((venta.observaciones && String(venta.observaciones).trim()) || '')
+      : ((venta.observaciones && String(venta.observaciones).trim()) ||
+          (venta.compRelacionado && String(venta.compRelacionado).trim()) ||
+          '');
     const cuotas = Array.isArray(venta.cuotas) ? venta.cuotas : [];
     const mostrarTablaCuotasMitad = mostrarCuotasPdf && esCredito && cuotas.length > 0;
     const tablaCuotasMitadHtml = mostrarTablaCuotasMitad
@@ -608,7 +718,8 @@ class HtmlBuilderService {
         pieSunatHtml,
         barcodeIdVentaUrl,
         tablaCuotasHtml: ticketCuotasHtml,
-        observaciones
+        observaciones,
+        notaCreditoDebitoClienteExtra: htmlDocMotivoNcNdTicket
       });
     }
 
@@ -703,6 +814,7 @@ class HtmlBuilderService {
     <div class="linea"><strong>CONDICIÓN DE PAGO:</strong> ${condicionPago}</div>
     <div class="linea"><strong>FECHA DE EMISIÓN:</strong> ${fEmision || '-'}</div>
     ${fVencimiento ? '<div class="linea"><strong>FECHA DE VENCIMIENTO:</strong> ' + this._escapeHtml(fVencimiento) + '</div>' : ''}
+    ${htmlDocMotivoNcNd}
   </div>
   <table class="detalle">
     <thead><tr><th class="text-center" style="width:10%;">Cant.</th><th style="width:44%;">Descripción</th><th class="text-end" style="width:18%;">P. Unit. (S/)</th><th class="text-end" style="width:18%;">Importe (S/)</th></tr></thead>

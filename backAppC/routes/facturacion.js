@@ -34,6 +34,7 @@ router.post('/comunicacion-baja/enviar', facturacionController.enviarComunicacio
 router.get('/comunicacion-baja/:idComunicacionBaja/xml', facturacionController.obtenerXmlComunicacionBaja);
 router.get('/comunicacion-baja/:idComunicacionBaja/cdr', facturacionController.obtenerCdrComunicacionBaja);
 router.post('/comunicacion-baja/:idComunicacionBaja/consultar-estado', facturacionController.consultarEstadoComunicacionBaja);
+router.delete('/comunicacion-baja/:idComunicacionBaja', facturacionController.eliminarComunicacionBaja);
 router.post('/enviar-lote', facturacionController.enviarLoteSunat);
 router.get('/comprobantes/:idComprobanteElectronico/estado', facturacionController.consultarEstadoSunat);
 
@@ -42,6 +43,7 @@ router.post('/guias/registrar', facturacionController.registrarGuia);
 router.put('/guias/:id', facturacionController.actualizarGuia);
 router.get('/guias/emitidas', facturacionController.listarGuiasEmitidas);
 router.get('/guias/:id/ticket', facturacionController.consultarTicketGuia);
+router.post('/guias/:id/consultar-estado-sol', facturacionController.consultarEstadoGuiaSol);
 router.get('/guias/:id/preview-xml', facturacionController.previewXmlGuia);
 router.get('/guias/:id/xml-firmado', facturacionController.descargarXmlFirmadoGuia);
 router.get('/guias/:id', facturacionController.obtenerGuia);

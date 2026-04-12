@@ -48,3 +48,64 @@
     width: 100%;
   }
 }
+
+/* Historial RA: compacto, encabezado alineado al primary del sistema */
+.cb-historial-wrap {
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  background: #fff;
+}
+
+.cb-historial-table {
+  font-size: 0.8125rem;
+}
+
+.cb-historial-thead {
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+  color: #fff;
+}
+
+.cb-historial-thead th {
+  border: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  padding: 0.4rem 0.45rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.cb-historial-table tbody td {
+  padding: 0.35rem 0.45rem;
+  vertical-align: middle;
+}
+
+.cb-historial-row {
+  cursor: pointer;
+}
+
+.cb-historial-row:hover {
+  background-color: rgba(13, 110, 253, 0.06);
+}
+
+.cb-desc-preview {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-desc-modal-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 60vh;
+  overflow-y: auto;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.cb-historial-pagination ::ng-deep .pagination .page-link {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}

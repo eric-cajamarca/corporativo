@@ -1416,12 +1416,39 @@ abrirModalPrecios(item: any) {
     this.detailForm.monto = this.getSaldoPendiente();
   }
 
-  /** Al abrir el modal Forma de pago: selecciona Efectivo y pone el monto = saldo (total de la venta). */
+  /**
+   * Si aún no hay líneas, agrega una fila EFECTIVO por el total de la venta.
+   * No aplica en pago PENDIENTE + condición crédito corriente (el backend arma la línea fiado).
+   */
+  private aplicarDetallePagoEfectivoPorDefectoSiVacio(): void {
+    if (this.detallePago.length > 0) return;
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    if (idEstadoPago === 1 && this.cabeceraEsCreditoFinanciacion()) return;
+    const total = Math.round((Number(this.ventas.total) || 0) * 100) / 100;
+    if (total <= 0) return;
+    const efectivo = this.formasPago.find(
+      (f: FormaPago) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
+    );
+    if (!efectivo?.idFormaPago) return;
+    const idForma = Number(efectivo.idFormaPago);
+    this.detallePago.push({
+      item: 1,
+      idFormaPago: idForma,
+      descripcion: efectivo.descripcion || 'EFECTIVO',
+      monto: total,
+      referencia: 'N/A'
+    });
+  }
+
+  /** Al abrir el modal Forma de pago: selecciona Efectivo, fila por defecto con el total (si aplica) y sincroniza resumen. */
   abrirModalPago(): void {
-    const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
+    const efectivo = this.formasPago.find(
+      (f: FormaPago) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
+    );
     if (efectivo) {
       this.formaPagoSeleccionada = { ...efectivo };
     }
+    this.aplicarDetallePagoEfectivoPorDefectoSiVacio();
     this.actualizarMontoSaldo();
     const total = Number(this.ventas.total) || 0;
     this.pagaCon = total;
@@ -1432,6 +1459,8 @@ abrirModalPrecios(item: any) {
     const modalEl = document.getElementById('modalPago');
     const inst = bootstrap.Modal.getInstance(modalEl as HTMLElement);
     inst?.hide();
+    this.registrarVenta();
+    
   }
 
   /** Normaliza texto para detectar "crédito" aunque venga con tilde (FormasPago / MediosPago). */

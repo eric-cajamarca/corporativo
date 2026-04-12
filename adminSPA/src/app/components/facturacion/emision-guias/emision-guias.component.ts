@@ -57,6 +57,8 @@ export class EmisionGuiasComponent implements OnInit {
   eliminandoId: string | null = null;
   imprimiendoId: string | null = null;
   consultandoTicketId: string | null = null;
+  /** Consulta estado en SUNAT vía CLAVE SOL (baja en portal, etc.). */
+  sincronizandoSolId: string | null = null;
 
   ngOnInit(): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
@@ -102,6 +104,11 @@ export class EmisionGuiasComponent implements OnInit {
 
   esEnProceso(row: GuiaEmitidaListItem): boolean {
     return row.idEstadoSunat === 2;
+  }
+
+  /** No mostrar junto a “Consultar ticket” (estado 2); el resto puede sincronizar con SOL. */
+  puedeConsultarEstadoSol(row: GuiaEmitidaListItem): boolean {
+    return row.idEstadoSunat !== 2;
   }
 
   /** Editar solo pendiente o error SUNAT (no aceptada ni en proceso). */
@@ -178,6 +185,31 @@ export class EmisionGuiasComponent implements OnInit {
       error: (err) => {
         this.consultandoTicketId = null;
         iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo consultar el ticket.', position: 'topRight' });
+      }
+    });
+  }
+
+  /** Sincroniza estado con SUNAT usando usuario/clave SOL (útil si la guía se dio de baja en el portal). */
+  consultarEstadoSol(row: GuiaEmitidaListItem): void {
+    this.sincronizandoSolId = row.idGuiaElectronica;
+    this.facturacionService.consultarEstadoGuiaSol(row.idGuiaElectronica).subscribe({
+      next: (res) => {
+        this.sincronizandoSolId = null;
+        const msg = res?.mensaje || 'Consulta finalizada.';
+        if (res?.actualizado) {
+          iziToast.success({ title: 'Estado actualizado', message: msg, position: 'topRight' });
+        } else {
+          iziToast.info({ title: 'SUNAT (SOL)', message: msg, position: 'topRight' });
+        }
+        this.cargar();
+      },
+      error: (err) => {
+        this.sincronizandoSolId = null;
+        iziToast.error({
+          title: 'Error',
+          message: err?.error?.message || 'No se pudo consultar el estado en SUNAT.',
+          position: 'topRight'
+        });
       }
     });
   }

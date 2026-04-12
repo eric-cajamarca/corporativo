@@ -88,15 +88,15 @@
         <div class="row g-2 align-items-end mb-3">
           <div class="col-auto">
             <label class="form-label mb-0 small">Desde</label>
-            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaDesde" (change)="cargarListado()">
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaDesde" (change)="onFiltroHistorialChange()">
           </div>
           <div class="col-auto">
             <label class="form-label mb-0 small">Hasta</label>
-            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="cargarListado()">
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaHasta" (change)="onFiltroHistorialChange()">
           </div>
           <div class="col-auto">
             <label class="form-label mb-0 small">Estado</label>
-            <select class="form-select form-select-sm" [(ngModel)]="idEstadoSunat" (change)="cargarListado()">
+            <select class="form-select form-select-sm" [(ngModel)]="idEstadoSunat" (change)="onFiltroHistorialChange()">
               <option [ngValue]="null">Todos</option>
               <option [ngValue]="7">Pendiente</option>
               <option [ngValue]="1">Aceptado</option>
@@ -105,12 +105,12 @@
             </select>
           </div>
           <div class="col-auto">
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarListado()">Buscar</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="onFiltroHistorialChange()">Buscar</button>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered">
-            <thead class="table-light">
+        <div class="table-responsive cb-historial-wrap">
+          <table class="table table-sm table-bordered mb-0 cb-historial-table">
+            <thead class="cb-historial-thead">
               <tr>
                 <th>Fecha</th>
                 <th>Correlativo</th>
@@ -122,13 +122,15 @@
             </thead>
             <tbody>
               @for (item of listado; track item.idComunicacionBaja) {
-                <tr>
+                <tr class="cb-historial-row" (click)="abrirModalDescripcion(item)" role="button" tabindex="0"
+                    (keydown.enter)="abrirModalDescripcion(item)" (keydown.space)="$event.preventDefault(); abrirModalDescripcion(item)"
+                    title="Clic para ver la descripción completa">
                   <td>{{ item.fechaComunicacion }}</td>
                   <td>{{ item.numeroCorrelativo }}</td>
                   <td class="small">{{ item.ticketSunat || '—' }}</td>
                   <td>{{ descripcionEstado(item) }}</td>
-                  <td class="small">{{ item.descripcionRespuesta || '—' }}</td>
-                  <td>
+                  <td class="small cb-desc-preview">{{ previewDescripcion(item.descripcionRespuesta) }}</td>
+                  <td (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
                     <div class="d-flex flex-wrap gap-1">
                       @if (tieneXmlEnviado(item)) {
                         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="verXmlEnviado(item)"
@@ -148,6 +150,13 @@
                           @if (consultandoId === item.idComunicacionBaja) { Consultando... } @else { Consultar estado }
                         </button>
                       }
+                      @if (puedeMostrarBotonEliminar(item)) {
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Quitar del historial (no cambia el correlativo RA en catálogo)"
+                                (click)="eliminarDelHistorial(item, $event)"
+                                [disabled]="eliminandoId === item.idComunicacionBaja">
+                          @if (eliminandoId === item.idComunicacionBaja) { … } @else { Eliminar }
+                        </button>
+                      }
                     </div>
                   </td>
                 </tr>
@@ -155,10 +164,45 @@
             </tbody>
           </table>
         </div>
-        @if (listado.length === 0 && totalListado === 0) {
-          <p class="small text-muted mb-0">No hay comunicaciones de baja en el rango indicado.</p>
+        @if (totalListado > 0) {
+          <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2 cb-historial-pagination">
+            <span class="text-muted small">
+              Mostrando {{ (pagina - 1) * porPagina + 1 }} – {{ min(pagina * porPagina, totalListado) }} de {{ totalListado }}
+            </span>
+            <ngb-pagination
+              [(page)]="pagina"
+              [pageSize]="porPagina"
+              [collectionSize]="totalListado"
+              [maxSize]="5"
+              [rotate]="true"
+              [boundaryLinks]="true"
+              class="mb-0"
+              (pageChange)="cargarListado()">
+            </ngb-pagination>
+          </div>
+        }
+        @if (totalListado === 0) {
+          <p class="small text-muted mb-0 mt-2">No hay comunicaciones de baja en el rango indicado.</p>
         }
       </div>
     </div>
   </div>
 </main>
+
+<!-- Descripción SUNAT completa -->
+<div class="modal fade" id="modalDescripcionBaja" tabindex="-1" aria-labelledby="modalDescripcionBajaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" id="modalDescripcionBajaLabel">Descripción (SUNAT)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div class="cb-desc-modal-body">{{ descripcionModalTexto }}</div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
