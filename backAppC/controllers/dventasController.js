@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
+const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
 
 
 async function obtenerDetalleVentas(req, res) {
@@ -278,25 +279,85 @@ async function eliminarDetalleVenta(req, res) {
   if (!idEmpresa) {
     return res.status(403).json({ message: 'No autorizado: falta empresa en token' });
   }
-  const id = req.params.id;
+  const idDetalle = parseInt(req.params.id, 10);
+  if (Number.isNaN(idDetalle) || idDetalle < 1) {
+    return res.status(400).json({ message: 'id de detalle inválido' });
+  }
+  const stockRepository = require('../repositories/stock.repository');
+  const inventarioRepository = require('../repositories/inventario.repository');
   try {
     const pool = await sql.connect(dbConfig);
-    const request = pool.request();
-    request.input('id', sql.Int, id);
-    request.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-    const check = await request.query(`
-      SELECT dv.idDetalle FROM DetalleVenta dv
-      INNER JOIN Ventas v ON dv.idVenta = v.idVenta
-      WHERE dv.idDetalle = @id AND v.idEmpresa = @idEmpresa
-    `);
-    if (!check.recordset || check.recordset.length === 0) {
-      return res.status(404).json({ message: 'El registro no existe o no pertenece a tu empresa' });
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    try {
+      const rowRs = await transaction.request()
+        .input('idDetalle', sql.Int, idDetalle)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT dv.idDetalle, dv.idVenta, dv.idProducto, dv.cantidad, ISNULL(dv.costoUnitario, 0) AS costoUnitario,
+            v.idSucursal, v.idEstadoSunat, v.compVenta, v.idComprobante, v.idUsuario, ISNULL(v.eliminado, 0) AS eliminado,
+            UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
+          FROM DetalleVenta dv
+          INNER JOIN Ventas v ON dv.idVenta = v.idVenta AND v.idEmpresa = @idEmpresa
+          LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+          WHERE dv.idDetalle = @idDetalle
+        `);
+      const row = rowRs.recordset && rowRs.recordset[0];
+      if (!row) {
+        await transaction.rollback();
+        return res.status(404).json({ message: 'El registro no existe o no pertenece a tu empresa' });
+      }
+      if (row.eliminado) {
+        await transaction.rollback();
+        return res.status(400).json({ message: 'No se puede eliminar línea: la venta está anulada.' });
+      }
+      const cod = String(row.codigoComprobante || '').trim().toUpperCase();
+      const esNv = cod === 'NV';
+      if (!esNv && (row.idEstadoSunat === 1 || row.idEstadoSunat === 2 || row.idEstadoSunat === 3)) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: 'No se puede eliminar la línea: el comprobante ya fue enviado o aceptado en SUNAT.'
+        });
+      }
+      const cant = parseFloat(row.cantidad) || 0;
+      if (cant > 0 && row.idProducto) {
+        await stockRepository.restaurarStockEnLotes(transaction, {
+          idEmpresa,
+          idSucursal: row.idSucursal,
+          idProducto: row.idProducto,
+          cantidad: cant
+        });
+        const idUsuarioMov = row.idUsuario || idUsuarioDesdePayloadUser(req.user);
+        if (idUsuarioMov) {
+          await inventarioRepository.insertarFilaMovimiento(transaction, {
+            idEmpresa,
+            idSucursal: row.idSucursal,
+            idProducto: row.idProducto,
+            tipoMovimiento: 'EN',
+            cantidad: cant,
+            docRelacionado: row.compVenta,
+            idComprobante: row.idComprobante,
+            idUsuario: idUsuarioMov,
+            observaciones: 'Eliminación de línea de venta — devolución de stock',
+            costoUnitario: row.costoUnitario != null ? Number(row.costoUnitario) : 0,
+            idLote: null
+          });
+        }
+      }
+      await transaction.request()
+        .input('idDetalle', sql.Int, idDetalle)
+        .query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle');
+      await transaction.commit();
+      res.json({ message: 'Registro eliminado correctamente; el stock de la línea fue devuelto.' });
+    } catch (inner) {
+      try {
+        await transaction.rollback();
+      } catch (_) {}
+      throw inner;
     }
-    await pool.request().input('id', sql.Int, id).query('DELETE FROM DetalleVenta WHERE idDetalle = @id');
-    res.json({ message: 'Registro eliminado correctamente' });
   } catch (error) {
     console.error('Error al eliminar el detalle de venta:', error);
-    res.status(500).json({ message: 'Error al eliminar el detalle de venta' });
+    res.status(500).json({ message: error.message || 'Error al eliminar el detalle de venta' });
   }
 }
 

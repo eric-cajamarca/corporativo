@@ -4,6 +4,7 @@
 
 const sql = require("mssql");
 const FacturacionRepository = require("../repositories/facturacion.repository");
+const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 const generadorXmlResumenDiario = require("./generadorXmlResumenDiarioSunat.service");
 const firmaXmlSunat = require("./firmaXmlSunat.service");
 const envioDirectoSunat = require("./envioDirectoSunat.service");
@@ -191,7 +192,8 @@ async function consultarEstadoResumenDiarioService(pool, user, idResumenDiarioSu
           idEstadoSunat,
           cdr ? cdr.xml : null,
           cdr ? cdr.codigo : null,
-          cdr ? cdr.descripcion : null
+          cdr ? cdr.descripcion : null,
+          { idUsuarioEjecutor: idUsuarioDesdePayloadUser(user) }
         );
       }
       return { ok: true, statusCode: 0, idEstadoSunat, mensaje: cdr ? cdr.descripcion : "Procesado" };

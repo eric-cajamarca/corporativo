@@ -308,8 +308,10 @@ export class DashboardAnalisisComponent implements OnInit {
   formatCurrency(value: number): string {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: 'PEN'
-    }).format(value);
+      currency: 'PEN',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value ?? 0);
   }
 
   formatPercent(value: number): string {

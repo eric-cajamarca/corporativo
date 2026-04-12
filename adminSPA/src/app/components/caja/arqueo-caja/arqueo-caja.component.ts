@@ -267,14 +267,14 @@ export class ArqueoCajaComponent implements OnInit {
         this.resumenConceptos = [
           ...baseResumen,
           {
-            concepto: 'Venta al crédito (informativo, no es efectivo en caja)',
+            concepto: 'Venta al crédito',
             tipoOperacion: 'I',
             importe: this.ventasCreditoImporte,
             icono: 'bi bi-credit-card-2-front',
             sinDetalle: true
           },
           {
-            concepto: 'Cobro de créditos (cuotas pagadas en el período)',
+            concepto: 'Cobro de créditos',
             tipoOperacion: 'I',
             importe: this.cobroCreditosImporte,
             icono: 'bi bi-cash-coin',

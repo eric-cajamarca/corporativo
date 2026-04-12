@@ -380,13 +380,14 @@ const obtenerNavegacionSidebar = async (pool, user) => {
                     ruta: '/caja/arqueo',
                     permiso: 'VER_ARQUEO',
                     visible: esAdmin || permisos.includes('VER_ARQUEO')
-                },
-                {
-                    nombre: 'Conteo de Dinero',
-                    ruta: '/caja/conteo-dinero',
-                    permiso: 'VER_CAJA',
-                    visible: esAdmin || permisos.includes('VER_CAJA')
                 }
+                //,
+                //{
+                //    nombre: 'Conteo de Dinero',
+                //    ruta: '/caja/conteo-dinero',
+                //    permiso: 'VER_CAJA',
+                //    visible: esAdmin || permisos.includes('VER_CAJA')
+                //}
             ]
         },
         {

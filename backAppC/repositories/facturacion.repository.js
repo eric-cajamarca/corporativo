@@ -19,6 +19,8 @@ const {
 } = require("../utils/sunatCodigoComprobante.util");
 const { extraerCodigoHashDesdeXmlFirmado } = require("../utils/sunatCodigoHash.util");
 const notaCreditoSunatStockService = require("../services/notaCreditoSunatStock.service");
+const bajaSunatStockService = require("../services/bajaSunatStock.service");
+const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -1376,9 +1378,25 @@ exports.listarComunicacionesBajaRepo = async (pool, idEmpresa, filtros = {}) => 
   return { items: listResult.recordset || [], total };
 };
 
-/** Actualiza estado de varios comprobantes electrónicos (y sus ventas) a idEstadoSunat. */
-exports.actualizarEstadoComprobantesRepo = async (pool, idsComprobanteElectronico, idEstadoSunat, cdr, codigoRespuesta, descripcionRespuesta) => {
+/** Actualiza estado de varios comprobantes electrónicos (y sus ventas) a idEstadoSunat.
+ * @param {object} [opciones] - aplicarStockComunicacionBaja: si true, ajusta inventario al pasar a baja aceptada (RA).
+ *   idUsuarioEjecutor: UUID del usuario logueado (JWT sub) para MovimientosInventario si Ventas.idUsuario es null.
+ */
+exports.actualizarEstadoComprobantesRepo = async (
+  pool,
+  idsComprobanteElectronico,
+  idEstadoSunat,
+  cdr,
+  codigoRespuesta,
+  descripcionRespuesta,
+  opciones = {}
+) => {
   const nowStr = getNowLocalSQLString();
+  const aplicarStockComunicacionBaja = opciones.aplicarStockComunicacionBaja === true;
+  const idUsuarioEjecutor =
+    opciones.idUsuarioEjecutor != null && String(opciones.idUsuarioEjecutor).trim() !== ""
+      ? String(opciones.idUsuarioEjecutor).trim()
+      : null;
   const transaction = pool.transaction();
   await transaction.begin();
   try {
@@ -1418,8 +1436,18 @@ exports.actualizarEstadoComprobantesRepo = async (pool, idsComprobanteElectronic
         transaction,
         id,
         idEstadoAnterior,
-        idEstadoSunat
+        idEstadoSunat,
+        idUsuarioEjecutor
       );
+
+      if (aplicarStockComunicacionBaja) {
+        await bajaSunatStockService.aplicarStockPorComunicacionBajaAceptadaSiCorresponde(
+          transaction,
+          id,
+          idEstadoAnterior,
+          idUsuarioEjecutor
+        );
+      }
     }
     await transaction.commit();
   } catch (err) {
@@ -1506,7 +1534,7 @@ exports.persistirHashXmlComprobanteElectronicoRepo = async (pool, idComprobanteE
 };
 
 /** Actualiza ComprobantesElectronicos y Ventas con el resultado del envío (mismo idEstadoSunat). Solo se guarda CDR en BD. */
-exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, resultado) => {
+exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, resultado, idUsuarioEjecutor = null) => {
   const nowStr = getNowLocalSQLString();
   const transaction = pool.transaction();
   await transaction.begin();
@@ -1558,7 +1586,8 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
       transaction,
       idComprobanteElectronico,
       idEstadoAnterior,
-      resultado.idEstadoSunat
+      resultado.idEstadoSunat,
+      idUsuarioEjecutor
     );
 
     await transaction.commit();
@@ -1713,12 +1742,17 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
         mensaje: err.message || "Error al enviar comprobante a SUNAT"
       };
     }
-    await exports.actualizarResultadoEnvioRepo(pool, idComprobanteElectronico, {
-      codigoRespuesta: resultado.codigoRespuesta,
-      descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
-      cdr: resultado.cdr,
-      idEstadoSunat: resultado.idEstadoSunat ?? 6
-    });
+    await exports.actualizarResultadoEnvioRepo(
+      pool,
+      idComprobanteElectronico,
+      {
+        codigoRespuesta: resultado.codigoRespuesta,
+        descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
+        cdr: resultado.cdr,
+        idEstadoSunat: resultado.idEstadoSunat ?? 6
+      },
+      idUsuarioDesdePayloadUser(user)
+    );
     const resDir = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
     console.error("[SUNAT] enviarComprobanteSunatRepo: resultado envío directo", resDir);
     debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoDirecto", message: "resultado", data: resDir });
@@ -1811,12 +1845,17 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     xmlYaEnFirma: usarXmlUbl
   });
 
-  await exports.actualizarResultadoEnvioRepo(pool, idComprobanteElectronico, {
-    codigoRespuesta: resultado.codigoRespuesta,
-    descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
-    cdr: resultado.cdr,
-    idEstadoSunat: resultado.idEstadoSunat ?? 6
-  });
+  await exports.actualizarResultadoEnvioRepo(
+    pool,
+    idComprobanteElectronico,
+    {
+      codigoRespuesta: resultado.codigoRespuesta,
+      descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
+      cdr: resultado.cdr,
+      idEstadoSunat: resultado.idEstadoSunat ?? 6
+    },
+    idUsuarioDesdePayloadUser(user)
+  );
 
   // #region agent log
   const resFac = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
@@ -1861,12 +1900,17 @@ exports.consultarEstadoSunatRepo = async (pool, user, idComprobanteElectronico) 
       urlConsultaCdr
     );
     if (resultadoCdr.cdr != null && resultadoCdr.idEstadoSunat != null) {
-      await exports.actualizarResultadoEnvioRepo(pool, idComprobanteElectronico, {
-        codigoRespuesta: resultadoCdr.codigoRespuesta,
-        descripcionRespuesta: resultadoCdr.descripcionRespuesta || resultadoCdr.error,
-        cdr: resultadoCdr.cdr,
-        idEstadoSunat: resultadoCdr.idEstadoSunat
-      });
+      await exports.actualizarResultadoEnvioRepo(
+        pool,
+        idComprobanteElectronico,
+        {
+          codigoRespuesta: resultadoCdr.codigoRespuesta,
+          descripcionRespuesta: resultadoCdr.descripcionRespuesta || resultadoCdr.error,
+          cdr: resultadoCdr.cdr,
+          idEstadoSunat: resultadoCdr.idEstadoSunat
+        },
+        idUsuarioDesdePayloadUser(user)
+      );
     }
   }
 

@@ -1061,9 +1061,12 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
   return result.recordset || [];
 };
 
-/** Anula/elimina lógicamente una venta (eliminado=1). Restaura stock, elimina movimientos caja. No permitido si ya enviado a SUNAT. */
-exports.anularVentaRepo = async (pool, idVenta, idEmpresa) => {
+/** Anula/elimina lógicamente una venta (eliminado=1). Restaura stock, elimina movimientos caja. No permitido si ya enviado a SUNAT.
+ * @param {string|null|undefined} idUsuarioEjecutor - JWT sub si Ventas.idUsuario es null (movimiento inventario)
+ */
+exports.anularVentaRepo = async (pool, idVenta, idEmpresa, idUsuarioEjecutor = null) => {
   const stockRepository = require('./stock.repository');
+  const inventarioRepository = require('./inventario.repository');
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
@@ -1071,7 +1074,8 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresa) => {
       .input('idVenta', sql.Int, idVenta)
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .query(`
-        SELECT v.idVenta, v.idEstadoSunat, v.idSucursal, v.compVenta, ISNULL(v.eliminado, 0) AS eliminado,
+        SELECT v.idVenta, v.idEstadoSunat, v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario,
+          ISNULL(v.eliminado, 0) AS eliminado,
           UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
@@ -1096,7 +1100,8 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresa) => {
     const detalleRows = await transaction.request()
       .input('idVenta', sql.Int, idVenta)
       .query(`
-        SELECT idProducto, cantidad FROM DetalleVenta WHERE idVenta = @idVenta
+        SELECT idProducto, cantidad, ISNULL(costoUnitario, 0) AS costoUnitario
+        FROM DetalleVenta WHERE idVenta = @idVenta
       `);
     const detalles = detalleRows.recordset || [];
     for (const d of detalles) {
@@ -1108,6 +1113,22 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresa) => {
           idProducto: d.idProducto,
           cantidad: cant
         });
+        const idUsuarioMov = venta.idUsuario || idUsuarioEjecutor;
+        if (idUsuarioMov) {
+          await inventarioRepository.insertarFilaMovimiento(transaction, {
+            idEmpresa,
+            idSucursal,
+            idProducto: d.idProducto,
+            tipoMovimiento: 'EN',
+            cantidad: cant,
+            docRelacionado: venta.compVenta,
+            idComprobante: venta.idComprobante,
+            idUsuario: idUsuarioMov,
+            observaciones: 'Anulación de venta — devolución de stock',
+            costoUnitario: d.costoUnitario != null ? Number(d.costoUnitario) : 0,
+            idLote: null
+          });
+        }
       }
     }
     await transaction.request()

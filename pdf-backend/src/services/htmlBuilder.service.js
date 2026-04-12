@@ -353,6 +353,21 @@ class HtmlBuilderService {
     return map[c] || 'COMPROBANTE DE PAGO ELECTRÓNICO';
   }
 
+  /**
+   * Título visible en cabecera/ticket del PDF (no usa nombre del catálogo con abreviaturas ni "(Factura/Boleta)").
+   */
+  _tituloCabeceraComprobanteVenta(codigoComp, nombreComprobanteDb) {
+    const c = String(codigoComp || '').trim().toUpperCase();
+    if (c === '07' || c === 'F7' || c === 'B7') {
+      return 'Nota de crédito Electrónica';
+    }
+    if (c === '08' || c === 'F8' || c === 'B8') {
+      return 'Nota de débito Electrónica';
+    }
+    const nom = nombreComprobanteDb != null ? String(nombreComprobanteDb).trim() : '';
+    return nom || 'Comprobante';
+  }
+
   /** Códigos internos (F7/B7/F8/B8) o SUNAT (07/08) para NC y ND en PDF. */
   _esNotaCreditoDebitoElectronica(codigoComp) {
     const c = String(codigoComp || '').trim().toUpperCase();
@@ -434,9 +449,9 @@ class HtmlBuilderService {
     const escCod = this._escapeHtml(codMot);
     const escDesc = this._escapeHtml(descMot);
     const bloqueA4 = `
-    <div class="linea"><strong>DOCUMENTO QUE MODIFICA (${escTipo}):</strong> ${escComp}</div>
-    <div class="linea"><strong>MOTIVO:</strong> ${escCod} — ${escDesc}</div>`;
-    const bloqueTicket = `<br><strong>DOC. QUE MODIFICA (${escTipo}):</strong> ${escComp}<br><strong>MOTIVO:</strong> ${escCod} — ${escDesc}<br>`;
+    <div class="linea"><strong>DOCUMENTO QUE MODIFICA:</strong> ${escComp}</div>
+    <div class="linea"><strong>MOTIVO:</strong> ${escDesc}</div>`;
+    const bloqueTicket = `<br><strong>DOC. QUE MODIFICA:</strong> ${escComp}<br><strong>MOTIVO:</strong> ${escDesc}<br>`;
     return { bloqueA4, bloqueTicket };
   }
 
@@ -578,11 +593,11 @@ class HtmlBuilderService {
       esCotizacion = false
     } = safeParams;
 
-    const titulo = venta.nombreComprobante || 'Comprobante';
+    const codigoComp = String(venta.codigoComprobante || '').trim();
+    const titulo = this._tituloCabeceraComprobanteVenta(codigoComp, venta.nombreComprobante);
     const compVenta = venta.compVenta || '';
     const fEmision = venta.fEmision || '';
     const idVenta = venta.idVenta != null ? String(venta.idVenta) : '';
-    const codigoComp = String(venta.codigoComprobante || '').trim();
     const tieneVentaAgrupada =
       venta.idVentaAgrupada != null && String(venta.idVentaAgrupada).trim() !== '';
     const barcodeIdVentaUrl =
@@ -790,7 +805,6 @@ class HtmlBuilderService {
           <div class="datos-empresa">
             <h3>${empresa.nombre || ''}</h3>
             <p>
-              ${empresa.ruc ? 'RUC: ' + empresa.ruc + '<br>' : ''}
               ${empresa.direccion ? 'Dirección: ' + empresa.direccion + '<br>' : ''}
               ${empresa.rubro ? 'Rubro: ' + empresa.rubro + '<br>' : ''}
               ${empresa.telefono ? 'Cel: ' + empresa.telefono + '<br>' : ''}
@@ -799,9 +813,9 @@ class HtmlBuilderService {
           </div>
         </td>
         <td class="comprobante-box" style="border:none;">
+          <div class="tipo">${empresa.ruc ? 'RUC: ' + empresa.ruc + '<br>' : ''}</div>
           <div class="tipo">${titulo}</div>
           <div class="numero">${compVenta}</div>
-          <div class="fecha">Fecha de emisión: ${fEmision}</div>
         </td>
       </tr>
     </table>

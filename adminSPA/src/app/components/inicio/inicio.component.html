@@ -114,11 +114,11 @@
           <i class="bi bi-graph-up"></i>
         </div>
         <div class="kpi-content">
-          <div class="kpi-value">{{ ventasTotales | currency:'PEN':'S/ ':'1.0-0'}}</div>
+          <div class="kpi-value">{{ ventasTotales | currency:'PEN':'S/ ':'1.2-2'}}</div>
           <div class="kpi-label">Ventas Totales</div>
           <div class="kpi-change" [class.positive]="ventasVariacion >= 0" [class.negative]="ventasVariacion < 0">
             <i class="bi" [class.bi-arrow-up]="ventasVariacion >= 0" [class.bi-arrow-down]="ventasVariacion < 0"></i>
-            {{ventasVariacion >= 0 ? '+' : ''}}{{ventasVariacion}}%
+            {{ventasVariacion >= 0 ? '+' : ''}}{{ ventasVariacion | number:'1.2-2' }}%
           </div>
         </div>
       </div>
@@ -131,11 +131,11 @@
           <i class="bi bi-cash-coin"></i>
         </div>
         <div class="kpi-content">
-          <div class="kpi-value">{{utilidadNeta | currency:'PEN':'S/ ':'1.0-0'}}</div>
+          <div class="kpi-value">{{utilidadNeta | currency:'PEN':'S/ ':'1.2-2'}}</div>
           <div class="kpi-label">Utilidad Neta</div>
           <div class="kpi-change" [class.positive]="utilidadVariacion >= 0" [class.negative]="utilidadVariacion < 0">
             <i class="bi" [class.bi-arrow-up]="utilidadVariacion >= 0" [class.bi-arrow-down]="utilidadVariacion < 0"></i>
-            {{utilidadVariacion >= 0 ? '+' : ''}}{{utilidadVariacion}}%
+            {{utilidadVariacion >= 0 ? '+' : ''}}{{ utilidadVariacion | number:'1.2-2' }}%
           </div>
         </div>
       </div>
@@ -152,7 +152,7 @@
           <div class="kpi-label">Clientes Activos</div>
           <div class="kpi-change" [class.positive]="clientesVariacion >= 0" [class.negative]="clientesVariacion < 0">
             <i class="bi" [class.bi-arrow-up]="clientesVariacion >= 0" [class.bi-arrow-down]="clientesVariacion < 0"></i>
-            {{clientesVariacion >= 0 ? '+' : ''}}{{clientesVariacion}}%
+            {{clientesVariacion >= 0 ? '+' : ''}}{{ clientesVariacion | number:'1.2-2' }}%
           </div>
         </div>
       </div>
@@ -165,7 +165,7 @@
           <i class="bi bi-percent"></i>
         </div>
         <div class="kpi-content">
-          <div class="kpi-value">{{roi}}%</div>
+          <div class="kpi-value">{{ roi | number:'1.2-2' }}%</div>
           <div class="kpi-label">ROI</div>
           <div class="kpi-change" [class.positive]="roi >= 15" [class.negative]="roi < 15">
             <i class="bi" [class.bi-arrow-up]="roi >= 15" [class.bi-arrow-down]="roi < 15"></i>
@@ -222,14 +222,14 @@
                 <i class="bi bi-arrow-up text-success me-2"></i>
                 Ingresos
               </div>
-              <div class="summary-value text-success">{{ingresos | currency:'PEN':'S/ ':'1.0-0'}}</div>
+              <div class="summary-value text-success">{{ingresos | currency:'PEN':'S/ ':'1.2-2'}}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">
                 <i class="bi bi-arrow-down text-danger me-2"></i>
                 Costos
               </div>
-              <div class="summary-value text-danger">{{costos | currency:'PEN':'S/ ':'1.0-0'}}</div>
+              <div class="summary-value text-danger">{{costos | currency:'PEN':'S/ ':'1.2-2'}}</div>
             </div>
             <div class="summary-divider"></div>
             <div class="summary-item">
@@ -237,14 +237,14 @@
                 <i class="bi bi-calculator text-info me-2"></i>
                 Utilidad Bruta
               </div>
-              <div class="summary-value text-info">{{utilidadBruta | currency:'PEN':'S/ ':'1.0-0'}}</div>
+              <div class="summary-value text-info">{{utilidadBruta | currency:'PEN':'S/ ':'1.2-2'}}</div>
             </div>
             <div class="summary-item">
               <div class="summary-label">
                 <i class="bi bi-minus-circle text-warning me-2"></i>
                 Gastos Operativos
               </div>
-              <div class="summary-value text-warning">{{gastosOperativos | currency:'PEN':'S/ ':'1.0-0'}}</div>
+              <div class="summary-value text-warning">{{gastosOperativos | currency:'PEN':'S/ ':'1.2-2'}}</div>
             </div>
             <div class="summary-divider"></div>
             <div class="summary-item total">
@@ -252,7 +252,7 @@
                 <i class="bi bi-money-bill-wave text-primary me-2"></i>
                 Utilidad Neta
               </div>
-              <div class="summary-value fw-bold text-primary">{{utilidadNeta | currency:'PEN':'S/ ':'1.0-0'}}</div>
+              <div class="summary-value fw-bold text-primary">{{utilidadNeta | currency:'PEN':'S/ ':'1.2-2'}}</div>
             </div>
           </div>
         </div>
@@ -284,7 +284,7 @@
               </div>
               <div class="product-stats">
                 <div class="sales-count">{{producto.ventas | number}} ventas</div>
-                <div class="sales-amount">{{producto.monto | currency:'PEN':'S/ ':'1.0-0'}}</div>
+                <div class="sales-amount">{{producto.monto | currency:'PEN':'S/ ':'1.2-2'}}</div>
               </div>
             </div>
             <div class="product-item empty" *ngIf="productosMasVendidos.length === 0">

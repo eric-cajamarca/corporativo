@@ -9,6 +9,7 @@ const generadorXmlVoidedDocuments = require("./generadorXmlVoidedDocumentsSunat.
 const firmaXmlSunat = require("./firmaXmlSunat.service");
 const envioDirectoSunat = require("./envioDirectoSunat.service");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
+const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 
 /**
  * Envía una comunicación de baja (RA) con los comprobantes indicados.
@@ -242,7 +243,11 @@ async function consultarEstadoComunicacionBajaService(pool, user, idComunicacion
             estadoFinal,
             cdr ? cdr.xml : null,
             cdr ? cdr.codigo : null,
-            cdr ? `Baja aceptada: ${cdr.descripcion || ''}`.trim() : "Baja aceptada"
+            cdr ? `Baja aceptada: ${cdr.descripcion || ''}`.trim() : "Baja aceptada",
+            {
+              aplicarStockComunicacionBaja: true,
+              idUsuarioEjecutor: idUsuarioDesdePayloadUser(user)
+            }
           );
           console.error("comunicacionBaja: comprobantes actualizados a estado", estadoFinal);
         } else {

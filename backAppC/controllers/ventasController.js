@@ -9,6 +9,7 @@ const dbConfig = require('../dbconfig');
 const { nombreArchivoComprobante, getRutaFirmaFacturador, getRutaRptaFacturador } = require('../utils/facturadorSunat.util');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 const sunatPostPagoService = require('../services/sunatPostPago.service');
+const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
 
 /** Empresa JWT + gestionadas (gestora): permite PDF/comprobante de ventas de empresas hijas. */
 const idsEmpresaParaComprobanteVenta = async (pool, idEmpresaUsuario) => {
@@ -974,7 +975,12 @@ const anularVenta = async (req, res) => {
   }
   try {
     const pool = await sql.connect(dbConfig);
-    const result = await ventasRepository.anularVentaRepo(pool, idVenta, req.user.empresa);
+    const result = await ventasRepository.anularVentaRepo(
+      pool,
+      idVenta,
+      req.user.empresa,
+      idUsuarioDesdePayloadUser(req.user)
+    );
     if (result.ok === false) {
       return res.status(400).json({ error: result.error || 'No se pudo anular' });
     }

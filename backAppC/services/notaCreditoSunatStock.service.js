@@ -26,8 +26,15 @@ function normalizarMotivoNotaCredito(val) {
  * @param {string} idComprobanteElectronico
  * @param {number|null|undefined} idEstadoAnterior - idEstadoSunat del CE antes de actualizar
  * @param {number|null|undefined} idEstadoNuevo
+ * @param {string|null|undefined} idUsuarioEjecutor - JWT (sub) si Ventas.idUsuario viene vacío
  */
-exports.aplicarStockPorNotaCreditoSiCorresponde = async (ctx, idComprobanteElectronico, idEstadoAnterior, idEstadoNuevo) => {
+exports.aplicarStockPorNotaCreditoSiCorresponde = async (
+  ctx,
+  idComprobanteElectronico,
+  idEstadoAnterior,
+  idEstadoNuevo,
+  idUsuarioEjecutor = null
+) => {
   if (!esEstadoAceptadoSunat(idEstadoNuevo)) return;
   if (esEstadoAceptadoSunat(idEstadoAnterior)) return;
 
@@ -69,7 +76,8 @@ exports.aplicarStockPorNotaCreditoSiCorresponde = async (ctx, idComprobanteElect
       cantidad: cant
     });
 
-    if (cab.idUsuario) {
+    const idUsuarioMov = cab.idUsuario || idUsuarioEjecutor;
+    if (idUsuarioMov) {
       await inventarioRepository.insertarFilaMovimiento(ctx, {
         idEmpresa: cab.idEmpresa,
         idSucursal: cab.idSucursal,
@@ -78,7 +86,7 @@ exports.aplicarStockPorNotaCreditoSiCorresponde = async (ctx, idComprobanteElect
         cantidad: cant,
         docRelacionado: cab.compVenta,
         idComprobante: cab.idComprobante,
-        idUsuario: cab.idUsuario,
+        idUsuario: idUsuarioMov,
         observaciones: "Nota de crédito aceptada SUNAT — devolución de stock",
         costoUnitario: d.costoUnitario != null ? Number(d.costoUnitario) : 0,
         idLote: null
