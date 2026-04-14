@@ -1,3 +1,4 @@
+const sql = require('mssql');
 const productosImagenRepository = require('../repositories/productosImagen.repository');
 const productosRepository = require('../repositories/productos.repository');
 const path = require('path');
@@ -75,4 +76,53 @@ exports.eliminar = async (pool, idImagen, idEmpresa) => {
     console.error('productosImagen.service eliminar archivo:', e.message);
   }
   return { deleted: deleted > 0 };
+};
+
+/**
+ * Coloca la imagen indicada como portada (orden = 1) y reasigna el resto 2..n.
+ */
+exports.marcarPortada = async (pool, idEmpresa, idProducto, idImagenPortada) => {
+  if (!idEmpresa || !idProducto || !idImagenPortada) {
+    throw new Error('Faltan datos para marcar portada');
+  }
+  const producto = await productosRepository.obtenerProductoPorIdRepo(pool, idProducto, idEmpresa);
+  if (!producto || !producto.idProducto) {
+    throw new Error('Producto no encontrado o no pertenece a la empresa');
+  }
+  const lista = await productosImagenRepository.listarPorProducto(pool, idEmpresa, idProducto);
+  const idStr = (id) => String(id).toLowerCase();
+  const target = idStr(idImagenPortada);
+  const match = lista.find((row) => idStr(row.idImagen) === target);
+  if (!match) {
+    throw new Error('La imagen no pertenece a este producto');
+  }
+  const nuevaOrder = [
+    match.idImagen,
+    ...lista.filter((row) => idStr(row.idImagen) !== target).map((row) => row.idImagen)
+  ];
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    let orden = 1;
+    for (const idImagen of nuevaOrder) {
+      await transaction
+        .request()
+        .input('idImagen', sql.UniqueIdentifier, idImagen)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idProducto', sql.UniqueIdentifier, idProducto)
+        .input('orden', sql.TinyInt, orden)
+        .query(`
+          UPDATE ProductosImagen
+          SET orden = @orden
+          WHERE idImagen = @idImagen AND idEmpresa = @idEmpresa AND idProducto = @idProducto
+        `);
+      orden += 1;
+    }
+    await transaction.commit();
+  } catch (e) {
+    await transaction.rollback();
+    throw e;
+  }
+  return { ok: true };
 };

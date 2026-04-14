@@ -392,10 +392,16 @@
       </div>
       <div class="modal-body">
         <form>
+          <div *ngIf="sucursales.length === 0" class="alert alert-warning mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            No hay <strong>sucursales</strong> registradas para esta empresa. Cree al menos una sucursal
+            (menú <strong>Empresa / Sucursales</strong> o la pantalla correspondiente) y vuelva a abrir este formulario.
+          </div>
           <div class="mb-3">
             <label for="nuevaCajaSucursal" class="form-label">Sucursal *</label>
             <select class="form-select" id="nuevaCajaSucursal"
-                    [(ngModel)]="nuevaCaja.idSucursal" name="idSucursal" required>
+                    [(ngModel)]="nuevaCaja.idSucursal" name="idSucursal" required
+                    [disabled]="sucursales.length === 0">
               <option value="">Seleccionar sucursal</option>
               <option *ngFor="let s of sucursales" [value]="s.idSucursal">{{s.nombre}}</option>
             </select>

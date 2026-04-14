@@ -44,19 +44,20 @@
       </ng-container>
 
       <ng-container *ngIf="productos.length > 0">
-        <div class="card-body">
+        <div class="card-body card-body-busqueda-productos py-2 px-3">
           <div class="input-group input-group-merge">
             <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
-              [(ngModel)]="filtro">
+              [(ngModel)]="filtro"
+              (keyup.enter)="filtrar()">
             <div class="input-group-append">
-              <button class="btn btn-primary" (click)="filtrar()">
+              <button type="button" class="btn btn-primary" (click)="filtrar()">
                 Buscar
               </button>
             </div>
           </div>
         </div>
-        <div class="table-responsive" style="height:500px;">
-          <table class="table table-striped table-hover">
+        <div class="table-responsive productos-tabla-wrap" style="height:500px;">
+          <table class="table table-striped table-hover table-sm mb-0 productos-tabla-compacta">
             <thead class="table-primary" style="position: sticky; top: 0; z-index: 100;">
               <tr>
                 <th>Codigo</th>
@@ -88,10 +89,7 @@
                   <span>{{item.codigoPresentacion}} </span>
                 </td>
                 <td>
-                  <span> {{item.cUnitario | number:'1.2-2'}}</span>
-                  <br>
-                  <!-- <span class="badge bg-success" *ngIf="item.condicion === 'ACTIVO'">Activo</span>
-                  <span class="badge bg-danger" *ngIf="item.condicion != 'ACTIVO'">No Activo</span> -->
+                  <span>{{item.cUnitario | number:'1.2-2'}}</span>
                 </td>
                 <td>
                   <span>{{ item.fProduccion || '—' }}</span>
@@ -115,6 +113,9 @@
                       </a>
                       <a class="dropdown-item" *ngIf="item.idProducto" (click)="abrirEditarProducto(item.idProducto)">
                         <i class="bi bi-pencil me-1"></i> Editar
+                      </a>
+                      <a class="dropdown-item" *ngIf="item.idProducto && productosConImagenes" (click)="abrirGaleriaProducto(item)">
+                        <i class="bi bi-images me-1"></i> Galería de imágenes
                       </a>
                       <a style="cursor: pointer;" class="dropdown-item text-danger" *ngIf="item.idProducto" data-bs-toggle="modal"
                         [attr.data-bs-target]="'#delete-'+item.idProducto">

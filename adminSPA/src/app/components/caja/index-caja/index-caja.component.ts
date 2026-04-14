@@ -104,7 +104,10 @@ export class IndexCajaComponent implements OnInit {
           this.sucursales = Array.isArray(response.data) ? response.data : [];
         }
       },
-      error: () => {}
+      error: (err) => {
+        console.error('Error al cargar sucursales (cajas):', err);
+        this.sucursales = [];
+      }
     });
   }
 
@@ -215,6 +218,7 @@ export class IndexCajaComponent implements OnInit {
   abrirModalNuevaCaja() {
     this.nuevaCaja = { idSucursal: '', nombre: '', descripcion: '' };
     this.mostrarModalNuevaCaja = true;
+    this.cargarSucursales();
   }
 
   registrarNuevaCaja() {

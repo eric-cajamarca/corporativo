@@ -43,4 +43,13 @@ export class ProductosImagenService {
       { withCredentials: true }
     );
   }
+
+  /** Marca una imagen como portada (orden 1); el resto se reordena 2..n. */
+  marcarPortada(idProducto: string, idImagen: string): Observable<{ data: { ok: boolean } }> {
+    return this.http.put<{ data: { ok: boolean } }>(
+      `${this.baseUrl}${idProducto}/imagenes/portada`,
+      { idImagen },
+      { withCredentials: true }
+    );
+  }
 }

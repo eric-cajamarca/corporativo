@@ -85,3 +85,27 @@
     font-size: 1.25rem;
   }
 }
+
+/* Buscador: menos padding que el card-body por defecto */
+.card-body-busqueda-productos {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+/* Tabla de productos: más compacta (menos márgenes/padding en celdas) */
+.productos-tabla-wrap {
+  margin: 0;
+  padding: 0 0.25rem;
+}
+
+.productos-tabla-compacta thead th,
+.productos-tabla-compacta tbody td {
+  padding: 0.35rem 0.45rem;
+  vertical-align: middle;
+  font-size: 0.875rem;
+}
+
+.productos-tabla-compacta thead th {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}

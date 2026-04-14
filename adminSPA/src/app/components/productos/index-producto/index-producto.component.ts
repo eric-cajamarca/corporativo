@@ -15,6 +15,8 @@ import { ProductovarianteService } from '../../../services/productovariante.serv
 import { ProductoDetalleModalService } from '../../../services/producto-detalle-modal.service';
 import { ProductoEditarModalService } from '../../../services/producto-editar-modal.service';
 import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
+import { GestoresService } from '../../../services/gestores.service';
+import { ProductoGaleriaModalService } from '../../../services/producto-galeria-modal.service';
 
 declare var iziToast: any;
  declare var bootstrap: any;
@@ -35,6 +37,8 @@ export class IndexProductoComponent {
   public token: any = "";
   public filtro = '';
   public load_estado = false;
+  /** Configuración inventario: galería de imágenes habilitada */
+  public productosConImagenes = false;
 
   // Configuración de paginación
   public page = 1;
@@ -76,6 +80,8 @@ export class IndexProductoComponent {
     private _productoDetalleModal: ProductoDetalleModalService,
     private _productoEditarModal: ProductoEditarModalService,
     private _productoCrearModal: ProductoCrearModalService,
+    private _gestoresService: GestoresService,
+    private _productoGaleriaModal: ProductoGaleriaModalService,
     public sidebarState: SidebarStateService,
   ) {
    // this.token = this._cookieService.get('token');
@@ -93,6 +99,19 @@ export class IndexProductoComponent {
 
   ngOnInit(): void {
     this.initData();
+    this._gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
+        this.productosConImagenes = item ? String(item.valor).toLowerCase() === 'true' : false;
+      },
+      error: () => {}
+    });
+  }
+
+  abrirGaleriaProducto(item: { idProducto?: string; codigo?: string; descripcion?: string }): void {
+    if (!item?.idProducto) return;
+    const etiqueta = [item.codigo, item.descripcion].filter((x) => !!x && String(x).trim() !== '').join(' — ');
+    this._productoGaleriaModal.abrir(item.idProducto, etiqueta).catch(() => {});
   }
 
   initData() {
@@ -119,14 +138,35 @@ export class IndexProductoComponent {
     );
   }
 
-  filtrar() {
-    if (this.filtro) {
-      //
-      var term = new RegExp(this.filtro, 'i');
-      this.productos = this.productos_const.filter(item => term.test(item.compCompra) || term.test(item.rSocial) || term.test(item.total) || term.test(item.fEmision) || term.test(item.descripcion));
-    } else {
-      this.productos = this.productos_const;
+  /**
+   * Buscar: con input vacío (o solo espacios) recarga todos los productos desde el servidor.
+   * Con texto, filtra en memoria por campos del producto (código, descripción, categoría, etc.).
+   */
+  filtrar(): void {
+    const q = (this.filtro ?? '').trim();
+    this.page = 1;
+
+    if (!q) {
+      this.initData();
+      return;
     }
+
+    const ql = q.toLowerCase();
+    const incluye = (v: unknown): boolean => {
+      if (v === null || v === undefined) return false;
+      return String(v).toLowerCase().includes(ql);
+    };
+
+    this.productos = this.productos_const.filter(
+      (item) =>
+        incluye(item.codigo) ||
+        incluye(item.descripcion) ||
+        incluye(item.categoria) ||
+        incluye(item.codigoPresentacion) ||
+        incluye(item.fProduccion) ||
+        incluye(item.fVencimiento) ||
+        incluye(item.tipoProducto)
+    );
   }
 
   abrirDetalleProducto(idProducto: string): void {

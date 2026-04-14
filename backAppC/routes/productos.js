@@ -13,6 +13,7 @@ api.post('/productos/match-descripcion', auth.auth, productosController.match_pr
 // Imágenes de producto (antes de /productos/:id para que no capture "imagenes" como id)
 api.get('/productos/:idProducto/imagenes', auth.auth, productosImagenController.listar);
 api.post('/productos/:idProducto/imagenes', auth.auth, multerConfig.uploadImagenesProducto, productosImagenController.subir);
+api.put('/productos/:idProducto/imagenes/portada', auth.auth, productosImagenController.marcarPortada);
 api.delete('/productos/imagenes/:idImagen', auth.auth, productosImagenController.eliminar);
 // CRUD por id
 api.get('/productos/:id', auth.auth, productosController.obtener_productos_id);

@@ -6,8 +6,6 @@ import { ProductoService } from '../../../services/producto.service';
 import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
 import { PresentacionService } from '../../../services/presentacion.service';
-import { GestoresService } from '../../../services/gestores.service';
-import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { Producto } from '../../../models/producto.models';
 
 declare var iziToast: any;
@@ -46,33 +44,18 @@ export class UpdateProductoComponent implements OnInit {
   cargando = true;
   guardando = false;
 
-  productosConImagenes = false;
-  imagenesProducto: ImagenProducto[] = [];
-  archivosSeleccionados: File[] = [];
-  subiendoImagenes = false;
-
   constructor(
     public activeModal: NgbActiveModal,
     private fb: FormBuilder,
     private productoService: ProductoService,
     private categoriaService: CategoriaService,
     private marcaService: MarcaService,
-    private presentacionService: PresentacionService,
-    private gestoresService: GestoresService,
-    private productosImagenService: ProductosImagenService
+    private presentacionService: PresentacionService
   ) {}
 
   ngOnInit(): void {
     this.initForm();
     this.cargarCatalogosYProducto();
-    this.gestoresService.obtenerConfiguracion().subscribe({
-      next: (res) => {
-        const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
-        this.productosConImagenes = item ? (String(item.valor).toLowerCase() === 'true') : false;
-        if (this.idProducto) this.cargarImagenes();
-      },
-      error: () => {}
-    });
   }
 
   private initForm(): void {
@@ -222,49 +205,5 @@ export class UpdateProductoComponent implements OnInit {
 
   cerrar(): void {
     this.activeModal.dismiss();
-  }
-
-  cargarImagenes(): void {
-    if (!this.idProducto || !this.productosConImagenes) return;
-    this.productosImagenService.listar(this.idProducto).subscribe({
-      next: (res) => { this.imagenesProducto = res.data || []; },
-      error: () => {}
-    });
-  }
-
-  onArchivosChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    if (input.files) {
-      this.archivosSeleccionados = Array.from(input.files).slice(0, 5 - this.imagenesProducto.length);
-    }
-  }
-
-  subirImagenes(): void {
-    if (!this.idProducto || this.archivosSeleccionados.length === 0) return;
-    this.subiendoImagenes = true;
-    this.productosImagenService.subir(this.idProducto, this.archivosSeleccionados).subscribe({
-      next: () => {
-        this.subiendoImagenes = false;
-        this.archivosSeleccionados = [];
-        this.cargarImagenes();
-        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Imágenes subidas', position: 'topRight' });
-      },
-      error: () => {
-        this.subiendoImagenes = false;
-        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudieron subir las imágenes', position: 'topRight' });
-      }
-    });
-  }
-
-  eliminarImagen(idImagen: string): void {
-    this.productosImagenService.eliminar(idImagen).subscribe({
-      next: () => {
-        this.imagenesProducto = this.imagenesProducto.filter(i => i.idImagen !== idImagen);
-        if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Imagen eliminada', position: 'topRight' });
-      },
-      error: () => {
-        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudo eliminar', position: 'topRight' });
-      }
-    });
   }
 }

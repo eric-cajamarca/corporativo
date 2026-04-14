@@ -1,0 +1,89 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <i class="bi bi-images me-2"></i>
+    Galería de imágenes
+  </h5>
+  <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrar()"></button>
+</div>
+
+<div class="modal-body">
+  @if (etiquetaProducto) {
+    <p class="text-muted small mb-3 mb-md-2">{{ etiquetaProducto }}</p>
+  }
+
+  @if (cargando) {
+    <div class="text-center py-4">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-2 text-muted">Cargando...</p>
+    </div>
+  } @else if (!productosConImagenes) {
+    <div class="alert alert-info mb-0">
+      La galería de productos no está habilitada. Actívela en configuración de inventario (PRODUCTOS_CON_IMAGENES).
+    </div>
+  } @else {
+    <p class="small text-muted mb-2">Hasta 5 imágenes. Máx. 2 MB por archivo. La <strong>portada</strong> es la primera en el orden.</p>
+
+    <div class="mb-3">
+      <label class="form-label">Agregar imágenes</label>
+      <input
+        type="file"
+        class="form-control form-control-sm"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        multiple
+        (change)="onArchivosChange($event)">
+      <button
+        type="button"
+        class="btn btn-outline-primary btn-sm mt-2"
+        (click)="subirImagenes()"
+        [disabled]="archivosSeleccionados.length === 0 || subiendoImagenes || imagenesProducto.length >= 5">
+        @if (subiendoImagenes) {
+          <span class="spinner-border spinner-border-sm me-1"></span>
+        }
+        Subir imágenes
+      </button>
+    </div>
+
+    @if (imagenesOrdenadas.length === 0) {
+      <p class="text-muted small mb-0">No hay imágenes aún.</p>
+    } @else {
+      <div class="galeria-grid">
+        @for (img of imagenesOrdenadas; track img.idImagen) {
+          <div class="galeria-item" [class.galeria-item-portada]="esPortada(img)">
+            <div class="galeria-thumb-wrap">
+              <img [src]="img.url" alt="" class="galeria-thumb" />
+              @if (esPortada(img)) {
+                <span class="badge bg-primary galeria-badge-portada">Portada</span>
+              }
+            </div>
+            <div class="galeria-actions">
+              @if (!esPortada(img)) {
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary w-100"
+                  (click)="marcarComoPortada(img.idImagen)"
+                  [disabled]="marcandoPortadaId === img.idImagen">
+                  @if (marcandoPortadaId === img.idImagen) {
+                    <span class="spinner-border spinner-border-sm"></span>
+                  } @else {
+                    Usar como portada
+                  }
+                </button>
+              }
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger w-100 mt-1"
+                (click)="eliminarImagen(img.idImagen)"
+                title="Eliminar">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cerrar()">Cerrar</button>
+</div>

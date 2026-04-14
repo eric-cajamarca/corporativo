@@ -1,3 +1,15 @@
+/*
+  styles.css global pone .modal.show ~ .modal-backdrop.show { z-index: 1060 } mientras el .modal
+  queda en 1055: el backdrop queda ENCIMA y bloquea clics/foco (parece que el formulario está deshabilitado).
+*/
+:host .modal.show {
+  z-index: 1070 !important;
+}
+
+:host .modal-backdrop.show {
+  z-index: 1065 !important;
+}
+
 :host {
   display: block;
   min-height: 100vh;
