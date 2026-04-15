@@ -342,6 +342,8 @@ export class CreateProductoComponent implements OnInit {
             message: 'Producto creado correctamente',
             position: 'topRight'
           });
+          this.productosYaCargados = false;
+          this.todosProductos = [];
           if (this.productosConImagenes && idProducto) {
             this.idProductoCreado = idProducto;
             this.imagenesProducto = [];

@@ -482,3 +482,187 @@ exports.obtenerProductosHabitacionRepo = async (pool, idEmpresa) => {
     `);
   return result.recordset || [];
 };
+
+exports.buscarIdUsuarioEnEmpresa = async (pool, idUsuario, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('SELECT idUsuario FROM UsuarioWeb WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa');
+  return r.recordset?.[0]?.idUsuario ?? null;
+};
+
+exports.buscarPrimerIdUsuarioEmpresa = async (pool, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('SELECT TOP 1 idUsuario FROM UsuarioWeb WHERE idEmpresa = @idEmpresa');
+  return r.recordset?.[0]?.idUsuario ?? null;
+};
+
+exports.incrementarCorrelativo = async (transaction, idEmpresa) => {
+  return transaction
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      UPDATE Correlativos WITH (UPDLOCK, HOLDLOCK)
+      SET numero = numero + 1
+      OUTPUT INSERTED.numero
+      WHERE idEmpresa = @idEmpresa
+    `);
+};
+
+exports.obtenerSiguienteCodigoProductoFallback = async (transaction, idEmpresa) => {
+  return transaction
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT ISNULL(MAX(TRY_CAST(RTRIM(LTRIM(Codigo)) AS INT)), 10000) + 1 AS siguiente
+      FROM Productos WITH (UPDLOCK, HOLDLOCK)
+      WHERE idEmpresa = @idEmpresa
+    `);
+};
+
+exports.contarProductoPorCodigo = async (transaction, idEmpresa, codigo) => {
+  return transaction
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('Codigo', sql.VarChar(50), codigo)
+    .query(`
+      SELECT COUNT(1) AS n
+      FROM Productos
+      WHERE idEmpresa = @idEmpresa
+        AND RTRIM(LTRIM(Codigo)) = @Codigo
+    `);
+};
+
+exports.insertarProducto = async (transaction, row) => {
+  return transaction
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, row.idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
+    .input('Codigo', sql.VarChar, row.Codigo)
+    .input('idCategoria', sql.Int, row.idCategoria)
+    .input('descripcion', sql.VarChar, row.descripcion)
+    .input('idMarca', sql.Int, row.idMarca)
+    .input('idPresentacion', sql.Int, row.idPresentacion)
+    .input('cUnitario', sql.Decimal(18, 5), row.cUnitario)
+    .input('fProduccion', sql.VarChar, row.fProduccion)
+    .input('fVencimiento', sql.VarChar, row.fVencimiento)
+    .input('alertaMinimo', sql.Decimal(18, 2), row.alertaMinimo)
+    .input('alertaMaximo', sql.Decimal(18, 2), row.alertaMaximo)
+    .input('VecesVendidas', sql.Int, row.VecesVendidas)
+    .input('facturar', sql.VarChar, row.facturar)
+    .input('idUsuario', sql.UniqueIdentifier, row.idUsuario)
+    .input('FIngreso', sql.DateTime, row.FIngreso)
+    .input('estado', sql.Bit, row.estado)
+    .input('tipoProducto', sql.Char(1), row.tipoProducto)
+    .input('permiteDescripcionEnVenta', sql.Bit, row.permiteDescripcionEnVenta ? 1 : 0)
+    .query(
+      'INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta)'
+    );
+};
+
+exports.insertarLoteInicial = async (transaction, row) => {
+  return transaction
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, row.idProducto)
+    .input('idSucursal', sql.UniqueIdentifier, row.idSucursal)
+    .input('costoUnitario', sql.Decimal(18, 6), row.costoUnitario)
+    .input('cantidadIngresada', sql.Decimal(18, 2), row.cantidadIngresada)
+    .input('cantidadDisponible', sql.Decimal(18, 2), row.cantidadDisponible)
+    .query(
+      'INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible) VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)'
+    );
+};
+
+exports.actualizarProductoCompra = async (pool, detalle) => {
+  return pool
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)
+    .input('Codigo', sql.VarChar, detalle.Codigo)
+    .input('idCategoria', sql.Int, detalle.idCategoria)
+    .input('descripcion', sql.VarChar, detalle.descripcion)
+    .input('idMarca', sql.Int, detalle.idMarca)
+    .input('idPresentacion', sql.Int, detalle.idPresentacion)
+    .input('cUnitario', sql.Decimal(18, 5), detalle.cUnitario)
+    .input('fProduccion', sql.VarChar, detalle.fProduccion)
+    .input('fVencimiento', sql.VarChar, detalle.fVencimiento)
+    .query(
+      'UPDATE Productos SET Codigo = @Codigo, idCategoria = @idCategoria, descripcion = @descripcion, idPresentacion = @idPresentacion, cUnitario = @cUnitario, fProduccion = @fProduccion, fVencimiento = @fVencimiento WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa'
+    );
+};
+
+exports.insertarProductoCompraValores = async (transaction, detalle) => {
+  return transaction
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)
+    .input('Codigo', sql.VarChar, detalle.Codigo)
+    .input('idCategoria', sql.Int, detalle.idCategoria)
+    .input('descripcion', sql.VarChar, detalle.descripcion)
+    .input('idMarca', sql.Int, detalle.idMarca)
+    .input('idPresentacion', sql.Int, detalle.idPresentacion)
+    .input('cUnitario', sql.Decimal(18, 5), detalle.cUnitario)
+    .input('fProduccion', sql.VarChar, detalle.fProduccion)
+    .input('fVencimiento', sql.VarChar, detalle.fVencimiento)
+    .input('alertaMinimo', sql.Decimal, detalle.alertaMinimo)
+    .input('alertaMaximo', sql.Decimal, detalle.alertaMaximo)
+    .input('VecesVendidas', sql.Int, detalle.VecesVendidas)
+    .input('facturar', sql.VarChar, detalle.facturar)
+    .input('idUsuario', sql.UniqueIdentifier, detalle.idUsuario)
+    .input('FIngreso', sql.DateTime, detalle.FIngreso)
+    .input('estado', sql.Bit, detalle.estado)
+    .query(
+      'INSERT INTO Productos VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)'
+    );
+};
+
+exports.eliminarProductoPorId = async (pool, idProducto, idEmpresa) => {
+  return pool
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('DELETE FROM Productos WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa');
+};
+
+exports.actualizarProductoFlexible = async (pool, detalle) => {
+  const request = pool
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)
+    .input('Codigo', sql.VarChar, detalle.Codigo)
+    .input('idCategoria', sql.Int, detalle.idCategoria)
+    .input('descripcion', sql.VarChar, detalle.descripcion)
+    .input('idMarca', sql.Int, detalle.idMarca)
+    .input('idPresentacion', sql.Int, detalle.idPresentacion)
+    .input('cUnitario', sql.Decimal(18, 5), detalle.cUnitario)
+    .input('fProduccion', sql.VarChar, detalle.fProduccion)
+    .input('fVencimiento', sql.VarChar, detalle.fVencimiento);
+  let updateSql =
+    'UPDATE Productos SET Codigo = @Codigo, idCategoria = @idCategoria, descripcion = @descripcion, idMarca = @idMarca, idPresentacion = @idPresentacion, cUnitario = @cUnitario, fProduccion = @fProduccion, fVencimiento = @fVencimiento';
+  if (detalle.tipoProducto !== undefined) {
+    request.input('tipoProducto', sql.Char(1), detalle.tipoProducto);
+    updateSql += ', tipoProducto = @tipoProducto';
+  }
+  if (detalle.alertaMinimo !== undefined) {
+    request.input('alertaMinimo', sql.Decimal(18, 2), detalle.alertaMinimo);
+    updateSql += ', alertaMinimo = @alertaMinimo';
+  }
+  if (detalle.alertaMaximo !== undefined) {
+    request.input('alertaMaximo', sql.Decimal(18, 2), detalle.alertaMaximo);
+    updateSql += ', alertaMaximo = @alertaMaximo';
+  }
+  if (detalle.estado !== undefined) {
+    request.input('estado', sql.Bit, detalle.estado);
+    updateSql += ', estado = @estado';
+  }
+  if (detalle.permiteDescripcionEnVenta !== undefined) {
+    request.input('permiteDescripcionEnVenta', sql.Bit, detalle.permiteDescripcionEnVenta);
+    updateSql += ', permiteDescripcionEnVenta = @permiteDescripcionEnVenta';
+  }
+  updateSql += ' WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa';
+  return request.query(updateSql);
+};

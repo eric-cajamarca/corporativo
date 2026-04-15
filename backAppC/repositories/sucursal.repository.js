@@ -1,0 +1,178 @@
+const sql = require('mssql');
+
+async function listarResumenPorEmpresa(pool, idEmpresa) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(
+      `SELECT idSucursal, nombre,
+              CONVERT(VARCHAR(10), fregistro, 23) AS fregistro
+       FROM Sucursal WHERE idEmpresa = @idEmpresa`
+    );
+  return result.recordset;
+}
+
+async function listarTodosPorEmpresa(pool, idEmpresa) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(
+      `SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa
+       ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
+    );
+  return result.recordset;
+}
+
+async function existeSucursalEnEmpresa(pool, idSucursal, idEmpresa) {
+  const result = await pool
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('SELECT 1 AS ok FROM Sucursal WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa');
+  return result.recordset && result.recordset.length > 0;
+}
+
+async function quitarPrincipalTodas(pool, idEmpresa) {
+  await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa');
+}
+
+async function marcarSucursalPrincipal(pool, idSucursal, idEmpresa) {
+  await pool
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(
+      'UPDATE Sucursal SET esPrincipal = 1 WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa'
+    );
+}
+
+async function actualizarNombreDireccion(pool, idEmpresa, idSucursal, nombre, direccion) {
+  const result = await pool
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('nombre', sql.VarChar(100), nombre)
+    .input('direccion', sql.VarChar(500), direccion ?? '')
+    .query(
+      `UPDATE Sucursal SET nombre = @nombre, direccion = @direccion, fregistro = GETDATE()
+       WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa`
+    );
+  return result.rowsAffected;
+}
+
+async function actualizarEstado(pool, idEmpresa, idSucursal, estado) {
+  const result = await pool
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('estado', sql.Bit, estado)
+    .query(
+      'UPDATE Sucursal SET estado = @estado WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa'
+    );
+  return result.rowsAffected[0];
+}
+
+async function eliminarTodasPorEmpresa(pool, idEmpresa) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('DELETE FROM Sucursal WHERE idEmpresa = @idEmpresa');
+  return result.rowsAffected;
+}
+
+async function listarLotesPorSucursalProducto(pool, idEmpresa, idSucursal, idProducto) {
+  const result = await pool
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT l.idLote, l.idProducto, l.idSucursal, l.cantidadDisponible AS cantidad, l.costoUnitario,
+             l.fechaIngreso, l.fechaVencimiento,
+             p.codigo, p.descripcion, p.cUnitario
+      FROM Lotes l
+      INNER JOIN Productos p ON l.idProducto = p.idProducto
+      WHERE l.idSucursal = @idSucursal AND l.idProducto = @idProducto AND l.idEmpresa = @idEmpresa
+        AND l.cantidadDisponible > 0
+    `);
+  return result.recordset;
+}
+
+async function listarLotesStockPorEmpresa(pool, idEmpresa) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT l.idLote, l.idEmpresa, l.idSucursal, l.idProducto, l.cantidadDisponible AS cantidad,
+             l.costoUnitario, l.fechaIngreso, l.fechaVencimiento,
+             p.codigo, p.descripcion, p.cUnitario, p.idCategoria, p.idMarca, p.idPresentacion,
+             s.nombre AS sucursal, c.nombre AS categoria, m.nombre AS marca,
+             pr.codigo AS codigoPresentacion, pr.descripcion AS descripcionPres
+      FROM Lotes l
+      INNER JOIN Productos p ON l.idProducto = p.idProducto
+      INNER JOIN Sucursal s ON l.idSucursal = s.idSucursal
+      LEFT JOIN Categorias c ON p.idCategoria = c.idCategoria
+      LEFT JOIN Marcas m ON p.idMarca = m.idMarca
+      LEFT JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+      WHERE l.idEmpresa = @idEmpresa AND l.cantidadDisponible > 0
+      ORDER BY s.nombre, p.descripcion, l.fechaIngreso DESC
+    `);
+  return result.recordset;
+}
+
+async function insertarLote(pool, payload) {
+  const { idEmpresa, idSucursal, idProducto, costoUnitario, cantidadIngresada, cantidadDisponible } = payload;
+  await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
+    .input('cantidadIngresada', sql.Decimal(18, 2), cantidadIngresada)
+    .input('cantidadDisponible', sql.Decimal(18, 2), cantidadDisponible)
+    .query(`
+      INSERT INTO Lotes (idEmpresa, idSucursal, idProducto, costoUnitario, cantidadIngresada, cantidadDisponible)
+      VALUES (@idEmpresa, @idSucursal, @idProducto, @costoUnitario, @cantidadIngresada, @cantidadDisponible)
+    `);
+}
+
+async function actualizarCantidadLote(pool, idEmpresa, idLote, cantidadDisponible) {
+  const result = await pool
+    .request()
+    .input('idLote', sql.UniqueIdentifier, idLote)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('cantidadDisponible', sql.Decimal(18, 2), cantidadDisponible)
+    .query(`
+      UPDATE Lotes SET cantidadDisponible = @cantidadDisponible
+      WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+    `);
+  return result.rowsAffected[0];
+}
+
+async function eliminarLote(pool, idEmpresa, idLote) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idLote', sql.UniqueIdentifier, idLote)
+    .query('DELETE FROM Lotes WHERE idEmpresa = @idEmpresa AND idLote = @idLote');
+  return result.rowsAffected[0];
+}
+
+module.exports = {
+  listarResumenPorEmpresa,
+  listarTodosPorEmpresa,
+  existeSucursalEnEmpresa,
+  quitarPrincipalTodas,
+  marcarSucursalPrincipal,
+  actualizarNombreDireccion,
+  actualizarEstado,
+  eliminarTodasPorEmpresa,
+  listarLotesPorSucursalProducto,
+  listarLotesStockPorEmpresa,
+  insertarLote,
+  actualizarCantidadLote,
+  eliminarLote
+};

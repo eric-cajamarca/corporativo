@@ -70,19 +70,31 @@ export class ProductoService {
   crearProducto(producto: ProductoCreate): Observable<ProductoResponse> {
     return this._http.post<ProductoResponse>(this.url + 'productos', producto, {
       withCredentials: true
-    });
+    }).pipe(
+      tap(() => {
+        this.limpiarCacheListaProductos();
+      })
+    );
   }
 
   actualizarProducto(id: string, producto: ProductoCreate): Observable<ProductoResponse> {
     return this._http.put<ProductoResponse>(this.url + 'productos/' + id, producto, {
       withCredentials: true
-    });
+    }).pipe(
+      tap(() => {
+        this.limpiarCacheListaProductos();
+      })
+    );
   }
 
   eliminarProducto(id: string): Observable<ProductoResponse> {
     return this._http.delete<ProductoResponse>(this.url + 'productos/' + id, {
       withCredentials: true
-    });
+    }).pipe(
+      tap(() => {
+        this.limpiarCacheListaProductos();
+      })
+    );
   }
 
   /** Busca idProducto por descripción exacta (empresa del usuario). Para compras al cargar XML. */

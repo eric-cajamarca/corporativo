@@ -1,208 +1,99 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-const bcrypt = require('bcryptjs');
-const moment = require('moment');
-const jwt = require('../helpers/jwt');
-const { v4: uuidv4 } = require('uuid');
+const direccionClientesService = require('../services/direccionClientes.service');
+const { errores: DE } = direccionClientesService;
 
-
-//crear n crud con esta tabla CREATE TABLE DireccionClientes ( idDireccionClientes INT IDENTITY(1,1) PRIMARY KEY not null, idEmpresa  UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE, idCliente int not null,ubigeo varchar(10) null,codPais varchar(10) null,region varchar(50) NULL,provincia varchar(50) NULL,distrito varchar(50) NULL,urbanizacion varchar(100) null,direccion VARCHAR(255) null,referencia varchar(200) null,codLocal varchar(10) null)
-//1. crea el metodo crearDireccionCliente segun los datos de la tabla
-const crearDireccionCliente = async function (req, res) {
-        
-
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            
-                try {
-                    let idEmpresa = req.user.empresa;
-                    let idCliente = req.body.idCliente;
-                    let ubigeo = req.body.ubigeo;
-                    let codPais = req.body.codpais;
-                    let region = req.body.region;
-                    let provincia = req.body.provincia;
-                    let distrito = req.body.distrito;
-                    let urbanizacion = req.body.urbanizacion;
-                    let direccion = req.body.direccion;
-                    let referencia = req.body.referencia;
-                    let codLocal = req.body.codLocal;
-                    let principal = req.body.principal;
-
-                    let pool = await sql.connect(dbConfig);
-                    let insertDireccionCliente = await pool.request()
-                        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                        .input('idCliente', sql.Int, idCliente)
-                        .input('ubigeo', sql.VarChar, ubigeo)
-                        .input('codPais', sql.VarChar, codPais)
-                        .input('region', sql.VarChar, region)
-                        .input('provincia', sql.VarChar, provincia)
-                        .input('distrito', sql.VarChar, distrito)
-                        .input('urbanizacion', sql.VarChar, urbanizacion)
-                        .input('direccion', sql.VarChar, direccion)
-                        .input('referencia', sql.VarChar, referencia)
-                        .input('codLocal', sql.VarChar, codLocal)
-                        .input('principal', sql.Bit, principal)
-                        .query('insert into DireccionClientes (idEmpresa,idCliente,ubigeo,codPais,region,provincia,distrito,urbanizacion,direccion,referencia,codLocal, principal) values (@idEmpresa,@idCliente,@ubigeo,@codPais,@region,@provincia,@distrito,@urbanizacion,@direccion,@referencia,@codLocal,@principal)');
-
-                    res.status(200).send({ message: 'DireccionCliente creado', data: insertDireccionCliente.rowsAffected });
-                } catch (error) {
-                                        res.status(500).send({ message: error.message, data: undefined });
-
-                }
-            
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+const crearDireccionCliente = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await direccionClientesService.crear(pool, req.user, req.body);
+    res.status(200).send({ message: 'DireccionCliente creado', data });
+  } catch (error) {
+    if (error.message === DE.NO_AUTH) {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === DE.NO_ROL) {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('direccionClientes.crear:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
-}
-
-
-//2. crea el metodo listarDireccionClientes segun los datos de la tabla
-const listarDireccionClientes = async function (req, res) {
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            try {
-                let idEmpresa = req.user.empresa;
-
-                let pool = await sql.connect(dbConfig);
-                let listaDireccionClientes = await pool.request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .query('select * from DireccionClientes where idEmpresa = @idEmpresa');
-
-                res.status(200).send({ message: 'Lista de DireccionClientes', data: listaDireccionClientes.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+const listarDireccionClientes = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await direccionClientesService.listar(pool, req.user);
+    res.status(200).send({ message: 'Lista de DireccionClientes', data });
+  } catch (error) {
+    if (error.message === DE.NO_AUTH) {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === DE.NO_ROL) {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('direccionClientes.listar:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
-}
-
-//2. crea el metodo listarDireccionClientes segun los datos de la tabla
-const listarDireccionesClientes_idCliente = async function (req, res) {
-       const idCliente = req.params.id;
-
-    
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            try {
-                const idEmpresa = req.user.empresa;
-
-                let pool = await sql.connect(dbConfig);
-                let listaDireccionClientes = await pool.request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .input('idCliente', sql.Int, idCliente)
-                    .query(`
-                      SELECT *
-                      FROM DireccionClientes
-                      WHERE idEmpresa = @idEmpresa
-                        AND idCliente = @idCliente
-                      ORDER BY CASE WHEN principal = 1 THEN 0 ELSE 1 END, idDireccionClientes ASC
-                    `);
-
-                
-                res.status(200).send({ message: 'Lista de DireccionClientes', data: listaDireccionClientes.recordset });
-            } catch (error) {
-                                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+const listarDireccionesClientes_idCliente = async (req, res) => {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await direccionClientesService.listarPorCliente(pool, req.user, req.params.id);
+    res.status(200).send({ message: 'Lista de DireccionClientes', data });
+  } catch (error) {
+    if (error.message === DE.NO_AUTH) {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === DE.NO_ROL) {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('direccionClientes.listarPorCliente:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
-}
-
-
-//3. crea el metodo actualizarDireccionCliente segun los datos de la tabla
-const actualizarDireccionCliente = async function (req, res) {
-    const { idCliente, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, referencia, codLocal, principal } = req.body;
-    const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let actualizarDireccionCliente = await pool.request()
-                    .input('idDireccionCliente', sql.Int, idDireccionCliente)
-                    .input('idCliente', sql.Int, idCliente)
-                    .input('ubigeo', sql.VarChar, ubigeo)
-                    .input('codPais', sql.VarChar, codPais)
-                    .input('region', sql.VarChar, region)
-                    .input('provincia', sql.VarChar, provincia)
-                    .input('distrito', sql.VarChar, distrito)
-                    .input('urbanizacion', sql.VarChar, urbanizacion)
-                    .input('direccion', sql.VarChar, direccion)
-                    .input('referencia', sql.VarChar, referencia)
-                    .input('codLocal', sql.VarChar, codLocal)
-                    .input('principal', sql.Bit, principal === true || principal === 1)
-                    .query('update DireccionClientes set idCliente = @idCliente, ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, referencia = @referencia, codLocal = @codLocal, principal = @principal where idDireccionClientes = @idDireccionCliente');
-
-                res.status(200).send({ message: 'DireccionCliente actualizado', data: actualizarDireccionCliente.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+const actualizarDireccionCliente = async (req, res) => {
+  const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await direccionClientesService.actualizar(pool, req.user, idDireccionCliente, req.body);
+    res.status(200).send({ message: 'DireccionCliente actualizado', data });
+  } catch (error) {
+    if (error.message === DE.NO_AUTH) {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === DE.NO_ROL) {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('direccionClientes.actualizar:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
-}
-
-//crea el metodo eliminarDireccionCliente segun los datos de la tabla
-const eliminarDireccionCliente = async function (req, res) {
-    const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let eliminarDireccionCliente = await pool.request()
-                    .input('idDireccionCliente', sql.Int, idDireccionCliente)
-                    .query('delete from DireccionClientes where idDireccionClientes = @idDireccionCliente');
-
-                res.status(200).send({ message: 'DireccionCliente eliminado', data: eliminarDireccionCliente.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+const eliminarDireccionCliente = async (req, res) => {
+  const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await direccionClientesService.eliminar(pool, req.user, idDireccionCliente);
+    res.status(200).send({ message: 'DireccionCliente eliminado', data });
+  } catch (error) {
+    if (error.message === DE.NO_AUTH) {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === DE.NO_ROL) {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
-
-}
+    console.error('direccionClientes.eliminar:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
 module.exports = {
-    crearDireccionCliente,
-    listarDireccionClientes,
-    actualizarDireccionCliente,
-    eliminarDireccionCliente,
-    listarDireccionesClientes_idCliente
-}
+  crearDireccionCliente,
+  listarDireccionClientes,
+  actualizarDireccionCliente,
+  eliminarDireccionCliente,
+  listarDireccionesClientes_idCliente
+};

@@ -1,33 +1,14 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const precioProductoService = require('../services/preciosV.service');
+const preciosVentaService = require('../services/preciosVenta.service');
 
 
 
-//crear un registro en PreciosV
-const crearPrecioV = async function (detalle) {
-    
-    
-    if (req.user) {
-        try {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
-                .input('cUnitario', sql.Decimal(18, 4), detalle.pUnitario)
-                .input('mayorista', sql.Decimal(18, 4), 0)
-                .input('cliente', sql.Decimal(18, 4), 0)
-                .input('transeunte', sql.Decimal(18, 4), 0)
-                .query(`INSERT INTO PreciosV (idProducto, cUnitario, mayorista, cliente, transeunte) VALUES (@idProducto, @cUnitario, @mayorista, @cliente, @transeunte)`);
-            res.status(200).send({ data: result });
-        } catch (error) {
-            console.error('Error al crear el precio:', error);
-            res.status(500).send({ data: undefined });
-        }
-    } else {
-        res.status(401).send({ message: 'No Access', data: undefined });
-    }
-}
+/** Helper interno (no es handler HTTP): inserta fila en tabla PreciosV. */
+const crearPrecioV = async function (pool, detalle) {
+  await preciosVentaService.crearDesdeDetalle(pool, detalle);
+};
 
 //obtener un precio por su id
 const obtenerPrecioV = async function (req, res) {
@@ -35,11 +16,8 @@ const obtenerPrecioV = async function (req, res) {
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idPrecioV', sql.Int, idPrecioV)
-                .query(`SELECT * FROM PreciosV WHERE idPreciosV = @idPrecioV`);
-            res.status(200).send({ data: result.recordset });
+            const data = await preciosVentaService.obtenerPorId(pool, idPrecioV);
+            res.status(200).send({ data });
         } catch (error) {
             console.error('Error al obtener el precio:', error);
             res.status(500).send({ data: undefined });
@@ -54,10 +32,8 @@ const obtenerPreciosV = async function (req, res) {
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .query(`SELECT * FROM PreciosV`);
-            res.status(200).send({ data: result.recordset });
+            const data = await preciosVentaService.listarTodos(pool);
+            res.status(200).send({ data });
         } catch (error) {
             console.error('Error al obtener los precios:', error);
             res.status(500).send({ data: undefined });
@@ -73,15 +49,14 @@ const actualizarPrecioV = async function (req, res) {
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idPreciosV', sql.Int, idPreciosV)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .input('cUnitario', sql.Decimal(18, 4), cUnitario)
-                .input('mayorista', sql.Decimal(18, 4), mayorista)
-                .input('cliente', sql.Decimal(18, 4), cliente)
-                .input('transeunte', sql.Decimal(18, 4), transeunte)
-                .query(`UPDATE PreciosV SET idProducto = @idProducto, cUnitario = @cUnitario, mayorista = @mayorista, cliente = @cliente, transeunte = @transeunte WHERE idPreciosV = @idPreciosV`);
+            const result = await preciosVentaService.actualizar(pool, {
+                idPreciosV,
+                idProducto,
+                cUnitario,
+                mayorista,
+                cliente,
+                transeunte
+            });
             res.status(200).send({ data: result });
         } catch (error) {
             console.error('Error al actualizar el precio:', error);
@@ -146,7 +121,7 @@ const crear_lista_precio = async function (req, res) {
         }
 
         // Crear conexión a la base de datos
-        pool = await sql.connect(dbConfig);
+        const pool = await sql.connect(dbConfig);
         let idEmpresa = req.user.empresa;
                 // Llamar al service
         const resultado = await precioProductoService.crearListaPrecio(
@@ -644,9 +619,13 @@ const obtener_precios_producto = async function (req, res) {
     if (req.user) {
         try {
             const pool = await sql.connect(dbConfig);
-            const result = precioProductoService.obtenerPrecioPorId(pool, req.params.idPrecio);
-            res.status(200).send({ data: result.recordset });
+            const idPrecio = req.params.productoId || req.params.idPrecio;
+            const result = await precioProductoService.obtenerPrecioPorId(pool, idPrecio);
+            res.status(200).send({ data: result.data });
         } catch (error) {
+            if (error.message === 'PRECIO_NO_ENCONTRADO') {
+                return res.status(404).send({ message: 'Precio no encontrado', data: undefined });
+            }
             console.error('Error al obtener los precios de los productos:', error);
             res.status(500).send({ data: undefined });
         }

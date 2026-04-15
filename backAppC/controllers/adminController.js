@@ -15,6 +15,7 @@ const empresaRepository = require('../repositories/empresa.repository');
 const jwtHelper = require('../helpers/jwt');
 const twoFactorAdminService = require('../services/twoFactorAdmin.service');
 const seguridadAlertasService = require('../services/seguridadAlertas.service');
+const usuarioAdminService = require('../services/usuarioAdmin.service');
 
 /** WhatsApp al celular de la empresa (no bloquea la respuesta HTTP). */
 function notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente) {
@@ -38,7 +39,7 @@ const getAdmin = async function (req, res, next) {
 
   try {
     // 3. Conectar BD (Controller gestiona el lifecycle de la conexión)
-    const pool = await sql.connect();
+    const pool = await sql.connect(dbConfig);
 
     // 4. Llamar al Service
     const usuarios = await usuarioService.getAdmin(pool, req.user.empresa);
@@ -218,31 +219,16 @@ const obtener_datos_colaborador_admin = async (req, res, next) => {
                         try {
 
                 const pool = await sql.connect(dbConfig);
-                const result = await pool
-                    .request()
-                    .input('idUsuario', sql.UniqueIdentifier, id)
-                    
-                    .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-                    .query('SELECT * FROM UsuarioWeb INNER JOIN Rol ON UsuarioWeb.idRol = Rol.idRol WHERE idUsuario = @idUsuario AND UsuarioWeb.idEmpresa = @idEmpresa');
-                //.query('SELECT * FROM UsuarioWeb where idUsuario = @idUsuario');
-
-
-
-                if (result.recordset.length === 0) {
-                    return res.status(404).send({ message: 'Usuario no encontrado', data: undefined });
-                }
-
-                // Formatear fecha (regla 1.4: NUNCA retornes fechas sin formatear)
-                if (result.recordset[0].fregistro) {
-                    result.recordset[0].fregistro = moment(result.recordset[0].fregistro).format('DD-MM-YYYY');
-                }
-
-                data = result.recordset;
-                res.status(200).send({ data: data });
+                const row = await usuarioAdminService.obtenerColaboradorConRol(pool, req.user, id);
+                data = [row];
+                res.status(200).send({ data });
                 //res.json({ data });
 
 
             } catch (error) {
+                if (error.code === 'NOT_FOUND') {
+                    return res.status(404).send({ message: 'Usuario no encontrado', data: undefined });
+                }
                 console.error('Error al obtener colaborador admin:', error);
                 return next(error);
             }
@@ -435,18 +421,12 @@ const deleteAdmin = async (req, res, next) => {
 
     try {
         const pool = await sql.connect(dbConfig);
-        const result = await pool
-            .request()
-            .input('id', sql.Int, id)
-            .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-            .query('DELETE FROM usuarioWeb WHERE id = @id AND idEmpresa = @idEmpresa');
-
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-
+        await usuarioAdminService.eliminarUsuarioWebLegacy(pool, id, req.user.empresa);
         res.json({ message: 'Usuario eliminado correctamente' });
     } catch (error) {
+        if (error.code === 'NOT_FOUND') {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
         console.error('Error al eliminar un Usuario:', error);
         return next(error);
     }

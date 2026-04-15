@@ -33,13 +33,8 @@ const getEmpresas = async function (req, res, next) {
         if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
                         try {
                 const pool = await sql.connect(dbConfig);
-                const result = await pool
-                    .request()
-                    .query('SELECT * FROM Empresas');
-                // res.json(result.recordset);
-                // console.log('result.recordset');
-                // console.log(result.recordset);
-                                res.status(200).send({ data: result.recordset });
+                const result = await empresasAdministracionService.listarTodas(pool);
+                                res.status(200).send({ data: result });
             } catch (error) {
                 console.error('Error al obtener las epresas:', error);
                 return next(error);
@@ -65,13 +60,8 @@ const getEmpresasById = async function (req, res, next) {
         if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
                         try {
                 const pool = await sql.connect(dbConfig);
-                let result = await pool
-                    .request()
-                    .input('idEmpresa', sql.UniqueIdentifier, id)
-                    .query('SELECT * FROM Empresas WHERE idEmpresa = @idEmpresa');
-
-                                //res.json(result.recordset);
-                res.status(200).send({ data: result.recordset });
+                let result = await empresasAdministracionService.obtenerPorId(pool, id);
+                                res.status(200).send({ data: result });
             } catch (error) {
                 console.error('Error al obtener los usuarios:', error);
                 return next(error);
@@ -93,19 +83,8 @@ const getEmpresa_id = async function (req, res, next) {
     }
     try {
         const pool = await sql.connect(dbConfig);
-        const result = await pool
-            .request()
-            .input('idEmpresa', sql.UniqueIdentifier, id)
-            .query(
-                'SELECT e.logo, e.razon_Social AS nombre, e.ruc, e.rubro, e.correo, e.celular AS telefono, ' +
-                'ISNULL(s.direccion, de.direccion) AS direccion, e.idRubro, r.codigo AS codigoRubro, s.idSucursal AS idSucursalPrincipal ' +
-                'FROM Empresas e ' +
-                'LEFT JOIN Sucursal s ON s.idEmpresa = e.idEmpresa AND s.esPrincipal = 1 ' +
-                'LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1 ' +
-                'LEFT JOIN Rubros r ON e.idRubro = r.idRubro ' +
-                'WHERE e.idEmpresa = @idEmpresa'
-            );
-        res.status(200).send({ data: result.recordset });
+        const result = await empresasAdministracionService.obtenerCabecera(pool, id);
+        res.status(200).send({ data: result });
     } catch (error) {
         console.error('Error al obtener empresa (getEmpresa_id):', error);
         return next(error);
@@ -120,6 +99,8 @@ const twoFactorAdminService = require('../services/twoFactorAdmin.service');
 const { obtenerIpCliente } = require('../utils/clientIp.util');
 const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
 const empresaRepository = require('../repositories/empresa.repository');
+const empresasAdministracionService = require('../services/empresasAdministracion.service');
+const usuarioAdminService = require('../services/usuarioAdmin.service');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
@@ -170,13 +151,10 @@ const createEmpresa = async function (req, res, next) {
     const pool = await sql.connect(dbConfig);
 
     // Verificar si el correo electrónico ya existe
-    const checkEmailQuery = await pool
-        .request()
-        .input('Ruc', sql.VarChar, ruc)
-        .query('SELECT * FROM Empresas WHERE ruc = @ruc');
+    const existentes = await empresasAdministracionService.buscarPorRuc(pool, ruc);
 
     
-    if (checkEmailQuery.recordset.length > 0) {
+    if (existentes.length > 0) {
 
         return res.status(200).send({ message: 'La Empresa ya existe. Por favor registre una empresa diferente', data: undefined });
     } else {
@@ -186,26 +164,24 @@ const createEmpresa = async function (req, res, next) {
             //crear el idUsuario con uuidv4
             const idEmpresa = uuidv4();
 
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idDocumento', sql.VarChar(1), idDocumento)
-                .input('ruc', sql.VarChar, ruc)
-                .input('razon_Social', sql.VarChar, razon_Social)
-                .input('nombreComercial', sql.VarChar, nombre_Comercial)
-                .input('rubro', sql.VarChar, rubro)
-                .input('idRubro', sql.Int, req.body.idRubro || null)
-                .input('celular', sql.VarChar, celular)
-                .input('correo', sql.VarChar, correo)
-                .input('password', sql.Text, hashedPassword)
-                .input('logo', sql.VarBinary(sql.MAX), null)
-                .input('alias', sql.VarChar, alias)
-                .input('condicion', sql.VarChar, condicion)
-                .input('estSunat', sql.VarChar, estSunat)
-                .input('estado', sql.Bit, 0) // Empresa deshabilitada hasta verificar código
-                .input('fregistro', sql.DateTime, fregistro)
-                .query('INSERT INTO Empresas (idEmpresa, idDocumento, ruc, razon_Social, nombreComercial, rubro, idRubro, celular, correo, password, logo, alias, condicion, estSunat, estado, fregistro) VALUES (@idEmpresa, @idDocumento, @ruc, @razon_Social, @nombreComercial, @rubro, @idRubro, @celular, @correo, @password, @logo, @alias, @condicion, @estSunat, @estado, @fregistro)');
+            await empresasAdministracionService.insertarEmpresa(pool, {
+                idEmpresa,
+                idDocumento,
+                ruc,
+                razon_Social,
+                nombreComercial: nombre_Comercial,
+                rubro,
+                idRubro: req.body.idRubro || null,
+                celular,
+                correo,
+                password: hashedPassword,
+                logo: null,
+                alias,
+                condicion,
+                estSunat,
+                estado: 0,
+                fregistro
+            });
 
 
             
@@ -263,12 +239,10 @@ const getIntegraciones = async function (req, res, next) {
             return res.status(401).send({ message: 'No autorizado', data: undefined });
         }
         const pool = await sql.connect(dbConfig);
-        const [integracionesRes, credencialesRes] = await Promise.all([
-            pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .query('SELECT * FROM EmpresaIntegraciones WHERE idEmpresa = @idEmpresa'),
-            pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .query('SELECT proveedor, clave, valor, idCredencial FROM EmpresaApiCredenciales WHERE idEmpresa = @idEmpresa AND activo = 1')
-        ]);
+        const { integracionesRes, credencialesRes } = await empresasAdministracionService.obtenerIntegracionesYCredenciales(
+            pool,
+            idEmpresa
+        );
         const integraciones = integracionesRes.recordset[0] || null;
         const credencialesList = credencialesRes.recordset || [];
         const credencialesPorProveedor = {};
@@ -296,23 +270,13 @@ const putIntegraciones = async function (req, res, next) {
         }
         const { twilioHabilitado, izipayHabilitado, culqiHabilitado, apisPeruHabilitado, factilizaHabilitado } = req.body || {};
         const pool = await sql.connect(dbConfig);
-        await pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('twilio', sql.Bit, twilioHabilitado ? 1 : 0)
-            .input('izipay', sql.Bit, izipayHabilitado ? 1 : 0)
-            .input('culqi', sql.Bit, culqiHabilitado ? 1 : 0)
-            .input('apisPeru', sql.Bit, apisPeruHabilitado ? 1 : 0)
-            .input('factiliza', sql.Bit, factilizaHabilitado ? 1 : 0)
-            .query(`
-                MERGE EmpresaIntegraciones AS t
-                USING (SELECT @idEmpresa AS idEmpresa) AS s ON t.idEmpresa = s.idEmpresa
-                WHEN MATCHED THEN
-                    UPDATE SET twilioHabilitado = @twilio, izipayHabilitado = @izipay, culqiHabilitado = @culqi,
-                        apisPeruHabilitado = @apisPeru, factilizaHabilitado = @factiliza, fActualizacion = GETDATE()
-                WHEN NOT MATCHED THEN
-                    INSERT (idEmpresa, twilioHabilitado, izipayHabilitado, culqiHabilitado, apisPeruHabilitado, factilizaHabilitado, fActualizacion)
-                    VALUES (@idEmpresa, @twilio, @izipay, @culqi, @apisPeru, @factiliza, GETDATE());
-            `);
+        await empresasAdministracionService.guardarIntegracionesFlags(pool, idEmpresa, {
+            twilioHabilitado,
+            izipayHabilitado,
+            culqiHabilitado,
+            apisPeruHabilitado,
+            factilizaHabilitado
+        });
         res.status(200).send({ data: { ok: true }, message: 'Integraciones actualizadas.' });
     } catch (error) {
         console.error('Error al actualizar integraciones:', error);
@@ -331,22 +295,7 @@ const putCredencialesProveedor = async function (req, res, next) {
             return res.status(400).send({ message: 'proveedor y credenciales (array) son requeridos', data: undefined });
         }
         const pool = await sql.connect(dbConfig);
-        const proveedorNorm = String(proveedor).toLowerCase().trim();
-        await pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('proveedor', sql.VarChar(50), proveedorNorm)
-            .query('DELETE FROM EmpresaApiCredenciales WHERE idEmpresa = @idEmpresa AND proveedor = @proveedor');
-        for (const item of credenciales) {
-            const clave = String(item.clave || '').trim();
-            const valor = String(item.valor ?? '').trim();
-            if (!clave) continue;
-            await pool.request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('proveedor', sql.VarChar(50), proveedorNorm)
-                .input('clave', sql.VarChar(100), clave)
-                .input('valor', sql.NVarChar(500), valor)
-                .query('INSERT INTO EmpresaApiCredenciales (idEmpresa, proveedor, clave, valor, activo) VALUES (@idEmpresa, @proveedor, @clave, @valor, 1)');
-        }
+        await empresasAdministracionService.reemplazarCredencialesProveedor(pool, idEmpresa, proveedor, credenciales);
         res.status(200).send({ data: { ok: true }, message: 'Credenciales guardadas.' });
     } catch (error) {
         console.error('Error al guardar credenciales:', error);
@@ -366,10 +315,7 @@ const enviarCodigoActivacion = async function (req, res, next) {
             return res.status(400).json({ message: 'idEmpresa es requerido' });
         }
         const pool = await sql.connect(dbConfig);
-        const emp = await pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresaTrim)
-            .query('SELECT idEmpresa, celular, estado FROM Empresas WHERE idEmpresa = @idEmpresa');
-        const empresa = emp.recordset[0];
+        const empresa = await empresasAdministracionService.obtenerEmpresaCelularEstado(pool, idEmpresaTrim);
         if (!empresa) {
             return res.status(404).json({ message: 'Empresa no encontrada' });
         }
@@ -440,45 +386,20 @@ const updateEmpresa = async function (req, res, next) {
         }
 
         const pool = await sql.connect(dbConfig);
-        let query = `
-            UPDATE Empresas SET 
-                Rubro = @Rubro,
-                idRubro = @idRubro,
-                Celular = @Celular,
-                nombreComercial = @nombreComercial,
-                Correo = @Correo,
-                Alias = @Alias
-        `;
-
-        // Parámetros base
-        const request = pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('Rubro', sql.VarChar, rubro || '')
-            .input('idRubro', sql.Int, idRubro != null && idRubro !== '' ? (typeof idRubro === 'string' ? parseInt(idRubro, 10) : idRubro) : null)
-            .input('Celular', sql.VarChar, celular || '')
-            .input('nombreComercial', sql.VarChar, nombreComercial || '')
-            .input('Correo', sql.VarChar, correo || '')
-            .input('Alias', sql.VarChar, alias || '');
-
-        // Si hay nueva imagen
-        if (req.file) {
-            query += ', Logo = @Logo';
-            request.input('Logo', sql.VarChar, req.file.filename);
-
-            // Eliminar imagen anterior si existe
-            if (logoAnterior && logoAnterior !== 'undefined' && logoAnterior !== 'null') {
-                try {
-                    const oldPath = path.join(__dirname, '../uploads/configuraciones/', logoAnterior);
-                    await fs.promises.unlink(oldPath);
-                                    } catch (err) {
-                    console.warn('No se pudo eliminar la imagen anterior:', err.message);
-                }
+        if (req.file && logoAnterior && logoAnterior !== 'undefined' && logoAnterior !== 'null') {
+            try {
+                const oldPath = path.join(__dirname, '../uploads/configuraciones/', logoAnterior);
+                await fs.promises.unlink(oldPath);
+            } catch (err) {
+                console.warn('No se pudo eliminar la imagen anterior:', err.message);
             }
         }
-
-        query += ' WHERE idEmpresa = @idEmpresa';
-
-        const result = await request.query(query);
+        const result = await empresasAdministracionService.actualizarEmpresaDatosContacto(
+            pool,
+            idEmpresa,
+            { rubro, idRubro, celular, nombreComercial, correo, alias },
+            req.file ? req.file.filename : null
+        );
 
         res.status(200).json({
             success: true,
@@ -502,32 +423,20 @@ const updateEmpresa = async function (req, res, next) {
 };
 
 const cambiar_estado_empresa = async function (req, res, next) {
-        if (req.user) {
-        let idEmpresa = req.params['id'];
-        const { estado } = req.body;
-
-        if (!estado) {
-            nuevo_estado = true;
-        } else {
-            nuevo_estado = false;
-        }
-
-        try {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool
-                .request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('estado', sql.Bit, nuevo_estado)
-                .query('UPDATE Empresas SET estado = @estado WHERE idEmpresa = @idEmpresa');
-            res.status(200).send({ data: result.rowsAffected });
-        } catch (error) {
-            console.error('Error al cambiar el estado de la empresa:', error);
-            return next(error);
-
-        }
-
-    }
-}
+  if (!req.user) {
+    return res.status(401).send({ message: 'No autorizado' });
+  }
+  const idEmpresa = req.params['id'];
+  const { estado } = req.body;
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await empresasAdministracionService.cambiarEstadoEmpresa(pool, idEmpresa, estado);
+    res.status(200).send({ data: result.rowsAffected });
+  } catch (error) {
+    console.error('Error al cambiar el estado de la empresa:', error);
+    return next(error);
+  }
+};
 
 // const obtener_logo = async function (req, res, next) {
 //     console.log('entro a obtener_logo', req.params);
@@ -580,14 +489,8 @@ const obtener_datos_colaborador_admin = async (req, res, next) => {
         try {
 
             const pool = await sql.connect(dbConfig);
-            const result = await pool.request().query('SELECT * FROM usuarioWeb where id =' + id);
-            // const result = await pool
-            //     .request()
-            //     .input('id', sql.Int, id)
-            //     .query('SELECT * FROM usuarioWeb WHERE email = @id');
-            // res.json({ message: 'Usuario actualizado correctamente' });
-                        data = result.recordset;
-                        // res.status(200).send({data: data });
+            const recordset = await usuarioAdminService.obtenerUsuarioWebLegacyPorId(pool, id);
+            data = recordset;
             res.json({ data });
 
 
@@ -615,11 +518,7 @@ const cambiar_estado_colaborador_admin = async function (req, res, next) {
             nuevo_estado = true;
         }
         const pool = await sql.connect(dbConfig);
-        const result = await pool
-            .request()
-            .input('id', sql.Int, id)
-            .input('estado', sql.Bit, nuevo_estado)
-            .query('UPDATE usuarioWeb SET estado = @estado WHERE id = @id');
+        const result = await usuarioAdminService.cambiarEstadoUsuarioWebLegacy(pool, id, data);
         res.status(200).send({ data: result.recordset });
     } catch (error) {
         console.error('cambiar_estado_colaborador_admin:', error);
@@ -634,10 +533,7 @@ const deleteAdmin = async (req, res, next) => {
     const { id } = req.params;
     try {
         const pool = await sql.connect(dbConfig);
-        const result = await pool
-            .request()
-            .input('id', sql.Int, id)
-            .query('DELETE FROM usuarioWeb WHERE id = @id');
+        await usuarioAdminService.eliminarUsuarioWebLegacySinEmpresa(pool, id);
         res.json({ message: 'Usuario eliminado correctamente' });
     } catch (error) {
         console.error('Error al eliminar un Usuario:', error);
@@ -669,52 +565,21 @@ const createDireccionEmpresa = async function (req, res, next) {
 
         //let nombre = 'Mi empresa';
 
-        let pool = await sql.connect(dbConfig);
-        if (principal) {
-            await pool.request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .query('UPDATE DireccionEmpresa SET principal = 0 WHERE idEmpresa = @idEmpresa');
-            await pool.request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .query('UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa');
-        }
-        let insertDireccionEmpresa = await pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('ubigeo', sql.VarChar, ubigeo)
-            .input('codPais', sql.VarChar, codPais)
-            .input('region', sql.VarChar, region)
-            .input('provincia', sql.VarChar, provincia)
-            .input('distrito', sql.VarChar, distrito)
-            .input('urbanizacion', sql.VarChar, urbanizacion)
-            .input('direccion', sql.VarChar, direccion)
-            .input('codLocal', sql.VarChar, codLocal)
-            .input('principal', sql.Bit, principal)
-            //.input('idUsuario', sql.UniqueIdentifier, idUsuario)
-            //.input('nombre', sql.VarChar, nombre)
-            .query('insert into DireccionEmpresa (idEmpresa,ubigeo,codPais,region,provincia,distrito,urbanizacion,direccion,codLocal, principal) values (@idEmpresa,@ubigeo,@codPais,@region,@provincia,@distrito,@urbanizacion,@direccion,@codLocal,@principal)');
-
-        // Si es dirección principal, actualizar la sucursal principal para que tenga la misma dirección (gestión de ubicaciones usa sucursal principal)
-        if (principal) {
-            const dirTexto = (direccion != null && direccion !== undefined) ? String(direccion).trim() : '';
-            await pool.request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('direccion', sql.VarChar(200), dirTexto || null)
-                .query("UPDATE Sucursal SET direccion = @direccion, esPrincipal = 1 WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
-        }
-
-        // Crear sucursal solo si el usuario indica crearSucursal y nombreSucursal (nueva dirección = nueva sucursal con nombre elegido)
-        if (req.body.crearSucursal === true && req.body.nombreSucursal && String(req.body.nombreSucursal).trim()) {
-            const idSucursal = uuidv4();
-            await pool.request()
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('nombre', sql.VarChar, String(req.body.nombreSucursal).trim())
-                .input('direccion', sql.VarChar, direccion || '')
-                .input('esPrincipal', sql.Bit, !!principal)
-                .input('fregistro', sql.DateTime, moment().format('YYYY-MM-DD'))
-                .input('estado', sql.Bit, true)
-                .query('INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, esPrincipal, fRegistro, estado) VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @esPrincipal, @fregistro, @estado)');
-        }
+        const pool = await sql.connect(dbConfig);
+        const insertDireccionEmpresa = await empresasAdministracionService.crearDireccionEmpresa(pool, {
+            idEmpresa,
+            ubigeo,
+            codPais,
+            region,
+            provincia,
+            distrito,
+            urbanizacion,
+            direccion,
+            principal,
+            codLocal,
+            crearSucursal: req.body.crearSucursal === true,
+            nombreSucursal: req.body.nombreSucursal
+        });
 
         res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
     } catch (error) {
@@ -752,18 +617,14 @@ const createSucursalEmpresa = async function (req, res, next) {
             return res.status(400).send({ message: 'nombre de la sucursal es requerido', data: undefined });
         }
         const direccion = req.body.direccion != null ? String(req.body.direccion) : '';
-        const idSucursal = uuidv4();
         const pool = await sql.connect(dbConfig);
-        await pool.request()
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('nombre', sql.VarChar, nombre)
-            .input('direccion', sql.VarChar, direccion)
-            .input('fregistro', sql.DateTime, moment().format('YYYY-MM-DD'))
-            .input('estado', sql.Bit, true)
-            .query('INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, fRegistro, estado) VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @fregistro, @estado)');
+        const out = await empresasAdministracionService.crearSucursalEmpresa(pool, {
+            idEmpresa,
+            nombre,
+            direccion
+        });
 
-        res.status(200).send({ data: { idSucursal, nombre, direccion }, message: 'Sucursal creada' });
+        res.status(200).send({ data: out, message: 'Sucursal creada' });
     } catch (error) {
         console.error('createSucursalEmpresa:', error);
         return next(error);
@@ -779,54 +640,18 @@ const updateDireccionEmpresa = async function (req, res, next) {
             try {
                 const pool = await sql.connect(dbConfig);
                 const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
-                const previo = await pool.request()
-                    .input('id', sql.Int, id)
-                    .query('SELECT direccion, principal FROM DireccionEmpresa WHERE idDireccionEmpresa = @id');
-                const direccionAnterior = previo?.recordset?.[0]?.direccion;
-                const principalAnterior = previo?.recordset?.[0]?.principal === true || previo?.recordset?.[0]?.principal === 1;
-                if (principal && idEmpresa) {
-                    await pool.request()
-                        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                        .query('UPDATE DireccionEmpresa SET principal = 0 WHERE idEmpresa = @idEmpresa');
-                    await pool.request()
-                        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                        .query('UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa');
-                }
-                const result = await pool
-                    .request()
-                    .input('id', sql.Int, id)
-                    .input('ubigeo', sql.VarChar, ubigeo)
-                    .input('codPais', sql.VarChar, codPais)
-                    .input('region', sql.VarChar, region)
-                    .input('provincia', sql.VarChar, provincia)
-                    .input('distrito', sql.VarChar, distrito)
-                    .input('urbanizacion', sql.VarChar, urbanizacion)
-                    .input('direccion', sql.VarChar, direccion)
-                    .input('codLocal', sql.VarChar, codLocal)
-                    .input('principal', sql.Bit, principal)
-                    .query('UPDATE DireccionEmpresa SET ubigeo = @ubigeo, codPais = @codPais, region = @region, provincia = @provincia, distrito = @distrito, urbanizacion = @urbanizacion, direccion = @direccion, codLocal = @codLocal, principal = @principal WHERE idDireccionEmpresa = @id');
-                if (idEmpresa) {
-                    const dirTexto = (direccion != null && direccion !== undefined) ? String(direccion).trim() : '';
-                    if (principal) {
-                        await pool.request()
-                            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                            .input('direccion', sql.VarChar(200), dirTexto || null)
-                            .query("UPDATE Sucursal SET direccion = @direccion, esPrincipal = 1 WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
-                    }
-                    if (principalAnterior && !principal) {
-                        await pool.request()
-                            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                            .query("UPDATE Sucursal SET esPrincipal = 0 WHERE idEmpresa = @idEmpresa AND nombre = 'Sucursal Principal'");
-                    }
-                    if (direccionAnterior != null && String(direccionAnterior).trim() !== dirTexto) {
-                        await pool.request()
-                            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                            .input('direccionAnterior', sql.VarChar(200), String(direccionAnterior))
-                            .input('direccionNueva', sql.VarChar(200), dirTexto || null)
-                            .input('esPrincipal', sql.Bit, !!principal)
-                            .query('UPDATE Sucursal SET direccion = @direccionNueva, esPrincipal = @esPrincipal WHERE idEmpresa = @idEmpresa AND direccion = @direccionAnterior');
-                    }
-                }
+                const result = await empresasAdministracionService.actualizarDireccionEmpresaCompleto(pool, idEmpresa, {
+                    idDireccionEmpresa,
+                    ubigeo,
+                    codPais,
+                    region,
+                    provincia,
+                    distrito,
+                    urbanizacion,
+                    direccion,
+                    codLocal,
+                    principal
+                });
                 res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al actualizar un DireccionEmpresa:', error);
@@ -848,11 +673,8 @@ const getDireccionEmpresa_id = async function (req, res, next) {
         if (req.user.rol == 'Administrador') {
             try {
                 const pool = await sql.connect(dbConfig);
-                const result = await pool
-                    .request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .query('SELECT * FROM DireccionEmpresa WHERE idEmpresa = @idEmpresa');
-                res.status(200).send({ data: result.recordset });
+                const result = await empresasAdministracionService.listarDireccionesEmpresa(pool, idEmpresa);
+                res.status(200).send({ data: result });
             } catch (error) {
                 console.error('Error al obtener las direcciones de la empresa:', error);
                 return next(error);
@@ -876,10 +698,7 @@ const deleteDireccion_id = async function (req, res, next) {
         if (req.user.rol == 'Administrador') {
             try {
                 const pool = await sql.connect(dbConfig);
-                const result = await pool
-                    .request()
-                    .input('idDireccionEmpresa', sql.Int, idDireccionEmpresa)
-                    .query('DELETE FROM DireccionEmpresa WHERE idDireccionEmpresa = @idDireccionEmpresa');
+                const result = await empresasAdministracionService.eliminarDireccionEmpresa(pool, idDireccionEmpresa);
                 res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al eliminar la direccion de la empresa:', error);
@@ -904,27 +723,12 @@ const cambiar_principal_direccion = async function (req, res, next) {
         if (req.user.rol == 'Administrador') {
             try {
                 const pool = await sql.connect(dbConfig);
-                const result = await pool
-                    .request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .query('UPDATE DireccionEmpresa SET principal = 0 WHERE idEmpresa = @idEmpresa');
-                //res.status(200).send({ data: result.rowsAffected });
-                if (result.rowsAffected > 0) {
-                    //console.log('result.rowsAffected:', result.rowsAffected);
-                    try {
-                        const pool = await sql.connect(dbConfig);
-                        const result = await pool
-                            .request()
-                            .input('idDireccionEmpresa', sql.Int, idDireccionEmpresa)
-                            .query('UPDATE DireccionEmpresa SET principal = 1 WHERE idDireccionEmpresa = @idDireccionEmpresa');
-                        res.status(200).send({ data: result.rowsAffected });
-                    } catch (error) {
-                        console.error('Error al cambiar la direccion principal1:', error);
-                        return next(error);
-                    }
-                }
-
-
+                const result = await empresasAdministracionService.cambiarPrincipalDireccion(
+                    pool,
+                    idEmpresa,
+                    idDireccionEmpresa
+                );
+                res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al cambiar la direccion principal0:', error);
                 return next(error);

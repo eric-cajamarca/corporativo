@@ -1,145 +1,95 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
+const documentoService = require('../services/documento.service');
 
-// crear el crud segun la tabla Documentos(idDocumento varchar(1) primary key not null,nombre varchar(20) not null,descripcion varchar(200) not null)
-//1. crea el metodo crearDocumento segun los datos de la tabla
-async function crearDocumento(req,res){
-    if (req.user) {
-        if (req.user.rol) {
-
-            try {
-                let idDocumento = req.body.idDocumento;
-                let nombre = req.body.nombre;
-                let descripcion = req.body.descripcion;
-
-                let pool = await sql.connect(dbConfig);
-                let insertDocumento = await pool.request()
-                    .input('idDocumento', sql.VarChar, idDocumento)
-                    .input('nombre', sql.VarChar, nombre)
-                    .input('descripcion', sql.VarChar, descripcion)
-                    .query('insert into Documentos (idDocumento,nombre,descripcion) values (@idDocumento,@nombre,@descripcion)');
-                
-                res.status(200).send({ message: 'Documento creado', data: insertDocumento.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+async function crearDocumento(req, res) {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await documentoService.crearDocumento(pool, req.user, req.body);
+    res.status(200).send({ message: 'Documento creado', data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === 'NO_PERMISOS') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
-
+    console.error('documento.crearDocumento:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
 }
 
-//2. crea el metodo listarDocumentos segun los datos de la tabla
-async function listarDocumentos(req,res){
-        if (req.user) {
-        if (req.user.rol) {
-            
-            try {
-                let pool = await sql.connect(dbConfig);
-                let documentos = await pool.request().query('select * from Documentos');
-                res.status(200).send({ message: 'Lista de documentos', data: documentos.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+async function listarDocumentos(req, res) {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await documentoService.listarDocumentos(pool, req.user);
+    res.status(200).send({ message: 'Lista de documentos', data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === 'NO_PERMISOS') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('documento.listarDocumentos:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
 }
 
-//3. crea el metodo actualizarDocumento segun los datos de la tabla
-async function actualizarDocumento(req,res){
-    const { nombre, descripcion } = req.body;
+async function actualizarDocumento(req, res) {
+  try {
+    const pool = await sql.connect(dbConfig);
     const idDocumento = req.params.idDocumento;
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let updateDocumento = await pool.request()
-                    .input('idDocumento', sql.VarChar, idDocumento)
-                    .input('nombre', sql.VarChar, nombre)
-                    .input('descripcion', sql.VarChar, descripcion)
-                    .query('update Documentos set nombre = @nombre, descripcion = @descripcion where idDocumento = @idDocumento');
-                res.status(200).send({ message: 'Documento actualizado', data: updateDocumento.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const data = await documentoService.actualizarDocumento(pool, req.user, idDocumento, req.body);
+    res.status(200).send({ message: 'Documento actualizado', data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === 'NO_PERMISOS') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('documento.actualizarDocumento:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
 }
 
-//4. crea el metodo eliminarDocumento segun los datos de la tabla
-async function eliminarDocumento(req,res){
+async function eliminarDocumento(req, res) {
+  try {
+    const pool = await sql.connect(dbConfig);
     const idDocumento = req.params.idDocumento;
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-
-            try {
-                let pool = await sql.connect(dbConfig);
-                let deleteDocumento = await pool.request()
-                    .input('idDocumento', sql.VarChar, idDocumento)
-                    .query('delete from Documentos where idDocumento = @idDocumento');
-                res.status(200).send({ message: 'Documento eliminado', data: deleteDocumento.recordset });
-            } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-            }
-        }
-        else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+    const data = await documentoService.eliminarDocumento(pool, req.user, idDocumento);
+    res.status(200).send({ message: 'Documento eliminado', data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(500).send({ message: 'No Access' });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.message === 'NO_PERMISOS') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    console.error('documento.eliminarDocumento:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
 }
 
-// create table FormaPago
-// (
-// 	idFPago int identity primary key not null,
-// 	descripcion varchar(50) not nulL
-// )
-
-const listarFormasPago = async function (req,res) {
-    if(req.user){
-
-        try{
-            let pool = await sql.connect(dbConfig);
-            let formasPago = await pool.request()
-                .query('select * from formasPago');
-            res.status(200).send({data: formasPago.recordset});
-        
-        }catch(error){
-                        res.status(500).send({ message: error.message, data: undefined });
-        }
-    }else{
-        res.status(500).send({ message: 'No Access' });
-
+async function listarFormasPago(req, res) {
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await documentoService.listarFormasPago(pool, req.user);
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(500).send({ message: 'No Access' });
     }
+    console.error('documento.listarFormasPago:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
 }
 
 module.exports = {
-    listarDocumentos,
-    crearDocumento,
-    actualizarDocumento,
-    eliminarDocumento,
-
-    listarFormasPago
-}
+  listarDocumentos,
+  crearDocumento,
+  actualizarDocumento,
+  eliminarDocumento,
+  listarFormasPago
+};

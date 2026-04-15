@@ -296,3 +296,52 @@ exports.limpiarTotpRolesElevadosPorEmpresa = async (pool, idEmpresa) => {
   `);
   return result.rowsAffected[0];
 };
+
+/** Colaborador con rol (panel admin). */
+exports.obtenerUsuarioConRolPorIdUsuario = async (pool, idUsuario, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT UW.*, R.descripcion AS rol
+      FROM UsuarioWeb UW
+      INNER JOIN Rol R ON UW.idRol = R.idRol
+      WHERE UW.idUsuario = @idUsuario AND UW.idEmpresa = @idEmpresa
+    `);
+  return result.recordset;
+};
+
+/** Tabla legacy usuarioWeb con clave numérica `id` (empresasController). */
+exports.obtenerUsuarioWebLegacyPorId = async (pool, id) => {
+  const result = await pool
+    .request()
+    .input('id', sql.Int, id)
+    .query('SELECT * FROM usuarioWeb WHERE id = @id');
+  return result.recordset;
+};
+
+exports.actualizarEstadoUsuarioWebLegacyPorId = async (pool, id, estado) => {
+  const result = await pool
+    .request()
+    .input('id', sql.Int, id)
+    .input('estado', sql.Bit, estado ? 1 : 0)
+    .query('UPDATE usuarioWeb SET estado = @estado WHERE id = @id');
+  return result;
+};
+
+exports.eliminarUsuarioWebLegacyPorIdYEmpresa = async (pool, id, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('id', sql.Int, id)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('DELETE FROM usuarioWeb WHERE id = @id AND idEmpresa = @idEmpresa');
+  return result;
+};
+
+exports.eliminarUsuarioWebLegacyPorId = async (pool, id) => {
+  return pool
+    .request()
+    .input('id', sql.Int, id)
+    .query('DELETE FROM usuarioWeb WHERE id = @id');
+};

@@ -1,315 +1,93 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-const preciosVController = require('./preciosVController');
-const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
-const lotesUbicacionRepository = require('../repositories/lotesUbicacion.repository');
-
-// create table DetalleCompras
-// (
-// idDetalleCompra int identity(1,1) primary key not null,
-// idEmpresa UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-// idSucursal UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Sucursal(idSucursal), -- Nueva columna
-// idCompra int not null,
-// cantidad decimal(18,3) not null,
-// idProducto UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Productos (idProducto),
-// idPresentacion int not null,
-// pUnitario decimal(18,5),
-// total decimal(18,2),
-// idUsuario UNIQUEIDENTIFIER FOREIGN KEY REFERENCES UsuarioWeb (idUsuario) not null,
-// )
+const detalleComprasService = require('../services/detalleCompras.service');
 
 const obtener_detalle_compras_idcompra = async function (req, res) {
-    const idCompra = req.params.id;
-    if (!idCompra || idCompra === 'undefined' || idCompra === 'null') {
-        return res.status(400).send({ message: 'idCompra es requerido', data: undefined });
+  const idCompra = req.params.id;
+  if (!idCompra || idCompra === 'undefined' || idCompra === 'null') {
+    return res.status(400).send({ message: 'idCompra es requerido', data: undefined });
+  }
+  if (!req.user) {
+    return res.status(500).send({ message: 'No Access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await detalleComprasService.obtenerDetallePorCompra(pool, req.user, idCompra);
+    res.status(200).send({ data });
+  } catch (err) {
+    if (err.message === 'NO_PERM') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            try {
-                let pool = await sql.connect(dbConfig);
-                let detallecompras = await pool
-                    .request()
-                    .input('idCompra', sql.UniqueIdentifier, idCompra)
-                    //quiero conssultar el detalle de una compra con idcompra trayendo los datos de las columnas relacionadas con inner join idSucursal, idProducto, idPresentacion y idUsuario
-                    //.query("SELECT * FROM DetalleCompras INNER JOIN Productos ON DetalleCompras.idProducto = Productos.idProducto WHERE idCompra = @idCompra");
-
-                    .query("SELECT * FROM DetalleCompras  WHERE idCompra = @idCompra");
-
-                                    res.status(200).send({ data: detallecompras.recordset });
-            } catch (error) {
-                                res.status(500).send({ message: 'Error al obtener los detallecompras', data: undefined });
-            }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
-    }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
-    }
-}
+    console.error('obtener_detalle_compras_idcompra:', err);
+    res.status(500).send({ message: 'Error al obtener los detallecompras', data: undefined });
+  }
+};
 
 const crear_detalle_compras_idcompra = async function (req, res) {
-    const { idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, fechaVencimiento, ubicacion, asignarPorDefecto } = req.body;
-    const idUsuario = req.user.sub || req.user.idUsuario;
-    const idEmpresa = req.user.empresa;
-
-    if (!req.user) {
-        return res.status(403).send({ message: 'No Access', data: undefined });
+  if (!req.user) {
+    return res.status(403).send({ message: 'No Access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const result = await detalleComprasService.crearDetalleCompraCompleto(pool, req.user, req.body);
+    res.status(200).send({
+      data: 1,
+      message: result.asignarUbicacionDefecto
+        ? 'Detalle de compra registrado. Lote y ubicación por defecto creados.'
+        : 'Detalle de compra registrado. Lote creado. Asigne ubicaciones desde Inventario.',
+      numeroLote: result.numeroLote,
+      idLote: result.idLote
+    });
+  } catch (err) {
+    if (err.message === 'NO_PERM') {
+      return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
-    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
-        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-    }
-
-    const pUnitarioFormateado = parseFloat(pUnitario) || 0;
-    const cantidadVal = parseFloat(cantidad) || 0;
-    const totalVal = parseFloat(total) || 0;
-    const fechaVencimientoVal = fechaVencimiento || null;
-    const asignarUbicacionDefecto = asignarPorDefecto !== false;
-
-    try {
-        let idUbicacionDefault = null;
-        if (asignarUbicacionDefecto) {
-            idUbicacionDefault = await ubicacionesPrioridadRepository.getOrCreateDefaultForSucursal(idSucursal);
-        }
-
-        const pool = await sql.connect(dbConfig);
-        const transaction = new sql.Transaction(pool);
-        await transaction.begin();
-
-        try {
-            const reqTr = transaction.request();
-            await reqTr
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('idCompra', sql.UniqueIdentifier, idCompra)
-                .input('cantidad', sql.Decimal(18, 3), cantidadVal)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .input('idPresentacion', sql.Int, idPresentacion)
-                .input('pUnitario', sql.Decimal(18, 6), pUnitarioFormateado)
-                .input('total', sql.Decimal(18, 2), totalVal)
-                .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-                .query(`
-                    INSERT INTO DetalleCompras (idEmpresa, idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario)
-                    VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)
-                `);
-
-            let numeroLote = null;
-            try {
-                const rNum = await transaction.request()
-                    .input('idCompra', sql.UniqueIdentifier, idCompra)
-                    .query('SELECT numeroLote FROM Compras WHERE idCompra = @idCompra');
-                numeroLote = rNum.recordset && rNum.recordset[0] ? rNum.recordset[0].numeroLote : null;
-            } catch (_) {
-                numeroLote = null;
-            }
-            if (numeroLote == null) {
-                const rNext = await transaction.request()
-                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                    .query(`
-                        SELECT ISNULL(MAX(TRY_CAST(numeroLote AS INT)), 0) + 1 AS siguiente FROM Lotes WHERE idEmpresa = @idEmpresa
-                    `);
-                numeroLote = (rNext.recordset && rNext.recordset[0] && rNext.recordset[0].siguiente) ? String(rNext.recordset[0].siguiente) : '1';
-                try {
-                    await transaction.request()
-                        .input('idCompra', sql.UniqueIdentifier, idCompra)
-                        .input('numeroLote', sql.Int, parseInt(numeroLote, 10))
-                        .query('UPDATE Compras SET numeroLote = @numeroLote WHERE idCompra = @idCompra');
-                } catch (_) {
-                    // Columna numeroLote puede no existir; se usa igual para el lote
-                }
-            } else {
-                numeroLote = String(numeroLote);
-            }
-
-            const loteInsert = await transaction.request()
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('costoUnitario', sql.Decimal(18, 6), pUnitarioFormateado)
-                .input('cantidadIngresada', sql.Decimal(18, 2), cantidadVal)
-                .input('cantidadDisponible', sql.Decimal(18, 2), cantidadVal)
-                .input('fechaVencimiento', sql.DateTime, fechaVencimientoVal)
-                .input('numeroLote', sql.VarChar(50), numeroLote)
-                .query(`
-                    INSERT INTO Lotes (idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible, fechaVencimiento, numeroLote)
-                    OUTPUT INSERTED.idLote
-                    VALUES (@idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible, @fechaVencimiento, @numeroLote)
-                `);
-            const idLote = loteInsert.recordset && loteInsert.recordset[0] ? loteInsert.recordset[0].idLote : null;
-
-            if (asignarUbicacionDefecto && idLote && idUbicacionDefault) {
-                await transaction.request()
-                    .input('idLote', sql.UniqueIdentifier, idLote)
-                    .input('idUbicacion', sql.Int, idUbicacionDefault)
-                    .input('cantidad', sql.Int, Math.round(cantidadVal))
-                    .query('INSERT INTO LotesUbicacion (idLote, idUbicacion, cantidad) VALUES (@idLote, @idUbicacion, @cantidad)');
-            }
-
-            await transaction.commit();
-            res.status(200).send({
-                data: 1,
-                message: asignarUbicacionDefecto
-                    ? 'Detalle de compra registrado. Lote y ubicación por defecto creados.'
-                    : 'Detalle de compra registrado. Lote creado. Asigne ubicaciones desde Inventario.',
-                numeroLote,
-                idLote
-            });
-        } catch (err) {
-            await transaction.rollback();
-            throw err;
-        }
-    } catch (error) {
-        console.error('crear_detalle_compras_idcompra error:', error);
-        res.status(500).send({ message: 'Error al crear detalle de compra', data: undefined });
-    }
-}
-
-
-const crear_detallecompras = async function (detalle) {
-        try {
-        // Formatear pUnitario a dos decimales
-        const pUnitarioFormateado = parseFloat(detalle.pUnitario);
-
-        
-        let pool = await sql.connect(dbConfig);
-        let detalleCompra = await pool
-            .request()
-            .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)
-            .input('idSucursal', sql.UniqueIdentifier, detalle.idSucursal)
-            .input('idCompra', sql.UniqueIdentifier, detalle.idCompra)
-            .input('cantidad', sql.Decimal(18, 3), detalle.cantidad)
-            .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
-            .input('idPresentacion', sql.Int, detalle.idPresentacion)
-            .input('pUnitario', sql.Decimal(18, 5), pUnitarioFormateado)
-            .input('total', sql.Decimal(18, 2), detalle.total)
-            .input('idUsuario', sql.UniqueIdentifier, detalle.idUsuario)
-            .query("INSERT INTO DetalleCompras (idEmpresa, idSucursal, idCompra, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario) VALUES (@idEmpresa, @idSucursal, @idCompra, @cantidad, @idProducto, @idPresentacion, @pUnitario, @total, @idUsuario)");
-
-        //res.status(200).send({ data: detalleCompra.rowsAffected });
-        
-    } catch (error) {
-                res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
-    }
-
-}
+    console.error('crear_detalle_compras_idcompra error:', err);
+    res.status(500).send({ message: 'Error al crear detalle de compra', data: undefined });
+  }
+};
 
 const editar_detalle_compras_idcompra = async (req, res) => {
-            //const {idDetalleCompra, idEmpresa, idSucursal, cantidad, idProducto, idPresentacion, pUnitario, total, idUsuario } = req.body;
-
-    const idCompra = req.params.id;
-
-    if (req.user) {
-
-
-        let DetalleCompra = [];
-        req.body.forEach(element => {
-            var detalleCompra = element;
-            DetalleCompra.push(detalleCompra);
-        });
-
-        
-
-        const idUsuario = req.user.sub;
-        const idEmpresa = req.user.empresa;
-
-        //quiero extraer del array de objetos DetalleCompra los objetos detalleCompra y luego hacer un update de cada uno de ellos
-        const dCompra = DetalleCompra.map(detalleCompra => {
-            const { idDetalleCompra, idSucursal, cantidad, idProducto, idPresentacion, pUnitario, total } = detalleCompra;
-            return {
-                idDetalleCompra,
-                idSucursal,
-                cantidad,
-                idProducto,
-                idPresentacion,
-                pUnitario,
-                total,
-                idCompra: req.params.id,
-                idEmpresa: req.user.empresa,
-                idUsuario: req.user.sub
-            };
-        });
-
-        
-
-        if (req.user.rol == 'Administrador') {
-            try {
-
-                for (const detalle of dCompra) {
-                    if (detalle.idDetalleCompra) {
-                        await actualizarDetalleCompra(detalle);
-                        // await preciosVController.crearPrecioV(detalle);
-                    } else {
-                        await crear_detallecompras(detalle);
-                    }
-
-                }
-                
-                res.status(200).send({ data: 1, message: 'Detalle de compra actualizado correctamente' });
-
-            } catch (error) {
-                                res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
-            }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
+  if (!req.user) {
+    return res.status(500).send({ message: 'No Access', data: undefined });
+  }
+  if (req.user.rol !== 'Administrador') {
+    return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+  }
+  const DetalleCompra = Array.isArray(req.body) ? req.body : [];
+  const dCompra = DetalleCompra.map((detalleCompra) => {
+    const { idDetalleCompra, idSucursal, cantidad, idProducto, idPresentacion, pUnitario, total } = detalleCompra;
+    return {
+      idDetalleCompra,
+      idSucursal,
+      cantidad,
+      idProducto,
+      idPresentacion,
+      pUnitario,
+      total,
+      idCompra: req.params.id,
+      idEmpresa: req.user.empresa,
+      idUsuario: req.user.sub || req.user.idUsuario
+    };
+  });
+  try {
+    const pool = await sql.connect(dbConfig);
+    for (const detalle of dCompra) {
+      if (detalle.idDetalleCompra) {
+        await detalleComprasService.actualizarDetalleInterno(pool, detalle);
+      } else {
+        await detalleComprasService.crearDetalleInterno(pool, detalle);
+      }
     }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
-    }
-}
-
-const actualizarDetalleCompra = async function (detalle) {
-
-        //const pUnitarioFormateado = parseFloat(detalle.pUnitario);
-    //quiero formatear detalle.pUnitario a un decimal con 5 decimales
-    const pUnitarioFormateado = parseFloat(detalle.pUnitario);
-    
-    try {
-        let pool = await sql.connect(dbConfig); // Asegúrate de tener dbConfig definido con tus credenciales de la base de datos
-        let result = await pool.request()
-            .input('idDetalleCompra', sql.Int, detalle.idDetalleCompra)
-            .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)
-            .input('idSucursal', sql.UniqueIdentifier, detalle.idSucursal)
-            .input('idCompra', sql.UniqueIdentifier, detalle.idCompra)
-            .input('cantidad', sql.Decimal(18, 3), detalle.cantidad)
-            .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
-            .input('idPresentacion', sql.Int, detalle.idPresentacion)
-            .input('pUnitario', sql.Decimal(18, 5), pUnitarioFormateado)
-            .input('total', sql.Decimal(18, 2), detalle.total)
-            .query('UPDATE DetalleCompras SET idSucursal = @idSucursal, cantidad = @cantidad, idProducto = @idProducto, idPresentacion = @idPresentacion, pUnitario = @pUnitario, total = @total WHERE idDetalleCompra = @idDetalleCompra and idCompra = @idCompra');
-            } catch (error) {
-        console.error('Error al actualizar el detalle de compra:', error);
-    }
-}
-
-const eliminar_detalle_compras_idcompra = async function (req, res) {
-    const idCompra = req.params.id;
-        if (req.user) {
-        if (req.user.rol == 'Administrador') {
-            try {
-                let pool = await sql.connect(dbConfig);
-                let detallecompras = await pool
-                    .request()
-                    .input('idCompra', sql.UniqueIdentifier, idCompra)
-                    .query("DELETE FROM DetalleCompras WHERE idCompra = @idCompra");
-
-                res.status(200).send({ data: detallecompras.rowsAffected });
-
-            } catch (error) {
-                                res.status(500).send({ message: 'Error al eliminar detallecompras', data: undefined });
-            }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
-    }
-    else {
-        res.status(500).send({ message: 'No Access', data: undefined });
-    }
-}
+    res.status(200).send({ data: 1, message: 'Detalle de compra actualizado correctamente' });
+  } catch (error) {
+    console.error('editar_detalle_compras_idcompra:', error);
+    res.status(500).send({ message: 'Error al crear detallecompras', data: undefined });
+  }
+};
 
 module.exports = {
-    obtener_detalle_compras_idcompra,
-    crear_detalle_compras_idcompra,
-    editar_detalle_compras_idcompra
-
-}
+  obtener_detalle_compras_idcompra,
+  crear_detalle_compras_idcompra,
+  editar_detalle_compras_idcompra
+};

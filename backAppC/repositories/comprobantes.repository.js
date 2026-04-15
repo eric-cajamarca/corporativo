@@ -1,75 +1,94 @@
 const sql = require('mssql');
 
-/** Número correlativo guardado en catálogo (último usado) para un código de comprobante (ej. RA). */
-exports.obtenerComprobantePorCodigoRepo = async (pool, idEmpresa, codigo) => {
-  try {
-    const result = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('codigo', sql.VarChar(10), String(codigo || '').trim())
-      .query(`
-        SELECT TOP 1 idComprobante, codigo, numero
-        FROM Comprobantes
-        WHERE idEmpresa = @idEmpresa AND codigo = @codigo
-      `);
-    const row = result.recordset && result.recordset[0];
-    return row || null;
-  } catch (error) {
-    throw new Error(`Repository Error: ${error.message}`);
-  }
-};
+const ALIAS_TABLA = /^[A-Za-z0-9]+$/;
 
-exports.obtenerComprobantePorIdEmpresa = async (pool, idEmpresa, idComprobante) => {
-  try {
-    const result = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('idComprobante', sql.Int, idComprobante)
-      .query(`
-        SELECT TOP 1 idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
-        FROM Comprobantes
-        WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
-      `);
-    return result;
-  } catch (error) {
-    throw new Error(`Repository Error: ${error.message}`);
+async function listarPorEmpresaYuso(pool, idEmpresa, uso) {
+  let sqlText =
+    'SELECT idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra FROM Comprobantes WHERE idEmpresa = @idEmpresa';
+  if (uso === 'venta') {
+    sqlText += ' AND usarEnVenta = 1';
+  } else if (uso === 'compra') {
+    sqlText += ' AND usarEnCompra = 1';
   }
-};
+  sqlText += ' ORDER BY codigo';
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(sqlText);
+  return result.recordset;
+}
 
-exports.actualizarNumeroComprobante = async (pool, idEmpresa, idComprobante, numero) => {
-  try {
-    const result = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('idComprobante', sql.Int, idComprobante)
-      .input('numero', sql.Int, numero)
-      .query(`
-        UPDATE Comprobantes
-        SET numero = @numero
-        WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
-      `);
-    return result;
-  } catch (error) {
-    throw new Error(`Repository Error: ${error.message}`);
+async function listarPorTablaAlias(pool, alias) {
+  const a = String(alias || '').trim();
+  if (!ALIAS_TABLA.test(a) || a.length > 40) {
+    throw new Error('ALIAS_INVALIDO');
   }
-};
+  const result = await pool.request().query(`SELECT * FROM Comprobantes${a} WHERE id = 15`);
+  return result.recordset;
+}
 
-/**
- * Asegura el comprobante Venta Agrupada (VA) para la empresa gestora.
- */
-exports.insertarComprobanteVentaAgrupadaSiNoExiste = async (pool, idEmpresa) => {
-  try {
-    const result = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
-        IF NOT EXISTS (
-          SELECT 1 FROM Comprobantes
-          WHERE idEmpresa = @idEmpresa AND codigo = 'VA'
-        )
-        BEGIN
-          INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
-          VALUES (@idEmpresa, 'VA', 'Venta Agrupada', 'VA01', 0, 1, 1, 0);
-        END
-      `);
-    return result;
-  } catch (error) {
-    throw new Error(`Repository Error: ${error.message}`);
+async function insertar(pool, payload) {
+  const {
+    idEmpresa,
+    codigo,
+    nombre,
+    serie,
+    numero,
+    usarEnVenta,
+    usarEnCompra
+  } = payload;
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('codigo', sql.VarChar(2), codigo)
+    .input('nombre', sql.VarChar(50), nombre)
+    .input('serie', sql.VarChar(4), serie)
+    .input('numero', sql.Int, numero)
+    .input('usarEnVenta', sql.Bit, usarEnVenta)
+    .input('usarEnCompra', sql.Bit, usarEnCompra)
+    .query(
+      `INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
+       VALUES (@idEmpresa, @codigo, @nombre, @serie, @numero, 1, @usarEnVenta, @usarEnCompra);
+       SELECT SCOPE_IDENTITY() AS idComprobante;`
+    );
+  const idNew =
+    result.recordset && result.recordset[0] ? result.recordset[0].idComprobante : null;
+  return idNew;
+}
+
+async function actualizar(pool, idEmpresa, idComprobante, updates) {
+  const request = pool
+    .request()
+    .input('idComprobante', sql.Int, idComprobante)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  const parts = [];
+  if (updates.serie !== undefined) {
+    parts.push('serie = @serie');
+    request.input('serie', sql.VarChar(4), updates.serie);
   }
+  if (updates.numero !== undefined) {
+    parts.push('numero = @numero');
+    request.input('numero', sql.Int, updates.numero);
+  }
+  if (updates.usarEnVenta !== undefined) {
+    parts.push('usarEnVenta = @usarEnVenta');
+    request.input('usarEnVenta', sql.Bit, updates.usarEnVenta);
+  }
+  if (updates.usarEnCompra !== undefined) {
+    parts.push('usarEnCompra = @usarEnCompra');
+    request.input('usarEnCompra', sql.Bit, updates.usarEnCompra);
+  }
+  if (parts.length === 0) {
+    throw new Error('SIN_CAMPOS');
+  }
+  const sqlText = `UPDATE Comprobantes SET ${parts.join(', ')} WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa`;
+  const result = await request.query(sqlText);
+  return result.rowsAffected[0];
+}
+
+module.exports = {
+  listarPorEmpresaYuso,
+  listarPorTablaAlias,
+  insertar,
+  actualizar
 };

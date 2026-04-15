@@ -34,22 +34,11 @@ const crearVenta = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
 
-  const pool = await sql.connect();
-  
   try {
-    //Inicia transacción (CONTROLADOR = ORQUESTADOR)
-    await pool.request().query('BEGIN TRANSACTION');
-
-    //Llama al SERVICIO (solo lógica de negocio)
-    await ventasService.crearVenta(pool, datosVenta, req.user.empresa, idUsuario);
-    
-    //Commit (si todo OK)
-    await pool.request().query('COMMIT');
+    const pool = await sql.connect(dbConfig);
+    await ventasService.crearVentaCabeceraConTransaccion(pool, datosVenta, req.user.empresa, idUsuario);
     res.status(201).json({ message: 'Venta creada correctamente' });
-
   } catch (error) {
-    // Rollback automático (si ALGÚN servicio falla)
-    await pool.request().query('ROLLBACK');
     console.error('Error al crear la venta:', error);
     res.status(500).send('Error al crear la venta');
   }
@@ -64,13 +53,9 @@ const obtenerVentaPorId = async function (req, res) {
   }
             if(req.user) {
     try {
-      let pool = await sql.connect(dbConfig);
-        let result = await pool
-        .request()
-        .input('Serie_Numero', sql.Char, Serie_Numero)
-        .input('idempresa', sql.UniqueIdentifier, idempresa)
-        .query('SELECT * FROM Ventas WHERE Serie_Numero = @Serie_Numero and idEmpresa=@idempresa');
-        res.json(result.recordset);
+      const pool = await sql.connect(dbConfig);
+      const result = await ventasService.obtenerVentaPorSerieNumero(pool, Serie_Numero, idempresa);
+      res.json(result);
     } catch (error) {
       console.error('Error al obtener la venta:', error);
       res.status(500).send('Error al obtener la venta por id');
@@ -259,14 +244,8 @@ const actualizarVenta = async function (req, res) {
   // const Serie_Numero = req.params.id;
             if(req.user) {
         try {
-        let pool = await sql.connect(dbConfig);
-            let result = await pool
-            .request()
-            .input('Serie_Numero', sql.VarChar, Serie_Numero)
-            .input('EstadoPedido', sql.VarChar, EstadoPedido)
-            .input('EStadoSunat', sql.VarChar, EstadoSunat)
-            // ... completar con otras entradas
-            .query('UPDATE Ventas SET EstadoPedido = @EstadoPedido, EstadoSunat = @EstadoSunat WHERE Serie_Numero = Serie_Numero');
+        const pool = await sql.connect(dbConfig);
+            await ventasService.actualizarVentaEstadoPedidoSunat(pool, Serie_Numero, EstadoPedido, EstadoSunat);
             res.status(200).json({ message: 'Registro actualizado correctamente' });
         } catch (error) {
         console.error('Error al actualizar el detalle de venta:', error);
@@ -367,37 +346,23 @@ const crearDetalleVenta_DescontarStock = async function (req, res) {
     const hVentaSQL = hVenta ? (getFechaEmisionSQLString(String(hVenta).trim().slice(0, 10)) || getNowLocalSQLString()) : getNowLocalSQLString();
     if (req.user) {
         try {
-            let pool = await sql.connect(dbConfig);
-            let transaction = new sql.Transaction(pool);
-            await transaction.begin();
-            let request = new sql.Request(transaction);
-
-            // Primero, descontar el stock
-            await request
-                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .input('cantidad', sql.Decimal(18, 2), cantidad)
-                .execute('sp_DescontarStock');
-            // Luego, crear el detalle de venta
-            await request
-                .input('idVenta', sql.Int, idVenta)
-                .input('idProducto', sql.UniqueIdentifier, idProducto)
-                .input('cantidad', sql.Decimal(18, 3), cantidad)
-                .input('pVenta', sql.Decimal(18, 5), pVenta)
-                .input('descuento', sql.Decimal(18, 2), descuento)
-                .input('subtotal', sql.Decimal(18, 2), subtotal)
-                .input('igv', sql.Bit, igv)
-                .input('isc', sql.Bit, isc)
-                .input('total', sql.Decimal(18, 2), total)
-                .input('hVenta', sql.VarChar(23), hVentaSQL)
-                .input('cantEntregada', sql.Decimal(18, 3), cantEntregada)
-                .input('idEstadoPedido', sql.Int, idEstadoPedido)
-                .query(`INSERT INTO DetalleVenta 
-                (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, hVenta, cantEntregada, idEstadoPedido)
-                VALUES
-                (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @hVenta, @cantEntregada, @idEstadoPedido)`);
-            await transaction.commit();
+            const pool = await sql.connect(dbConfig);
+            await ventasService.crearDetalleVentaDescontarStock(pool, {
+              idEmpresa,
+              idSucursal,
+              idProducto,
+              cantidad,
+              idVenta,
+              pVenta,
+              descuento,
+              subtotal,
+              igv,
+              isc,
+              total,
+              hVentaSQL,
+              cantEntregada,
+              idEstadoPedido
+            });
             res.status(201).json({ message: 'Detalle de venta creado y stock descontado correctamente' });
         } catch (error) {
             console.error('Error al crear el detalle de venta y descontar stock:', error);
@@ -415,14 +380,8 @@ const actualizarDetalleVenta = async function (req, res) {
   const FUltEntregaSQL = FUltEntrega ? (getFechaSoloSQLString(FUltEntrega) || getFechaEmisionSQLString(String(FUltEntrega).trim().slice(0, 10)) || String(FUltEntrega).trim().slice(0, 19).replace('T', ' ') + '.000') : null;
   if(req.user) {
         try {
-        let pool = await sql.connect(dbConfig);
-            let result = await pool
-            .request()
-            .input('id', sql.Int, id)
-            .input('CantEntregado', sql.Decimal, CantEntregado)
-            .input('FUltEntrega', sql.VarChar(23), FUltEntregaSQL)
-            .input('EstadoPedido', sql.Int, EstadoPedido)
-            .query('UPDATE DetalleVentas SET CantEntregado = @CantEntregado, FUltEntrega = @FUltEntrega, idEstadoPedido = @EstadoPedido WHERE Id = @id');
+        const pool = await sql.connect(dbConfig);
+            await ventasService.actualizarDetalleVentasEntrega(pool, id, CantEntregado, FUltEntregaSQL, EstadoPedido);
             res.status(200).json({ message: 'Registro actualizado correctamente' });
         } catch (error) {
         console.error('Error al actualizar el detalle de venta:', error);
@@ -437,12 +396,9 @@ const obtenerDetalleVenta_idVenta = async function (req, res) {
     const idVenta = req.params.id;
     if(req.user) {
         try {
-        let pool = await sql.connect(dbConfig);
-            let result = await pool
-            .request()
-            .input('idVenta', sql.Int, idVenta)
-            .query('SELECT * FROM DetalleVenta WHERE idVenta = @idVenta');
-            res.json(result.recordset);
+        const pool = await sql.connect(dbConfig);
+            const result = await ventasService.obtenerDetalleVentaPorIdVenta(pool, idVenta);
+            res.json(result);
         } catch (error) {
         console.error('Error al obtener el detalle de venta:', error);
         res.status(500).send('Error al obtener el detalle de venta por idVenta');
@@ -456,12 +412,9 @@ const obtenerVenta_idDetalle = async function (req, res) {
     const idDetalle = req.params.id;
     if(req.user) {
         try {
-        let pool = await sql.connect(dbConfig);
-            let result = await pool
-            .request()
-            .input('idDetalle', sql.Int, idDetalle)
-            .query('SELECT v.* FROM Ventas v JOIN DetalleVenta dv ON v.idVenta = dv.idVenta WHERE dv.idDetalle = @idDetalle');
-            res.json(result.recordset);
+        const pool = await sql.connect(dbConfig);
+            const result = await ventasService.obtenerVentaPorIdDetalle(pool, idDetalle);
+            res.json(result);
         } catch (error) {
         console.error('Error al obtener la venta por idDetalle:', error);
         res.status(500).send('Error al obtener la venta por idDetalle');
@@ -507,14 +460,13 @@ const eliminarDetalleVenta = async function (req, res) {
     const { idSucursal, idProducto, cantidad } = req.body;
     try {
         const pool = await sql.connect(dbConfig);
-        const request = pool.request();
-        request.input('idDetalle', sql.Int, idDetalle);
-        request.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-        request.input('idSucursal', sql.UniqueIdentifier, idSucursal);
-        request.input('idProducto', sql.UniqueIdentifier, idProducto);
-        request.input('cantidad', sql.Decimal(18, 2), cantidad);
-        await request.execute('sp_RestaurarStock');
-        await pool.request().input('idDetalle', sql.Int, idDetalle).query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle');
+        await ventasService.restaurarStockEliminarDetalleVenta(pool, {
+          idDetalle,
+          idEmpresa,
+          idSucursal,
+          idProducto,
+          cantidad
+        });
         res.status(200).json({ message: 'Detalle de venta eliminado correctamente' });
     } catch (error) {
         console.error('Error al eliminar el detalle de venta:', error);
@@ -681,15 +633,7 @@ const postCobrarVentaAgrupada = async (req, res) => {
   }
   try {
     const pool = await sql.connect(dbConfig);
-    const ventaAgrRow = await pool.request()
-      .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
-      .input('idEmpresaCobradora', sql.UniqueIdentifier, req.user.empresa)
-      .query(`
-        SELECT idVentaAgrupada, idSucursal, idEstadoPago, compVenta
-        FROM VentaAgrupada
-        WHERE idVentaAgrupada = @idVentaAgrupada AND idEmpresaCobradora = @idEmpresaCobradora
-      `);
-    const ventaAgr = ventaAgrRow.recordset && ventaAgrRow.recordset[0];
+    const ventaAgr = await ventasService.obtenerVentaAgrupadaParaCobro(pool, idVentaAgrupada, req.user.empresa);
     if (!ventaAgr) {
       return res.status(404).json({ message: 'Venta agrupada no encontrada' });
     }
@@ -705,17 +649,7 @@ const postCobrarVentaAgrupada = async (req, res) => {
         throw new Error('La venta agrupada no tiene comprobantes asociados (VentaEmpresa). No se puede cobrar.');
       }
 
-      const fvRow = await transaction
-        .request()
-        .input('idVA', sql.UniqueIdentifier, idVentaAgrupada)
-        .query(`
-          SELECT TOP 1 CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento
-          FROM VentaEmpresa ve
-          INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
-          WHERE ve.idVentaAgrupada = @idVA
-          ORDER BY ve.fEmision ASC
-        `);
-      const fVencCab = fvRow.recordset?.[0]?.fVencimiento || null;
+      const fVencCab = await ventasService.obtenerFVencimientoPrimeraVentaEmpresaVA(transaction, idVentaAgrupada);
 
       const ventaCreditoPostVentaService = require('../services/ventaCreditoPostVenta.service');
       await ventaCreditoPostVentaService.crearCreditosDesdeVentaAgrupada(transaction, {
@@ -805,25 +739,7 @@ const postCobrarVenta = async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig);
     const CajaRepository = require('../repositories/caja.repository');
-    const ventaRow = await pool
-      .request()
-      .input('idVenta', sql.Int, idVenta)
-      .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-      .query(`
-        SELECT
-          v.idVenta,
-          v.compVenta,
-          v.idSucursal,
-          v.idEstadoPago,
-          v.idCliente,
-          v.total,
-          CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento,
-          UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
-        FROM Ventas v
-        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
-      `);
-    const venta = ventaRow.recordset && ventaRow.recordset[0];
+    const venta = await ventasService.obtenerVentaParaCobroPendiente(pool, idVenta, req.user.empresa);
     if (!venta) {
       return res.status(404).json({ message: 'Venta no encontrada' });
     }

@@ -1777,3 +1777,156 @@ exports.obtenerDetalleVentaAgrupada = async (pool, idEmpresaCobradora, idVentaAg
     `);
   return result.recordset || [];
 };
+
+/** --- Consultas migradas desde ventasController --- */
+
+exports.obtenerVentaPorSerieNumeroEmpresa = async (pool, serieNumero, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('Serie_Numero', sql.VarChar(30), String(serieNumero).trim())
+    .input('idempresa', sql.UniqueIdentifier, idEmpresa)
+    .query('SELECT * FROM Ventas WHERE Serie_Numero = @Serie_Numero AND idEmpresa = @idempresa');
+  return result.recordset;
+};
+
+exports.actualizarVentaEstadoPedidoSunat = async (pool, serieNumero, estadoPedido, estadoSunat) => {
+  await pool
+    .request()
+    .input('Serie_Numero', sql.VarChar(30), String(serieNumero).trim())
+    .input('EstadoPedido', sql.VarChar(100), estadoPedido != null ? String(estadoPedido) : '')
+    .input('EstadoSunat', sql.VarChar(100), estadoSunat != null ? String(estadoSunat) : '')
+    .query(
+      'UPDATE Ventas SET EstadoPedido = @EstadoPedido, EstadoSunat = @EstadoSunat WHERE Serie_Numero = @Serie_Numero'
+    );
+};
+
+exports.transaccionDescontarStockEInsertarDetalleVenta = async (pool, params) => {
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const r1 = new sql.Request(transaction);
+    await r1
+      .input('idEmpresa', sql.UniqueIdentifier, params.idEmpresa)
+      .input('idSucursal', sql.UniqueIdentifier, params.idSucursal)
+      .input('idProducto', sql.UniqueIdentifier, params.idProducto)
+      .input('cantidad', sql.Decimal(18, 2), params.cantidad)
+      .execute('sp_DescontarStock');
+    const r2 = new sql.Request(transaction);
+    await r2
+      .input('idVenta', sql.Int, params.idVenta)
+      .input('idProducto', sql.UniqueIdentifier, params.idProducto)
+      .input('cantidad', sql.Decimal(18, 3), params.cantidad)
+      .input('pVenta', sql.Decimal(18, 5), params.pVenta)
+      .input('descuento', sql.Decimal(18, 2), params.descuento)
+      .input('subtotal', sql.Decimal(18, 2), params.subtotal)
+      .input('igv', sql.Bit, params.igv)
+      .input('isc', sql.Bit, params.isc)
+      .input('total', sql.Decimal(18, 2), params.total)
+      .input('hVenta', sql.VarChar(23), params.hVentaSQL)
+      .input('cantEntregada', sql.Decimal(18, 3), params.cantEntregada)
+      .input('idEstadoPedido', sql.Int, params.idEstadoPedido)
+      .query(`INSERT INTO DetalleVenta 
+        (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, hVenta, cantEntregada, idEstadoPedido)
+        VALUES
+        (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @hVenta, @cantEntregada, @idEstadoPedido)`);
+    await transaction.commit();
+  } catch (e) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw e;
+  }
+};
+
+exports.actualizarDetalleVentasEntrega = async (pool, id, cantEntregado, fUltEntregaSQL, estadoPedido) => {
+  await pool
+    .request()
+    .input('id', sql.Int, id)
+    .input('CantEntregado', sql.Decimal(18, 4), cantEntregado)
+    .input('FUltEntrega', sql.VarChar(23), fUltEntregaSQL)
+    .input('EstadoPedido', sql.Int, estadoPedido)
+    .query(
+      'UPDATE DetalleVentas SET CantEntregado = @CantEntregado, FUltEntrega = @FUltEntrega, idEstadoPedido = @EstadoPedido WHERE Id = @id'
+    );
+};
+
+exports.obtenerDetalleVentaPorIdVenta = async (pool, idVenta) => {
+  const result = await pool
+    .request()
+    .input('idVenta', sql.Int, idVenta)
+    .query('SELECT * FROM DetalleVenta WHERE idVenta = @idVenta');
+  return result.recordset;
+};
+
+exports.obtenerVentaPorIdDetalle = async (pool, idDetalle) => {
+  const result = await pool
+    .request()
+    .input('idDetalle', sql.Int, idDetalle)
+    .query(
+      'SELECT v.* FROM Ventas v JOIN DetalleVenta dv ON v.idVenta = dv.idVenta WHERE dv.idDetalle = @idDetalle'
+    );
+  return result.recordset;
+};
+
+exports.restaurarStockEliminarDetalleVenta = async (pool, { idDetalle, idEmpresa, idSucursal, idProducto, cantidad }) => {
+  const r0 = pool.request();
+  r0.input('idDetalle', sql.Int, idDetalle);
+  r0.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  r0.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+  r0.input('idProducto', sql.UniqueIdentifier, idProducto);
+  r0.input('cantidad', sql.Decimal(18, 2), cantidad);
+  await r0.execute('sp_RestaurarStock');
+  await pool
+    .request()
+    .input('idDetalle', sql.Int, idDetalle)
+    .query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle');
+};
+
+exports.obtenerVentaAgrupadaParaCobro = async (pool, idVentaAgrupada, idEmpresaCobradora) => {
+  const result = await pool
+    .request()
+    .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`
+      SELECT idVentaAgrupada, idSucursal, idEstadoPago, compVenta
+      FROM VentaAgrupada
+      WHERE idVentaAgrupada = @idVentaAgrupada AND idEmpresaCobradora = @idEmpresaCobradora
+    `);
+  return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+};
+
+exports.obtenerFVencimientoPrimeraVentaEmpresaVA = async (transaction, idVentaAgrupada) => {
+  const result = await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVentaAgrupada)
+    .query(`
+      SELECT TOP 1 CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento
+      FROM VentaEmpresa ve
+      INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
+      WHERE ve.idVentaAgrupada = @idVA
+      ORDER BY ve.fEmision ASC
+    `);
+  return result.recordset?.[0]?.fVencimiento || null;
+};
+
+exports.obtenerVentaParaCobroPendiente = async (pool, idVenta, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idVenta', sql.Int, idVenta)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        v.idVenta,
+        v.compVenta,
+        v.idSucursal,
+        v.idEstadoPago,
+        v.idCliente,
+        v.total,
+        CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento,
+        UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
+      FROM Ventas v
+      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+      WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+    `);
+  return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+};

@@ -13,9 +13,67 @@ const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } 
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 const sunatPostPagoService = require('./sunatPostPago.service');
 
-exports.crearVenta = async (datosVenta, idEmpresa, idUsuario) => {
-  // El Service solo extrae datos y llama al Repository
-  return await ventasRepository.insertar(datosVenta, idEmpresa, idUsuario);
+/** Inserta cabecera de venta dentro de una transacción ya iniciada. */
+exports.insertarVentaCabecera = async (transaction, datosVenta, idEmpresa, idUsuario) => {
+  return await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
+};
+
+/**
+ * Crea cabecera de venta en una transacción propia (commit/rollback).
+ * Usado por POST crear venta legacy del controlador.
+ */
+exports.crearVentaCabeceraConTransaccion = async (pool, datosVenta, idEmpresa, idUsuario) => {
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
+};
+
+exports.obtenerVentaPorSerieNumero = async (pool, serieNumero, idEmpresa) => {
+  return ventasRepository.obtenerVentaPorSerieNumeroEmpresa(pool, serieNumero, idEmpresa);
+};
+
+exports.actualizarVentaEstadoPedidoSunat = async (pool, serieNumero, estadoPedido, estadoSunat) => {
+  return ventasRepository.actualizarVentaEstadoPedidoSunat(pool, serieNumero, estadoPedido, estadoSunat);
+};
+
+exports.crearDetalleVentaDescontarStock = async (pool, payload) => {
+  return ventasRepository.transaccionDescontarStockEInsertarDetalleVenta(pool, payload);
+};
+
+exports.actualizarDetalleVentasEntrega = async (pool, id, cantEntregado, fUltEntregaSQL, estadoPedido) => {
+  return ventasRepository.actualizarDetalleVentasEntrega(pool, id, cantEntregado, fUltEntregaSQL, estadoPedido);
+};
+
+exports.obtenerDetalleVentaPorIdVenta = async (pool, idVenta) => {
+  return ventasRepository.obtenerDetalleVentaPorIdVenta(pool, idVenta);
+};
+
+exports.obtenerVentaPorIdDetalle = async (pool, idDetalle) => {
+  return ventasRepository.obtenerVentaPorIdDetalle(pool, idDetalle);
+};
+
+exports.restaurarStockEliminarDetalleVenta = async (pool, params) => {
+  return ventasRepository.restaurarStockEliminarDetalleVenta(pool, params);
+};
+
+exports.obtenerVentaAgrupadaParaCobro = async (pool, idVentaAgrupada, idEmpresaCobradora) => {
+  return ventasRepository.obtenerVentaAgrupadaParaCobro(pool, idVentaAgrupada, idEmpresaCobradora);
+};
+
+exports.obtenerFVencimientoPrimeraVentaEmpresaVA = async (transaction, idVentaAgrupada) => {
+  return ventasRepository.obtenerFVencimientoPrimeraVentaEmpresaVA(transaction, idVentaAgrupada);
+};
+
+exports.obtenerVentaParaCobroPendiente = async (pool, idVenta, idEmpresa) => {
+  return ventasRepository.obtenerVentaParaCobroPendiente(pool, idVenta, idEmpresa);
 };
 
 function fechaEmisionConHoraActual(fEmision) {

@@ -1,122 +1,81 @@
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-const e = require('cors');
-
-// create table Presentacion
-// (
-// idPresentacion int identity(1,1) primary key not null,
-// idEmpresa  UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Empresas(idEmpresa) ON DELETE CASCADE,
-// codigo varchar(3) not null,
-// Descripcion varchar(50) null,
-// Multiplicador int null,
-
-// )
+const presentacionService = require('../services/presentacion.service');
 
 const obtener_Presentaciones = async (req, res) => {
-    if(req.user){
-        try {
-            let pool = await sql.connect(dbConfig);
-            let presentaciones = await pool.request().query("select idPresentacion,codigo,Descripcion from Presentacion");
-            res.status(200).send({data: presentaciones.recordset});
-        } catch (error) {
-            res.status(500).send({message: error.message, data: undefined});
-        }
-    }
-    else {
-        
-    res.status(200).send({ message: 'No access', data: undefined });
-    }
-}
+  if (!req.user) {
+    return res.status(200).send({ message: 'No access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await presentacionService.obtenerPresentaciones(pool, req.user);
+    res.status(200).send({ data });
+  } catch (error) {
+    console.error('presentacion.obtener_Presentaciones:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
 const obtener_presentacion_id = async (req, res) => {
-    const idPresentacion = req.params.id;
-
-    if(req.user){
-        try {
-            let pool = await sql.connect(dbConfig);
-            let presentacion = await pool.request()
-            .input('idPresentacion',sql.Int,idPresentacion)
-            .query("select * from Presentaciones where idPresentacion = @idPresentacion");
-            res.status(200).send({data: presentacion.recordset});
-        } catch (error) {
-            res.status(500).send({message: error.message, data: undefined});
-        }
-    }
-    else {
-    res.status(200).send({ message: 'No access', data: undefined });
-    }
-}
+  if (!req.user) {
+    return res.status(200).send({ message: 'No access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await presentacionService.obtenerPresentacionPorId(pool, req.user, req.params.id);
+    res.status(200).send({ data });
+  } catch (error) {
+    console.error('presentacion.obtener_presentacion_id:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
 const crear_Presentacion = async (req, res) => {
-    const { codigo, Descripcion, Multiplicador} = req.body;
-    const idEmpresa = req.user.empresa;
-
-    if(req.user){
-        try {
-            let pool = await sql.connect(dbConfig);
-            let presentacion = await pool.request()
-            .input('idEmpresa',sql.UniqueIdentifier,idEmpresa)
-            .input('codigo',sql.VarChar(3),codigo)
-            .input('Descripcion',sql.VarChar(50),Descripcion)
-            .input('Multiplicador',sql.Int,Multiplicador)
-            .query("insert into Presentaciones (idEmpresa, codigo, Descripcion, Multiplicador) values (@idEmpresa, @codigo, @Descripcion, @Multiplicador)");
-            res.status(200).send({data: presentacion.recordset});
-        } catch (error) {
-            res.status(500).send({message: error.message, data: undefined});
-        }
-    }
-    else {
-    res.status(200).send({ message: 'No access', data: undefined });
-    }
-}
+  if (!req.user) {
+    return res.status(200).send({ message: 'No access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await presentacionService.crearPresentacion(pool, req.user, req.body);
+    res.status(200).send({ data });
+  } catch (error) {
+    console.error('presentacion.crear_Presentacion:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
 const editar_presentacion = async (req, res) => {
-    const { codigo, Descripcion, Multiplicador} = req.body;
-    const idPresentacion = req.params.id;
-
-    if(req.user){
-        try {
-            let pool = await sql.connect(dbConfig);
-            let presentacion = await pool.request()
-            .input('idPresentacion',sql.Int,idPresentacion)
-            .input('codigo',sql.VarChar(3),codigo)
-            .input('Descripcion',sql.VarChar(50),Descripcion)
-            .input('Multiplicador',sql.Int,Multiplicador)
-            .query("update Presentaciones set codigo = @codigo, Descripcion = @Descripcion, Multiplicador = @Multiplicador where idPresentacion = @idPresentacion");
-            res.status(200).send({data: presentacion.recordset});
-        } catch (error) {
-            res.status(500).send({message: error.message, data: undefined});
-        }
-    }
-    else {
-    res.status(200).send({ message: 'No access', data: undefined });
-    }
-}
+  if (!req.user) {
+    return res.status(200).send({ message: 'No access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await presentacionService.editarPresentacion(pool, req.user, req.params.id, req.body);
+    res.status(200).send({ data });
+  } catch (error) {
+    console.error('presentacion.editar_presentacion:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
 const eliminar_presentacion = async (req, res) => {
-    const idPresentacion = req.params.id;
-
-    if(req.user){
-        try {
-            let pool = await sql.connect(dbConfig);
-            let presentacion = await pool.request()
-            .input('idPresentacion',sql.Int,idPresentacion)
-            .query("delete from Presentaciones where idPresentacion = @idPresentacion");
-            res.status(200).send({data: presentacion.recordset});
-        } catch (error) {
-            res.status(500).send({message: error.message, data: undefined});
-        }
-    }
-    else {
-    res.status(200).send({ message: 'No access', data: undefined });
-    }
-}
+  if (!req.user) {
+    return res.status(200).send({ message: 'No access', data: undefined });
+  }
+  try {
+    const pool = await sql.connect(dbConfig);
+    const data = await presentacionService.eliminarPresentacion(pool, req.user, req.params.id);
+    res.status(200).send({ data });
+  } catch (error) {
+    console.error('presentacion.eliminar_presentacion:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
 
 module.exports = {
-    obtener_Presentaciones,
-    obtener_presentacion_id,
-    crear_Presentacion,
-    editar_presentacion,
-    eliminar_presentacion
-
-}
+  obtener_Presentaciones,
+  obtener_presentacion_id,
+  crear_Presentacion,
+  editar_presentacion,
+  eliminar_presentacion
+};
