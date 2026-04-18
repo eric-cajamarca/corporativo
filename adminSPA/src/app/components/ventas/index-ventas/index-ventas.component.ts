@@ -70,9 +70,8 @@ export class IndexVentasComponent implements OnInit {
   filtroFecha = 'all';
   fechaDesde = '';
   fechaHasta = '';
-  filtroRuc = '';
-  filtroRazon = '';
-  filtroNumero = '';
+  /** Búsqueda única: comprobante, id venta, RUC, cliente o doc. relacionado (OR). */
+  filtroBusqueda = '';
   filtroTipoComprobante = '';
 
   comprobantesVenta: ComprobanteVentaAgrupada[] = [];
@@ -187,14 +186,8 @@ export class IndexVentasComponent implements OnInit {
         if (this.fechaHasta) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
       }
 
-      let ruc = (this.filtroRuc || '').toLowerCase().trim();
-      if (ruc) listVa = listVa.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
-
-      let razon = (this.filtroRazon || '').toLowerCase().trim();
-      if (razon) listVa = listVa.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
-
-      const numVa = (this.filtroNumero || '').trim();
-      if (numVa) listVa = listVa.filter((v) => (v.idVentaAgrupada || '').toLowerCase().includes(numVa.toLowerCase()));
+      const qVa = (this.filtroBusqueda || '').trim();
+      if (qVa) listVa = listVa.filter((v) => this.coincideBusquedaVentaAgrupada(v, qVa));
 
       this.ventas = listVa;
 
@@ -215,21 +208,8 @@ export class IndexVentasComponent implements OnInit {
         if (this.fechaHasta) listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
       }
 
-      ruc = (this.filtroRuc || '').toLowerCase().trim();
-      if (ruc) listComp = listComp.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
-
-      razon = (this.filtroRazon || '').toLowerCase().trim();
-      if (razon) listComp = listComp.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
-
-      const numComp = (this.filtroNumero || '').trim();
-      if (numComp) {
-        const n = numComp.toLowerCase();
-        listComp = listComp.filter(
-          (v) =>
-            (v.compVenta || '').toLowerCase().includes(n) ||
-            String(v.idVenta).includes(numComp)
-        );
-      }
+      const qComp = (this.filtroBusqueda || '').trim();
+      if (qComp) listComp = listComp.filter((v) => this.coincideBusquedaVentaListado(v, qComp));
 
       const tipo = (this.filtroTipoComprobante || '').trim();
       if (tipo) listComp = listComp.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
@@ -253,14 +233,8 @@ export class IndexVentasComponent implements OnInit {
         if (this.fechaHasta) list = list.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
       }
 
-      const ruc = (this.filtroRuc || '').toLowerCase().trim();
-      if (ruc) list = list.filter((v) => (v.clienteRuc || '').toLowerCase().includes(ruc));
-
-      const razon = (this.filtroRazon || '').toLowerCase().trim();
-      if (razon) list = list.filter((v) => (v.clienteRazonSocial || '').toLowerCase().includes(razon));
-
-      const num = (this.filtroNumero || '').trim();
-      if (num) list = list.filter((v) => (v.compVenta || '').toLowerCase().includes(num.toLowerCase()));
+      const q = (this.filtroBusqueda || '').trim();
+      if (q) list = list.filter((v) => this.coincideBusquedaVentaListado(v, q));
 
       const tipo = (this.filtroTipoComprobante || '').trim();
       if (tipo) list = list.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
@@ -269,15 +243,43 @@ export class IndexVentasComponent implements OnInit {
     }
   }
 
+  /** Coincidencia en cualquiera de los campos habituales de búsqueda (OR). */
+  private coincideBusquedaVentaListado(v: VentaListado, texto: string): boolean {
+    const raw = texto.trim();
+    if (!raw) return true;
+    const n = raw.toLowerCase();
+    const comp = (v.compVenta || '').toLowerCase();
+    const ruc = (v.clienteRuc || '').toLowerCase();
+    const rs = (v.clienteRazonSocial || '').toLowerCase();
+    const idV = String(v.idVenta ?? '');
+    const rel = (v.compRelacionado || '').toLowerCase();
+    return (
+      comp.includes(n) ||
+      ruc.includes(n) ||
+      rs.includes(n) ||
+      idV.includes(raw) ||
+      rel.includes(n)
+    );
+  }
+
+  private coincideBusquedaVentaAgrupada(v: VentaAgrupadaListado, texto: string): boolean {
+    const raw = texto.trim();
+    if (!raw) return true;
+    const n = raw.toLowerCase();
+    const idVa = (v.idVentaAgrupada || '').toLowerCase();
+    const ruc = (v.clienteRuc || '').toLowerCase();
+    const rs = (v.clienteRazonSocial || '').toLowerCase();
+    const comp = (v.compVenta || '').toLowerCase();
+    return idVa.includes(n) || ruc.includes(n) || rs.includes(n) || comp.includes(n);
+  }
+
   limpiarFiltros(): void {
     this.page = 1;
     this.pageCompGestora = 1;
     this.filtroFecha = 'all';
     this.fechaDesde = '';
     this.fechaHasta = '';
-    this.filtroRuc = '';
-    this.filtroRazon = '';
-    this.filtroNumero = '';
+    this.filtroBusqueda = '';
     this.filtroTipoComprobante = '';
     if (this.esGestora) {
       this.ventas = [...this.ventasConst];
@@ -365,6 +367,44 @@ export class IndexVentasComponent implements OnInit {
   private esCodigoTipoSunat(codigo: string | undefined | null): boolean {
     const c = (codigo || '').trim().toUpperCase();
     return c === '01' || c === '03' || c === '07' || c === '08' || c === 'F7' || c === 'B7' || c === 'F8' || c === 'B8';
+  }
+
+  /**
+   * Catálogo SUNAT electrónico: 01 Factura, 03 Boleta, 07 NC, 08 ND.
+   * No confundir codigoEstadoSunat '08' (baja) con tipo ND '08'.
+   */
+  private tipoSunatCatalogo(v: VentaListado): '01' | '03' | '07' | '08' | null {
+    const t = (v.tipoComprobante || '').trim();
+    if (t === '01' || t === '03' || t === '07' || t === '08') return t as '01' | '03' | '07' | '08';
+    const c = (v.codigoComprobante || '').trim().toUpperCase();
+    if (c === '01' || c === '03') return c;
+    if (c === 'F7' || c === 'B7') return '07';
+    if (c === 'F8' || c === 'B8') return '08';
+    return null;
+  }
+
+  esNotaCreditoListado(v: VentaListado): boolean {
+    return this.tipoSunatCatalogo(v) === '07';
+  }
+
+  esNotaDebitoListado(v: VentaListado): boolean {
+    return this.tipoSunatCatalogo(v) === '08';
+  }
+
+  /** Texto del comprobante modificado por NC/ND (serie-número). */
+  etiquetaDocAfectadoListado(v: VentaListado): string {
+    if (!this.esNotaCreditoListado(v) && !this.esNotaDebitoListado(v)) return '—';
+    const s = (v.compRelacionado || '').trim();
+    return s || '—';
+  }
+
+  /** Fila que entra en el neto fiscal SUNAT aceptado (F+B+ND − NC). */
+  private filaFacturadoNetoSunat(v: VentaListado): boolean {
+    if (v.eliminado) return false;
+    if (this.esComprobanteAnuladoSunat(v)) return false;
+    const id = v.idEstadoSunat;
+    if (id !== 1 && id !== 2 && id !== 3) return false;
+    return this.tipoSunatCatalogo(v) != null;
   }
 
   esCotizacionONotaVenta(v: VentaListado): boolean {
@@ -665,6 +705,7 @@ export class IndexVentasComponent implements OnInit {
           venta: d.venta,
           cliente: d.cliente,
           items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
           cantidadLetras,
           nombreArchivo
         };
@@ -742,6 +783,7 @@ export class IndexVentasComponent implements OnInit {
           venta: d.venta,
           cliente: d.cliente,
           items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
           cantidadLetras,
           nombreArchivo
         };
@@ -845,6 +887,7 @@ export class IndexVentasComponent implements OnInit {
           venta: d.venta,
           cliente: d.cliente,
           items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
           cantidadLetras,
           nombreArchivo
         };
@@ -871,22 +914,26 @@ export class IndexVentasComponent implements OnInit {
   }
 
   get resumenValidosSunat(): { cantidad: number; total: number } {
-    const list = this.ventasEmpresa.filter(
-      (v) => !v.eliminado && !this.esNotaVentaSinSunat(v) && (v.idEstadoSunat === 1 || v.idEstadoSunat === 2 || v.idEstadoSunat === 3)
-    );
-    const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
-    return { cantidad: list.length, total };
+    let cantidad = 0;
+    let total = 0;
+    for (const v of this.ventasEmpresa) {
+      if (!this.filaFacturadoNetoSunat(v)) continue;
+      cantidad++;
+      const monto = Number(v.total) || 0;
+      const tipo = this.tipoSunatCatalogo(v);
+      if (tipo === '07') total -= monto;
+      else total += monto;
+    }
+    return { cantidad, total };
   }
 
+  /**
+   * Comprobantes que no forman parte del neto fiscal aceptado: NV/CT, pendientes/rechazo,
+   * y comprobantes electrónicos sin estado aceptado. Excluye eliminados y baja SUNAT (08).
+   */
   get resumenNoValidosSunat(): { cantidad: number; total: number } {
     const list = this.ventasEmpresa.filter(
-      (v) =>
-        !v.eliminado &&
-        !this.esNotaVentaSinSunat(v) &&
-        !this.esComprobanteAnuladoSunat(v) &&
-        v.idEstadoSunat !== 1 &&
-        v.idEstadoSunat !== 2 &&
-        v.idEstadoSunat !== 3
+      (v) => !v.eliminado && !this.esComprobanteAnuladoSunat(v) && !this.filaFacturadoNetoSunat(v)
     );
     const total = list.reduce((sum, v) => sum + (Number(v.total) || 0), 0);
     return { cantidad: list.length, total };
@@ -937,6 +984,7 @@ export class IndexVentasComponent implements OnInit {
           venta: d.venta,
           cliente: d.cliente,
           items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
           cantidadLetras,
           nombreArchivo
         };
@@ -982,12 +1030,13 @@ export class IndexVentasComponent implements OnInit {
         ? {
             empresa: empresaPdf,
             titulo: 'Comprobantes (gestora y empresas gestionadas)',
-            columnas: ['#', 'Empresa', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+            columnas: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
             filas: this.ventasEmpresa.map((v, i) => [
               i + 1,
               (v.razonSocialEmpresa || '').trim() || '—',
               this.formatearFecha(v.fEmision),
               v.compVenta || '—',
+              this.etiquetaDocAfectadoListado(v),
               v.clienteRuc || '—',
               v.clienteRazonSocial || '—',
               `S/ ${Number(v.total).toFixed(2)}`,
@@ -1012,11 +1061,12 @@ export class IndexVentasComponent implements OnInit {
       : {
           empresa: empresaPdf,
           titulo: 'Lista de Ventas',
-          columnas: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+          columnas: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
           filas: this.ventasEmpresa.map((v, i) => [
             i + 1,
             this.formatearFecha(v.fEmision),
             v.compVenta || '—',
+            this.etiquetaDocAfectadoListado(v),
             v.clienteRuc || '—',
             v.clienteRazonSocial || '—',
             `S/ ${Number(v.total).toFixed(2)}`,
@@ -1048,12 +1098,13 @@ export class IndexVentasComponent implements OnInit {
             title: 'Comprobantes (gestora y gestionadas)',
             filename: `ventas_${new Date().getTime()}`,
             worksheetName: 'Ventas',
-            columns: ['#', 'Empresa', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+            columns: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
             rows: this.ventasEmpresa.map((v, i) => [
               i + 1,
               (v.razonSocialEmpresa || '').trim() || '—',
               this.formatearFecha(v.fEmision),
               v.compVenta || '—',
+              this.etiquetaDocAfectadoListado(v),
               v.clienteRuc || '—',
               v.clienteRazonSocial || '—',
               Number(v.total),
@@ -1080,11 +1131,12 @@ export class IndexVentasComponent implements OnInit {
           title: 'Lista de Ventas',
           filename: `ventas_${new Date().getTime()}`,
           worksheetName: 'Ventas',
-          columns: ['#', 'Fecha', 'Comprobante', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+          columns: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
           rows: this.ventasEmpresa.map((v, i) => [
             i + 1,
             this.formatearFecha(v.fEmision),
             v.compVenta || '—',
+            this.etiquetaDocAfectadoListado(v),
             v.clienteRuc || '—',
             v.clienteRazonSocial || '—',
             Number(v.total),

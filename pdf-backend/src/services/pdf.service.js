@@ -48,7 +48,7 @@ function extractHtmlDocumentParts(rawHtml) {
  * Genera PDF desde HTML.
  * @param {string} html - HTML del contenido
  * @param {number} fontSize - Tamaño de fuente base
- * @param {string} formato - 'A4' | 'A5' | 'ticket' (ticket = 80mm de ancho)
+ * @param {string} formato - 'A4' | 'A5' | 'ticket' (ticket = 80mm ancho; QR comprobante ~2cm en HTML)
  */
 async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
   const browser = await getSharedBrowser();

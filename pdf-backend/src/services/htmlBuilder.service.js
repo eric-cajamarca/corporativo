@@ -1,4 +1,12 @@
 class HtmlBuilderService {
+  /**
+   * Ancho en píxeles del PNG del QR (node-qrcode). El tamaño físico en el PDF lo define CSS (cm).
+   * Ticket ~2 cm papel térmico; A4/A5 ~3 cm estándar comercial.
+   */
+  _qrBitmapWidthPx(formato) {
+    return formato === 'ticket' ? 300 : 420;
+  }
+
   _escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -46,16 +54,40 @@ class HtmlBuilderService {
     return pct > 0 ? (subtotal * pct) / 100 : 0;
   }
 
+  /** Catálogo Impuestos: estado puede venir como boolean, 0/1 o textos Activ/Inactiv. */
+  _impuestoCatalogoEstaActivo(imp) {
+    const e = imp?.estado;
+    if (e === true || e === 1) return true;
+    if (e === false || e === 0 || e == null) return false;
+    const s = String(e).trim().toLowerCase();
+    if (s === '0' || s === 'false' || s === 'inactivo' || s === 'inactiva' || s === 'no') return false;
+    if (s === '1' || s === 'true' || s === 'activo' || s === 'activa' || s === 'si' || s === 'sí') return true;
+    return !!e;
+  }
+
   _lineasImpuestosDesdeCatalogo(impuestos, venta) {
     const list = Array.isArray(impuestos) ? impuestos : [];
     return list.map((imp) => {
-      const activo = !!imp?.estado;
+      const activo = this._impuestoCatalogoEstaActivo(imp);
       const pct = this._numeroSeguro(imp?.porcentaje);
       const nombre = String(imp?.descripcion || 'Impuesto').trim() || 'Impuesto';
       const label = pct > 0 ? `${nombre} (${pct}%)` : nombre;
       const monto = activo ? this._impuestoMontoSegunVenta(imp, venta) : 0;
       return { label, value: monto };
     });
+  }
+
+  /**
+   * Si el cliente PDF no envió el catálogo de impuestos (arreglo vacío), mostrar IGV y Exonerado desde cabecera Ventas.
+   * Factura/boleta/NC/ND SUNAT (01, 03, 07, 08).
+   */
+  _lineasImpuestosFallbackSunatDesdeVenta(venta) {
+    const igv = this._numeroSeguro(venta?.igv);
+    const exo = this._numeroSeguro(venta?.exonerado);
+    return [
+      { label: 'IGV', value: igv },
+      { label: 'Exonerado', value: exo }
+    ];
   }
 
   _parseCuentasBancarias(value) {
@@ -563,11 +595,11 @@ class HtmlBuilderService {
     .ticket-sunat-text { flex: 1; min-width: 0; text-align: left; }
     .ticket-sunat-text .pie-sunat-electronico { font-size: 5px !important; line-height: 1.35 !important; margin: 0 !important; }
     .ticket-sunat-qr { flex-shrink: 0; }
-    .ticket-sunat-qr img { width: 56px; height: 56px; display: block; }
+    .ticket-sunat-qr img { width: 2cm; height: 2cm; max-width: 100%; object-fit: contain; display: block; }
     .ticket-final .barcode-venta { margin-top: 1px; text-align: center; }
     .ticket-final .barcode-venta img { height: 28px; width: auto; max-width: 60mm; }
     .ticket-qr-final { text-align: center; margin: 0; padding: 0; width: 100%; line-height: 0; }
-    .ticket-qr-final img { width: 111px; max-width: calc(100% - 2px); height: auto; aspect-ratio: 1; object-fit: contain; display: block; margin: 1px auto 0; }
+    .ticket-qr-final img { width: 2cm; height: 2cm; max-width: calc(100% - 2px); box-sizing: border-box; object-fit: contain; display: block; margin: 2px auto 0; }
   </style>
 </head>
 <body>
@@ -667,8 +699,8 @@ class HtmlBuilderService {
       const qrString = this._buildQrString(empresa, venta, cliente);
       try {
         qrDataUri = await QRCode.toDataURL(qrString, {
-          width: formato === 'ticket' ? 186 : 198,
-          margin: 0,
+          width: this._qrBitmapWidthPx(formato),
+          margin: 1,
           errorCorrectionLevel: 'M'
         });
       } catch (e) {
@@ -694,11 +726,15 @@ class HtmlBuilderService {
 
     const codigoSunat = this._normalizarCodigoTipoSunatParaQr(codigoComp);
     const esComprobanteSunatValido = this._codigosComprobanteConQrSunat().has(codigoSunat);
-    const lineasImpuestos = esComprobanteSunatValido
+    let lineasImpuestos = esComprobanteSunatValido
       ? this._lineasImpuestosDesdeCatalogo(impuestos, venta)
       : [];
+    if (esComprobanteSunatValido && (!Array.isArray(lineasImpuestos) || lineasImpuestos.length === 0)) {
+      lineasImpuestos = this._lineasImpuestosFallbackSunatDesdeVenta(venta);
+    }
     const lineasTotales = [
       { label: 'Subtotal', value: subtotal },
+      { label: 'Descuentos', value: descuentos },
       ...(esComprobanteSunatValido
         ? lineasImpuestos
         : [
@@ -707,7 +743,6 @@ class HtmlBuilderService {
           ]),
       ...(gratuito > 0 ? [{ label: 'Gratuito', value: gratuito }] : []),
       ...(otrosCargos > 0 ? [{ label: 'Otros cargos', value: otrosCargos }] : []),
-      { label: 'Descuentos', value: descuentos },
       { label: 'TOTAL (S/)', value: total, total: true }
     ];
     const filasTotalesHtml = lineasTotales.map(l =>
@@ -830,7 +865,7 @@ class HtmlBuilderService {
     .pie-bajo-son .pie-sunat-electronico { margin: 0 !important; padding: 0 !important; }
     .fila-qr-auxiliares { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 6px; margin-top: 4px; width: 100%; page-break-inside: avoid; }
     .qr-izq-col { flex: 1; min-width: 0; text-align: center; margin: 0; padding: 0; line-height: 0; }
-    .qr-izq-col img { width: 108px; height: auto; aspect-ratio: 1; object-fit: contain; display: block; margin: 6px auto 0; padding: 0; }
+    .qr-izq-col img { width: 3cm; height: 3cm; max-width: 100%; box-sizing: border-box; object-fit: contain; display: block; margin: 6px auto 0; padding: 0; }
     .aux-der-col { flex-shrink: 0; width: 280px; max-width: 40%; align-self: flex-start; }
     .cuentas-bajo-cuotas { margin-top: 10px; }
     .bloque-final { margin-top: 10px; border: none; padding: 0; overflow: visible; background: transparent; border-radius: 0; }

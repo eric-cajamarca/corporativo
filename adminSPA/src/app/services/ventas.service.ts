@@ -354,6 +354,15 @@ export interface ComprobantePdfData {
     subtotal?: number;
     total: number;
   }>;
+  /** Catálogo de impuestos de la empresa para el PDF (SUNAT). */
+  impuestos?: Array<{
+    idImpuesto?: number;
+    descripcion?: string;
+    codigoSunat?: string;
+    porcentaje?: number;
+    pIncluyeIGV?: boolean;
+    estado?: boolean;
+  }>;
 }
 
 export interface VentaAgrupadaListado {
@@ -457,4 +466,6 @@ export interface VentaListado {
   eliminado?: boolean;
   /** Si la venta pertenece a una venta agrupada (comprobante hijo). */
   idVentaAgrupada?: string | null;
+  /** Serie-número del comprobante afectado (NC/ND), según Ventas.compRelacionado. */
+  compRelacionado?: string | null;
 }

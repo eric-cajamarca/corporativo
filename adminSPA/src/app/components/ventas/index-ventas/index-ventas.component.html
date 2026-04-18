@@ -61,14 +61,13 @@
           <div class="col-12 col-sm-6 col-lg-auto" *ngIf="filtroFecha === 'range'">
             <input type="date" class="form-control form-control-sm w-100" [(ngModel)]="fechaHasta" title="Hasta">
           </div>
-          <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="text" class="form-control form-control-sm w-100 ventas-filtro-control" [(ngModel)]="filtroNumero" [placeholder]="esGestora ? 'ID VA / N° comp. / ID' : 'N° Comprobante'">
-          </div>
-          <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="text" class="form-control form-control-sm w-100 ventas-filtro-control" [(ngModel)]="filtroRuc" placeholder="RUC">
-          </div>
-          <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="text" class="form-control form-control-sm w-100 ventas-filtro-control" [(ngModel)]="filtroRazon" placeholder="Cliente">
+          <div class="col-12 col-md-6 col-lg">
+            <input
+              type="text"
+              class="form-control form-control-sm w-100 ventas-filtro-control"
+              [(ngModel)]="filtroBusqueda"
+              [placeholder]="esGestora ? 'ID VA, comprobante, RUC o cliente' : 'N° comprobante, RUC o cliente'"
+              title="Busca en comprobante, ID venta, RUC, razón social o documento relacionado (NC/ND)" />
           </div>
           <div class="col-12 col-sm-6 col-lg-auto">
             <select class="form-select form-select-sm w-100 ventas-filtro-control" [(ngModel)]="filtroTipoComprobante">
@@ -208,6 +207,7 @@
                   <th>ID</th>
                   <th>F. Emisión</th>
                   <th>Comprobante</th>
+                  <th class="small">Afecta</th>
                   <th>Cliente</th>
                   <th>Condición</th>
                   <th>Forma pago</th>
@@ -222,6 +222,7 @@
                   <td class="fw-medium">{{ v.idVenta }}</td>
                   <td class="text-nowrap">{{ formatearFecha(v.fEmision) }}</td>
                   <td>{{ v.compVenta || '—' }}</td>
+                  <td class="small text-nowrap" [title]="etiquetaDocAfectadoListado(v)">{{ etiquetaDocAfectadoListado(v) }}</td>
                   <td>
                     <span class="cliente-nombre" title="{{ v.clienteRuc || '' }}">{{ v.clienteRazonSocial || '—' }}</span>
                   </td>
@@ -300,10 +301,12 @@
               </tbody>
               <tfoot class="table-ventas-tfoot">
                 <tr class="resumen-row">
-                  <td [attr.colspan]="esGestora ? 7 : 6" class="text-end fw-semibold py-2"></td>
+                  <td [attr.colspan]="esGestora ? 10 : 3" class="text-end fw-semibold py-2"></td>
                   <td colspan="3" class="py-2">
                     <div class="d-flex flex-wrap gap-4 justify-content-end align-items-center">
-                      <span class="resumen-item resumen-validos">
+                      <span
+                        class="resumen-item resumen-validos"
+                        title="Neto SUNAT: facturas, boletas y notas de débito menos notas de crédito (aceptadas; anulados SUNAT excluidos).">
                         <i class="bi bi-check-circle-fill me-1"></i>
                         Facturado: <strong>{{ resumenValidosSunat.cantidad }}</strong> comprobante(s) — Total <strong>{{ formatearMoneda(resumenValidosSunat.total) }}</strong>
                       </span>
@@ -351,6 +354,9 @@
               </div>
               <div class="ventas-m-kv" *ngIf="esGestora"><span class="ventas-m-k">Empresa</span><span class="ventas-m-v small">{{ v.razonSocialEmpresa || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Emisión</span><span class="ventas-m-v">{{ formatearFecha(v.fEmision) }}</span></div>
+              <div class="ventas-m-kv" *ngIf="esNotaCreditoListado(v) || esNotaDebitoListado(v)">
+                <span class="ventas-m-k">Doc. afectado</span><span class="ventas-m-v small">{{ etiquetaDocAfectadoListado(v) }}</span>
+              </div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Cliente</span><span class="ventas-m-v">{{ v.clienteRazonSocial || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Condición</span><span class="ventas-m-v">{{ v.condicionPago || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Forma pago</span><span class="ventas-m-v small font-monospace">{{ etiquetaFormaPago(v) }}</span></div>

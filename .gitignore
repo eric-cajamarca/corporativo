@@ -14,4 +14,8 @@ backAppC/utils/bash_write_test.txt
 
 # Variables de entorno locales
 .env
+.env.example
+.env.production
+.env.development
+backAppC/.env.example
 **/.env.local

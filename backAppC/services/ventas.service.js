@@ -226,27 +226,123 @@ const asegurarClienteEmpresaConBase = async (transaction, idEmpresaDestino, clie
   return nuevo?.idCliente || null;
 };
 
+const EPS_FISCAL = 0.02;
+
+const redondear2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+/** Línea marcada como afecta IGV (el POS a veces manda siempre igv: 0 en el arreglo de detalles). */
+const esLineaConFlagIgv = (d) =>
+  !!(d && (d.igv === true || d.igv === 1 || d.igv === '1'));
+
 const calcularTotales = (detalles) => {
+  const lista = Array.isArray(detalles) ? detalles : [];
   const suma = (arr, key) => arr.reduce((acc, d) => acc + (Number(d[key]) || 0), 0);
-  const subtotal = suma(detalles, 'subtotal');
-  const total = suma(detalles, 'total');
-  const igvTotal = suma(detalles, 'igvTotal');
-  const igv = igvTotal > 0
+  const subtotal = suma(lista, 'subtotal');
+  const total = suma(lista, 'total');
+  const igvTotal = suma(lista, 'igvTotal');
+  let igv = igvTotal > 0
     ? igvTotal
-    : detalles.reduce((acc, d) => {
-        if (!d.igv) return acc;
+    : lista.reduce((acc, d) => {
+        if (!esLineaConFlagIgv(d)) return acc;
         const sub = Number(d.subtotal) || 0;
         const tot = Number(d.total) || 0;
         return acc + Math.max(0, tot - sub);
       }, 0);
+  igv = redondear2(igv);
+
+  let exonerado = redondear2(suma(lista, 'exonerado'));
+  if (exonerado <= EPS_FISCAL) {
+    exonerado = redondear2(
+      lista.reduce((acc, d) => {
+        const sub = Number(d.subtotal) || 0;
+        const tot = Number(d.total) || 0;
+        if (esLineaConFlagIgv(d)) return acc;
+        if (Math.abs(tot - sub) > EPS_FISCAL) return acc;
+        return acc + sub;
+      }, 0)
+    );
+  }
+
   return {
     subtotal,
     igv,
-    exonerado: suma(detalles, 'exonerado') || 0,
-    gratuito: suma(detalles, 'gratuito') || 0,
-    otrosCargos: suma(detalles, 'otrosCargos') || 0,
-    descuentos: suma(detalles, 'descuentos') || suma(detalles, 'descuento') || 0,
+    exonerado,
+    gratuito: suma(lista, 'gratuito') || 0,
+    otrosCargos: suma(lista, 'otrosCargos') || 0,
+    descuentos: suma(lista, 'descuentos') || suma(lista, 'descuento') || 0,
     total
+  };
+};
+
+/**
+ * Consolida montos de impuestos de cabecera: el POS suele mandar totales correctos en `venta` pero líneas sin IGV/exonerado.
+ * No sustituye validación de negocio completa (tipo afectación por ítem); alinea cabecera con líneas cuando cuadran.
+ * @param {object} venta - Cabecera (subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total)
+ * @param {object} totalesDet - Resultado de calcularTotales(detalles)
+ */
+const resolverMontosCabeceraImpuestos = (venta, totalesDet) => {
+  const td = totalesDet || {};
+  const subDet = redondear2(td.subtotal);
+  const totDet = redondear2(td.total);
+  const igvDet = redondear2(td.igv);
+  const exoDet = redondear2(td.exonerado);
+  const gratDet = redondear2(td.gratuito);
+  const otrDet = redondear2(td.otrosCargos);
+
+  const subCab = redondear2(venta && venta.subtotal);
+  const totCab = redondear2(venta && venta.total);
+  const igvCab = redondear2(venta && venta.igv);
+  const exoCab = redondear2(venta && venta.exonerado);
+  const gratCab = redondear2(venta && venta.gratuito);
+  const otrCab = redondear2(venta && venta.otrosCargos);
+  const descCab = redondear2(venta && venta.descuentos);
+
+  const subOk =
+    subCab > EPS_FISCAL &&
+    subDet > EPS_FISCAL &&
+    Math.abs(subCab - subDet) <= EPS_FISCAL;
+
+  const totOkSinIgvExtra = Math.abs(totCab - totDet) <= EPS_FISCAL;
+  const totOkConIgv =
+    igvCab > EPS_FISCAL &&
+    Math.abs(totCab - redondear2(totDet + igvCab)) <= EPS_FISCAL;
+  const totOk = totCab > EPS_FISCAL && (totOkSinIgvExtra || totOkConIgv);
+
+  if (!subOk || !totOk) {
+    return {
+      subtotal: subDet,
+      igv: igvDet,
+      exonerado: exoDet,
+      gratuito: gratDet,
+      otrosCargos: otrDet,
+      total: totDet
+    };
+  }
+
+  let igv = igvCab >= 0 ? igvCab : igvDet;
+  if (igvDet > EPS_FISCAL && igvCab <= EPS_FISCAL) {
+    igv = igvDet;
+  }
+
+  let exonerado = exoCab > EPS_FISCAL ? exoCab : exoDet;
+  if (exoCab <= EPS_FISCAL && redondear2(igv) <= EPS_FISCAL) {
+    const neto = redondear2(subCab - descCab);
+    const esperado = redondear2(neto + gratCab + otrCab);
+    if (neto > EPS_FISCAL && Math.abs(totCab - esperado) <= 0.05) {
+      exonerado = neto;
+    }
+  }
+
+  const gratuito = gratCab > EPS_FISCAL ? gratCab : gratDet;
+  const otrosCargos = otrCab > EPS_FISCAL ? otrCab : otrDet;
+
+  return {
+    subtotal: subCab,
+    igv: redondear2(igv),
+    exonerado: redondear2(exonerado),
+    gratuito: redondear2(gratuito),
+    otrosCargos: redondear2(otrosCargos),
+    total: totCab
   };
 };
 
@@ -382,17 +478,14 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const compVenta = serie + '-' + numero;
 
     const totalesEmpresa = calcularTotales(dets);
+    const montosFiscales = resolverMontosCabeceraImpuestos(ventaConHora, totalesEmpresa);
     const descuentosCliente = Number(venta.descuentos);
-    const exoneradoCliente = Number(venta.exonerado);
     let descuentosCabeceraFinal = totalesEmpresa.descuentos;
     if (!usarDescuentoEnTotal) {
       descuentosCabeceraFinal = 0;
     } else if (Number.isFinite(descuentosCliente) && descuentosCliente >= 0) {
       descuentosCabeceraFinal = Math.round(descuentosCliente * 100) / 100;
     }
-    const exoneradoCabeceraFinal = (Number.isFinite(exoneradoCliente) && exoneradoCliente >= 0)
-      ? Math.round(exoneradoCliente * 100) / 100
-      : totalesEmpresa.exonerado;
 
     const ventaDatos = {
       idSucursal: idSucursalLinea,
@@ -405,13 +498,13 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       idCliente: idClienteEmpresa,
       idMoneda: venta.idMoneda || 1,
       tCambio: venta.tCambio || 1,
-      subtotal: totalesEmpresa.subtotal,
-      igv: totalesEmpresa.igv,
-      exonerado: exoneradoCabeceraFinal,
-      gratuito: totalesEmpresa.gratuito,
-      otrosCargos: totalesEmpresa.otrosCargos,
+      subtotal: montosFiscales.subtotal,
+      igv: montosFiscales.igv,
+      exonerado: montosFiscales.exonerado,
+      gratuito: montosFiscales.gratuito,
+      otrosCargos: montosFiscales.otrosCargos,
       descuentos: descuentosCabeceraFinal,
-      total: totalesEmpresa.total,
+      total: montosFiscales.total,
       idMediosPago: ventaConHora.idMediosPago,
       idEstadoPedido: idEstadoPedidoVenta,
       idEstadoPago,
@@ -685,6 +778,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const compVentaVA = vaCorrelativo.serie + '-' + vaCorrelativo.numero;
 
     const totalesAgrupados = calcularTotales(detalles);
+    const montosCabAgr = resolverMontosCabeceraImpuestos(ventaConHora, totalesAgrupados);
     const descuentosClienteAgr = Number(venta.descuentos);
     let descuentosCabeceraVA = totalesAgrupados.descuentos;
     if (!usarDescuentoEnTotal) {
@@ -697,10 +791,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       idSucursal: idSucursalCobradora,
       idCliente: idClienteCobradora,
       fEmision: fechaEmisionConHora,
-      subtotal: totalesAgrupados.subtotal,
-      igv: totalesAgrupados.igv,
+      subtotal: montosCabAgr.subtotal,
+      igv: montosCabAgr.igv,
       descuentos: descuentosCabeceraVA,
-      total: totalesAgrupados.total,
+      total: montosCabAgr.total,
       idEstadoPago,
       idUsuario: user.sub,
       serie: vaCorrelativo.serie,
@@ -788,7 +882,14 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const totalesEmpresa = calcularTotales(dets);
       sumaHijasTotal += totalesEmpresa.total;
       let descuentosHija = totalesEmpresa.descuentos;
-      let exoneradoHija = totalesEmpresa.exonerado;
+      const propSub =
+        (Number(totalesAgrupados.subtotal) || 0) > EPS_FISCAL
+          ? (Number(totalesEmpresa.subtotal) || 0) / (Number(totalesAgrupados.subtotal) || 1)
+          : 0;
+      const igvHija = redondear2((montosCabAgr.igv || 0) * propSub);
+      const exoneradoHija = redondear2((montosCabAgr.exonerado || 0) * propSub);
+      const gratuitoHija = redondear2((montosCabAgr.gratuito || 0) * propSub);
+      const otrosCargosHija = redondear2((montosCabAgr.otrosCargos || 0) * propSub);
       if (!usarDescuentoEnTotal) {
         descuentosHija = 0;
       } else if (
@@ -799,16 +900,6 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         const prop =
           (Number(totalesEmpresa.subtotal) || 0) / (Number(totalesAgrupados.subtotal) || 1);
         descuentosHija = Math.round(descuentosClienteAgr * prop * 100) / 100;
-      }
-      const exoneradoClienteAgr = Number(venta.exonerado);
-      if (
-        Number.isFinite(exoneradoClienteAgr) &&
-        exoneradoClienteAgr >= 0 &&
-        (Number(totalesAgrupados.subtotal) || 0) > 0
-      ) {
-        const propExo =
-          (Number(totalesEmpresa.subtotal) || 0) / (Number(totalesAgrupados.subtotal) || 1);
-        exoneradoHija = Math.round(exoneradoClienteAgr * propExo * 100) / 100;
       }
 
       const ventaDatos = {
@@ -821,10 +912,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         idMoneda: venta.idMoneda || 1,
         tCambio: venta.tCambio || 1,
         subtotal: totalesEmpresa.subtotal,
-        igv: totalesEmpresa.igv,
+        igv: igvHija,
         exonerado: exoneradoHija,
-        gratuito: totalesEmpresa.gratuito,
-        otrosCargos: totalesEmpresa.otrosCargos,
+        gratuito: gratuitoHija,
+        otrosCargos: otrosCargosHija,
         descuentos: descuentosHija,
         total: totalesEmpresa.total,
         idMediosPago: ventaConHora.idMediosPago,
@@ -936,11 +1027,11 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         idMoneda: venta.idMoneda || 1,
         tCambio: venta.tCambio || 1,
         subtotal: totalesEmpresa.subtotal,
-        igv: totalesEmpresa.igv,
+        igv: igvHija,
         exonerado: exoneradoHija,
-        gratuito: totalesEmpresa.gratuito,
-        otrosCargos: totalesEmpresa.otrosCargos,
-        descuentos: totalesEmpresa.descuentos,
+        gratuito: gratuitoHija,
+        otrosCargos: otrosCargosHija,
+        descuentos: descuentosHija,
         total: totalesEmpresa.total,
         idMediosPago: ventaConHora.idMediosPago,
         idEstadoPedido: idEstadoPedidoVenta,

@@ -134,6 +134,15 @@ export interface ComprobantePdfData {
   empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
   cliente: { rSocial?: string; razonSocial?: string; ruc?: string; direccion?: string; tipoDocSunat?: string };
   items: Array<{ descripcion: string; cantidad: number; pVenta: number; subtotal?: number; total: number }>;
+  /** Catálogo de impuestos de la empresa (mismo contrato que ventas/comprobante). Opcional en cotización. */
+  impuestos?: Array<{
+    idImpuesto?: number;
+    descripcion?: string;
+    codigoSunat?: string;
+    porcentaje?: number;
+    pIncluyeIGV?: boolean;
+    estado?: boolean;
+  }>;
 }
 
 @Injectable({

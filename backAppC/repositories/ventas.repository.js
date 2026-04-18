@@ -13,6 +13,16 @@ const bindUniqueIdentifiersIn = (request, idsEmpresa, prefix) => {
   }).join(', ');
 };
 
+/** Impuesto activo en catálogo (bit/int o textos Activ/Inactiv). Alineado al criterio del POS. */
+function normalizarEstadoImpuestoCatalogo(val) {
+  if (val === true || val === 1) return true;
+  if (val === false || val === 0 || val == null) return false;
+  const s = String(val).trim().toLowerCase();
+  if (s === '0' || s === 'false' || s === 'inactivo' || s === 'inactiva' || s === 'no') return false;
+  if (s === '1' || s === 'true' || s === 'activo' || s === 'activa' || s === 'si' || s === 'sí') return true;
+  return !!val;
+}
+
 /** Comprobante de venta NC/ND (catálogo interno B7/F7/B8/F8, no el tipo SUNAT 07/08). */
 const CODIGOS_VENTA_NOTA_CREDITO_DEBITO = new Set(["B7", "F7", "B8", "F8"]);
 
@@ -230,6 +240,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
           v.idComprobante,
           v.idCliente,
           v.idMediosPago,
+          ISNULL(LTRIM(RTRIM(v.compRelacionado)), '') AS compRelacionado,
           ISNULL(mp.descripcion, CAST(v.idMediosPago AS VARCHAR(20))) AS condicionPago,
           c.nombre AS nombreComprobante,
           c.codigo AS codigoComprobante,
@@ -284,6 +295,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             v.idComprobante,
             v.idCliente,
             v.idMediosPago AS condicionPago,
+            ISNULL(LTRIM(RTRIM(v.compRelacionado)), '') AS compRelacionado,
             c.nombre AS nombreComprobante,
             c.codigo AS codigoComprobante,
             COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
@@ -350,6 +362,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
         v.idComprobante,
         v.idCliente,
         v.idMediosPago,
+        ISNULL(LTRIM(RTRIM(v.compRelacionado)), '') AS compRelacionado,
         ISNULL(mp.descripcion, CAST(v.idMediosPago AS VARCHAR(20))) AS condicionPago,
         c.nombre AS nombreComprobante,
         c.codigo AS codigoComprobante,
@@ -405,6 +418,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           v.idComprobante,
           v.idCliente,
           v.idMediosPago AS condicionPago,
+          ISNULL(LTRIM(RTRIM(v.compRelacionado)), '') AS compRelacionado,
           c.nombre AS nombreComprobante,
           c.codigo AS codigoComprobante,
           COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRazonSocial,
@@ -730,7 +744,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     codigoSunat: String(r.codigoSunat || '').trim(),
     porcentaje: r.porcentaje,
     pIncluyeIGV: !!r.pIncluyeIGV,
-    estado: !!r.estado
+    estado: normalizarEstadoImpuestoCatalogo(r.estado)
   }));
 
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
@@ -1709,7 +1723,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
     codigoSunat: String(r.codigoSunat || '').trim(),
     porcentaje: r.porcentaje,
     pIncluyeIGV: !!r.pIncluyeIGV,
-    estado: !!r.estado
+    estado: normalizarEstadoImpuestoCatalogo(r.estado)
   }));
 
   const base = (baseUrl || '').replace(/\/$/, '');

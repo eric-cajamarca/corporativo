@@ -281,6 +281,7 @@ export class VentasPendientesPagoComponent implements OnInit {
           venta: d.venta,
           cliente: d.cliente,
           items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
           cantidadLetras,
           nombreArchivo
         };
@@ -359,6 +360,7 @@ export class VentasPendientesPagoComponent implements OnInit {
           venta: d.venta,
           cliente: d.cliente,
           items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
           cantidadLetras,
           nombreArchivo
         };
