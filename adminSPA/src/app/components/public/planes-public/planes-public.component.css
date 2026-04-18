@@ -1,0 +1,22 @@
+.planes-page {
+  min-height: 60vh;
+  background: linear-gradient(180deg, #f8f9fc 0%, #fff 40%);
+}
+
+.planes-card .planes-beneficios li {
+  text-align: left;
+  line-height: 1.35;
+}
+
+.planes-beneficios__bullet {
+  flex-shrink: 0;
+  line-height: 1.35;
+}
+
+.planes-footer-links a {
+  text-decoration: none;
+}
+
+.planes-footer-links a:hover {
+  text-decoration: underline;
+}

@@ -107,6 +107,7 @@ async function generatePdf(req, res) {
           venta,
           cliente,
           items: Array.isArray(datos.items) ? datos.items : [],
+          impuestos: Array.isArray(datos.impuestos) ? datos.impuestos : [],
           cantidadLetras: datos.cantidadLetras || '',
           formato: formatoPdf,
           esCotizacion: datos.esCotizacion === true

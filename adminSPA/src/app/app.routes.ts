@@ -95,6 +95,8 @@ import { IndexValesDespachoComponent } from './components/vales-despacho/index-v
 import { CreateValeDespachoComponent } from './components/vales-despacho/create-vale-despacho/create-vale-despacho.component';
 import { MisEnviosChoferComponent } from './components/envios/mis-envios-chofer/mis-envios-chofer.component';
 import { IndexEnviosComponent } from './components/envios/index-envios/index-envios.component';
+import { PlanesPublicComponent } from './components/public/planes-public/planes-public.component';
+import { CheckoutSuscripcionComponent } from './components/public/checkout-suscripcion/checkout-suscripcion.component';
 
 export const routes: Routes = [
     {
@@ -107,6 +109,16 @@ export const routes: Routes = [
         component: LoginEmpresaComponent,
         title: 'Login Empresa',
      },
+    {
+      path: 'planes',
+      component: PlanesPublicComponent,
+      title: 'Planes y precios'
+    },
+    {
+      path: 'suscribirse/:planCode',
+      component: CheckoutSuscripcionComponent,
+      title: 'Contratar plan'
+    },
     { path: 'recuperar-password',
         component: RecuperarPasswordComponent,
         title: 'Recuperar contraseña',

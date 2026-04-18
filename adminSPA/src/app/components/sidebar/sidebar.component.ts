@@ -6,6 +6,7 @@ import { PermisosService } from '../../services/permisos.service';
 import { AuthService } from '../../services/auth.service';
 import { EmpresaService } from '../../services/empresa.service';
 import { SidebarStateService } from '../../services/sidebar-state.service';
+import { DeploymentContextService } from '../../services/deployment-context.service';
 import { MenuItem, SubMenuItem } from '../../interfaces/permisos-interface';
 
 @Component({
@@ -32,6 +33,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   // Estado de configuración de la empresa
   estadoConfiguracion = signal<any>(null);
 
+  /** Enlace a página pública de planes (solo modo SaaS). */
+  mostrarPlanesSaas = signal(false);
+
   // Eventos
   @Output() sidebarToggle = new EventEmitter<boolean>();
   @Input() forceCollapsed: boolean = false;
@@ -41,7 +45,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
     private authService: AuthService,
     private empresaService: EmpresaService,
     private sidebarState: SidebarStateService,
-    private router: Router
+    private router: Router,
+    private deploymentContext: DeploymentContextService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -70,6 +75,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private routerEventsSubscription: ReturnType<Router['events']['subscribe']> | null = null;
 
   ngOnInit(): void {
+    this.deploymentContext.cargarSiNecesario().subscribe((cfg) => {
+      this.mostrarPlanesSaas.set(!!cfg?.mostrarPlanesPublicos);
+    });
     this.cargarEstadoConfiguracion();
     this.cargarNavegacion();
 

@@ -3,11 +3,11 @@ const api = express.Router();
 
 const sql = require('mssql');
 const dbConfig = require('../dbconfig');
-const { parsearOrderNumber } = require('../services/integraciones.service');
+const { parsearOrderNumber, esOrderNumberCheckout } = require('../services/integraciones.service');
+const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 
 /**
- * Webhooks multiempresa: identifican pago por orderNumber (patrón idEmpresa-uuid).
- * Ajustar nombres de campos según documentación real de cada pasarela (Izipay/Culqi).
+ * Webhooks multiempresa: identifican pago por orderNumber (patrón idEmpresa-uuid o CHK-uuid para checkout público).
  */
 
 /**
@@ -21,11 +21,6 @@ api.post('/webhooks/izipay', async (req, res) => {
       return res.status(400).json({ message: 'order_number requerido' });
     }
 
-    const parsed = parsearOrderNumber(orderNumber);
-    if (!parsed) {
-      return res.status(400).json({ message: 'order_number inválido' });
-    }
-
     const estadoPasarela = String(payload.status || payload.transactionStatus || payload.payment_status || payload.result || '').toUpperCase();
     let nuevoEstado = 'PENDIENTE';
     if (estadoPasarela.includes('CAPTURE') || estadoPasarela.includes('PAID') || estadoPasarela.includes('SUCCESS') || estadoPasarela.includes('COMPLETED')) nuevoEstado = 'PAGADO';
@@ -33,6 +28,17 @@ api.post('/webhooks/izipay', async (req, res) => {
 
     const idTransaccion = String(payload.transactionId || payload.transaction_id || payload.id || payload.reference || '');
     const pool = await sql.connect(dbConfig);
+
+    if (esOrderNumberCheckout(orderNumber)) {
+      await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
+      return res.status(200).json({ ok: true });
+    }
+
+    const parsed = parsearOrderNumber(orderNumber);
+    if (!parsed) {
+      return res.status(400).json({ message: 'order_number inválido' });
+    }
+
     await pool.request()
       .input('orderNumber', sql.VarChar(100), orderNumber)
       .input('estado', sql.VarChar(20), nuevoEstado)
@@ -54,6 +60,7 @@ api.post('/webhooks/izipay', async (req, res) => {
 
 /**
  * Webhook Culqi. Eventos tipo charge.paid, charge.failed, etc. order_number en data.object o en metadata.
+ * Producción: exponer solo tras proxy y validar firma Culqi (requiere capturar rawBody en middleware dedicado).
  */
 api.post('/webhooks/culqi', async (req, res) => {
   try {
@@ -64,11 +71,6 @@ api.post('/webhooks/culqi', async (req, res) => {
       return res.status(400).json({ message: 'order_number requerido' });
     }
 
-    const parsed = parsearOrderNumber(orderNumber);
-    if (!parsed) {
-      return res.status(400).json({ message: 'order_number inválido' });
-    }
-
     const tipo = (event.type || obj.status || '').toString().toLowerCase();
     let nuevoEstado = 'PENDIENTE';
     if (tipo.includes('paid') || tipo.includes('succeeded') || tipo.includes('success')) nuevoEstado = 'PAGADO';
@@ -76,6 +78,17 @@ api.post('/webhooks/culqi', async (req, res) => {
 
     const idTransaccion = String(obj.id || event.id || event.data?.id || '');
     const pool = await sql.connect(dbConfig);
+
+    if (esOrderNumberCheckout(orderNumber)) {
+      await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
+      return res.status(200).json({ ok: true });
+    }
+
+    const parsed = parsearOrderNumber(orderNumber);
+    if (!parsed) {
+      return res.status(400).json({ message: 'order_number inválido' });
+    }
+
     await pool.request()
       .input('orderNumber', sql.VarChar(100), orderNumber)
       .input('estado', sql.VarChar(20), nuevoEstado)
@@ -96,4 +109,3 @@ api.post('/webhooks/culqi', async (req, res) => {
 });
 
 module.exports = api;
-

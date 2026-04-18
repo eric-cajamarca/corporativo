@@ -2,6 +2,7 @@ import { Component, OnInit, signal, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { TopnavComponent } from '../topnav/topnav.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { SidebarStateService } from '../../services/sidebar-state.service';
@@ -9,12 +10,13 @@ import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
 import { DashboardService, ResumenDashboard } from '../../services/dashboard.service';
 import { EmpresaService } from '../../services/empresa.service';
+import { SaasSubscriptionService } from '../../services/saas-subscription.service';
 import { Chart } from 'chart.js/auto';
 
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [FormsModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, CommonModule, RouterModule, TopnavComponent, SidebarComponent],
   templateUrl: './inicio.component.html',
   styleUrl: './inicio.component.css'
 })
@@ -64,12 +66,16 @@ export class InicioComponent implements OnInit {
   public esGestora = false;
   public porEmpresaDashboard: { idEmpresa: string; razonSocial: string; resumen: ResumenDashboard }[] = [];
 
+  /** SaaS: aviso si falta completar pago / vincular suscripción */
+  public mostrarAlertaSuscripcion = false;
+
   constructor(
     private router: Router,
     public authService: AuthService,
     private permisosService: PermisosService,
     private dashboardService: DashboardService,
     private empresaService: EmpresaService,
+    private saasSubscriptionService: SaasSubscriptionService,
     public sidebarState: SidebarStateService
   ) {
     // Efecto para actualizar datos del usuario
@@ -83,6 +89,15 @@ export class InicioComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.saasSubscriptionService.getMiEstado().subscribe({
+      next: (r) => {
+        if (r.deploymentMode === 'saas' && r.suscripcion?.estado === 'PENDIENTE_PAGO') {
+          this.mostrarAlertaSuscripcion = true;
+        }
+      },
+      error: () => {}
+    });
+
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (res) => {
         this.esGestora = !!res?.data?.esGestora;

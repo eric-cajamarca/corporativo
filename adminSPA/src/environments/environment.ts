@@ -6,6 +6,8 @@
 export const environment = {
   production: false,
   API_URL: '/api/',
+  /** Valor por defecto si falla GET /public/config/deployment. En SaaS real use `saas`. */
+  deploymentMode: 'enterprise' as 'saas' | 'enterprise',
   FRONTEND_URL: 'http://localhost:4200',
   /**
    * UUID de la empresa principal (mismo valor que EMPRESA_PRINCIPAL_ID en el backend).

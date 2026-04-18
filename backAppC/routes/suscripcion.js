@@ -13,4 +13,8 @@ api.post('/suscripcion/crear-pago', auth.auth, (req, res, next) => {
   verificarIntegracion('izipay')(req, res, next);
 }, suscripcionController.crearPagoSuscripcion);
 
+api.post('/suscripcion/vincular-checkout', auth.auth, suscripcionController.vincularCheckout);
+api.get('/suscripcion/mi-estado', auth.auth, suscripcionController.miEstado);
+api.post('/suscripcion/solicitar-upgrade', auth.auth, suscripcionController.solicitarUpgrade);
+
 module.exports = api;

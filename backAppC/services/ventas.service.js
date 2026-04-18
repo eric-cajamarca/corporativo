@@ -383,12 +383,16 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
 
     const totalesEmpresa = calcularTotales(dets);
     const descuentosCliente = Number(venta.descuentos);
+    const exoneradoCliente = Number(venta.exonerado);
     let descuentosCabeceraFinal = totalesEmpresa.descuentos;
     if (!usarDescuentoEnTotal) {
       descuentosCabeceraFinal = 0;
     } else if (Number.isFinite(descuentosCliente) && descuentosCliente >= 0) {
       descuentosCabeceraFinal = Math.round(descuentosCliente * 100) / 100;
     }
+    const exoneradoCabeceraFinal = (Number.isFinite(exoneradoCliente) && exoneradoCliente >= 0)
+      ? Math.round(exoneradoCliente * 100) / 100
+      : totalesEmpresa.exonerado;
 
     const ventaDatos = {
       idSucursal: idSucursalLinea,
@@ -403,7 +407,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       tCambio: venta.tCambio || 1,
       subtotal: totalesEmpresa.subtotal,
       igv: totalesEmpresa.igv,
-      exonerado: totalesEmpresa.exonerado,
+      exonerado: exoneradoCabeceraFinal,
       gratuito: totalesEmpresa.gratuito,
       otrosCargos: totalesEmpresa.otrosCargos,
       descuentos: descuentosCabeceraFinal,
@@ -784,6 +788,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const totalesEmpresa = calcularTotales(dets);
       sumaHijasTotal += totalesEmpresa.total;
       let descuentosHija = totalesEmpresa.descuentos;
+      let exoneradoHija = totalesEmpresa.exonerado;
       if (!usarDescuentoEnTotal) {
         descuentosHija = 0;
       } else if (
@@ -794,6 +799,16 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         const prop =
           (Number(totalesEmpresa.subtotal) || 0) / (Number(totalesAgrupados.subtotal) || 1);
         descuentosHija = Math.round(descuentosClienteAgr * prop * 100) / 100;
+      }
+      const exoneradoClienteAgr = Number(venta.exonerado);
+      if (
+        Number.isFinite(exoneradoClienteAgr) &&
+        exoneradoClienteAgr >= 0 &&
+        (Number(totalesAgrupados.subtotal) || 0) > 0
+      ) {
+        const propExo =
+          (Number(totalesEmpresa.subtotal) || 0) / (Number(totalesAgrupados.subtotal) || 1);
+        exoneradoHija = Math.round(exoneradoClienteAgr * propExo * 100) / 100;
       }
 
       const ventaDatos = {
@@ -807,7 +822,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         tCambio: venta.tCambio || 1,
         subtotal: totalesEmpresa.subtotal,
         igv: totalesEmpresa.igv,
-        exonerado: totalesEmpresa.exonerado,
+        exonerado: exoneradoHija,
         gratuito: totalesEmpresa.gratuito,
         otrosCargos: totalesEmpresa.otrosCargos,
         descuentos: descuentosHija,
@@ -922,7 +937,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         tCambio: venta.tCambio || 1,
         subtotal: totalesEmpresa.subtotal,
         igv: totalesEmpresa.igv,
-        exonerado: totalesEmpresa.exonerado,
+        exonerado: exoneradoHija,
         gratuito: totalesEmpresa.gratuito,
         otrosCargos: totalesEmpresa.otrosCargos,
         descuentos: totalesEmpresa.descuentos,

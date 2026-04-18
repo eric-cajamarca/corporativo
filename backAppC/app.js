@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 require('express-async-errors');
 const cors = require('cors');
@@ -6,7 +7,10 @@ const { connectDB } = require('./dbConnection');
 const xss = require('xss'); // Solo si vas a usarlo
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const auth = require('./middlewares/autenticate');
 const { querySafeMiddleware } = require('./middlewares/tenant-query');
+const { saasSuscripcionGate } = require('./middlewares/saasSuscripcionGate');
+const publicSaasRoutes = require('./routes/publicSaas');
 // Importaci?n de rutas
 const detalleVentasRoutes = require('./routes/detalleventas');
 const adminRoutes = require('./routes/admin');
@@ -148,8 +152,11 @@ app.get('/database', async (req, res) => {
   }
 });
 
+app.use('/api', auth.optionalAuth);
 app.use('/api', querySafeMiddleware); // Agrega req.querySafe
-// Rutas públicas sin auth (ANTES del resto para que no exijan token)
+app.use('/api', saasSuscripcionGate);
+// Rutas públicas SaaS (planes, checkout) y resto
+app.use('/api', publicSaasRoutes);
 app.use('/api/external', externalRoutes);
 app.use('/api/empresa', require('./routes/empresaPublic'));
 app.use('/api/activacion', require('./routes/activacionPublic')); // Solo activación por código WhatsApp
@@ -237,5 +244,11 @@ app.listen(PORT, () => {
     guiasTicketJob.iniciar();
   } catch (e) {
     console.error('No se pudo iniciar job guiasTicket:', e.message);
+  }
+  try {
+    const suscripcionVencimientoJob = require('./jobs/suscripcionVencimiento.job');
+    suscripcionVencimientoJob.iniciar();
+  } catch (e) {
+    console.error('No se pudo iniciar job suscripción vencimiento:', e.message);
   }
 });

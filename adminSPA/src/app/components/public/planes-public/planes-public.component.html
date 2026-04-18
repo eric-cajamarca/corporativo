@@ -1,0 +1,86 @@
+<div class="planes-page py-5 px-3">
+  <div class="container" style="max-width: 1100px;">
+    <div class="text-center mb-4">
+      <h1 class="h2 mb-2">Planes</h1>
+      <p class="text-muted mb-0">Elige mensual o anual y continúa al pago con Culqi (modo SaaS).</p>
+    </div>
+
+    @if (modoEnterprise()) {
+      <div class="alert alert-secondary text-center">
+        Esta instancia está en <strong>modo enterprise</strong>. Los planes públicos no están disponibles.
+        <div class="mt-3">
+          <button type="button" class="btn btn-primary me-2" (click)="irLogin()">Ingresar</button>
+        </div>
+      </div>
+    }
+
+    @if (!modoEnterprise()) {
+      @if (cargando()) {
+        <p class="text-center text-muted">Cargando…</p>
+      }
+
+      @if (errorMsg()) {
+        <div class="alert alert-danger">{{ errorMsg() }}</div>
+      }
+
+      @if (!cargando() && !errorMsg()) {
+        <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+          <span class="text-muted">Facturación</span>
+          <div class="btn-group" role="group">
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="ciclo() === 'monthly'"
+              [class.btn-outline-primary]="ciclo() !== 'monthly'"
+              (click)="ciclo.set('monthly')">
+              Mensual
+            </button>
+            <button
+              type="button"
+              class="btn"
+              [class.btn-primary]="ciclo() === 'yearly'"
+              [class.btn-outline-primary]="ciclo() !== 'yearly'"
+              (click)="ciclo.set('yearly')">
+              Anual
+            </button>
+          </div>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+          @for (p of planes(); track p.planCode) {
+            <div class="col-md-6 col-lg-4">
+              <div class="card h-100 shadow-sm planes-card">
+                <div class="card-body d-flex flex-column">
+                  <h2 class="h5 card-title mb-2">{{ p.nombre }}</h2>
+                  <ul class="planes-beneficios list-unstyled small mb-3 flex-grow-1">
+                    @for (b of p.beneficios; track $index) {
+                      <li class="d-flex gap-2 mb-2">
+                        <span class="text-primary planes-beneficios__bullet" aria-hidden="true">✓</span>
+                        <span [class.fw-semibold]="b.startsWith('*')">{{ b }}</span>
+                      </li>
+                    }
+                  </ul>
+                  <div class="border-top pt-3 mt-auto">
+                    <p class="display-6 mb-1">S/ {{ precio(p) | number : '1.0-0' }}</p>
+                    <p class="text-muted small mb-3">por {{ etiquetaCiclo() }}</p>
+                    <button type="button" class="btn btn-primary w-100" (click)="elegirPlan(p.planCode)">
+                      Elegir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="text-center mt-4 planes-footer-links">
+          <a routerLink="/crear-empresa">Crear empresa</a>
+          <span class="text-muted mx-2">·</span>
+          <a routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">Probar demo 14 días</a>
+          <span class="text-muted mx-2">·</span>
+          <a routerLink="/login-empresa">Ya tengo cuenta</a>
+        </div>
+      }
+    }
+  </div>
+</div>

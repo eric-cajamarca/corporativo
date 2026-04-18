@@ -16,6 +16,48 @@ class HtmlBuilderService {
     return raw ? raw.toUpperCase() : 'CONTADO';
   }
 
+  _numeroSeguro(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  _impuestoMontoSegunVenta(impuesto, venta) {
+    const cod = String(impuesto?.codigoSunat || '').trim().toUpperCase();
+    const desc = String(impuesto?.descripcion || '').trim().toUpperCase();
+
+    const subtotal = this._numeroSeguro(venta?.subtotal);
+    const igv = this._numeroSeguro(venta?.igv);
+    const exonerado = this._numeroSeguro(venta?.exonerado);
+    const gratuito = this._numeroSeguro(venta?.gratuito);
+    const otrosCargos = this._numeroSeguro(venta?.otrosCargos);
+
+    // Reglas por código SUNAT o descripción. Si no hay dato explícito, se aproxima por porcentaje sobre subtotal.
+    if (cod === '1000' || desc.includes('IGV')) return igv;
+    if (cod === '9997' || desc.includes('EXON')) return exonerado;
+    if (cod === '9996' || desc.includes('GRATUIT')) return gratuito;
+    if (desc.includes('OTRO') && desc.includes('CARGO')) return otrosCargos;
+    if (cod === '2000' || desc.includes('ISC')) {
+      // ISC no se persiste en cabecera; se aproxima por porcentaje sobre subtotal si existe.
+      const pct = this._numeroSeguro(impuesto?.porcentaje);
+      return pct > 0 ? (subtotal * pct) / 100 : 0;
+    }
+
+    const pct = this._numeroSeguro(impuesto?.porcentaje);
+    return pct > 0 ? (subtotal * pct) / 100 : 0;
+  }
+
+  _lineasImpuestosDesdeCatalogo(impuestos, venta) {
+    const list = Array.isArray(impuestos) ? impuestos : [];
+    return list.map((imp) => {
+      const activo = !!imp?.estado;
+      const pct = this._numeroSeguro(imp?.porcentaje);
+      const nombre = String(imp?.descripcion || 'Impuesto').trim() || 'Impuesto';
+      const label = pct > 0 ? `${nombre} (${pct}%)` : nombre;
+      const monto = activo ? this._impuestoMontoSegunVenta(imp, venta) : 0;
+      return { label, value: monto };
+    });
+  }
+
   _parseCuentasBancarias(value) {
     if (!value) return [];
     if (Array.isArray(value)) {
@@ -588,6 +630,7 @@ class HtmlBuilderService {
       venta = {},
       cliente = {},
       items = [],
+      impuestos = [],
       cantidadLetras = '',
       formato = 'A4',
       esCotizacion = false
@@ -649,10 +692,19 @@ class HtmlBuilderService {
     const usarColorPdf = formato !== 'ticket' && empresa.pdfUsarColor !== false;
     const colorPrimario = String(empresa.pdfColorPrimario || '#0B5FA5').trim() || '#0B5FA5';
 
+    const codigoSunat = this._normalizarCodigoTipoSunatParaQr(codigoComp);
+    const esComprobanteSunatValido = this._codigosComprobanteConQrSunat().has(codigoSunat);
+    const lineasImpuestos = esComprobanteSunatValido
+      ? this._lineasImpuestosDesdeCatalogo(impuestos, venta)
+      : [];
     const lineasTotales = [
       { label: 'Subtotal', value: subtotal },
-      ...(exonerado > 0 ? [{ label: 'Exonerado', value: exonerado }] : []),
-      { label: 'IGV (18%)', value: igv },
+      ...(esComprobanteSunatValido
+        ? lineasImpuestos
+        : [
+            ...(exonerado > 0 ? [{ label: 'Exonerado', value: exonerado }] : []),
+            { label: 'IGV (18%)', value: igv }
+          ]),
       ...(gratuito > 0 ? [{ label: 'Gratuito', value: gratuito }] : []),
       ...(otrosCargos > 0 ? [{ label: 'Otros cargos', value: otrosCargos }] : []),
       { label: 'Descuentos', value: descuentos },

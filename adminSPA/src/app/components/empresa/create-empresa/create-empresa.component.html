@@ -481,6 +481,25 @@
                   }
                 </div>
               </div>
+
+              @if (checkoutOrderNumber) {
+                <div class="alert alert-info mb-3">
+                  Tiene un pago asociado. Número de orden: <strong>{{ checkoutOrderNumber }}</strong>.
+                  Si el pago está confirmado, al registrar se activará el plan correspondiente.
+                </div>
+              }
+
+              @if (mostrarOpcionDemo) {
+                <div class="form-group">
+                  <div class="form-check">
+                    <input type="checkbox" id="solicitudDemo" class="form-check-input" formControlName="solicitudDemo" />
+                    <label class="form-check-label" for="solicitudDemo">
+                      Probar 14 días en modo demo (sin tarjeta)
+                    </label>
+                  </div>
+                </div>
+              }
+
               <!-- DEBUG: Estado del formulario -->
               <div class="alert alert-info mb-3">
                 <strong>Estado del formulario:</strong>

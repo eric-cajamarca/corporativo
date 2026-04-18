@@ -16,6 +16,12 @@
   </div>
 
   <!-- Header del contenido -->
+  <div class="alert alert-warning mx-3 mt-3 mb-0" *ngIf="mostrarAlertaSuscripcion">
+    <strong>Suscripción pendiente.</strong> Complete un plan en
+    <a routerLink="/planes" class="alert-link">Planes y precios</a>
+    y luego vincule el pago desde su cuenta (menú o soporte) con el número de orden, o registre la empresa usando el enlace tras el pago.
+  </div>
+
   <div class="content-header">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
       <div>

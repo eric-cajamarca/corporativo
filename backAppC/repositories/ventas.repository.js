@@ -713,10 +713,15 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
     .query(`
-      SELECT idImpuesto, descripcion, ISNULL(codigoSunat, '') AS codigoSunat,
-        CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje, pIncluyeIGV
+      SELECT
+        idImpuesto,
+        descripcion,
+        ISNULL(codigoSunat, '') AS codigoSunat,
+        CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
+        pIncluyeIGV,
+        ISNULL(estado, 0) AS estado
       FROM Impuestos
-      WHERE idEmpresa = @idEmpresa AND estado = 1
+      WHERE idEmpresa = @idEmpresa
       ORDER BY descripcion
     `);
   const impuestos = (impuestosResult.recordset || []).map(r => ({
@@ -724,7 +729,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     descripcion: r.descripcion,
     codigoSunat: String(r.codigoSunat || '').trim(),
     porcentaje: r.porcentaje,
-    pIncluyeIGV: !!r.pIncluyeIGV
+    pIncluyeIGV: !!r.pIncluyeIGV,
+    estado: !!r.estado
   }));
 
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
@@ -921,6 +927,9 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     const idCliente = cabecera.idCliente != null ? Number(cabecera.idCliente) : null;
     const subtotal = Number(cabecera.subtotal) || 0;
     const igv = Number(cabecera.igv) || 0;
+    const exonerado = Number(cabecera.exonerado) || 0;
+    const gratuito = Number(cabecera.gratuito) || 0;
+    const otrosCargos = Number(cabecera.otrosCargos) || 0;
     const descuentos = Number(cabecera.descuentos) || 0;
     const total = Number(cabecera.total) || 0;
     if (idCliente != null && idCliente > 0) {
@@ -931,10 +940,13 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         .input('idCliente', sql.Int, idCliente)
         .input('subtotal', sql.Decimal(18, 2), subtotal)
         .input('igv', sql.Decimal(18, 2), igv)
+        .input('exonerado', sql.Decimal(18, 2), exonerado)
+        .input('gratuito', sql.Decimal(18, 2), gratuito)
+        .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
         .input('descuentos', sql.Decimal(18, 2), descuentos)
         .input('total', sql.Decimal(18, 2), total)
         .query(`
-          UPDATE Ventas SET fEmision = @fEmision, idCliente = @idCliente, subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total
+          UPDATE Ventas SET fEmision = @fEmision, idCliente = @idCliente, subtotal = @subtotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total
           WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
         `);
     } else {
@@ -944,10 +956,13 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         .input('fEmision', sql.VarChar(23), fEmision)
         .input('subtotal', sql.Decimal(18, 2), subtotal)
         .input('igv', sql.Decimal(18, 2), igv)
+        .input('exonerado', sql.Decimal(18, 2), exonerado)
+        .input('gratuito', sql.Decimal(18, 2), gratuito)
+        .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
         .input('descuentos', sql.Decimal(18, 2), descuentos)
         .input('total', sql.Decimal(18, 2), total)
         .query(`
-          UPDATE Ventas SET fEmision = @fEmision, subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total
+          UPDATE Ventas SET fEmision = @fEmision, subtotal = @subtotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total
           WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
         `);
     }
@@ -1673,6 +1688,30 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       ORDER BY dva.idDetalleVA
     `);
 
+  const impuestosVaResult = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`
+      SELECT
+        idImpuesto,
+        descripcion,
+        ISNULL(codigoSunat, '') AS codigoSunat,
+        CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
+        pIncluyeIGV,
+        ISNULL(estado, 0) AS estado
+      FROM Impuestos
+      WHERE idEmpresa = @idEmpresa
+      ORDER BY descripcion
+    `);
+  const impuestosVa = (impuestosVaResult.recordset || []).map((r) => ({
+    idImpuesto: r.idImpuesto,
+    descripcion: r.descripcion,
+    codigoSunat: String(r.codigoSunat || '').trim(),
+    porcentaje: r.porcentaje,
+    pIncluyeIGV: !!r.pIncluyeIGV,
+    estado: !!r.estado
+  }));
+
   const base = (baseUrl || '').replace(/\/$/, '');
   const logoFileName = emp && (emp.logoArchivo ?? emp.logo ?? '');
   const logoUrl = (typeof logoFileName === 'string' && logoFileName.trim())
@@ -1748,7 +1787,8 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       aliasEmpresa: d.aliasEmpresa || '',
       sucursal: d.sucursal || '',
       idEmpresaProducto: d.idEmpresaProducto
-    }))
+    })),
+    impuestos: impuestosVa
   };
 };
 

@@ -45,6 +45,7 @@ function construirOrderNumber(idEmpresaCliente) {
  */
 function parsearOrderNumber(orderNumber) {
   if (!orderNumber || typeof orderNumber !== 'string') return null;
+  if (orderNumber.startsWith('CHK-')) return null;
   const idx = orderNumber.indexOf('-');
   if (idx <= 0) return null;
   const idEmpresa = orderNumber.substring(0, idx);
@@ -52,10 +53,15 @@ function parsearOrderNumber(orderNumber) {
   return { idEmpresa, uuid };
 }
 
+function esOrderNumberCheckout(orderNumber) {
+  return typeof orderNumber === 'string' && orderNumber.startsWith('CHK-');
+}
+
 module.exports = {
   obtenerIntegracionesEmpresa,
   obtenerCredencialesProveedor,
   construirOrderNumber,
-  parsearOrderNumber
+  parsearOrderNumber,
+  esOrderNumberCheckout
 };
 

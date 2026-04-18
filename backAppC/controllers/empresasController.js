@@ -101,15 +101,13 @@ const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmp
 const empresaRepository = require('../repositories/empresa.repository');
 const empresasAdministracionService = require('../services/empresasAdministracion.service');
 const usuarioAdminService = require('../services/usuarioAdmin.service');
+const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
 /** Envía código de activación por WhatsApp vía Factiliza (FactilizaConfig 'Factiliza WHATSAPP'). Sin sesión. */
 async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
   const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'enviarCodigoActivacionFactiliza:config',message:'config loaded',data:{hasConfig:!!config,hasToken:!!(config&&config.tokenDefault),hasParametroRuta:!!(config&&config.parametroRuta)},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
   if (!config || !config.tokenDefault) {
     console.error('Factiliza WHATSAPP no configurado en FactilizaConfig (tokenDefault).');
     return { sent: false, error: 'Servicio WhatsApp no configurado. Configure Factiliza WHATSAPP en la base de datos.' };
@@ -126,17 +124,11 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
   const text = `Tu código de verificación para activar tu empresa es: ${codigo}`;
   try {
     const resultado = await whatsappFactilizaService.sendText(config, numeroNormalizado, text);
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'enviarCodigoActivacionFactiliza:result',message:'sendText result',data:{success:resultado.success,message:resultado.message},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     if (resultado.success) {
       return { sent: true };
     }
     return { sent: false, error: resultado.message || 'Error al enviar por WhatsApp.' };
   } catch (err) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'enviarCodigoActivacionFactiliza:catch',message:'catch',data:{message:err?.message},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     console.error('Error enviando código activación Factiliza WHATSAPP:', err.message);
     return { sent: false, error: err.message || 'Error al enviar por WhatsApp.' };
   }
@@ -193,14 +185,20 @@ const createEmpresa = async function (req, res, next) {
                     celular,
                     direccion: req.body.direccion || 'Sin dirección'
                 };
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c0e71'},body:JSON.stringify({sessionId:'3c0e71',location:'empresasController.createEmpresa:datosEmpresa',message:'datosEmpresa before inicializar',data:{reqBodyDireccion:req.body.direccion,datosEmpresaDireccion:datosEmpresa.direccion},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-                // #endregion
                 const resultadoInicializacion = await empresaService.inicializarDatosEmpresa(pool, idEmpresa, datosEmpresa);
                 
                 
                 await empresaService.insertarEmpresaIntegraciones(pool, idEmpresa);
                 await empresaService.marcarEmpresaPrincipalSiEsPrimera(pool, idEmpresa);
+
+                try {
+                  await empresaSuscripcionBootstrap.aplicarSuscripcionNuevaEmpresa(pool, idEmpresa, {
+                    solicitudDemo: !!req.body.solicitudDemo,
+                    checkoutOrderNumber: (req.body.checkoutOrderNumber || '').trim() || null
+                  });
+                } catch (errSub) {
+                  console.error('Suscripción inicial no aplicada:', errSub);
+                }
 
                 // Crear registro de verificación y enviar código por WhatsApp (Factiliza WHATSAPP desde FactilizaConfig)
                 const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
@@ -305,9 +303,6 @@ const putCredencialesProveedor = async function (req, res, next) {
 
 // Ruta pública: enviar código de activación por WhatsApp (sin sesión). Usa Factiliza WHATSAPP desde FactilizaConfig.
 const enviarCodigoActivacion = async function (req, res, next) {
-        // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:entry',message:'enviarCodigoActivacion entered',data:{hasBody:!!req.body,idEmpresa:req.body?.idEmpresa!=null},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     try {
         const { idEmpresa, celular } = req.body || {};
         const idEmpresaTrim = idEmpresa != null ? String(idEmpresa).trim() : '';
@@ -335,16 +330,10 @@ const enviarCodigoActivacion = async function (req, res, next) {
         }
         const resultado = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
         if (!resultado.sent) {
-            // #region agent log
-            fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:503',message:'returning 503',data:{error:resultado.error},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             return res.status(503).json({ message: resultado.error || 'No se pudo enviar el código por WhatsApp' });
         }
         res.status(200).json({ message: 'Código enviado por WhatsApp' });
     } catch (error) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'empresasController.enviarCodigoActivacion:catch',message:'catch',data:{message:error?.message},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         console.error('Error en enviarCodigoActivacion:', error);
         return next(error);
     }

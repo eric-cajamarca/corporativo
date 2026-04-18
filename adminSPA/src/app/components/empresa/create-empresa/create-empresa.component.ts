@@ -4,7 +4,8 @@ import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
 import { EmpresaService } from '../../../services/empresa.service';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 declare var iziToast: any;
@@ -29,6 +30,11 @@ export class CreateEmpresaComponent implements OnInit {
   showConfirmPassword = signal<boolean>(false);
   currentStep = signal<number>(1);
   idEmpresaCreada = signal<string | null>(null);
+
+  /** Número de orden Culqi (CHK-...) si el usuario pagó desde /planes. */
+  checkoutOrderNumber = '';
+  /** Mostrar opción demo solo en modo SaaS. */
+  mostrarOpcionDemo = false;
 
   // Datos de la empresa encontrada
   empresaEncontrada: any = null;
@@ -63,11 +69,20 @@ export class CreateEmpresaComponent implements OnInit {
     private apiperuService: ApiperuService,
     private empresaService: EmpresaService,
     private router: Router,
+    private route: ActivatedRoute,
+    private deploymentContext: DeploymentContextService
   ) {}
 
   ngOnInit(): void {
     this.initForm();
     this.cargarUbicaciones();
+    this.route.queryParamMap.subscribe((q) => {
+      const co = q.get('checkout');
+      this.checkoutOrderNumber = co ? co.trim() : '';
+    });
+    this.deploymentContext.cargarSiNecesario().subscribe((cfg) => {
+      this.mostrarOpcionDemo = !!cfg?.mostrarPlanesPublicos;
+    });
   }
 
   /**
@@ -103,7 +118,8 @@ export class CreateEmpresaComponent implements OnInit {
       confirmPassword: ['', Validators.required],
       
       // Términos
-      acceptTerms: [false, Validators.requiredTrue]
+      acceptTerms: [false, Validators.requiredTrue],
+      solicitudDemo: [false]
     }, {
       validators: this.passwordMatchValidator
     });
@@ -126,13 +142,7 @@ export class CreateEmpresaComponent implements OnInit {
 
   /**
    * Validador personalizado para confirmar contraseña
-   
-  private passwordMatchValidator(group: FormGroup): { [key: string]: boolean } | null {
-    const password = group.get('password')?.value;
-    const confirmPassword = group.get('confirmPassword')?.value;
-    return password === confirmPassword ? null : { passwordMismatch: true };
-  }
-    */
+   */
   private passwordMatchValidator(group: FormGroup): { [key: string]: boolean } | null {
     const password = group.get('password')?.value ?? '';
     const confirmPassword = group.get('confirmPassword')?.value ?? '';
@@ -465,7 +475,7 @@ export class CreateEmpresaComponent implements OnInit {
 
     const formData = this.empresaForm.value;
     
-    const empresaData = {
+    const empresaData: Record<string, unknown> = {
       idDocumento: '6',
       ruc: formData.ruc,
       razon_Social: formData.razonSocial,
@@ -475,7 +485,9 @@ export class CreateEmpresaComponent implements OnInit {
       password: formData.password,
       condicion: formData.condicion || '',
       estSunat: formData.estado || '',
-      direccion: (formData.direccion || '').trim()
+      direccion: (formData.direccion || '').trim(),
+      solicitudDemo: !!formData.solicitudDemo,
+      checkoutOrderNumber: this.checkoutOrderNumber || undefined
     };
 
     this.empresaService.createEmpresa(empresaData).subscribe({

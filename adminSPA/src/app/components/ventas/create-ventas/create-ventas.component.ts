@@ -483,7 +483,7 @@ export class CreateVentasComponent implements OnInit {
     this._impuestoService.obtenerTodos().subscribe({
       next: (res) => {
         const list: Impuesto[] = res.data || [];
-        this.impuestosActivosEmpresa = list.filter((i: Impuesto) => !!i.estado);
+        this.impuestosActivosEmpresa = list.filter((i: Impuesto) => this.impuestoEstaActivo(i));
       },
       error: () => {}
     });
@@ -889,6 +889,14 @@ export class CreateVentasComponent implements OnInit {
       .reduce((s: number, i: { monto: number }) => s + i.monto, 0);
     this.ventas.total = Math.round((baseGravada + totalImpuestosASumar) * 100) / 100;
     this.guardarEstadoProvisional();
+  }
+
+  private impuestoEstaActivo(impuesto: Impuesto): boolean {
+    const estado: unknown = (impuesto as { estado?: unknown })?.estado;
+    if (estado === true || estado === 1) return true;
+    if (estado === false || estado === 0 || estado == null) return false;
+    const s = String(estado).trim().toLowerCase();
+    return s === '1' || s === 'true' || s === 'activo' || s === 'activa';
   }
 
   eliminarDelCarrito(index: number): void {
