@@ -1,0 +1,110 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <h1 class="content-title mb-1">Mi suscripción</h1>
+    <p class="content-subtitle text-muted mb-0">Estado del plan, vigencia y uso frente a los límites del contrato.</p>
+  </div>
+
+  @if (cargando()) {
+    <p class="text-muted">Cargando…</p>
+  } @else if (errorMsg()) {
+    <div class="alert alert-danger">{{ errorMsg() }}</div>
+  } @else if (estado(); as e) {
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h2 class="h5 card-title">Resumen</h2>
+            <dl class="row mb-0 small">
+              <dt class="col-sm-4">Modo despliegue</dt>
+              <dd class="col-sm-8">{{ e.deploymentMode }}</dd>
+              <dt class="col-sm-4">Estado</dt>
+              <dd class="col-sm-8">{{ e.suscripcion?.estado ?? '—' }}</dd>
+              <dt class="col-sm-4">Plan</dt>
+              <dd class="col-sm-8">{{ e.planCatalogo?.nombre ?? e.suscripcion?.planCode ?? '—' }}</dd>
+              <dt class="col-sm-4">Ciclo</dt>
+              <dd class="col-sm-8">{{ e.suscripcion?.billingCycle ?? '—' }}</dd>
+              <dt class="col-sm-4">Inicio</dt>
+              <dd class="col-sm-8">{{ e.suscripcion?.fechaInicio ?? '—' }}</dd>
+              <dt class="col-sm-4">Fin</dt>
+              <dd class="col-sm-8">{{ e.suscripcion?.fechaFin ?? 'Sin fecha de fin' }}</dd>
+            </dl>
+            @if (e.suscripcion?.estado === 'PENDIENTE_PAGO' && e.deploymentMode === 'saas') {
+              <div class="alert alert-warning mt-3 mb-0">
+                Complete el pago o vincule la orden que recibió al contratar.
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        @if (e.limitesUso; as lim) {
+          <div class="card shadow-sm mb-3">
+            <div class="card-body">
+              <h2 class="h5 card-title">Uso del plan</h2>
+              <p class="small text-muted mb-2">Usuarios activos y sucursales registradas frente al límite del plan.</p>
+              <div class="mb-3">
+                <div class="d-flex justify-content-between small">
+                  <span>Usuarios</span>
+                  <span>{{ lim.usuariosActivos }} / {{ lim.maxUsuarios }}</span>
+                </div>
+                <div class="progress" style="height: 8px">
+                  <div
+                    class="progress-bar"
+                    [class.bg-danger]="lim.excedeUsuarios"
+                    role="progressbar"
+                    [style.width.%]="pctUso(lim.usuariosActivos, lim.maxUsuarios)"
+                  ></div>
+                </div>
+                @if (lim.excedeUsuarios) {
+                  <div class="text-danger small mt-1">Supera el límite de usuarios del plan.</div>
+                }
+              </div>
+              <div>
+                <div class="d-flex justify-content-between small">
+                  <span>Sucursales</span>
+                  <span>{{ lim.sucursales }} / {{ lim.maxSucursales }}</span>
+                </div>
+                <div class="progress" style="height: 8px">
+                  <div
+                    class="progress-bar"
+                    [class.bg-danger]="lim.excedeSucursales"
+                    role="progressbar"
+                    [style.width.%]="pctUso(lim.sucursales, lim.maxSucursales)"
+                  ></div>
+                </div>
+                @if (lim.excedeSucursales) {
+                  <div class="text-danger small mt-1">Supera el límite de sucursales del plan.</div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+        @if (e.deploymentMode === 'saas') {
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h2 class="h5 card-title">Renovar o cambiar plan</h2>
+              <a routerLink="/planes" class="btn btn-primary btn-sm me-2">Ver planes</a>
+              @if (e.suscripcion?.estado === 'PENDIENTE_PAGO') {
+                <div class="mt-3">
+                  <label class="form-label small" for="orderNum">Número de orden (CHK-…)</label>
+                  <input id="orderNum" class="form-control form-control-sm mb-2" [(ngModel)]="orderNumber" />
+                  <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="vinculando()" (click)="vincular()">
+                    Vincular pago
+                  </button>
+                  @if (vinculoMsg()) {
+                    <p class="small mt-2 mb-0" [class.text-success]="!vinculoMsg()?.includes('No se')" [class.text-danger]="vinculoMsg()?.includes('No se')">
+                      {{ vinculoMsg() }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</main>

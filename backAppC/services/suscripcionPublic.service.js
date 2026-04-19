@@ -16,7 +16,7 @@ async function iniciarCheckout(pool, body) {
   const billingCycle = (body?.billingCycle || 'monthly').toString().toLowerCase();
   const emailContacto = (body?.emailContacto || '').trim() || null;
 
-  const plan = saasPlanesService.obtenerPlan(planCode);
+  const plan = await saasPlanesService.resolverPlanInternoAsync(pool, planCode);
   if (!plan) throw new Error('PLAN_INVALIDO');
 
   if (planCode === 'demo') {
@@ -47,8 +47,8 @@ async function iniciarCheckout(pool, body) {
     };
   }
 
-  const montoSoles = saasPlanesService.montoSoles(planCode, billingCycle);
-  const montoCulqiCentimos = saasPlanesService.montoCulqiCentimos(planCode, billingCycle);
+  const montoSoles = await saasPlanesService.montoSolesAsync(pool, planCode, billingCycle);
+  const montoCulqiCentimos = await saasPlanesService.montoCulqiCentimosAsync(pool, planCode, billingCycle);
 
   const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
   if (!idEmpresaPrincipal) throw new Error('NO_PRINCIPAL');
@@ -107,8 +107,8 @@ async function confirmarCulqiCheckout(pool, body) {
   const secretKey = credenciales.secretKey || credenciales.secret_key;
   if (!secretKey) throw new Error('CULQI_SECRET_FALTANTE');
 
-  const amountCentimos = saasPlanesService.montoCulqiCentimos(row.planCode, row.billingCycle);
-  const expectedSoles = saasPlanesService.montoSoles(row.planCode, row.billingCycle);
+  const amountCentimos = await saasPlanesService.montoCulqiCentimosAsync(pool, row.planCode, row.billingCycle);
+  const expectedSoles = await saasPlanesService.montoSolesAsync(pool, row.planCode, row.billingCycle);
   if (Math.abs(Number(row.monto) - Number(expectedSoles)) > 0.009) {
     throw new Error('MONTO_CHECKOUT_INCONSISTENTE');
   }

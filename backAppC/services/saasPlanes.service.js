@@ -1,6 +1,9 @@
 /**
  * Catálogo comercial de planes (montos en PEN). Ajustar según mercado.
+ * Si existe la tabla SaasPlan (migración saas_planes_catalogo.sql), listados y montos pueden leerse desde BD.
  */
+const saasPlanRepository = require('../repositories/saasPlan.repository');
+
 const PLANES = {
   emprendedor: {
     codigo: 'emprendedor',
@@ -58,6 +61,16 @@ const PLANES = {
     maxUsuarios: 3,
     maxSucursales: 1,
     beneficios: []
+  },
+  enterprise: {
+    codigo: 'enterprise',
+    nombre: 'Enterprise',
+    descripcionCorta: 'Licencia on-premise / corporativa.',
+    mensualPen: 0,
+    anualPen: 0,
+    maxUsuarios: 99999,
+    maxSucursales: 99999,
+    beneficios: []
   }
 };
 
@@ -83,8 +96,79 @@ function obtenerPlan(planCode) {
   return PLANES[key] || null;
 }
 
-function montoSoles(planCode, billingCycle) {
+function parseBeneficiosJson(raw) {
+  if (!raw || typeof raw !== 'string') return [];
+  try {
+    const j = JSON.parse(raw);
+    return Array.isArray(j) ? j.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function filaBdAPlanInterno(row) {
+  if (!row) return null;
+  return {
+    codigo: row.planCode,
+    nombre: row.nombre,
+    descripcionCorta: row.descripcionCorta,
+    mensualPen: Number(row.precioMensualPen),
+    anualPen: Number(row.precioAnualPen),
+    maxUsuarios: Number(row.maxUsuarios),
+    maxSucursales: Number(row.maxSucursales),
+    beneficios: parseBeneficiosJson(row.beneficiosJson)
+  };
+}
+
+function filaBdACatalogoItem(row) {
+  const p = filaBdAPlanInterno(row);
+  if (!p) return null;
+  return {
+    planCode: p.codigo,
+    nombre: p.nombre,
+    descripcionCorta: p.descripcionCorta,
+    beneficios: p.beneficios,
+    precioMensualPen: p.mensualPen,
+    precioAnualPen: p.anualPen,
+    maxUsuarios: p.maxUsuarios,
+    maxSucursales: p.maxSucursales
+  };
+}
+
+/** Listado para /public/planes: usa SaasPlan si hay filas; si no, catálogo en memoria. */
+async function listarPlanesCatalogoAsync(pool) {
+  const rows = await saasPlanRepository.listarCatalogoPublico(pool);
+  if (rows.length) {
+    return rows.map(filaBdACatalogoItem).filter(Boolean);
+  }
+  return listarPlanesCatalogo();
+}
+
+/** Resumen del plan actual (mi-estado). */
+async function obtenerResumenPlanAsync(pool, planCode) {
+  const row = await saasPlanRepository.obtenerPorPlanCode(pool, planCode);
+  if (row) return filaBdACatalogoItem(row);
   const p = obtenerPlan(planCode);
+  if (!p) return null;
+  return {
+    planCode: p.codigo,
+    nombre: p.nombre,
+    descripcionCorta: p.descripcionCorta,
+    beneficios: Array.isArray(p.beneficios) ? p.beneficios : [],
+    precioMensualPen: p.mensualPen,
+    precioAnualPen: p.anualPen,
+    maxUsuarios: p.maxUsuarios,
+    maxSucursales: p.maxSucursales
+  };
+}
+
+async function resolverPlanInternoAsync(pool, planCode) {
+  const row = await saasPlanRepository.obtenerPorPlanCode(pool, planCode);
+  if (row) return filaBdAPlanInterno(row);
+  return obtenerPlan(planCode);
+}
+
+function montoSolesDesdePlanInterno(p, billingCycle) {
   if (!p) throw new Error('PLAN_INVALIDO');
   if (p.codigo === 'demo') return 0;
   const c = (billingCycle || '').toString().toLowerCase();
@@ -93,9 +177,24 @@ function montoSoles(planCode, billingCycle) {
   throw new Error('CICLO_FACTURACION_INVALIDO');
 }
 
+function montoSoles(planCode, billingCycle) {
+  const p = obtenerPlan(planCode);
+  return montoSolesDesdePlanInterno(p, billingCycle);
+}
+
+async function montoSolesAsync(pool, planCode, billingCycle) {
+  const p = await resolverPlanInternoAsync(pool, planCode);
+  return montoSolesDesdePlanInterno(p, billingCycle);
+}
+
 /** Culqi usa el monto en la unidad mínima (céntimos para PEN). */
 function montoCulqiCentimos(planCode, billingCycle) {
   const soles = montoSoles(planCode, billingCycle);
+  return Math.round(Number(soles) * 100);
+}
+
+async function montoCulqiCentimosAsync(pool, planCode, billingCycle) {
+  const soles = await montoSolesAsync(pool, planCode, billingCycle);
   return Math.round(Number(soles) * 100);
 }
 
@@ -118,8 +217,13 @@ function fechaFinDesdePlan(planCode, billingCycle, desde) {
 
 module.exports = {
   listarPlanesCatalogo,
+  listarPlanesCatalogoAsync,
   obtenerPlan,
+  obtenerResumenPlanAsync,
+  resolverPlanInternoAsync,
   montoSoles,
+  montoSolesAsync,
   montoCulqiCentimos,
+  montoCulqiCentimosAsync,
   fechaFinDesdePlan
 };

@@ -1,7 +1,7 @@
 const suscripcionService = require('../services/suscripcion.service');
 const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
-const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
-const { getDeploymentMode, isSaas } = require('../config/deployment.config');
+const empresaSuscripcionEstadoService = require('../services/empresaSuscripcionEstado.service');
+const { isSaas } = require('../config/deployment.config');
 const suscripcionPublicService = require('../services/suscripcionPublic.service');
 const { withPool } = require('../utils/dbPool.util');
 
@@ -64,13 +64,8 @@ const miEstado = async (req, res) => {
     if (!idEmpresa) {
       return res.status(401).json({ message: 'No autorizado' });
     }
-    const suscripcion = await withPool((pool) => empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa));
-    res.status(200).json({
-      data: {
-        deploymentMode: getDeploymentMode(),
-        suscripcion
-      }
-    });
+    const data = await withPool((pool) => empresaSuscripcionEstadoService.obtenerMiEstado(pool, idEmpresa));
+    res.status(200).json({ data });
   } catch (error) {
     console.error('miEstado:', error);
     res.status(500).json({ message: 'Error' });

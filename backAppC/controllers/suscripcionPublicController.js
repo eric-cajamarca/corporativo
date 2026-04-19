@@ -8,7 +8,8 @@ const listarPlanes = async (req, res) => {
     if (!isSaas()) {
       return res.status(404).json({ message: 'No disponible en modo enterprise' });
     }
-    res.status(200).json({ data: saasPlanesService.listarPlanesCatalogo() });
+    const data = await withPool((pool) => saasPlanesService.listarPlanesCatalogoAsync(pool));
+    res.status(200).json({ data });
   } catch (error) {
     console.error('listarPlanes:', error);
     res.status(500).json({ message: 'Error al listar planes' });

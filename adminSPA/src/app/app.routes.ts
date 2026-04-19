@@ -97,6 +97,7 @@ import { MisEnviosChoferComponent } from './components/envios/mis-envios-chofer/
 import { IndexEnviosComponent } from './components/envios/index-envios/index-envios.component';
 import { PlanesPublicComponent } from './components/public/planes-public/planes-public.component';
 import { CheckoutSuscripcionComponent } from './components/public/checkout-suscripcion/checkout-suscripcion.component';
+import { MiSuscripcionComponent } from './components/cuenta/mi-suscripcion/mi-suscripcion.component';
 
 export const routes: Routes = [
     {
@@ -280,6 +281,7 @@ export const routes: Routes = [
      { path: 'creditos', component: IndexCreditosComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Créditos y Cuotas' },
      { path: 'analisis', component: DashboardAnalisisComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Análisis Financiero' },
      { path: 'configuracion', component: IndexConfiguracionComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Configuración del Sistema' },
+     { path: 'cuenta/suscripcion', component: MiSuscripcionComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Mi suscripción' },
      { path: 'configuracion/integraciones', component: IntegracionesComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Integraciones y APIs de pago' },
      { path: 'rubros', component: IndexRubrosComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Configuración por rubro' },
      { path: 'vales-despacho', component: IndexValesDespachoComponent, canActivate: [AuthGuard, empresaGestoraGuard], title: 'Vales de despacho' },

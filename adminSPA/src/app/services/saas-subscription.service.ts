@@ -3,12 +3,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { CheckoutIniciado, SuscripcionEmpresaRow } from '../models/saas-public.model';
-
-export interface MiEstadoSuscripcionResponse {
-  deploymentMode: string;
-  suscripcion: SuscripcionEmpresaRow | null;
-}
+import { CheckoutIniciado } from '../models/saas-public.model';
+import { MiEstadoSuscripcionResponse } from '../models/saas-subscription.model';
 
 @Injectable({ providedIn: 'root' })
 export class SaasSubscriptionService {
