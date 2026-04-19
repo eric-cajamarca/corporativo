@@ -1,8 +1,7 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const { isSaas } = require('../config/deployment.config');
 const saasPlanesService = require('../services/saasPlanes.service');
 const suscripcionPublicService = require('../services/suscripcionPublic.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const listarPlanes = async (req, res) => {
   try {
@@ -18,8 +17,7 @@ const listarPlanes = async (req, res) => {
 
 const iniciarCheckout = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await suscripcionPublicService.iniciarCheckout(pool, req.body || {});
+    const data = await withPool((pool) => suscripcionPublicService.iniciarCheckout(pool, req.body || {}));
     res.status(201).json({ data, message: 'Checkout iniciado' });
   } catch (error) {
     if (error.message === 'MODO_NO_SAAS') {
@@ -41,9 +39,10 @@ const iniciarCheckout = async (req, res) => {
 
 const confirmarDemo = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
     const orderNumber = (req.body?.orderNumber || '').trim();
-    const data = await suscripcionPublicService.confirmarDemoCheckout(pool, orderNumber);
+    const data = await withPool((pool) =>
+      suscripcionPublicService.confirmarDemoCheckout(pool, orderNumber)
+    );
     res.status(200).json({ data, message: 'Demo activada' });
   } catch (error) {
     if (error.message === 'MODO_NO_SAAS') {
@@ -59,8 +58,9 @@ const confirmarDemo = async (req, res) => {
 
 const confirmarCulqi = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await suscripcionPublicService.confirmarCulqiCheckout(pool, req.body || {});
+    const data = await withPool((pool) =>
+      suscripcionPublicService.confirmarCulqiCheckout(pool, req.body || {})
+    );
     res.status(200).json({ data, message: 'Pago registrado' });
   } catch (error) {
     if (error.message === 'MODO_NO_SAAS') {
@@ -82,9 +82,8 @@ const confirmarCulqi = async (req, res) => {
 
 const estadoCheckout = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
     const orderNumber = (req.params.orderNumber || '').trim();
-    const data = await suscripcionPublicService.estadoCheckout(pool, orderNumber);
+    const data = await withPool((pool) => suscripcionPublicService.estadoCheckout(pool, orderNumber));
     res.status(200).json({ data });
   } catch (error) {
     if (error.message === 'CHECKOUT_NO_ENCONTRADO') {

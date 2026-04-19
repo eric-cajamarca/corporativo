@@ -1,5 +1,4 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const utilidadesService = require('../services/utilidades.service');
 
 /**
@@ -22,13 +21,14 @@ const getUtilidades = async (req, res) => {
       });
     }
     const { tipo, fechaInicio, fechaFin } = req.query;
-    const pool = await sql.connect(dbConfig);
-    const data = await utilidadesService.obtenerUtilidades(
-      pool,
-      idEmpresa,
-      tipo,
-      fechaInicio,
-      fechaFin
+    const data = await withPool(async (pool) =>
+      utilidadesService.obtenerUtilidades(
+        pool,
+        idEmpresa,
+        tipo,
+        fechaInicio,
+        fechaFin
+      )
     );
     return res.status(200).json({ message: 'OK', data });
   } catch (error) {
@@ -74,12 +74,13 @@ const getUtilidadesDetalle = async (req, res) => {
       });
     }
     const { fechaInicio, fechaFin } = req.query;
-    const pool = await sql.connect(dbConfig);
-    const data = await utilidadesService.obtenerUtilidadesDetalle(
-      pool,
-      idEmpresa,
-      fechaInicio,
-      fechaFin
+    const data = await withPool(async (pool) =>
+      utilidadesService.obtenerUtilidadesDetalle(
+        pool,
+        idEmpresa,
+        fechaInicio,
+        fechaFin
+      )
     );
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '486b2c' }, body: JSON.stringify({ sessionId: '486b2c', location: 'utilidades.controller.js:getUtilidadesDetalle:success', message: 'getUtilidadesDetalle success', data: { dataLength: Array.isArray(data) ? data.length : typeof data }, timestamp: Date.now(), hypothesisId: 'H2' }) }).catch(() => {});

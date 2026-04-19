@@ -13,8 +13,8 @@ El proyecto sigue una **arquitectura en capas** (controllers → services → re
 | Regla | Estado | Evidencia |
 |-------|--------|-----------|
 | Estructura controllers/services/repositories | ✅ Cumple | `backAppC/`: controllers, services, repositories, routes, middlewares, utils |
-| Sin lógica de negocio en controllers | ⚠️ Parcial | Mayoría delega a services; algunos controllers (ventasController, dventasController) tienen queries SQL directos y lógica |
-| Sin queries SQL en controllers | ❌ Incumple | `dventasController.js`: `SELECT * FROM DetalleVentas`; `clientesController.js`, `comprasController.js`, `ventasController.js` usan `pool.request().query()` directo |
+| Sin lógica de negocio en controllers | ⚠️ Parcial | **ventas** y **dventas**: orquestación y acceso a BD movidos a [backAppC/services/ventasOrquestacion.service.js](backAppC/services/ventasOrquestacion.service.js) y [backAppC/services/dventas.service.js](backAppC/services/dventas.service.js); el controlador solo hace HTTP. Siguen otros controllers con `sql.connect` + delegación mínima. |
+| Sin queries SQL en controllers | ⚠️ Parcial | **Mejorado (2026):** `ventasController` ya no importa repositorios ni arma listados/XML; `dventasController` no importa `mssql`. Pendiente: mismo patrón en `facturacionController`, `adminController`, `productosController`, etc. |
 | Transacciones al tocar 2+ tablas | ✅ Cumple en varios flujos | creditos, caja, ventas, facturacion, cotizaciones, transferencia usan `transaction` + commit/rollback |
 | Validación en services | ✅ Cumple | Ej. caja.service, creditos.service, ventas (parcial en service) |
 | Repositories con tipos SQL correctos | ✅ Cumple | Uso de `sql.UniqueIdentifier`, `sql.Decimal`, etc. |
@@ -70,26 +70,23 @@ El proyecto sigue una **arquitectura en capas** (controllers → services → re
 - **Middleware tenant** (`tenant-query`): inyección de `idEmpresa` desde `req.user.empresa` para rutas que usan `req.querySafe`.
 - **Controllers que usan `req.user.empresa`**: ventas, caja, clientes, compras, etc., no confían en `idEmpresa` del body en la mayoría de los casos.
 
-### 3.2 Brechas críticas
+### 3.2 Brechas críticas (actualización Fase 1 SaaS — revisión código)
 
-#### A) Rutas sin autenticación
+#### A) Rutas sin autenticación — **parcialmente corregido**
 
-- **`GET /api/ventas`** (`dventasController.obtenerDetalleVentas`): devuelve **todas** las filas de `DetalleVentas` sin filtro por empresa ni auth. **Fuga de datos multi-tenant.**
-- **`DELETE /api/ventas/:id`** (`dventasController.eliminarDetalleVenta`): elimina por `id` sin comprobar `idEmpresa` ni token. **Eliminación no autorizada.**
-- **Factiliza (proxy a APIs externas)** sin auth:  
-  `GET /api/ruc/anexo/:ruc`, `/api/dni/:dni`, `/api/ruc/:ruc`, `/api/tipocambio/:fecha`, `/api/placa/:placa`, `/api/soat/:placa`, `/api/licencia/:dni`, `POST /api/xml`.  
-  Cualquiera puede consumir y gastar cuota/costo del proveedor.
-- **`GET /api/obtener_logo/:img`**: acceso público a logos; si el nombre es predecible podría listarse contenido. Valorar restricción o auth.
-- **`POST /api/empresa`** (crear empresa): sin auth; puede ser intencional (registro). Si es solo para admins, debería protegerse.
+- **`GET /api/ventas`** / **`DELETE /api/ventas/:id`**: ahora van con `auth` en [backAppC/routes/detalleventas.js](backAppC/routes/detalleventas.js); listado y borrado filtran por empresa del JWT vía servicio/repositorio.
+- **`GET /api/ventas/:id/:idempresa`**: el segundo parámetro es numérico (`Destino` en `DetalleVentas`, no UUID de empresa). Se corrigió la fuga horizontal **uniendo `Ventas` con `idEmpresa` del token** en [backAppC/repositories/dventas.repository.js](backAppC/repositories/dventas.repository.js).
+- **Factiliza / `external`**: rutas bajo [backAppC/routes/factiliza.js](backAppC/routes/factiliza.js) y [backAppC/routes/external.js](backAppC/routes/external.js) usan `auth` salvo `ruc-publico` (registro).
+- **`GET /api/obtener_logo/:img`**: sigue público; valorar restricción o auth.
+- **`POST /api/empresa`**: sin auth por diseño de registro; si solo admins, proteger.
 
-#### B) Token de API externa en frontend
+#### B) Token de API externa en frontend — **mitigado**
 
-- **`apiperu.service.ts`**: token de apisperu.com **hardcodeado** y expuesto en el cliente. Cualquiera puede extraerlo y usar el servicio por tu cuenta.
-- **Recomendación**: Proxy DNI/RUC desde backAppC (con auth) y guardar el token solo en backend (env).
+- **`apiperu.service.ts`**: las llamadas activas usan `environment.API_URL + 'external/'` con cookies; el token apisperu en código quedó **comentado** (legacy). Mantener solo proxy backend.
 
-#### C) Secreto JWT
+#### C) Secreto JWT — **endurecido**
 
-- **`autenticate.js`**: `process.env.JWT_SECRET || 'erik@./Eog_DEV_CHANGE_IN_PRODUCTION'`. Si en producción no se define `JWT_SECRET`, se usa un valor por defecto conocido. **Obligatorio** definir `JWT_SECRET` fuerte en producción.
+- **`JWT_SECRET`**: en `NODE_ENV=production` el proceso **termina al arranque** si falta o está vacío ([backAppC/config/env.validation.js](backAppC/config/env.validation.js)). En runtime, [backAppC/config/jwt.config.js](backAppC/config/jwt.config.js) + [backAppC/helpers/jwt.js](backAppC/helpers/jwt.js) y [backAppC/middlewares/autenticate.js](backAppC/middlewares/autenticate.js) centralizan el secreto; en desarrollo se conserva fallback solo para DX local.
 
 #### D) Uso de idEmpresa desde el body
 
@@ -98,8 +95,8 @@ El proyecto sigue una **arquitectura en capas** (controllers → services → re
 ### 3.3 Resumen seguridad
 
 - Hay buena base (JWT, tenant, Helmet, CORS).
-- **Crítico**: corregir rutas sin auth (`/api/ventas`, `DELETE /api/ventas/:id`), proteger proxy factiliza y mover token apisperu al backend.
-- **Importante**: JWT_SECRET obligatorio en producción y no confiar en `req.body.idEmpresa` para operaciones sensibles.
+- **Pendiente revisión**: `req.body.idEmpresa` en controladores puntuales (p. ej. ventas), logo público, y observabilidad avanzada.
+- **Añadido Fase 1**: correlación `X-Request-Id` / `req.requestId`, logs JSON en `errorHandler`, `GET /health` opcional con `HEALTH_CHECK_DB=1`, gate SaaS **fail-closed** si falla lectura de suscripción en BD ([backAppC/middlewares/saasSuscripcionGate.js](backAppC/middlewares/saasSuscripcionGate.js)).
 
 ---
 

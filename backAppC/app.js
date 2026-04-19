@@ -1,4 +1,6 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const { assertProductionEnv } = require('./config/env.validation');
+assertProductionEnv();
 const express = require('express');
 require('express-async-errors');
 const cors = require('cors');
@@ -8,6 +10,7 @@ const xss = require('xss'); // Solo si vas a usarlo
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const auth = require('./middlewares/autenticate');
+const { requestContextMiddleware } = require('./middlewares/requestContext.middleware');
 const { querySafeMiddleware } = require('./middlewares/tenant-query');
 const { saasSuscripcionGate } = require('./middlewares/saasSuscripcionGate');
 const publicSaasRoutes = require('./routes/publicSaas');
@@ -97,6 +100,7 @@ app.use('/productos-img', express.static(path.join(__dirname, 'uploads/productos
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 
 app.use(cookieParser());
+app.use(requestContextMiddleware);
 const PORT = process.env.PORT || 3000;
 
 // Middleware para parsear JSON y formularios
@@ -226,9 +230,22 @@ app.use('/api', grifoRoutes);
 const errorHandler = require('./middlewares/errorHandler');
 app.use(errorHandler);
 
-// Health para Kubernetes/Ambassador (sin auth)
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'backAppC' });
+// Health para Kubernetes/Ambassador (sin auth). Con HEALTH_CHECK_DB=1 valida SELECT 1.
+app.get('/health', async (req, res) => {
+  const body = { status: 'ok', service: 'backAppC', requestId: req.requestId };
+  if (process.env.HEALTH_CHECK_DB === '1') {
+    try {
+      const { withPool } = require('./utils/dbPool.util');
+      await withPool(async (pool) => {
+        await pool.request().query('SELECT 1 AS ok');
+      });
+      body.db = 'ok';
+    } catch (error) {
+      console.error('context:', JSON.stringify({ level: 'error', message: 'health_db_failed', requestId: req.requestId, detail: error.message }));
+      return res.status(503).json({ ...body, status: 'degraded', db: 'error' });
+    }
+  }
+  res.status(200).json(body);
 });
 
 // Iniciar servidor

@@ -1,12 +1,10 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const choferesService = require('../services/choferes.service');
 
 // Listar choferes internos registrados (por empresa del token)
 const listarChoferes = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const choferes = await choferesService.listarChoferesService(pool, req.user);
+    const choferes = await withPool(async (pool) => choferesService.listarChoferesService(pool, req.user));
     return res.status(200).send({ data: choferes });
   } catch (error) {
     if (error.message === 'NO_ACCESS') return res.status(401).send({ message: 'No autorizado', data: undefined });
@@ -18,8 +16,7 @@ const listarChoferes = async (req, res) => {
 // Listar usuarios que tienen rol 'Chofer' (para asignar a un chofer interno)
 const listarUsuariosChoferRol = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const usuarios = await choferesService.listarUsuariosChoferRolService(pool, req.user);
+    const usuarios = await withPool(async (pool) => choferesService.listarUsuariosChoferRolService(pool, req.user));
     return res.status(200).send({ data: usuarios });
   } catch (error) {
     if (error.message === 'NO_ACCESS') return res.status(401).send({ message: 'No autorizado', data: undefined });
@@ -38,11 +35,12 @@ const crearOActualizarChofer = async (req, res) => {
       return res.status(400).send({ message: 'idUsuarioChofer es requerido', data: undefined });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await choferesService.crearOActualizarChoferService(pool, req.user, {
-      idUsuarioChofer,
-      idVehiculo: idVehiculo || null
-    });
+    const result = await withPool(async (pool) =>
+      choferesService.crearOActualizarChoferService(pool, req.user, {
+        idUsuarioChofer,
+        idVehiculo: idVehiculo || null
+      })
+    );
 
     return res.status(200).send({ message: result?.mensaje || 'Chofer guardado', data: result?.data || null });
   } catch (error) {
@@ -58,4 +56,3 @@ module.exports = {
   listarUsuariosChoferRol,
   crearOActualizarChofer
 };
-

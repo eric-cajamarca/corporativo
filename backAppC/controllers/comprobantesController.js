@@ -1,13 +1,11 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const comprobantesService = require('../services/comprobantes.service');
 const { errores: CE } = comprobantesService;
+const { withPool } = require('../utils/dbPool.util');
 
 async function obtener_comprobantes(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
     const uso = (req.query?.uso || '').toLowerCase();
-    const data = await comprobantesService.obtenerComprobantes(pool, req.user, uso);
+    const data = await withPool((pool) => comprobantesService.obtenerComprobantes(pool, req.user, uso));
     return res.status(200).send({ data });
   } catch (error) {
     if (error.message === CE.NO_AUTH) {
@@ -21,8 +19,7 @@ async function obtener_comprobantes(req, res) {
 async function obtenerComprobantes_alias(req, res) {
   const alias = req.params.id;
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await comprobantesService.obtenerComprobantesAlias(pool, req.user, alias);
+    const data = await withPool((pool) => comprobantesService.obtenerComprobantesAlias(pool, req.user, alias));
     return res.json(data);
   } catch (error) {
     if (error.message === CE.NO_AUTH) {
@@ -38,12 +35,8 @@ async function obtenerComprobantes_alias(req, res) {
 
 async function actualizar_comprobante(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
-    const affected = await comprobantesService.actualizarComprobante(
-      pool,
-      req.user,
-      req.params.id,
-      req.body || {}
+    const affected = await withPool((pool) =>
+      comprobantesService.actualizarComprobante(pool, req.user, req.params.id, req.body || {})
     );
     return res.status(200).send({ data: { rowsAffected: affected } });
   } catch (error) {
@@ -76,8 +69,7 @@ async function actualizar_comprobante(req, res) {
 
 async function crear_comprobante(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
-    const idNew = await comprobantesService.crearComprobante(pool, req.user, req.body || {});
+    const idNew = await withPool((pool) => comprobantesService.crearComprobante(pool, req.user, req.body || {}));
     return res.status(200).send({ data: { idComprobante: idNew } });
   } catch (error) {
     if (error.message === CE.NO_AUTH) {

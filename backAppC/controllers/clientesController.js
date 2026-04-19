@@ -1,14 +1,12 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const clientesService = require('../services/clientes.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const crearCliente = async function (req, res) {
   if (!req.user) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const cliente = await clientesService.crearCliente(pool, req.user, req.body);
+    const cliente = await withPool((pool) => clientesService.crearCliente(pool, req.user, req.body));
     res.status(200).send({ message: 'Cliente creado', data: cliente });
   } catch (err) {
     if (err.code === 'RUC_DUPLICADO') {
@@ -27,8 +25,7 @@ const listarClientes = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await clientesService.listarClientes(pool, req.user);
+    const data = await withPool((pool) => clientesService.listarClientes(pool, req.user));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {
     if (err.message === 'NO_PERM' || err.message === 'NO_EMPRESA') {
@@ -45,8 +42,7 @@ const listarClientes_ruc = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await clientesService.listarPorRuc(pool, req.user, ruc);
+    const data = await withPool((pool) => clientesService.listarPorRuc(pool, req.user, ruc));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -63,8 +59,7 @@ const listarClientes_id = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await clientesService.listarPorId(pool, req.user, idCliente);
+    const data = await withPool((pool) => clientesService.listarPorId(pool, req.user, idCliente));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -81,8 +76,7 @@ const actualizarCliente = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await clientesService.actualizarCliente(pool, req.user, idCliente, req.body);
+    const data = await withPool((pool) => clientesService.actualizarCliente(pool, req.user, idCliente, req.body));
     res.status(200).send({ message: 'Cliente actualizado', data });
   } catch (err) {
     if (err.code === 'NOT_FOUND') {
@@ -102,8 +96,7 @@ const eliminarCliente = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const n = await clientesService.eliminarCliente(pool, req.user, idCliente);
+    const n = await withPool((pool) => clientesService.eliminarCliente(pool, req.user, idCliente));
     res.status(200).send({ message: 'Cliente eliminado', data: n });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -121,8 +114,7 @@ const cambiarEstadoCliente = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const rows = await clientesService.cambiarEstado(pool, req.user, idCliente, estado);
+    const rows = await withPool((pool) => clientesService.cambiarEstado(pool, req.user, idCliente, estado));
     res.status(200).send({ message: 'Cliente eliminado', data: rows });
   } catch (err) {
     if (err.message === 'NO_PERM') {

@@ -1,5 +1,4 @@
-const sql = require("mssql");
-const dbConfig = require("../dbconfig");
+const { withPool } = require("../utils/dbPool.util");
 const vehiculosService = require("../services/vehiculos.service");
 
 const guardarVehiculoYSoat = async (req, res) => {
@@ -9,8 +8,9 @@ const guardarVehiculoYSoat = async (req, res) => {
       return res.status(401).json({ message: "No autorizado: falta empresa en token" });
     }
     const { vehiculo, soat } = req.body || {};
-    const pool = await sql.connect(dbConfig);
-    const result = await vehiculosService.guardarVehiculoYSoatService(pool, idEmpresa, { vehiculo, soat });
+    const result = await withPool(async (pool) =>
+      vehiculosService.guardarVehiculoYSoatService(pool, idEmpresa, { vehiculo, soat })
+    );
     return res.status(200).json({ message: "Vehículo y SOAT guardados", data: result });
   } catch (err) {
     console.error("vehiculosController.guardarVehiculoYSoat:", err?.message || err);
@@ -26,8 +26,7 @@ const listarVehiculos = async (req, res) => {
     if (!idEmpresa) {
       return res.status(401).json({ message: "No autorizado: falta empresa en token" });
     }
-    const pool = await sql.connect(dbConfig);
-    const list = await vehiculosService.listarVehiculosService(pool, idEmpresa);
+    const list = await withPool(async (pool) => vehiculosService.listarVehiculosService(pool, idEmpresa));
     return res.status(200).json({ data: list });
   } catch (err) {
     console.error("vehiculosController.listarVehiculos:", err?.message || err);
@@ -41,8 +40,9 @@ const listarVehiculosSoatVencido = async (req, res) => {
     if (!idEmpresa) {
       return res.status(401).json({ message: "No autorizado: falta empresa en token" });
     }
-    const pool = await sql.connect(dbConfig);
-    const list = await vehiculosService.listarVehiculosSoatVencidoService(pool, idEmpresa);
+    const list = await withPool(async (pool) =>
+      vehiculosService.listarVehiculosSoatVencidoService(pool, idEmpresa)
+    );
     return res.status(200).json({ data: list });
   } catch (err) {
     console.error("vehiculosController.listarVehiculosSoatVencido:", err?.message || err);
@@ -60,8 +60,7 @@ const eliminarVehiculo = async (req, res) => {
     if (!idVehiculo) {
       return res.status(400).json({ message: "idVehiculo es obligatorio" });
     }
-    const pool = await sql.connect(dbConfig);
-    const ok = await vehiculosService.eliminarVehiculoService(pool, idEmpresa, idVehiculo);
+    const ok = await withPool(async (pool) => vehiculosService.eliminarVehiculoService(pool, idEmpresa, idVehiculo));
     if (!ok) {
       return res.status(404).json({ message: "Vehículo no encontrado" });
     }

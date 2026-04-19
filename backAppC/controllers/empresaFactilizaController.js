@@ -1,7 +1,6 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
+const { withPool } = require('../utils/dbPool.util');
 
 /** Igual que listado de empresas / política 2FA: superAdmin + empresa principal (EMPRESA_PRINCIPAL_ID). */
 function requireSuperAdminPlataforma(req, res) {
@@ -24,16 +23,12 @@ function requireSuperAdminPlataforma(req, res) {
  */
 async function getServicios(req, res) {
   if (!requireSuperAdminPlataforma(req, res)) return;
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    const servicios = await factilizaRepository.getServiciosFactiliza(pool);
+    const servicios = await withPool((pool) => factilizaRepository.getServiciosFactiliza(pool));
     res.json({ data: servicios });
   } catch (err) {
     console.error('empresaFactilizaController getServicios:', err.message);
     res.status(500).json({ message: 'Error al listar servicios' });
-  } finally {
-    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 
@@ -43,16 +38,12 @@ async function getServicios(req, res) {
  */
 async function getEmpresasServicios(req, res) {
   if (!requireSuperAdminPlataforma(req, res)) return;
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    const result = await factilizaRepository.getEmpresasServicios(pool);
+    const result = await withPool((pool) => factilizaRepository.getEmpresasServicios(pool));
     res.json({ data: result });
   } catch (err) {
     console.error('empresaFactilizaController getEmpresasServicios:', err.message);
     res.status(500).json({ message: 'Error al cargar empresas y servicios' });
-  } finally {
-    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 
@@ -67,25 +58,23 @@ async function guardarEmpresasServicios(req, res) {
   if (!Array.isArray(asignaciones)) {
     return res.status(400).json({ message: 'Se requiere asignaciones (array)' });
   }
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    for (const a of asignaciones) {
-      if (a.idEmpresa && a.nombreServicio != null) {
-        await factilizaRepository.guardarEmpresaServicio(
-          pool,
-          a.idEmpresa,
-          String(a.nombreServicio).trim(),
-          !!a.puedeUsar
-        );
+    await withPool(async (pool) => {
+      for (const a of asignaciones) {
+        if (a.idEmpresa && a.nombreServicio != null) {
+          await factilizaRepository.guardarEmpresaServicio(
+            pool,
+            a.idEmpresa,
+            String(a.nombreServicio).trim(),
+            !!a.puedeUsar
+          );
+        }
       }
-    }
+    });
     res.json({ message: 'Asignaciones guardadas correctamente' });
   } catch (err) {
     console.error('empresaFactilizaController guardarEmpresasServicios:', err.message);
     res.status(500).json({ message: 'Error al guardar asignaciones' });
-  } finally {
-    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 

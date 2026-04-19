@@ -1,19 +1,19 @@
 // NUNCA pongas lógica de negocio en controllers (regla 1.1)
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const permisosService = require('../services/permisos.service');
 
 /**
  * Obtiene los permisos del usuario autenticado
  */
 const obtener_permisos_usuario = async function (req, res) {
-        try {
+    try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.obtenerPermisosUsuario(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.obtenerPermisosUsuario(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Permisos obtenidos correctamente',
@@ -46,8 +46,9 @@ const obtener_permisos_empresa = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.obtenerPermisosEmpresa(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.obtenerPermisosEmpresa(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Permisos de empresa obtenidos correctamente',
@@ -82,8 +83,9 @@ const obtener_permisos_rol = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.obtenerPermisosRol(pool, idRol, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.obtenerPermisosRol(pool, idRol, req.user)
+        );
 
         res.status(200).json({
             message: 'Permisos del rol obtenidos correctamente',
@@ -118,8 +120,9 @@ const crear_permiso = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.crearPermiso(pool, nombre, descripcion, modulo, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.crearPermiso(pool, nombre, descripcion, modulo, req.user)
+        );
 
         res.status(200).json({
             message: 'Permiso creado correctamente',
@@ -163,13 +166,14 @@ const crear_permiso = async function (req, res) {
 const actualizar_permisos_rol = async function (req, res) {
     const { idRol } = req.params;
     const { permisos } = req.body;
-        try {
+    try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.actualizarPermisosRol(pool, idRol, permisos, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.actualizarPermisosRol(pool, idRol, permisos, req.user)
+        );
 
         res.status(200).json({
             message: 'Permisos del rol actualizados correctamente',
@@ -209,8 +213,7 @@ const obtener_modulos = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.obtenerModulos(pool, req.user);
+        const resultado = await withPool(async (pool) => permisosService.obtenerModulos(pool, req.user));
 
         res.status(200).json({
             message: 'Módulos obtenidos correctamente',
@@ -236,8 +239,9 @@ const inicializar_permisos = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.inicializarPermisos(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.inicializarPermisos(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Permisos inicializados correctamente',
@@ -265,14 +269,14 @@ const inicializar_permisos = async function (req, res) {
  * Obtiene la navegación del sidebar basada en permisos
  */
 const obtener_navegacion_sidebar = async function (req, res) {
-    
-        try {
+    try {
         if (!req.user) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await permisosService.obtenerNavegacionSidebar(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            permisosService.obtenerNavegacionSidebar(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Navegación obtenida correctamente',

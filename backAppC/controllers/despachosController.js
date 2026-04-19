@@ -1,5 +1,4 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const DespachosServices = require('../services/despachos.service');
 
 // Obtener despachos por venta
@@ -7,8 +6,9 @@ const obtenerDespachosVenta = async (req, res) => {
   try {
     const { idVenta } = req.params;
 
-    const pool = await sql.connect(dbConfig);
-    const despachos = await DespachosServices.obtenerDespachosVentaService(pool, req.user, idVenta, req.query);
+    const despachos = await withPool(async (pool) =>
+      DespachosServices.obtenerDespachosVentaService(pool, req.user, idVenta, req.query)
+    );
 
     res.status(200).send({ data: despachos });
   } catch (error) {
@@ -48,18 +48,19 @@ const crearDespacho = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
     const idEmpresaOperativa =
       idEmpresa != null && String(idEmpresa).trim() !== ''
         ? String(idEmpresa).trim()
         : undefined;
-    const result = await DespachosServices.crearDespachoService(pool, req.user, {
-      idVenta,
-      idTipoDespacho,
-      observaciones,
-      detalles: Array.isArray(detalles) ? detalles : undefined,
-      ...(idEmpresaOperativa ? { idEmpresa: idEmpresaOperativa } : {})
-    });
+    const result = await withPool(async (pool) =>
+      DespachosServices.crearDespachoService(pool, req.user, {
+        idVenta,
+        idTipoDespacho,
+        observaciones,
+        detalles: Array.isArray(detalles) ? detalles : undefined,
+        ...(idEmpresaOperativa ? { idEmpresa: idEmpresaOperativa } : {})
+      })
+    );
 
     res.status(200).send({
       message: "Despacho creado exitosamente",
@@ -103,13 +104,14 @@ const actualizarCantidadDespachada = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await DespachosServices.actualizarCantidadDespachadaService(pool, req.user, {
-      idDetalleDespacho,
-      cantidadDespachada,
-      ubicacionOrigen,
-      ubicacionDestino
-    });
+    const result = await withPool(async (pool) =>
+      DespachosServices.actualizarCantidadDespachadaService(pool, req.user, {
+        idDetalleDespacho,
+        cantidadDespachada,
+        ubicacionOrigen,
+        ubicacionDestino
+      })
+    );
 
     res.status(200).send({
       message: "Cantidad despachada actualizada exitosamente",
@@ -144,8 +146,9 @@ const finalizarDespacho = async (req, res) => {
   try {
     const { idDespacho } = req.params;
 
-    const pool = await sql.connect(dbConfig);
-    const result = await DespachosServices.finalizarDespachoService(pool, req.user, idDespacho);
+    const result = await withPool(async (pool) =>
+      DespachosServices.finalizarDespachoService(pool, req.user, idDespacho)
+    );
 
     res.status(200).send({
       message: "Despacho finalizado exitosamente",
@@ -178,8 +181,9 @@ const finalizarDespacho = async (req, res) => {
 // Obtener tipos de despacho
 const obtenerTiposDespacho = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const tipos = await DespachosServices.obtenerTiposDespachoService(pool, req.user);
+    const tipos = await withPool(async (pool) =>
+      DespachosServices.obtenerTiposDespachoService(pool, req.user)
+    );
     res.status(200).send({ data: tipos });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -196,8 +200,9 @@ const obtenerTiposDespacho = async (req, res) => {
 // Obtener estado de despachos
 const obtenerEstadoDespachos = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const estado = await DespachosServices.obtenerEstadoDespachosService(pool, req.user);
+    const estado = await withPool(async (pool) =>
+      DespachosServices.obtenerEstadoDespachosService(pool, req.user)
+    );
     res.status(200).send({ data: estado });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -214,8 +219,9 @@ const obtenerEstadoDespachos = async (req, res) => {
 // Buscar venta por número comprobante o idVenta; devuelve venta + despachos + entregadoMismoDia
 const buscarVentaDespachos = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const resultado = await DespachosServices.buscarVentaDespachosService(pool, req.user, req.query);
+    const resultado = await withPool(async (pool) =>
+      DespachosServices.buscarVentaDespachosService(pool, req.user, req.query)
+    );
     if (!resultado) {
       return res.status(404).send({ message: "Venta no encontrada", data: null });
     }
@@ -234,8 +240,9 @@ const buscarVentaDespachos = async (req, res) => {
 
 const buscarVentaAgrupadaDespachoGestora = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const resultado = await DespachosServices.buscarVentaAgrupadaDespachoGestoraService(pool, req.user, req.query);
+    const resultado = await withPool(async (pool) =>
+      DespachosServices.buscarVentaAgrupadaDespachoGestoraService(pool, req.user, req.query)
+    );
     if (!resultado) {
       return res.status(404).send({ message: "Sin coincidencias", data: null });
     }
@@ -265,8 +272,9 @@ const buscarVentaAgrupadaDespachoGestora = async (req, res) => {
 const obtenerDetalleDespacho = async (req, res) => {
   try {
     const { idDespacho } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const detalle = await DespachosServices.obtenerDetalleDespachoService(pool, req.user, idDespacho);
+    const detalle = await withPool(async (pool) =>
+      DespachosServices.obtenerDetalleDespachoService(pool, req.user, idDespacho)
+    );
     res.status(200).send({ data: detalle });
   } catch (error) {
     if (error.message === "NO_ACCESS") {

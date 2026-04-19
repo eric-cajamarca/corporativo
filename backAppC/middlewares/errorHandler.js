@@ -13,7 +13,18 @@ function errorHandler(err, req, res, next) {
   const status = typeof err.status === 'number' ? err.status : typeof err.statusCode === 'number' ? err.statusCode : 500;
   const message = err.message || 'Error interno del servidor';
 
-  console.error('errorHandler:', message);
+  console.error(
+    'context:',
+    JSON.stringify({
+      level: 'error',
+      message: 'errorHandler',
+      requestId: req.requestId,
+      path: (req.originalUrl || req.url || '').split('?')[0],
+      method: req.method,
+      status,
+      errMessage: message
+    })
+  );
   if (err.stack) console.error(err.stack);
 
   if (status >= 500) {
@@ -23,7 +34,11 @@ function errorHandler(err, req, res, next) {
       .catch((e) => console.error('errorHandler: alerta WhatsApp:', e.message));
   }
 
-  const body = { message: status >= 500 ? 'Error interno del servidor' : message, data: undefined };
+  const body = {
+    message: status >= 500 ? 'Error interno del servidor' : message,
+    data: undefined,
+    requestId: req.requestId
+  };
   res.status(status).json(body);
 }
 

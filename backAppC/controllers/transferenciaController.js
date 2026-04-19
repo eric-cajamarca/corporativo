@@ -1,9 +1,7 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const transferenciaService = require('../services/transferencia.service');
 
 const crear_transferencia = async function (req, res) {
-    let pool;
     try {
         if (!req.user) {
             return res.status(401).send({ 
@@ -35,20 +33,20 @@ const crear_transferencia = async function (req, res) {
             });
         }
 
-        pool = await sql.connect(dbConfig);
-        
-        const resultado = await transferenciaService.crearTransferencia(
-            pool,
-            {
-                idEmpresa: req.user.empresa,
-                idSucursalOrigen,
-                idSucursalDestino,
-                items,
-                observaciones: observaciones || '',
-                docRelacionado: docRelacionado || null,
-                idUsuario: req.user.idUsuario
-            },
-            req.user
+        const resultado = await withPool(async (pool) =>
+            transferenciaService.crearTransferencia(
+                pool,
+                {
+                    idEmpresa: req.user.empresa,
+                    idSucursalOrigen,
+                    idSucursalDestino,
+                    items,
+                    observaciones: observaciones || '',
+                    docRelacionado: docRelacionado || null,
+                    idUsuario: req.user.idUsuario
+                },
+                req.user
+            )
         );
 
         res.status(200).send({ 
@@ -79,16 +77,10 @@ const crear_transferencia = async function (req, res) {
             default:
                 return res.status(500).send({ message: 'Error interno del servidor', data: undefined });
         }
-    } finally {
-        // #region agent log
-        if (pool) fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'transferenciaController.js:finally:closePool',message:'about to close pool',data:{hasPool:!!pool},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
-        // No cerrar el pool: sql.connect(dbConfig) devuelve el pool global; cerrarlo rompe otras peticiones (ej. obtener productos).
     }
 };
 
 const obtener_transferencias = async function (req, res) {
-    let pool;
     try {
         if (!req.user) {
             return res.status(401).send({ message: 'No Access', data: undefined });
@@ -96,18 +88,18 @@ const obtener_transferencias = async function (req, res) {
 
         const { fechaInicio, fechaFin, idSucursal, estado } = req.query;
 
-        pool = await sql.connect(dbConfig);
-        
-        const resultado = await transferenciaService.obtenerTransferencias(
-            pool,
-            {
-                idEmpresa: req.user.empresa,
-                fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
-                fechaFin: fechaFin ? new Date(fechaFin) : null,
-                idSucursal: idSucursal || null,
-                estado: estado || null
-            },
-            req.user
+        const resultado = await withPool(async (pool) =>
+            transferenciaService.obtenerTransferencias(
+                pool,
+                {
+                    idEmpresa: req.user.empresa,
+                    fechaInicio: fechaInicio ? new Date(fechaInicio) : null,
+                    fechaFin: fechaFin ? new Date(fechaFin) : null,
+                    idSucursal: idSucursal || null,
+                    estado: estado || null
+                },
+                req.user
+            )
         );
 
         res.status(200).send({ 
@@ -124,13 +116,10 @@ const obtener_transferencias = async function (req, res) {
         }
         
         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
-    } finally {
-        // No cerrar pool global (ver crear_transferencia).
     }
 };
 
 const obtener_transferencia_por_id = async function (req, res) {
-    let pool;
     try {
         if (!req.user) {
             return res.status(401).send({ message: 'No Access', data: undefined });
@@ -142,13 +131,13 @@ const obtener_transferencia_por_id = async function (req, res) {
             return res.status(400).send({ message: 'ID de movimiento requerido', data: undefined });
         }
 
-        pool = await sql.connect(dbConfig);
-        
-        const resultado = await transferenciaService.obtenerTransferenciaPorId(
-            pool,
-            idMovimiento,
-            req.user.empresa,
-            req.user
+        const resultado = await withPool(async (pool) =>
+            transferenciaService.obtenerTransferenciaPorId(
+                pool,
+                idMovimiento,
+                req.user.empresa,
+                req.user
+            )
         );
 
         res.status(200).send({ 
@@ -164,13 +153,10 @@ const obtener_transferencia_por_id = async function (req, res) {
         }
         
         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
-    } finally {
-        // No cerrar pool global (ver crear_transferencia).
     }
 };
 
 const revertir_transferencia = async function (req, res) {
-    let pool;
     try {
         if (!req.user) {
             return res.status(401).send({ message: 'No Access', data: undefined });
@@ -187,17 +173,17 @@ const revertir_transferencia = async function (req, res) {
             return res.status(400).send({ message: 'Motivo de reversión requerido', data: undefined });
         }
 
-        pool = await sql.connect(dbConfig);
-        
-        const resultado = await transferenciaService.revertirTransferencia(
-            pool,
-            {
-                idMovimiento,
-                motivo: motivo.trim(),
-                idUsuario: req.user.idUsuario,
-                idEmpresa: req.user.empresa
-            },
-            req.user
+        const resultado = await withPool(async (pool) =>
+            transferenciaService.revertirTransferencia(
+                pool,
+                {
+                    idMovimiento,
+                    motivo: motivo.trim(),
+                    idUsuario: req.user.idUsuario,
+                    idEmpresa: req.user.empresa
+                },
+                req.user
+            )
         );
 
         res.status(200).send({ 
@@ -219,13 +205,10 @@ const revertir_transferencia = async function (req, res) {
             default:
                 return res.status(500).send({ message: 'Error interno del servidor', data: undefined });
         }
-    } finally {
-        // No cerrar pool global (ver crear_transferencia).
     }
 };
 
 const verificar_stock_transferencia = async function (req, res) {
-    let pool;
     try {
         if (!req.user) {
             return res.status(401).send({ message: 'No Access', data: undefined });
@@ -240,16 +223,16 @@ const verificar_stock_transferencia = async function (req, res) {
             return res.status(400).send({ message: 'Faltan campos requeridos', data: undefined });
         }
 
-        pool = await sql.connect(dbConfig);
-        
-        const resultado = await transferenciaService.verificarStockTransferencia(
-            pool,
-            {
-                idEmpresa: req.user.empresa,
-                idSucursalOrigen,
-                items
-            },
-            req.user
+        const resultado = await withPool(async (pool) =>
+            transferenciaService.verificarStockTransferencia(
+                pool,
+                {
+                    idEmpresa: req.user.empresa,
+                    idSucursalOrigen,
+                    items
+                },
+                req.user
+            )
         );
 
         res.status(200).send({ 
@@ -261,8 +244,6 @@ const verificar_stock_transferencia = async function (req, res) {
     } catch (error) {
         console.error('Error al verificar stock:', error);
         res.status(500).send({ message: 'Error interno del servidor', data: undefined });
-    } finally {
-        // No cerrar pool global (ver crear_transferencia).
     }
 };
 

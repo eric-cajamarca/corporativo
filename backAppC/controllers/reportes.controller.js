@@ -1,5 +1,4 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const reportesService = require('../services/reportes.service');
 
 // GET /api/reportes/compras-proveedor?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD
@@ -13,12 +12,13 @@ const getComprasPorProveedor = async (req, res) => {
       });
     }
     const { fechaInicio, fechaFin } = req.query;
-    const pool = await sql.connect(dbConfig);
-    const data = await reportesService.obtenerComprasPorProveedor(
-      pool,
-      idEmpresa,
-      fechaInicio,
-      fechaFin
+    const data = await withPool(async (pool) =>
+      reportesService.obtenerComprasPorProveedor(
+        pool,
+        idEmpresa,
+        fechaInicio,
+        fechaFin
+      )
     );
     return res.status(200).json({ message: 'OK', data });
   } catch (error) {
@@ -48,8 +48,7 @@ const getInventarioResumen = async (req, res) => {
         data: null,
       });
     }
-    const pool = await sql.connect(dbConfig);
-    const data = await reportesService.obtenerInventarioResumen(pool, idEmpresa);
+    const data = await withPool(async (pool) => reportesService.obtenerInventarioResumen(pool, idEmpresa));
     return res.status(200).json({ message: 'OK', data });
   } catch (error) {
     console.error('Error getInventarioResumen:', error);
@@ -71,12 +70,13 @@ const getClientesRentabilidad = async (req, res) => {
       });
     }
     const { fechaInicio, fechaFin } = req.query;
-    const pool = await sql.connect(dbConfig);
-    const data = await reportesService.obtenerClientesRentabilidad(
-      pool,
-      idEmpresa,
-      fechaInicio,
-      fechaFin
+    const data = await withPool(async (pool) =>
+      reportesService.obtenerClientesRentabilidad(
+        pool,
+        idEmpresa,
+        fechaInicio,
+        fechaFin
+      )
     );
     return res.status(200).json({ message: 'OK', data });
   } catch (error) {
@@ -106,8 +106,7 @@ const getCarteraCreditos = async (req, res) => {
         data: null,
       });
     }
-    const pool = await sql.connect(dbConfig);
-    const data = await reportesService.obtenerCarteraCreditos(pool, idEmpresa);
+    const data = await withPool(async (pool) => reportesService.obtenerCarteraCreditos(pool, idEmpresa));
     return res.status(200).json({ message: 'OK', data });
   } catch (error) {
     console.error('Error getCarteraCreditos:', error);
@@ -124,4 +123,3 @@ module.exports = {
   getClientesRentabilidad,
   getCarteraCreditos,
 };
-

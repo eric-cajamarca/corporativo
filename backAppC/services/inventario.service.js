@@ -1,7 +1,7 @@
 // services/inventario.service.js
 const { randomUUID } = require('crypto');
 const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const inventarioRepository = require('../repositories/inventario.repository');
 const productosVendidosRepository = require('../repositories/productosVendidos.repository');
 const productosCompradosRepository = require('../repositories/productosComprados.repository');
@@ -77,7 +77,7 @@ async function procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body) 
     throw new Error('Debe incluir al menos un ítem');
   }
 
-  const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
   const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
   const controlUbicaciones = String(getConfig(configRows, 'INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
 
@@ -241,6 +241,7 @@ async function procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body) 
     await transaction.rollback();
     throw err;
   }
+  });
 }
 
 /**
@@ -262,7 +263,7 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
   if (!idSucursal) throw new Error('Sucursal es obligatoria');
   if (!items || !Array.isArray(items) || items.length === 0) throw new Error('Debe incluir al menos un ítem');
 
-  const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
   const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
   const controlUbicaciones = String(getConfig(configRows, 'INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
 
@@ -395,22 +396,21 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
     await transaction.rollback();
     throw err;
   }
+  });
 };
 
 /**
  * Lista movimientos con filtros.
  */
 exports.listarMovimientos = async (idEmpresa, filtros) => {
-  const pool = await sql.connect(dbConfig);
-  return await inventarioRepository.listarMovimientos(pool, { ...filtros, idEmpresa });
+  return withPool((pool) => inventarioRepository.listarMovimientos(pool, { ...filtros, idEmpresa }));
 };
 
 /**
  * Cabeceras agrupadas para pantalla Movimientos (ingresos/salidas).
  */
 exports.listarMovimientosResumen = async (idEmpresa, query) => {
-  const pool = await sql.connect(dbConfig);
-  try {
+  return withPool(async (pool) => {
     const fechaInicio = query.fechaInicio || query.fechaDesde || null;
     const fechaFinRaw = query.fechaFin || query.fechaHasta || null;
     const toYmd = (v) => (v ? String(v).trim().substring(0, 10) : null);
@@ -427,33 +427,23 @@ exports.listarMovimientosResumen = async (idEmpresa, query) => {
       pageSize: Number.isNaN(pageSize) ? 10 : pageSize
     };
     return await inventarioRepository.listarMovimientosResumen(pool, filtros);
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  });
 };
 
 /**
  * Líneas de una cabecera (idMovimiento representativo).
  */
 exports.listarLineasMovimientoCabecera = async (idEmpresa, idMovimiento) => {
-  const pool = await sql.connect(dbConfig);
-  try {
-    return await inventarioRepository.listarLineasMovimientoPorCabecera(pool, idEmpresa, idMovimiento);
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  return withPool((pool) =>
+    inventarioRepository.listarLineasMovimientoPorCabecera(pool, idEmpresa, idMovimiento)
+  );
 };
 
 /**
  * Obtiene un movimiento por id (para detalle en modal).
  */
 exports.obtenerMovimientoPorId = async (idEmpresa, idMovimiento) => {
-  const pool = await sql.connect(dbConfig);
-  try {
-    return await inventarioRepository.obtenerMovimientoPorId(pool, idEmpresa, idMovimiento);
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  return withPool((pool) => inventarioRepository.obtenerMovimientoPorId(pool, idEmpresa, idMovimiento));
 };
 
 /**
@@ -479,8 +469,7 @@ exports.obtenerStockActual = async (user, query) => {
   if (!user || !user.empresa) {
     throw new Error('NO_AUTH');
   }
-  const pool = await sql.connect(dbConfig);
-  try {
+  return withPool(async (pool) => {
     const esAdmin = user.rol === 'Administrador';
     const puede =
       esAdmin || (await permisosService.verificarPermisoUsuario(pool, 'VER_INVENTARIO', user));
@@ -515,9 +504,7 @@ exports.obtenerStockActual = async (user, query) => {
       totalProductos: items.length,
       totalValorizado
     };
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  });
 };
 
 /**
@@ -528,8 +515,7 @@ exports.obtenerProductosVendidos = async (user, query) => {
   if (!user || !user.empresa) {
     throw new Error('NO_AUTH');
   }
-  const pool = await sql.connect(dbConfig);
-  try {
+  return withPool(async (pool) => {
     const esAdmin = user.rol === 'Administrador';
     const puede =
       esAdmin || (await permisosService.verificarPermisoUsuario(pool, 'VER_INVENTARIO', user));
@@ -566,9 +552,7 @@ exports.obtenerProductosVendidos = async (user, query) => {
       agrupar,
       buscar: query.buscar || null
     });
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  });
 };
 
 /**
@@ -578,8 +562,7 @@ exports.obtenerProductosComprados = async (user, query) => {
   if (!user || !user.empresa) {
     throw new Error('NO_AUTH');
   }
-  const pool = await sql.connect(dbConfig);
-  try {
+  return withPool(async (pool) => {
     const esAdmin = user.rol === 'Administrador';
     const puede =
       esAdmin || (await permisosService.verificarPermisoUsuario(pool, 'VER_INVENTARIO', user));
@@ -620,7 +603,5 @@ exports.obtenerProductosComprados = async (user, query) => {
       agrupar,
       buscar: query.buscar || null
     });
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  });
 };

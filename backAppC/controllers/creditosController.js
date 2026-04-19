@@ -1,6 +1,5 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
 const CreditosServices = require('../services/creditos.service');
+const { withPool } = require('../utils/dbPool.util');
 
 function handleEmpresaOpError(res, error) {
   if (error.message === 'EMPRESA_OPERACION_NO_PERMITIDA') {
@@ -11,8 +10,9 @@ function handleEmpresaOpError(res, error) {
 
 const obtenerCreditosClienteTodos = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const creditos = await CreditosServices.obtenerCreditosClienteService(pool, req.user, '', req.query.idEmpresaOperacion);
+    const creditos = await withPool((pool) =>
+      CreditosServices.obtenerCreditosClienteService(pool, req.user, '', req.query.idEmpresaOperacion)
+    );
     res.status(200).send({ data: creditos });
   } catch (error) {
     if (handleEmpresaOpError(res, error)) return;
@@ -30,8 +30,9 @@ const obtenerCreditosClienteTodos = async (req, res) => {
 const obtenerCreditosCliente = async (req, res) => {
   try {
     const { idCliente } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const creditos = await CreditosServices.obtenerCreditosClienteService(pool, req.user, idCliente, req.query.idEmpresaOperacion);
+    const creditos = await withPool((pool) =>
+      CreditosServices.obtenerCreditosClienteService(pool, req.user, idCliente, req.query.idEmpresaOperacion)
+    );
     res.status(200).send({ data: creditos });
   } catch (error) {
     if (handleEmpresaOpError(res, error)) return;
@@ -65,16 +66,17 @@ const crearCredito = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await CreditosServices.crearCreditoService(pool, req.user, {
-      idCliente,
-      idVenta,
-      montoTotal,
-      plazoDias: plazoDias || 30,
-      tasaInteres,
-      fechaInicio,
-      observaciones
-    });
+    const result = await withPool((pool) =>
+      CreditosServices.crearCreditoService(pool, req.user, {
+        idCliente,
+        idVenta,
+        montoTotal,
+        plazoDias: plazoDias || 30,
+        tasaInteres,
+        fechaInicio,
+        observaciones
+      })
+    );
 
     res.status(200).send({
       message: 'Crédito creado exitosamente',
@@ -101,8 +103,9 @@ const crearCredito = async (req, res) => {
 const obtenerCuotasCredito = async (req, res) => {
   try {
     const { idCredito } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const cuotas = await CreditosServices.obtenerCuotasCreditoService(pool, req.user, idCredito, req.query.idEmpresaOperacion);
+    const cuotas = await withPool((pool) =>
+      CreditosServices.obtenerCuotasCreditoService(pool, req.user, idCredito, req.query.idEmpresaOperacion)
+    );
     res.status(200).send({ data: cuotas });
   } catch (error) {
     if (handleEmpresaOpError(res, error)) return;
@@ -137,17 +140,18 @@ const pagarCuota = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await CreditosServices.pagarCuotaService(pool, req.user, {
-      idCuota,
-      montoPagado,
-      idMediosPago,
-      idMoneda,
-      numeroRecibo,
-      observaciones,
-      idApertura,
-      idEmpresaOperacion
-    });
+    const result = await withPool((pool) =>
+      CreditosServices.pagarCuotaService(pool, req.user, {
+        idCuota,
+        montoPagado,
+        idMediosPago,
+        idMoneda,
+        numeroRecibo,
+        observaciones,
+        idApertura,
+        idEmpresaOperacion
+      })
+    );
 
     res.status(200).send({
       message: 'Pago registrado exitosamente',
@@ -174,8 +178,9 @@ const pagarCuota = async (req, res) => {
 
 const obtenerResumenCreditos = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const resumen = await CreditosServices.obtenerResumenCreditosService(pool, req.user, req.query.idEmpresaOperacion);
+    const resumen = await withPool((pool) =>
+      CreditosServices.obtenerResumenCreditosService(pool, req.user, req.query.idEmpresaOperacion)
+    );
     res.status(200).send({ data: resumen });
   } catch (error) {
     if (handleEmpresaOpError(res, error)) return;
@@ -190,13 +195,14 @@ const obtenerResumenCreditos = async (req, res) => {
 const obtenerCuotasPendientes = async (req, res) => {
   try {
     const { dias } = req.query;
-    const pool = await sql.connect(dbConfig);
     const d = dias != null && dias !== '' ? parseInt(String(dias), 10) : 7;
-    const cuotas = await CreditosServices.obtenerCuotasPendientesService(
-      pool,
-      req.user,
-      Number.isNaN(d) ? 7 : d,
-      req.query.idEmpresaOperacion
+    const cuotas = await withPool((pool) =>
+      CreditosServices.obtenerCuotasPendientesService(
+        pool,
+        req.user,
+        Number.isNaN(d) ? 7 : d,
+        req.query.idEmpresaOperacion
+      )
     );
     res.status(200).send({ data: cuotas });
   } catch (error) {
@@ -211,8 +217,9 @@ const obtenerCuotasPendientes = async (req, res) => {
 
 const obtenerEficienciaCobros = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const eficiencia = await CreditosServices.obtenerEficienciaCobrosService(pool, req.user, req.query.idEmpresaOperacion);
+    const eficiencia = await withPool((pool) =>
+      CreditosServices.obtenerEficienciaCobrosService(pool, req.user, req.query.idEmpresaOperacion)
+    );
     res.status(200).send({ data: eficiencia });
   } catch (error) {
     if (handleEmpresaOpError(res, error)) return;

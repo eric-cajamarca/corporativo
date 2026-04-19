@@ -1,5 +1,4 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const whatsappFactilizaService = require('../services/whatsappFactiliza.service');
 
@@ -16,25 +15,26 @@ async function sendText(req, res) {
     return res.status(401).json({ status: 401, success: false, message: 'No autorizado' });
   }
   const { number, text } = req.body || {};
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_WHATSAPP);
-    if (!puedeUsar) {
-      return res.status(403).json({ status: 403, success: false, message: 'Su empresa no tiene autorización para usar WhatsApp' });
-    }
-    const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
-    if (!config || !config.tokenDefault) {
+    const gate = await withPool(async (pool) => {
+      const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_WHATSAPP);
+      if (!puedeUsar) return { ok: false, reason: 'FORBIDDEN' };
+      const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
+      if (!config || !config.tokenDefault) return { ok: false, reason: 'NOT_CONFIGURED' };
+      return { ok: true, config };
+    });
+    if (!gate.ok) {
+      if (gate.reason === 'FORBIDDEN') {
+        return res.status(403).json({ status: 403, success: false, message: 'Su empresa no tiene autorización para usar WhatsApp' });
+      }
       return res.status(503).json({ status: 503, success: false, message: 'Servicio WhatsApp no configurado' });
     }
-    const resultado = await whatsappFactilizaService.sendText(config, number, text);
+    const resultado = await whatsappFactilizaService.sendText(gate.config, number, text);
     return res.status(resultado.status === 200 ? 200 : 400).json(resultado);
   } catch (err) {
     console.error('whatsappController sendText:', err.message);
     const msg = err.message || 'Error al enviar mensaje';
     return res.status(400).json({ status: 400, success: false, message: msg });
-  } finally {
-    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 
@@ -49,25 +49,26 @@ async function sendMedia(req, res) {
     return res.status(401).json({ status: 401, success: false, message: 'No autorizado' });
   }
   const { number, mediatype, media, filename, caption } = req.body || {};
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_WHATSAPP);
-    if (!puedeUsar) {
-      return res.status(403).json({ status: 403, success: false, message: 'Su empresa no tiene autorización para usar WhatsApp' });
-    }
-    const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
-    if (!config || !config.tokenDefault) {
+    const gate = await withPool(async (pool) => {
+      const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_WHATSAPP);
+      if (!puedeUsar) return { ok: false, reason: 'FORBIDDEN' };
+      const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
+      if (!config || !config.tokenDefault) return { ok: false, reason: 'NOT_CONFIGURED' };
+      return { ok: true, config };
+    });
+    if (!gate.ok) {
+      if (gate.reason === 'FORBIDDEN') {
+        return res.status(403).json({ status: 403, success: false, message: 'Su empresa no tiene autorización para usar WhatsApp' });
+      }
       return res.status(503).json({ status: 503, success: false, message: 'Servicio WhatsApp no configurado' });
     }
-    const resultado = await whatsappFactilizaService.sendMedia(config, number, mediatype, media, filename, caption);
+    const resultado = await whatsappFactilizaService.sendMedia(gate.config, number, mediatype, media, filename, caption);
     return res.status(resultado.status === 200 ? 200 : 400).json(resultado);
   } catch (err) {
     console.error('whatsappController sendMedia:', err.message);
     const msg = err.message || 'Error al enviar archivo';
     return res.status(400).json({ status: 400, success: false, message: msg });
-  } finally {
-    // No cerrar pool global (rompe otras peticiones concurrentes).
   }
 }
 

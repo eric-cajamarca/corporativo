@@ -1,11 +1,9 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const documentoService = require('../services/documento.service');
+const { withPool } = require('../utils/dbPool.util');
 
 async function crearDocumento(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await documentoService.crearDocumento(pool, req.user, req.body);
+    const data = await withPool((pool) => documentoService.crearDocumento(pool, req.user, req.body));
     res.status(200).send({ message: 'Documento creado', data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -21,8 +19,7 @@ async function crearDocumento(req, res) {
 
 async function listarDocumentos(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await documentoService.listarDocumentos(pool, req.user);
+    const data = await withPool((pool) => documentoService.listarDocumentos(pool, req.user));
     res.status(200).send({ message: 'Lista de documentos', data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -38,9 +35,10 @@ async function listarDocumentos(req, res) {
 
 async function actualizarDocumento(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
     const idDocumento = req.params.idDocumento;
-    const data = await documentoService.actualizarDocumento(pool, req.user, idDocumento, req.body);
+    const data = await withPool((pool) =>
+      documentoService.actualizarDocumento(pool, req.user, idDocumento, req.body)
+    );
     res.status(200).send({ message: 'Documento actualizado', data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -56,9 +54,8 @@ async function actualizarDocumento(req, res) {
 
 async function eliminarDocumento(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
     const idDocumento = req.params.idDocumento;
-    const data = await documentoService.eliminarDocumento(pool, req.user, idDocumento);
+    const data = await withPool((pool) => documentoService.eliminarDocumento(pool, req.user, idDocumento));
     res.status(200).send({ message: 'Documento eliminado', data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -74,8 +71,7 @@ async function eliminarDocumento(req, res) {
 
 async function listarFormasPago(req, res) {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await documentoService.listarFormasPago(pool, req.user);
+    const data = await withPool((pool) => documentoService.listarFormasPago(pool, req.user));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {

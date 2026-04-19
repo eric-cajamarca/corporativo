@@ -1,48 +1,15 @@
-const dbConfig = require('../dbconfig');
 const { v4: uuidv4 } = require('uuid');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const ProductosServices = require('../services/productos.service');
 const ProductosRepository = require('../repositories/productos.repository');
 const productosMutacionesService = require('../services/productosMutaciones.service');
 
-
-
-// const obtener_productos_todos = async (req, res) => {
-//   if (req.user) {
-//     if (req.user.rol == "Administrador") {
-//       try {
-//         let pool = await sql.connect(dbConfig);
-//         let productos = await pool.request().query("SELECT * FROM Productos");
-
-      
-
-//         res.status(200).send({ data: productos.recordset });
-//       } catch (error) {
-//         console.log("obterner productos error: " + error);
-//         res
-//           .status(500)
-//           .send({ message: "Error al obtener los productos", data: undefined });
-//       }
-//     } else {
-//       res
-//         .status(200)
-//         .send({
-//           message: "No tiene permisos para realizar esta acción",
-//           data: undefined,
-//         });
-//     }
-//   } else {
-//     res.status(500).send({ message: "No Access", data: undefined });
-//   }
-// };
-
-
 const obtener_productos_todos = async (req, res) => {
   try {
 
-    const pool = await sql.connect(dbConfig);
-
-    const productos = await ProductosServices.obtenerProductosTodosService(pool, req.user);
+    const productos = await withPool(async (pool) =>
+      ProductosServices.obtenerProductosTodosService(pool, req.user)
+    );
 
     res.status(200).send({ data: productos });
   } catch (error) {
@@ -67,9 +34,9 @@ const obtener_productos_todos = async (req, res) => {
 const obtener_productos_compras = async (req, res) => {
   try {
 
-    const pool = await sql.connect(dbConfig);
-
-    const productos = await ProductosServices.obtenerProductosComprasService(pool, req.user);
+    const productos = await withPool(async (pool) =>
+      ProductosServices.obtenerProductosComprasService(pool, req.user)
+    );
 
     res.status(200).send({ data: productos });
   } catch (error) {
@@ -94,8 +61,9 @@ const obtener_productos_compras = async (req, res) => {
 const match_productos_descripcion = async (req, res) => {
   try {
     const descripciones = req.body && req.body.descripciones;
-    const pool = await sql.connect(dbConfig);
-    const matches = await ProductosServices.matchProductosPorDescripcionService(pool, req.user, descripciones || []);
+    const matches = await withPool(async (pool) =>
+      ProductosServices.matchProductosPorDescripcionService(pool, req.user, descripciones || [])
+    );
     res.status(200).send({ data: matches });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -110,10 +78,10 @@ const obtener_productos_id = async (req, res) => {
   try {
     const idProducto = req.params.id;
 
-    const pool = await sql.connect(dbConfig);
-
     // NUNCA pongas lógica de negocio en controllers, solo llamadas a services (regla 1.1)
-    const producto = await ProductosServices.obtenerProductoPorIdService(pool, idProducto, req.user);
+    const producto = await withPool(async (pool) =>
+      ProductosServices.obtenerProductoPorIdService(pool, idProducto, req.user)
+    );
 
     res.status(200).json({ data: producto });
   } catch (error) {
@@ -142,76 +110,6 @@ const obtener_productos_id = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor", data: undefined });
   }
 };
-
-// const crear_producto = async (req, res) => {
-//     const { Codigo, idCategoria, idMarca, descripcion, idPresentacion, pUnitario, fProduccion, fVencimiento, facturar } = req.body;
-
-//     console.log('crear producto ', req.body);
-//     //crear id unico
-//     const idProducto = uuidv4();
-//     const idEmpresa = req.user.empresa;
-//     const idUsuario = req.user.sub;
-//     //console.log('idUsuario ', idUsuario);
-
-//     // idCategoria = parseInt(idCategoria);
-
-//     //obtener fecha actual
-//     var hoy = new Date();
-//     var dd = hoy.getDate();
-//     var mm = hoy.getMonth() + 1;
-//     var yyyy = hoy.getFullYear();
-
-//     //dar formato a la fecha datetime
-//     const FIngreso = yyyy + '-' + mm + '-' + dd;
-
-//     if (req.user) {
-//         if (req.user.rol == 'Administrador') {
-//             try {
-//                 let pool = await sql.connect(dbConfig);
-//                 let productos = await pool
-//                     .request()
-//                     .input("idProducto", sql.UniqueIdentifier, idProducto)
-//                     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-//                     .input("Codigo", sql.VarChar, Codigo.toString())
-//                     .input("idCategoria", sql.Int, parseInt(idCategoria))
-//                     .input("descripcion", sql.VarChar, descripcion)
-//                     .input("idMarca", sql.Int, parseInt(idMarca)) //idMarca
-//                     .input("idPresentacion", sql.Int, parseInt(idPresentacion))
-//                     .input("cUnitario", sql.Decimal(18,5), parseFloat(pUnitario))
-//                     .input("fProduccion", sql.VarChar, fProduccion)
-//                     .input("fVencimiento", sql.VarChar, fVencimiento)
-//                     .input("alertaMinimo", sql.Decimal, 5)
-//                     .input("alertaMaximo", sql.Decimal, 50)
-//                     .input("VecesVendidas", sql.Int, 0)
-//                     .input("facturar", sql.VarChar, facturar)
-//                     .input("idUsuario", sql.UniqueIdentifier, idUsuario)
-//                     .input("FIngreso", sql.DateTime, FIngreso)
-//                     .input("estado", sql.Bit, 1) //estado
-//                     .query("INSERT INTO Productos VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado)");
-
-//                     //if(productos.rowsAffected == 1){
-//                         res.status(200).send({ data: idProducto });
-//                     // }else{
-//                     //     res.status(500).send({ message: 'Error al crear los productos', data: undefined });
-//                     // }
-//                     console.log('producto creado ', idProducto);
-
-//             } catch (error) {
-//                 console.log('crear productos error: ' + error);
-//                 res.status(500).send({ message: 'Error al crear los productos', data: undefined });
-//             }
-
-//         } else {
-//             console.log('no tiene permisos');
-//             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-//         }
-//     }
-//     else {
-//         console.log('no tiene acceso');
-//         res.status(500).send({ message: 'No Access', data: undefined });
-//     }
-
-// }
 
 const gestionProductos_Compras = async (req, res) => {
     const {
@@ -389,28 +287,31 @@ const crear_producto = async (req, res) => {
   }
 
   try {
-    const pool = await sql.connect(dbConfig);
-    datosProducto.idUsuario = await productosMutacionesService.resolverIdUsuarioParaProducto(
-      pool,
-      idEmpresa,
-      req.user.sub
-    );
-    if (!datosProducto.idUsuario) {
+    const resultado = await withPool(async (pool) => {
+      datosProducto.idUsuario = await productosMutacionesService.resolverIdUsuarioParaProducto(
+        pool,
+        idEmpresa,
+        req.user.sub
+      );
+      if (!datosProducto.idUsuario) {
+        return { __sinUsuario: true };
+      }
+      return productosMutacionesService.crearProductoConTransaccion(pool, {
+        datosProducto,
+        usarCorrelativo: usarCorrelativo,
+        lote,
+        precioVenta,
+        idListaPrecio,
+        idEmpresa
+      });
+    });
+    if (resultado && resultado.__sinUsuario) {
       console.error("crear_producto: no se encontró idUsuario válido para empresa", idEmpresa);
       return res.status(400).send({
         message: "No hay usuario asociado a la empresa para registrar el producto. Contacte al administrador.",
         data: undefined,
       });
     }
-
-    const resultado = await productosMutacionesService.crearProductoConTransaccion(pool, {
-      datosProducto,
-      usarCorrelativo: usarCorrelativo,
-      lote,
-      precioVenta,
-      idListaPrecio,
-      idEmpresa
-    });
     if (resultado.errorLista) {
       return res.status(400).send({ message: "Lista de precios inválida", data: undefined });
     }
@@ -428,8 +329,7 @@ const crear_producto = async (req, res) => {
 const actualizar_producto_compra = async function (datosProducto, user) {
   const detalle = datosProducto;
   try {
-    const pool = await sql.connect(dbConfig);
-    await productosMutacionesService.actualizarProductoCompra(pool, detalle);
+    await withPool(async (pool) => productosMutacionesService.actualizarProductoCompra(pool, detalle));
     return detalle.idProducto;
   } catch (error) {
     console.error('actualizar_producto_compra:', error);
@@ -440,8 +340,7 @@ const actualizar_producto_compra = async function (datosProducto, user) {
 const crear_producto_compra = async (datosProducto, user) => {
   const detalle = datosProducto;
   try {
-    const pool = await sql.connect(dbConfig);
-    await productosMutacionesService.crearProductoCompra(pool, detalle);
+    await withPool(async (pool) => productosMutacionesService.crearProductoCompra(pool, detalle));
     return detalle.idProducto;
   } catch (error) {
     console.error('crear_producto_compra:', error);
@@ -490,8 +389,7 @@ const actualizar_producto = async function (req, res) {
   };
 
   try {
-    let pool = await sql.connect(dbConfig);
-    const productos = await productosMutacionesService.actualizarProducto(pool, detalle);
+    const productos = await withPool(async (pool) => productosMutacionesService.actualizarProducto(pool, detalle));
 
     res.status(200).send({ data: productos.rowsAffected });
   } catch (error) {
@@ -516,8 +414,9 @@ const eliminar_producto = async function (req, res) {
   if (req.user) {
     if (req.user.rol == "Administrador") {
       try {
-        let pool = await sql.connect(dbConfig);
-        let productos = await productosMutacionesService.eliminarProducto(pool, idProducto, idEmpresa);
+        const productos = await withPool(async (pool) =>
+          productosMutacionesService.eliminarProducto(pool, idProducto, idEmpresa)
+        );
 
         res.status(200).send({ data: productos.rowsAffected });
       } catch (error) {
@@ -616,31 +515,12 @@ function formatearFecha(date) {
   return `${year}-${month}-${day}`;
 }
 
-
-// const obtener_Stock_id = async function (req, res){
-//   const { id } = req.params;
-//   let pool = await sql.connect(dbConfig);
-//   const stock = await obtenerProductosTodosService.getStock(id, pool);
-//   res.status(200).send({ data: stock });
-  
-// };
-
-// export const updateStock = async function (req, res){
-//   const { id } = req.params;
-//   const { quantity, reason } = req.body;
-
-//   let pool = await sql.connect(dbConfig);
-
-//   await obtenerProductosTodosService.updateStock(id, catidad, reason);
-//   res.sendStatus(204);
-// };
-
-
 const obtener_productos_habitacion = async (req, res) => {
   try {
     if (!req.user || !req.user.empresa) return res.status(401).json({ message: 'No autorizado' });
-    const pool = await sql.connect(dbConfig);
-    const items = await ProductosRepository.obtenerProductosHabitacionRepo(pool, req.user.empresa);
+    const items = await withPool(async (pool) =>
+      ProductosRepository.obtenerProductosHabitacionRepo(pool, req.user.empresa)
+    );
     res.status(200).json({ data: items });
   } catch (error) {
     console.error('productos.obtener_productos_habitacion:', error);

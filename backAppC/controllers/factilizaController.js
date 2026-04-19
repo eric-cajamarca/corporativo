@@ -1,8 +1,7 @@
 const xml2js = require('xml2js');
 require('dotenv').config();
 const JSZip = require('jszip');
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const facturacionRepo = require('../repositories/facturacion.repository');
 const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
@@ -95,7 +94,6 @@ const getDni = async function (req, res){
       }
     
     res.status(200).send({ message: 'Consulta exitosa', data });
-    // res.json({ message: 'OK', innerData});
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Error al consultar el DNI' });
@@ -123,7 +121,6 @@ const getCextranjeria = async function (req, res){
       }
     
     res.status(200).send({ message: 'Consulta exitosa', data });
-    // res.json({ message: 'OK', innerData});
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Error al consultar el DNI' });
@@ -156,8 +153,6 @@ const getRuc = async function (req, res){
     res.status(500).json({ message: 'Error al consultar el RUC'});
   }
 };
-
-//tipo de cambio
 
 const getTipoCambio = async function (req, res) {
   try {
@@ -259,76 +254,11 @@ const getLicencia = async function (req, res){
       }
     
     res.status(200).send({ message: 'Consulta exitosa', data });
-    // res.json({ message: 'OK', innerData});
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Error al consultar el DNI' });
   }
 };
-
-//////////////////////////////////////////////////////////////////////////
-// Exportar las funciones para usarlas en las rutas
-///////////////////////////////////////////////////////////////////////////
-
-// controllers/factilizaController.js
-
-// const getXmlSunat = async function (req, res) {
-//   try {
-//     const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = req.body;
-//     const url = `https://api.factiliza.com/v1/sunat/xml/${ruc}-${usuario}-${password}-${proveedor}-${tipo_doc}-${serie}-${correlativo}`;
-
-//     const response = await fetch(url, {
-//       method: 'POST',
-//       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
-//     });
-
-//     console.log('Status Factiliza:', response); // ← depura el status
-//     const raw = await response.text(); // ← leer como texto
-//     console.log('Raw Factiliza:', raw); // ← depura qué llega
-
-//     let body;
-//     try {
-//       body = JSON.parse(raw); // intenta parsear JSON
-//     } catch {
-//       return res.status(500).json({ message: 'Respuesta no válida de Factiliza', raw });
-//     }
-
-//     if (!response.ok || body.status !== 200) {
-//       return res.status(body.status || 500).json(body);
-//     }
-
-//     const xmlBase64 = body.data;
-//     const xmlText = Buffer.from(xmlBase64, 'base64').toString('utf-8');
-//     // const body = await fact.json();
-
-//     // if (!fact.ok) return res.status(fact.status).json(body);
-
-//     // const xmlText = Buffer.from(body.data, 'base64').toString('utf-8');
-
-//     // xml2js.parseString(xmlText, { explicitArray: false }, (err, result) => {
-//     //   if (err) return res.status(500).json({ message: 'Error al convertir XML' });
-//     //   res.json({ xmlJson: result });
-//     // });
-//     // const body = await response.json();
-
-//     // if (!response.ok || body.status !== 200) {
-//     //   return res.status(body.status || 500).json(body);
-//     // }
-
-//     // const xmlBase64 = body.data;
-//     // const xmlText = Buffer.from(xmlBase64, 'base64').toString('utf-8');
-
-//     // xml2js.parseString(xmlText, { explicitArray: false }, (err, result) => {
-//     //   if (err) return res.status(500).json({ message: 'Error al convertir XML' });
-//     //   res.json({ xmlJson: result });
-//     // });
-
-
-//   } catch (e) {
-//     console.error(e);
-//     res.status(500).json({ message: 'Error al obtener XML' });
-//   }
-// };
 
 function base64ToUint8Array(base64) {
   const buffer = Buffer.from(base64, 'base64');
@@ -377,12 +307,6 @@ const getXmlSunat = async function (req, res) {
 
     const xmlContent = await xmlFile.async('text');
 
-    // Convertir XML a JSON
-    // xml2js.parseString(xmlContent, { explicitArray: false }, (err, jsonData) => {
-    //   if (err) return res.status(500).json({ message: 'Error al convertir XML a JSON' });
-    //   res.json({ xmlJson: jsonData });
-    // });
-
     res.status(200).json({ message: 'Consulta exitosa', data: xmlContent });
 
   } catch (e) {
@@ -407,16 +331,25 @@ const consultarComprobanteSunat = async function (req, res) {
       return res.status(400).json({ message: 'Faltan datos: proveedor, tipo_doc, serie, correlativo' });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const acceso = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
-
-    let rucFinal = ruc || acceso.rucEmpresa;
-    let usuarioFinal = usuario || acceso.usuarioSol;
-    let passwordFinal = password || acceso.passwordSol;
-    const creds = await completarCredencialesSolDesdeFacturacion(pool, idEmpresa, rucFinal, usuarioFinal, passwordFinal);
-    rucFinal = creds.ruc;
-    usuarioFinal = creds.usuario;
-    passwordFinal = creds.password;
+    const { acceso, rucFinal, usuarioFinal, passwordFinal } = await withPool(async (pool) => {
+      const accesoRow = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
+      let rucFinal0 = ruc || accesoRow.rucEmpresa;
+      let usuarioFinal0 = usuario || accesoRow.usuarioSol;
+      let passwordFinal0 = password || accesoRow.passwordSol;
+      const creds = await completarCredencialesSolDesdeFacturacion(
+        pool,
+        idEmpresa,
+        rucFinal0,
+        usuarioFinal0,
+        passwordFinal0
+      );
+      return {
+        acceso: accesoRow,
+        rucFinal: creds.ruc,
+        usuarioFinal: creds.usuario,
+        passwordFinal: creds.password
+      };
+    });
 
     if (!rucFinal || String(rucFinal).replace(/\D/g, '').length !== 11 || !usuarioFinal || !passwordFinal) {
       return res.status(400).json({
@@ -489,22 +422,32 @@ const consultarComprobantePdf = async function (req, res) {
       return res.status(400).json({ message: 'Faltan datos: proveedor, tipo_doc, serie, correlativo' });
     }
 
-    const pool = await sql.connect(dbConfig);
-
-    const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_FACTILIZA_PDF);
-    if (!puedeUsar) {
+    const pdfDb = await withPool(async (pool) => {
+      const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_FACTILIZA_PDF);
+      if (!puedeUsar) return { ok: false };
+      const accesoRow = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
+      let rucFinal0 = ruc || accesoRow.rucEmpresa;
+      let usuarioFinal0 = usuario || accesoRow.usuarioSol;
+      let passwordFinal0 = password || accesoRow.passwordSol;
+      const credsPdf = await completarCredencialesSolDesdeFacturacion(
+        pool,
+        idEmpresa,
+        rucFinal0,
+        usuarioFinal0,
+        passwordFinal0
+      );
+      return {
+        ok: true,
+        acceso: accesoRow,
+        rucFinal: credsPdf.ruc,
+        usuarioFinal: credsPdf.usuario,
+        passwordFinal: credsPdf.password
+      };
+    });
+    if (!pdfDb.ok) {
       return res.status(403).json({ message: 'Servicio Factiliza PDF no habilitado para su empresa' });
     }
-
-    const acceso = await factilizaRepository.getTokenParaEmpresa(pool, idEmpresa);
-
-    let rucFinal = ruc || acceso.rucEmpresa;
-    let usuarioFinal = usuario || acceso.usuarioSol;
-    let passwordFinal = password || acceso.passwordSol;
-    const credsPdf = await completarCredencialesSolDesdeFacturacion(pool, idEmpresa, rucFinal, usuarioFinal, passwordFinal);
-    rucFinal = credsPdf.ruc;
-    usuarioFinal = credsPdf.usuario;
-    passwordFinal = credsPdf.password;
+    const { acceso, rucFinal, usuarioFinal, passwordFinal } = pdfDb;
 
     if (!rucFinal || String(rucFinal).replace(/\D/g, '').length !== 11 || !usuarioFinal || !passwordFinal) {
       return res.status(400).json({

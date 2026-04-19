@@ -1,6 +1,5 @@
 // NUNCA pongas lógica de negocio en controllers (regla 1.1)
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const usuarioSucursalService = require('../services/usuarioSucursal.service');
 
 /**
@@ -14,8 +13,9 @@ const obtener_sucursales_usuario = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.obtenerSucursalesUsuario(pool, idUsuario, req.user);
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.obtenerSucursalesUsuario(pool, idUsuario, req.user)
+        );
 
         res.status(200).json({
             message: 'Sucursales obtenidas correctamente',
@@ -48,8 +48,9 @@ const obtener_mis_sucursales = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.obtenerMisSucursales(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.obtenerMisSucursales(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Sucursales obtenidas correctamente',
@@ -76,8 +77,9 @@ const obtener_usuarios_sucursal = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.obtenerUsuariosSucursal(pool, idSucursal, req.user);
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.obtenerUsuariosSucursal(pool, idSucursal, req.user)
+        );
 
         res.status(200).json({
             message: 'Usuarios obtenidos correctamente',
@@ -112,13 +114,14 @@ const asignar_usuario_sucursal = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.asignarUsuarioSucursal(
-            pool, 
-            idUsuario, 
-            idSucursal, 
-            esDefault, 
-            req.user
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.asignarUsuarioSucursal(
+                pool,
+                idUsuario,
+                idSucursal,
+                esDefault,
+                req.user
+            )
         );
 
         res.status(200).json({
@@ -161,11 +164,12 @@ const desasignar_usuario_sucursal = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.desasignarUsuarioSucursal(
-            pool, 
-            idUsuarioSucursal, 
-            req.user
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.desasignarUsuarioSucursal(
+                pool,
+                idUsuarioSucursal,
+                req.user
+            )
         );
 
         res.status(200).json({
@@ -193,8 +197,9 @@ const establecer_sucursal_default = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.establecerSucursalDefault(pool, idSucursal, req.user);
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.establecerSucursalDefault(pool, idSucursal, req.user)
+        );
 
         res.status(200).json({
             message: 'Sucursal default establecida correctamente',
@@ -229,8 +234,9 @@ const verificar_acceso = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const tieneAcceso = await usuarioSucursalService.verificarAcceso(pool, idSucursal, req.user);
+        const tieneAcceso = await withPool(async (pool) =>
+            usuarioSucursalService.verificarAcceso(pool, idSucursal, req.user)
+        );
 
         res.status(200).json({
             message: tieneAcceso ? 'Tiene acceso' : 'Sin acceso',
@@ -255,8 +261,9 @@ const obtener_sucursal_default = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.obtenerSucursalDefault(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.obtenerSucursalDefault(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Sucursal default obtenida',
@@ -283,12 +290,13 @@ const actualizar_asignaciones = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.actualizarAsignaciones(
-            pool, 
-            idUsuario, 
-            sucursalesIds, 
-            req.user
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.actualizarAsignaciones(
+                pool,
+                idUsuario,
+                sucursalesIds,
+                req.user
+            )
         );
 
         res.status(200).json({
@@ -324,11 +332,12 @@ const obtener_sucursales_con_asignacion = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await usuarioSucursalService.obtenerSucursalesConAsignacion(
-            pool, 
-            idUsuario, 
-            req.user
+        const resultado = await withPool(async (pool) =>
+            usuarioSucursalService.obtenerSucursalesConAsignacion(
+                pool,
+                idUsuario,
+                req.user
+            )
         );
 
         res.status(200).json({

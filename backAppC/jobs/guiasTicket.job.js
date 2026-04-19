@@ -10,9 +10,8 @@
  *      codRespuesta "99" → actualiza a ERROR (98) con descripción del error.
  */
 
-const sql      = require("mssql");
 const axios    = require("axios");
-const dbConfig = require("../dbconfig");
+const { withPool } = require("../utils/dbPool.util");
 const guiaRepo = require("../repositories/guiaElectronica.repository");
 const { descifrar } = require("../utils/cifradoClaveCertificado.util");
 const { normalizarRucSunatGre } = require("../utils/rucSunatGre.util");
@@ -96,18 +95,18 @@ async function procesarTicket(pool, guia) {
 }
 
 async function ejecutar() {
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    const pendientes = await guiaRepo.listarGuiasPendientesTicketRepo(pool);
+    await withPool(async (pool) => {
+      const pendientes = await guiaRepo.listarGuiasPendientesTicketRepo(pool);
 
-    if (pendientes.length === 0) return;
+      if (pendientes.length === 0) return;
 
-    console.error(`[GRE TICKET] Consultando ${pendientes.length} ticket(s) pendiente(s)...`);
+      console.error(`[GRE TICKET] Consultando ${pendientes.length} ticket(s) pendiente(s)...`);
 
-    for (const guia of pendientes) {
-      await procesarTicket(pool, guia);
-    }
+      for (const guia of pendientes) {
+        await procesarTicket(pool, guia);
+      }
+    });
   } catch (err) {
     console.error("[GRE TICKET] Error en job guiasTicket:", err.message);
   }

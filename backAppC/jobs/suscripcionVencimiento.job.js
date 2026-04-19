@@ -1,5 +1,4 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const { isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 
@@ -10,11 +9,12 @@ let timer = null;
 async function ejecutarUnaVez() {
   if (!isSaas()) return;
   try {
-    const pool = await sql.connect(dbConfig);
-    const n = await empresaSuscripcionRepository.marcarVencidas(pool, new Date());
-    if (n > 0) {
-      console.error('Suscripción vencimiento: empresas marcadas VENCIDA:', n);
-    }
+    await withPool(async (pool) => {
+      const n = await empresaSuscripcionRepository.marcarVencidas(pool, new Date());
+      if (n > 0) {
+        console.error('Suscripción vencimiento: empresas marcadas VENCIDA:', n);
+      }
+    });
   } catch (e) {
     console.error('Job suscripción vencimiento:', e.message);
   }

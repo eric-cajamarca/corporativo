@@ -1,5 +1,4 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const devolucionesDespachoService = require('../services/devolucionesDespacho.service');
 
 const crearDevolucionDespacho = async (req, res) => {
@@ -12,12 +11,13 @@ const crearDevolucionDespacho = async (req, res) => {
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).send({ message: 'Debe incluir items de devolución', data: undefined });
     }
-    const pool = await sql.connect(dbConfig);
-    const result = await devolucionesDespachoService.crearDevolucionDespachoService(pool, req.user, {
-      idDespacho,
-      observaciones,
-      items
-    });
+    const result = await withPool(async (pool) =>
+      devolucionesDespachoService.crearDevolucionDespachoService(pool, req.user, {
+        idDespacho,
+        observaciones,
+        items
+      })
+    );
     if (result?.ok === false) {
       return res.status(400).send({ message: result.error || 'No se pudo registrar', data: undefined });
     }
@@ -43,8 +43,9 @@ const crearDevolucionDespacho = async (req, res) => {
 const listarDevolucionesPorDespacho = async (req, res) => {
   try {
     const { idDespacho } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const data = await devolucionesDespachoService.listarDevolucionesPorDespachoService(pool, req.user, idDespacho);
+    const data = await withPool(async (pool) =>
+      devolucionesDespachoService.listarDevolucionesPorDespachoService(pool, req.user, idDespacho)
+    );
     return res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -58,8 +59,9 @@ const listarDevolucionesPorDespacho = async (req, res) => {
 const obtenerDetalleDevolucion = async (req, res) => {
   try {
     const { idDevolucionDespacho } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const data = await devolucionesDespachoService.obtenerDetalleDevolucionService(pool, req.user, idDevolucionDespacho);
+    const data = await withPool(async (pool) =>
+      devolucionesDespachoService.obtenerDetalleDevolucionService(pool, req.user, idDevolucionDespacho)
+    );
     return res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {

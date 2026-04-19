@@ -1,17 +1,13 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const cventasService = require('../services/cventas.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const getCompVentaById_Empresa = async (req, res) => {
   if (!req.user) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await cventasService.obtenerPorSerieYDestino(
-      pool,
-      req.params.id,
-      req.params.aliasempresa
+    const data = await withPool((pool) =>
+      cventasService.obtenerPorSerieYDestino(pool, req.params.id, req.params.aliasempresa)
     );
     res.json(data);
   } catch (error) {
@@ -28,8 +24,7 @@ const updateCompVenta = async (req, res) => {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    await cventasService.actualizarEstados(pool, req.body);
+    await withPool((pool) => cventasService.actualizarEstados(pool, req.body));
     res.status(200).json({ message: 'Registro actualizado correctamente' });
   } catch (error) {
     console.error('Error al actualizar el detalle de venta:', error);
@@ -42,8 +37,7 @@ const deleteCompVenta = async (req, res) => {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    await cventasService.eliminar(pool, req.params.id);
+    await withPool((pool) => cventasService.eliminar(pool, req.params.id));
     res.status(200).json({ message: 'Registro eliminado correctamente' });
   } catch (error) {
     if (error.message === 'ID_INVALIDO') {

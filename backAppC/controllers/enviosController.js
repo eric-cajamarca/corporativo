@@ -1,5 +1,4 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const EnviosServices = require('../services/envios.service');
 
 // Obtener envíos programados (listado para pantalla Envios programados)
@@ -13,8 +12,9 @@ const obtenerEnviosProgramados = async (req, res) => {
     if (ruc != null && String(ruc).trim() !== "") filtros.ruc = ruc;
     if (cliente != null && String(cliente).trim() !== "") filtros.cliente = cliente;
 
-    const pool = await sql.connect(dbConfig);
-    const envios = await EnviosServices.obtenerEnviosProgramadosService(pool, req.user, filtros);
+    const envios = await withPool(async (pool) =>
+      EnviosServices.obtenerEnviosProgramadosService(pool, req.user, filtros)
+    );
     return res.status(200).send({ data: envios });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -32,8 +32,9 @@ const obtenerEnviosProgramados = async (req, res) => {
 const obtenerDetalleEnvio = async (req, res) => {
   try {
     const { idEnvio } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const detalle = await EnviosServices.obtenerDetalleEnvioService(pool, req.user, idEnvio);
+    const detalle = await withPool(async (pool) =>
+      EnviosServices.obtenerDetalleEnvioService(pool, req.user, idEnvio)
+    );
     return res.status(200).send({ data: detalle });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -55,8 +56,9 @@ const obtenerEnviosVenta = async (req, res) => {
   try {
     const { idVenta } = req.params;
 
-    const pool = await sql.connect(dbConfig);
-    const envios = await EnviosServices.obtenerEnviosVentaService(pool, req.user, idVenta);
+    const envios = await withPool(async (pool) =>
+      EnviosServices.obtenerEnviosVentaService(pool, req.user, idVenta)
+    );
 
     res.status(200).send({ data: envios });
   } catch (error) {
@@ -106,8 +108,8 @@ const crearEnvio = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await EnviosServices.crearEnvioService(pool, req.user, {
+    const result = await withPool(async (pool) =>
+      EnviosServices.crearEnvioService(pool, req.user, {
       idVenta,
       idDespacho,
       idTipoEnvio,
@@ -123,7 +125,8 @@ const crearEnvio = async (req, res) => {
       telefonoDestinatario,
       fechaProgramada,
       observaciones
-    });
+      })
+    );
 
     res.status(200).send({
       message: "Envío creado exitosamente",
@@ -162,8 +165,9 @@ const crearEnvio = async (req, res) => {
 // Obtener envíos asignados al chofer interno (rol Chofer)
 const obtenerEnviosMisChoferes = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const envios = await EnviosServices.obtenerEnviosMisChoferesService(pool, req.user);
+    const envios = await withPool(async (pool) =>
+      EnviosServices.obtenerEnviosMisChoferesService(pool, req.user)
+    );
     return res.status(200).send({ data: envios });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -183,8 +187,8 @@ const actualizarEnvio = async (req, res) => {
     const { idEnvio } = req.params;
     const { fechaProgramada, direccionEntrega, idChofer, idTransportista, contactoDestinatario, telefonoDestinatario, observaciones } = req.body;
 
-    const pool = await sql.connect(dbConfig);
-    const result = await EnviosServices.actualizarEnvioService(pool, req.user, {
+    const result = await withPool(async (pool) =>
+      EnviosServices.actualizarEnvioService(pool, req.user, {
       idEnvio,
       fechaProgramada,
       direccionEntrega,
@@ -193,7 +197,8 @@ const actualizarEnvio = async (req, res) => {
       contactoDestinatario,
       telefonoDestinatario,
       observaciones
-    });
+      })
+    );
 
     res.status(200).send({ message: result.mensaje, data: result });
   } catch (error) {
@@ -215,8 +220,9 @@ const actualizarEnvio = async (req, res) => {
 const eliminarEnvio = async (req, res) => {
   try {
     const { idEnvio } = req.params;
-    const pool = await sql.connect(dbConfig);
-    const result = await EnviosServices.eliminarEnvioService(pool, req.user, idEnvio);
+    const result = await withPool(async (pool) =>
+      EnviosServices.eliminarEnvioService(pool, req.user, idEnvio)
+    );
     res.status(200).send({ message: result.mensaje, data: result });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -247,13 +253,14 @@ const actualizarEstadoEnvio = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await EnviosServices.actualizarEstadoEnvioService(pool, req.user, {
+    const result = await withPool(async (pool) =>
+      EnviosServices.actualizarEstadoEnvioService(pool, req.user, {
       idEnvio,
       idEstadoEnvio,
       observaciones,
       evidenciaFoto
-    });
+      })
+    );
 
     res.status(200).send({
       message: "Estado del envío actualizado exitosamente",
@@ -297,11 +304,12 @@ const asignarTransportista = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await EnviosServices.asignarTransportistaService(pool, req.user, {
-      idEnvio,
-      idTransportista
-    });
+    const result = await withPool(async (pool) =>
+      EnviosServices.asignarTransportistaService(pool, req.user, {
+        idEnvio,
+        idTransportista
+      })
+    );
 
     res.status(200).send({
       message: "Transportista asignado exitosamente",
@@ -328,8 +336,9 @@ const asignarTransportista = async (req, res) => {
 // Obtener transportistas disponibles
 const obtenerTransportistas = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const transportistas = await EnviosServices.obtenerTransportistasService(pool, req.user);
+    const transportistas = await withPool(async (pool) =>
+      EnviosServices.obtenerTransportistasService(pool, req.user)
+    );
 
     res.status(200).send({ data: transportistas });
   } catch (error) {
@@ -365,17 +374,18 @@ const crearTransportista = async (req, res) => {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
-    const result = await EnviosServices.crearTransportistaService(pool, req.user, {
-      nombres,
-      apellidos,
-      documento,
-      licencia: licencia || null,
-      celular,
-      email: email || null,
-      vehiculo: vehiculo || null,
-      placa: placa || null
-    });
+    const result = await withPool(async (pool) =>
+      EnviosServices.crearTransportistaService(pool, req.user, {
+        nombres,
+        apellidos,
+        documento,
+        licencia: licencia || null,
+        celular,
+        email: email || null,
+        vehiculo: vehiculo || null,
+        placa: placa || null
+      })
+    );
 
     return res.status(200).send({ message: "Transportista registrado", data: result });
   } catch (error) {
@@ -396,8 +406,9 @@ const crearTransportista = async (req, res) => {
 // Obtener tipos de envío
 const obtenerTiposEnvio = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const tipos = await EnviosServices.obtenerTiposEnvioService(pool, req.user);
+    const tipos = await withPool(async (pool) =>
+      EnviosServices.obtenerTiposEnvioService(pool, req.user)
+    );
     res.status(200).send({ data: tipos });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -414,8 +425,9 @@ const obtenerTiposEnvio = async (req, res) => {
 // Obtener estados de envío
 const obtenerEstadosEnvio = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const estados = await EnviosServices.obtenerEstadosEnvioService(pool, req.user);
+    const estados = await withPool(async (pool) =>
+      EnviosServices.obtenerEstadosEnvioService(pool, req.user)
+    );
     res.status(200).send({ data: estados });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
@@ -434,8 +446,9 @@ const obtenerEnviosPorEstado = async (req, res) => {
   try {
     const { estado } = req.query;
 
-    const pool = await sql.connect(dbConfig);
-    const envios = await EnviosServices.obtenerEnviosPorEstadoService(pool, req.user, estado);
+    const envios = await withPool(async (pool) =>
+      EnviosServices.obtenerEnviosPorEstadoService(pool, req.user, estado)
+    );
 
     res.status(200).send({ data: envios });
   } catch (error) {
@@ -455,8 +468,9 @@ const obtenerEnviosPorTransportista = async (req, res) => {
   try {
     const { idTransportista } = req.params;
 
-    const pool = await sql.connect(dbConfig);
-    const envios = await EnviosServices.obtenerEnviosPorTransportistaService(pool, req.user, idTransportista);
+    const envios = await withPool(async (pool) =>
+      EnviosServices.obtenerEnviosPorTransportistaService(pool, req.user, idTransportista)
+    );
 
     res.status(200).send({ data: envios });
   } catch (error) {

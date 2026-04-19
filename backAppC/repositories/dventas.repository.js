@@ -12,12 +12,23 @@ async function listarDetalleVentaPorEmpresa(pool, idEmpresa) {
   return result.recordset;
 }
 
-async function obtenerDetalleVentasPorCompDestino(pool, compVentas, destino) {
+async function obtenerDetalleVentasPorCompDestino(pool, idEmpresa, compVentas, destino) {
+  const destNum = parseInt(destino, 10);
+  if (!idEmpresa || Number.isNaN(destNum)) {
+    return [];
+  }
   const result = await pool
     .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('CompVentas', sql.VarChar(30), String(compVentas).trim())
-    .input('Destino', sql.Int, parseInt(destino, 10))
-    .query('SELECT * FROM DetalleVentas WHERE CompVentas = @CompVentas AND Destino = @Destino');
+    .input('Destino', sql.Int, destNum)
+    .query(`
+      SELECT dv.*
+      FROM DetalleVentas dv
+      INNER JOIN Ventas v ON v.idEmpresa = @idEmpresa
+        AND LTRIM(RTRIM(ISNULL(CAST(v.compVenta AS VARCHAR(40)), ''))) = LTRIM(RTRIM(ISNULL(CAST(dv.CompVentas AS VARCHAR(40)), '')))
+      WHERE dv.CompVentas = @CompVentas AND dv.Destino = @Destino
+    `);
   return result.recordset;
 }
 

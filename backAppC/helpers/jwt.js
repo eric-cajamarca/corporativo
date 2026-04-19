@@ -1,7 +1,7 @@
 // jwt.js
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
-const secret = process.env.JWT_SECRET || 'erik@./Eog_DEV_CHANGE_IN_PRODUCTION';
+const { getJwtSecret } = require('../config/jwt.config');
 
 const ACCESS_EXPIRES_MINUTES = Math.min(
   Math.max(parseInt(process.env.JWT_ACCESS_EXPIRES_MINUTES, 10) || 15, 5),
@@ -17,12 +17,12 @@ exports.getAccessTokenMaxAgeMs = () => ACCESS_EXPIRES_MINUTES * 60 * 1000;
 exports.createResetToken = function (payload) {
   return jwt.sign(
     { ...payload, purpose: 'password_reset', iat: moment().unix(), exp: moment().add(15, 'minutes').unix() },
-    secret
+    getJwtSecret()
   );
 };
 
 exports.verifyResetToken = function (token) {
-  const decoded = jwt.verify(token, secret);
+  const decoded = jwt.verify(token, getJwtSecret());
   if (decoded.purpose !== 'password_reset') throw new Error('Token inválido');
   return decoded;
 };
@@ -42,13 +42,13 @@ exports.createTwoFactorPendingToken = function (payload) {
       synthetic: !!payload.synthetic,
       flow: payload.flow
     },
-    secret,
+    getJwtSecret(),
     { expiresIn: `${TWOFA_PENDING_MINUTES}m` }
   );
 };
 
 exports.verifyTwoFactorPendingToken = function (token) {
-  const decoded = jwt.verify(token, secret);
+  const decoded = jwt.verify(token, getJwtSecret());
   if (decoded.purpose !== '2fa_pending') throw new Error('Token 2FA inválido');
   if (decoded.flow !== 'setup' && decoded.flow !== 'verify') throw new Error('Token 2FA inválido');
   return decoded;
@@ -65,5 +65,5 @@ exports.createToken = function (user) {
     iat: moment().unix(),
     exp: moment().add(ACCESS_EXPIRES_MINUTES, 'minutes').unix()
   };
-  return jwt.sign(payload, secret);
+  return jwt.sign(payload, getJwtSecret());
 };

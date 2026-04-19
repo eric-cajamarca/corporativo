@@ -1,40 +1,19 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const bcrypt = require('bcryptjs');
 const moment = require('moment');
-const jwt = require('../helpers/jwt');
 const { v4: uuidv4 } = require('uuid');
-const { max } = require('moment/moment');
 const path = require('path');
-const fs = require('fs').promises; // Usamos la versión con promesas
-// CREATE TABLE Empresas(
-// 	idEmpresa UNIQUEIDENTIFIER primary key NOT NULL,
-// 	idDocumento varchar(1) not null,
-// 	ruc varchar(11) not NULL,
-// 	razon_Social varchar(200) not NULL,
-// 	nombreComercial varchar(200) null,
-// 	rubro varchar(200) NULL,
-// 	celular varchar(11) NULL,
-// 	correo varchar(100) not NULL,
-// 	password text not null,
-// 	logo varbinary(max) NULL,
-// 	alias varchar(10) NULL,
-// 	condicion varchar(20) null,
-// 	estSunat varchar(20) null,
-// 	estado bit NOT NULL
-
-
-// )
-
+const fs = require('fs').promises;
 
 const getEmpresas = async function (req, res, next) {
         
     if (req.user) {
         if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
                         try {
-                const pool = await sql.connect(dbConfig);
-                const result = await empresasAdministracionService.listarTodas(pool);
-                                res.status(200).send({ data: result });
+                await withPool(async (pool) => {
+                    const result = await empresasAdministracionService.listarTodas(pool);
+                    res.status(200).send({ data: result });
+                });
             } catch (error) {
                 console.error('Error al obtener las epresas:', error);
                 return next(error);
@@ -59,9 +38,10 @@ const getEmpresasById = async function (req, res, next) {
     if (req.user) {
         if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
                         try {
-                const pool = await sql.connect(dbConfig);
-                let result = await empresasAdministracionService.obtenerPorId(pool, id);
-                                res.status(200).send({ data: result });
+                await withPool(async (pool) => {
+                    const result = await empresasAdministracionService.obtenerPorId(pool, id);
+                    res.status(200).send({ data: result });
+                });
             } catch (error) {
                 console.error('Error al obtener los usuarios:', error);
                 return next(error);
@@ -82,9 +62,10 @@ const getEmpresa_id = async function (req, res, next) {
         return res.status(401).send({ message: 'No autorizado' });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const result = await empresasAdministracionService.obtenerCabecera(pool, id);
-        res.status(200).send({ data: result });
+        await withPool(async (pool) => {
+            const result = await empresasAdministracionService.obtenerCabecera(pool, id);
+            res.status(200).send({ data: result });
+        });
     } catch (error) {
         console.error('Error al obtener empresa (getEmpresa_id):', error);
         return next(error);
@@ -139,21 +120,14 @@ const createEmpresa = async function (req, res, next) {
 
     const currentDate = moment().format('YYYY-MM-DD');
     const fregistro = currentDate;
-    
-    const pool = await sql.connect(dbConfig);
 
-    // Verificar si el correo electrónico ya existe
-    const existentes = await empresasAdministracionService.buscarPorRuc(pool, ruc);
-
-    
-    if (existentes.length > 0) {
-
-        return res.status(200).send({ message: 'La Empresa ya existe. Por favor registre una empresa diferente', data: undefined });
-    } else {
-        try {
-            // Convertir buffer a cadena base64
-            const hashedPassword = await bcrypt.hash(password, 8); // El número 10 es el factor de coste para el cifrado
-            //crear el idUsuario con uuidv4
+    try {
+        await withPool(async (pool) => {
+            const existentes = await empresasAdministracionService.buscarPorRuc(pool, ruc);
+            if (existentes.length > 0) {
+                throw Object.assign(new Error('__EMPRESA_YA_EXISTE__'), { __empresaDuplicada: true });
+            }
+            const hashedPassword = await bcrypt.hash(password, 8);
             const idEmpresa = uuidv4();
 
             await empresasAdministracionService.insertarEmpresa(pool, {
@@ -175,9 +149,6 @@ const createEmpresa = async function (req, res, next) {
                 fregistro
             });
 
-
-            
-            // Inicializar datos maestros de la empresa (roles, comprobantes, sucursal, etc.)
             try {
                 const datosEmpresa = {
                     razon_Social,
@@ -186,8 +157,7 @@ const createEmpresa = async function (req, res, next) {
                     direccion: req.body.direccion || 'Sin dirección'
                 };
                 const resultadoInicializacion = await empresaService.inicializarDatosEmpresa(pool, idEmpresa, datosEmpresa);
-                
-                
+
                 await empresaService.insertarEmpresaIntegraciones(pool, idEmpresa);
                 await empresaService.marcarEmpresaPrincipalSiEsPrimera(pool, idEmpresa);
 
@@ -200,7 +170,6 @@ const createEmpresa = async function (req, res, next) {
                   console.error('Suscripción inicial no aplicada:', errSub);
                 }
 
-                // Crear registro de verificación y enviar código por WhatsApp (Factiliza WHATSAPP desde FactilizaConfig)
                 const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
                 const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, celular, verificacion.codigo);
 
@@ -216,43 +185,45 @@ const createEmpresa = async function (req, res, next) {
                 });
             } catch (errorInicializacion) {
                 console.error('⚠️ Error inicializando datos maestros:', errorInicializacion);
-                res.status(200).send({ 
+                res.status(200).send({
                     data: idEmpresa,
                     warning: 'Empresa creada pero algunos datos maestros no se inicializaron correctamente. Se enviará el código de verificación igualmente.'
                 });
             }
+        });
+    } catch (error) {
+        if (error && error.__empresaDuplicada && error.message === '__EMPRESA_YA_EXISTE__') {
+            return res.status(200).send({ message: 'La Empresa ya existe. Por favor registre una empresa diferente', data: undefined });
         }
-        catch (error) {
-            console.error('Error al crear la Empresa:', error);
-            return next(error);
-        }
+        console.error('Error al crear la Empresa:', error);
+        return next(error);
     }
 }
 
-// Integraciones y APIs de pago (empresa del usuario logueado)
 const getIntegraciones = async function (req, res, next) {
     try {
         const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
         if (!idEmpresa) {
             return res.status(401).send({ message: 'No autorizado', data: undefined });
         }
-        const pool = await sql.connect(dbConfig);
-        const { integracionesRes, credencialesRes } = await empresasAdministracionService.obtenerIntegracionesYCredenciales(
-            pool,
-            idEmpresa
-        );
-        const integraciones = integracionesRes.recordset[0] || null;
-        const credencialesList = credencialesRes.recordset || [];
-        const credencialesPorProveedor = {};
-        for (const row of credencialesList) {
-            if (!credencialesPorProveedor[row.proveedor]) credencialesPorProveedor[row.proveedor] = [];
-            credencialesPorProveedor[row.proveedor].push({ idCredencial: row.idCredencial, clave: row.clave, valor: row.valor });
-        }
-        res.status(200).send({
-            data: {
-                integraciones,
-                credenciales: credencialesPorProveedor
+        await withPool(async (pool) => {
+            const { integracionesRes, credencialesRes } = await empresasAdministracionService.obtenerIntegracionesYCredenciales(
+                pool,
+                idEmpresa
+            );
+            const integraciones = integracionesRes.recordset[0] || null;
+            const credencialesList = credencialesRes.recordset || [];
+            const credencialesPorProveedor = {};
+            for (const row of credencialesList) {
+                if (!credencialesPorProveedor[row.proveedor]) credencialesPorProveedor[row.proveedor] = [];
+                credencialesPorProveedor[row.proveedor].push({ idCredencial: row.idCredencial, clave: row.clave, valor: row.valor });
             }
+            res.status(200).send({
+                data: {
+                    integraciones,
+                    credenciales: credencialesPorProveedor
+                }
+            });
         });
     } catch (error) {
         console.error('Error al obtener integraciones:', error);
@@ -267,15 +238,16 @@ const putIntegraciones = async function (req, res, next) {
             return res.status(401).send({ message: 'No autorizado', data: undefined });
         }
         const { twilioHabilitado, izipayHabilitado, culqiHabilitado, apisPeruHabilitado, factilizaHabilitado } = req.body || {};
-        const pool = await sql.connect(dbConfig);
-        await empresasAdministracionService.guardarIntegracionesFlags(pool, idEmpresa, {
-            twilioHabilitado,
-            izipayHabilitado,
-            culqiHabilitado,
-            apisPeruHabilitado,
-            factilizaHabilitado
+        await withPool(async (pool) => {
+            await empresasAdministracionService.guardarIntegracionesFlags(pool, idEmpresa, {
+                twilioHabilitado,
+                izipayHabilitado,
+                culqiHabilitado,
+                apisPeruHabilitado,
+                factilizaHabilitado
+            });
+            res.status(200).send({ data: { ok: true }, message: 'Integraciones actualizadas.' });
         });
-        res.status(200).send({ data: { ok: true }, message: 'Integraciones actualizadas.' });
     } catch (error) {
         console.error('Error al actualizar integraciones:', error);
         return next(error);
@@ -292,16 +264,16 @@ const putCredencialesProveedor = async function (req, res, next) {
         if (!proveedor || !Array.isArray(credenciales)) {
             return res.status(400).send({ message: 'proveedor y credenciales (array) son requeridos', data: undefined });
         }
-        const pool = await sql.connect(dbConfig);
-        await empresasAdministracionService.reemplazarCredencialesProveedor(pool, idEmpresa, proveedor, credenciales);
-        res.status(200).send({ data: { ok: true }, message: 'Credenciales guardadas.' });
+        await withPool(async (pool) => {
+            await empresasAdministracionService.reemplazarCredencialesProveedor(pool, idEmpresa, proveedor, credenciales);
+            res.status(200).send({ data: { ok: true }, message: 'Credenciales guardadas.' });
+        });
     } catch (error) {
         console.error('Error al guardar credenciales:', error);
         return next(error);
     }
 };
 
-// Ruta pública: enviar código de activación por WhatsApp (sin sesión). Usa Factiliza WHATSAPP desde FactilizaConfig.
 const enviarCodigoActivacion = async function (req, res, next) {
     try {
         const { idEmpresa, celular } = req.body || {};
@@ -309,49 +281,49 @@ const enviarCodigoActivacion = async function (req, res, next) {
         if (!idEmpresaTrim) {
             return res.status(400).json({ message: 'idEmpresa es requerido' });
         }
-        const pool = await sql.connect(dbConfig);
-        const empresa = await empresasAdministracionService.obtenerEmpresaCelularEstado(pool, idEmpresaTrim);
-        if (!empresa) {
-            return res.status(404).json({ message: 'Empresa no encontrada' });
-        }
-        // estado en BD es bit: puede llegar como 0/1 o false/true desde mssql
-        if (empresa.estado === 1 || empresa.estado === true) {
-            return res.status(400).json({ message: 'La cuenta ya está activada' });
-        }
-        const telefono = (celular && String(celular).trim()) || (empresa.celular && String(empresa.celular).trim());
-        if (!telefono) {
-            return res.status(400).json({ message: 'Celular es requerido para enviar el código' });
-        }
-        const verificacion = await empresaService.obtenerOActualizarCodigoVerificacion(pool, idEmpresaTrim, telefono);
-        const codigoEnviar = verificacion && (verificacion.codigo != null) ? String(verificacion.codigo) : null;
-        if (!codigoEnviar) {
-            console.error('enviarCodigoActivacion: no se generó código de verificación');
-            return next(new Error('Error al generar código de verificación'));
-        }
-        const resultado = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
-        if (!resultado.sent) {
-            return res.status(503).json({ message: resultado.error || 'No se pudo enviar el código por WhatsApp' });
-        }
-        res.status(200).json({ message: 'Código enviado por WhatsApp' });
+        await withPool(async (pool) => {
+            const empresa = await empresasAdministracionService.obtenerEmpresaCelularEstado(pool, idEmpresaTrim);
+            if (!empresa) {
+                return res.status(404).json({ message: 'Empresa no encontrada' });
+            }
+            if (empresa.estado === 1 || empresa.estado === true) {
+                return res.status(400).json({ message: 'La cuenta ya está activada' });
+            }
+            const telefono = (celular && String(celular).trim()) || (empresa.celular && String(empresa.celular).trim());
+            if (!telefono) {
+                return res.status(400).json({ message: 'Celular es requerido para enviar el código' });
+            }
+            const verificacion = await empresaService.obtenerOActualizarCodigoVerificacion(pool, idEmpresaTrim, telefono);
+            const codigoEnviar = verificacion && (verificacion.codigo != null) ? String(verificacion.codigo) : null;
+            if (!codigoEnviar) {
+                console.error('enviarCodigoActivacion: no se generó código de verificación');
+                throw new Error('Error al generar código de verificación');
+            }
+            const resultado = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
+            if (!resultado.sent) {
+                return res.status(503).json({ message: resultado.error || 'No se pudo enviar el código por WhatsApp' });
+            }
+            res.status(200).json({ message: 'Código enviado por WhatsApp' });
+        });
     } catch (error) {
         console.error('Error en enviarCodigoActivacion:', error);
         return next(error);
     }
 };
 
-// Verificar empresa con código enviado por WhatsApp
 const verificarEmpresaCodigo = async function (req, res, next) {
     try {
         const { idEmpresa, codigo } = req.body || {};
         if (!idEmpresa || !codigo) {
             return res.status(400).send({ message: 'idEmpresa y código son requeridos', data: undefined });
         }
-        const pool = await sql.connect(dbConfig);
-        const resultado = await empresaService.verificarEmpresaPorCodigo(pool, idEmpresa, String(codigo).trim());
-        if (!resultado.ok) {
-            return res.status(400).send({ message: resultado.message || 'Código inválido', data: undefined });
-        }
-        res.status(200).send({ data: { ok: true }, message: 'Empresa verificada y habilitada correctamente.' });
+        await withPool(async (pool) => {
+            const resultado = await empresaService.verificarEmpresaPorCodigo(pool, idEmpresa, String(codigo).trim());
+            if (!resultado.ok) {
+                return res.status(400).send({ message: resultado.message || 'Código inválido', data: undefined });
+            }
+            res.status(200).send({ data: { ok: true }, message: 'Empresa verificada y habilitada correctamente.' });
+        });
     } catch (error) {
         console.error('Error al verificar empresa por código:', error);
         return next(error);
@@ -374,29 +346,30 @@ const updateEmpresa = async function (req, res, next) {
             return res.status(401).send({ success: false, message: 'No autorizado' });
         }
 
-        const pool = await sql.connect(dbConfig);
-        if (req.file && logoAnterior && logoAnterior !== 'undefined' && logoAnterior !== 'null') {
-            try {
-                const oldPath = path.join(__dirname, '../uploads/configuraciones/', logoAnterior);
-                await fs.promises.unlink(oldPath);
-            } catch (err) {
-                console.warn('No se pudo eliminar la imagen anterior:', err.message);
+        await withPool(async (pool) => {
+            if (req.file && logoAnterior && logoAnterior !== 'undefined' && logoAnterior !== 'null') {
+                try {
+                    const oldPath = path.join(__dirname, '../uploads/configuraciones/', logoAnterior);
+                    await fs.unlink(oldPath);
+                } catch (err) {
+                    console.warn('No se pudo eliminar la imagen anterior:', err.message);
+                }
             }
-        }
-        const result = await empresasAdministracionService.actualizarEmpresaDatosContacto(
-            pool,
-            idEmpresa,
-            { rubro, idRubro, celular, nombreComercial, correo, alias },
-            req.file ? req.file.filename : null
-        );
+            const result = await empresasAdministracionService.actualizarEmpresaDatosContacto(
+                pool,
+                idEmpresa,
+                { rubro, idRubro, celular, nombreComercial, correo, alias },
+                req.file ? req.file.filename : null
+            );
 
-        res.status(200).json({
-            success: true,
-            message: 'Empresa actualizada correctamente',
-            data: {
-                rowsAffected: result.rowsAffected,
-                newLogo: req.file ? req.file.filename : null
-            }
+            res.status(200).json({
+                success: true,
+                message: 'Empresa actualizada correctamente',
+                data: {
+                    rowsAffected: result.rowsAffected,
+                    newLogo: req.file ? req.file.filename : null
+                }
+            });
         });
 
     } catch (error) {
@@ -418,35 +391,15 @@ const cambiar_estado_empresa = async function (req, res, next) {
   const idEmpresa = req.params['id'];
   const { estado } = req.body;
   try {
-    const pool = await sql.connect(dbConfig);
-    const result = await empresasAdministracionService.cambiarEstadoEmpresa(pool, idEmpresa, estado);
-    res.status(200).send({ data: result.rowsAffected });
+    await withPool(async (pool) => {
+      const result = await empresasAdministracionService.cambiarEstadoEmpresa(pool, idEmpresa, estado);
+      res.status(200).send({ data: result.rowsAffected });
+    });
   } catch (error) {
     console.error('Error al cambiar el estado de la empresa:', error);
     return next(error);
   }
 };
-
-// const obtener_logo = async function (req, res, next) {
-//     console.log('entro a obtener_logo', req.params);
-//     //var img = req.params['img'];
-//     var img = '01.jpg';
-
-
-//     fs.stat('./uploads/configuraciones/' + img, function (err) {
-//         if (!err) {
-//             let path_img = './uploads/configuraciones/' + img;
-//             res.status(200).sendFile(path.resolve(path_img));
-//         } else {
-//             let path_img = '../public/assets/img/01.jpg';
-//             res.status(200).sendFile(path.resolve(path_img));
-//         }
-
-//         //console.log('path_img', path_img);
-//     })
-// }
-
-
 
 const obtener_logo = async function (req, res, next) {
     try {
@@ -477,10 +430,11 @@ const obtener_datos_colaborador_admin = async (req, res, next) => {
 
         try {
 
-            const pool = await sql.connect(dbConfig);
-            const recordset = await usuarioAdminService.obtenerUsuarioWebLegacyPorId(pool, id);
-            data = recordset;
-            res.json({ data });
+            await withPool(async (pool) => {
+                const recordset = await usuarioAdminService.obtenerUsuarioWebLegacyPorId(pool, id);
+                data = recordset;
+                res.json({ data });
+            });
 
 
         } catch (error) {
@@ -506,9 +460,10 @@ const cambiar_estado_colaborador_admin = async function (req, res, next) {
         } else if (!data.estado) {
             nuevo_estado = true;
         }
-        const pool = await sql.connect(dbConfig);
-        const result = await usuarioAdminService.cambiarEstadoUsuarioWebLegacy(pool, id, data);
-        res.status(200).send({ data: result.recordset });
+        await withPool(async (pool) => {
+            const result = await usuarioAdminService.cambiarEstadoUsuarioWebLegacy(pool, id, data);
+            res.status(200).send({ data: result.recordset });
+        });
     } catch (error) {
         console.error('cambiar_estado_colaborador_admin:', error);
         return next(error);
@@ -521,9 +476,10 @@ const cambiar_estado_colaborador_admin = async function (req, res, next) {
 const deleteAdmin = async (req, res, next) => {
     const { id } = req.params;
     try {
-        const pool = await sql.connect(dbConfig);
-        await usuarioAdminService.eliminarUsuarioWebLegacySinEmpresa(pool, id);
-        res.json({ message: 'Usuario eliminado correctamente' });
+        await withPool(async (pool) => {
+            await usuarioAdminService.eliminarUsuarioWebLegacySinEmpresa(pool, id);
+            res.json({ message: 'Usuario eliminado correctamente' });
+        });
     } catch (error) {
         console.error('Error al eliminar un Usuario:', error);
         return next(error);
@@ -554,43 +510,31 @@ const createDireccionEmpresa = async function (req, res, next) {
 
         //let nombre = 'Mi empresa';
 
-        const pool = await sql.connect(dbConfig);
-        const insertDireccionEmpresa = await empresasAdministracionService.crearDireccionEmpresa(pool, {
-            idEmpresa,
-            ubigeo,
-            codPais,
-            region,
-            provincia,
-            distrito,
-            urbanizacion,
-            direccion,
-            principal,
-            codLocal,
-            crearSucursal: req.body.crearSucursal === true,
-            nombreSucursal: req.body.nombreSucursal
-        });
+        await withPool(async (pool) => {
+            const insertDireccionEmpresa = await empresasAdministracionService.crearDireccionEmpresa(pool, {
+                idEmpresa,
+                ubigeo,
+                codPais,
+                region,
+                provincia,
+                distrito,
+                urbanizacion,
+                direccion,
+                principal,
+                codLocal,
+                crearSucursal: req.body.crearSucursal === true,
+                nombreSucursal: req.body.nombreSucursal
+            });
 
-        res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
+            res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
+        });
     } catch (error) {
                 res.status(500).send({ message: error.message, data: undefined });
 
     }
 
-    //     }
-    //     else {
-    //         res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-    //     }
-    // }
-    // else {
-    //     return res.status(401).send({ message: 'No autorizado' });
-    // }
-
 }
 
-//crear sucursal de la empresa 
-
-
-//crear el metodo const createSucursalEmpresa con los parametros del metodo const createDireccionEmpresa
 /**
  * Crear sucursal (para nueva dirección con nombre elegido por el usuario).
  * Body: idEmpresa, nombre (obligatorio), direccion (opcional).
@@ -606,14 +550,15 @@ const createSucursalEmpresa = async function (req, res, next) {
             return res.status(400).send({ message: 'nombre de la sucursal es requerido', data: undefined });
         }
         const direccion = req.body.direccion != null ? String(req.body.direccion) : '';
-        const pool = await sql.connect(dbConfig);
-        const out = await empresasAdministracionService.crearSucursalEmpresa(pool, {
-            idEmpresa,
-            nombre,
-            direccion
-        });
+        await withPool(async (pool) => {
+            const out = await empresasAdministracionService.crearSucursalEmpresa(pool, {
+                idEmpresa,
+                nombre,
+                direccion
+            });
 
-        res.status(200).send({ data: out, message: 'Sucursal creada' });
+            res.status(200).send({ data: out, message: 'Sucursal creada' });
+        });
     } catch (error) {
         console.error('createSucursalEmpresa:', error);
         return next(error);
@@ -627,21 +572,22 @@ const updateDireccionEmpresa = async function (req, res, next) {
     if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
-                const pool = await sql.connect(dbConfig);
-                const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
-                const result = await empresasAdministracionService.actualizarDireccionEmpresaCompleto(pool, idEmpresa, {
-                    idDireccionEmpresa,
-                    ubigeo,
-                    codPais,
-                    region,
-                    provincia,
-                    distrito,
-                    urbanizacion,
-                    direccion,
-                    codLocal,
-                    principal
+                await withPool(async (pool) => {
+                    const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
+                    const result = await empresasAdministracionService.actualizarDireccionEmpresaCompleto(pool, idEmpresa, {
+                        idDireccionEmpresa,
+                        ubigeo,
+                        codPais,
+                        region,
+                        provincia,
+                        distrito,
+                        urbanizacion,
+                        direccion,
+                        codLocal,
+                        principal
+                    });
+                    res.status(200).send({ data: result.rowsAffected });
                 });
-                res.status(200).send({ data: result.rowsAffected });
             } catch (error) {
                 console.error('Error al actualizar un DireccionEmpresa:', error);
                 return next(error);
@@ -661,9 +607,10 @@ const getDireccionEmpresa_id = async function (req, res, next) {
         if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
-                const pool = await sql.connect(dbConfig);
-                const result = await empresasAdministracionService.listarDireccionesEmpresa(pool, idEmpresa);
-                res.status(200).send({ data: result });
+                await withPool(async (pool) => {
+                    const result = await empresasAdministracionService.listarDireccionesEmpresa(pool, idEmpresa);
+                    res.status(200).send({ data: result });
+                });
             } catch (error) {
                 console.error('Error al obtener las direcciones de la empresa:', error);
                 return next(error);
@@ -678,7 +625,6 @@ const getDireccionEmpresa_id = async function (req, res, next) {
     }
 }
 
-// const eliminarDirecion_id
 const deleteDireccion_id = async function (req, res, next) {
     const idDireccionEmpresa = req.params['id'];
     
@@ -686,9 +632,10 @@ const deleteDireccion_id = async function (req, res, next) {
     if( req.user) {
         if (req.user.rol == 'Administrador') {
             try {
-                const pool = await sql.connect(dbConfig);
-                const result = await empresasAdministracionService.eliminarDireccionEmpresa(pool, idDireccionEmpresa);
-                res.status(200).send({ data: result.rowsAffected });
+                await withPool(async (pool) => {
+                    const result = await empresasAdministracionService.eliminarDireccionEmpresa(pool, idDireccionEmpresa);
+                    res.status(200).send({ data: result.rowsAffected });
+                });
             } catch (error) {
                 console.error('Error al eliminar la direccion de la empresa:', error);
                 return next(error);
@@ -703,7 +650,6 @@ const deleteDireccion_id = async function (req, res, next) {
     }
 }
 
-//convertir en principal la direccion de la empresa por su idDireccionEmpresa y el resro de direcciones en false
 const cambiar_principal_direccion = async function (req, res, next) {
         const idDireccionEmpresa = req.params.id;
     const idEmpresa = req.user.empresa;
@@ -711,13 +657,14 @@ const cambiar_principal_direccion = async function (req, res, next) {
     if (req.user) {
         if (req.user.rol == 'Administrador') {
             try {
-                const pool = await sql.connect(dbConfig);
-                const result = await empresasAdministracionService.cambiarPrincipalDireccion(
-                    pool,
-                    idEmpresa,
-                    idDireccionEmpresa
-                );
-                res.status(200).send({ data: result.rowsAffected });
+                await withPool(async (pool) => {
+                    const result = await empresasAdministracionService.cambiarPrincipalDireccion(
+                        pool,
+                        idEmpresa,
+                        idDireccionEmpresa
+                    );
+                    res.status(200).send({ data: result.rowsAffected });
+                });
             } catch (error) {
                 console.error('Error al cambiar la direccion principal0:', error);
                 return next(error);
@@ -740,10 +687,11 @@ const getEstadoConfiguracion = async function (req, res, next) {
     }
 
     try {
-        const pool = await sql.connect(dbConfig);
-        const estado = await empresaService.obtenerEstadoConfiguracion(pool, req.user.empresa);
-        
-                res.status(200).send({ data: estado });
+        await withPool(async (pool) => {
+            const estado = await empresaService.obtenerEstadoConfiguracion(pool, req.user.empresa);
+
+            res.status(200).send({ data: estado });
+        });
     } catch (error) {
         console.error('Error obteniendo estado de configuración:', error);
         return next(error);
@@ -772,19 +720,20 @@ const reset2faEmpresa = async (req, res, next) => {
   }
   const ipCliente = obtenerIpCliente(req);
   try {
-    const pool = await sql.connect(dbConfig);
-    await twoFactorAdminService.resetearTotpEmpresa(pool, idEmpresaTarget);
-    await seguridadAuditoriaService.registrar(pool, req, {
-      idEmpresa: idEmpresaTarget,
-      idUsuario: req.user.sub,
-      tipo: 'RESET_2FA_EMPRESA',
-      detalle: String(req.user.email || '').slice(0, 500),
-      ipCliente
-    });
-    return res.status(200).send({
-      message:
-        '2FA restablecido para la empresa. Los administradores deberán configurar de nuevo el autenticador al iniciar sesión.',
-      data: undefined
+    await withPool(async (pool) => {
+      await twoFactorAdminService.resetearTotpEmpresa(pool, idEmpresaTarget);
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: idEmpresaTarget,
+        idUsuario: req.user.sub,
+        tipo: 'RESET_2FA_EMPRESA',
+        detalle: String(req.user.email || '').slice(0, 500),
+        ipCliente
+      });
+      return res.status(200).send({
+        message:
+          '2FA restablecido para la empresa. Los administradores deberán configurar de nuevo el autenticador al iniciar sesión.',
+        data: undefined
+      });
     });
   } catch (error) {
     if (error.message === 'EMPRESA_NO_ENCONTRADA') {
@@ -823,21 +772,22 @@ const putPolitica2faAdmin = async (req, res, next) => {
   }
   const ipCliente = obtenerIpCliente(req);
   try {
-    const pool = await sql.connect(dbConfig);
-    const n = await empresaRepository.actualizarAdminRequiere2FA(pool, idEmpresa, adminRequiere2FA);
-    if (!n) {
-      return res.status(404).send({ message: 'Empresa no encontrada', data: undefined });
-    }
-    await seguridadAuditoriaService.registrar(pool, req, {
-      idEmpresa,
-      idUsuario: req.user.sub,
-      tipo: 'POLITICA_2FA_ADMIN',
-      detalle: `adminRequiere2FA=${adminRequiere2FA}`,
-      ipCliente
-    });
-    return res.status(200).send({
-      message: 'Política de 2FA para administradores actualizada.',
-      data: { adminRequiere2FA }
+    await withPool(async (pool) => {
+      const n = await empresaRepository.actualizarAdminRequiere2FA(pool, idEmpresa, adminRequiere2FA);
+      if (!n) {
+        return res.status(404).send({ message: 'Empresa no encontrada', data: undefined });
+      }
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa,
+        idUsuario: req.user.sub,
+        tipo: 'POLITICA_2FA_ADMIN',
+        detalle: `adminRequiere2FA=${adminRequiere2FA}`,
+        ipCliente
+      });
+      return res.status(200).send({
+        message: 'Política de 2FA para administradores actualizada.',
+        data: { adminRequiere2FA }
+      });
     });
   } catch (error) {
     console.error('putPolitica2faAdmin:', error.message);
@@ -846,13 +796,11 @@ const putPolitica2faAdmin = async (req, res, next) => {
 };
 
 module.exports = {
-    // getEmpresas,
     getEmpresas,
     createEmpresa,
     updateEmpresa,
     cambiar_estado_empresa,
     deleteAdmin,
-    // admin_login,
     cambiar_estado_colaborador_admin,
     obtener_datos_colaborador_admin,
     getEmpresasById,
@@ -867,22 +815,13 @@ module.exports = {
     putIntegraciones,
     putCredencialesProveedor,
 
-    //logo,
     obtener_logo,
     getEmpresa_id,
 
-    // sucursales
     createSucursalEmpresa,
 
-    // Estado de configuración
     getEstadoConfiguracion,
 
     reset2faEmpresa,
-    putPolitica2faAdmin,
-
-    //direcciones de la empresa
-
-
-
-
+    putPolitica2faAdmin
 };

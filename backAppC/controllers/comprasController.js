@@ -1,6 +1,3 @@
-// controllers/comprasController.js
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const comprasService = require('../services/compras.service');
 
 const obtener_compras_todos = async (req, res, next) => {

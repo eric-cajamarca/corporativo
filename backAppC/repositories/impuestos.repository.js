@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 
 /**
  * Lista todos los impuestos de la empresa.
@@ -7,7 +7,7 @@ const dbConfig = require('../dbconfig');
  * @returns {Promise<Array>}
  */
 async function listarPorEmpresa(idEmpresa) {
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool
         .request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -26,6 +26,7 @@ async function listarPorEmpresa(idEmpresa) {
             ORDER BY descripcion
         `);
     return result.recordset;
+  });
 }
 
 /**
@@ -35,7 +36,7 @@ async function listarPorEmpresa(idEmpresa) {
  * @returns {Promise<object|null>}
  */
 async function obtenerPorId(idImpuesto, idEmpresa) {
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool
         .request()
         .input('idImpuesto', sql.Int, idImpuesto)
@@ -54,6 +55,7 @@ async function obtenerPorId(idImpuesto, idEmpresa) {
             WHERE idImpuesto = @idImpuesto AND idEmpresa = @idEmpresa
         `);
     return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+  });
 }
 
 /**
@@ -64,7 +66,7 @@ async function obtenerPorId(idImpuesto, idEmpresa) {
  */
 async function crear(idEmpresa, data) {
     const { descripcion, estado, porcentaje, pIncluyeIGV, codigoSunat } = data;
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool
         .request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -79,6 +81,7 @@ async function crear(idEmpresa, data) {
             SELECT SCOPE_IDENTITY() AS idImpuesto;
         `);
     return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+  });
 }
 
 /**
@@ -90,7 +93,7 @@ async function crear(idEmpresa, data) {
  */
 async function actualizar(idImpuesto, idEmpresa, data) {
     const { descripcion, estado, porcentaje, pIncluyeIGV, codigoSunat } = data;
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool
         .request()
         .input('idImpuesto', sql.Int, idImpuesto)
@@ -106,6 +109,7 @@ async function actualizar(idImpuesto, idEmpresa, data) {
             WHERE idImpuesto = @idImpuesto AND idEmpresa = @idEmpresa
         `);
     return result.rowsAffected[0];
+  });
 }
 
 /**
@@ -116,7 +120,7 @@ async function actualizar(idImpuesto, idEmpresa, data) {
  * @returns {Promise<number>} rowsAffected
  */
 async function actualizarEstado(idImpuesto, idEmpresa, estado) {
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool
         .request()
         .input('idImpuesto', sql.Int, idImpuesto)
@@ -128,6 +132,7 @@ async function actualizarEstado(idImpuesto, idEmpresa, estado) {
             WHERE idImpuesto = @idImpuesto AND idEmpresa = @idEmpresa
         `);
     return result.rowsAffected[0];
+  });
 }
 
 /**

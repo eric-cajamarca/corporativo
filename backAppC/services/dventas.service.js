@@ -2,14 +2,19 @@ const dventasRepository = require('../repositories/dventas.repository');
 const stockRepository = require('../repositories/stock.repository');
 const inventarioRepository = require('../repositories/inventario.repository');
 const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
 
 async function obtenerDetalleVentas(pool, idEmpresa) {
   return dventasRepository.listarDetalleVentaPorEmpresa(pool, idEmpresa);
 }
 
-async function obtenerDetalleVentaPorCompDestino(pool, compVentas, destino) {
-  return dventasRepository.obtenerDetalleVentasPorCompDestino(pool, compVentas, destino);
+async function obtenerDetalleVentaPorCompDestino(pool, user, compVentas, destino) {
+  const idEmpresa = user?.empresa || user?.idEmpresa;
+  if (!idEmpresa) {
+    throw new Error('NO_EMPRESA');
+  }
+  return dventasRepository.obtenerDetalleVentasPorCompDestino(pool, idEmpresa, compVentas, destino);
 }
 
 async function actualizarDetalleVentaLote(pool, user, data) {
@@ -103,9 +108,34 @@ async function eliminarDetalleVenta(pool, user, idDetalle) {
   }
 }
 
+/** API HTTP: abre pool y delega (el controlador no usa mssql). */
+async function obtenerDetalleVentasConPool(user) {
+  const idEmpresa = user?.empresa || user?.idEmpresa;
+  if (!idEmpresa) {
+    throw new Error('NO_EMPRESA');
+  }
+  return withPool((pool) => obtenerDetalleVentas(pool, idEmpresa));
+}
+
+async function obtenerDetalleVentaPorCompDestinoConPool(user, compVentas, destino) {
+  return withPool((pool) => obtenerDetalleVentaPorCompDestino(pool, user, compVentas, destino));
+}
+
+async function actualizarDetalleVentaLoteConPool(user, body) {
+  return withPool((pool) => actualizarDetalleVentaLote(pool, user, body));
+}
+
+async function eliminarDetalleVentaConPool(user, idDetalle) {
+  return withPool((pool) => eliminarDetalleVenta(pool, user, idDetalle));
+}
+
 module.exports = {
   obtenerDetalleVentas,
   obtenerDetalleVentaPorCompDestino,
   actualizarDetalleVentaLote,
-  eliminarDetalleVenta
+  eliminarDetalleVenta,
+  obtenerDetalleVentasConPool,
+  obtenerDetalleVentaPorCompDestinoConPool,
+  actualizarDetalleVentaLoteConPool,
+  eliminarDetalleVentaConPool
 };

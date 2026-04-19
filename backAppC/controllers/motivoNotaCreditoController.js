@@ -1,5 +1,4 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const motivoNotaCreditoService = require('../services/motivoNotaCredito.service');
 
 async function listar(req, res) {
@@ -7,8 +6,9 @@ async function listar(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const resultado = await motivoNotaCreditoService.listar(pool, req.user.empresa, req.query);
+        const resultado = await withPool(async (pool) =>
+            motivoNotaCreditoService.listar(pool, req.user.empresa, req.query)
+        );
         res.status(200).json({ data: resultado.items, total: resultado.total });
     } catch (error) {
         console.error('motivoNotaCredito.listar:', error);
@@ -21,8 +21,9 @@ async function obtenerPorId(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const item = await motivoNotaCreditoService.obtenerPorId(pool, req.params.id, req.user.empresa);
+        const item = await withPool(async (pool) =>
+            motivoNotaCreditoService.obtenerPorId(pool, req.params.id, req.user.empresa)
+        );
         if (!item) return res.status(404).json({ message: 'No encontrado', data: undefined });
         res.status(200).json({ data: item });
     } catch (error) {
@@ -36,8 +37,9 @@ async function crear(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const creado = await motivoNotaCreditoService.crear(pool, req.user.empresa, req.body);
+        const creado = await withPool(async (pool) =>
+            motivoNotaCreditoService.crear(pool, req.user.empresa, req.body)
+        );
         res.status(201).json({ data: creado });
     } catch (error) {
         console.error('motivoNotaCredito.crear:', error);
@@ -50,8 +52,9 @@ async function actualizar(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        await motivoNotaCreditoService.actualizar(pool, req.params.id, req.user.empresa, req.body);
+        await withPool(async (pool) =>
+            motivoNotaCreditoService.actualizar(pool, req.params.id, req.user.empresa, req.body)
+        );
         res.status(200).json({ data: { ok: true } });
     } catch (error) {
         console.error('motivoNotaCredito.actualizar:', error);
@@ -64,8 +67,9 @@ async function eliminar(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        await motivoNotaCreditoService.eliminar(pool, req.params.id, req.user.empresa);
+        await withPool(async (pool) =>
+            motivoNotaCreditoService.eliminar(pool, req.params.id, req.user.empresa)
+        );
         res.status(200).json({ data: { ok: true } });
     } catch (error) {
         console.error('motivoNotaCredito.eliminar:', error);

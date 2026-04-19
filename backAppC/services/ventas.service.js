@@ -1,7 +1,7 @@
 // services/ventas.service.js
 
 const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const ventasRepository = require('../repositories/ventas.repository');
 const valesDespachoRepository = require('../repositories/valesDespacho.repository');
 const detalleVentaService = require('./detalle-ventas.service');
@@ -672,7 +672,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     throw new Error('Venta y detalles son requeridos.');
   }
 
-  const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
   const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
   if (!esGestora) {
     return crearVentaSimpleCompletaWithPool(payload, user, pool);
@@ -1139,6 +1139,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     try { await transaction.rollback(); } catch (_) {}
     throw error;
   }
+  });
 };
 
 /**

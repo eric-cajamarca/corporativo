@@ -1,14 +1,12 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const proveedorService = require('../services/proveedor.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const crearProveedor = async function (req, res) {
   if (!req.user) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const rows = await proveedorService.crearProveedor(pool, req.user, req.body);
+    const rows = await withPool((pool) => proveedorService.crearProveedor(pool, req.user, req.body));
     res.status(200).send({ message: 'Proveedor creado', data: rows });
   } catch (err) {
     if (err.code === 'RUC_DUPLICADO') {
@@ -27,8 +25,7 @@ const listarProveedores = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await proveedorService.listarProveedores(pool, req.user);
+    const data = await withPool((pool) => proveedorService.listarProveedores(pool, req.user));
     res.status(200).send({ message: 'Lista de proveedores', data });
   } catch (err) {
     if (err.message === 'NO_PERM' || err.message === 'NO_EMPRESA') {
@@ -45,8 +42,7 @@ const listarProveedores_ruc = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await proveedorService.listarPorRuc(pool, req.user, ruc);
+    const data = await withPool((pool) => proveedorService.listarPorRuc(pool, req.user, ruc));
     res.status(200).send({ message: 'Lista de Proveedores', data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -63,8 +59,7 @@ const listarProveedores_id = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await proveedorService.listarPorId(pool, req.user, idProveedor);
+    const data = await withPool((pool) => proveedorService.listarPorId(pool, req.user, idProveedor));
     res.status(200).send({ message: 'Lista de proveedores', data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -81,8 +76,7 @@ const actualizarProveedor = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    await proveedorService.actualizarProveedor(pool, req.user, idProveedor, req.body);
+    await withPool((pool) => proveedorService.actualizarProveedor(pool, req.user, idProveedor, req.body));
     res.status(200).send({ message: 'Proveedor actualizado', data: 1 });
   } catch (err) {
     if (err.code === 'NOT_FOUND') {
@@ -102,8 +96,7 @@ const eliminarProveedor = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const n = await proveedorService.eliminarProveedor(pool, req.user, idProveedor);
+    const n = await withPool((pool) => proveedorService.eliminarProveedor(pool, req.user, idProveedor));
     res.status(200).send({ message: 'Proveedor eliminado', data: n });
   } catch (err) {
     if (err.code === 'TIENE_COMPRAS') {
@@ -124,8 +117,7 @@ const cambiarEstadoProveedor = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const rows = await proveedorService.cambiarEstado(pool, req.user, idProveedor, estado);
+    const rows = await withPool((pool) => proveedorService.cambiarEstado(pool, req.user, idProveedor, estado));
     res.status(200).send({ message: 'Proveedor eliminado', data: rows });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -141,8 +133,7 @@ const crearDireccionProveedor = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const r = await proveedorService.crearDireccion(pool, req.user, req.body);
+    const r = await withPool((pool) => proveedorService.crearDireccion(pool, req.user, req.body));
     res.status(200).send({ message: 'DireccionProveedor creado', data: r.rowsAffected });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -158,8 +149,7 @@ const listarDireccionProveedores = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await proveedorService.listarDireccionesEmpresa(pool, req.user);
+    const data = await withPool((pool) => proveedorService.listarDireccionesEmpresa(pool, req.user));
     res.status(200).send({ message: 'Lista de DireccionProveedores', data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -176,8 +166,9 @@ const listarDirecciones_idProveedor = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await proveedorService.listarDireccionesPorProveedor(pool, req.user, idProveedor);
+    const data = await withPool((pool) =>
+      proveedorService.listarDireccionesPorProveedor(pool, req.user, idProveedor)
+    );
     res.status(200).send({ message: 'Lista de DireccionProveedores', data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -194,8 +185,9 @@ const actualizarDireccionProveedor = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    await proveedorService.actualizarDireccion(pool, req.user, idDireccionProveedor, req.body);
+    await withPool((pool) =>
+      proveedorService.actualizarDireccion(pool, req.user, idDireccionProveedor, req.body)
+    );
     res.status(200).send({ message: 'DireccionProveedor actualizado', data: 1 });
   } catch (err) {
     if (err.message === 'NOT_FOUND') {
@@ -215,8 +207,7 @@ const eliminarDireccionProveedor = async function (req, res) {
     return res.status(500).send({ message: 'No Access' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    await proveedorService.eliminarDireccion(pool, req.user, idDireccionProveedor);
+    await withPool((pool) => proveedorService.eliminarDireccion(pool, req.user, idDireccionProveedor));
     res.status(200).send({ message: 'DireccionProveedor eliminado', data: 1 });
   } catch (err) {
     if (err.message === 'NOT_FOUND') {

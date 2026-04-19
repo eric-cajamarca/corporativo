@@ -1,13 +1,11 @@
 const sql = require('mssql');
-const dbConfig = require('../dbconfig');
-
-
+const { withPool } = require('../utils/dbPool.util');
 
 async function getAll(idEmpresa) {
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .query(`
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
             SELECT 
                 l.idLote, 
                 l.idEmpresa, 
@@ -27,14 +25,15 @@ async function getAll(idEmpresa) {
             ORDER BY l.fechaIngreso DESC
         `);
     return result.recordset;
+  });
 }
 
 async function getById(idLote) {
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     try {
-        const result = await pool.request()
-            .input('idLote', sql.UniqueIdentifier, idLote)
-            .query(`
+      const result = await pool.request()
+        .input('idLote', sql.UniqueIdentifier, idLote)
+        .query(`
                 SELECT 
                     idLote, 
                     idEmpresa, 
@@ -46,85 +45,89 @@ async function getById(idLote) {
                 FROM Lotes 
                 WHERE idLote = @idLote
             `);
-        const row = result.recordset && result.recordset[0];
-        if (!row) return null;
-        return {
-            idLote: row.idLote,
-            idEmpresa: row.idEmpresa,
-            idProducto: row.idProducto,
-            idSucursal: row.idSucursal,
-            costoUnitario: row.costoUnitario != null ? Number(row.costoUnitario) : 0,
-            cantidadIngresada: row.cantidadIngresada != null ? Number(row.cantidadIngresada) : 0,
-            cantidadDisponible: row.cantidadDisponible != null ? Number(row.cantidadDisponible) : 0
-        };
+      const row = result.recordset && result.recordset[0];
+      if (!row) return null;
+      return {
+        idLote: row.idLote,
+        idEmpresa: row.idEmpresa,
+        idProducto: row.idProducto,
+        idSucursal: row.idSucursal,
+        costoUnitario: row.costoUnitario != null ? Number(row.costoUnitario) : 0,
+        cantidadIngresada: row.cantidadIngresada != null ? Number(row.cantidadIngresada) : 0,
+        cantidadDisponible: row.cantidadDisponible != null ? Number(row.cantidadDisponible) : 0
+      };
     } catch (err) {
-        console.error('lotes.repository getById error:', err.message);
-        throw err;
+      console.error('lotes.repository getById error:', err.message);
+      throw err;
     }
+  });
 }
 
 async function getBySucursal(idEmpresa, idSucursal) {
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-        .query('SELECT * FROM Lotes WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal');
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+      .query('SELECT * FROM Lotes WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal');
     return result.recordset;
+  });
 }
 
 async function create(loteData) {
-    const { idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible } = loteData;
-    
-    const pool = await sql.connect(dbConfig);
+  const { idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible } = loteData;
+
+  return withPool(async (pool) => {
     const result = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('idProducto', sql.UniqueIdentifier, idProducto)
-        .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-        .input('costoUnitario', sql.Decimal(18,6), costoUnitario)
-        .input('cantidadIngresada', sql.Int, cantidadIngresada)
-        .input('cantidadDisponible', sql.Int, cantidadDisponible)
-        .query(`INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idProducto', sql.UniqueIdentifier, idProducto)
+      .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+      .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
+      .input('cantidadIngresada', sql.Int, cantidadIngresada)
+      .input('cantidadDisponible', sql.Int, cantidadDisponible)
+      .query(`INSERT INTO Lotes (idLote, idEmpresa, idProducto, idSucursal, costoUnitario, cantidadIngresada, cantidadDisponible)
                 VALUES (NEWID(), @idEmpresa, @idProducto, @idSucursal, @costoUnitario, @cantidadIngresada, @cantidadDisponible)`);
     return result;
+  });
 }
 
 async function update(idLote, loteData) {
-    const { costoUnitario, cantidadDisponible } = loteData;
+  const { costoUnitario, cantidadDisponible } = loteData;
 
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool.request()
-        .input('idLote', sql.UniqueIdentifier, idLote)
-        .input('costoUnitario', sql.Decimal(18,6), costoUnitario)
-        .input('cantidadDisponible', sql.Int, cantidadDisponible)
-        .query('UPDATE Lotes SET costoUnitario = @costoUnitario, cantidadDisponible = @cantidadDisponible WHERE idLote = @idLote');
+      .input('idLote', sql.UniqueIdentifier, idLote)
+      .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
+      .input('cantidadDisponible', sql.Int, cantidadDisponible)
+      .query('UPDATE Lotes SET costoUnitario = @costoUnitario, cantidadDisponible = @cantidadDisponible WHERE idLote = @idLote');
     return result;
+  });
 }
 
 async function deleted(idLote) {
-
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool.request()
-        .input('idLote', sql.UniqueIdentifier, idLote)
-        .query('DELETE FROM Lotes WHERE idLote = @idLote');
+      .input('idLote', sql.UniqueIdentifier, idLote)
+      .query('DELETE FROM Lotes WHERE idLote = @idLote');
     return result;
+  });
 }
 
 async function actualizarCantidadDisponible(idLote, nuevaCantidad) {
-
-    const pool = await sql.connect(dbConfig);
+  return withPool(async (pool) => {
     const result = await pool.request()
-        .input('idLote', sql.UniqueIdentifier, idLote)
-        .input('nuevaCantidad', sql.Int, nuevaCantidad)
-        .query('UPDATE Lotes SET cantidadDisponible = @nuevaCantidad WHERE idLote = @idLote');
+      .input('idLote', sql.UniqueIdentifier, idLote)
+      .input('nuevaCantidad', sql.Int, nuevaCantidad)
+      .query('UPDATE Lotes SET cantidadDisponible = @nuevaCantidad WHERE idLote = @idLote');
     return result;
+  });
 }
 
 module.exports = {
-    getAll,
-    getById,
-    getBySucursal,
-    create,
-    update,
-    deleted,
-    actualizarCantidadDisponible
+  getAll,
+  getById,
+  getBySucursal,
+  create,
+  update,
+  deleted,
+  actualizarCantidadDisponible
 };

@@ -1,14 +1,12 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const tablassunatService = require('../services/tablassunat.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const wrap = (fn) => async (req, res) => {
   if (!req.user) {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await fn(pool);
+    const data = await withPool((pool) => fn(pool));
     res.status(200).send({ data });
   } catch (error) {
     console.error('tablassunat:', error);
@@ -21,8 +19,7 @@ const wrap401 = (fn) => async (req, res) => {
     return res.status(401).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await fn(pool);
+    const data = await withPool((pool) => fn(pool));
     res.status(200).send({ data });
   } catch (error) {
     console.error('tablassunat:', error);

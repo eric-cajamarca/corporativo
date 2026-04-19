@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken'); // Cambiado a jsonwebtoken
 const moment = require('moment');
-const secret = process.env.JWT_SECRET || 'erik@./Eog_DEV_CHANGE_IN_PRODUCTION';
+const { getJwtSecret } = require('../config/jwt.config');
 
 exports.auth = function(req, res, next) {
     // if (!req.headers) {
@@ -15,7 +15,7 @@ exports.auth = function(req, res, next) {
 
     try {
         // Verifica y decodifica el token con jsonwebtoken
-        const payload = jwt.verify(token, secret);
+        const payload = jwt.verify(token, getJwtSecret());
 
         // Verifica si el token ha expirado
         if (payload.exp <= moment().unix()) {
@@ -42,7 +42,7 @@ exports.optionalAuth = function (req, res, next) {
         return next();
     }
     try {
-        const payload = jwt.verify(token, secret);
+        const payload = jwt.verify(token, getJwtSecret());
         if (payload.exp <= moment().unix()) {
             return next();
         }

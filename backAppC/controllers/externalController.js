@@ -7,8 +7,7 @@
  * Respuesta unificada: { _source: 'factiliza'|'apisperu', data: { ... campos normalizados } }
  */
 const axios = require('axios');
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const factilizaRepository = require('../repositories/factiliza.repository');
 
 const FACTILIZA_BASE = 'https://api.factiliza.com/v1';
@@ -211,10 +210,15 @@ async function getRucPublico(req, res) {
   let token = null;
   let hasConfig = false;
   try {
-    const pool = await sql.connect(dbConfig);
-    const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_RUC_SUNAT);
-    hasConfig = !!(config && config.tokenDefault);
-    token = (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null;
+    const db = await withPool(async (pool) => {
+      const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_RUC_SUNAT);
+      return {
+        hasConfig: !!(config && config.tokenDefault),
+        token: (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null
+      };
+    });
+    hasConfig = db.hasConfig;
+    token = db.token;
     // #region agent log
     logIngest('getRucPublico after DB', { hasConfig, hasToken: !!token });
     // #endregion

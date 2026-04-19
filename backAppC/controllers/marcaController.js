@@ -1,14 +1,12 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const marcaService = require('../services/marca.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const obtenerMarcas = async (req, res) => {
   if (!req.user) {
     return res.status(401).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await marcaService.obtenerMarcas(pool, req.user);
+    const data = await withPool((pool) => marcaService.obtenerMarcas(pool, req.user));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -24,8 +22,7 @@ const obtenerMarcaPorId = async (req, res) => {
     return res.status(401).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await marcaService.obtenerMarcaPorId(pool, req.user, req.params.id);
+    const data = await withPool((pool) => marcaService.obtenerMarcaPorId(pool, req.user, req.params.id));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -41,8 +38,7 @@ const crearMarca = async (req, res) => {
     return res.status(401).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await marcaService.crearMarca(pool, req.user, req.body);
+    const data = await withPool((pool) => marcaService.crearMarca(pool, req.user, req.body));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -58,8 +54,7 @@ const editarMarca = async (req, res) => {
     return res.status(401).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await marcaService.editarMarca(pool, req.user, req.params.id, req.body);
+    const data = await withPool((pool) => marcaService.editarMarca(pool, req.user, req.params.id, req.body));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -75,8 +70,9 @@ const editarEstadoMarca = async (req, res) => {
     return res.status(401).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await marcaService.editarEstadoMarca(pool, req.user, req.params.id, req.body);
+    const data = await withPool((pool) =>
+      marcaService.editarEstadoMarca(pool, req.user, req.params.id, req.body)
+    );
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {

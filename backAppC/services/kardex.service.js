@@ -1,6 +1,5 @@
 // services/kardex.service.js
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const kardexRepository = require('../repositories/kardex.repository');
 
 /**
@@ -18,10 +17,7 @@ exports.obtenerKardex = async (idEmpresa, idProducto, fechaDesde, fechaHasta) =>
   const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
   const desde = fechaDesde || inicioMes.toISOString().slice(0, 10);
   const hasta = fechaHasta || hoy.toISOString().slice(0, 10);
-  const pool = await sql.connect(dbConfig);
-  try {
-    return await kardexRepository.obtenerKardex(pool, idEmpresa, idProducto, desde, hasta);
-  } finally {
-    pool.close && pool.close().catch(() => {});
-  }
+  return withPool((pool) =>
+    kardexRepository.obtenerKardex(pool, idEmpresa, idProducto, desde, hasta)
+  );
 };

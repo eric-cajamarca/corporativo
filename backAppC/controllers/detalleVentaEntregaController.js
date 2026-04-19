@@ -1,6 +1,5 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const DetalleVentaEntregaService = require('../services/detalleVentaEntrega.service');
+const { withPool } = require('../utils/dbPool.util');
 
 /**
  * GET /api/ventas/:idVenta/entregas
@@ -11,8 +10,7 @@ const listarPorVenta = async (req, res) => {
     if (isNaN(idVenta)) {
       return res.status(400).json({ message: 'idVenta inválido' });
     }
-    const pool = await sql.connect(dbConfig);
-    const lista = await DetalleVentaEntregaService.listarPorVentaService(pool, idVenta, req.user);
+    const lista = await withPool((pool) => DetalleVentaEntregaService.listarPorVentaService(pool, idVenta, req.user));
     return res.status(200).json({ message: 'Entregas de la venta', data: lista });
   } catch (error) {
     if (error.message === 'USUARIO_NO_VALIDO') {
@@ -29,8 +27,7 @@ const listarPorVenta = async (req, res) => {
  */
 const crear = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const idEntrega = await DetalleVentaEntregaService.crearService(pool, req.body, req.user);
+    const idEntrega = await withPool((pool) => DetalleVentaEntregaService.crearService(pool, req.body, req.user));
     return res.status(201).json({ message: 'Entrega registrada', data: { idEntrega } });
   } catch (error) {
     if (error.message === 'USUARIO_NO_VALIDO') {

@@ -1,6 +1,5 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
 const productosImagenService = require('../services/productosImagen.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const listar = async (req, res) => {
   try {
@@ -9,8 +8,7 @@ const listar = async (req, res) => {
     if (!idEmpresa || !idProducto) {
       return res.status(400).json({ message: 'Falta idEmpresa o idProducto', data: undefined });
     }
-    const pool = await sql.connect(dbConfig);
-    const lista = await productosImagenService.listarPorProducto(pool, idEmpresa, idProducto);
+    const lista = await withPool((pool) => productosImagenService.listarPorProducto(pool, idEmpresa, idProducto));
     res.status(200).json({ data: lista });
   } catch (error) {
     if (error.message && error.message.includes('no encontrado')) {
@@ -32,8 +30,7 @@ const subir = async (req, res) => {
     if (files.length === 0) {
       return res.status(400).json({ message: 'No se enviaron imágenes', data: undefined });
     }
-    const pool = await sql.connect(dbConfig);
-    const rutas = await productosImagenService.subir(pool, idEmpresa, idProducto, files);
+    const rutas = await withPool((pool) => productosImagenService.subir(pool, idEmpresa, idProducto, files));
     res.status(201).json({ message: 'Imágenes subidas', data: rutas });
   } catch (error) {
     if (error.message && error.message.includes('no encontrado')) {
@@ -54,8 +51,7 @@ const eliminar = async (req, res) => {
     if (!idEmpresa || !idImagen) {
       return res.status(400).json({ message: 'Falta idEmpresa o idImagen', data: undefined });
     }
-    const pool = await sql.connect(dbConfig);
-    const result = await productosImagenService.eliminar(pool, idImagen, idEmpresa);
+    const result = await withPool((pool) => productosImagenService.eliminar(pool, idImagen, idEmpresa));
     res.status(200).json({ message: 'Imagen eliminada', data: result });
   } catch (error) {
     if (error.message && error.message.includes('no encontrada')) {
@@ -74,8 +70,7 @@ const marcarPortada = async (req, res) => {
     if (!idEmpresa || !idProducto || !idImagen) {
       return res.status(400).json({ message: 'Falta idEmpresa, idProducto o idImagen', data: undefined });
     }
-    const pool = await sql.connect(dbConfig);
-    await productosImagenService.marcarPortada(pool, idEmpresa, idProducto, idImagen);
+    await withPool((pool) => productosImagenService.marcarPortada(pool, idEmpresa, idProducto, idImagen));
     res.status(200).json({ message: 'Portada actualizada', data: { ok: true } });
   } catch (error) {
     if (error.message && (error.message.includes('no encontrado') || error.message.includes('no pertenece'))) {

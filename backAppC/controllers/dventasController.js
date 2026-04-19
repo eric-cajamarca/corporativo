@@ -1,30 +1,31 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const dventasService = require('../services/dventas.service');
 
 async function obtenerDetalleVentas(req, res) {
-  const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
-  if (!idEmpresa) {
-    return res.status(403).json({ message: 'No autorizado: falta empresa en token' });
-  }
   try {
-    const pool = await sql.connect(dbConfig);
-    const rows = await dventasService.obtenerDetalleVentas(pool, idEmpresa);
+    const rows = await dventasService.obtenerDetalleVentasConPool(req.user);
     res.json(rows);
   } catch (error) {
+    if (error.message === 'NO_EMPRESA') {
+      return res.status(403).json({ message: 'No autorizado: falta empresa en token' });
+    }
     console.error('Error al obtener detalle de ventas:', error);
     res.status(500).json({ message: 'Error al obtener detalle de ventas' });
   }
 }
 
 async function obtenerDetalleVentaPorId_empresa(req, res) {
+  if (!req.user) {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
   const CompVentas = req.params.id;
   const Destino = req.params.idempresa;
   try {
-    const pool = await sql.connect(dbConfig);
-    const rows = await dventasService.obtenerDetalleVentaPorCompDestino(pool, CompVentas, Destino);
+    const rows = await dventasService.obtenerDetalleVentaPorCompDestinoConPool(req.user, CompVentas, Destino);
     res.json(rows);
   } catch (error) {
+    if (error.message === 'NO_EMPRESA') {
+      return res.status(403).json({ message: 'No autorizado: falta empresa en token' });
+    }
     console.error('Error al obtener la venta:', error);
     res.status(500).send('Error al obtener la venta');
   }
@@ -39,8 +40,7 @@ async function actualizarDetalleVenta(req, res) {
     return res.status(200).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const { mensaje, estado } = await dventasService.actualizarDetalleVentaLote(pool, req.user, req.body);
+    const { mensaje, estado } = await dventasService.actualizarDetalleVentaLoteConPool(req.user, req.body);
     res.status(200).send({ message: mensaje, data: estado });
   } catch (error) {
     console.error('Error al actualizar el detalle de venta:', error);
@@ -54,8 +54,7 @@ async function eliminarDetalleVenta(req, res) {
     return res.status(400).json({ message: 'id de detalle inválido' });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const out = await dventasService.eliminarDetalleVenta(pool, req.user, idDetalle);
+    const out = await dventasService.eliminarDetalleVentaConPool(req.user, idDetalle);
     if (out.notFound) {
       return res.status(404).json({ message: 'El registro no existe o no pertenece a tu empresa' });
     }

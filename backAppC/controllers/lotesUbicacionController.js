@@ -1,5 +1,3 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const lotesUbicacionService = require('../services/lotesUbicacion.service');
 
 const getByLote = async function (req, res) {

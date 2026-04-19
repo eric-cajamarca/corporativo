@@ -1,6 +1,5 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const detalleComprasService = require('../services/detalleCompras.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const obtener_detalle_compras_idcompra = async function (req, res) {
   const idCompra = req.params.id;
@@ -11,8 +10,7 @@ const obtener_detalle_compras_idcompra = async function (req, res) {
     return res.status(500).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await detalleComprasService.obtenerDetallePorCompra(pool, req.user, idCompra);
+    const data = await withPool((pool) => detalleComprasService.obtenerDetallePorCompra(pool, req.user, idCompra));
     res.status(200).send({ data });
   } catch (err) {
     if (err.message === 'NO_PERM') {
@@ -28,8 +26,7 @@ const crear_detalle_compras_idcompra = async function (req, res) {
     return res.status(403).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const result = await detalleComprasService.crearDetalleCompraCompleto(pool, req.user, req.body);
+    const result = await withPool((pool) => detalleComprasService.crearDetalleCompraCompleto(pool, req.user, req.body));
     res.status(200).send({
       data: 1,
       message: result.asignarUbicacionDefecto
@@ -71,14 +68,15 @@ const editar_detalle_compras_idcompra = async (req, res) => {
     };
   });
   try {
-    const pool = await sql.connect(dbConfig);
-    for (const detalle of dCompra) {
-      if (detalle.idDetalleCompra) {
-        await detalleComprasService.actualizarDetalleInterno(pool, detalle);
-      } else {
-        await detalleComprasService.crearDetalleInterno(pool, detalle);
+    await withPool(async (pool) => {
+      for (const detalle of dCompra) {
+        if (detalle.idDetalleCompra) {
+          await detalleComprasService.actualizarDetalleInterno(pool, detalle);
+        } else {
+          await detalleComprasService.crearDetalleInterno(pool, detalle);
+        }
       }
-    }
+    });
     res.status(200).send({ data: 1, message: 'Detalle de compra actualizado correctamente' });
   } catch (error) {
     console.error('editar_detalle_compras_idcompra:', error);

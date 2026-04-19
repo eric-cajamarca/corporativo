@@ -1,5 +1,4 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const { isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 
@@ -70,18 +69,26 @@ exports.saasSuscripcionGate = async function saasSuscripcionGate(req, res, next)
   }
 
   try {
-    const pool = await sql.connect(dbConfig);
-    const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
-    if (permiteEscrituraSegunSuscripcion(sub)) {
-      return next();
-    }
-    return res.status(402).json({
+    await withPool(async (pool) => {
+      const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
+      if (permiteEscrituraSegunSuscripcion(sub)) {
+        return next();
+      }
+      return res.status(402).json({
       code: 'SUBSCRIPTION_REQUIRED',
       message:
         'Su plan requiere completar el pago o renovar la suscripción para registrar operaciones. Puede navegar en modo lectura o ir a Planes.'
+      });
     });
   } catch (error) {
-    console.error('saasSuscripcionGate:', error);
-    return next();
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'saasSuscripcionGate_db_error',
+      detail: error?.message || String(error)
+    }));
+    return res.status(503).json({
+      code: 'SUBSCRIPTION_CHECK_UNAVAILABLE',
+      message: 'No se pudo verificar el estado de la suscripción. Intente de nuevo en unos momentos.'
+    });
   }
 };

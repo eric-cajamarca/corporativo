@@ -1,5 +1,4 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const bcrypt = require('bcryptjs');
 const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
@@ -38,13 +37,10 @@ const getAdmin = async function (req, res, next) {
   }
 
   try {
-    // 3. Conectar BD (Controller gestiona el lifecycle de la conexión)
-    const pool = await sql.connect(dbConfig);
-
-    // 4. Llamar al Service
-    const usuarios = await usuarioService.getAdmin(pool, req.user.empresa);
-        // 5. Responder HTTP
-    res.status(200).send({ data: usuarios });
+    await withPool(async (pool) => {
+      const usuarios = await usuarioService.getAdmin(pool, req.user.empresa);
+      res.status(200).send({ data: usuarios });
+    });
   } catch (error) {
     console.error('Error al obtener usuarios:', error);
     return next(error);
@@ -57,9 +53,10 @@ const getEmpresa_login = async function (req, res, next) {
     }
 
     try {
-        const pool = await sql.connect(dbConfig);
-        const empresaResult = await empresaService.getDatosEmpresaLogin(pool, req.user);
-        return res.status(200).send({ active: true, data: empresaResult });
+        await withPool(async (pool) => {
+            const empresaResult = await empresaService.getDatosEmpresaLogin(pool, req.user);
+            return res.status(200).send({ active: true, data: empresaResult });
+        });
     } catch (error) {
         console.error('Error al obtener datos getEmpresa_login:', error);
         return next(error);
@@ -75,14 +72,12 @@ const createAdmin = async (req, res, next) => {
       return res.status(403).json({ data: undefined, message: 'No Access' });
     }
 
-    const pool = await sql.connect(dbConfig);
-    // Llamar al service
-    const resultado = await authService.createAdministrador(pool, req.body, req.user);
-
-    // Respuesta exitosa
-    res.status(200).json({
-      message: resultado.message,
-      data: resultado.rowsAffected
+    await withPool(async (pool) => {
+      const resultado = await authService.createAdministrador(pool, req.body, req.user);
+      res.status(200).json({
+        message: resultado.message,
+        data: resultado.rowsAffected
+      });
     });
 
   } catch (error) {
@@ -107,9 +102,6 @@ const createAdmin = async (req, res, next) => {
   }
 };
 
-
-// Agrega esta función al archivo existente
-
 const updateAdmin = async (req, res, next) => {
   const { id } = req.params;
   
@@ -119,14 +111,12 @@ const updateAdmin = async (req, res, next) => {
       return res.status(403).json({ message: 'No Access', data: undefined });
     }
 
-    const pool = await sql.connect(dbConfig);
-    // Llamar al service
-    const rowsAffected = await authService.updateAdministrador(pool, id, req.body, req.user);
-
-    // Respuesta exitosa
-    res.status(200).json({
-      message: 'Usuario actualizado correctamente',
-      data: rowsAffected
+    await withPool(async (pool) => {
+      const rowsAffected = await authService.updateAdministrador(pool, id, req.body, req.user);
+      res.status(200).json({
+        message: 'Usuario actualizado correctamente',
+        data: rowsAffected
+      });
     });
 
   } catch (error) {
@@ -144,69 +134,6 @@ const updateAdmin = async (req, res, next) => {
   }
 };
 
-
-// const updateAdmin = async (req, res) => {
-//     //   const { name, apellidos, email, password, rol, estado } = req.body;
-//     const { nombres, apellidos, password, idRol } = req.body;
-//     const { id } = req.params;
-//     console.log('updateAdmin rol: ', idRol);
-
-//     if (req.user) {
-//         if (req.user.rol == 'Administrador') {
-//             try {
-//                 console.log('password : ', password);
-
-//                 if (password.trim() == 'sin datos') {
-
-//                     //cuando viene sin password
-//                     console.log('cuando viene sin password');
-
-//                     const pool = await sql.connect(dbConfig);
-//                     const result = await pool
-//                         .request()
-//                         .input('idUsuario', sql.UniqueIdentifier, id)
-//                         .input('nombres', sql.VarChar, nombres)
-//                         .input('apellidos', sql.VarChar, apellidos)
-//                         .input('idRol', sql.UniqueIdentifier, idRol)
-//                         .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-
-//                         .query('UPDATE usuarioWeb SET nombres = @nombres, apellidos = @apellidos, idRol = @idRol WHERE idUsuario = @idUsuario and idEmpresa = @idEmpresa');
-//                     res.status(200).send({ message: 'Usuario actualizado correctamente', data: result.rowsAffected });
-
-//                 } else {
-
-//                     //cuando viene con password
-//                     console.log('cuando viene con password')
-//                     const hashedPassword = await bcrypt.hash(password, 8);
-
-//                     const pool = await sql.connect(dbConfig);
-//                     const result = await pool
-//                         .request()
-//                         .input('idUsuario', sql.UniqueIdentifier, id)
-//                         .input('nombres', sql.VarChar, nombres)
-//                         .input('apellidos', sql.VarChar, apellidos)
-//                         .input('password', sql.Text, hashedPassword)
-//                         .input('idRol', sql.UniqueIdentifier, idRol)
-//                         .query('UPDATE usuarioWeb SET nombres = @nombres, apellidos = @apellidos, password = @password, idRol = @idRol WHERE idUsuario = @idUsuario');
-//                     res.status(200).send({ message: 'Usuario actualizado correctamente', data: result.rowsAffected });
-
-//                 }
-
-//             } catch (error) {
-//                 console.error('Error al actualizar un usuario:', error);
-//                 res.status(500).send('Error al actualizar un usuario');
-//             }
-//         } else {
-//             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-//         }
-//     }
-//     else {
-//         res.status(500).send({ message: 'No Access' });
-//     }
-
-
-// };
-
 const obtener_datos_colaborador_admin = async (req, res, next) => {
     const { id } = req.params;
     let data;
@@ -214,16 +141,14 @@ const obtener_datos_colaborador_admin = async (req, res, next) => {
         
 
     if (req.user) {
-        //quiero validar si el rol del usuario es administrador
         if (req.user.rol == 'Administrador') {
                         try {
 
-                const pool = await sql.connect(dbConfig);
-                const row = await usuarioAdminService.obtenerColaboradorConRol(pool, req.user, id);
-                data = [row];
-                res.status(200).send({ data });
-                //res.json({ data });
-
+                await withPool(async (pool) => {
+                    const row = await usuarioAdminService.obtenerColaboradorConRol(pool, req.user, id);
+                    data = [row];
+                    res.status(200).send({ data });
+                });
 
             } catch (error) {
                 if (error.code === 'NOT_FOUND') {
@@ -256,15 +181,12 @@ const cambiar_estado_colaborador_admin = async (req, res, next) => {
   try {
     const id = req.params.id;
     const data = req.body;
-    const pool = await sql.connect(dbConfig);
-
-    // Llamada al service
-    const resultado = await colaboradorService.cambiarEstado(pool,id, data, req.user ,req.user.empresa);
-
-    // Respuesta exitosa
-    res.status(200).json({
-      message: resultado.message,
-      data: { nuevoEstado: resultado.nuevoEstado }
+    await withPool(async (pool) => {
+      const resultado = await colaboradorService.cambiarEstado(pool,id, data, req.user ,req.user.empresa);
+      res.status(200).json({
+        message: resultado.message,
+        data: { nuevoEstado: resultado.nuevoEstado }
+      });
     });
 
   } catch (error) {
@@ -293,17 +215,36 @@ const admin_login = async (req, res, next) => {
   const ipCliente = obtenerIpCliente(req);
 
   try {
-    const pool = await sql.connect(dbConfig);
+    const loginOutcome = await withPool(async (pool) => {
+      const loginResult = await authService.adminLogin(pool, email, password, ruc, ipCliente);
 
-    const loginResult = await authService.adminLogin(pool, email, password, ruc, ipCliente);
+      if (loginResult.stage === 'SETUP') {
+        return { kind: 'SETUP', loginResult };
+      }
+      if (loginResult.stage === 'VERIFY') {
+        return { kind: 'VERIFY', loginResult };
+      }
 
-    if (loginResult.stage === 'SETUP') {
-      const d = loginResult.datosUsuario;
+      const datosUsuario = loginResult.datosUsuario;
+      await refreshTokenService.emitirSesion(pool, datosUsuario, res, req);
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: datosUsuario.idEmpresa,
+        idUsuario: datosUsuario.idUsuario,
+        tipo: 'LOGIN_OK',
+        detalle: null,
+        ipCliente
+      });
+      notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente);
+      return { kind: 'OK', datosUsuario };
+    });
+
+    if (loginOutcome.kind === 'SETUP') {
+      const d = loginOutcome.loginResult.datosUsuario;
       return res.status(200).send({
         message: 'Configure el código de verificación en dos pasos.',
         data: {
           requiresTwoFactorSetup: true,
-          pendingToken: loginResult.pendingToken,
+          pendingToken: loginOutcome.loginResult.pendingToken,
           idUsuario: d.idUsuario,
           idEmpresa: d.idEmpresa,
           razonSocial: d.razonSocial,
@@ -315,13 +256,13 @@ const admin_login = async (req, res, next) => {
       });
     }
 
-    if (loginResult.stage === 'VERIFY') {
-      const d = loginResult.datosUsuario;
+    if (loginOutcome.kind === 'VERIFY') {
+      const d = loginOutcome.loginResult.datosUsuario;
       return res.status(200).send({
         message: 'Ingrese el código de su aplicación autenticadora.',
         data: {
           requiresTwoFactor: true,
-          pendingToken: loginResult.pendingToken,
+          pendingToken: loginOutcome.loginResult.pendingToken,
           idUsuario: d.idUsuario,
           idEmpresa: d.idEmpresa,
           razonSocial: d.razonSocial,
@@ -333,22 +274,9 @@ const admin_login = async (req, res, next) => {
       });
     }
 
-    const datosUsuario = loginResult.datosUsuario;
-
-    await refreshTokenService.emitirSesion(pool, datosUsuario, res, req);
-
-    await seguridadAuditoriaService.registrar(pool, req, {
-      idEmpresa: datosUsuario.idEmpresa,
-      idUsuario: datosUsuario.idUsuario,
-      tipo: 'LOGIN_OK',
-      detalle: null,
-      ipCliente
-    });
-
-    notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente);
-
-    const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
-    res.status(200).send({
+    const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } =
+      loginOutcome.datosUsuario;
+    return res.status(200).send({
       message: 'Login exitoso',
       data: {
         idUsuario,
@@ -365,19 +293,20 @@ const admin_login = async (req, res, next) => {
     if (error.stack) console.error(error.stack);
 
     try {
-      const poolA = await sql.connect(dbConfig);
-      let idEmpresaAud = null;
-      if (ruc && String(ruc).trim()) {
-        const emp = await empresaRepository.buscarPorRuc(poolA, String(ruc).trim());
-        if (emp) idEmpresaAud = emp.idEmpresa;
-      }
-      const tipoAud =
-        error.message === 'LOGIN_BLOQUEADO_TEMPORAL' ? 'LOGIN_BLOQUEADO' : 'LOGIN_FAIL';
-      await seguridadAuditoriaService.registrar(poolA, req, {
-        idEmpresa: idEmpresaAud,
-        tipo: tipoAud,
-        detalle: String(error.message).slice(0, 500),
-        ipCliente
+      await withPool(async (poolA) => {
+        let idEmpresaAud = null;
+        if (ruc && String(ruc).trim()) {
+          const emp = await empresaRepository.buscarPorRuc(poolA, String(ruc).trim());
+          if (emp) idEmpresaAud = emp.idEmpresa;
+        }
+        const tipoAud =
+          error.message === 'LOGIN_BLOQUEADO_TEMPORAL' ? 'LOGIN_BLOQUEADO' : 'LOGIN_FAIL';
+        await seguridadAuditoriaService.registrar(poolA, req, {
+          idEmpresa: idEmpresaAud,
+          tipo: tipoAud,
+          detalle: String(error.message).slice(0, 500),
+          ipCliente
+        });
       });
     } catch (audErr) {
       console.error('Auditoría login fallido:', audErr.message);
@@ -420,9 +349,10 @@ const deleteAdmin = async (req, res, next) => {
     }
 
     try {
-        const pool = await sql.connect(dbConfig);
-        await usuarioAdminService.eliminarUsuarioWebLegacy(pool, id, req.user.empresa);
-        res.json({ message: 'Usuario eliminado correctamente' });
+        await withPool(async (pool) => {
+            await usuarioAdminService.eliminarUsuarioWebLegacy(pool, id, req.user.empresa);
+            res.json({ message: 'Usuario eliminado correctamente' });
+        });
     } catch (error) {
         if (error.code === 'NOT_FOUND') {
             return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -434,21 +364,22 @@ const deleteAdmin = async (req, res, next) => {
 
 const refresh_session = async (req, res, next) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const { datosUsuario } = await refreshTokenService.rotarSesion(
-      pool,
-      req.cookies && req.cookies.refreshToken,
-      res,
-      req
-    );
-    await seguridadAuditoriaService.registrar(pool, req, {
-      idEmpresa: datosUsuario.idEmpresa,
-      idUsuario: datosUsuario.idUsuario,
-      tipo: 'REFRESH_TOKEN',
-      detalle: null,
-      ipCliente: obtenerIpCliente(req)
+    await withPool(async (pool) => {
+      const { datosUsuario } = await refreshTokenService.rotarSesion(
+        pool,
+        req.cookies && req.cookies.refreshToken,
+        res,
+        req
+      );
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: datosUsuario.idEmpresa,
+        idUsuario: datosUsuario.idUsuario,
+        tipo: 'REFRESH_TOKEN',
+        detalle: null,
+        ipCliente: obtenerIpCliente(req)
+      });
+      return res.status(200).json({ success: true, message: 'Sesión renovada' });
     });
-    return res.status(200).json({ success: true, message: 'Sesión renovada' });
   } catch (err) {
     if (err.message && String(err.message).startsWith('REFRESH_')) {
       refreshTokenService.limpiarCookies(res);
@@ -463,39 +394,28 @@ const refresh_session = async (req, res, next) => {
 
 const logout = async (req, res, next) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    if (req.cookies && req.cookies.refreshToken) {
-      await refreshTokenService.revocarPorTokenRaw(pool, req.cookies.refreshToken);
-    } else if (req.user && req.user.sub && req.user.empresa) {
-      await refreshTokenService.revocarTodosUsuarioEmpresa(pool, req.user.sub, req.user.empresa);
-    }
-    if (req.user && req.user.sub && req.user.empresa) {
-      await seguridadAuditoriaService.registrar(pool, req, {
-        idEmpresa: req.user.empresa,
-        idUsuario: req.user.sub,
-        tipo: 'LOGOUT',
-        ipCliente: obtenerIpCliente(req)
-      });
-    }
-    refreshTokenService.limpiarCookies(res);
-    return res.status(200).json({ success: true, message: 'Sesión cerrada exitosamente' });
+    await withPool(async (pool) => {
+      if (req.cookies && req.cookies.refreshToken) {
+        await refreshTokenService.revocarPorTokenRaw(pool, req.cookies.refreshToken);
+      } else if (req.user && req.user.sub && req.user.empresa) {
+        await refreshTokenService.revocarTodosUsuarioEmpresa(pool, req.user.sub, req.user.empresa);
+      }
+      if (req.user && req.user.sub && req.user.empresa) {
+        await seguridadAuditoriaService.registrar(pool, req, {
+          idEmpresa: req.user.empresa,
+          idUsuario: req.user.sub,
+          tipo: 'LOGOUT',
+          ipCliente: obtenerIpCliente(req)
+        });
+      }
+      refreshTokenService.limpiarCookies(res);
+      return res.status(200).json({ success: true, message: 'Sesión cerrada exitosamente' });
+    });
   } catch (e) {
     refreshTokenService.limpiarCookies(res);
     return next(e);
   }
 };
-  
-// const consulCookie= async (req, res) => {
-//     const token = req.cookies.token;
-//     if (!token) return res.status(401).send({ message: 'No autenticado' });
-  
-//     try {
-//       //const decoded = jwt.verify(token, 'secreto');
-//       res.send({ nombre: decoded.nombre, idUsuario: decoded.idUsuario });
-//     } catch {
-//       res.status(401).send({ message: 'Token inválido' });
-//     }
-//   };
 
 /**
  * POST /recuperar-password
@@ -509,11 +429,12 @@ const recuperarPassword = async (req, res, next) => {
   }
 
   try {
-    const pool = await sql.connect(dbConfig);
-    await authService.solicitarRecuperacion(pool, ruc.trim(), email.trim());
-    res.status(200).send({
-      message: 'Si el correo está registrado, recibirá un enlace en su bandeja en los próximos minutos. Revise también la carpeta de spam.',
-      data: undefined
+    await withPool(async (pool) => {
+      await authService.solicitarRecuperacion(pool, ruc.trim(), email.trim());
+      res.status(200).send({
+        message: 'Si el correo está registrado, recibirá un enlace en su bandeja en los próximos minutos. Revise también la carpeta de spam.',
+        data: undefined
+      });
     });
   } catch (error) {
     if (error.message === 'RUC_NO_ENCONTRADO') {
@@ -541,9 +462,10 @@ const restablecerPassword = async (req, res, next) => {
   }
 
   try {
-    const pool = await sql.connect(dbConfig);
-    const result = await authService.restablecerPassword(pool, token, newPassword);
-    res.status(200).send({ message: result.message, data: undefined });
+    await withPool(async (pool) => {
+      const result = await authService.restablecerPassword(pool, token, newPassword);
+      res.status(200).send({ message: result.message, data: undefined });
+    });
   } catch (error) {
     if (error.message === 'jwt expired' || error.message === 'Token inválido') {
       return res.status(400).send({ message: 'El enlace ha expirado. Solicite uno nuevo.', data: undefined });
@@ -569,12 +491,13 @@ const admin_2fa_setup_init = async (req, res, next) => {
     return res.status(400).send({ message: 'Token pendiente requerido', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
     const decoded = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
     if (decoded.flow !== 'setup') {
       return res.status(400).send({ message: 'Token no válido para configuración', data: undefined });
     }
-    const { qrDataUrl } = await twoFactorAdminService.iniciarSetup(pool, decoded);
+    const { qrDataUrl } = await withPool(async (pool) =>
+      twoFactorAdminService.iniciarSetup(pool, decoded)
+    );
     return res.status(200).send({ message: 'OK', data: { qrDataUrl } });
   } catch (error) {
     if (esErrorJwt2fa(error)) {
@@ -598,44 +521,48 @@ const admin_2fa_setup_confirm = async (req, res, next) => {
   }
   const ipCliente = obtenerIpCliente(req);
   try {
-    const pool = await sql.connect(dbConfig);
     const decoded = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
     if (decoded.flow !== 'setup') {
       return res.status(400).send({ message: 'Token no válido para confirmación', data: undefined });
     }
-    await twoFactorAdminService.completarSetup(pool, decoded, code);
-    const datosUsuario = await authService.construirDatosUsuarioPost2FA(
-      pool,
-      decoded.idUsuario,
-      decoded.idEmpresa,
-      decoded.synthetic
-    );
-    if (!datosUsuario) {
-      return res.status(401).send({ message: 'Usuario no válido', data: undefined });
-    }
-    await refreshTokenService.emitirSesion(pool, datosUsuario, res, req);
-    await seguridadAuditoriaService.registrar(pool, req, {
-      idEmpresa: datosUsuario.idEmpresa,
-      idUsuario: datosUsuario.idUsuario,
-      tipo: 'LOGIN_OK',
-      detalle: '2FA_SETUP_OK',
-      ipCliente
-    });
-    notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente);
-    const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
-    return res.status(200).send({
-      message: 'Login exitoso',
-      data: {
-        idUsuario,
-        idEmpresa,
-        razonSocial,
-        nombres,
-        apellidos,
-        email: userEmail,
-        rol
+    await withPool(async (pool) => {
+      await twoFactorAdminService.completarSetup(pool, decoded, code);
+      const datosUsuario = await authService.construirDatosUsuarioPost2FA(
+        pool,
+        decoded.idUsuario,
+        decoded.idEmpresa,
+        decoded.synthetic
+      );
+      if (!datosUsuario) {
+        throw Object.assign(new Error('USUARIO_NO_VALIDO_2FA'), { __status401: true });
       }
+      await refreshTokenService.emitirSesion(pool, datosUsuario, res, req);
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: datosUsuario.idEmpresa,
+        idUsuario: datosUsuario.idUsuario,
+        tipo: 'LOGIN_OK',
+        detalle: '2FA_SETUP_OK',
+        ipCliente
+      });
+      notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente);
+      const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
+      res.status(200).send({
+        message: 'Login exitoso',
+        data: {
+          idUsuario,
+          idEmpresa,
+          razonSocial,
+          nombres,
+          apellidos,
+          email: userEmail,
+          rol
+        }
+      });
     });
   } catch (error) {
+    if (error && error.__status401 && error.message === 'USUARIO_NO_VALIDO_2FA') {
+      return res.status(401).send({ message: 'Usuario no válido', data: undefined });
+    }
     if (esErrorJwt2fa(error)) {
       return res.status(401).send({
         message: 'La verificación en dos pasos expiró. Inicie sesión de nuevo.',
@@ -644,14 +571,15 @@ const admin_2fa_setup_confirm = async (req, res, next) => {
     }
     if (error.message === 'CODIGO_2FA_INCORRECTO') {
       try {
-        const poolA = await sql.connect(dbConfig);
-        const dec = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
-        await seguridadAuditoriaService.registrar(poolA, req, {
-          idEmpresa: dec.idEmpresa,
-          idUsuario: dec.idUsuario,
-          tipo: 'LOGIN_2FA_FAIL',
-          detalle: 'setup',
-          ipCliente
+        await withPool(async (poolA) => {
+          const dec = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
+          await seguridadAuditoriaService.registrar(poolA, req, {
+            idEmpresa: dec.idEmpresa,
+            idUsuario: dec.idUsuario,
+            tipo: 'LOGIN_2FA_FAIL',
+            detalle: 'setup',
+            ipCliente
+          });
         });
       } catch (audErr) {
         console.error('Auditoría 2FA:', audErr.message);
@@ -673,44 +601,48 @@ const admin_2fa_verify = async (req, res, next) => {
   }
   const ipCliente = obtenerIpCliente(req);
   try {
-    const pool = await sql.connect(dbConfig);
     const decoded = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
     if (decoded.flow !== 'verify') {
       return res.status(400).send({ message: 'Token no válido para verificación', data: undefined });
     }
-    await twoFactorAdminService.verificarCodigoLogin(pool, decoded, code);
-    const datosUsuario = await authService.construirDatosUsuarioPost2FA(
-      pool,
-      decoded.idUsuario,
-      decoded.idEmpresa,
-      decoded.synthetic
-    );
-    if (!datosUsuario) {
-      return res.status(401).send({ message: 'Usuario no válido', data: undefined });
-    }
-    await refreshTokenService.emitirSesion(pool, datosUsuario, res, req);
-    await seguridadAuditoriaService.registrar(pool, req, {
-      idEmpresa: datosUsuario.idEmpresa,
-      idUsuario: datosUsuario.idUsuario,
-      tipo: 'LOGIN_OK',
-      detalle: '2FA_VERIFY_OK',
-      ipCliente
-    });
-    notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente);
-    const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
-    return res.status(200).send({
-      message: 'Login exitoso',
-      data: {
-        idUsuario,
-        idEmpresa,
-        razonSocial,
-        nombres,
-        apellidos,
-        email: userEmail,
-        rol
+    await withPool(async (pool) => {
+      await twoFactorAdminService.verificarCodigoLogin(pool, decoded, code);
+      const datosUsuario = await authService.construirDatosUsuarioPost2FA(
+        pool,
+        decoded.idUsuario,
+        decoded.idEmpresa,
+        decoded.synthetic
+      );
+      if (!datosUsuario) {
+        throw Object.assign(new Error('USUARIO_NO_VALIDO_2FA'), { __status401: true });
       }
+      await refreshTokenService.emitirSesion(pool, datosUsuario, res, req);
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: datosUsuario.idEmpresa,
+        idUsuario: datosUsuario.idUsuario,
+        tipo: 'LOGIN_OK',
+        detalle: '2FA_VERIFY_OK',
+        ipCliente
+      });
+      notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente);
+      const { idUsuario, idEmpresa, razonSocial, nombres, apellidos, email: userEmail, rol } = datosUsuario;
+      res.status(200).send({
+        message: 'Login exitoso',
+        data: {
+          idUsuario,
+          idEmpresa,
+          razonSocial,
+          nombres,
+          apellidos,
+          email: userEmail,
+          rol
+        }
+      });
     });
   } catch (error) {
+    if (error && error.__status401 && error.message === 'USUARIO_NO_VALIDO_2FA') {
+      return res.status(401).send({ message: 'Usuario no válido', data: undefined });
+    }
     if (esErrorJwt2fa(error)) {
       return res.status(401).send({
         message: 'La verificación en dos pasos expiró. Inicie sesión de nuevo.',
@@ -719,14 +651,15 @@ const admin_2fa_verify = async (req, res, next) => {
     }
     if (error.message === 'CODIGO_2FA_INCORRECTO') {
       try {
-        const poolA = await sql.connect(dbConfig);
-        const dec = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
-        await seguridadAuditoriaService.registrar(poolA, req, {
-          idEmpresa: dec.idEmpresa,
-          idUsuario: dec.idUsuario,
-          tipo: 'LOGIN_2FA_FAIL',
-          detalle: 'verify',
-          ipCliente
+        await withPool(async (poolA) => {
+          const dec = jwtHelper.verifyTwoFactorPendingToken(pendingToken);
+          await seguridadAuditoriaService.registrar(poolA, req, {
+            idEmpresa: dec.idEmpresa,
+            idUsuario: dec.idUsuario,
+            tipo: 'LOGIN_2FA_FAIL',
+            detalle: 'verify',
+            ipCliente
+          });
         });
       } catch (audErr) {
         console.error('Auditoría 2FA:', audErr.message);

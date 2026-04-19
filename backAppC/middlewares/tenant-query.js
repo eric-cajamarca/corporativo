@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 
 // Tablas globales que NO necesitan filtro de empresa
 const TABLAS_GLOBALES = [
@@ -52,13 +53,11 @@ exports.querySafeMiddleware = (req, res, next) => {
 
 // Función helper para ejecutar queries con mssql
 async function ejecutarQuery(queryString, params) {
-  const pool = await sql.connect(); // Ya está conectado por tu dbConnection.js
-  const request = pool.request();
-
-  // Agrega todos los parámetros con su tipo
-  params.forEach(param => {
-    request.input(param.name, param.type, param.value);
+  return withPool(async (pool) => {
+    const request = pool.request();
+    params.forEach(param => {
+      request.input(param.name, param.type, param.value);
+    });
+    return request.query(queryString);
   });
-
-  return request.query(queryString);
 }

@@ -1,6 +1,5 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const factilizaRepository = require('../repositories/factiliza.repository');
+const { withPool } = require('../utils/dbPool.util');
 
 const NOMBRE_SERVICIO_TIPO_CAMBIO = 'Factiliza TIPO CAMBIO';
 const API_TIPO_CAMBIO_BASE = 'https://api.factiliza.com/v1/tipocambio/info/dia';
@@ -37,17 +36,22 @@ async function getTipoCambioDia(req, res) {
     return res.status(401).json({ status: 401, success: false, message: 'No autorizado' });
   }
 
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
+    const { puedeUsar, token } = await withPool(async (pool) => {
+      const puede = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_TIPO_CAMBIO);
+      const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_TIPO_CAMBIO);
+      const tok = (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null;
+      return { puedeUsar: puede, token: tok };
+    });
 
-    const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_TIPO_CAMBIO);
     if (!puedeUsar) {
-      return res.status(403).json({ status: 403, success: false, message: 'Su empresa no tiene autorización para usar el servicio de tipo de cambio' });
+      return res.status(403).json({
+        status: 403,
+        success: false,
+        message: 'Su empresa no tiene autorización para usar el servicio de tipo de cambio'
+      });
     }
 
-    const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_TIPO_CAMBIO);
-    const token = (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null;
     if (!token) {
       return res.status(503).json({ status: 503, success: false, message: 'Servicio de tipo de cambio no configurado' });
     }
@@ -83,8 +87,6 @@ async function getTipoCambioDia(req, res) {
   } catch (err) {
     console.error('tipoCambioController getTipoCambioDia:', err.message);
     res.status(500).json({ status: 500, success: false, message: 'Error al consultar tipo de cambio' });
-  } finally {
-    // No cerrar pool: sql.connect() devuelve el pool global; cerrarlo rompe otras peticiones.
   }
 }
 
@@ -118,17 +120,22 @@ async function getTipoCambioMes(req, res) {
     return res.status(400).json({ status: 400, success: false, message: 'Parámetros anio y mes inválidos' });
   }
 
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
+    const { puedeUsar, token } = await withPool(async (pool) => {
+      const puede = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_TIPO_CAMBIO);
+      const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_TIPO_CAMBIO);
+      const tok = (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null;
+      return { puedeUsar: puede, token: tok };
+    });
 
-    const puedeUsar = await factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_TIPO_CAMBIO);
     if (!puedeUsar) {
-      return res.status(403).json({ status: 403, success: false, message: 'Su empresa no tiene autorización para usar el servicio de tipo de cambio' });
+      return res.status(403).json({
+        status: 403,
+        success: false,
+        message: 'Su empresa no tiene autorización para usar el servicio de tipo de cambio'
+      });
     }
 
-    const config = await factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_TIPO_CAMBIO);
-    const token = (config && config.tokenDefault) || process.env.FACTILIZA_TOKEN || null;
     if (!token) {
       return res.status(503).json({ status: 503, success: false, message: 'Servicio de tipo de cambio no configurado' });
     }
@@ -158,8 +165,6 @@ async function getTipoCambioMes(req, res) {
   } catch (err) {
     console.error('tipoCambioController getTipoCambioMes:', err.message);
     res.status(500).json({ status: 500, success: false, message: 'Error al consultar tipo de cambio del mes' });
-  } finally {
-    // No cerrar pool global (ver getTipoCambioDia).
   }
 }
 

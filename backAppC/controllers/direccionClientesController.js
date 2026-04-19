@@ -1,12 +1,10 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const direccionClientesService = require('../services/direccionClientes.service');
+const { withPool } = require('../utils/dbPool.util');
 const { errores: DE } = direccionClientesService;
 
 const crearDireccionCliente = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await direccionClientesService.crear(pool, req.user, req.body);
+    const data = await withPool((pool) => direccionClientesService.crear(pool, req.user, req.body));
     res.status(200).send({ message: 'DireccionCliente creado', data });
   } catch (error) {
     if (error.message === DE.NO_AUTH) {
@@ -22,8 +20,7 @@ const crearDireccionCliente = async (req, res) => {
 
 const listarDireccionClientes = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await direccionClientesService.listar(pool, req.user);
+    const data = await withPool((pool) => direccionClientesService.listar(pool, req.user));
     res.status(200).send({ message: 'Lista de DireccionClientes', data });
   } catch (error) {
     if (error.message === DE.NO_AUTH) {
@@ -39,8 +36,9 @@ const listarDireccionClientes = async (req, res) => {
 
 const listarDireccionesClientes_idCliente = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await direccionClientesService.listarPorCliente(pool, req.user, req.params.id);
+    const data = await withPool((pool) =>
+      direccionClientesService.listarPorCliente(pool, req.user, req.params.id)
+    );
     res.status(200).send({ message: 'Lista de DireccionClientes', data });
   } catch (error) {
     if (error.message === DE.NO_AUTH) {
@@ -57,8 +55,9 @@ const listarDireccionesClientes_idCliente = async (req, res) => {
 const actualizarDireccionCliente = async (req, res) => {
   const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await direccionClientesService.actualizar(pool, req.user, idDireccionCliente, req.body);
+    const data = await withPool((pool) =>
+      direccionClientesService.actualizar(pool, req.user, idDireccionCliente, req.body)
+    );
     res.status(200).send({ message: 'DireccionCliente actualizado', data });
   } catch (error) {
     if (error.message === DE.NO_AUTH) {
@@ -75,8 +74,9 @@ const actualizarDireccionCliente = async (req, res) => {
 const eliminarDireccionCliente = async (req, res) => {
   const idDireccionCliente = req.params.id || req.params.idDireccionCliente;
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await direccionClientesService.eliminar(pool, req.user, idDireccionCliente);
+    const data = await withPool((pool) =>
+      direccionClientesService.eliminar(pool, req.user, idDireccionCliente)
+    );
     res.status(200).send({ message: 'DireccionCliente eliminado', data });
   } catch (error) {
     if (error.message === DE.NO_AUTH) {

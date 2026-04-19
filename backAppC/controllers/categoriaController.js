@@ -1,14 +1,12 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const categoriaService = require('../services/categoria.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const obtener_Categorias = async (req, res) => {
   if (!req.user) {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await categoriaService.obtenerCategorias(pool, req.user);
+    const data = await withPool((pool) => categoriaService.obtenerCategorias(pool, req.user));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -24,8 +22,7 @@ const obtener_Categoria_id = async (req, res) => {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await categoriaService.obtenerCategoriaPorId(pool, req.user, req.params.id);
+    const data = await withPool((pool) => categoriaService.obtenerCategoriaPorId(pool, req.user, req.params.id));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -41,8 +38,7 @@ const crear_Categoria = async (req, res) => {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await categoriaService.crearCategoria(pool, req.user, req.body);
+    const data = await withPool((pool) => categoriaService.crearCategoria(pool, req.user, req.body));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -58,8 +54,9 @@ const editar_Categoria = async (req, res) => {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await categoriaService.editarCategoria(pool, req.user, req.params.id, req.body);
+    const data = await withPool((pool) =>
+      categoriaService.editarCategoria(pool, req.user, req.params.id, req.body)
+    );
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -75,8 +72,9 @@ const cambiar_estado_categoria = async (req, res) => {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await categoriaService.cambiarEstadoCategoria(pool, req.user, req.params.id, req.body);
+    const data = await withPool((pool) =>
+      categoriaService.cambiarEstadoCategoria(pool, req.user, req.params.id, req.body)
+    );
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -92,8 +90,7 @@ const eliminar_Categoria = async (req, res) => {
     return res.status(200).send({ message: 'No Acces', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await categoriaService.eliminarCategoria(pool, req.user, req.params.id);
+    const data = await withPool((pool) => categoriaService.eliminarCategoria(pool, req.user, req.params.id));
     res.status(200).send({ data });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {

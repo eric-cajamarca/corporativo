@@ -1,6 +1,5 @@
 // NUNCA pongas lógica de negocio en controllers (regla 1.1)
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const gestoresService = require('../services/gestores.service');
 
 /**
@@ -12,8 +11,9 @@ const obtener_empresas_gestionadas = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.obtenerEmpresasGestionadas(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.obtenerEmpresasGestionadas(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Empresas gestionadas obtenidas correctamente',
@@ -46,8 +46,9 @@ const obtener_todos_gestores = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.obtenerTodosGestores(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.obtenerTodosGestores(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Gestores obtenidos correctamente',
@@ -74,8 +75,9 @@ const buscar_empresa_ruc = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.buscarEmpresaPorRuc(pool, ruc, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.buscarEmpresaPorRuc(pool, ruc, req.user)
+        );
 
         res.status(200).json({
             message: 'Empresa encontrada',
@@ -124,8 +126,9 @@ const asignar_empresa_gestionada = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.asignarEmpresaGestionada(pool, idEmpresaDestino, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.asignarEmpresaGestionada(pool, idEmpresaDestino, req.user)
+        );
 
         res.status(200).json({
             message: 'Empresa asignada correctamente',
@@ -174,8 +177,9 @@ const remover_empresa_gestionada = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.removerEmpresaGestionada(pool, idGestor, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.removerEmpresaGestionada(pool, idGestor, req.user)
+        );
 
         res.status(200).json({
             message: 'Empresa removida correctamente',
@@ -202,8 +206,9 @@ const activar_empresa_gestionada = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.activarEmpresaGestionada(pool, idGestor, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.activarEmpresaGestionada(pool, idGestor, req.user)
+        );
 
         res.status(200).json({
             message: 'Empresa activada correctamente',
@@ -230,8 +235,9 @@ const eliminar_empresa_gestionada = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.eliminarEmpresaGestionada(pool, idGestor, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.eliminarEmpresaGestionada(pool, idGestor, req.user)
+        );
 
         res.status(200).json({
             message: 'Empresa eliminada permanentemente',
@@ -256,8 +262,9 @@ const obtener_configuracion = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.obtenerConfiguracion(pool, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.obtenerConfiguracion(pool, req.user)
+        );
 
         res.status(200).json({
             message: 'Configuración obtenida correctamente',
@@ -284,8 +291,9 @@ const guardar_configuracion = async function (req, res) {
             return res.status(403).json({ message: 'No Access', data: undefined });
         }
 
-        const pool = await sql.connect(dbConfig);
-        const resultado = await gestoresService.guardarConfiguracion(pool, configuraciones, req.user);
+        const resultado = await withPool(async (pool) =>
+            gestoresService.guardarConfiguracion(pool, configuraciones, req.user)
+        );
 
         res.status(200).json({
             message: 'Configuración guardada correctamente',

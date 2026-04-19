@@ -1,6 +1,5 @@
 // services/compras.service.js
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 const comprasRepository = require('../repositories/compras.repository');
@@ -30,51 +29,52 @@ function formatearFechasCompras(recordset) {
  * Lista todas las compras (solo admin). idEmpresa no aplica.
  */
 exports.listarComprasTodos = async () => {
-    const pool = await sql.connect(dbConfig);
-    const recordset = await comprasRepository.listarComprasTodos(pool);
-    return formatearFechasCompras(recordset);
+    return withPool(async (pool) => {
+        const recordset = await comprasRepository.listarComprasTodos(pool);
+        return formatearFechasCompras(recordset);
+    });
 };
 
 /**
  * Lista una compra por idCompra (admin).
  */
 exports.obtenerComprasPorId = async (idCompra) => {
-    const pool = await sql.connect(dbConfig);
-    const recordset = await comprasRepository.listarComprasPorId(pool, idCompra);
-    return formatearFechasCompras(recordset);
+    return withPool(async (pool) => {
+        const recordset = await comprasRepository.listarComprasPorId(pool, idCompra);
+        return formatearFechasCompras(recordset);
+    });
 };
 
 /**
  * Lista una compra por idCompra e idEmpresa.
  */
 exports.obtenerComprasPorIdCompraIdEmpresa = async (idEmpresa, idCompra) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.listarComprasPorIdCompraIdEmpresa(pool, idEmpresa, idCompra);
+    return withPool((pool) => comprasRepository.listarComprasPorIdCompraIdEmpresa(pool, idEmpresa, idCompra));
 };
 
 /**
  * Lista compras de una empresa (con proveedor y estado pago).
  */
 exports.listarComprasPorIdEmpresa = async (idEmpresa) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.listarComprasPorIdEmpresa(pool, idEmpresa);
+    return withPool((pool) => comprasRepository.listarComprasPorIdEmpresa(pool, idEmpresa));
 };
 
 /**
  * Listado para caja / pago proveedores: una empresa (query idEmpresaOperacion) o todas las permitidas si el query va vacío.
  */
 exports.listarComprasCajaPorUsuario = async (user, idEmpresaOperacionRaw) => {
-    const pool = await sql.connect(dbConfig);
-    let recordset;
-    if (idEmpresaOperacionRaw != null && String(idEmpresaOperacionRaw).trim() !== '') {
-        const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacionRaw);
-        recordset = await comprasRepository.listarComprasPorIdEmpresa(pool, idE);
-    } else {
-        const lista = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
-        const ids = lista.map((x) => x.idEmpresa).filter(Boolean);
-        recordset = await comprasRepository.listarComprasPorIdsEmpresa(pool, ids);
-    }
-    return formatearFechasCompras(recordset);
+    return withPool(async (pool) => {
+        let recordset;
+        if (idEmpresaOperacionRaw != null && String(idEmpresaOperacionRaw).trim() !== '') {
+            const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacionRaw);
+            recordset = await comprasRepository.listarComprasPorIdEmpresa(pool, idE);
+        } else {
+            const lista = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+            const ids = lista.map((x) => x.idEmpresa).filter(Boolean);
+            recordset = await comprasRepository.listarComprasPorIdsEmpresa(pool, ids);
+        }
+        return formatearFechasCompras(recordset);
+    });
 };
 
 /**
@@ -98,7 +98,7 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
     const compRelacionadoVal = compRelacionado || null;
 
     let idEstadoPagoFinal = idEstadoPago != null ? Number(idEstadoPago) : 2;
-    const pool = await sql.connect(dbConfig);
+    return await withPool(async (pool) => {
     if (idMediosPago != null) {
         const idNum = Number(idMediosPago);
         let desc = await comprasRepository.obtenerDescripcionFormaPago(pool, idNum);
@@ -211,6 +211,7 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
     }
 
     return { idCompra };
+    });
 };
 
 /**
@@ -225,8 +226,7 @@ exports.editarCompra = async (idEmpresa, idUsuario, idCompra, body) => {
     const fEmision = body.fEmision ? getFechaSoloSQLString(body.fEmision) : null;
     const fVencimiento = body.fVencimiento ? getFechaSoloSQLString(body.fVencimiento) : null;
 
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.actualizarCompra(pool, {
+    return withPool((pool) => comprasRepository.actualizarCompra(pool, {
         idEmpresa,
         idCompra,
         compCompra: body.compCompra ?? '',
@@ -247,55 +247,49 @@ exports.editarCompra = async (idEmpresa, idUsuario, idCompra, body) => {
         idMediosPago: body.idMediosPago ?? 1,
         compRelacionado: body.compRelacionado ?? '',
         idUsuario
-    });
+    }));
 };
 
 /**
  * Elimina una compra por idEmpresa (token) e idCompra. Retorna rowsAffected.
  */
 exports.eliminarCompra = async (idEmpresa, idCompra) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.eliminarCompra(pool, idEmpresa, idCompra);
+    return withPool((pool) => comprasRepository.eliminarCompra(pool, idEmpresa, idCompra));
 };
 
 /**
  * Lista comprobantes (compCompra) por proveedor e idEmpresa.
  */
 exports.listarComprobantesPorProveedor = async (idEmpresa, idProveedor) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.listarComprobantesPorProveedor(pool, idEmpresa, idProveedor);
+    return withPool((pool) => comprasRepository.listarComprobantesPorProveedor(pool, idEmpresa, idProveedor));
 };
 
 // --- Borrador compras ---
 
 exports.listarBorradorCompras = async (idEmpresa) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.listarBorradorCompras(pool, idEmpresa);
+    return withPool((pool) => comprasRepository.listarBorradorCompras(pool, idEmpresa));
 };
 
 exports.crearBorradorCompra = async (idEmpresa, body) => {
-    const pool = await sql.connect(dbConfig);
-    await comprasRepository.crearBorradorCompra(pool, { idEmpresa, ...body });
+    return withPool(async (pool) => {
+        await comprasRepository.crearBorradorCompra(pool, { idEmpresa, ...body });
+    });
 };
 
 exports.editarBorradorCompra = async (idEmpresa, body) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.actualizarBorradorCompra(pool, { idEmpresa, ...body });
+    return withPool((pool) => comprasRepository.actualizarBorradorCompra(pool, { idEmpresa, ...body }));
 };
 
 exports.eliminarBorradorCompras = async (idEmpresa) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.eliminarBorradorCompras(pool, idEmpresa);
+    return withPool((pool) => comprasRepository.eliminarBorradorCompras(pool, idEmpresa));
 };
 
 // --- Correlativos ---
 
 exports.listarCorrelativos = async (idEmpresa) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.listarCorrelativos(pool, idEmpresa);
+    return withPool((pool) => comprasRepository.listarCorrelativos(pool, idEmpresa));
 };
 
 exports.actualizarCorrelativo = async (idEmpresa, idCorrelativo, numero) => {
-    const pool = await sql.connect(dbConfig);
-    return await comprasRepository.actualizarCorrelativo(pool, idEmpresa, idCorrelativo, numero);
+    return withPool((pool) => comprasRepository.actualizarCorrelativo(pool, idEmpresa, idCorrelativo, numero));
 };

@@ -1,5 +1,4 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const catalogoTipoMovimientoService = require('../services/catalogoTipoMovimiento.service');
 
 async function listar(req, res) {
@@ -7,8 +6,7 @@ async function listar(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const data = await catalogoTipoMovimientoService.listar(pool, req.query);
+        const data = await withPool(async (pool) => catalogoTipoMovimientoService.listar(pool, req.query));
         res.status(200).json({ data: data || [] });
     } catch (error) {
         console.error('catalogoTipoMovimiento.listar:', error);
@@ -21,8 +19,7 @@ async function obtenerPorId(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const item = await catalogoTipoMovimientoService.obtenerPorId(pool, req.params.id);
+        const item = await withPool(async (pool) => catalogoTipoMovimientoService.obtenerPorId(pool, req.params.id));
         if (!item) return res.status(404).json({ message: 'No encontrado', data: undefined });
         res.status(200).json({ data: item });
     } catch (error) {
@@ -36,8 +33,7 @@ async function crear(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        const creado = await catalogoTipoMovimientoService.crear(pool, req.body);
+        const creado = await withPool(async (pool) => catalogoTipoMovimientoService.crear(pool, req.body));
         res.status(201).json({ data: creado });
     } catch (error) {
         console.error('catalogoTipoMovimiento.crear:', error);
@@ -50,8 +46,7 @@ async function actualizar(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        await catalogoTipoMovimientoService.actualizar(pool, req.params.id, req.body);
+        await withPool(async (pool) => catalogoTipoMovimientoService.actualizar(pool, req.params.id, req.body));
         res.status(200).json({ data: { ok: true } });
     } catch (error) {
         console.error('catalogoTipoMovimiento.actualizar:', error);
@@ -64,8 +59,7 @@ async function eliminar(req, res) {
         return res.status(401).json({ message: 'No autorizado', data: undefined });
     }
     try {
-        const pool = await sql.connect(dbConfig);
-        await catalogoTipoMovimientoService.eliminar(pool, req.params.id);
+        await withPool(async (pool) => catalogoTipoMovimientoService.eliminar(pool, req.params.id));
         res.status(200).json({ data: { ok: true } });
     } catch (error) {
         console.error('catalogoTipoMovimiento.eliminar:', error);

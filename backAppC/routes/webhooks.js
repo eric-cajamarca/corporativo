@@ -2,7 +2,7 @@ const express = require('express');
 const api = express.Router();
 
 const sql = require('mssql');
-const dbConfig = require('../dbconfig');
+const { withPool } = require('../utils/dbPool.util');
 const { parsearOrderNumber, esOrderNumberCheckout } = require('../services/integraciones.service');
 const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 
@@ -27,23 +27,22 @@ api.post('/webhooks/izipay', async (req, res) => {
     else if (estadoPasarela.includes('FAIL') || estadoPasarela.includes('DECLIN') || estadoPasarela.includes('CANCEL') || estadoPasarela.includes('REJECTED')) nuevoEstado = 'FALLIDO';
 
     const idTransaccion = String(payload.transactionId || payload.transaction_id || payload.id || payload.reference || '');
-    const pool = await sql.connect(dbConfig);
+    await withPool(async (pool) => {
+      if (esOrderNumberCheckout(orderNumber)) {
+        await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
+        return res.status(200).json({ ok: true });
+      }
 
-    if (esOrderNumberCheckout(orderNumber)) {
-      await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
-      return res.status(200).json({ ok: true });
-    }
+      const parsed = parsearOrderNumber(orderNumber);
+      if (!parsed) {
+        return res.status(400).json({ message: 'order_number inválido' });
+      }
 
-    const parsed = parsearOrderNumber(orderNumber);
-    if (!parsed) {
-      return res.status(400).json({ message: 'order_number inválido' });
-    }
-
-    await pool.request()
-      .input('orderNumber', sql.VarChar(100), orderNumber)
-      .input('estado', sql.VarChar(20), nuevoEstado)
-      .input('idTransaccion', sql.VarChar(100), idTransaccion)
-      .query(`
+      await pool.request()
+        .input('orderNumber', sql.VarChar(100), orderNumber)
+        .input('estado', sql.VarChar(20), nuevoEstado)
+        .input('idTransaccion', sql.VarChar(100), idTransaccion)
+        .query(`
         UPDATE PagosSuscripcionEmpresa
         SET estado = @estado,
             idTransaccionPasarela = CASE WHEN @idTransaccion <> '' THEN @idTransaccion ELSE idTransaccionPasarela END,
@@ -51,7 +50,8 @@ api.post('/webhooks/izipay', async (req, res) => {
         WHERE orderNumber = @orderNumber
       `);
 
-    res.status(200).json({ ok: true });
+      res.status(200).json({ ok: true });
+    });
   } catch (error) {
     console.error('Webhook Izipay error:', error);
     res.status(500).json({ ok: false });
@@ -77,23 +77,22 @@ api.post('/webhooks/culqi', async (req, res) => {
     else if (tipo.includes('failed') || tipo.includes('declined') || tipo.includes('rejected')) nuevoEstado = 'FALLIDO';
 
     const idTransaccion = String(obj.id || event.id || event.data?.id || '');
-    const pool = await sql.connect(dbConfig);
+    await withPool(async (pool) => {
+      if (esOrderNumberCheckout(orderNumber)) {
+        await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
+        return res.status(200).json({ ok: true });
+      }
 
-    if (esOrderNumberCheckout(orderNumber)) {
-      await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
-      return res.status(200).json({ ok: true });
-    }
+      const parsed = parsearOrderNumber(orderNumber);
+      if (!parsed) {
+        return res.status(400).json({ message: 'order_number inválido' });
+      }
 
-    const parsed = parsearOrderNumber(orderNumber);
-    if (!parsed) {
-      return res.status(400).json({ message: 'order_number inválido' });
-    }
-
-    await pool.request()
-      .input('orderNumber', sql.VarChar(100), orderNumber)
-      .input('estado', sql.VarChar(20), nuevoEstado)
-      .input('idTransaccion', sql.VarChar(100), idTransaccion)
-      .query(`
+      await pool.request()
+        .input('orderNumber', sql.VarChar(100), orderNumber)
+        .input('estado', sql.VarChar(20), nuevoEstado)
+        .input('idTransaccion', sql.VarChar(100), idTransaccion)
+        .query(`
         UPDATE PagosSuscripcionEmpresa
         SET estado = @estado,
             idTransaccionPasarela = CASE WHEN @idTransaccion <> '' THEN @idTransaccion ELSE idTransaccionPasarela END,
@@ -101,7 +100,8 @@ api.post('/webhooks/culqi', async (req, res) => {
         WHERE orderNumber = @orderNumber
       `);
 
-    res.status(200).json({ ok: true });
+      res.status(200).json({ ok: true });
+    });
   } catch (error) {
     console.error('Webhook Culqi error:', error);
     res.status(500).json({ ok: false });

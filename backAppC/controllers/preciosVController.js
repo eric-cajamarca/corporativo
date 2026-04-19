@@ -1,7 +1,6 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const precioProductoService = require('../services/preciosV.service');
 const preciosVentaService = require('../services/preciosVenta.service');
+const { withPool } = require('../utils/dbPool.util');
 
 
 
@@ -10,13 +9,11 @@ const crearPrecioV = async function (pool, detalle) {
   await preciosVentaService.crearDesdeDetalle(pool, detalle);
 };
 
-//obtener un precio por su id
 const obtenerPrecioV = async function (req, res) {
         const idPrecioV = req.params.id;
     if (req.user) {
         try {
-            const pool = await sql.connect(dbConfig);
-            const data = await preciosVentaService.obtenerPorId(pool, idPrecioV);
+            const data = await withPool((pool) => preciosVentaService.obtenerPorId(pool, idPrecioV));
             res.status(200).send({ data });
         } catch (error) {
             console.error('Error al obtener el precio:', error);
@@ -27,12 +24,10 @@ const obtenerPrecioV = async function (req, res) {
     }
 }
 
-//obtener todos los precios
 const obtenerPreciosV = async function (req, res) {
     if (req.user) {
         try {
-            const pool = await sql.connect(dbConfig);
-            const data = await preciosVentaService.listarTodos(pool);
+            const data = await withPool((pool) => preciosVentaService.listarTodos(pool));
             res.status(200).send({ data });
         } catch (error) {
             console.error('Error al obtener los precios:', error);
@@ -43,20 +38,18 @@ const obtenerPreciosV = async function (req, res) {
     }
 }
 
-//actualizar un precio
 const actualizarPrecioV = async function (req, res) {
     const { idPreciosV, idProducto, cUnitario, mayorista, cliente, transeunte } = req.body;
     if (req.user) {
         try {
-            const pool = await sql.connect(dbConfig);
-            const result = await preciosVentaService.actualizar(pool, {
+            const result = await withPool((pool) => preciosVentaService.actualizar(pool, {
                 idPreciosV,
                 idProducto,
                 cUnitario,
                 mayorista,
                 cliente,
                 transeunte
-            });
+            }));
             res.status(200).send({ data: result });
         } catch (error) {
             console.error('Error al actualizar el precio:', error);
@@ -66,28 +59,6 @@ const actualizarPrecioV = async function (req, res) {
         res.status(401).send({ message: 'No Access', data: undefined });
     }
 }
-
-//crear controlador para esta tabla
-// CREATE TABLE dbo.ListasPrecio
-// (
-//     idLista int IDENTITY(1,1) NOT NULL,
-//     idEmpresa UNIQUEIDENTIFIER NOT NULL,
-//     idSucursal UNIQUEIDENTIFIER NULL,       -- NULL = lista global para todas las sucursales  
-//     nombre varchar(100) NOT NULL,   -- ej. "Normal", "Mayorista", "Cyber 2025"
-//     idMoneda int NOT NULL,
-//     principal bit NOT NULL DEFAULT 0,  -- 1 = lista por defecto
-//     conIgv bit  NOT NULL DEFAULT 1,  -- indica si el precio ya tiene IGV
-//     fecha_inicio date NOT NULL,
-//     fecha_fin date NULL,                  -- NULL = vigente hasta aviso
-//     activo bit NOT NULL DEFAULT 1,
-//     CONSTRAINT PK_ListasPrecio PRIMARY KEY (idLista),
-// 	CONSTRAINT FK_ListasPrecio_Empresas FOREIGN KEY (idEmpresa) REFERENCES dbo.Empresas(idEmpresa),
-// 	CONSTRAINT FK_ListasPrecio_Moneda FOREIGN KEY (idMoneda) REFERENCES dbo.Moneda(idMoneda),
-// 	CONSTRAINT FK_ListasPrecio_Sucursales FOREIGN KEY (idSucursal) REFERENCES dbo.Sucursal(idSucursal),
-//     CONSTRAINT UQ_ListasPrecio_EmpSucNombre UNIQUE (idEmpresa, idSucursal, nombre),
-
-// );
-
 
 const crear_lista_precio = async function (req, res) {
         try {
@@ -120,24 +91,23 @@ const crear_lista_precio = async function (req, res) {
             });
         }
 
-        // Crear conexión a la base de datos
-        const pool = await sql.connect(dbConfig);
-        let idEmpresa = req.user.empresa;
-                // Llamar al service
-        const resultado = await precioProductoService.crearListaPrecio(
+        const idEmpresa = req.user.empresa;
+        const resultado = await withPool((pool) =>
+          precioProductoService.crearListaPrecio(
             pool,
-            { 
-                idEmpresa , 
-                idSucursal, 
-                nombre, 
-                idMoneda, 
-                principal: principal || false, 
-                conIgv: conIgv || false, 
-                fecha_inicio, 
-                fecha_fin, 
-                activo: activo !== undefined ? activo : true 
+            {
+              idEmpresa,
+              idSucursal,
+              nombre,
+              idMoneda,
+              principal: principal || false,
+              conIgv: conIgv || false,
+              fecha_inicio,
+              fecha_fin,
+              activo: activo !== undefined ? activo : true
             },
             req.user
+          )
         );
 
         // Enviar respuesta exitosa
@@ -232,23 +202,24 @@ const editar_lista_precio = async function (req, res) {
             });
         }
 
-        const pool = await sql.connect(dbConfig);
-        let idEmpresa = req.user.empresa;
-        const resultado = await precioProductoService.editarListaPrecio(
+        const idEmpresa = req.user.empresa;
+        const resultado = await withPool((pool) =>
+          precioProductoService.editarListaPrecio(
             pool,
-            { 
-                idLista, 
-                idEmpresa, 
-                idSucursal: idSucursalNormalizado, 
-                nombre, 
-                idMoneda, 
-                principal: principal || false, 
-                conIgv: conIgv || false, 
-                fecha_inicio, 
-                fecha_fin, 
-                activo: activo !== undefined ? activo : true 
+            {
+              idLista,
+              idEmpresa,
+              idSucursal: idSucursalNormalizado,
+              nombre,
+              idMoneda,
+              principal: principal || false,
+              conIgv: conIgv || false,
+              fecha_inicio,
+              fecha_fin,
+              activo: activo !== undefined ? activo : true
             },
             req.user
+          )
         );
 
         res.status(200).send({ 
@@ -320,12 +291,8 @@ const obtener_listas_precio_producto = async function (req, res) {
             });
         }
 
-        const pool = await sql.connect(dbConfig);
-        
-        const listas = await precioProductoService.obtenerListasPrecioPorProducto(
-            pool, 
-            idProducto, 
-            req.user
+        const listas = await withPool((pool) =>
+          precioProductoService.obtenerListasPrecioPorProducto(pool, idProducto, req.user)
         );
         
         res.status(200).send({ data: listas });
@@ -372,9 +339,7 @@ const obtener_listas_precio_empresa = async function (req, res) {
             });
         }
 
-        const pool = await sql.connect(dbConfig);
-        
-        const listas = await precioProductoService.obtenerListasPrecioEmpresa(pool, req.user);
+        const listas = await withPool((pool) => precioProductoService.obtenerListasPrecioEmpresa(pool, req.user));
         
         res.status(200).send({ data: listas });
 
@@ -404,8 +369,6 @@ const obtener_listas_precio_empresa = async function (req, res) {
 };
 
 const desactivar_lista_precio = async function (req, res) {
-    let pool;
-    
     try {
         if (!req.user) {
             return res.status(401).send({ 
@@ -423,12 +386,8 @@ const desactivar_lista_precio = async function (req, res) {
             });
         }
 
-        pool = await sql.connect(dbConfig);
-        
-        const resultado = await precioProductoService.desactivarListaPrecio(
-            pool, 
-            idLista, 
-            req.user
+        const resultado = await withPool((pool) =>
+          precioProductoService.desactivarListaPrecio(pool, idLista, req.user)
         );
         
         res.status(200).send({ 
@@ -468,76 +427,26 @@ const desactivar_lista_precio = async function (req, res) {
     }
 };
 
-
-
-
-// const desactivar_lista_precio = async function (req, res) {
-//     const idLista = req.params.id;
-//     if (req.user) {
-//         try {
-//             const pool = await sql.connect(dbConfig);
-//             const result = await pool
-//                 .request()
-//                 .input('idLista', sql.Int, idLista)
-//                 .query(`DELETE FROM ListasPrecio WHERE idLista = @idLista`);
-//             res.status(200).send({ data: result });
-//         } catch (error) {
-//             console.error('Error al eliminar la lista de precios:', error);
-//             res.status(500).send({ data: undefined });
-//         }
-//     } else {
-//         res.status(401).send({ message: 'No Access', data: undefined });
-//     }
-// }
-
-
-// CREATE TABLE dbo.PreciosProducto
-// (
-//     idPrecio int IDENTITY(1,1) NOT NULL,
-//     idLista int NOT NULL,
-//     idProducto UNIQUEIDENTIFIER NOT NULL,
-//     precio decimal(18,4) NOT NULL,
-//     idMoneda int NOT NULL,
-//     fActualizacion datetime2 NOT NULL DEFAULT SYSDATETIME(),
-//     idUsuario   UNIQUEIDENTIFIER NULL,
-//     CONSTRAINT PK_PreciosProducto PRIMARY KEY (idPrecio),
-// 	CONSTRAINT FK_PreciosProducto_ListasPrecio FOREIGN KEY (idLista) REFERENCES dbo.ListasPrecio(idLista),
-// 	CONSTRAINT FK_PreciosProducto_Productos FOREIGN KEY (idProducto) REFERENCES dbo.Productos(idProducto),
-// 	CONSTRAINT FK_PreciosProducto_Moneda FOREIGN KEY (idMoneda) REFERENCES dbo.Moneda(idMoneda),
-// 	 CONSTRAINT FK_PreciosProducto_Usuario FOREIGN KEY (idUsuario) REFERENCES dbo.UsuarioWeb(idUsuario),
-//     CONSTRAINT UQ_PreciosProducto_ListaProducto UNIQUE (idLista, idProducto)
-// );
-
 const crear_precio_producto = async function (req, res) {
-            
-    if (req.user.rol) {
-    
-         // Obtener datos del request
-                        const precioData = req.body;
-            
-            // Crear conexión a la base de datos
-            const pool = await sql.connect(dbConfig);
-            
-            // Llamar al service pasando el pool y datos necesarios
-            const resultado = await precioProductoService.crearPrecioProducto(
-                pool,
-                precioData,
-                req.user  // usuario autenticado
-            );
-            
-            // Enviar respuesta exitosa
-            res.status(200).send({ 
-                data: resultado.data,
-                message: resultado.message
-            });
-            
-        
-    } else {
-        res.status(401).send({ 
-            message: 'No Access', 
-            data: undefined 
-        });
-    }
+  if (!req.user?.rol) {
+    return res.status(401).send({
+      message: 'No Access',
+      data: undefined
+    });
+  }
+  const precioData = req.body;
+  try {
+    const resultado = await withPool((pool) =>
+      precioProductoService.crearPrecioProducto(pool, precioData, req.user)
+    );
+    res.status(200).send({
+      data: resultado.data,
+      message: resultado.message
+    });
+  } catch (error) {
+    console.error('Error al crear precio producto:', error);
+    res.status(500).send({ message: error.message || 'Error interno', data: undefined });
+  }
 };
 
 const editar_precio_producto = async function (req, res) {
@@ -553,12 +462,12 @@ const editar_precio_producto = async function (req, res) {
         // Obtener datos del request
         const { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario } = req.body;
 
-        // Llamar al service pasando req.querySafe (el middleware)
-        const pool = await sql.connect(dbConfig);
-        const resultado = await precioProductoService.editarPrecioProducto(
-            pool,  // Pasamos el método seguro con empresa
+        const resultado = await withPool((pool) =>
+          precioProductoService.editarPrecioProducto(
+            pool,
             { idPrecio, idLista, idProducto, precio, idMoneda, idUsuario },
-            req.user  // usuario autenticado
+            req.user
+          )
         );
 
         // Enviar respuesta exitosa
@@ -618,9 +527,8 @@ const editar_precio_producto = async function (req, res) {
 const obtener_precios_producto = async function (req, res) {
     if (req.user) {
         try {
-            const pool = await sql.connect(dbConfig);
             const idPrecio = req.params.productoId || req.params.idPrecio;
-            const result = await precioProductoService.obtenerPrecioPorId(pool, idPrecio);
+            const result = await withPool((pool) => precioProductoService.obtenerPrecioPorId(pool, idPrecio));
             res.status(200).send({ data: result.data });
         } catch (error) {
             if (error.message === 'PRECIO_NO_ENCONTRADO') {
@@ -637,12 +545,9 @@ const obtener_precios_producto = async function (req, res) {
 const eliminar_precio_producto = async function (req, res) {
     const idPrecio = req.params.id;
     if (req.user) {
-        try {   
-            const pool = await sql.connect(dbConfig);
-            const result = await precioProductoService.eliminarPrecioProducto(
-                pool,
-                idPrecio,
-                req.user  // usuario autenticado
+        try {
+            const result = await withPool((pool) =>
+              precioProductoService.eliminarPrecioProducto(pool, idPrecio, req.user)
             );
             res.status(200).send({ data: result });
         } catch (error) {

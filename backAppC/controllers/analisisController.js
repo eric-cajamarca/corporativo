@@ -1,13 +1,13 @@
-const dbConfig = require('../dbconfig');
-const sql = require('mssql');
+const { withPool } = require('../utils/dbPool.util');
 const AnalisisServices = require('../services/analisis.service');
 const GastosService = require('../services/gastos.service');
 
 // Obtener dashboard ejecutivo
 const obtenerDashboardEjecutivo = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const dashboard = await AnalisisServices.obtenerDashboardEjecutivoService(pool, req.user);
+    const dashboard = await withPool(async (pool) =>
+      AnalisisServices.obtenerDashboardEjecutivoService(pool, req.user)
+    );
 
     res.status(200).send({ data: dashboard });
   } catch (error) {
@@ -27,8 +27,9 @@ const obtenerBalanceGeneral = async (req, res) => {
   try {
     const { periodo } = req.query;
 
-    const pool = await sql.connect(dbConfig);
-    const balance = await AnalisisServices.obtenerBalanceGeneralService(pool, req.user, periodo);
+    const balance = await withPool(async (pool) =>
+      AnalisisServices.obtenerBalanceGeneralService(pool, req.user, periodo)
+    );
 
     res.status(200).send({ data: balance });
   } catch (error) {
@@ -50,13 +51,14 @@ const obtenerEstadoResultados = async (req, res) => {
     const periodoInicioRes = periodoInicio || (fechaDesde ? String(fechaDesde).substring(0, 7) : null);
     const periodoFinRes = periodoFin || (fechaHasta ? String(fechaHasta).substring(0, 7) : null);
 
-    const pool = await sql.connect(dbConfig);
-    const estadoResultados = await AnalisisServices.obtenerEstadoResultadosService(pool, req.user, {
-      periodoInicio: periodoInicioRes,
-      periodoFin: periodoFinRes,
-      fechaDesde: fechaDesde || null,
-      fechaHasta: fechaHasta || null
-    });
+    const estadoResultados = await withPool(async (pool) =>
+      AnalisisServices.obtenerEstadoResultadosService(pool, req.user, {
+        periodoInicio: periodoInicioRes,
+        periodoFin: periodoFinRes,
+        fechaDesde: fechaDesde || null,
+        fechaHasta: fechaHasta || null
+      })
+    );
 
     res.status(200).send({ data: estadoResultados });
   } catch (error) {
@@ -74,8 +76,9 @@ const obtenerEstadoResultados = async (req, res) => {
 // Obtener ratios financieros
 const obtenerRatiosFinancieros = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const ratios = await AnalisisServices.obtenerRatiosFinancierosService(pool, req.user);
+    const ratios = await withPool(async (pool) =>
+      AnalisisServices.obtenerRatiosFinancierosService(pool, req.user)
+    );
 
     res.status(200).send({ data: ratios });
   } catch (error) {
@@ -90,22 +93,23 @@ const obtenerRatiosFinancieros = async (req, res) => {
   }
 };
 
-// Obtener análisis de rentabilidad
+// Obtener an?lisis de rentabilidad
 const obtenerAnalisisRentabilidad = async (req, res) => {
   try {
     const { tipo } = req.query; // 'producto', 'categoria'
 
-    const pool = await sql.connect(dbConfig);
-    const rentabilidad = await AnalisisServices.obtenerAnalisisRentabilidadService(pool, req.user, tipo);
+    const rentabilidad = await withPool(async (pool) =>
+      AnalisisServices.obtenerAnalisisRentabilidadService(pool, req.user, tipo)
+    );
 
     res.status(200).send({ data: rentabilidad });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
-    console.error("Error obtener análisis rentabilidad:", error);
+    console.error("Error obtener an?lisis rentabilidad:", error);
     res.status(500).send({
-      message: "Error al obtener el análisis de rentabilidad",
+      message: "Error al obtener el an?lisis de rentabilidad",
       data: undefined
     });
   }
@@ -114,8 +118,9 @@ const obtenerAnalisisRentabilidad = async (req, res) => {
 // Obtener flujo de efectivo
 const obtenerFlujoEfectivo = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const flujo = await AnalisisServices.obtenerFlujoEfectivoService(pool, req.user);
+    const flujo = await withPool(async (pool) =>
+      AnalisisServices.obtenerFlujoEfectivoService(pool, req.user)
+    );
 
     res.status(200).send({ data: flujo });
   } catch (error) {
@@ -130,11 +135,12 @@ const obtenerFlujoEfectivo = async (req, res) => {
   }
 };
 
-// Obtener análisis de eficiencia operativa
+// Obtener an?lisis de eficiencia operativa
 const obtenerEficienciaOperativa = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const eficiencia = await AnalisisServices.obtenerEficienciaOperativaService(pool, req.user);
+    const eficiencia = await withPool(async (pool) =>
+      AnalisisServices.obtenerEficienciaOperativaService(pool, req.user)
+    );
 
     res.status(200).send({ data: eficiencia });
   } catch (error) {
@@ -149,30 +155,32 @@ const obtenerEficienciaOperativa = async (req, res) => {
   }
 };
 
-// Obtener proyección de ventas
+// Obtener proyecci?n de ventas
 const obtenerProyeccionVentas = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const proyeccion = await AnalisisServices.obtenerProyeccionVentasService(pool, req.user);
+    const proyeccion = await withPool(async (pool) =>
+      AnalisisServices.obtenerProyeccionVentasService(pool, req.user)
+    );
 
     res.status(200).send({ data: proyeccion });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
-    console.error("Error obtener proyección ventas:", error);
+    console.error("Error obtener proyecci?n ventas:", error);
     res.status(500).send({
-      message: "Error al obtener la proyección de ventas",
+      message: "Error al obtener la proyecci?n de ventas",
       data: undefined
     });
   }
 };
 
-// Obtener análisis de punto de equilibrio
+// Obtener an?lisis de punto de equilibrio
 const obtenerPuntoEquilibrio = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const puntoEquilibrio = await AnalisisServices.obtenerPuntoEquilibrioService(pool, req.user);
+    const puntoEquilibrio = await withPool(async (pool) =>
+      AnalisisServices.obtenerPuntoEquilibrioService(pool, req.user)
+    );
 
     res.status(200).send({ data: puntoEquilibrio });
   } catch (error) {
@@ -187,31 +195,33 @@ const obtenerPuntoEquilibrio = async (req, res) => {
   }
 };
 
-// Obtener diagnóstico financiero completo
+// Obtener diagn?stico financiero completo
 const obtenerDiagnosticoFinanciero = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const diagnostico = await AnalisisServices.obtenerDiagnosticoFinancieroService(pool, req.user);
+    const diagnostico = await withPool(async (pool) =>
+      AnalisisServices.obtenerDiagnosticoFinancieroService(pool, req.user)
+    );
 
     res.status(200).send({ data: diagnostico });
   } catch (error) {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
-    console.error("Error obtener diagnóstico financiero:", error);
+    console.error("Error obtener diagn?stico financiero:", error);
     res.status(500).send({
-      message: "Error al obtener el diagnóstico financiero",
+      message: "Error al obtener el diagn?stico financiero",
       data: undefined
     });
   }
 };
 
-// Gastos (para análisis financiero: gastos operativos por período)
+// Gastos (para an?lisis financiero: gastos operativos por per?odo)
 const listarGastos = async (req, res) => {
   try {
     const { fechaDesde, fechaHasta } = req.query;
-    const pool = await sql.connect(dbConfig);
-    const list = await GastosService.listarPorPeriodo(pool, req.user, fechaDesde, fechaHasta);
+    const list = await withPool(async (pool) =>
+      GastosService.listarPorPeriodo(pool, req.user, fechaDesde, fechaHasta)
+    );
     res.status(200).send({ data: list });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -224,8 +234,7 @@ const listarGastos = async (req, res) => {
 
 const crearGasto = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const row = await GastosService.crear(pool, req.user, req.body);
+    const row = await withPool(async (pool) => GastosService.crear(pool, req.user, req.body));
     res.status(201).send({ data: row });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {
@@ -242,8 +251,7 @@ const crearGasto = async (req, res) => {
 const eliminarGasto = async (req, res) => {
   try {
     const { idGasto } = req.params;
-    const pool = await sql.connect(dbConfig);
-    await GastosService.eliminar(pool, req.user, idGasto);
+    await withPool(async (pool) => GastosService.eliminar(pool, req.user, idGasto));
     res.status(200).send({ message: 'Gasto eliminado' });
   } catch (error) {
     if (error.message === 'NO_ACCESS') {

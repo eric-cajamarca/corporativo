@@ -1,11 +1,9 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const renviosService = require('../services/renvios.service');
+const { withPool } = require('../utils/dbPool.util');
 
 const obtenerEnvios = async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await renviosService.listarEnvios(pool);
+    const data = await withPool((pool) => renviosService.listarEnvios(pool));
     res.json(data);
   } catch (error) {
     console.error('Error al obtener envíos:', error);
@@ -16,8 +14,7 @@ const obtenerEnvios = async (req, res) => {
 const getCompEnvio = async function (req, res) {
   const codicion = req.params.id;
   try {
-    const pool = await sql.connect(dbConfig);
-    const data = await renviosService.obtenerPorCodigo(pool, codicion);
+    const data = await withPool((pool) => renviosService.obtenerPorCodigo(pool, codicion));
     res.json(data);
   } catch (error) {
     console.error('Error al obtener la venta:', error);
@@ -32,8 +29,7 @@ const createCompEnvio = async (req, res) => {
     return res.status(200).send({ message: 'No Access', data: undefined });
   }
   try {
-    const pool = await sql.connect(dbConfig);
-    await renviosService.crearCompEnvio(pool, req.user, data);
+    await withPool((pool) => renviosService.crearCompEnvio(pool, req.user, data));
     res.status(200).send({ message: 'Registros guardados correctamente', data: 1 });
   } catch (err) {
     if (err.code === 'COMP_DUPLICADO') {
@@ -60,14 +56,15 @@ const updateCompEnvio = async (req, res) => {
   const { CompVentas, FEnvio, Descripcion, Presentacion, Cantidad } = req.body;
   const CompEnvio = req.params.id;
   try {
-    const pool = await sql.connect(dbConfig);
-    await renviosService.actualizarCompEnvio(pool, CompEnvio, {
-      CompVentas,
-      FEnvio,
-      Descripcion,
-      Presentacion,
-      Cantidad
-    });
+    await withPool((pool) =>
+      renviosService.actualizarCompEnvio(pool, CompEnvio, {
+        CompVentas,
+        FEnvio,
+        Descripcion,
+        Presentacion,
+        Cantidad
+      })
+    );
     res.json({ message: 'Registro actualizado correctamente' });
   } catch (error) {
     console.error('Error al actualizar el registro:', error);
@@ -78,8 +75,7 @@ const updateCompEnvio = async (req, res) => {
 const deleteCompEnvio = async function (req, res) {
   const codicion = req.params.id;
   try {
-    const pool = await sql.connect(dbConfig);
-    await renviosService.eliminarCompEnvio(pool, codicion);
+    await withPool((pool) => renviosService.eliminarCompEnvio(pool, codicion));
     res.json({ message: 'El registro se eliminó correctamente' });
   } catch (error) {
     console.error('Error al eliminar el registro de envio :', error);

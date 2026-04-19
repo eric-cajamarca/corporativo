@@ -1,5 +1,3 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const ubicacionesPrioridadService = require('../services/ubicacionesPrioridad.service');
 
 const getAll = async function (req, res){

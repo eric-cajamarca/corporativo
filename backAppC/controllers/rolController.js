@@ -1,63 +1,5 @@
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
-const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
 const rolService = require('../services/rol.service');
-
-// const crear_rol = async function (req, res) {
-
-//     const { descripcion } = req.body;
-//     // escribe el codigo para crear un rol
-//     if (req.user) {
-
-//         if (req.user.rol == 'Administrador') {
-
-//             //antes de crear el rol, verificar que no exista
-//             try {
-//                 let pool = await sql.connect(dbConfig);
-//                 let rol = await pool
-//                     .request()
-                    
-//                     .input('descripcion', sql.VarChar, descripcion)
-//                     .query("SELECT * FROM Rol WHERE descripcion = @descripcion");
-//                 if (rol.recordset.length > 0) {
-//                     res.status(200).send({ message: 'El rol ya existe', data: undefined });
-//                 } else {
-//                     try {
-//                         let pool = await sql.connect(dbConfig);
-//                         let rol = await pool
-//                             .request()
-//                             .input('idEmpresa', sql.UniqueIdentifier, req.user.empresa)
-//                             .input('idRol', sql.UniqueIdentifier, uuidv4())
-//                             .input('descripcion', sql.VarChar, descripcion)
-//                             .query("INSERT INTO Rol (idRol,descripcion,idEmpresa) VALUES (@idRol,@descripcion,@idEmpresa)");
-
-                        
-//                         res.status(200).send({ message: 'Rol creado correctamente', data: rol.rowsAffected });
-//                     } catch (error) {
-                        
-//                         res.status(200).send({ message: 'Error al crear el rol', data: undefined });
-//                         //res.send(error.message);
-//                     }
-//                 }
-//             } catch (error) {
-//                 res.status(500);
-//                 res.send(error.message);
-//             }
-
-
-//         } else {
-//             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-//         }
-//     }
-//     else {
-//         res.status(500).send({ message: 'No Access' });
-//     }
-// }
-
-// GET ALL
-
-
+const { withPool } = require('../utils/dbPool.util');
 
 const crear_rol = async function (req, res) {
   const { descripcion } = req.body;
@@ -68,9 +10,7 @@ const crear_rol = async function (req, res) {
       return res.status(403).json({ message: 'No Access', data: undefined });
     }
 
-    const pool = await sql.connect(dbConfig);
-    // Llamar al service
-    const resultado = await rolService.crearRol(pool, descripcion, req.user);
+    const resultado = await withPool((pool) => rolService.crearRol(pool, descripcion, req.user));
 
     // Respuesta exitosa
     res.status(200).json({
@@ -112,9 +52,7 @@ const obtener_roles = async function (req, res) {
     if (!req.user) {
       return res.status(403).json({ message: 'No Access', data: undefined });
     }
-    const pool = await sql.connect(dbConfig);
-    // Llamar al service
-    const resultado = await rolService.obtenerRoles(pool, req.user);
+    const resultado = await withPool((pool) => rolService.obtenerRoles(pool, req.user));
 
     // Respuesta exitosa
     res.status(200).json({
@@ -140,35 +78,6 @@ const obtener_roles = async function (req, res) {
   }
 };
 
-// const obtener_rol_id = async function (req, res) {
-//     const { id } = req.params;
-
-//     if (req.user) {
-
-//         if (req.user.rol == 'Administrador') {
-
-//             try {
-//                 let pool = await sql.connect(dbConfig);
-//                 let rol = await pool
-//                     .request()
-//                     .input('idRol', sql.UniqueIdentifier, id)
-//                     .query("SELECT * from Rol WHERE idRol = @idRol");
-//                 res.status(200).send({data: rol.recordset});
-//             } catch (error) {
-//                 res.status(500);
-//                 res.send(error.message);
-//             }
-
-//         } else {
-//             res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-//         }
-//     }
-//     else {
-//         res.status(500).send({ message: 'No Access' });
-//     }
-
-// }
-
 const obtener_rol_id = async function (req, res) {
   const { id } = req.params;
   
@@ -178,9 +87,7 @@ const obtener_rol_id = async function (req, res) {
       return res.status(403).json({ message: 'No Access', data: undefined });
     }
 
-    const pool = await sql.connect(dbConfig);
-    // Llamar al service
-    const resultado = await rolService.obtenerRolPorId(pool, id, req.user);
+    const resultado = await withPool((pool) => rolService.obtenerRolPorId(pool, id, req.user));
 
     // Respuesta exitosa
     res.status(200).json({
@@ -213,11 +120,6 @@ const obtener_rol_id = async function (req, res) {
   }
 };
 
-
-//crea la funcion actualizar_rol para actualizar un rol por id
-// UPDATE
-
-
 const actualizar_rol = async function (req, res) {
   const { id } = req.params;
   const { descripcion } = req.body;
@@ -228,9 +130,7 @@ const actualizar_rol = async function (req, res) {
       return res.status(403).json({ message: 'No Access', data: undefined });
     }
 
-    const pool = await sql.connect(dbConfig);
-    // Llamar al service
-    const resultado = await rolService.actualizarRol(pool, id, descripcion, req.user);
+    const resultado = await withPool((pool) => rolService.actualizarRol(pool, id, descripcion, req.user));
 
     // Respuesta exitosa
     res.status(200).json({
