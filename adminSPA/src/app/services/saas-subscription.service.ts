@@ -29,6 +29,31 @@ export class SaasSubscriptionService {
     );
   }
 
+  getPlanesCatalogoEditor(): Observable<{ puedeEditar: boolean }> {
+    return this.http
+      .get<{ data: { puedeEditar: boolean } }>(`${this.baseUrl}suscripcion/planes-catalogo-editor`, {
+        withCredentials: true
+      })
+      .pipe(map((r) => r.data));
+  }
+
+  actualizarPlanCatalogo(
+    planCode: string,
+    body: {
+      descripcionCorta: string;
+      precioMensualPen: number;
+      precioAnualPen: number;
+      maxUsuarios: number;
+      maxSucursales: number;
+    }
+  ): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(
+      `${this.baseUrl}suscripcion/planes-catalogo/${encodeURIComponent(planCode)}`,
+      JSON.stringify(body),
+      { headers: this.headers, withCredentials: true }
+    );
+  }
+
   solicitarUpgrade(body: { planCode: string; billingCycle: string; emailContacto?: string }): Observable<CheckoutIniciado> {
     return this.http
       .post<{ data: CheckoutIniciado }>(`${this.baseUrl}suscripcion/solicitar-upgrade`, JSON.stringify(body), {

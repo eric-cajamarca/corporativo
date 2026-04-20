@@ -14,7 +14,8 @@ async function obtenerPorEmpresa(pool, idEmpresa) {
         CONVERT(VARCHAR(19), fechaInicio, 120) AS fechaInicio,
         CONVERT(VARCHAR(19), fechaFin, 120) AS fechaFin,
         idCheckoutOrigen,
-        migracionDemoPendiente
+        migracionDemoPendiente,
+        ISNULL(contadorComprobantesSunatAceptados, 0) AS contadorComprobantesSunatAceptados
       FROM EmpresaSuscripcion
       WHERE idEmpresa = @idEmpresa
     `);
@@ -87,9 +88,47 @@ async function marcarVencidas(pool, fechaReferencia) {
   return r.rowsAffected[0] || 0;
 }
 
+/**
+ * Suma 1 al contador de comprobantes SUNAT aceptados de la empresa (suscripción).
+ * @param {import('mssql').ConnectionPool|import('mssql').Transaction} poolOrTx
+ */
+async function incrementarContadorComprobantesSunatAceptados(poolOrTx, idEmpresa) {
+  if (!idEmpresa) return;
+  await poolOrTx
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      UPDATE dbo.EmpresaSuscripcion
+      SET contadorComprobantesSunatAceptados = ISNULL(contadorComprobantesSunatAceptados, 0) + 1
+      WHERE idEmpresa = @idEmpresa
+    `);
+}
+
+/** Sube el contador persistido si el valor calculado (p. ej. histórico desde tablas) es mayor. */
+async function actualizarContadorSunatSiInferior(pool, idEmpresa, valor) {
+  const v = Math.floor(Number(valor));
+  if (!idEmpresa || !Number.isFinite(v) || v < 0) return;
+  try {
+    await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('valor', sql.Int, v)
+      .query(`
+        UPDATE dbo.EmpresaSuscripcion
+        SET contadorComprobantesSunatAceptados = @valor
+        WHERE idEmpresa = @idEmpresa
+          AND ISNULL(contadorComprobantesSunatAceptados, 0) < @valor
+      `);
+  } catch (err) {
+    console.error('contexto: actualizarContadorSunatSiInferior', err);
+  }
+}
+
 module.exports = {
   obtenerPorEmpresa,
   insertar,
   actualizarEstadoYPlan,
-  marcarVencidas
+  marcarVencidas,
+  incrementarContadorComprobantesSunatAceptados,
+  actualizarContadorSunatSiInferior
 };

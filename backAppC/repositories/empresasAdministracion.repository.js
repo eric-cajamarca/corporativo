@@ -1,7 +1,17 @@
 const sql = require('mssql');
 
 async function listarTodasEmpresas(pool) {
-  const r = await pool.request().query('SELECT * FROM Empresas');
+  const r = await pool.request().query(`
+    SELECT
+      e.*,
+      s.planCode AS planSuscripcion,
+      s.billingCycle AS cicloFacturacionSuscripcion,
+      s.estado AS estadoSuscripcion,
+      CONVERT(VARCHAR(19), s.fechaInicio, 120) AS fechaInicioSuscripcion,
+      CONVERT(VARCHAR(19), s.fechaFin, 120) AS fechaFinSuscripcion
+    FROM dbo.Empresas e
+    LEFT JOIN dbo.EmpresaSuscripcion s ON s.idEmpresa = e.idEmpresa
+  `);
   return r.recordset;
 }
 

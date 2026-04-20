@@ -8,6 +8,7 @@ export interface PlanCatalogoItem {
   precioAnualPen: number;
   maxUsuarios: number;
   maxSucursales: number;
+  maxComprobantesSunatAceptados?: number;
 }
 
 export interface CheckoutIniciado {
@@ -35,4 +36,5 @@ export interface SuscripcionEmpresaRow {
   fechaFin: string | null;
   idCheckoutOrigen: string | null;
   migracionDemoPendiente: boolean;
+  contadorComprobantesSunatAceptados?: number;
 }

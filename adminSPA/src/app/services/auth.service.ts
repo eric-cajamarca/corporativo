@@ -33,11 +33,14 @@ export class AuthService {
   /** Una sola petición refresh en vuelo (evita tormenta si expiran muchas llamadas a la vez). */
   private refreshInFlight$: Observable<boolean> | null = null;
 
-  // Rutas públicas que NO requieren autenticación
+  // Rutas públicas que NO requieren autenticación (deben alinearse con app.routes y AuthGuard)
   private readonly publicRoutes = [
     '/login-empresa',
     '/crear-empresa',
-    '/verificar-empresa'
+    '/verificar-empresa',
+    '/planes',
+    '/suscribirse',
+    '/recuperar-password'
   ];
 
   // Exponer datos reactivos
@@ -52,11 +55,21 @@ export class AuthService {
   }
 
   /**
-   * Verifica si la ruta actual es pública
+   * Verifica si la ruta actual es pública.
+   * En el arranque `router.url` puede ser '' o '/' antes de la primera navegación; se usa también `location`.
    */
   private isPublicRoute(): boolean {
-    const currentUrl = this.router.url;
-    return this.publicRoutes.some(route => currentUrl.includes(route));
+    const routerUrl = (this.router.url || '').trim();
+    let pathFromWindow = '';
+    try {
+      if (typeof globalThis !== 'undefined' && globalThis.location?.pathname) {
+        pathFromWindow = `${globalThis.location.pathname}${globalThis.location.search || ''}`;
+      }
+    } catch {
+      /* ignore */
+    }
+    const candidates = [routerUrl, pathFromWindow].filter((u) => u.length > 0);
+    return candidates.some((currentUrl) => this.publicRoutes.some((route) => currentUrl.includes(route)));
   }
 
   initialize() {

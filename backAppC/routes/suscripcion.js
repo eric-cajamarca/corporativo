@@ -14,6 +14,8 @@ api.post('/suscripcion/crear-pago', auth.auth, (req, res, next) => {
 }, suscripcionController.crearPagoSuscripcion);
 
 api.post('/suscripcion/vincular-checkout', auth.auth, suscripcionController.vincularCheckout);
+api.get('/suscripcion/planes-catalogo-editor', auth.optionalAuth, suscripcionController.planesCatalogoEditor);
+api.put('/suscripcion/planes-catalogo/:planCode', auth.auth, suscripcionController.actualizarPlanCatalogo);
 api.get('/suscripcion/mi-estado', auth.auth, suscripcionController.miEstado);
 api.post('/suscripcion/solicitar-upgrade', auth.auth, suscripcionController.solicitarUpgrade);
 

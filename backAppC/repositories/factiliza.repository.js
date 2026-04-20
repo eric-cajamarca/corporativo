@@ -1,4 +1,6 @@
 const sql = require('mssql');
+const empresaSuscripcionRepository = require('./empresaSuscripcion.repository');
+const saasPlanAccesoRepository = require('./saasPlanAcceso.repository');
 
 /**
  * Obtiene la configuración global de Factiliza (primera fila activa)
@@ -74,6 +76,23 @@ async function getServiciosFactiliza(pool) {
  * si no, se usa EmpresaFactiliza.puedeUsar (retrocompatibilidad).
  */
 async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
+  const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
+  let planCode = 'empresarial';
+  if (sub) {
+    const st = String(sub.estado || '')
+      .trim()
+      .toUpperCase();
+    if (st === 'ACTIVA' || st === 'DEMO') {
+      planCode = String(sub.planCode || 'demo')
+        .trim()
+        .toLowerCase();
+    }
+  }
+  const incluidoPlan = await saasPlanAccesoRepository.planPermiteFactilizaServicioNombre(pool, planCode, nombreServicio);
+  if (!incluidoPlan) {
+    return false;
+  }
+
   const row = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('nombreServicio', sql.VarChar(100), nombreServicio)

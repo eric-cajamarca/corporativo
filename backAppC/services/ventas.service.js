@@ -12,6 +12,7 @@ const inventarioRepository = require('../repositories/inventario.repository');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 const sunatPostPagoService = require('./sunatPostPago.service');
+const saasPlanLimitesService = require('./saasPlanLimites.service');
 
 /** Inserta cabecera de venta dentro de una transacción ya iniciada. */
 exports.insertarVentaCabecera = async (transaction, datosVenta, idEmpresa, idUsuario) => {
@@ -23,6 +24,7 @@ exports.insertarVentaCabecera = async (transaction, datosVenta, idEmpresa, idUsu
  * Usado por POST crear venta legacy del controlador.
  */
 exports.crearVentaCabeceraConTransaccion = async (pool, datosVenta, idEmpresa, idUsuario) => {
+  await saasPlanLimitesService.assertPuedeCrearVenta(pool, idEmpresa);
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
@@ -360,6 +362,8 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     throw new Error('Comprobante de venta no válido.');
   }
 
+  await saasPlanLimitesService.assertPuedeCrearVenta(pool, user.empresa);
+
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
@@ -679,6 +683,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
   }
 
   const tipoComprobanteDestino = (venta.tipoComprobanteDestino || 'NV').trim().toUpperCase();
+
+  await saasPlanLimitesService.assertPuedeCrearVenta(pool, user.empresa);
 
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
@@ -1158,6 +1164,8 @@ exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, pa
   if (!idValeDespacho || idComprobante == null) {
     throw new Error('Faltan idValeDespacho o idComprobante (Factura/Boleta).');
   }
+
+  await saasPlanLimitesService.assertPuedeCrearVenta(pool, idEmpresa);
 
   const vale = await valesDespachoRepository.obtenerPorId(pool, idValeDespacho, idEmpresa);
   if (!vale) throw new Error('Vale de despacho no encontrado.');

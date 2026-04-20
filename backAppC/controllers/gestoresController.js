@@ -159,6 +159,13 @@ const asignar_empresa_gestionada = async function (req, res) {
             });
         }
 
+        if (error.message === 'GESTORA_SOLO_PLAN_ENTERPRISE') {
+            return res.status(403).json({
+                message: 'La empresa gestora multi-empresa solo está disponible en plan Enterprise.',
+                data: undefined
+            });
+        }
+
         res.status(500).json({
             message: 'Error al asignar empresa',
             data: undefined
@@ -217,6 +224,12 @@ const activar_empresa_gestionada = async function (req, res) {
 
     } catch (error) {
         console.error('Error en activar_empresa_gestionada:', error.message);
+        if (error.message === 'GESTORA_SOLO_PLAN_ENTERPRISE') {
+            return res.status(403).json({
+                message: 'La empresa gestora multi-empresa solo está disponible en plan Enterprise.',
+                data: undefined
+            });
+        }
         res.status(500).json({
             message: 'Error al activar empresa',
             data: undefined

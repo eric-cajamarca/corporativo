@@ -5,6 +5,7 @@ const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 const { parsearOrderNumber, esOrderNumberCheckout } = require('../services/integraciones.service');
 const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
+const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
 
 /**
  * Webhooks multiempresa: identifican pago por orderNumber (patrón idEmpresa-uuid o CHK-uuid para checkout público).
@@ -30,6 +31,9 @@ api.post('/webhooks/izipay', async (req, res) => {
     await withPool(async (pool) => {
       if (esOrderNumberCheckout(orderNumber)) {
         await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
+        if (nuevoEstado === 'PAGADO') {
+          await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, orderNumber, null);
+        }
         return res.status(200).json({ ok: true });
       }
 
@@ -80,6 +84,9 @@ api.post('/webhooks/culqi', async (req, res) => {
     await withPool(async (pool) => {
       if (esOrderNumberCheckout(orderNumber)) {
         await suscripcionCheckoutRepository.actualizarEstadoPago(pool, orderNumber, nuevoEstado, idTransaccion);
+        if (nuevoEstado === 'PAGADO') {
+          await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, orderNumber, null);
+        }
         return res.status(200).json({ ok: true });
       }
 

@@ -129,7 +129,42 @@ async function vincularCheckoutPagado(pool, idEmpresa, orderNumber) {
   return empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
 }
 
+function idEmpresaDesdeJwt(authUser) {
+  if (!authUser) return null;
+  const id = authUser.empresa || authUser.idEmpresa;
+  if (!id) return null;
+  const s = String(id).trim();
+  return s || null;
+}
+
+/**
+ * Tras marcar un checkout CHK-* como PAGADO: actualiza EmpresaSuscripcion sin intervención del cliente.
+ * Usa idEmpresaCliente del checkout (sesión al iniciar o webhook) o, si coincide, la empresa del JWT.
+ */
+async function intentarAplicarPagoCheckoutAEmpresa(pool, orderNumber, authUser) {
+  const chk = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, orderNumber);
+  if (!chk || String(chk.estado || '').toUpperCase() !== 'PAGADO') {
+    return;
+  }
+  const idChk = chk.idEmpresaCliente ? String(chk.idEmpresaCliente).trim() : null;
+  const idAuth = idEmpresaDesdeJwt(authUser);
+  if (idChk && idAuth && idChk.toLowerCase() !== String(idAuth).toLowerCase()) {
+    console.error('contexto: intentarAplicarPagoCheckoutAEmpresa empresa checkout distinta a sesión, omitido');
+    return;
+  }
+  const idEmpresa = idChk || idAuth || null;
+  if (!idEmpresa) {
+    return;
+  }
+  try {
+    await vincularCheckoutPagado(pool, idEmpresa, orderNumber);
+  } catch (err) {
+    console.error('contexto: intentarAplicarPagoCheckoutAEmpresa', err.message || err);
+  }
+}
+
 module.exports = {
   aplicarSuscripcionNuevaEmpresa,
-  vincularCheckoutPagado
+  vincularCheckoutPagado,
+  intentarAplicarPagoCheckoutAEmpresa
 };

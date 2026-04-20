@@ -1,6 +1,7 @@
 const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
 const empresasAdministracionRepository = require('../repositories/empresasAdministracion.repository');
+const saasPlanLimitesService = require('./saasPlanLimites.service');
 
 async function listarTodas(pool) {
   return empresasAdministracionRepository.listarTodasEmpresas(pool);
@@ -158,6 +159,7 @@ async function crearDireccionEmpresa(pool, payload) {
 
 async function crearSucursalEmpresa(pool, payload) {
   const { idEmpresa, nombre, direccion } = payload;
+  await saasPlanLimitesService.assertPuedeCrearSucursal(pool, idEmpresa);
   const idSucursal = uuidv4();
   await empresasAdministracionRepository.insertarSucursalSimple(pool, {
     idSucursal,

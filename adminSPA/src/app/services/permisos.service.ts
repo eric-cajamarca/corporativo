@@ -7,7 +7,8 @@ import {
     Permiso, 
     PermisosUsuario, 
     MenuItem, 
-    ModuloInfo 
+    ModuloInfo,
+    LimitesPlanAcciones
 } from '../interfaces/permisos-interface';
 
 interface ApiResponse<T> {
@@ -25,11 +26,22 @@ export class PermisosService {
     private _permisos = signal<string[]>([]);
     private _navegacion = signal<MenuItem[]>([]);
     private _cargando = signal<boolean>(false);
+    private _deploymentMode = signal<'saas' | 'enterprise' | null>(null);
+    private _planCodeEfectivo = signal<string | null>(null);
+    private _modulosPlanMenu = signal<string[]>([]);
+    private _limitesPlan = signal<LimitesPlanAcciones | null>(null);
+    /** True tras primera carga de permisos (éxito o error) para que el guard no re-dispare en bucle. */
+    private _contextoPlanCargado = signal<boolean>(false);
 
     // Exponer datos reactivos
     permisos = this._permisos.asReadonly();
     navegacion = this._navegacion.asReadonly();
     cargando = this._cargando.asReadonly();
+    deploymentMode = this._deploymentMode.asReadonly();
+    planCodeEfectivo = this._planCodeEfectivo.asReadonly();
+    modulosPlanMenu = this._modulosPlanMenu.asReadonly();
+    limitesPlan = this._limitesPlan.asReadonly();
+    contextoPlanCargado = this._contextoPlanCargado.asReadonly();
 
     // Computed para verificar permisos fácilmente
     tienePermisos = computed(() => this._permisos().length > 0);
@@ -49,14 +61,48 @@ export class PermisosService {
         ).pipe(
             tap(response => {
                 if (response.data) {
-                    this._permisos.set(response.data.listaPermisos);
+                    this._permisos.set(response.data.listaPermisos || []);
+                    const dm = response.data.deploymentMode;
+                    this._deploymentMode.set(dm === 'saas' || dm === 'enterprise' ? dm : 'enterprise');
+                    this._planCodeEfectivo.set(
+                        response.data.planCodeEfectivo != null ? String(response.data.planCodeEfectivo) : null
+                    );
+                    this._modulosPlanMenu.set(
+                        Array.isArray(response.data.modulosPlanMenu) ? response.data.modulosPlanMenu : []
+                    );
+                    this._limitesPlan.set(
+                        response.data.limitesPlan != null ? (response.data.limitesPlan as LimitesPlanAcciones) : null
+                    );
+                } else {
+                    this._deploymentMode.set('enterprise');
+                    this._planCodeEfectivo.set(null);
+                    this._modulosPlanMenu.set([]);
+                    this._limitesPlan.set(null);
                 }
+                this._contextoPlanCargado.set(true);
                 this._cargando.set(false);
             }),
             catchError(error => {
                 console.error('Error al cargar permisos:', error);
+                this._permisos.set([]);
+                this._deploymentMode.set('enterprise');
+                this._planCodeEfectivo.set(null);
+                this._modulosPlanMenu.set([]);
+                this._limitesPlan.set(null);
+                this._contextoPlanCargado.set(true);
                 this._cargando.set(false);
-                return of({ message: 'Error', data: { permisos: [], permisosPorModulo: {}, listaPermisos: [] } });
+                return of({
+                    message: 'Error',
+                    data: {
+                        permisos: [],
+                        permisosPorModulo: {},
+                        listaPermisos: [],
+                        deploymentMode: 'enterprise' as const,
+                        planCodeEfectivo: null,
+                        modulosPlanMenu: [],
+                        limitesPlan: null
+                    }
+                });
             })
         );
     }
@@ -167,5 +213,10 @@ export class PermisosService {
     limpiarPermisos(): void {
         this._permisos.set([]);
         this._navegacion.set([]);
+        this._deploymentMode.set(null);
+        this._planCodeEfectivo.set(null);
+        this._modulosPlanMenu.set([]);
+        this._limitesPlan.set(null);
+        this._contextoPlanCargado.set(false);
     }
 }

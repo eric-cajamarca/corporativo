@@ -112,7 +112,17 @@ export class IndexColaboradorComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.permisosService.cargarPermisosUsuario().subscribe({ error: () => {} });
     this.cargarColaboradores();
+  }
+
+  /** SaaS con límites: false si el plan ya no admite más colaboradores. */
+  puedeNuevoColaborador(): boolean {
+    const lp = this.permisosService.limitesPlan();
+    if (!lp) {
+      return true;
+    }
+    return lp.puedeCrearUsuario !== false;
   }
 
   // =============================================

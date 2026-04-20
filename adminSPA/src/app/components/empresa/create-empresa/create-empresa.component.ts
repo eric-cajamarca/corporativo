@@ -10,6 +10,8 @@ import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } 
 
 declare var iziToast: any;
 
+const LS_CHECKOUT_PENDIENTE = 'efaf_checkout_pendiente';
+
 @Component({
   selector: 'app-create-empresa',
   standalone: true,
@@ -77,8 +79,19 @@ export class CreateEmpresaComponent implements OnInit {
     this.initForm();
     this.cargarUbicaciones();
     this.route.queryParamMap.subscribe((q) => {
-      const co = q.get('checkout');
-      this.checkoutOrderNumber = co ? co.trim() : '';
+      let co = (q.get('checkout') || '').trim();
+      if (!co) {
+        try {
+          const raw = localStorage.getItem(LS_CHECKOUT_PENDIENTE);
+          if (raw) {
+            const parsed = JSON.parse(raw) as { orderNumber?: string };
+            co = (parsed?.orderNumber || '').trim();
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      this.checkoutOrderNumber = co;
     });
     this.deploymentContext.cargarSiNecesario().subscribe((cfg) => {
       this.mostrarOpcionDemo = !!cfg?.mostrarPlanesPublicos;
@@ -512,6 +525,11 @@ export class CreateEmpresaComponent implements OnInit {
             next: () => {
               this.registrando.set(false);
               this.loadCreate.set(true);
+              try {
+                localStorage.removeItem(LS_CHECKOUT_PENDIENTE);
+              } catch {
+                /* ignore */
+              }
               const msg = (response as any).mensaje || (response as any).message;
               iziToast.show({
                 title: 'Empresa creada',

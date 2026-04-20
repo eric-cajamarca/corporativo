@@ -22,7 +22,8 @@ export class AuthGuard implements CanActivate {
           state.url.includes('/crear-empresa') ||
           state.url.includes('/verificar-empresa') ||
           state.url.includes('/planes') ||
-          state.url.includes('/suscribirse');
+          state.url.includes('/suscribirse') ||
+          state.url.includes('/recuperar-password');
 
         
         // Si es una ruta pública, siempre permitir

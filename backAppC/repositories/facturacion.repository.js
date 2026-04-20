@@ -21,6 +21,7 @@ const { extraerCodigoHashDesdeXmlFirmado } = require("../utils/sunatCodigoHash.u
 const notaCreditoSunatStockService = require("../services/notaCreditoSunatStock.service");
 const bajaSunatStockService = require("../services/bajaSunatStock.service");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
+const saasContadorComprobantesSunatService = require("../services/saasContadorComprobantesSunat.service");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -1404,11 +1405,13 @@ exports.actualizarEstadoComprobantesRepo = async (
       const prevRs = await transaction.request()
         .input("idComprobanteElectronico", sql.UniqueIdentifier, id)
         .query(`
-          SELECT idEstadoSunat FROM ComprobantesElectronicos
+          SELECT idEstadoSunat, idEmpresa FROM ComprobantesElectronicos
           WHERE idComprobanteElectronico = @idComprobanteElectronico
         `);
       const idEstadoAnterior =
         prevRs.recordset && prevRs.recordset[0] != null ? prevRs.recordset[0].idEstadoSunat : null;
+      const idEmpresaCe =
+        prevRs.recordset && prevRs.recordset[0] != null ? prevRs.recordset[0].idEmpresa : null;
 
       await transaction
         .request()
@@ -1448,6 +1451,13 @@ exports.actualizarEstadoComprobantesRepo = async (
           idUsuarioEjecutor
         );
       }
+
+      await saasContadorComprobantesSunatService.registrarTransicionComprobanteElectronico(
+        transaction,
+        idEmpresaCe,
+        idEstadoAnterior,
+        idEstadoSunat
+      );
     }
     await transaction.commit();
   } catch (err) {
@@ -1542,11 +1552,13 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
     const prevRs = await transaction.request()
       .input("idComprobanteElectronico", sql.UniqueIdentifier, idComprobanteElectronico)
       .query(`
-        SELECT idEstadoSunat FROM ComprobantesElectronicos
+        SELECT idEstadoSunat, idEmpresa FROM ComprobantesElectronicos
         WHERE idComprobanteElectronico = @idComprobanteElectronico
       `);
     const idEstadoAnterior =
       prevRs.recordset && prevRs.recordset[0] != null ? prevRs.recordset[0].idEstadoSunat : null;
+    const idEmpresaCe =
+      prevRs.recordset && prevRs.recordset[0] != null ? prevRs.recordset[0].idEmpresa : null;
 
     await transaction
       .request()
@@ -1588,6 +1600,13 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
       idEstadoAnterior,
       resultado.idEstadoSunat,
       idUsuarioEjecutor
+    );
+
+    await saasContadorComprobantesSunatService.registrarTransicionComprobanteElectronico(
+      transaction,
+      idEmpresaCe,
+      idEstadoAnterior,
+      resultado.idEstadoSunat
     );
 
     await transaction.commit();

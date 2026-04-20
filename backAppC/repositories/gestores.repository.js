@@ -233,14 +233,21 @@ const guardarConfiguracion = async (pool, idEmpresa, clave, valor, descripcion, 
     return result.rowsAffected[0];
 };
 
-/** True si la empresa tiene al menos una relación activa como gestora (origen). */
+/**
+ * True si la empresa es gestora activa y su plan de suscripción es enterprise.
+ * La multi-empresa gestora solo aplica a plan enterprise.
+ */
 const esEmpresaGestoraActiva = async (pool, idEmpresa) => {
     const result = await pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .query(`
             SELECT COUNT(*) AS n
-            FROM Gestores_Empresas
-            WHERE idEmpresaOrigen = @idEmpresa AND estado = 1
+            FROM Gestores_Empresas ge
+            INNER JOIN EmpresaSuscripcion es ON es.idEmpresa = ge.idEmpresaOrigen
+            WHERE ge.idEmpresaOrigen = @idEmpresa
+              AND ge.estado = 1
+              AND LOWER(LTRIM(RTRIM(es.planCode))) = 'enterprise'
+              AND UPPER(LTRIM(RTRIM(es.estado))) IN ('ACTIVA', 'DEMO')
         `);
     return Number(result.recordset[0]?.n || 0) > 0;
 };

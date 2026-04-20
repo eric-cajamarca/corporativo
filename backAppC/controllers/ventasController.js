@@ -19,6 +19,13 @@ const crearVenta = async function (req, res) {
     res.status(201).json({ message: 'Venta creada correctamente' });
   } catch (error) {
     console.error('Error al crear la venta:', error);
+    if (error && error.message === 'PLAN_LIMITE_COMPROBANTES_SUNAT') {
+      return res.status(403).json({
+        error:
+          'Ha alcanzado el límite de comprobantes electrónicos aceptados por SUNAT previsto en su plan de suscripción.',
+        code: error.message
+      });
+    }
     res.status(500).send('Error al crear la venta');
   }
 };
@@ -209,6 +216,13 @@ const crearVentaCompleta = async (req, res) => {
     });
   } catch (error) {
     console.error('Error crearVentaCompleta:', error);
+    if (error && error.message === 'PLAN_LIMITE_COMPROBANTES_SUNAT') {
+      return res.status(403).json({
+        error:
+          'Ha alcanzado el límite de comprobantes electrónicos aceptados por SUNAT previsto en su plan de suscripción.',
+        code: error.message
+      });
+    }
     res.status(500).json({ error: error?.message });
   }
 };
@@ -532,6 +546,13 @@ const crearVentaDesdeVale = async (req, res) => {
   } catch (error) {
     console.error('Error crearVentaDesdeVale:', error);
     if (!res.headersSent) {
+      if (error && error.message === 'PLAN_LIMITE_COMPROBANTES_SUNAT') {
+        return res.status(403).json({
+          error:
+            'Ha alcanzado el límite de comprobantes electrónicos aceptados por SUNAT previsto en su plan de suscripción.',
+          code: error.message
+        });
+      }
       res.status(500).json({ error: error.message || 'Error al liquidar vale.' });
     }
   }

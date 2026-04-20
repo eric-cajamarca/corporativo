@@ -12,11 +12,12 @@ async function insertar(pool, row) {
     .input('estado', sql.VarChar(20), row.estado || 'PENDIENTE')
     .input('idEmpresaPrincipal', sql.UniqueIdentifier, row.idEmpresaPrincipal)
     .input('emailContacto', sql.VarChar(200), row.emailContacto || null)
+    .input('idEmpresaCliente', sql.UniqueIdentifier, row.idEmpresaCliente || null)
     .query(`
       INSERT INTO SuscripcionCheckoutPendiente (
-        idCheckout, orderNumber, planCode, billingCycle, monto, moneda, estado, idEmpresaPrincipal, emailContacto
+        idCheckout, orderNumber, planCode, billingCycle, monto, moneda, estado, idEmpresaPrincipal, emailContacto, idEmpresaCliente
       ) VALUES (
-        @idCheckout, @orderNumber, @planCode, @billingCycle, @monto, @moneda, @estado, @idEmpresaPrincipal, @emailContacto
+        @idCheckout, @orderNumber, @planCode, @billingCycle, @monto, @moneda, @estado, @idEmpresaPrincipal, @emailContacto, @idEmpresaCliente
       )
     `);
 }
@@ -73,9 +74,38 @@ async function vincularEmpresaCliente(pool, orderNumber, idEmpresaCliente) {
     `);
 }
 
+/**
+ * Checkouts SaaS asociados a la empresa (vinculados o el origen de la suscripción actual).
+ * Incluye demo, emprendedor, profesional, etc.
+ */
+async function listarPorEmpresaOCheckoutOrigen(pool, idEmpresa, idCheckoutOrigen) {
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  let filtroOrigen = '';
+  if (idCheckoutOrigen) {
+    req.input('idCheckoutOrigen', sql.UniqueIdentifier, idCheckoutOrigen);
+    filtroOrigen = ' OR c.idCheckout = @idCheckoutOrigen';
+  }
+  const r = await req.query(`
+    SELECT
+      c.orderNumber,
+      c.planCode,
+      c.billingCycle,
+      c.monto,
+      c.moneda,
+      c.estado,
+      CONVERT(VARCHAR(19), c.fCreacion, 120) AS fCreacion,
+      CONVERT(VARCHAR(19), c.fConfirmacion, 120) AS fConfirmacion
+    FROM SuscripcionCheckoutPendiente c
+    WHERE c.idEmpresaCliente = @idEmpresa${filtroOrigen}
+    ORDER BY c.fCreacion DESC
+  `);
+  return r.recordset || [];
+}
+
 module.exports = {
   insertar,
   obtenerPorOrderNumber,
   actualizarEstadoPago,
-  vincularEmpresaCliente
+  vincularEmpresaCliente,
+  listarPorEmpresaOCheckoutOrigen
 };

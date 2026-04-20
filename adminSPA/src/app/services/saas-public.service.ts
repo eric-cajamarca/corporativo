@@ -29,7 +29,8 @@ export class SaasPublicService {
     return this.http
       .post<{ data: CheckoutIniciado }>(`${this.baseUrl}public/suscripcion/iniciar-checkout`, JSON.stringify(body), {
         headers: this.headers,
-        withCredentials: false
+        /** Cookie de sesión: asocia el CHK a la empresa para vincular al pagar (demo/Culqi) o por webhook. */
+        withCredentials: true
       })
       .pipe(map((r) => r.data));
   }
@@ -37,14 +38,25 @@ export class SaasPublicService {
   confirmarDemo(orderNumber: string): Observable<unknown> {
     return this.http.post(`${this.baseUrl}public/suscripcion/confirmar-demo`, JSON.stringify({ orderNumber }), {
       headers: this.headers,
-      withCredentials: false
+      withCredentials: true
     });
   }
 
-  confirmarCulqi(payload: { orderNumber: string; tokenId: string; email: string }): Observable<unknown> {
+  confirmarCulqi(payload: {
+    orderNumber: string;
+    tokenId: string;
+    email: string;
+    /** De Culqi3DS.generateDevice() — recomendado para cargos con tarjeta. */
+    deviceFingerPrintId?: string;
+    clientFirstName?: string;
+    clientLastName?: string;
+    clientPhone?: string;
+    /** Tras Culqi3DS: mismo token y device que el primer intento; cuerpo del postMessage.parameters3DS. */
+    authentication3DS?: Record<string, unknown>;
+  }): Observable<unknown> {
     return this.http.post(`${this.baseUrl}public/suscripcion/confirmar-culqi`, JSON.stringify(payload), {
       headers: this.headers,
-      withCredentials: false
+      withCredentials: true
     });
   }
 

@@ -12,6 +12,7 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { AuthService } from '../../../services/auth.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { PermisosService } from '../../../services/permisos.service';
 
 declare var $: any;
 declare var iziToast: any;
@@ -86,7 +87,8 @@ export class UpdateEmpresaComponent {
     private _rubrosService: RubrosService,
     private _router: Router,
     private _route: ActivatedRoute,
-    public authService: AuthService
+    public authService: AuthService,
+    private _permisosService: PermisosService
   ) {
     
     this.url = global.url;
@@ -124,10 +126,26 @@ export class UpdateEmpresaComponent {
       }
 
   ngOnInit() {
-
+    this._permisosService.cargarPermisosUsuario().subscribe({ error: () => {} });
     this.initData();
 
     this.select_pais();
+  }
+
+  puedeNuevaDireccionEmpresa(): boolean {
+    const lp = this._permisosService.limitesPlan();
+    if (!lp) {
+      return true;
+    }
+    return lp.puedeAgregarDireccionEmpresa !== false;
+  }
+
+  puedeCrearSucursalSegunPlan(): boolean {
+    const lp = this._permisosService.limitesPlan();
+    if (!lp) {
+      return true;
+    }
+    return lp.puedeCrearSucursal !== false;
   }
 
   onSidebarToggle(collapsed: boolean) {
@@ -538,6 +556,29 @@ export class UpdateEmpresaComponent {
     if (this.crearSucursalConDireccion && this.nombreSucursalNueva?.trim()) {
       payload.crearSucursal = true;
       payload.nombreSucursal = this.nombreSucursalNueva.trim();
+    }
+    const lp = this._permisosService.limitesPlan();
+    if (lp) {
+      if (!lp.puedeAgregarDireccionEmpresa) {
+        iziToast.show({
+          title: 'Plan',
+          titleColor: '#856404',
+          color: '#fff8e1',
+          position: 'topRight',
+          message: 'Ha alcanzado el máximo de direcciones de establecimiento de su plan.'
+        });
+        return;
+      }
+      if (payload.crearSucursal && !lp.puedeCrearSucursal) {
+        iziToast.show({
+          title: 'Plan',
+          titleColor: '#856404',
+          color: '#fff8e1',
+          position: 'topRight',
+          message: 'Ha alcanzado el máximo de sucursales de su plan. Desactive «Crear sucursal» o actualice el plan.'
+        });
+        return;
+      }
     }
     this._empresasService.createDireccionEmpresa(payload).subscribe({
       next: (response) => {

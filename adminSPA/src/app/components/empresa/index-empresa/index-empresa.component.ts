@@ -594,4 +594,57 @@ export class IndexEmpresaComponent implements OnInit {
     const config = this.configuraciones.find(c => c.clave === clave);
     return config?.valor || '';
   }
+
+  /** Etiqueta legible para `EmpresaSuscripcion.estado` (listado plataforma). */
+  etiquetaEstadoSuscripcion(estado: string | null | undefined): string {
+    if (!estado) return 'Sin registro';
+    const mapa: Record<string, string> = {
+      ACTIVA: 'Activa',
+      PENDIENTE_PAGO: 'Pendiente de pago',
+      DEMO: 'Demo',
+      ENTERPRISE: 'Enterprise',
+      VENCIDA: 'Vencida'
+    };
+    return mapa[estado] || estado;
+  }
+
+  claseBadgeSuscripcion(estado: string | null | undefined): string {
+    if (!estado) return 'bg-secondary';
+    switch (estado) {
+      case 'ACTIVA':
+        return 'bg-success';
+      case 'ENTERPRISE':
+        return 'bg-dark';
+      case 'DEMO':
+        return 'bg-info text-dark';
+      case 'PENDIENTE_PAGO':
+        return 'bg-warning text-dark';
+      case 'VENCIDA':
+        return 'bg-danger';
+      default:
+        return 'bg-secondary';
+    }
+  }
+
+  /**
+   * Resumen para columna "Pago al día": según estado de suscripción (no sustituye contabilidad de Culqi).
+   */
+  resumenPagoSuscripcion(empresa: {
+    estadoSuscripcion?: string | null;
+  }): { texto: string; clase: string } {
+    const est = empresa?.estadoSuscripcion;
+    if (!est) {
+      return { texto: '—', clase: 'text-muted small' };
+    }
+    if (est === 'PENDIENTE_PAGO') {
+      return { texto: 'No', clase: 'text-danger fw-semibold small' };
+    }
+    if (est === 'VENCIDA') {
+      return { texto: 'No (vencida)', clase: 'text-danger small' };
+    }
+    if (est === 'ACTIVA' || est === 'ENTERPRISE' || est === 'DEMO') {
+      return { texto: 'Sí', clase: 'text-success fw-semibold small' };
+    }
+    return { texto: '—', clase: 'text-muted small' };
+  }
 }

@@ -43,9 +43,30 @@ async function completarCredencialesSolDesdeFacturacion(pool, idEmpresa, ruc, us
 }
 
 const NOMBRE_SERVICIO_FACTILIZA_PDF = 'Factiliza SUNAT PDF';
+const NOMBRE_SERVICIO_SUNAT = 'Factiliza SUNAT';
+const NOMBRE_SERVICIO_TIPO_CAMBIO = 'Factiliza TIPO CAMBIO';
+const NOMBRE_SERVICIO_PLACA = 'Factiliza PLACA';
+const NOMBRE_SERVICIO_SOAT = 'Factiliza SOAT';
+const NOMBRE_SERVICIO_LICENCIA = 'Factiliza LICENCIA';
+
+async function gateFactilizaPlan(req, res, nombreServicio) {
+  if (!req.user || !req.user.empresa) {
+    res.status(401).json({ message: 'No autorizado' });
+    return false;
+  }
+  const ok = await withPool((pool) => factilizaRepository.puedeUsarServicio(pool, req.user.empresa, nombreServicio));
+  if (!ok) {
+    res.status(403).json({
+      message: 'Servicio Factiliza no incluido en su plan o no habilitado para la empresa.'
+    });
+    return false;
+  }
+  return true;
+}
 
 const getAnexo = async function(req, res) {
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SUNAT))) return;
     const ruc = req.params.ruc;
     const response = await fetch(`https://api.factiliza.com/v1/ruc/anexo/${ruc}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -75,6 +96,7 @@ const getAnexo = async function(req, res) {
 
 const getDni = async function (req, res){
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SUNAT))) return;
     const { dni } = req.params;
     const response = await fetch(`https://api.factiliza.com/v1/dni/info/${dni}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -102,6 +124,7 @@ const getDni = async function (req, res){
 
 const getCextranjeria = async function (req, res){
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SUNAT))) return;
     const { cee } = req.params;
     const response = await fetch(`https://api.factiliza.com/v1/cee/info/${cee}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -129,6 +152,7 @@ const getCextranjeria = async function (req, res){
 
 const getRuc = async function (req, res){
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SUNAT))) return;
     const { ruc } = req.params;
     const response = await fetch(`https://api.factiliza.com/v1/ruc/info/${ruc}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -156,6 +180,7 @@ const getRuc = async function (req, res){
 
 const getTipoCambio = async function (req, res) {
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_TIPO_CAMBIO))) return;
     const { fecha } = req.params;                      // yyyy-mm-dd
     const url = `https://api.factiliza.com/v1/tipocambio/info/dia?fecha=${fecha}`;
     const response = await fetch(url, {
@@ -181,6 +206,7 @@ const getTipoCambio = async function (req, res) {
 
 const getPlaca = async function (req, res){
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_PLACA))) return;
     const { placa } = req.params;
     const response = await fetch(`https://api.factiliza.com/v1/placa/info/${placa}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -208,6 +234,7 @@ const getPlaca = async function (req, res){
 
 const getSoat = async function (req, res){
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SOAT))) return;
     const { placa } = req.params;
     const response = await fetch(`https://api.factiliza.com/v1/placa/soat/${placa}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -235,6 +262,7 @@ const getSoat = async function (req, res){
 
 const getLicencia = async function (req, res){
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_LICENCIA))) return;
     const { dni } = req.params;
     const response = await fetch(`https://api.factiliza.com/v1/licencia/info/${dni}`, {
       headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
@@ -267,6 +295,7 @@ function base64ToUint8Array(base64) {
 
 const getXmlSunat = async function (req, res) {
   try {
+    if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SUNAT))) return;
     const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = req.body;
 
     if (!ruc || !usuario || !password || !proveedor || !tipo_doc || !serie || !correlativo) {
@@ -329,6 +358,11 @@ const consultarComprobanteSunat = async function (req, res) {
 
     if (!proveedor || !tipo_doc || !serie || !correlativo) {
       return res.status(400).json({ message: 'Faltan datos: proveedor, tipo_doc, serie, correlativo' });
+    }
+
+    const sunatOk = await withPool((pool) => factilizaRepository.puedeUsarServicio(pool, idEmpresa, NOMBRE_SERVICIO_SUNAT));
+    if (!sunatOk) {
+      return res.status(403).json({ message: 'Servicio Factiliza SUNAT no incluido en su plan o no habilitado para la empresa.' });
     }
 
     const { acceso, rucFinal, usuarioFinal, passwordFinal } = await withPool(async (pool) => {

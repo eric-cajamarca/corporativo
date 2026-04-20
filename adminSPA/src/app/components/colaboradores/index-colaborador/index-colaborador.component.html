@@ -17,10 +17,22 @@
           <i class="bi bi-shield-fill me-1"></i>
           Roles y Permisos
         </button>
-        <button class="btn btn-primary" [routerLink]="['/colaborador/create']">
-          <i class="bi bi-person-plus me-1"></i>
-          Nuevo Colaborador
-        </button>
+        @if (puedeNuevoColaborador()) {
+          <button class="btn btn-primary" type="button" [routerLink]="['/colaborador/create']">
+            <i class="bi bi-person-plus me-1"></i>
+            Nuevo Colaborador
+          </button>
+        } @else {
+          <button
+            class="btn btn-primary"
+            type="button"
+            disabled
+            title="Límite de usuarios del plan alcanzado. Actualice el plan en Mi suscripción."
+          >
+            <i class="bi bi-person-plus me-1"></i>
+            Nuevo Colaborador
+          </button>
+        }
       </div>
     </div>
   </div>
@@ -52,10 +64,22 @@
         <div class="text-center py-5">
           <i class="fas fa-users fa-4x text-muted mb-3"></i>
           <h5 class="text-muted">No hay colaboradores registrados</h5>
-          <button class="btn btn-primary" [routerLink]="['/colaborador/create']">
-            <i class="bi bi-person-plus me-1"></i>
-            Crear Colaborador
-          </button>
+          @if (puedeNuevoColaborador()) {
+            <button class="btn btn-primary" type="button" [routerLink]="['/colaborador/create']">
+              <i class="bi bi-person-plus me-1"></i>
+              Crear Colaborador
+            </button>
+          } @else {
+            <button
+              class="btn btn-primary"
+              type="button"
+              disabled
+              title="Límite de usuarios del plan alcanzado. Actualice el plan en Mi suscripción."
+            >
+              <i class="bi bi-person-plus me-1"></i>
+              Crear Colaborador
+            </button>
+          }
         </div>
       } @else {
         <div class="table-responsive">

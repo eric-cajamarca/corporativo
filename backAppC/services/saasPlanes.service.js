@@ -13,6 +13,7 @@ const PLANES = {
     anualPen: 590,
     maxUsuarios: 4,
     maxSucursales: 1,
+    maxComprobantesSunatAceptados: 500,
     beneficios: [
       'Hasta 4 usuarios y 1 sucursal',
       'Productos (categorías, marcas, impuestos), clientes y proveedores',
@@ -28,6 +29,7 @@ const PLANES = {
     anualPen: 1490,
     maxUsuarios: 11,
     maxSucursales: 3,
+    maxComprobantesSunatAceptados: 2000,
     beneficios: [
       'Todo lo que tiene el plan emprendedor',
       'Hasta 11 usuarios y hasta 3 sucursales',
@@ -44,6 +46,7 @@ const PLANES = {
     anualPen: 3990,
     maxUsuarios: 35,
     maxSucursales: 99,
+    maxComprobantesSunatAceptados: 10000,
     beneficios: [
       'Todo lo que tiene el plan Profesional',
       'Hasta 35 usuarios y hasta 99 sucursales',
@@ -58,8 +61,9 @@ const PLANES = {
     descripcionCorta: 'Prueba el sistema 14 días.',
     mensualPen: 0,
     anualPen: 0,
-    maxUsuarios: 3,
+    maxUsuarios: 1,
     maxSucursales: 1,
+    maxComprobantesSunatAceptados: 50,
     beneficios: []
   },
   enterprise: {
@@ -70,6 +74,7 @@ const PLANES = {
     anualPen: 0,
     maxUsuarios: 99999,
     maxSucursales: 99999,
+    maxComprobantesSunatAceptados: 0,
     beneficios: []
   }
 };
@@ -86,7 +91,8 @@ function listarPlanesCatalogo() {
       precioMensualPen: p.mensualPen,
       precioAnualPen: p.anualPen,
       maxUsuarios: p.maxUsuarios,
-      maxSucursales: p.maxSucursales
+      maxSucursales: p.maxSucursales,
+      maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0
     };
   });
 }
@@ -116,6 +122,7 @@ function filaBdAPlanInterno(row) {
     anualPen: Number(row.precioAnualPen),
     maxUsuarios: Number(row.maxUsuarios),
     maxSucursales: Number(row.maxSucursales),
+    maxComprobantesSunatAceptados: Number(row.maxComprobantesSunatAceptados ?? 0),
     beneficios: parseBeneficiosJson(row.beneficiosJson)
   };
 }
@@ -131,7 +138,8 @@ function filaBdACatalogoItem(row) {
     precioMensualPen: p.mensualPen,
     precioAnualPen: p.anualPen,
     maxUsuarios: p.maxUsuarios,
-    maxSucursales: p.maxSucursales
+    maxSucursales: p.maxSucursales,
+    maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0
   };
 }
 
@@ -158,7 +166,8 @@ async function obtenerResumenPlanAsync(pool, planCode) {
     precioMensualPen: p.mensualPen,
     precioAnualPen: p.anualPen,
     maxUsuarios: p.maxUsuarios,
-    maxSucursales: p.maxSucursales
+    maxSucursales: p.maxSucursales,
+    maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0
   };
 }
 

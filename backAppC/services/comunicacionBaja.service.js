@@ -10,6 +10,7 @@ const firmaXmlSunat = require("./firmaXmlSunat.service");
 const envioDirectoSunat = require("./envioDirectoSunat.service");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
+const saasContadorComprobantesSunatService = require("./saasContadorComprobantesSunat.service");
 
 /**
  * Envía una comunicación de baja (RA) con los comprobantes indicados.
@@ -253,6 +254,12 @@ async function consultarEstadoComunicacionBajaService(pool, user, idComunicacion
         } else {
           console.error("comunicacionBaja: ADVERTENCIA - No se encontraron comprobantes para actualizar en ComunicacionBajaDetalle");
         }
+        await saasContadorComprobantesSunatService.registrarTransicionComunicacionBaja(
+          pool,
+          user.empresa,
+          com.idEstadoSunat,
+          idEstadoSunat
+        );
       }
       return { ok: true, statusCode: 0, idEstadoSunat, mensaje: cdr ? cdr.descripcion : "Procesado" };
     } catch (err) {

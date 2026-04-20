@@ -4,6 +4,7 @@ const empresaSuscripcionEstadoService = require('../services/empresaSuscripcionE
 const { isSaas } = require('../config/deployment.config');
 const suscripcionPublicService = require('../services/suscripcionPublic.service');
 const { withPool } = require('../utils/dbPool.util');
+const suscripcionCatalogoAdminService = require('../services/suscripcionCatalogoAdmin.service');
 
 const crearPagoSuscripcion = async (req, res) => {
   try {
@@ -75,15 +76,76 @@ const miEstado = async (req, res) => {
 /**
  * Fase 3: solicitud de upgrade/downgrade — crea un nuevo checkout público (mismo flujo que /public/suscripcion/iniciar-checkout).
  */
+const planesCatalogoEditor = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    if (!req.user?.empresa && !req.user?.idEmpresa) {
+      return res.status(200).json({ data: { puedeEditar: false } });
+    }
+    const puedeEditar = await withPool((pool) =>
+      suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, req.user)
+    );
+    res.status(200).json({ data: { puedeEditar } });
+  } catch (error) {
+    console.error('planesCatalogoEditor:', error);
+    res.status(500).json({ message: 'Error' });
+  }
+};
+
+const actualizarPlanCatalogo = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const planCode = (req.params.planCode || '').toString().trim().toLowerCase();
+    if (!planCode) {
+      return res.status(400).json({ message: 'planCode inválido' });
+    }
+    await withPool((pool) =>
+      suscripcionCatalogoAdminService.actualizarPlanCatalogoPublico(pool, req.user, planCode, req.body || {})
+    );
+    res.status(200).json({ message: 'Plan actualizado' });
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CATALOGO') {
+      return res.status(403).json({
+        message: 'Solo el superAdmin de la empresa principal de la plataforma puede editar el catálogo de planes.'
+      });
+    }
+    if (
+      error.message === 'DESCRIPCION_REQUERIDA' ||
+      error.message === 'DESCRIPCION_LARGA' ||
+      error.message === 'PRECIO_MENSUAL_INVALIDO' ||
+      error.message === 'PRECIO_ANUAL_INVALIDO' ||
+      error.message === 'MAX_USUARIOS_INVALIDO' ||
+      error.message === 'MAX_SUCURSALES_INVALIDO'
+    ) {
+      return res.status(400).json({ message: error.message });
+    }
+    if (error.message === 'PLAN_NO_EDITABLE_EN_BD') {
+      return res.status(400).json({
+        message:
+          'No se actualizó ninguna fila. Ejecute la migración de SaasPlan o el plan no pertenece al catálogo público.'
+      });
+    }
+    console.error('actualizarPlanCatalogo:', error);
+    res.status(500).json({ message: 'Error al actualizar el plan' });
+  }
+};
+
 const solicitarUpgrade = async (req, res) => {
   try {
     if (!isSaas()) {
       return res.status(404).json({ message: 'No disponible en modo enterprise' });
     }
-    const data = await withPool((pool) => suscripcionPublicService.iniciarCheckout(pool, req.body || {}));
+    const data = await withPool((pool) =>
+      suscripcionPublicService.iniciarCheckout(pool, req.body || {}, req.user)
+    );
     res.status(201).json({
       data,
-      message: 'Use el orderNumber en la página de pago para completar el cambio de plan. Luego vincule desde su cuenta si aplica.'
+      message:
+        'Use el orderNumber en la página de pago para completar el cambio de plan. Con sesión iniciada, el plan se aplicará al confirmar el pago o al notificar la pasarela.'
     });
   } catch (error) {
     if (error.message === 'PLAN_INVALIDO' || error.message === 'CICLO_FACTURACION_INVALIDO') {
@@ -100,6 +162,8 @@ const solicitarUpgrade = async (req, res) => {
 module.exports = {
   crearPagoSuscripcion,
   vincularCheckout,
+  planesCatalogoEditor,
+  actualizarPlanCatalogo,
   miEstado,
   solicitarUpgrade
 };

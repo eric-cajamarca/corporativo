@@ -7,6 +7,7 @@ import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { PermisosService } from '../../../services/permisos.service';
 
 declare var bootstrap: any;
 
@@ -34,8 +35,8 @@ export class IndexSucursalComponent {
   constructor(
     private _sucursalcervice: SucursalService,
     public sidebarState: SidebarStateService,
-  ) { 
-    //this.token = this._cookieService.get('token');
+    private _permisosService: PermisosService
+  ) {
     this.obtenerSucursales();
   }
 
@@ -47,6 +48,16 @@ export class IndexSucursalComponent {
   }
 
   ngOnInit(): void {
+    this._permisosService.cargarPermisosUsuario().subscribe({ error: () => {} });
+  }
+
+  /** Alta de sucursal/dirección vía «Editar empresa»; desactiva si el plan ya no admite más. */
+  puedeIrCrearNuevaSucursal(): boolean {
+    const lp = this._permisosService.limitesPlan();
+    if (!lp) {
+      return true;
+    }
+    return lp.puedeAgregarDireccionEmpresa !== false || lp.puedeCrearSucursal !== false;
   }
 
   obtenerSucursales(){

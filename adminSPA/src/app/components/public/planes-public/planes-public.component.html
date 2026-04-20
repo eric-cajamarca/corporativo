@@ -2,7 +2,7 @@
   <div class="container" style="max-width: 1100px;">
     <div class="text-center mb-4">
       <h1 class="h2 mb-2">Planes</h1>
-      <p class="text-muted mb-0">Elige mensual o anual y continúa al pago con Culqi (modo SaaS).</p>
+      <p class="text-muted mb-0">Elige mensual o anual y continúa con el pago.</p>
     </div>
 
     @if (modoEnterprise()) {
@@ -52,6 +52,77 @@
               <div class="card h-100 shadow-sm planes-card">
                 <div class="card-body d-flex flex-column">
                   <h2 class="h5 card-title mb-2">{{ p.nombre }}</h2>
+                  @if (puedeEditar() && edicion()[p.planCode]; as ed) {
+                    <label class="form-label small text-muted mb-1" [attr.for]="'desc-' + p.planCode">Descripción corta</label>
+                    <textarea
+                      [id]="'desc-' + p.planCode"
+                      class="form-control form-control-sm mb-2"
+                      rows="2"
+                      [ngModel]="ed.descripcionCorta"
+                      (ngModelChange)="patchEdicion(p.planCode, 'descripcionCorta', $event)"
+                    ></textarea>
+                    <div class="row g-2 small mb-2">
+                      <div class="col-6">
+                        <label class="form-label mb-0 text-muted" [attr.for]="'mu-' + p.planCode">Máx. usuarios</label>
+                        <input
+                          [id]="'mu-' + p.planCode"
+                          type="number"
+                          class="form-control form-control-sm"
+                          min="1"
+                          step="1"
+                          [ngModel]="ed.maxUsuarios"
+                          (ngModelChange)="patchEdicion(p.planCode, 'maxUsuarios', $event)"
+                        />
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label mb-0 text-muted" [attr.for]="'ms-' + p.planCode">Máx. sucursales</label>
+                        <input
+                          [id]="'ms-' + p.planCode"
+                          type="number"
+                          class="form-control form-control-sm"
+                          min="1"
+                          step="1"
+                          [ngModel]="ed.maxSucursales"
+                          (ngModelChange)="patchEdicion(p.planCode, 'maxSucursales', $event)"
+                        />
+                      </div>
+                    </div>
+                    <div class="row g-2 small mb-2">
+                      <div class="col-6">
+                        <label class="form-label mb-0 text-muted" [attr.for]="'pm-' + p.planCode">Mensual (S/)</label>
+                        <input
+                          [id]="'pm-' + p.planCode"
+                          type="number"
+                          class="form-control form-control-sm"
+                          min="0"
+                          step="0.01"
+                          [ngModel]="ed.precioMensualPen"
+                          (ngModelChange)="patchEdicion(p.planCode, 'precioMensualPen', $event)"
+                        />
+                      </div>
+                      <div class="col-6">
+                        <label class="form-label mb-0 text-muted" [attr.for]="'pa-' + p.planCode">Anual (S/)</label>
+                        <input
+                          [id]="'pa-' + p.planCode"
+                          type="number"
+                          class="form-control form-control-sm"
+                          min="0"
+                          step="0.01"
+                          [ngModel]="ed.precioAnualPen"
+                          (ngModelChange)="patchEdicion(p.planCode, 'precioAnualPen', $event)"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm mb-3"
+                      [disabled]="guardandoPlan() === p.planCode"
+                      (click)="guardarPlan(p.planCode)">
+                      {{ guardandoPlan() === p.planCode ? 'Guardando…' : 'Guardar cambios' }}
+                    </button>
+                  } @else {
+                    <p class="text-muted small mb-3">{{ p.descripcionCorta }}</p>
+                  }
                   <ul class="planes-beneficios list-unstyled small mb-3 flex-grow-1">
                     @for (b of p.beneficios; track $index) {
                       <li class="d-flex gap-2 mb-2">
@@ -74,8 +145,7 @@
         </div>
 
         <div class="text-center mt-4 planes-footer-links">
-          <a routerLink="/crear-empresa">Crear empresa</a>
-          <span class="text-muted mx-2">·</span>
+
           <a routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">Probar demo 14 días</a>
           <span class="text-muted mx-2">·</span>
           <a routerLink="/login-empresa">Ya tengo cuenta</a>

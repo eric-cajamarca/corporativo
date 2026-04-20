@@ -208,19 +208,27 @@
             </div>
           </div>
           <div class="dropdown-divider"></div>
-          <!--
-          <a class="dropdown-item" (click)="navigateToProfile(); $event.preventDefault()">
-            <i class="fas fa-user me-2"></i>
-            Mi Perfil
-          </a>
-          -->
-          <a class="dropdown-item d-flex align-items-center justify-content-between" (click)="abrirModalPlaca(); $event.preventDefault()">
+          <a
+            *ngIf="mostrarPlacaSoatTarjeta"
+            class="dropdown-item d-flex align-items-center justify-content-between"
+            (click)="abrirModalPlaca(); $event.preventDefault()">
             <span><i class="bi bi-car-front-fill me-2"></i>Consultar placa</span>
             <span class="badge bg-danger ms-2" *ngIf="soatVencidoCount > 0">{{ soatVencidoCount }} SOAT vencido</span>
           </a>
-          <a class="dropdown-item" (click)="abrirModalSoat(); $event.preventDefault()">
+          <a
+            *ngIf="mostrarPlacaSoatTarjeta"
+            class="dropdown-item"
+            (click)="abrirModalSoat(); $event.preventDefault()">
             <i class="bi bi-file-medical-fill me-2"></i>
             Consultar SOAT
+          </a>
+          <a *ngIf="mostrarArqueoCajaTarjeta" class="dropdown-item" routerLink="/caja/arqueo">
+            <i class="bi bi-calculator me-2"></i>
+            Arqueo de caja
+          </a>
+          <a *ngIf="mostrarMiPerfilSuscripcion" class="dropdown-item" routerLink="/cuenta/suscripcion">
+            <i class="bi bi-person-badge me-2"></i>
+            Mi perfil
           </a>
           <a class="dropdown-item" (click)="navigateToEmpresa(); $event.preventDefault()">
             <i class="bi bi-building-fill me-2"></i>

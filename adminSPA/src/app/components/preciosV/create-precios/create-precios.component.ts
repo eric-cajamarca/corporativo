@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, signal, inject } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -10,6 +10,7 @@ import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { PermisosService } from '../../../services/permisos.service';
 
 declare var bootstrap: any;
 
@@ -23,6 +24,8 @@ declare var bootstrap: any;
 })
 export class CreatePreciosComponent implements OnInit {
   @ViewChild('modalNuevaLista') modalNuevaLista!: ElementRef;
+
+  private readonly permisosService = inject(PermisosService);
 
   // Datos
   listasPrecio: any[] = [];
@@ -93,10 +96,19 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.permisosService.cargarPermisosUsuario().subscribe({ error: () => {} });
     this.cargarListasPrecio();
     this.cargarProductos();
     this.cargarSucursales();
     this.cargarMonedas();
+  }
+
+  /** SaaS plan demo: una sola lista (principal); no permitir crear otras listas nuevas. */
+  bloquearNuevaListaDemo(): boolean {
+    if (this.permisosService.deploymentMode() !== 'saas') {
+      return false;
+    }
+    return (this.permisosService.planCodeEfectivo() || '').toLowerCase() === 'demo';
   }
 
   ngAfterViewInit(): void {
@@ -231,6 +243,9 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   abrirModalNuevaLista(lista?: any): void {
+    if (!lista && this.bloquearNuevaListaDemo()) {
+      return;
+    }
     this.listaEditar = lista;
     
     if (lista) {

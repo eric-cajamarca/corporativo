@@ -224,11 +224,21 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">Direcciones de la empresa</h4>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crearDireccionModal"
-                    (click)="modalCrearDireccion()">
-                    <i class="fas fa-plus me-2"></i>Nueva dirección
-                </button>
+                @if (puedeNuevaDireccionEmpresa()) {
+                  <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#crearDireccionModal"
+                      (click)="modalCrearDireccion()">
+                      <i class="fas fa-plus me-2"></i>Nueva dirección
+                  </button>
+                } @else {
+                  <button class="btn btn-primary" type="button" disabled
+                      title="Límite de direcciones del plan alcanzado. Actualice el plan en Mi suscripción.">
+                      <i class="fas fa-plus me-2"></i>Nueva dirección
+                  </button>
+                }
             </div>
+            @if (!puedeNuevaDireccionEmpresa()) {
+              <p class="small text-warning mb-0 px-3 pb-2">No puede agregar más direcciones: límite del plan actual alcanzado.</p>
+            }
 
             <div class="card-body">
                 @if (direccionEmpresas_const.length > 0) {

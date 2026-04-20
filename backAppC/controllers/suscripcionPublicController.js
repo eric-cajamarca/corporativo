@@ -18,7 +18,9 @@ const listarPlanes = async (req, res) => {
 
 const iniciarCheckout = async (req, res) => {
   try {
-    const data = await withPool((pool) => suscripcionPublicService.iniciarCheckout(pool, req.body || {}));
+    const data = await withPool((pool) =>
+      suscripcionPublicService.iniciarCheckout(pool, req.body || {}, req.user)
+    );
     res.status(201).json({ data, message: 'Checkout iniciado' });
   } catch (error) {
     if (error.message === 'MODO_NO_SAAS') {
@@ -42,7 +44,7 @@ const confirmarDemo = async (req, res) => {
   try {
     const orderNumber = (req.body?.orderNumber || '').trim();
     const data = await withPool((pool) =>
-      suscripcionPublicService.confirmarDemoCheckout(pool, orderNumber)
+      suscripcionPublicService.confirmarDemoCheckout(pool, orderNumber, req.user)
     );
     res.status(200).json({ data, message: 'Demo activada' });
   } catch (error) {
@@ -60,12 +62,20 @@ const confirmarDemo = async (req, res) => {
 const confirmarCulqi = async (req, res) => {
   try {
     const data = await withPool((pool) =>
-      suscripcionPublicService.confirmarCulqiCheckout(pool, req.body || {})
+      suscripcionPublicService.confirmarCulqiCheckout(pool, req.body || {}, req.user)
     );
     res.status(200).json({ data, message: 'Pago registrado' });
   } catch (error) {
     if (error.message === 'MODO_NO_SAAS') {
       return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    if (error.message === 'REQUIERE_3DS') {
+      return res.status(409).json({
+        code: 'REQUIERE_3DS',
+        actionCode: error.actionCode || undefined,
+        message:
+          'Culqi requiere 3D Secure: en el cliente ejecute Culqi3DS (settings + initAuthentication con el mismo token), espere postMessage con parameters3DS y vuelva a llamar confirmar-culqi enviando authentication3DS. Si actionCode es REVIEW, es el flujo estándar documentado por Culqi.'
+      });
     }
     if (
       error.message === 'DATOS_INCOMPLETOS' ||

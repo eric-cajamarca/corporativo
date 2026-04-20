@@ -1,5 +1,6 @@
 const sql = require("mssql");
 const { v4: uuidv4 } = require("uuid");
+const saasContadorComprobantesSunatService = require("../services/saasContadorComprobantesSunat.service");
 
 /**
  * Devuelve RUC, razón social y dirección fiscal (principal o primera) para GRE / XML UBL emisor.
@@ -184,20 +185,49 @@ exports.actualizarGuiaDatosRepo = async (pool, idGuiaElectronica, idEmpresa, dat
  * Actualiza idEstadoSunat, descripcionEstado y ticketSunat de una guía ya insertada.
  */
 exports.actualizarEstadoGuiaRepo = async (pool, idGuiaElectronica, idEmpresa, estado) => {
-  await pool
-    .request()
-    .input("idGuiaElectronica", sql.UniqueIdentifier, idGuiaElectronica)
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .input("idEstadoSunat", sql.Int, estado.idEstadoSunat ?? null)
-    .input("descripcionEstado", sql.VarChar(200), estado.descripcionEstado ?? null)
-    .input("ticketSunat", sql.VarChar(100), estado.ticketSunat ?? null)
-    .query(`
-      UPDATE GuiasElectronicasEmitidas
-      SET idEstadoSunat = @idEstadoSunat,
-          descripcionEstado = @descripcionEstado,
-          ticketSunat = @ticketSunat
-      WHERE idGuiaElectronica = @idGuiaElectronica AND idEmpresa = @idEmpresa
-    `);
+  const idNuevo = estado.idEstadoSunat != null ? Number(estado.idEstadoSunat) : null;
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const prevR = await transaction
+      .request()
+      .input("idGuiaElectronica", sql.UniqueIdentifier, idGuiaElectronica)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT idEstadoSunat FROM GuiasElectronicasEmitidas
+        WHERE idGuiaElectronica = @idGuiaElectronica AND idEmpresa = @idEmpresa
+      `);
+    const idAnterior = prevR.recordset && prevR.recordset[0] != null ? prevR.recordset[0].idEstadoSunat : null;
+
+    await transaction
+      .request()
+      .input("idGuiaElectronica", sql.UniqueIdentifier, idGuiaElectronica)
+      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+      .input("idEstadoSunat", sql.Int, estado.idEstadoSunat ?? null)
+      .input("descripcionEstado", sql.VarChar(200), estado.descripcionEstado ?? null)
+      .input("ticketSunat", sql.VarChar(100), estado.ticketSunat ?? null)
+      .query(`
+        UPDATE GuiasElectronicasEmitidas
+        SET idEstadoSunat = @idEstadoSunat,
+            descripcionEstado = @descripcionEstado,
+            ticketSunat = @ticketSunat
+        WHERE idGuiaElectronica = @idGuiaElectronica AND idEmpresa = @idEmpresa
+      `);
+
+    await saasContadorComprobantesSunatService.registrarTransicionGuiaElectronica(
+      transaction,
+      idEmpresa,
+      idAnterior,
+      idNuevo
+    );
+
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch (_) {}
+    throw err;
+  }
 };
 
 /**

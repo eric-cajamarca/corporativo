@@ -63,6 +63,11 @@ exports.saasSuscripcionGate = async function saasSuscripcionGate(req, res, next)
     return next();
   }
 
+  // Catálogo SaaS: solo la empresa principal (validado en controller) puede ajustar textos/precios aunque el gate de pago aplique a otras rutas.
+  if (method === 'PUT' && /^\/api\/suscripcion\/planes-catalogo\//.test(pathname)) {
+    return next();
+  }
+
   const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
   if (!idEmpresa) {
     return next();

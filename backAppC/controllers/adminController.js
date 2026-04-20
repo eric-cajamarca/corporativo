@@ -98,6 +98,14 @@ const createAdmin = async (req, res, next) => {
       });
     }
 
+    if (error.message === 'PLAN_LIMITE_USUARIOS') {
+      return res.status(403).json({
+        message:
+          'Ha alcanzado el número máximo de usuarios permitido por su plan. Actualice el plan para agregar más colaboradores.',
+        data: undefined
+      });
+    }
+
     return next(error);
   }
 };

@@ -2,6 +2,10 @@
 // NUNCA hagas cálculos de precios/impuestos en repositories
 const permisosRepository = require('../repositories/permisos.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
+const saasPlanAccesoService = require('./saasPlanAcceso.service');
+const saasPlanAccesoRepository = require('../repositories/saasPlanAcceso.repository');
+const saasPlanLimitesService = require('./saasPlanLimites.service');
+const { getDeploymentMode } = require('../config/deployment.config');
 
 /**
  * Navegación reducida para empresa gestora (tiene empresas gestionadas activas).
@@ -165,10 +169,30 @@ const obtenerPermisosUsuario = async (pool, user) => {
         permisosPorModulo[permiso.modulo].push(permiso.nombre);
     });
 
+    const deploymentMode = getDeploymentMode();
+    let planCodeEfectivo = null;
+    let modulosPlanMenu = [];
+    let limitesPlan = null;
+    if (deploymentMode === 'saas') {
+        try {
+            planCodeEfectivo = await saasPlanAccesoService.obtenerPlanCodeActivo(pool, user.empresa);
+            modulosPlanMenu = await saasPlanAccesoRepository.listarModulosPorPlan(pool, planCodeEfectivo);
+            limitesPlan = await saasPlanLimitesService.obtenerBanderasPlan(pool, user.empresa);
+        } catch (err) {
+            console.error('contexto: obtenerPermisosUsuario modulos plan SaaS', err.message || err);
+            modulosPlanMenu = [];
+            limitesPlan = null;
+        }
+    }
+
     return {
         permisos: permisos,
         permisosPorModulo: permisosPorModulo,
-        listaPermisos: permisos.map(p => p.nombre)
+        listaPermisos: permisos.map(p => p.nombre),
+        deploymentMode,
+        planCodeEfectivo,
+        modulosPlanMenu,
+        limitesPlan
     };
 };
 
@@ -602,6 +626,12 @@ const obtenerNavegacionSidebar = async (pool, user) => {
     const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
     if (esGestora) {
         resultado = construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChofer);
+    }
+
+    try {
+        resultado = await saasPlanAccesoService.filtrarNavegacionPorPlan(pool, user.empresa, resultado);
+    } catch (err) {
+        console.error('obtenerNavegacionSidebar filtrarNavegacionPorPlan:', err.message);
     }
 
     return resultado;

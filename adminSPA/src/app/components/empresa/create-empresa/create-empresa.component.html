@@ -106,6 +106,15 @@
           </div>
         </div>
 
+        @if (checkoutOrderNumber) {
+          <div class="alert alert-info small mb-3" role="status">
+            Tiene un <strong>pago o plan pendiente de asociar</strong> a una empresa
+            (<code class="text-break user-select-all">{{ checkoutOrderNumber }}</code>).
+            Si <strong>ya tiene cuenta</strong> y solo desea activar el plan en su empresa actual,
+            <a [routerLink]="['/login-empresa']" [queryParams]="{ checkout: checkoutOrderNumber }">inicie sesión para vincular el pago</a>.
+          </div>
+        }
+
         <form [formGroup]="empresaForm" class="registro-form">
           <!-- Paso 1: Verificar RUC -->
           @if (currentStep() === 1) {

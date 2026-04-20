@@ -46,7 +46,13 @@
     
                     <!-- Botones de Acción -->
                     <div class="col-md-4 text-end">
-                        <button class="btn btn-success" (click)="abrirModalNuevaLista()">
+                        <button
+                            class="btn btn-success"
+                            type="button"
+                            [disabled]="bloquearNuevaListaDemo()"
+                            [title]="bloquearNuevaListaDemo() ? 'En plan demo solo se permite la lista de precios existente. Actualice el plan para crear listas adicionales.' : ''"
+                            (click)="abrirModalNuevaLista()"
+                        >
                             <i class="bi bi-plus-circle me-1"></i> Nueva Lista
                         </button>
                         <button class="btn btn-primary ms-2" [disabled]="!listaSeleccionadaId" 

@@ -481,6 +481,8 @@ npm run dev         # Con nodemon (desarrollo)
 1. **GUIA_ONBOARDING_EMPRESA.md** - Guía completa paso a paso (2-3 horas)
 2. **FLUJO_RAPIDO_NUEVA_EMPRESA.md** - Guía rápida (30 minutos)
 3. **REGLAS.md** - Reglas de desarrollo del proyecto
+4. **FASE3_PRODUCTO_ESTANDAR_MATRIZ.md** - Matriz configuración vs. roadmap, flags plan→módulos, respuestas comerciales (producto estándar SaaS)
+5. **POLITICA_MIGRACION_LICENCIA_UNICA_A_SAAS.md** - Migración licencia única / on‑premise → SaaS (comercial + técnico)
 
 ---
 

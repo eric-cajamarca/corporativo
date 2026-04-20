@@ -12,6 +12,19 @@ async function contarUsuariosActivos(pool, idEmpresa) {
   return Number(r.recordset[0]?.total || 0);
 }
 
+/** Cuentas de usuario que ocupan plaza (incluye pendientes de activación). */
+async function contarUsuariosPlazas(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT COUNT(*) AS total
+      FROM dbo.UsuarioWeb
+      WHERE idEmpresa = @idEmpresa
+    `);
+  return Number(r.recordset[0]?.total || 0);
+}
+
 async function contarSucursales(pool, idEmpresa) {
   const r = await pool
     .request()
@@ -24,16 +37,74 @@ async function contarSucursales(pool, idEmpresa) {
   return Number(r.recordset[0]?.total || 0);
 }
 
+async function contarDireccionesEmpresa(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT COUNT(*) AS total
+      FROM dbo.DireccionEmpresa
+      WHERE idEmpresa = @idEmpresa
+    `);
+  return Number(r.recordset[0]?.total || 0);
+}
+
 async function contarUso(pool, idEmpresa) {
-  const [usuariosActivos, sucursales] = await Promise.all([
+  const [usuariosActivos, usuariosPlazas, sucursales, direccionesEmpresa] = await Promise.all([
     contarUsuariosActivos(pool, idEmpresa),
-    contarSucursales(pool, idEmpresa)
+    contarUsuariosPlazas(pool, idEmpresa),
+    contarSucursales(pool, idEmpresa),
+    contarDireccionesEmpresa(pool, idEmpresa)
   ]);
-  return { usuariosActivos, sucursales };
+  return { usuariosActivos, usuariosPlazas, sucursales, direccionesEmpresa };
+}
+
+/**
+ * Reconstruye el total de documentos SUNAT que cuentan para cuota (histórico + actual):
+ * comprobantes electrónicos aceptados (1,3) o con baja aceptada (EstadosSunat 08), guías aceptadas y RA aceptadas.
+ */
+async function contarComprobantesSunatDesdeTablas(pool, idEmpresa) {
+  if (!idEmpresa) return 0;
+  try {
+    const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
+      SELECT
+        ISNULL((
+          SELECT COUNT_BIG(*)
+          FROM dbo.ComprobantesElectronicos ce
+          WHERE ce.idEmpresa = @idEmpresa
+            AND (
+              ce.idEstadoSunat IN (1, 3)
+              OR EXISTS (
+                SELECT 1 FROM dbo.EstadosSunat es
+                WHERE es.idEstadoSunat = ce.idEstadoSunat AND es.codigo = '08'
+              )
+            )
+        ), 0)
+        + ISNULL((
+          SELECT COUNT_BIG(*)
+          FROM dbo.GuiasElectronicasEmitidas g
+          WHERE g.idEmpresa = @idEmpresa AND g.idEstadoSunat IN (1, 3)
+        ), 0)
+        + ISNULL((
+          SELECT COUNT_BIG(*)
+          FROM dbo.ComunicacionesBaja c
+          WHERE c.idEmpresa = @idEmpresa AND c.idEstadoSunat IN (1, 3)
+        ), 0)
+        AS total
+    `);
+    const n = r.recordset && r.recordset[0] != null ? Number(r.recordset[0].total) : 0;
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  } catch (err) {
+    console.error('contexto: contarComprobantesSunatDesdeTablas', err);
+    return 0;
+  }
 }
 
 module.exports = {
   contarUsuariosActivos,
+  contarUsuariosPlazas,
   contarSucursales,
-  contarUso
+  contarDireccionesEmpresa,
+  contarUso,
+  contarComprobantesSunatDesdeTablas
 };

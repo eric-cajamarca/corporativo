@@ -8,6 +8,13 @@ import { TipoCambioService, TipoCambioData } from '../../services/tipo-cambio.se
 import { ConsultarPlacaModalComponent } from '../facturacion/consultar-placa-modal/consultar-placa-modal.component';
 import { ConsultarSoatModalComponent } from '../facturacion/consultar-soat-modal/consultar-soat-modal.component';
 import { VehiculosService } from '../../services/vehiculos.service';
+import { DeploymentContextService } from '../../services/deployment-context.service';
+import { SaasSubscriptionService } from '../../services/saas-subscription.service';
+import {
+  puedeVerArqueoCaja,
+  tarjetaMostrarArqueoDemoPlan,
+  tarjetaPermiteConsultaPlacaSoat
+} from '../../utils/plan-tarjeta-perfil.util';
 
 declare const iziToast: any;
 
@@ -53,6 +60,14 @@ export class TopnavComponent implements OnInit {
   public soatVencidoCount = 0;
   private soatVencidoToastYaMostrado = false;
 
+  /** Tarjeta de perfil: enlaces según plan SaaS (Factiliza placa/SOAT desde profesional; demo + arqueo). */
+  public mostrarPlacaSoatTarjeta = true;
+  public mostrarMiPerfilSuscripcion = false;
+  public mostrarArqueoCajaTarjeta = false;
+  private planSuscripcionCode: string | null = null;
+  private ultimaEmpresaMiEstado: string | null = null;
+  private miEstadoSuscripcionEnVuelo = false;
+
   constructor(
     private router: Router,
     public authService: AuthService,
@@ -60,6 +75,8 @@ export class TopnavComponent implements OnInit {
     private tipoCambioService: TipoCambioService,
     private vehiculosService: VehiculosService,
     private cdr: ChangeDetectorRef,
+    private deploymentContext: DeploymentContextService,
+    private saasSubscription: SaasSubscriptionService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -77,8 +94,74 @@ export class TopnavComponent implements OnInit {
         this.empresaNombre = '';
         this.isAuthenticated = false;
         this.tipoCambio = null;
+        this.ultimaEmpresaMiEstado = null;
+        this.planSuscripcionCode = null;
+        this.miEstadoSuscripcionEnVuelo = false;
+        this.mostrarPlacaSoatTarjeta = true;
+        this.mostrarMiPerfilSuscripcion = false;
+        this.mostrarArqueoCajaTarjeta = false;
       }
     });
+
+    effect(() => {
+      const userData = this.authService.userData();
+      this.permisosService.permisos();
+      if (!userData) {
+        return;
+      }
+      this.deploymentContext.cargarSiNecesario().subscribe((cfg) => {
+        const dm = cfg?.deploymentMode || 'enterprise';
+        if (dm !== 'saas') {
+          this.ultimaEmpresaMiEstado = null;
+          this.planSuscripcionCode = null;
+          this.miEstadoSuscripcionEnVuelo = false;
+          this.mostrarPlacaSoatTarjeta = true;
+          this.mostrarMiPerfilSuscripcion = false;
+          this.mostrarArqueoCajaTarjeta = false;
+          this.cdr.markForCheck();
+          return;
+        }
+        this.mostrarMiPerfilSuscripcion = true;
+        const emp = (userData.idEmpresa || '').toString();
+        const debePedirEstado = emp && emp !== this.ultimaEmpresaMiEstado && !this.miEstadoSuscripcionEnVuelo;
+        if (debePedirEstado) {
+          this.mostrarPlacaSoatTarjeta = false;
+          this.mostrarArqueoCajaTarjeta = false;
+          this.miEstadoSuscripcionEnVuelo = true;
+          this.saasSubscription.getMiEstado().subscribe({
+            next: (r) => {
+              this.miEstadoSuscripcionEnVuelo = false;
+              this.ultimaEmpresaMiEstado = emp;
+              this.planSuscripcionCode = r.suscripcion?.planCode ?? null;
+              this.aplicarFlagsTarjetaPerfil(r.deploymentMode, this.planSuscripcionCode, userData);
+              this.cdr.markForCheck();
+            },
+            error: () => {
+              this.miEstadoSuscripcionEnVuelo = false;
+              this.planSuscripcionCode = null;
+              this.mostrarPlacaSoatTarjeta = false;
+              this.mostrarArqueoCajaTarjeta = false;
+              this.cdr.markForCheck();
+            }
+          });
+        } else if (this.ultimaEmpresaMiEstado === emp && this.ultimaEmpresaMiEstado) {
+          this.aplicarFlagsTarjetaPerfil(dm, this.planSuscripcionCode, userData);
+          this.cdr.markForCheck();
+        }
+      });
+    });
+  }
+
+  private aplicarFlagsTarjetaPerfil(
+    deploymentMode: string,
+    planCode: string | null,
+    userData: { rol: string }
+  ): void {
+    this.mostrarPlacaSoatTarjeta = tarjetaPermiteConsultaPlacaSoat(deploymentMode, planCode);
+    const esAdmin = (userData.rol || '').trim() === 'Administrador';
+    const perms = this.permisosService.permisos();
+    this.mostrarArqueoCajaTarjeta =
+      tarjetaMostrarArqueoDemoPlan(deploymentMode, planCode) && puedeVerArqueoCaja(esAdmin, perms);
   }
 
   ngOnInit(): void {

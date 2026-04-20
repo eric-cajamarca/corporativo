@@ -10,7 +10,9 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
         <h1 class="content-title mb-1">Gestión de Empresas</h1>
-        <p class="content-subtitle text-muted mb-0">Administra las empresas del sistema</p>
+        <p class="content-subtitle text-muted mb-0">
+          Administra las empresas del sistema. Incluye plan SaaS, estado de suscripción y si el pago está al día (vista plataforma).
+        </p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-outline-secondary" [routerLink]="['/rubros']">
@@ -52,6 +54,11 @@
                 <th>Celular</th>
                 <th>Estado SUNAT</th>
                 <th>Estado</th>
+                <th>Plan SaaS</th>
+                <th>Suscripción</th>
+                <th>Ciclo</th>
+                <th>Fin vigencia</th>
+                <th>Pago al día</th>
                 <th class="text-end">Acciones</th>
               </tr>
             </thead>
@@ -61,7 +68,12 @@
                   <td>
                     <span class="fw-medium">{{ empresa.ruc }}</span>
                   </td>
-                  <td>{{ empresa.razon_Social }}</td>
+                  <td>
+                    {{ empresa.razon_Social }}
+                    @if (empresa.esPrincipal) {
+                      <span class="badge bg-primary ms-1">Principal</span>
+                    }
+                  </td>
                   <td>{{ empresa.celular || '-' }}</td>
                   <td>
                     @switch (empresa.estSunat) {
@@ -94,6 +106,29 @@
                       <span class="badge bg-danger">
                         <i class="fas fa-times-circle me-1"></i>Inactivo
                       </span>
+                    }
+                  </td>
+                  <td>
+                    <span class="text-muted small">{{ empresa.planSuscripcion || '—' }}</span>
+                  </td>
+                  <td>
+                    @if (empresa.estadoSuscripcion) {
+                      <span class="badge" [ngClass]="claseBadgeSuscripcion(empresa.estadoSuscripcion)">
+                        {{ etiquetaEstadoSuscripcion(empresa.estadoSuscripcion) }}
+                      </span>
+                    } @else {
+                      <span class="text-muted small">Sin registro</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="text-muted small">{{ empresa.cicloFacturacionSuscripcion || '—' }}</span>
+                  </td>
+                  <td>
+                    <span class="text-muted small">{{ empresa.fechaFinSuscripcion || '—' }}</span>
+                  </td>
+                  <td>
+                    @if (resumenPagoSuscripcion(empresa); as rp) {
+                      <span [class]="rp.clase">{{ rp.texto }}</span>
                     }
                   </td>
                   <td class="text-end">

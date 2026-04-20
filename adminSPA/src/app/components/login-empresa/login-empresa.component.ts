@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { AdminService, AdminLoginUserData } from '../../services/admin.service';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { CommonModule } from '@angular/common';
@@ -39,15 +39,23 @@ export class LoginEmpresaComponent implements OnInit {
   // Información de empresa recordada
   public empresaRecordada: any = null;
 
+  /** Tras pago público: vincular suscripción en “Mi suscripción”. */
+  private postLoginCheckout: string | null = null;
+
   constructor(
     private _adminService: AdminService,
     private _router: Router,
+    private route: ActivatedRoute,
     private authService: AuthService
   ) {}
 
   ngOnInit(): void {
     this.initializeForm();
     this.loadEmpresaRecordada();
+    this.route.queryParamMap.subscribe((q) => {
+      const c = (q.get('checkout') || '').trim();
+      this.postLoginCheckout = c || null;
+    });
   }
 
   initializeForm(): void {
@@ -311,10 +319,14 @@ export class LoginEmpresaComponent implements OnInit {
     // Establecer usuario en AuthService desde la respuesta del login (evita verificar token en el mismo tick)
     this.authService.setUserDataFromLogin(userData);
 
-    // Navegar al dashboard; el AuthGuard verificará el token en la siguiente petición (cookie ya disponible)
+    // Navegar al dashboard o a vincular pago (checkout CHK-… tras suscripción pública)
     setTimeout(() => {
-      this._router.navigate(['/home']).then(() => {
-              });
+      const chk = (this.postLoginCheckout || '').trim();
+      if (chk) {
+        void this._router.navigate(['/cuenta', 'suscripcion'], { queryParams: { checkout: chk } });
+        return;
+      }
+      void this._router.navigate(['/home']);
     }, 0);
   }
 

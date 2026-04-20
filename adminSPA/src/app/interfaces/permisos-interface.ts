@@ -12,10 +12,35 @@ export interface PermisosPorModulo {
     [modulo: string]: string[];
 }
 
+/** SaaS + suscripción ACTIVA/DEMO: límites del plan y si puede crear recursos. */
+export interface LimitesPlanAcciones {
+    planCode?: string;
+    maxUsuarios: number;
+    maxSucursales: number;
+    maxDireccionesEmpresa: number;
+    usuariosActivos: number;
+    usuariosOcupados: number;
+    sucursales: number;
+    direccionesEmpresa: number;
+    puedeCrearUsuario: boolean;
+    puedeCrearSucursal: boolean;
+    puedeAgregarDireccionEmpresa: boolean;
+    excedeUsuarios: boolean;
+    excedeSucursales: boolean;
+    excedeDirecciones: boolean;
+}
+
 export interface PermisosUsuario {
     permisos: Permiso[];
     permisosPorModulo: PermisosPorModulo;
     listaPermisos: string[];
+    /** Modo despliegue (API); en Enterprise no aplica tope de plan en el cliente. */
+    deploymentMode?: 'saas' | 'enterprise';
+    planCodeEfectivo?: string | null;
+    /** Códigos de módulo de menú permitidos por `SaasPlanModulo` (SaaS). */
+    modulosPlanMenu?: string[];
+    /** Solo SaaS con suscripción que aplica límites; null si no aplica. */
+    limitesPlan?: LimitesPlanAcciones | null;
 }
 
 export interface SubMenuItem {

@@ -529,8 +529,17 @@ const createDireccionEmpresa = async function (req, res, next) {
             res.status(200).send({ data: insertDireccionEmpresa.rowsAffected });
         });
     } catch (error) {
-                res.status(500).send({ message: error.message, data: undefined });
-
+        if (
+            error.message === 'PLAN_LIMITE_DIRECCIONES_EMPRESA' ||
+            error.message === 'PLAN_LIMITE_SUCURSALES'
+        ) {
+            const msg =
+                error.message === 'PLAN_LIMITE_SUCURSALES'
+                    ? 'Ha alcanzado el máximo de sucursales de su plan. Actualice el plan para agregar más.'
+                    : 'Ha alcanzado el máximo de direcciones de establecimiento permitidas por su plan.';
+            return res.status(403).send({ message: msg, data: undefined });
+        }
+        res.status(500).send({ message: error.message, data: undefined });
     }
 
 }
@@ -560,6 +569,13 @@ const createSucursalEmpresa = async function (req, res, next) {
             res.status(200).send({ data: out, message: 'Sucursal creada' });
         });
     } catch (error) {
+        if (error.message === 'PLAN_LIMITE_SUCURSALES') {
+            return res.status(403).send({
+                message:
+                    'Ha alcanzado el máximo de sucursales de su plan. Actualice el plan para agregar más.',
+                data: undefined
+            });
+        }
         console.error('createSucursalEmpresa:', error);
         return next(error);
     }

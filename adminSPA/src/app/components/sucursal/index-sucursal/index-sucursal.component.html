@@ -13,11 +13,20 @@
             <h4 class="mb-3 mb-md-0 fw-semibold">
               Mostrando todas las sucursales
             </h4>
-            <button class="btn btn-primary mb-2" 
-                      [routerLink]="['/editar-empresa']" 
-                      routerLinkActive="active">
+            @if (puedeIrCrearNuevaSucursal()) {
+              <button class="btn btn-primary mb-2" type="button" [routerLink]="['/editar-empresa']" routerLinkActive="active">
                 Crear nueva sucursal
               </button>
+            } @else {
+              <button
+                class="btn btn-primary mb-2"
+                type="button"
+                disabled
+                title="Límite de sucursales o direcciones del plan alcanzado. Actualice el plan en Mi suscripción."
+              >
+                Crear nueva sucursal
+              </button>
+            }
             
           </div>
         </div>

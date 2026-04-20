@@ -35,7 +35,7 @@ BEGIN
          N'["Todo lo que tiene el plan Profesional","Hasta 35 usuarios y hasta 99 sucursales","Multi-empresa y gestores (varias razones sociales)","Prioridad de soporte y opciones de escala (según contrato)","Integraciones y operación avanzada (según contrato)"]',
          399.00, 3990.00, 35, 99, 1, 1, 30),
         (N'demo', N'Demo', N'Prueba el sistema 14 días.',
-         N'[]', 0.00, 0.00, 3, 1, 1, 0, 5),
+         N'[]', 0.00, 0.00, 1, 1, 1, 0, 5),
         (N'enterprise', N'Enterprise', N'Licencia on-premise / corporativa.',
          N'[]', 0.00, 0.00, 99999, 99999, 1, 0, 0)
     ) AS s (planCode, nombre, descripcionCorta, beneficiosJson, precioMensualPen, precioAnualPen, maxUsuarios, maxSucursales, activo, visibleEnCatalogoPublico, orden)

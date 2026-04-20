@@ -7,6 +7,7 @@ const seguridadAlertasService = require('./seguridadAlertas.service');
 const emailService = require('./email.service');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
+const saasPlanLimitesService = require('./saasPlanLimites.service');
 
 const LOGIN_INTENTOS_MAX = 5;
 const LOGIN_BLOQUEO_MINUTOS = 30;
@@ -308,6 +309,8 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
   // 2. Destructurar datos
   const { nombres, apellidos, email, password, idRol } = datos;
   const idEmpresa = usuarioAutenticado.empresa;
+
+  await saasPlanLimitesService.assertPuedeCrearUsuarioColaborador(pool, idEmpresa);
 
     // 3. Verificar email duplicado
   const emailExiste = await usuarioRepository.checkEmailExists(pool, email, idEmpresa);

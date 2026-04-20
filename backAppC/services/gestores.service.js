@@ -1,6 +1,7 @@
 // SIEMPRE valida reglas de negocio aquí (regla 1.3)
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
+const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 
 /**
  * Obtiene las empresas gestionadas por la empresa actual
@@ -86,6 +87,14 @@ const asignarEmpresaGestionada = async (pool, idEmpresaDestino, user) => {
         throw new Error('PERMISO_DENEGADO');
     }
 
+    const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
+    const pc = String(sub?.planCode || '')
+        .trim()
+        .toLowerCase();
+    if (pc !== 'enterprise') {
+        throw new Error('GESTORA_SOLO_PLAN_ENTERPRISE');
+    }
+
     if (!idEmpresaDestino) {
         throw new Error('EMPRESA_DESTINO_REQUERIDA');
     }
@@ -145,6 +154,14 @@ const activarEmpresaGestionada = async (pool, idGestor, user) => {
 
     if (user.rol !== 'Administrador') {
         throw new Error('PERMISO_DENEGADO');
+    }
+
+    const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
+    const pc = String(sub?.planCode || '')
+        .trim()
+        .toLowerCase();
+    if (pc !== 'enterprise') {
+        throw new Error('GESTORA_SOLO_PLAN_ENTERPRISE');
     }
 
     return await gestoresRepository.activarGestor(pool, idGestor);
