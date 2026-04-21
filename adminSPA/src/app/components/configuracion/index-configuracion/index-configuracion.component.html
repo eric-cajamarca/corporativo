@@ -59,9 +59,11 @@
           <button class="nav-link" id="nav-comprobante-defecto-tab" data-bs-toggle="tab" data-bs-target="#nav-comprobante-defecto" type="button" role="tab" aria-controls="nav-comprobante-defecto" aria-selected="false" (click)="cargarVentasDefaults()">
             <i class="fas fa-file-invoice me-2"></i>Comprobante por defecto
           </button>
-          <button class="nav-link" id="nav-sistema-tab" data-bs-toggle="tab" data-bs-target="#nav-sistema" type="button" role="tab" aria-controls="nav-sistema" aria-selected="false">
-            <i class="fas fa-cog me-2"></i>Sistema
-          </button>
+          @if (mostrarTabSistema) {
+            <button class="nav-link" id="nav-sistema-tab" data-bs-toggle="tab" data-bs-target="#nav-sistema" type="button" role="tab" aria-controls="nav-sistema" aria-selected="false" (click)="cargarConfiguracionSistema()">
+              <i class="fas fa-cog me-2"></i>Sistema
+            </button>
+          }
         </div>
       </nav>
 
@@ -623,68 +625,174 @@
           </div>
         </div>
 
+        @if (mostrarTabSistema) {
         <div class="tab-pane fade" id="nav-sistema" role="tabpanel" aria-labelledby="nav-sistema-tab">
-          <div class="card">
-            <div class="card-header">
-              <h5 class="card-title mb-0">Configuración del Sistema</h5>
+          @if (!puedeEditarSistemaOperativo) {
+            <div class="alert alert-warning small mb-3">
+              Solo el <strong>superAdmin</strong> de la <strong>empresa principal</strong> puede editar esta configuración operativa. Los valores se muestran en solo lectura.
             </div>
-            <div class="card-body">
-              <form>
-                <div class="row g-3">
-                  <div class="col-md-6 d-flex align-items-center">
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" id="backupAutomatico" [(ngModel)]="sistema.backupAutomatico" name="backupAutomatico">
-                      <label class="form-check-label" for="backupAutomatico">
-                        Backup automático
-                      </label>
-                    </div>
+          }
+
+          <form>
+            <div class="row g-3 sistema-operativo-cards">
+              <!-- Programación de backups -->
+              <div class="col-12 col-lg-6">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-calendar-check text-primary me-2"></i>Programación de backups</h5>
+                    <p class="small text-muted mb-0 mt-2">Indica si deseas backups automáticos y cada cuánto se consideran en operación (la ejecución real la programa el servidor con Task Scheduler leyendo estos valores).</p>
                   </div>
-                  <div class="col-md-6">
-                    <label for="frecuenciaBackup" class="form-label">Frecuencia de backup</label>
-                    <select class="form-select" id="frecuenciaBackup" [(ngModel)]="sistema.frecuenciaBackup" name="frecuenciaBackup">
+                  <div class="card-body">
+                    <div class="form-check mb-3">
+                      <input class="form-check-input" type="checkbox" id="backupAutomatico" [(ngModel)]="sistema.backupAutomatico" name="backupAutomatico" [disabled]="!puedeEditarSistemaOperativo">
+                      <label class="form-check-label" for="backupAutomatico">Backup automático habilitado</label>
+                    </div>
+                    <label for="frecuenciaBackup" class="form-label">Frecuencia</label>
+                    <select class="form-select" id="frecuenciaBackup" [(ngModel)]="sistema.frecuenciaBackup" name="frecuenciaBackup" [disabled]="!puedeEditarSistemaOperativo">
                       <option value="diario">Diario</option>
                       <option value="semanal">Semanal</option>
                       <option value="mensual">Mensual</option>
                     </select>
                   </div>
-                  <div class="col-md-6">
-                    <label for="retencionLogs" class="form-label">Retención de logs (días)</label>
-                    <input type="number" class="form-control" id="retencionLogs" [(ngModel)]="sistema.retencionLogs" name="retencionLogs">
+                </div>
+              </div>
+
+              <!-- Destino local -->
+              <div class="col-12 col-lg-6">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-hdd text-primary me-2"></i>Destino local del respaldo</h5>
+                    <p class="small text-muted mb-0 mt-2">Carpeta en el servidor SQL donde se genera el archivo <code>.bak</code> (parámetro <code>-BackupDir</code> del script <code>backup_sqlserver.ps1</code>).</p>
                   </div>
-                  <div class="col-md-6 d-flex align-items-center">
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" id="notificacionesEmail" [(ngModel)]="sistema.notificacionesEmail" name="notificacionesEmail">
-                      <label class="form-check-label" for="notificacionesEmail">
-                        Notificaciones por email
-                      </label>
+                  <div class="card-body">
+                    <label for="rutaBackupLocal" class="form-label">Ruta en disco</label>
+                    <input type="text" class="form-control font-monospace" id="rutaBackupLocal" [(ngModel)]="sistema.rutaBackupLocal" name="rutaBackupLocal" [disabled]="!puedeEditarSistemaOperativo" placeholder="D:\sql_backups">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Otro servidor / NAS -->
+              <div class="col-12 col-lg-6">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-server text-primary me-2"></i>Copia en otro servidor o NAS</h5>
+                    <p class="small text-muted mb-0 mt-2">Ruta UNC o de red accesible desde el servidor SQL. El script copia los <code>.bak</code> con <code>robocopy</code> (<code>-SecondaryBackupDir</code>). Deje vacío si no aplica.</p>
+                  </div>
+                  <div class="card-body">
+                    <label for="rutaBackupSecundaria" class="form-label">Ruta secundaria (UNC recomendado)</label>
+                    <input type="text" class="form-control font-monospace" id="rutaBackupSecundaria" [(ngModel)]="sistema.rutaBackupSecundaria" name="rutaBackupSecundaria" [disabled]="!puedeEditarSistemaOperativo" [attr.placeholder]="ejemploUncBackupSecundario">
+                    <p class="form-text small mb-0 mt-2">Ejemplo: dos barras invertidas al inicio del servidor, luego carpeta compartida. La cuenta que ejecuta el backup debe tener permisos de escritura en esa ruta.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Google Drive -->
+              <div class="col-12 col-lg-6">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fab fa-google-drive text-primary me-2"></i>Copia en Google Drive (rclone)</h5>
+                    <p class="small text-muted mb-0 mt-2">Nombre del remote y carpeta remota configurados con <code>rclone config</code> en el servidor. El script ejecuta <code>rclone copy</code> sobre los <code>.bak</code> (<code>-GoogleDriveRemote</code>).</p>
+                  </div>
+                  <div class="card-body">
+                    <label for="googleDriveRemote" class="form-label">Remote rclone</label>
+                    <input type="text" class="form-control font-monospace" id="googleDriveRemote" [(ngModel)]="sistema.googleDriveRemote" name="googleDriveRemote" [disabled]="!puedeEditarSistemaOperativo" placeholder="gdrive:erp-backups/sql">
+                    <p class="form-text small mb-0 mt-2">En el servidor: instalar rclone, autenticar Google Drive una vez (<code>rclone config</code>), probar <code>rclone ls gdrive:</code>. Aquí guarda el mismo destino (p. ej. <code>miRemote:carpeta/subcarpeta</code>).</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Retención logs -->
+              <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-file-alt text-primary me-2"></i>Retención de logs</h5>
+                  </div>
+                  <div class="card-body">
+                    <label for="retencionLogs" class="form-label">Días</label>
+                    <input type="number" class="form-control" id="retencionLogs" [(ngModel)]="sistema.retencionLogs" name="retencionLogs" [disabled]="!puedeEditarSistemaOperativo" min="1">
+                    <p class="small text-muted mb-0 mt-2">Política de conservación de registros operativos en aplicación/servidor.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Notificaciones -->
+              <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-bell text-primary me-2"></i>Notificaciones</h5>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" id="notificacionesEmail" [(ngModel)]="sistema.notificacionesEmail" name="notificacionesEmail" [disabled]="!puedeEditarSistemaOperativo">
+                      <label class="form-check-label" for="notificacionesEmail">Correo electrónico</label>
                     </div>
-                  </div>
-                  <div class="col-md-6 d-flex align-items-center">
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" id="notificacionesWhatsApp" [(ngModel)]="sistema.notificacionesWhatsApp" name="notificacionesWhatsApp">
-                      <label class="form-check-label" for="notificacionesWhatsApp">
-                        Notificaciones por WhatsApp
-                      </label>
-                    </div>
-                  </div>
-                  <div class="col-md-6 d-flex align-items-center">
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" id="modoMantenimiento" [(ngModel)]="sistema.modoMantenimiento" name="modoMantenimiento">
-                      <label class="form-check-label" for="modoMantenimiento">
-                        Modo mantenimiento
-                      </label>
+                      <input class="form-check-input" type="checkbox" id="notificacionesWhatsApp" [(ngModel)]="sistema.notificacionesWhatsApp" name="notificacionesWhatsApp" [disabled]="!puedeEditarSistemaOperativo">
+                      <label class="form-check-label" for="notificacionesWhatsApp">WhatsApp</label>
                     </div>
                   </div>
                 </div>
-                <div class="mt-3">
-                  <button type="button" class="btn btn-primary" (click)="guardarConfiguracionSistema()">
-                    <i class="fas fa-save me-2"></i>Guardar Cambios
-                  </button>
+              </div>
+
+              <!-- Restauración semanal -->
+              <div class="col-12 col-md-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-database text-primary me-2"></i>Ensayo de restauración</h5>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="restauracionSemanal" [(ngModel)]="sistema.restauracionSemanal" name="restauracionSemanal" [disabled]="!puedeEditarSistemaOperativo">
+                      <label class="form-check-label" for="restauracionSemanal">Planificar ensayo semanal (<code>restore_verify_sqlserver.ps1</code>)</label>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2">Comprueba que el <code>.bak</code> sea restorable a una BD de prueba.</p>
+                  </div>
                 </div>
-              </form>
+              </div>
+
+              <!-- Culqi -->
+              <div class="col-12 col-md-6 col-lg-6">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-file-csv text-primary me-2"></i>Conciliación Culqi</h5>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="exportarConciliacionCulqi" [(ngModel)]="sistema.exportarConciliacionCulqi" name="exportarConciliacionCulqi" [disabled]="!puedeEditarSistemaOperativo">
+                      <label class="form-check-label" for="exportarConciliacionCulqi">Habilitar exportación CSV vía API (<code>/api/suscripcion/conciliacion/culqi</code>)</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mantenimiento -->
+              <div class="col-12 col-md-6 col-lg-6">
+                <div class="card h-100 shadow-sm border-0 sistema-op-card">
+                  <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title mb-0 text-body"><i class="fas fa-tools text-primary me-2"></i>Modo mantenimiento</h5>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="modoMantenimiento" [(ngModel)]="sistema.modoMantenimiento" name="modoMantenimiento" [disabled]="!puedeEditarSistemaOperativo">
+                      <label class="form-check-label" for="modoMantenimiento">Activar modo mantenimiento</label>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2">Use con precaución: puede afectar el acceso de usuarios según cómo esté implementado en backend.</p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div class="card mt-3 border-primary border-opacity-25 shadow-sm">
+              <div class="card-body d-flex flex-wrap align-items-center gap-3 justify-content-between">
+                <p class="small text-muted mb-0">Los cambios se guardan en la configuración de empresa (claves <code>SISTEMA_*</code>). Un mismo clic persiste todas las tarjetas.</p>
+                <button type="button" class="btn btn-primary" (click)="guardarConfiguracionSistema()" [disabled]="sistemaGuardando || !puedeEditarSistemaOperativo">
+                  <i class="fas fa-save me-2"></i>{{ sistemaGuardando ? 'Guardando...' : 'Guardar toda la configuración de sistema' }}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
+        }
       </div>
 
       <!-- Modal Crear/Editar Impuesto -->

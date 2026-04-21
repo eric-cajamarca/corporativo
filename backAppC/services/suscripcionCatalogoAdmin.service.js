@@ -61,5 +61,7 @@ async function actualizarPlanCatalogoPublico(pool, user, planCode, body) {
 
 module.exports = {
   puedeEditarCatalogoPlanes,
-  actualizarPlanCatalogoPublico
+  actualizarPlanCatalogoPublico,
+  usuarioEsEmpresaPrincipal,
+  esSuperAdmin
 };

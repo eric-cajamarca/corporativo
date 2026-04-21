@@ -268,4 +268,10 @@ app.listen(PORT, () => {
   } catch (e) {
     console.error('No se pudo iniciar job suscripción vencimiento:', e.message);
   }
+  try {
+    const onboardingAutomationJob = require('./jobs/onboardingAutomation.job');
+    onboardingAutomationJob.iniciar();
+  } catch (e) {
+    console.error('No se pudo iniciar job onboarding automation:', e.message);
+  }
 });

@@ -18,5 +18,7 @@ api.get('/suscripcion/planes-catalogo-editor', auth.optionalAuth, suscripcionCon
 api.put('/suscripcion/planes-catalogo/:planCode', auth.auth, suscripcionController.actualizarPlanCatalogo);
 api.get('/suscripcion/mi-estado', auth.auth, suscripcionController.miEstado);
 api.post('/suscripcion/solicitar-upgrade', auth.auth, suscripcionController.solicitarUpgrade);
+api.get('/suscripcion/conciliacion/culqi', auth.auth, suscripcionController.conciliacionCulqi);
+api.get('/suscripcion/conciliacion/culqi.csv', auth.auth, suscripcionController.conciliacionCulqiCsv);
 
 module.exports = api;

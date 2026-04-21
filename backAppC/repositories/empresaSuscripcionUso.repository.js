@@ -100,11 +100,42 @@ async function contarComprobantesSunatDesdeTablas(pool, idEmpresa) {
   }
 }
 
+async function obtenerMetricasOnboarding(pool, idEmpresa) {
+  const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
+    SELECT
+      ISNULL((
+        SELECT COUNT(1)
+        FROM dbo.ConfiguracionFacturacionElectronica c
+        INNER JOIN dbo.Empresas e ON e.idEmpresa = c.idEmpresa
+        WHERE c.idEmpresa = @idEmpresa
+          AND ISNULL(LTRIM(RTRIM(e.ruc)), '') <> ''
+          AND ISNULL(LTRIM(RTRIM(c.usuarioSunat)), '') <> ''
+          AND ISNULL(LTRIM(RTRIM(c.claveSunat)), '') <> ''
+      ), 0) AS tieneConfigSunat,
+      (
+        SELECT MIN(ce.fechaRespuesta)
+        FROM dbo.ComprobantesElectronicos ce
+        WHERE ce.idEmpresa = @idEmpresa
+          AND (
+            ce.idEstadoSunat IN (1, 3)
+            OR EXISTS (
+              SELECT 1
+              FROM dbo.EstadosSunat es
+              WHERE es.idEstadoSunat = ce.idEstadoSunat
+                AND es.codigo = '08'
+            )
+          )
+      ) AS fechaPrimerComprobante
+  `);
+  return r.recordset && r.recordset[0] ? r.recordset[0] : null;
+}
+
 module.exports = {
   contarUsuariosActivos,
   contarUsuariosPlazas,
   contarSucursales,
   contarDireccionesEmpresa,
   contarUso,
-  contarComprobantesSunatDesdeTablas
+  contarComprobantesSunatDesdeTablas,
+  obtenerMetricasOnboarding
 };

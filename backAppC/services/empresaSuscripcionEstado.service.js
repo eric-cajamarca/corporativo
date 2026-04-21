@@ -14,6 +14,7 @@ async function obtenerMiEstado(pool, idEmpresa) {
     : null;
 
   let limitesUso = null;
+  let onboarding = null;
   if (planCatalogo) {
     const uso = await empresaSuscripcionUsoRepository.contarUso(pool, idEmpresa);
     const banderas = await saasPlanLimitesService.obtenerBanderasPlan(pool, idEmpresa);
@@ -48,6 +49,24 @@ async function obtenerMiEstado(pool, idEmpresa) {
       puedeCrearVentaPorCuotaSunat:
         banderas == null ? !limComp || compNorm < maxCompSunat : banderas.puedeCrearVentaPorCuotaSunat
     };
+
+    const metricas = await empresaSuscripcionUsoRepository.obtenerMetricasOnboarding(pool, idEmpresa);
+    const tieneConfigSunat = Number(metricas?.tieneConfigSunat || 0) > 0;
+    const fechaPrimerComprobante = metricas?.fechaPrimerComprobante
+      ? new Date(metricas.fechaPrimerComprobante)
+      : null;
+    const fechaInicioSuscripcion = suscripcion?.fechaInicio ? new Date(suscripcion.fechaInicio) : null;
+    const minsPrimerComp =
+      fechaPrimerComprobante && fechaInicioSuscripcion && !Number.isNaN(fechaPrimerComprobante.getTime())
+        ? Math.max(0, Math.round((fechaPrimerComprobante.getTime() - fechaInicioSuscripcion.getTime()) / 60000))
+        : null;
+    onboarding = {
+      tieneConfigSunat,
+      fechaPrimerComprobante: fechaPrimerComprobante && !Number.isNaN(fechaPrimerComprobante.getTime())
+        ? fechaPrimerComprobante.toISOString()
+        : null,
+      minutosHastaPrimerComprobante: minsPrimerComp
+    };
   }
 
   let checkoutsOrden = [];
@@ -70,6 +89,7 @@ async function obtenerMiEstado(pool, idEmpresa) {
     suscripcion,
     planCatalogo,
     limitesUso,
+    onboarding,
     checkoutsOrden
   };
 }

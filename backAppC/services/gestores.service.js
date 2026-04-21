@@ -2,6 +2,21 @@
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
+const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
+
+const CLAVES_CONFIG_SISTEMA_OPERATIVO = new Set([
+    'SISTEMA_BACKUP_AUTOMATICO',
+    'SISTEMA_BACKUP_FRECUENCIA',
+    'SISTEMA_BACKUP_RUTA_LOCAL',
+    'SISTEMA_BACKUP_RUTA_SECUNDARIA',
+    'SISTEMA_BACKUP_GOOGLE_DRIVE_REMOTE',
+    'SISTEMA_BACKUP_RESTORE_SEMANAL',
+    'SISTEMA_NOTIFICACIONES_EMAIL',
+    'SISTEMA_NOTIFICACIONES_WHATSAPP',
+    'SISTEMA_MODO_MANTENIMIENTO',
+    'SISTEMA_RETENCION_LOGS_DIAS',
+    'SISTEMA_CULQI_CONCILIACION_CSV'
+]);
 
 /**
  * Obtiene las empresas gestionadas por la empresa actual
@@ -193,20 +208,52 @@ const obtenerConfiguracion = async (pool, user) => {
     return await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
 };
 
+const obtenerPermisosConfiguracionSistema = async (pool, user) => {
+    if (!user || !user.empresa) {
+        throw new Error('USUARIO_NO_VALIDO');
+    }
+    const esEmpresaPrincipal = await suscripcionCatalogoAdminService.usuarioEsEmpresaPrincipal(pool, user);
+    const esSuperAdminUsuario = suscripcionCatalogoAdminService.esSuperAdmin(user);
+    const puedeEditarSistemaOperativo = await suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, user);
+    /** Pestaña Sistema visible si empresa principal o rol superAdmin (regla UI). */
+    const mostrarTabSistema = esEmpresaPrincipal || esSuperAdminUsuario;
+    return {
+        puedeEditarSistemaOperativo,
+        mostrarTabSistema,
+        esEmpresaPrincipal,
+        esSuperAdmin: esSuperAdminUsuario
+    };
+};
+
 /**
  * Guarda configuración de la empresa
  */
+function puedeEditarConfiguracionEmpresa(user) {
+    const r = (user?.rol || '').toString();
+    return r === 'Administrador' || r === 'superAdmin';
+}
+
 const guardarConfiguracion = async (pool, configuraciones, user) => {
     if (!user || !user.empresa) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
+    if (!puedeEditarConfiguracionEmpresa(user)) {
         throw new Error('PERMISO_DENEGADO');
     }
 
     if (!Array.isArray(configuraciones)) {
         throw new Error('CONFIGURACIONES_INVALIDAS');
+    }
+
+    const intentaEditarConfigSistema = configuraciones.some((c) =>
+        CLAVES_CONFIG_SISTEMA_OPERATIVO.has(String(c?.clave || '').trim().toUpperCase())
+    );
+    if (intentaEditarConfigSistema) {
+        const autorizado = await suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, user);
+        if (!autorizado) {
+            throw new Error('NO_AUTORIZADO_CONFIG_SISTEMA');
+        }
     }
 
     for (const config of configuraciones) {
@@ -232,5 +279,6 @@ module.exports = {
     activarEmpresaGestionada,
     eliminarEmpresaGestionada,
     obtenerConfiguracion,
+    obtenerPermisosConfiguracionSistema,
     guardarConfiguracion
 };

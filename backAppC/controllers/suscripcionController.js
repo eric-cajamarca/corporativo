@@ -5,6 +5,7 @@ const { isSaas } = require('../config/deployment.config');
 const suscripcionPublicService = require('../services/suscripcionPublic.service');
 const { withPool } = require('../utils/dbPool.util');
 const suscripcionCatalogoAdminService = require('../services/suscripcionCatalogoAdmin.service');
+const suscripcionConciliacionService = require('../services/suscripcionConciliacion.service');
 
 const crearPagoSuscripcion = async (req, res) => {
   try {
@@ -159,11 +160,62 @@ const solicitarUpgrade = async (req, res) => {
   }
 };
 
+const conciliacionCulqi = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const filtros = {
+      fechaDesde: req.query?.fechaDesde || null,
+      fechaHasta: req.query?.fechaHasta || null,
+      estado: req.query?.estado || null
+    };
+    const data = await withPool((pool) =>
+      suscripcionConciliacionService.listarConciliacion(pool, req.user, filtros)
+    );
+    return res.status(200).json({ data });
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
+      return res.status(403).json({ message: 'No autorizado para conciliación de pasarela.' });
+    }
+    console.error('conciliacionCulqi:', error);
+    return res.status(500).json({ message: 'Error al consultar conciliación Culqi' });
+  }
+};
+
+const conciliacionCulqiCsv = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const filtros = {
+      fechaDesde: req.query?.fechaDesde || null,
+      fechaHasta: req.query?.fechaHasta || null,
+      estado: req.query?.estado || null
+    };
+    const rows = await withPool((pool) =>
+      suscripcionConciliacionService.listarConciliacion(pool, req.user, filtros)
+    );
+    const csv = suscripcionConciliacionService.convertirCsv(rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="conciliacion-culqi.csv"');
+    return res.status(200).send(csv);
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
+      return res.status(403).json({ message: 'No autorizado para conciliación de pasarela.' });
+    }
+    console.error('conciliacionCulqiCsv:', error);
+    return res.status(500).json({ message: 'Error al exportar conciliación Culqi' });
+  }
+};
+
 module.exports = {
   crearPagoSuscripcion,
   vincularCheckout,
   planesCatalogoEditor,
   actualizarPlanCatalogo,
   miEstado,
-  solicitarUpgrade
+  solicitarUpgrade,
+  conciliacionCulqi,
+  conciliacionCulqiCsv
 };

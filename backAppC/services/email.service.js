@@ -73,3 +73,28 @@ exports.enviarLinkRecuperacion = async (to, recoveryLink, tipo) => {
     html
   });
 };
+
+/**
+ * Correo operativo genérico (onboarding, recordatorios de activación, etc.).
+ */
+exports.enviarNotificacionOperativa = async ({ to, subject, text, html }) => {
+  const tieneSmtp = SMTP_HOST && SMTP_USER && SMTP_PASS;
+  if (!to || !subject) return;
+
+  if (!tieneSmtp) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[DEV] SMTP no configurado. Notificación operativa:', { to, subject, text });
+      return;
+    }
+    throw new Error('SMTP no configurado: defina SMTP_HOST, SMTP_USER y SMTP_PASS en .env');
+  }
+
+  const transporter = getTransport();
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || SMTP_USER,
+    to,
+    subject,
+    text: text || '',
+    html: html || `<p>${String(text || '').replace(/\n/g, '<br>')}</p>`
+  });
+};

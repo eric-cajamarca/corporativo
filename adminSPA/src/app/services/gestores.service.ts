@@ -62,6 +62,14 @@ interface ApiResponse<T> {
     data: T;
 }
 
+export interface PermisosConfiguracionSistema {
+    puedeEditarSistemaOperativo: boolean;
+    /** Visible si empresa principal o rol superAdmin (backend). */
+    mostrarTabSistema?: boolean;
+    esEmpresaPrincipal?: boolean;
+    esSuperAdmin?: boolean;
+}
+
 @Injectable({
     providedIn: 'root'
 })
@@ -162,6 +170,13 @@ export class GestoresService {
         return this.http.post<ApiResponse<any>>(
             `${this.url}gestores/configuracion`,
             { configuraciones },
+            { withCredentials: true }
+        );
+    }
+
+    obtenerPermisosConfiguracionSistema(): Observable<ApiResponse<PermisosConfiguracionSistema>> {
+        return this.http.get<ApiResponse<PermisosConfiguracionSistema>>(
+            `${this.url}gestores/configuracion/sistema-permisos`,
             { withCredentials: true }
         );
     }

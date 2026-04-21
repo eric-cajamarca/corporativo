@@ -77,6 +77,16 @@
   margin-right: 0.5rem;
 }
 
+/* Pestaña Sistema: tarjetas operativas */
+.sistema-operativo-cards .sistema-op-card {
+  border: 1px solid #e2e8f0 !important;
+}
+
+.sistema-operativo-cards .card-header .card-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 /* Cards */
 .card {
   background: white;

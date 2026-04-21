@@ -13,7 +13,7 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
-import { GestoresService } from '../../../services/gestores.service';
+import { GestoresService, ConfiguracionEmpresa } from '../../../services/gestores.service';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 
 declare var iziToast: any;
@@ -110,11 +110,22 @@ export class IndexConfiguracionComponent implements OnInit {
   public sistema = {
     backupAutomatico: true,
     frecuenciaBackup: 'diario',
+    rutaBackupLocal: 'D:\\sql_backups',
+    rutaBackupSecundaria: '',
+    googleDriveRemote: '',
+    restauracionSemanal: true,
     retencionLogs: 90,
     notificacionesEmail: true,
     notificacionesWhatsApp: false,
-    modoMantenimiento: false
+    modoMantenimiento: false,
+    exportarConciliacionCulqi: true
   };
+  public sistemaGuardando = false;
+  public puedeEditarSistemaOperativo = false;
+  /** Pestaña Sistema: visible solo si empresa principal o usuario superAdmin. */
+  public mostrarTabSistema = false;
+  /** Placeholder UNC para copia secundaria (evita escapado frágil en plantilla). */
+  readonly ejemploUncBackupSecundario = '\\\\SERVIDOR\\Compartida\\sql_backups';
 
   /** Correlativo de códigos de producto (número inicial por defecto 10000) */
   public correlativo: { idCorrelativo?: number; numero?: number } = { numero: 10000 };
@@ -198,6 +209,7 @@ export class IndexConfiguracionComponent implements OnInit {
     this.cargarConfiguracionInventario();
     this.cargarConfiguracionPdfComprobante();
     this.cargarConfiguracionVentas();
+    this.cargarConfiguracionSistema();
     this._comprasService.obtener_correlativo_empresa().subscribe({
       next: (response: { data?: Array<{ idCorrelativo?: number; numero?: number }> }) => {
         const lista = response?.data;
@@ -578,7 +590,146 @@ export class IndexConfiguracionComponent implements OnInit {
   }
 
   guardarConfiguracionSistema(): void {
-        // Llamada al backend para guardar
+    if (!this.puedeEditarSistemaOperativo) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'Permisos',
+          message: 'Solo superAdmin de la empresa principal puede editar esta configuración.',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
+    this.sistemaGuardando = true;
+    const configs: ConfiguracionEmpresa[] = [
+      {
+        clave: 'SISTEMA_BACKUP_AUTOMATICO',
+        valor: this.sistema.backupAutomatico ? 'true' : 'false',
+        descripcion: 'Activa backup automático SQL Server',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'SISTEMA_BACKUP_FRECUENCIA',
+        valor: String(this.sistema.frecuenciaBackup || 'diario').toLowerCase(),
+        descripcion: 'Frecuencia backup: diario|semanal|mensual',
+        tipoDato: 'STRING'
+      },
+      {
+        clave: 'SISTEMA_BACKUP_RUTA_LOCAL',
+        valor: String(this.sistema.rutaBackupLocal || '').trim(),
+        descripcion: 'Ruta local donde se genera .bak',
+        tipoDato: 'STRING'
+      },
+      {
+        clave: 'SISTEMA_BACKUP_RUTA_SECUNDARIA',
+        valor: String(this.sistema.rutaBackupSecundaria || '').trim(),
+        descripcion: 'Ruta secundaria (otro servidor/NAS) para réplica',
+        tipoDato: 'STRING'
+      },
+      {
+        clave: 'SISTEMA_BACKUP_GOOGLE_DRIVE_REMOTE',
+        valor: String(this.sistema.googleDriveRemote || '').trim(),
+        descripcion: 'Remote rclone Google Drive (ej: gdrive:erp-backups/sql)',
+        tipoDato: 'STRING'
+      },
+      {
+        clave: 'SISTEMA_BACKUP_RESTORE_SEMANAL',
+        valor: this.sistema.restauracionSemanal ? 'true' : 'false',
+        descripcion: 'Habilita ensayo semanal de restauración',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'SISTEMA_RETENCION_LOGS_DIAS',
+        valor: String(this.sistema.retencionLogs ?? 90),
+        descripcion: 'Retención de logs en días',
+        tipoDato: 'NUMBER'
+      },
+      {
+        clave: 'SISTEMA_NOTIFICACIONES_EMAIL',
+        valor: this.sistema.notificacionesEmail ? 'true' : 'false',
+        descripcion: 'Notificaciones operativas por email',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'SISTEMA_NOTIFICACIONES_WHATSAPP',
+        valor: this.sistema.notificacionesWhatsApp ? 'true' : 'false',
+        descripcion: 'Notificaciones operativas por WhatsApp',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'SISTEMA_MODO_MANTENIMIENTO',
+        valor: this.sistema.modoMantenimiento ? 'true' : 'false',
+        descripcion: 'Modo mantenimiento global',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'SISTEMA_CULQI_CONCILIACION_CSV',
+        valor: this.sistema.exportarConciliacionCulqi ? 'true' : 'false',
+        descripcion: 'Habilita exportación conciliación Culqi CSV',
+        tipoDato: 'BOOLEAN'
+      }
+    ];
+    this._gestoresService.guardarConfiguracion(configs).subscribe({
+      next: () => {
+        this.sistemaGuardando = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Guardado',
+            message: 'Configuración operativa guardada.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: (err) => {
+        this.sistemaGuardando = false;
+        const msg =
+          err?.error?.message ||
+          'No se pudo guardar la configuración. Solo superAdmin de la empresa principal puede editar.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  cargarConfiguracionSistema(): void {
+    this._gestoresService.obtenerPermisosConfiguracionSistema().subscribe({
+      next: (res) => {
+        const d = res?.data;
+        this.puedeEditarSistemaOperativo = !!d?.puedeEditarSistemaOperativo;
+        this.mostrarTabSistema =
+          typeof d?.mostrarTabSistema === 'boolean'
+            ? d.mostrarTabSistema
+            : !!(d?.esEmpresaPrincipal || d?.esSuperAdmin);
+        if (!this.mostrarTabSistema) {
+          return;
+        }
+        this._gestoresService.obtenerConfiguracion().subscribe({
+          next: (cfgRes) => {
+            const lista = cfgRes?.data ?? [];
+            const getVal = (clave: string, def: string) =>
+              (lista.find((c: ConfiguracionEmpresa) => c.clave === clave)?.valor ?? def);
+            this.sistema.backupAutomatico = String(getVal('SISTEMA_BACKUP_AUTOMATICO', 'true')).toLowerCase() === 'true';
+            this.sistema.frecuenciaBackup = String(getVal('SISTEMA_BACKUP_FRECUENCIA', 'diario')).toLowerCase();
+            this.sistema.rutaBackupLocal = getVal('SISTEMA_BACKUP_RUTA_LOCAL', 'D:\\sql_backups');
+            this.sistema.rutaBackupSecundaria = getVal('SISTEMA_BACKUP_RUTA_SECUNDARIA', '');
+            this.sistema.googleDriveRemote = getVal('SISTEMA_BACKUP_GOOGLE_DRIVE_REMOTE', '');
+            this.sistema.restauracionSemanal = String(getVal('SISTEMA_BACKUP_RESTORE_SEMANAL', 'true')).toLowerCase() === 'true';
+            this.sistema.retencionLogs = parseInt(getVal('SISTEMA_RETENCION_LOGS_DIAS', '90'), 10) || 90;
+            this.sistema.notificacionesEmail = String(getVal('SISTEMA_NOTIFICACIONES_EMAIL', 'true')).toLowerCase() === 'true';
+            this.sistema.notificacionesWhatsApp = String(getVal('SISTEMA_NOTIFICACIONES_WHATSAPP', 'false')).toLowerCase() === 'true';
+            this.sistema.modoMantenimiento = String(getVal('SISTEMA_MODO_MANTENIMIENTO', 'false')).toLowerCase() === 'true';
+            this.sistema.exportarConciliacionCulqi =
+              String(getVal('SISTEMA_CULQI_CONCILIACION_CSV', 'true')).toLowerCase() === 'true';
+          },
+          error: () => {}
+        });
+      },
+      error: () => {
+        this.puedeEditarSistemaOperativo = false;
+        this.mostrarTabSistema = false;
+      }
+    });
   }
 
   exportarConfiguracion(): void {

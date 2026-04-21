@@ -1,0 +1,125 @@
+name: Monorepo CI/CD
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: "Environment para deploy (staging|production)"
+        required: false
+        default: "staging"
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            backAppC/package-lock.json
+            adminSPA/package-lock.json
+            pdf-backend/package-lock.json
+
+      - name: Install backAppC deps
+        working-directory: backAppC
+        run: npm ci
+
+      - name: Verify backAppC syntax
+        working-directory: backAppC
+        run: node --check app.js
+
+      - name: Install adminSPA deps
+        working-directory: adminSPA
+        run: npm ci
+
+      - name: Build adminSPA
+        working-directory: adminSPA
+        run: npx ng build --configuration=development
+
+      - name: Install pdf-backend deps
+        working-directory: pdf-backend
+        run: npm ci
+
+      - name: Verify pdf-backend syntax
+        working-directory: pdf-backend
+        run: node --check index.js
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: |
+            backAppC/**
+            pdf-backend/**
+            adminSPA/dist/**
+          if-no-files-found: error
+
+  deploy:
+    needs: build-and-verify
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.deploy_environment || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: release
+
+      - name: Deploy backAppC (optional SSH)
+        if: ${{ secrets.DEPLOY_BACKAPP_HOST != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_BACKAPP_HOST }}
+          username: ${{ secrets.DEPLOY_BACKAPP_USER }}
+          key: ${{ secrets.DEPLOY_BACKAPP_SSH_KEY }}
+          source: "release/backAppC/*"
+          target: "${{ secrets.DEPLOY_BACKAPP_TARGET }}"
+          strip_components: 2
+
+      - name: Restart backAppC (optional SSH)
+        if: ${{ secrets.DEPLOY_BACKAPP_HOST != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_BACKAPP_HOST }}
+          username: ${{ secrets.DEPLOY_BACKAPP_USER }}
+          key: ${{ secrets.DEPLOY_BACKAPP_SSH_KEY }}
+          script: |
+            cd "${{ secrets.DEPLOY_BACKAPP_TARGET }}"
+            npm ci --omit=dev
+            pm2 restart backAppC || pm2 start app.js --name backAppC
+
+      - name: Deploy pdf-backend (optional SSH)
+        if: ${{ secrets.DEPLOY_PDF_HOST != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_PDF_HOST }}
+          username: ${{ secrets.DEPLOY_PDF_USER }}
+          key: ${{ secrets.DEPLOY_PDF_SSH_KEY }}
+          source: "release/pdf-backend/*"
+          target: "${{ secrets.DEPLOY_PDF_TARGET }}"
+          strip_components: 2
+
+      - name: Restart pdf-backend (optional SSH)
+        if: ${{ secrets.DEPLOY_PDF_HOST != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_PDF_HOST }}
+          username: ${{ secrets.DEPLOY_PDF_USER }}
+          key: ${{ secrets.DEPLOY_PDF_SSH_KEY }}
+          script: |
+            cd "${{ secrets.DEPLOY_PDF_TARGET }}"
+            npm ci --omit=dev
+            pm2 restart pdf-backend || pm2 start index.js --name pdf-backend
+

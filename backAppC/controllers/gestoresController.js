@@ -293,6 +293,27 @@ const obtener_configuracion = async function (req, res) {
     }
 };
 
+const obtener_permisos_configuracion_sistema = async function (req, res) {
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+        const resultado = await withPool(async (pool) =>
+            gestoresService.obtenerPermisosConfiguracionSistema(pool, req.user)
+        );
+        res.status(200).json({
+            message: 'Permisos obtenidos correctamente',
+            data: resultado
+        });
+    } catch (error) {
+        console.error('Error en obtener_permisos_configuracion_sistema:', error.message);
+        res.status(500).json({
+            message: 'Error al obtener permisos de configuración de sistema',
+            data: undefined
+        });
+    }
+};
+
 /**
  * Guarda la configuración de la empresa
  */
@@ -322,6 +343,18 @@ const guardar_configuracion = async function (req, res) {
                 data: undefined
             });
         }
+        if (error.message === 'NO_AUTORIZADO_CONFIG_SISTEMA') {
+            return res.status(403).json({
+                message: 'Solo superAdmin de la empresa principal puede editar esta configuración.',
+                data: undefined
+            });
+        }
+        if (error.message === 'PERMISO_DENEGADO') {
+            return res.status(403).json({
+                message: 'No tiene permiso para guardar la configuración (se requiere Administrador o superAdmin).',
+                data: undefined
+            });
+        }
 
         res.status(500).json({
             message: 'Error al guardar configuración',
@@ -339,5 +372,6 @@ module.exports = {
     activar_empresa_gestionada,
     eliminar_empresa_gestionada,
     obtener_configuracion,
+    obtener_permisos_configuracion_sistema,
     guardar_configuracion
 };

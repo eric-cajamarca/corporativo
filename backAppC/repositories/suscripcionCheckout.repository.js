@@ -102,10 +102,52 @@ async function listarPorEmpresaOCheckoutOrigen(pool, idEmpresa, idCheckoutOrigen
   return r.recordset || [];
 }
 
+async function listarConciliacionCulqi(pool, filtros = {}) {
+  const { fechaDesde, fechaHasta, estado } = filtros;
+  const req = pool.request();
+  let where = "WHERE c.planCode <> 'demo'";
+
+  if (fechaDesde) {
+    where += ' AND c.fCreacion >= @fechaDesde';
+    req.input('fechaDesde', sql.DateTime2, new Date(fechaDesde));
+  }
+  if (fechaHasta) {
+    where += ' AND c.fCreacion < DATEADD(DAY, 1, @fechaHasta)';
+    req.input('fechaHasta', sql.DateTime2, new Date(fechaHasta));
+  }
+  if (estado) {
+    where += ' AND c.estado = @estado';
+    req.input('estado', sql.VarChar(20), String(estado).trim().toUpperCase());
+  }
+
+  const r = await req.query(`
+    SELECT
+      c.orderNumber,
+      c.planCode,
+      c.billingCycle,
+      c.monto,
+      c.moneda,
+      c.estado,
+      c.idTransaccionPasarela,
+      CONVERT(VARCHAR(19), c.fCreacion, 120) AS fCreacion,
+      CONVERT(VARCHAR(19), c.fConfirmacion, 120) AS fConfirmacion,
+      c.emailContacto,
+      c.idEmpresaCliente,
+      e.razon_Social AS razonSocialCliente,
+      e.ruc AS rucCliente
+    FROM dbo.SuscripcionCheckoutPendiente c
+    LEFT JOIN dbo.Empresas e ON e.idEmpresa = c.idEmpresaCliente
+    ${where}
+    ORDER BY c.fCreacion DESC
+  `);
+  return r.recordset || [];
+}
+
 module.exports = {
   insertar,
   obtenerPorOrderNumber,
   actualizarEstadoPago,
   vincularEmpresaCliente,
-  listarPorEmpresaOCheckoutOrigen
+  listarPorEmpresaOCheckoutOrigen,
+  listarConciliacionCulqi
 };
