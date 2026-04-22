@@ -107,7 +107,7 @@
 
 <!-- Modales fuera de main para que cubran toda la pantalla (sidebar + topnav + contenido) -->
 <!-- Modal Crear / Editar -->
-<div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+<div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
@@ -210,7 +210,7 @@
 </div>
 
 <!-- Modal Forma de pago (se abre al hacer clic en Guardar) -->
-<div class="modal fade" [class.show]="mostrarModalFormaPago" [style.display]="mostrarModalFormaPago ? 'block' : 'none'" tabindex="-1" style="z-index: 1060;">
+<div class="modal fade" [class.show]="mostrarModalFormaPago" [style.display]="mostrarModalFormaPago ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
@@ -245,7 +245,7 @@
 </div>
 
 <!-- Modal Ver -->
-<div class="modal fade" [class.show]="mostrarVer" [style.display]="mostrarVer ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+<div class="modal fade" [class.show]="mostrarVer" [style.display]="mostrarVer ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -272,4 +272,4 @@
   </div>
 </div>
 
-<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer || mostrarModalFormaPago" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer || mostrarModalFormaPago"></div>

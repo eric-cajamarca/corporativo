@@ -36,6 +36,12 @@ declare var iziToast: any;
 declare var bootstrap: any;
 const FORMATO_FECHA = 'dd/MM/yyyy';
 
+interface CuotaCompraSunatForm {
+  numeroCuota: number;
+  fechaVencimiento: string;
+  montoCuota: number;
+}
+
 @Component({
   selector: 'app-create-compras',
   standalone: true,
@@ -70,7 +76,12 @@ export class CreateComprasComponent {
     otrosCargos: 0,
     subTotal: 0,
     descuentos: 0,
+    /** Tipo de cambio SUNAT: solo aplica en crédito y moneda distinta de soles. */
+    tipoCambioSunat: '' as string | number,
   };
+
+  /** Cuotas del CPE (crédito); se persisten en CuotasCompraSunat vía comprobanteSunat.cuotas. */
+  public cuotasSunat: CuotaCompraSunatForm[] = [];
 
   
 
@@ -228,6 +239,7 @@ export class CreateComprasComponent {
 
     this.loading = true;
     this.comprobante = null;
+    this.cuotasSunat = [];
     this.error = '';
 
     const { ruc, usuario, password, proveedor, tipo_doc, serie, correlativo } = this.consultaForm.value;
@@ -322,6 +334,8 @@ export class CreateComprasComponent {
             .filter((x: any) => x != null);
           this.matchDetalleConProductosCargados();
           this.sumarFooterFactura();
+          this.aplicarCuotasDesdeComprobanteSunat();
+          this.syncSunatAuxiliaresDesdeFormulario();
         } else {
           iziToast.warning({ title: 'Aviso', message: 'El comprobante no tiene líneas de detalle', position: 'topRight' });
         }
@@ -579,7 +593,8 @@ export class CreateComprasComponent {
     this._tablasSunatService.obtener_estado_pago().subscribe(
       (response) => {
         this.estadoPago = response.data;
-              },
+        this.sincronizarEstadoPagoSiCreditoOperacion();
+      },
       (error) => {
               }
     );
@@ -587,7 +602,8 @@ export class CreateComprasComponent {
     this._tablasSunatService.obtener_medios_pago().subscribe(
       (response) => {
         this.mediosPago = response.data;
-              },
+        this.sincronizarEstadoPagoSiCreditoOperacion();
+      },
       (error) => {
               }
     );
@@ -1164,7 +1180,7 @@ export class CreateComprasComponent {
     if (!this.validarCamposObligatoriosParaAbrir()) {
       return;
     }
-    if (this.esCompraAlCredito()) {
+    if (this.esCompraAlCreditoParaSunat()) {
       this.registrarCompras();
       return;
     }
@@ -1196,6 +1212,9 @@ export class CreateComprasComponent {
     }
     if (!fechaEmisionOk || !fechaVencOk || !idProveedorOk || !idSucursalOk || !idMonedaOk || !idEstadoPagoOk || !idMediosPagoOk || !totalOk || !detalleOk) {
       this.mostrarErrorValidacion(esCredito);
+      return false;
+    }
+    if (!this.validarComprobanteSunatParaRegistrar()) {
       return false;
     }
     return true;
@@ -1251,12 +1270,18 @@ export class CreateComprasComponent {
       return;
     }
 
-    if (!this.esCompraAlCredito() && this.detallePago.length > 0) {
+    // Solo contado: idFormaPago es de FormasPago; Compras.idMediosPago tiene FK a MediosPago (no pisar en crédito por medio/estado).
+    if (!this.esCompraAlCreditoParaSunat() && this.detallePago.length > 0) {
       this.compras.idMediosPago = String(this.detallePago[0].idFormaPago);
     }
 
     const idSucursalCompra = this.compras.idSucursal;
-    this._comprasService.crear_compra(this.compras).pipe(
+    const cuerpoCompra: Record<string, unknown> = { ...this.compras };
+    const snap = this.buildComprobanteSunatPayload();
+    if (snap) {
+      cuerpoCompra['comprobanteSunat'] = snap;
+    }
+    this._comprasService.crear_compra(cuerpoCompra).pipe(
       switchMap((response) => {
         if (response.data == null) {
           return of(null);
@@ -1529,7 +1554,7 @@ export class CreateComprasComponent {
     const totalOk = !isNaN(Number(this.compras.total)) && Number(this.compras.total) > 0;
     const detalleOk = Array.isArray(this.detalleCompras) && this.detalleCompras.length > 0;
 
-    const esCredito = this.esCompraAlCredito();
+    const esCredito = this.esCompraAlCreditoParaSunat();
     let idMediosPagoOk = !!this.compras.idMediosPago;
     if (!esCredito) {
       if (this.detallePago.length > 0) {
@@ -1557,6 +1582,9 @@ export class CreateComprasComponent {
 
     if (!fechaEmisionOk || !fechaVencOk || !idProveedorOk || !idSucursalOk || !idMonedaOk || !idEstadoPagoOk || !idMediosPagoOk || !totalOk || !detalleOk) {
       this.mostrarErrorValidacion(esCredito);
+      return false;
+    }
+    if (!this.validarComprobanteSunatParaRegistrar()) {
       return false;
     }
     return true;
@@ -1924,6 +1952,187 @@ export class CreateComprasComponent {
     }
   }
 
+  /** Limpia tipo de cambio SUNAT cuando no aplica (soles o contado). */
+  syncSunatAuxiliaresDesdeFormulario(): void {
+    if (!this.comprobante) return;
+    if (this.esMonedaSolesSunatXml() || !this.esCompraAlCreditoParaSunat()) {
+      this.compras.tipoCambioSunat = '';
+    }
+  }
+
+  onCambioEstadoPagoCompras(): void {
+    this.sincronizarEstadoPagoSiCreditoOperacion();
+    if (this.comprobante) {
+      this.syncSunatAuxiliaresDesdeFormulario();
+    }
+  }
+
+  onCambioMedioPagoCompras(): void {
+    this.sincronizarEstadoPagoSiCreditoOperacion();
+    if (this.comprobante) {
+      this.syncSunatAuxiliaresDesdeFormulario();
+    }
+  }
+
+  esMedioPagoCredito(): boolean {
+    const mp = this.mediosPago?.find((m: any) => String(m.idMediosPago) === String(this.compras.idMediosPago));
+    return /credito/i.test(String(mp?.descripcion ?? ''));
+  }
+
+  /** Crédito operativo: estado de pago o medio de pago (misma lógica que el backend con idEstadoPago). */
+  esCompraAlCreditoParaSunat(): boolean {
+    return this.esCompraAlCredito() || this.esMedioPagoCredito();
+  }
+
+  /** Moneda del CPE consultado (DocumentCurrencyCode); el tipo de cambio SUNAT sigue esta moneda. */
+  esMonedaSolesSunatXml(): boolean {
+    const code = String(this.comprobante?.informacionGeneral?.moneda || 'PEN')
+      .toUpperCase()
+      .trim();
+    return !code || code.startsWith('PEN');
+  }
+
+  private aplicarCuotasDesdeComprobanteSunat(): void {
+    const raw = this.comprobante?.cuotas;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      this.cuotasSunat = [];
+      return;
+    }
+    this.cuotasSunat = raw
+      .map((c: any, idx: number) => ({
+        numeroCuota: Number(c.numeroCuota ?? c.numero ?? idx + 1) || idx + 1,
+        fechaVencimiento: this.formatFechaParaInputDate(c.fechaVencimiento) || '',
+        montoCuota: Number(String(c.montoCuota ?? c.amount ?? 0).replace(',', '.')) || 0,
+      }))
+      .filter((c) => c.fechaVencimiento && c.montoCuota > 0)
+      .sort((a, b) => a.numeroCuota - b.numeroCuota);
+  }
+
+  /** Si hubo consulta SUNAT, valida tipo de cambio (solo moneda extranjera) y cuotas en crédito. */
+  validarComprobanteSunatParaRegistrar(): boolean {
+    if (!this.comprobante) return true;
+    if (!this.esCompraAlCreditoParaSunat()) {
+      return true;
+    }
+    if (!this.esMonedaSolesSunatXml()) {
+      const tc = Number(this.compras.tipoCambioSunat);
+      if (!Number.isFinite(tc) || tc <= 0) {
+        iziToast.error({
+          title: 'SUNAT',
+          message: 'En crédito con comprobante en moneda extranjera debe indicar el tipo de cambio (mayor a 0).',
+          position: 'topRight',
+        });
+        return false;
+      }
+    }
+    if (!this.compras.fVencimiento) {
+      iziToast.error({
+        title: 'SUNAT',
+        message: 'En crédito debe indicar la fecha de vencimiento de la compra.',
+        position: 'topRight',
+      });
+      return false;
+    }
+    let cuotas = [...this.cuotasSunat];
+    if (!cuotas.length) {
+      cuotas = [
+        {
+          numeroCuota: 1,
+          fechaVencimiento: this.compras.fVencimiento,
+          montoCuota: Number(this.compras.total) || 0,
+        },
+      ];
+    }
+    const sum = cuotas.reduce((s, c) => s + (Number(c.montoCuota) || 0), 0);
+    const tot = Number(this.compras.total) || 0;
+    if (tot > 0 && Math.abs(sum - tot) > 0.05) {
+      iziToast.error({
+        title: 'SUNAT',
+        message: 'La suma de las cuotas debe coincidir con el total de la compra.',
+        position: 'topRight',
+      });
+      return false;
+    }
+    return true;
+  }
+
+  /** Payload para tabla ComprobantesCompraSunat (totales reales del XML normalizado). */
+  private buildComprobanteSunatPayload(): Record<string, unknown> | undefined {
+    if (!this.comprobante) return undefined;
+    const info = this.comprobante.informacionGeneral || {};
+    const emisor = this.comprobante.emisor || {};
+    const totales = this.comprobante.totales || {};
+    const impuestos = this.comprobante.impuestos || {};
+    const tipo = String(info.tipoDocumento ?? this.consultaForm?.value?.tipo_doc ?? '01')
+      .trim()
+      .padStart(2, '0');
+    let serie = String(this.compras.serie || '').trim();
+    let numero = String(this.compras.numero || '').trim();
+    if (!serie || !numero) {
+      const parts = String(info.serieNumero || '').split('-');
+      serie = (parts[0] || serie).trim();
+      numero = (parts[1] || numero).trim();
+    }
+    const sub = parseFloat(String(totales.totalValorVenta || 0).replace(',', '.')) || 0;
+    const igv = parseFloat(String(impuestos.total || totales.totalImpuestos || 0).replace(',', '.')) || 0;
+    const total = parseFloat(String(totales.totalVenta || totales.totalPagar || 0).replace(',', '.')) || 0;
+    const esCred = this.esCompraAlCreditoParaSunat();
+    const cond = esCred ? 'CREDITO' : 'CONTADO';
+    const tcRaw = Number(this.compras.tipoCambioSunat);
+    const codigoMoneda = String(info.moneda || 'PEN')
+      .toUpperCase()
+      .substring(0, 3);
+
+    let cuotasPayload: CuotaCompraSunatForm[] = [];
+    if (esCred) {
+      cuotasPayload = this.cuotasSunat.map((c, i) => ({
+        numeroCuota: c.numeroCuota || i + 1,
+        fechaVencimiento: c.fechaVencimiento,
+        montoCuota: Number(c.montoCuota) || 0,
+      }));
+      if (!cuotasPayload.length && this.compras.fVencimiento) {
+        cuotasPayload = [
+          {
+            numeroCuota: 1,
+            fechaVencimiento: this.compras.fVencimiento,
+            montoCuota: total,
+          },
+        ];
+      }
+    }
+
+    const payload: Record<string, unknown> = {
+      condicionPago: cond,
+      tipoCambio:
+        cond === 'CREDITO' &&
+        !this.esMonedaSolesSunatXml() &&
+        Number.isFinite(tcRaw) &&
+        tcRaw > 0
+          ? tcRaw
+          : null,
+      rucEmisor: String(emisor.ruc || '').replace(/\D/g, '').slice(0, 11),
+      razonSocialEmisor: (() => {
+        const rsXml = String(emisor.razonSocial ?? '').trim();
+        const rsProv = String(this.proveedores?.rSocial ?? this.proveedores?.razonSocial ?? '').trim();
+        return rsXml || rsProv || null;
+      })(),
+      tipoDocumento: tipo,
+      serie: serie.substring(0, 10),
+      numero: numero.substring(0, 20),
+      fechaEmision: this.compras.fEmision || info.fechaEmision,
+      codigoMoneda,
+      fechaVencimiento: esCred ? this.compras.fVencimiento || null : null,
+      subTotal: sub,
+      igv,
+      exonerado: 0,
+      total,
+    };
+    if (esCred && cuotasPayload.length > 0) {
+      payload['cuotas'] = cuotasPayload;
+    }
+    return payload;
+  }
+
   /** True si la compra es al crédito (no se muestra el modal de formas de pago). */
   esCompraAlCredito(): boolean {
     const id = this.compras.idEstadoPago;
@@ -1931,6 +2140,23 @@ export class CreateComprasComponent {
     const estado = this.estadoPago?.find((e: any) => String(e.idEstadoPago) === String(id));
     const desc = (estado?.descripcion ?? '').toLowerCase();
     return desc.includes('credito') || desc.includes('crédito');
+  }
+
+  private idEstadoPagoPendienteCatalogo(): string | number {
+    const row = this.estadoPago?.find((e: any) => /pendiente/i.test(String(e.descripcion ?? '')));
+    if (row?.idEstadoPago != null && row.idEstadoPago !== '') return row.idEstadoPago;
+    return 1;
+  }
+
+  /**
+   * Compra al crédito (estado o medio): estado de pago = Pendiente (coherente con backend; no modal de formas de pago).
+   */
+  sincronizarEstadoPagoSiCreditoOperacion(): void {
+    if (!this.esCompraAlCreditoParaSunat()) {
+      return;
+    }
+    const pendiente = this.idEstadoPagoPendienteCatalogo();
+    this.compras.idEstadoPago = String(pendiente);
   }
 
   calcularTotalTablaPago(): number {
@@ -1984,7 +2210,7 @@ export class CreateComprasComponent {
 
   guardarPagoCompra(): void {
     this.cerrarModalPagoCompra();
-    if (this.detallePago.length > 0) {
+    if (this.detallePago.length > 0 && !this.esCompraAlCreditoParaSunat()) {
       this.compras.idMediosPago = String(this.detallePago[0].idFormaPago);
     }
   }

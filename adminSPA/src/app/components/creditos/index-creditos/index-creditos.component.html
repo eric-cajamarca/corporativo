@@ -105,7 +105,7 @@
 
 <!-- Modal Nueva Cobranza de Crédito -->
 <div class="modal fade" [class.show]="mostrarModalNuevaCobranza" [style.display]="mostrarModalNuevaCobranza ? 'block' : 'none'"
-     tabindex="-1" style="z-index: 1050;">
+     tabindex="-1">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -246,7 +246,7 @@
 
 <!-- Modal Buscar Cliente (lista clientes por RUC o nombre) -->
 <div class="modal fade" [class.show]="mostrarModalBuscarCliente" [style.display]="mostrarModalBuscarCliente ? 'block' : 'none'"
-     tabindex="-1" style="z-index: 1060;">
+     tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -262,7 +262,7 @@
 
 <!-- Modal Buscar Comprobantes al crédito del cliente -->
 <div class="modal fade" [class.show]="mostrarModalBuscarComprobantes" [style.display]="mostrarModalBuscarComprobantes ? 'block' : 'none'"
-     tabindex="-1" style="z-index: 1060;">
+     tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -309,9 +309,9 @@
   </div>
 </div>
 
-<!-- Modal Ver Cuotas (fuera de main, z-index 1050) -->
+<!-- Modal Ver Cuotas (fuera de main) -->
 <div class="modal fade" [class.show]="mostrarVerCuotas" [style.display]="mostrarVerCuotas ? 'block' : 'none'"
-     tabindex="-1" style="z-index: 1050;">
+     tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -366,9 +366,9 @@
   </div>
 </div>
 
-<!-- Modal Pagar Cuota (fuera de main, z-index 1050) -->
+<!-- Modal Pagar Cuota (fuera de main) -->
 <div class="modal fade" [class.show]="mostrarModalPagarCuota" [style.display]="mostrarModalPagarCuota ? 'block' : 'none'"
-     tabindex="-1" style="z-index: 1050;">
+     tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
@@ -442,4 +442,4 @@
 </div>
 
 <!-- Backdrop para modales -->
-<div class="modal-backdrop fade show" *ngIf="mostrarModalNuevoCredito || mostrarModalPagarCuota || mostrarVerCuotas || mostrarModalNuevaCobranza || mostrarModalBuscarCliente || mostrarModalBuscarComprobantes" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalNuevoCredito || mostrarModalPagarCuota || mostrarVerCuotas || mostrarModalNuevaCobranza || mostrarModalBuscarCliente || mostrarModalBuscarComprobantes"></div>

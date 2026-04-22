@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { global } from './global';
 import { environment } from '../../environments/environment';
 import { Observable } from 'rxjs/internal/Observable';
+import type { ComprobanteCompraSunatListaItem } from '../models/comprobante-compra-sunat.model';
 
 @Injectable({
   providedIn: 'root'
@@ -196,6 +197,24 @@ export class ComprasService {
     return this._http.get(this.url + 'comprasCliente/' + id, { 
       headers:headers,
       withCredentials: true
+    });
+  }
+
+  /** Listado ComprobantesCompraSunat (CPE reales) con filtros opcionales en query. */
+  listarComprobantesCompraSunat(params?: Record<string, string>): Observable<{ data: ComprobanteCompraSunatListaItem[] }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let httpParams = new HttpParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v != null && String(v).trim() !== '') {
+          httpParams = httpParams.set(k, String(v).trim());
+        }
+      }
+    }
+    return this._http.get<{ data: ComprobanteCompraSunatListaItem[] }>(this.url + 'comprobantes-compra-sunat', {
+      headers,
+      withCredentials: true,
+      params: httpParams
     });
   }
 

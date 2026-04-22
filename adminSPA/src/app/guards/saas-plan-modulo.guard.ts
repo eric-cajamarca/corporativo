@@ -33,6 +33,13 @@ function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosServic
     }
   }
 
+  const planRaw = permisos.planCodeEfectivo();
+  if (abs.startsWith('/compras/comprobantes-sunat')) {
+    if (!planRaw || nivelPlan(planRaw) < 2) {
+      return router.createUrlTree(['/home']);
+    }
+  }
+
   const plan = (permisos.planCodeEfectivo() || '').toLowerCase();
   if (plan === 'demo') {
     if (abs === '/caja' || abs.startsWith('/caja/') || abs === '/creditos' || abs.startsWith('/creditos/')) {

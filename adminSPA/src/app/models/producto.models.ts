@@ -61,3 +61,28 @@ export interface ProductoResponse {
   data: Producto | Producto[];
   message?: string;
 }
+
+/** Respuesta de POST /productos/importacion/validar */
+export interface ImportacionProductosValidarData {
+  totalLeidas: number;
+  validas: number;
+  conError: number;
+  errores: Array<{ fila: number; codigo: string; mensajes: string[] }>;
+  vistaPrevia: Array<{
+    fila: number;
+    codigo: string;
+    descripcion: string;
+    cantidadInicial: number;
+    costoUnitario: number;
+    precioListaCliente: number;
+  }>;
+}
+
+/** Respuesta de POST /productos/importacion/ejecutar */
+export interface ImportacionProductosEjecutarData {
+  total: number;
+  insertados: number;
+  detalle: Array<{ fila: number; idProducto: string; codigo: string }>;
+  erroresValidacion: Array<{ fila: number; codigo: string; mensajes: string[] }>;
+  erroresEjecucion: Array<{ fila: number; codigo: string; mensajes: string[] }>;
+}

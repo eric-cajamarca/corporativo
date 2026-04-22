@@ -104,3 +104,20 @@ exports.uploadImagenesProducto = multer({
   fileFilter: imageFilter,
   limits: { fileSize: 2 * 1024 * 1024 } // 2MB por archivo
 }).array('imagenes', 5);
+
+const excelProductosFilter = (req, file, cb) => {
+  const ext = (path.extname(file.originalname) || '').toLowerCase();
+  const ok =
+    ext === '.xlsx' ||
+    file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    file.mimetype === 'application/octet-stream';
+  if (ok) cb(null, true);
+  else cb(new Error('Solo se permiten archivos .xlsx'), false);
+};
+
+/** Importación masiva de productos (memoria, máx. 8 MB). Campo formulario: archivo */
+exports.uploadProductosExcel = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: excelProductosFilter,
+  limits: { fileSize: 8 * 1024 * 1024 }
+}).single('archivo');

@@ -17,6 +17,8 @@ import { ProductoEditarModalService } from '../../../services/producto-editar-mo
 import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductoGaleriaModalService } from '../../../services/producto-galeria-modal.service';
+import { ExcelService } from '../../../services/excel.service';
+import { ImportacionProductosValidarData, ImportacionProductosEjecutarData } from '../../../models/producto.models';
 
 declare var iziToast: any;
  declare var bootstrap: any;
@@ -39,6 +41,14 @@ export class IndexProductoComponent {
   public load_estado = false;
   /** Configuración inventario: galería de imágenes habilitada */
   public productosConImagenes = false;
+
+  /** Importación Excel */
+  archivoImportacion: File | null = null;
+  resultadoValidacionImportacion: ImportacionProductosValidarData | null = null;
+  resultadoEjecucionImportacion: ImportacionProductosEjecutarData | null = null;
+  descargandoPlantilla = false;
+  validandoImportacion = false;
+  importandoEjecucion = false;
 
   // Configuración de paginación
   public page = 1;
@@ -82,6 +92,7 @@ export class IndexProductoComponent {
     private _productoCrearModal: ProductoCrearModalService,
     private _gestoresService: GestoresService,
     private _productoGaleriaModal: ProductoGaleriaModalService,
+    private _excelService: ExcelService,
     public sidebarState: SidebarStateService,
   ) {
    // this.token = this._cookieService.get('token');
@@ -105,6 +116,92 @@ export class IndexProductoComponent {
         this.productosConImagenes = item ? String(item.valor).toLowerCase() === 'true' : false;
       },
       error: () => {}
+    });
+  }
+
+  reiniciarModalImportacion(): void {
+    this.archivoImportacion = null;
+    this.resultadoValidacionImportacion = null;
+    this.resultadoEjecucionImportacion = null;
+  }
+
+  onArchivoImportacionChange(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const f = input.files && input.files[0];
+    this.archivoImportacion = f || null;
+    this.resultadoValidacionImportacion = null;
+    this.resultadoEjecucionImportacion = null;
+  }
+
+  descargarPlantillaImportacion(): void {
+    this.descargandoPlantilla = true;
+    this._productoService.descargarPlantillaImportacionProductos().subscribe({
+      next: (blob) => {
+        this.descargandoPlantilla = false;
+        this._excelService.descargar(blob, 'plantilla_importacion_productos.xlsx');
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Listo', message: 'Plantilla descargada.', position: 'topRight' });
+        }
+      },
+      error: (err) => {
+        this.descargandoPlantilla = false;
+        const msg = err?.error?.message || 'No se pudo descargar la plantilla (¿permisos de administrador?).';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  validarImportacion(): void {
+    if (!this.archivoImportacion) return;
+    this.validandoImportacion = true;
+    this.resultadoEjecucionImportacion = null;
+    this._productoService.validarImportacionProductos(this.archivoImportacion).subscribe({
+      next: (res) => {
+        this.validandoImportacion = false;
+        this.resultadoValidacionImportacion = res.data;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.info({
+            title: 'Validación',
+            message: `${res.data.validas} filas válidas, ${res.data.conError} con error.`,
+            position: 'topRight'
+          });
+        }
+      },
+      error: (err) => {
+        this.validandoImportacion = false;
+        const msg = err?.error?.message || 'Error al validar el archivo.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  ejecutarImportacion(): void {
+    if (!this.archivoImportacion) return;
+    this.importandoEjecucion = true;
+    this._productoService.ejecutarImportacionProductos(this.archivoImportacion).subscribe({
+      next: (res) => {
+        this.importandoEjecucion = false;
+        this.resultadoEjecucionImportacion = res.data;
+        this.initData();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Importación',
+            message: `Se registraron ${res.data.insertados} producto(s).`,
+            position: 'topRight'
+          });
+        }
+      },
+      error: (err) => {
+        this.importandoEjecucion = false;
+        const msg = err?.error?.message || 'Error al importar.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
+      }
     });
   }
 

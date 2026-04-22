@@ -2,7 +2,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { Producto, ProductoCreate, ProductoResponse } from '../models/producto.models';
+import {
+  Producto,
+  ProductoCreate,
+  ProductoResponse,
+  ImportacionProductosValidarData,
+  ImportacionProductosEjecutarData
+} from '../models/producto.models';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -104,5 +110,38 @@ export class ProductoService {
       { descripciones: descripciones || [] },
       { withCredentials: true }
     );
+  }
+
+  descargarPlantillaImportacionProductos(): Observable<Blob> {
+    return this._http.get(`${this.url}productos/importacion/plantilla`, {
+      withCredentials: true,
+      responseType: 'blob'
+    });
+  }
+
+  validarImportacionProductos(archivo: File): Observable<{ message: string; data: ImportacionProductosValidarData }> {
+    const fd = new FormData();
+    fd.append('archivo', archivo, archivo.name);
+    return this._http.post<{ message: string; data: ImportacionProductosValidarData }>(
+      `${this.url}productos/importacion/validar`,
+      fd,
+      { withCredentials: true }
+    );
+  }
+
+  ejecutarImportacionProductos(archivo: File): Observable<{ message: string; data: ImportacionProductosEjecutarData }> {
+    const fd = new FormData();
+    fd.append('archivo', archivo, archivo.name);
+    return this._http
+      .post<{ message: string; data: ImportacionProductosEjecutarData }>(
+        `${this.url}productos/importacion/ejecutar`,
+        fd,
+        { withCredentials: true }
+      )
+      .pipe(
+        tap(() => {
+          this.limpiarCacheListaProductos();
+        })
+      );
   }
 }

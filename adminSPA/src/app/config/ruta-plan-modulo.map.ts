@@ -13,6 +13,7 @@ const REGLAS: readonly { prefijo: string; modulo: string }[] = [
   { prefijo: '/inventario/', modulo: 'INVENTARIO' },
   { prefijo: '/ventas/', modulo: 'VENTAS' },
   { prefijo: '/cotizaciones/', modulo: 'VENTAS' },
+  { prefijo: '/compras/comprobantes-sunat', modulo: 'COMPRAS' },
   { prefijo: '/compras/', modulo: 'COMPRAS' },
   { prefijo: '/proveedores/', modulo: 'COMPRAS' },
   { prefijo: '/caja/', modulo: 'CAJA' },

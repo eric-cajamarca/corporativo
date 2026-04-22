@@ -95,6 +95,9 @@ const crear_compra = async (req, res, next) => {
         if (error.number === 2627) {
             return res.status(400).send({ message: 'Ya existe una compra con la misma serie y número para esta empresa.', data: undefined });
         }
+        if (error.statusCode === 400 && error.message) {
+            return res.status(400).send({ message: error.message, data: undefined });
+        }
         return next(error);
     }
 };

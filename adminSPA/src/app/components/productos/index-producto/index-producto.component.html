@@ -12,7 +12,11 @@
         <h1 class="content-title mb-1">Productos</h1>
         <p class="content-subtitle text-muted mb-0">Gestiona tu inventario de productos</p>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalImportProductos" (click)="reiniciarModalImportacion()">
+          <i class="fas fa-file-excel me-1"></i>
+          Importar Excel
+        </button>
         <button class="btn btn-outline-primary" (click)="abrirCrearProducto()">
           <i class="fas fa-plus me-1"></i>
           Nuevo Producto
@@ -540,5 +544,95 @@
         </ngb-pagination>
     <!-- <ngb-pagination *ngIf="productos.length >= 1" [(page)]="page" ...
     </ngb-pagination> -->
+  </div>
+
+  <!-- Importación masiva desde Excel -->
+  <div class="modal fade" id="modalImportProductos" tabindex="-1" aria-labelledby="modalImportProductosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalImportProductosLabel">Importar productos desde Excel</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">
+            Descargue la plantilla, complete las columnas y suba el archivo. La <strong>cantidadInicial</strong> se registra como stock en la
+            <strong>sucursal principal</strong> (primera sucursal activa). Categoría vacía = VARIOS; marca vacía = SM. Presentación = código SUNAT (ej. NIU).
+          </p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="descargarPlantillaImportacion()" [disabled]="descargandoPlantilla">
+              <i class="fas fa-download me-1"></i>{{ descargandoPlantilla ? 'Descargando…' : 'Descargar plantilla' }}
+            </button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Archivo .xlsx</label>
+            <input type="file" class="form-control" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" (change)="onArchivoImportacionChange($event)" />
+          </div>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="validarImportacion()" [disabled]="!archivoImportacion || validandoImportacion">
+              {{ validandoImportacion ? 'Validando…' : 'Validar' }}
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="ejecutarImportacion()" [disabled]="!archivoImportacion || importandoEjecucion || validandoImportacion">
+              {{ importandoEjecucion ? 'Importando…' : 'Importar filas válidas' }}
+            </button>
+          </div>
+          @if (resultadoValidacionImportacion) {
+            <div class="border rounded p-2 mb-2 small">
+              <div><strong>Filas leídas:</strong> {{ resultadoValidacionImportacion.totalLeidas }}</div>
+              <div class="text-success"><strong>Válidas:</strong> {{ resultadoValidacionImportacion.validas }}</div>
+              <div class="text-danger" *ngIf="resultadoValidacionImportacion.conError > 0"><strong>Con error:</strong> {{ resultadoValidacionImportacion.conError }}</div>
+            </div>
+            @if (resultadoValidacionImportacion.errores.length) {
+              <div class="alert alert-warning small py-2 mb-2">Revise las filas con error (no se importarán hasta corregirlas).</div>
+              <div class="table-responsive" style="max-height: 200px;">
+                <table class="table table-sm table-bordered mb-0">
+                  <thead><tr><th>Fila</th><th>Código</th><th>Detalle</th></tr></thead>
+                  <tbody>
+                    @for (e of resultadoValidacionImportacion.errores; track e.fila + '-' + e.codigo) {
+                      <tr>
+                        <td>{{ e.fila }}</td>
+                        <td>{{ e.codigo || '—' }}</td>
+                        <td>{{ e.mensajes.join('; ') }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            @if (resultadoValidacionImportacion.vistaPrevia.length) {
+              <p class="small fw-bold mt-2 mb-1">Vista previa (primeras filas válidas)</p>
+              <div class="table-responsive" style="max-height: 180px;">
+                <table class="table table-sm table-striped mb-0">
+                  <thead><tr><th>Fila</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>Costo</th><th>P. lista</th></tr></thead>
+                  <tbody>
+                    @for (v of resultadoValidacionImportacion.vistaPrevia; track v.fila + v.codigo) {
+                      <tr>
+                        <td>{{ v.fila }}</td>
+                        <td>{{ v.codigo }}</td>
+                        <td>{{ v.descripcion }}</td>
+                        <td>{{ v.cantidadInicial }}</td>
+                        <td>{{ v.costoUnitario }}</td>
+                        <td>{{ v.precioListaCliente }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+          @if (resultadoEjecucionImportacion) {
+            <div class="alert alert-info small mt-2 mb-0">
+              Importados: <strong>{{ resultadoEjecucionImportacion.insertados }}</strong> de {{ resultadoEjecucionImportacion.total }} filas leídas.
+              @if (resultadoEjecucionImportacion.erroresEjecucion.length) {
+                <span class="text-danger d-block mt-1">Algunas filas válidas fallaron al guardar; revise la consola o vuelva a validar.</span>
+              }
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
   </div>
 </main>

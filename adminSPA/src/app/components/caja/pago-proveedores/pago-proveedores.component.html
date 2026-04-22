@@ -104,7 +104,7 @@
 </main>
 
 <!-- Modal Recibo de Pago (fuera de main, z-index 1050) -->
-<div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+<div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-secondary text-white">
@@ -252,7 +252,7 @@
 </div>
 
 <!-- Modal Ver -->
-<div class="modal fade" [class.show]="mostrarVer" [style.display]="mostrarVer ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+<div class="modal fade" [class.show]="mostrarVer" [style.display]="mostrarVer ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -278,4 +278,4 @@
   </div>
 </div>
 
-<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarForm || mostrarVer"></div>

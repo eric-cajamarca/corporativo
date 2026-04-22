@@ -326,6 +326,17 @@ const inicializarPermisos = async (pool, user) => {
     return await permisosRepository.inicializarPermisosDefecto(pool, user.empresa);
 };
 
+/** Emprendedor en adelante (SaaS); mismo criterio que el guard de Angular para /compras/comprobantes-sunat. */
+function planPermiteComprasSunatMenu(deploymentMode, planCodeEfectivo) {
+    if (deploymentMode !== 'saas') {
+        return true;
+    }
+    const p = String(planCodeEfectivo || '').toLowerCase().trim();
+    const orden = { demo: 1, emprendedor: 2, profesional: 3, empresarial: 4, enterprise: 5 };
+    const n = orden[p] ?? 2;
+    return n >= 2;
+}
+
 /**
  * Obtiene la estructura de navegación del sidebar basada en permisos
  */
@@ -449,6 +460,14 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             submenu: [
                 { nombre: 'Registrar Compras', ruta: '/compras/create', permiso: 'CREAR_COMPRAS', visible: esAdmin || permisos.includes('CREAR_COMPRAS') },
                 { nombre: 'Consultar Compras', ruta: '/compras', permiso: 'VER_COMPRAS', visible: esAdmin || permisos.includes('VER_COMPRAS') },
+                {
+                    nombre: 'Compras SUNAT',
+                    ruta: '/compras/comprobantes-sunat',
+                    permiso: 'VER_COMPRAS',
+                    visible:
+                        (esAdmin || permisos.includes('VER_COMPRAS')) &&
+                        planPermiteComprasSunatMenu(permisosData.deploymentMode, permisosData.planCodeEfectivo)
+                },
                 { nombre: 'Proveedores', ruta: '/proveedores', permiso: 'VER_PROVEEDORES', visible: esAdmin || permisos.includes('VER_PROVEEDORES') }
             ]
         },

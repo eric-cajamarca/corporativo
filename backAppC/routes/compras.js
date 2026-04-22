@@ -1,10 +1,14 @@
 var express = require('express');
 var api = express.Router();
 var comprasController = require('../controllers/comprasController');
+var comprobantesCompraSunatController = require('../controllers/comprobantesCompraSunatController');
 var auth  = require('../middlewares/autenticate');
 
 // Listado de compras de la empresa logueada (ruta única para evitar que otra ruta capture la petición)
 api.get('/compras-por-empresa', auth.auth, comprasController.obtener_compras_todos_idEmpresa);
+
+/** CPE de compra (SUNAT) registrados por empresa; filtros vía query string. */
+api.get('/comprobantes-compra-sunat', auth.auth, comprobantesCompraSunatController.listar);
 
 // Rutas para el CRUD de compras (rutas más específicas primero)
 //api.get('/comprasempresa', auth.auth, comprasController.obtener_compras_todos_idEmpresa);

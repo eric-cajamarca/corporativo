@@ -1,9 +1,11 @@
 // services/compras.service.js
+const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 const comprasRepository = require('../repositories/compras.repository');
 const CajaRepository = require('../repositories/caja.repository');
+const comprobantesCompraSunatService = require('./comprobantesCompraSunat.service');
 const {
     obtenerEmpresasPermitidasOperacionCaja,
     resolverIdEmpresaOperacionCaja
@@ -79,13 +81,14 @@ exports.listarComprasCajaPorUsuario = async (user, idEmpresaOperacionRaw) => {
 
 /**
  * Crea una compra. Valida permisos y reglas de negocio; idEmpresa e idUsuario vienen del token.
- * Body: idProveedor, compCompra, idComprobante, serie, numero, fEmision, fVencimiento, idMoneda, idEstadoPago, subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado.
+ * Body: ... opcional comprobanteSunat (CPE: condicionPago, tipoCambio solo crédito+moneda≠PEN, fechaVencimiento y cuotas si crédito).
  * Retorna { idCompra }.
  */
 exports.crearCompra = async (idEmpresa, idUsuario, body) => {
     const {
         idProveedor, compCompra, idComprobante, serie, numero, fEmision, fVencimiento, idMoneda, idEstadoPago,
-        subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado
+        subTotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, compRelacionado,
+        comprobanteSunat
     } = body;
 
     if (total != null && Number(total) < 0) {
@@ -99,118 +102,93 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
 
     let idEstadoPagoFinal = idEstadoPago != null ? Number(idEstadoPago) : 2;
     return await withPool(async (pool) => {
-    if (idMediosPago != null) {
-        const idNum = Number(idMediosPago);
-        let desc = await comprasRepository.obtenerDescripcionFormaPago(pool, idNum);
-        if (!desc) desc = await comprasRepository.obtenerDescripcionMedioPago(pool, idNum);
-        if (/credito/i.test(desc)) {
-            idEstadoPagoFinal = 1;
-        }
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'X-Debug-Session-Id':'3c0e71'
-          },
-          body:JSON.stringify({
-            sessionId:'3c0e71',
-            runId:'post-fix',
-            hypothesisId:'H1-H2',
-            location:'compras.service.js:crearCompra',
-            message:'Estado pago y medio pago para compra',
-            data:{
-              idMediosPago,
-              descMedioPago: desc,
-              idEstadoPagoOriginal: idEstadoPago,
-              idEstadoPagoFinal
-            },
-            timestamp:Date.now()
-          })
-        }).catch(()=>{});
-        // #endregion
-    }
-
-    await comprasRepository.crearCompra(pool, {
-        idCompra,
-        idEmpresa,
-        compCompra: compCompra || '',
-        idComprobante,
-        serie,
-        numero,
-        fEmision: fEmisionSQL,
-        fVencimiento: fVencimientoSQL,
-        idProveedor,
-        idMoneda,
-        idEstadoPago: idEstadoPagoFinal,
-        subTotal: subTotal ?? 0,
-        igv: igv ?? 0,
-        exonerado: exonerado ?? 0,
-        gratuito: gratuito ?? 0,
-        otrosCargos: otrosCargos ?? 0,
-        descuentos: descuentos ?? 0,
-        total: total ?? 0,
-        idMediosPago,
-        compRelacionado: compRelacionadoVal,
-        idUsuario
-    });
-
-    // Registrar egreso en caja solo si: comprobante es Boleta (03) o Factura (01) y compra está pagada.
-    // Solo el pago en efectivo resta del efectivo disponible; otras formas de pago se muestran pero no afectan el saldo efectivo (se calcula en arqueo).
-    const totalNum = Number(total) || 0;
-    if (idEstadoPagoFinal === 2 && totalNum > 0) {
-        try {
-            const codigoComp = await comprasRepository.obtenerCodigoComprobante(pool, idEmpresa, idComprobante);
-            const codigo = (codigoComp || '').trim();
-            const esBoletaOFactura = codigo === '01' || codigo === '03';
-            if (!esBoletaOFactura) return { idCompra };
-
-            const apertura = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(pool, idEmpresa);
-            if (apertura && apertura.idApertura) {
-                const idTipoEgreso = await CajaRepository.obtenerIdTipoMovimientoEgresoRepo(pool, 'COMPRA_CONTADO');
-                if (idTipoEgreso) {
-                    const serieNum = [serie, numero].filter(Boolean).join('-') || compCompra || 'Compra';
-                    const userMin = { empresa: idEmpresa, sub: idUsuario, sucursal: apertura.idSucursal || undefined };
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{
-                      method:'POST',
-                      headers:{
-                        'Content-Type':'application/json',
-                        'X-Debug-Session-Id':'3c0e71'
-                      },
-                      body:JSON.stringify({
-                        sessionId:'3c0e71',
-                        runId:'post-fix',
-                        hypothesisId:'H1-H2',
-                        location:'compras.service.js:crearCompra',
-                        message:'Registro egreso caja por compra',
-                        data:{
-                          idCompra,
-                          idMediosPago,
-                          totalNum,
-                          serieNum,
-                          idTipoMovimientoCaja:idTipoEgreso
-                        },
-                        timestamp:Date.now()
-                      })
-                    }).catch(()=>{});
-                    // #endregion
-                    await CajaRepository.registrarMovimientoRepo(pool, userMin, {
-                        idApertura: apertura.idApertura,
-                        idTipoMovimientoCaja: idTipoEgreso,
-                        concepto: 'Compra al contado ' + serieNum,
-                        monto: totalNum,
-                        idMediosPago: idMediosPago != null ? Number(idMediosPago) : null,
-                        documentoRelacionado: serieNum
-                    });
-                }
+        if (idMediosPago != null) {
+            const idNum = Number(idMediosPago);
+            let desc = await comprasRepository.obtenerDescripcionFormaPago(pool, idNum);
+            if (!desc) desc = await comprasRepository.obtenerDescripcionMedioPago(pool, idNum);
+            if (/credito/i.test(desc)) {
+                idEstadoPagoFinal = 1;
             }
-        } catch (err) {
-            console.error('compras.service crearCompra: no se pudo registrar egreso en caja:', err);
         }
-    }
 
-    return { idCompra };
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        try {
+            await comprasRepository.crearCompra(transaction, {
+                idCompra,
+                idEmpresa,
+                compCompra: compCompra || '',
+                idComprobante,
+                serie,
+                numero,
+                fEmision: fEmisionSQL,
+                fVencimiento: fVencimientoSQL,
+                idProveedor,
+                idMoneda,
+                idEstadoPago: idEstadoPagoFinal,
+                subTotal: subTotal ?? 0,
+                igv: igv ?? 0,
+                exonerado: exonerado ?? 0,
+                gratuito: gratuito ?? 0,
+                otrosCargos: otrosCargos ?? 0,
+                descuentos: descuentos ?? 0,
+                total: total ?? 0,
+                idMediosPago,
+                compRelacionado: compRelacionadoVal,
+                idUsuario
+            });
+
+            if (comprobanteSunat && typeof comprobanteSunat === 'object') {
+                await comprobantesCompraSunatService.registrarDespuesCompra(
+                    transaction,
+                    idEmpresa,
+                    idUsuario,
+                    idCompra,
+                    comprobanteSunat
+                );
+            }
+
+            await transaction.commit();
+        } catch (err) {
+            try {
+                await transaction.rollback();
+            } catch (re) {
+                console.error('compras.service crearCompra rollback:', re);
+            }
+            throw err;
+        }
+
+        // Registrar egreso en caja solo si: comprobante es Boleta (03) o Factura (01) y compra está pagada.
+        const totalNum = Number(total) || 0;
+        if (idEstadoPagoFinal === 2 && totalNum > 0) {
+            try {
+                const codigoComp = await comprasRepository.obtenerCodigoComprobante(pool, idEmpresa, idComprobante);
+                const codigo = (codigoComp || '').trim();
+                const esBoletaOFactura = codigo === '01' || codigo === '03';
+                if (esBoletaOFactura) {
+                    const apertura = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(pool, idEmpresa);
+                    if (apertura && apertura.idApertura) {
+                        const idTipoEgreso = await CajaRepository.obtenerIdTipoMovimientoEgresoRepo(pool, 'COMPRA_CONTADO');
+                        if (idTipoEgreso) {
+                            const serieNum = [serie, numero].filter(Boolean).join('-') || compCompra || 'Compra';
+                            const userMin = { empresa: idEmpresa, sub: idUsuario, sucursal: apertura.idSucursal || undefined };
+                            await CajaRepository.registrarMovimientoRepo(pool, userMin, {
+                                idApertura: apertura.idApertura,
+                                idTipoMovimientoCaja: idTipoEgreso,
+                                concepto: 'Compra al contado ' + serieNum,
+                                monto: totalNum,
+                                idMediosPago: idMediosPago != null ? Number(idMediosPago) : null,
+                                documentoRelacionado: serieNum
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('compras.service crearCompra: no se pudo registrar egreso en caja:', err);
+            }
+        }
+
+        return { idCompra };
     });
 };
 

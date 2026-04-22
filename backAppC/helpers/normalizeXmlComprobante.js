@@ -68,6 +68,44 @@ function processInvoiceLines(invoice) {
   });
 }
 
+/**
+ * Cuotas de crédito en factura UBL (cac:PaymentTerms con monto y fecha de vencimiento).
+ * No confundir con términos de pago sin monto (solo texto).
+ */
+function getAmountFromCbcAmount(obj) {
+  if (obj == null) return undefined;
+  if (typeof obj === 'object' && ('_' in obj || '#text' in obj)) {
+    return obj._ ?? obj['#text'];
+  }
+  return typeof obj === 'string' || typeof obj === 'number' ? obj : undefined;
+}
+
+function processPaymentTerms(invoice) {
+  const raw = invoice['cac:PaymentTerms'];
+  if (!raw) return [];
+  const arr = Array.isArray(raw) ? raw : [raw];
+  const cuotas = [];
+  let fallbackNum = 0;
+  for (const pt of arr) {
+    const due = getVal(pt, 'cbc:PaymentDueDate');
+    const amountStr = getAmountFromCbcAmount(pt['cbc:Amount']);
+    if (!due || amountStr == null || amountStr === '') continue;
+    const monto = parseFloat(String(amountStr).replace(',', '.'));
+    if (!Number.isFinite(monto) || monto <= 0) continue;
+    fallbackNum += 1;
+    const idRaw = getVal(pt, 'cbc:ID');
+    const parsedNum = parseInt(String(idRaw).replace(/\D/g, ''), 10);
+    const numeroCuota = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : fallbackNum;
+    cuotas.push({
+      numeroCuota,
+      fechaVencimiento: due,
+      montoCuota: monto
+    });
+  }
+  cuotas.sort((a, b) => a.numeroCuota - b.numeroCuota);
+  return cuotas;
+}
+
 function normalizeData(xmlParsed) {
   const invoice = xmlParsed.Invoice || xmlParsed['invoice:Invoice'] || xmlParsed['ubl:Invoice'] || xmlParsed;
   if (!invoice) throw new Error('No se encontró nodo Invoice en el XML');
@@ -85,7 +123,14 @@ function normalizeData(xmlParsed) {
     },
     emisor: {
       ruc: getVal(invoice, 'cac:AccountingSupplierParty.cac:Party.cac:PartyIdentification.cbc:ID') || getV('cac:AccountingSupplierParty.cac:Party.cac:PartyIdentification.cbc:ID'),
-      razonSocial: getVal(invoice, 'cac:AccountingSupplierParty.cac:Party.cac:PartyName.cbc:Name') || getV('cac:AccountingSupplierParty.cac:Party.cac:PartyName.cbc:Name')
+      razonSocial:
+        getValInvoice(
+          invoice,
+          'cac:AccountingSupplierParty.cac:Party.cac:PartyLegalEntity.cbc:RegistrationName'
+        ) ||
+        getVal(invoice, 'cac:AccountingSupplierParty.cac:Party.cac:PartyLegalEntity.cbc:RegistrationName') ||
+        getValInvoice(invoice, 'cac:AccountingSupplierParty.cac:Party.cac:PartyName.cbc:Name') ||
+        getV('cac:AccountingSupplierParty.cac:Party.cac:PartyName.cbc:Name')
     },
     cliente: {
       // Ruta completa desde Invoice (getVal con varios strings cortos no recorría el árbol).
@@ -110,6 +155,7 @@ function normalizeData(xmlParsed) {
       total: getV('cac:TaxTotal', 'cbc:TaxAmount') || (invoice['cac:TaxTotal'] && getVal(invoice['cac:TaxTotal'], 'cbc:TaxAmount'))
     },
     detalles: processInvoiceLines(invoice),
+    cuotas: processPaymentTerms(invoice),
     observacion: ''
   };
 }

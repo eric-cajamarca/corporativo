@@ -1,9 +1,25 @@
 var express = require('express');
 var api = express.Router();
 var productosController = require('../controllers/productosController');
+var productosImportacionController = require('../controllers/productosImportacion.controller');
 var productosImagenController = require('../controllers/productosImagen.controller');
 var auth = require('../middlewares/autenticate');
 var multerConfig = require('../config/multer.config');
+
+// Importación Excel (antes de /productos/:id)
+api.get('/productos/importacion/plantilla', auth.auth, productosImportacionController.descargarPlantilla);
+api.post(
+  '/productos/importacion/validar',
+  auth.auth,
+  multerConfig.uploadProductosExcel,
+  productosImportacionController.validar
+);
+api.post(
+  '/productos/importacion/ejecutar',
+  auth.auth,
+  multerConfig.uploadProductosExcel,
+  productosImportacionController.ejecutar
+);
 
 // Rutas CRUD productos (habitaciones antes de :id)
 api.get('/productos', auth.auth, productosController.obtener_productos_todos);

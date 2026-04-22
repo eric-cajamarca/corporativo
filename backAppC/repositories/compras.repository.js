@@ -46,8 +46,8 @@ exports.listarComprasPorId = async (pool, idCompra) => {
 /**
  * Lista una compra por idCompra e idEmpresa.
  */
-exports.listarComprasPorIdCompraIdEmpresa = async (pool, idEmpresa, idCompra) => {
-    const result = await pool.request()
+exports.listarComprasPorIdCompraIdEmpresa = async (executor, idEmpresa, idCompra) => {
+    const result = await executor.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('idCompra', sql.UniqueIdentifier, idCompra)
         .query(`
@@ -128,8 +128,8 @@ exports.obtenerCodigoComprobante = async (pool, idEmpresa, idComprobante) => {
 /**
  * Inserta una compra. No retorna filas.
  */
-exports.crearCompra = async (pool, params) => {
-    const req = pool.request()
+exports.crearCompra = async (executor, params) => {
+    const req = executor.request()
         .input('idCompra', sql.UniqueIdentifier, params.idCompra)
         .input('idEmpresa', sql.UniqueIdentifier, params.idEmpresa)
         .input('compCompra', sql.VarChar(13), params.compCompra || '')
@@ -381,4 +381,21 @@ exports.actualizarCorrelativo = async (pool, idEmpresa, idCorrelativo, numero) =
         .input('numero', sql.Int, numero)
         .query('UPDATE Correlativos SET numero = @numero WHERE idEmpresa = @idEmpresa AND idCorrelativo = @idCorrelativo');
     return result.rowsAffected?.[0] ?? 0;
+};
+
+/**
+ * Proveedor de la compra (razón social SUNAT / maestro) para completar ComprobantesCompraSunat.
+ * @param {import('mssql').ConnectionPool|import('mssql').Transaction} executor
+ */
+exports.obtenerProveedorRucRSocialPorCompra = async (executor, idEmpresa, idCompra) => {
+    const result = await executor.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idCompra', sql.UniqueIdentifier, idCompra)
+        .query(`
+            SELECT P.ruc AS rucProveedor, P.rSocial
+            FROM dbo.Compras C
+            INNER JOIN dbo.Proveedores P ON P.idProveedor = C.idProveedor
+            WHERE C.idEmpresa = @idEmpresa AND C.idCompra = @idCompra
+        `);
+    return result.recordset?.[0] || null;
 };

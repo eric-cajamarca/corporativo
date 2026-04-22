@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { EmpresaService } from '../../services/empresa.service';
 import { SidebarStateService } from '../../services/sidebar-state.service';
 import { MenuItem, SubMenuItem } from '../../interfaces/permisos-interface';
+import { nivelPlan } from '../../config/saas-plan-reglas.util';
 
 @Component({
   selector: 'app-sidebar',
@@ -53,10 +54,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Efecto: al cambiar navegación (API) o estado (habilitarGuiasElectronicas), mostrar menú fusionado
+    // Efecto: al cambiar navegación, estado empresa o plan SaaS, fusionar menú (p. ej. Compras SUNAT + guías).
     effect(() => {
       const navegacion = this.permisosService.navegacion();
       const estado = this.estadoConfiguracion();
+      this.permisosService.planCodeEfectivo();
+      this.permisosService.contextoPlanCargado();
       if (navegacion && navegacion.length > 0) {
         if (estado) {
           this.actualizarNavegacionSegunEstado(estado);
@@ -120,6 +123,30 @@ export class SidebarComponent implements OnInit, OnDestroy {
     if (tieneMenuConSubmenus && navegacionDesdeApi && navegacionDesdeApi.length > 0) {
       const items: MenuItem[] = navegacionDesdeApi.map((i: MenuItem) => {
         const mod = (i.modulo || '').toString().toLowerCase();
+        if (!i.submenu && i.ruta === '/compras') {
+          return {
+            nombre: i.nombre,
+            icono: i.icono || 'bi bi-bag',
+            modulo: 'compras',
+            visible: i.visible !== false,
+            submenu: this.buildSubmenuCompras()
+          };
+        }
+        if (i.submenu?.length && mod === 'compras') {
+          const sunatRuta = '/compras/comprobantes-sunat';
+          const visSunat = this.puedeVerComprasSunatMenu();
+          const base = i.submenu.filter((s: SubMenuItem) => s.ruta !== sunatRuta);
+          const insert: SubMenuItem = {
+            nombre: 'Compras SUNAT',
+            ruta: sunatRuta,
+            permiso: 'VER_COMPRAS',
+            visible: visSunat && i.visible !== false
+          };
+          const idxLista = base.findIndex((s) => s.ruta === '/compras');
+          const merged =
+            idxLista >= 0 ? [...base.slice(0, idxLista + 1), insert, ...base.slice(idxLista + 1)] : [...base, insert];
+          return { ...i, submenu: merged };
+        }
         if (i.submenu && mod === 'facturacion') {
           let base: SubMenuItem[] = i.submenu.filter((s: SubMenuItem) =>
             s.ruta !== '/facturacion/guias-remision' &&
@@ -187,7 +214,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { tipo: 'separador' },
       { nombre: 'Colaboradores', icono: 'bi bi-people', ruta: '/colaborador', visible: true },
       { nombre: 'Ventas', icono: 'bi bi-cart', ruta: '/ventas', visible: true },
-      { nombre: 'Compras', icono: 'bi bi-bag', ruta: '/compras', visible: true },
+      {
+        nombre: 'Compras',
+        icono: 'bi bi-bag',
+        modulo: 'compras',
+        visible: true,
+        submenu: this.buildSubmenuCompras()
+      },
       { nombre: 'Inventario', icono: 'bi bi-box-seam', ruta: '/inventario', visible: true },
       { nombre: 'Productos', icono: 'bi bi-box', ruta: '/productos', visible: true },
       { nombre: 'Clientes', icono: 'bi bi-people', ruta: '/clientes', visible: true },
@@ -205,6 +238,35 @@ export class SidebarComponent implements OnInit, OnDestroy {
     ];
 
     this.menuItems.set(navegacionCompleta);
+  }
+
+  /**
+   * Plan Emprendedor+ (SaaS). Mientras no cargue el plan, se muestra el ítem; el guard corta si no aplica.
+   */
+  private puedeVerComprasSunatMenu(): boolean {
+    if (this.permisosService.deploymentMode() !== 'saas') {
+      return true;
+    }
+    if (!this.permisosService.contextoPlanCargado()) {
+      return true;
+    }
+    const code = this.permisosService.planCodeEfectivo();
+    if (!code) {
+      return false;
+    }
+    return nivelPlan(code) >= 2;
+  }
+
+  private buildSubmenuCompras(): SubMenuItem[] {
+    return [
+      { nombre: 'Listado de compras', ruta: '/compras', permiso: '', visible: true },
+      {
+        nombre: 'Compras SUNAT',
+        ruta: '/compras/comprobantes-sunat',
+        permiso: '',
+        visible: this.puedeVerComprasSunatMenu()
+      }
+    ];
   }
 
   /** Submenú Facturación: emisión de guías siempre visible; resto de guías si están habilitadas en empresa. */
@@ -290,7 +352,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { nombre: 'Dashboard', icono: 'bi bi-speedometer2', ruta: '/home', visible: true },
       { tipo: 'separador' },
       { nombre: 'Ventas', icono: 'bi bi-cart', ruta: '/ventas', visible: true },
-      { nombre: 'Compras', icono: 'bi bi-bag', ruta: '/compras', visible: true },
+      {
+        nombre: 'Compras',
+        icono: 'bi bi-bag',
+        modulo: 'compras',
+        visible: true,
+        submenu: this.buildSubmenuCompras()
+      },
       { nombre: 'Inventario', icono: 'bi bi-box-seam', ruta: '/inventario', visible: true },
       {
         nombre: 'Facturación',
