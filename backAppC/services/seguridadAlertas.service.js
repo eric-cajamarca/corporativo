@@ -4,9 +4,9 @@ const whatsappFactilizaService = require('./whatsappFactiliza.service');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
-/** Número desarrollador (Perú). Sobrescribible por env. */
+/** Número desarrollador (solo dígitos). Definir ALERT_DEV_WHATSAPP en .env; sin valor no se alerta al dev. */
 const NUMERO_DESARROLLADOR =
-  (process.env.ALERT_DEV_WHATSAPP && String(process.env.ALERT_DEV_WHATSAPP).replace(/\D/g, '')) || '51993289440';
+  (process.env.ALERT_DEV_WHATSAPP && String(process.env.ALERT_DEV_WHATSAPP).replace(/\D/g, '')) || '';
 
 /** Mínimo entre alertas globales de error de sistema (evita spam). */
 const THROTTLE_MS_ERRORES_SISTEMA = parseInt(process.env.ALERT_SYSTEM_THROTTLE_MS, 10) || 15 * 60 * 1000;

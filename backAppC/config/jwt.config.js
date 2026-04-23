@@ -9,7 +9,9 @@ function getJwtSecret() {
     }
     return String(raw).trim();
   }
-  return raw && String(raw).trim() ? String(raw).trim() : 'erik@./Eog_DEV_CHANGE_IN_PRODUCTION';
+  return raw && String(raw).trim()
+    ? String(raw).trim()
+    : 'LOCAL_DEV_JWT_FALLBACK_SET_JWT_SECRET_IN_ENV_NOT_FOR_PRODUCTION';
 }
 
 module.exports = { getJwtSecret };

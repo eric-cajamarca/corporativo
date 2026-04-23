@@ -12,10 +12,11 @@ backAppC/utils/bash_write_test.txt
 # Cursor
 .cursor/
 
-# Variables de entorno locales
+# Variables de entorno locales (no subir valores reales)
 .env
-.env.example
+.env.local
 .env.production
 .env.development
-backAppC/.env.example
 **/.env.local
+
+# Plantillas SIN secretos: sí se versionan (p. ej. backAppC/.env.example)
