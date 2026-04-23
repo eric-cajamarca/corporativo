@@ -18,5 +18,7 @@ backAppC/utils/bash_write_test.txt
 .env.production
 .env.development
 **/.env.local
+# Backend: credenciales (explícito; si ya se subió antes, ejecutar: git rm --cached backAppC/.env)
+backAppC/.env
 
 # Plantillas SIN secretos: sí se versionan (p. ej. backAppC/.env.example)
