@@ -37,6 +37,33 @@ function escXml(s) {
   return t;
 }
 
+/**
+ * Observaciones / OC según guía SUNAT XML factura UBL 2.1 y orden XSD UBL Invoice 2.1:
+ * - Todas las cbc:Note (cat. 52, ej. 1000 y 3000) antes de cbc:DocumentCurrencyCode.
+ * - cac:OrderReference después de DocumentCurrencyCode (si no, SUNAT 0306: hijo Note inválido).
+ * Cat. 52: 1000 = solo monto en letras; 3000 = texto largo; OC corta en OrderReference.
+ */
+function fragmentosObservacionesUblFactura(obsRaw) {
+  const obs = toStr(obsRaw).replace(/\s+/g, " ").trim();
+  if (!obs) {
+    return { notasAntesMoneda: "", orderReferenceTrasMoneda: "" };
+  }
+  if (obs.length <= 20) {
+    return {
+      notasAntesMoneda: "",
+      orderReferenceTrasMoneda: `
+  <cac:OrderReference>
+    <cbc:ID>${escXml(obs)}</cbc:ID>
+  </cac:OrderReference>`
+    };
+  }
+  return {
+    notasAntesMoneda: `
+  <cbc:Note languageLocaleID="3000">${escXml(obs.slice(0, 100))}</cbc:Note>`,
+    orderReferenceTrasMoneda: ""
+  };
+}
+
 /** Ubigeo PE (SUNAT): 6 dígitos en cbc:CountrySubentityCode del domicilio fiscal. */
 function normalizarUbigeoSunat(ubigeo) {
   const d = toStr(ubigeo).replace(/\D/g, "");
@@ -87,6 +114,7 @@ function resolverPagoFacturaBoletaUbl(venta, fechaEmisionYmd) {
   const emitirCuotasUbl = esFacturaOBoleta && ventaCredito && cuotas.length > 0;
 
   const paymentMeansId = paymentMeansIdUblFormaPago(ventaCredito);
+  const montoTotalVenta = toNum(venta.total);
 
   let dueDate = fechaEmisionYmd;
   if (emitirCuotasUbl) {
@@ -100,7 +128,20 @@ function resolverPagoFacturaBoletaUbl(venta, fechaEmisionYmd) {
     if (fv.fecha) dueDate = fv.fecha;
   }
 
-  let paymentTermsXml = `
+  /**
+   * Anexo 9-A / Anexo 8 SUNAT (UBL Factura): crédito exige en el primer PaymentTerms
+   * cbc:Amount = monto neto pendiente (además de FormaPago + Credito).
+   * Cuotas: cbc:ID siempre "FormaPago"; el identificador de cuota va en cbc:PaymentMeansID (Cuota001…).
+   * @see comentario técnico FormaPago/Credito/monto + FormaPago/Cuota001/… en lineamientos CPE.
+   */
+  let paymentTermsXml = ventaCredito
+    ? `
+  <cac:PaymentTerms>
+    <cbc:ID>FormaPago</cbc:ID>
+    <cbc:PaymentMeansID>${escXml(paymentMeansId)}</cbc:PaymentMeansID>
+    <cbc:Amount currencyID="PEN">${montoTotalVenta > 0.001 ? montoTotalVenta.toFixed(2) : "0.00"}</cbc:Amount>
+  </cac:PaymentTerms>`
+    : `
   <cac:PaymentTerms>
     <cbc:ID>FormaPago</cbc:ID>
     <cbc:PaymentMeansID>${escXml(paymentMeansId)}</cbc:PaymentMeansID>
@@ -116,9 +157,21 @@ function resolverPagoFacturaBoletaUbl(venta, fechaEmisionYmd) {
       if (!fpago) fpago = dueDate;
       paymentTermsXml += `
   <cac:PaymentTerms>
-    <cbc:ID>${escXml(idCuota)}</cbc:ID>
+    <cbc:ID>FormaPago</cbc:ID>
     <cbc:PaymentMeansID>${escXml(idCuota)}</cbc:PaymentMeansID>
     <cbc:Amount currencyID="PEN">${monto.toFixed(2)}</cbc:Amount>
+    <cbc:PaymentDueDate>${escXml(fpago)}</cbc:PaymentDueDate>
+  </cac:PaymentTerms>`;
+    }
+  } else if (ventaCredito && esFacturaOBoleta) {
+    /** SUNAT 3249: al menos una fila de cuota (PaymentMeansID Cuota00n + monto + fecha). */
+    if (montoTotalVenta > 0.001) {
+      const fpago = dueDate || fechaEmisionYmd;
+      paymentTermsXml += `
+  <cac:PaymentTerms>
+    <cbc:ID>FormaPago</cbc:ID>
+    <cbc:PaymentMeansID>Cuota001</cbc:PaymentMeansID>
+    <cbc:Amount currencyID="PEN">${montoTotalVenta.toFixed(2)}</cbc:Amount>
     <cbc:PaymentDueDate>${escXml(fpago)}</cbc:PaymentDueDate>
   </cac:PaymentTerms>`;
     }
@@ -203,6 +256,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
 
   const montoEnLetras = numeroALetras(total);
   const observaciones = toStr(venta.observaciones) || toStr(venta.compRelacionado);
+  const { notasAntesMoneda, orderReferenceTrasMoneda } = fragmentosObservacionesUblFactura(observaciones);
   const ventaParaPago = {
     ...venta,
     codigoComprobante: toStr(venta.codigoComprobante) || String(tipoComprobante || "01").trim()
@@ -279,9 +333,9 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
   <cbc:IssueDate>${fecha}</cbc:IssueDate>
   <cbc:IssueTime>${hora}</cbc:IssueTime>
   <cbc:DueDate>${escXml(dueDateInvoice)}</cbc:DueDate>
-  <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listID="0101" listName="Tipo de Documento" listSchemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01" name="Tipo de Operacion">${tipoCod}</cbc:InvoiceTypeCode>
-  <cbc:Note languageLocaleID="1000">${escXml(montoEnLetras)}</cbc:Note>${observaciones ? '\n  <cbc:Note languageLocaleID="1000">' + escXml(observaciones) + '</cbc:Note>' : ''}
-  <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 4217 Alpha" listName="Currency">PEN</cbc:DocumentCurrencyCode>
+  <cbc:InvoiceTypeCode listAgencyName="PE:SUNAT" listID="0101" listName="Tipo de Documento" listSchemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01" name="Tipo de Operacion">${tipoCod}</cbc:InvoiceTypeCode>${notasAntesMoneda}
+  <cbc:Note languageLocaleID="1000">${escXml(montoEnLetras)}</cbc:Note>
+  <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 4217 Alpha" listName="Currency">PEN</cbc:DocumentCurrencyCode>${orderReferenceTrasMoneda}
   <cac:Signature>
     <cbc:ID>${rucEmisor}</cbc:ID>
     <cbc:Note>Elaborado por Sistema de Emision Electronica del Contribuyente</cbc:Note>

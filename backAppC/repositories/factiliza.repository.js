@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('./empresaSuscripcion.repository');
 const saasPlanAccesoRepository = require('./saasPlanAcceso.repository');
 
@@ -76,16 +77,18 @@ async function getServiciosFactiliza(pool) {
  * si no, se usa EmpresaFactiliza.puedeUsar (retrocompatibilidad).
  */
 async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
-  const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
   let planCode = 'empresarial';
-  if (sub) {
-    const st = String(sub.estado || '')
-      .trim()
-      .toUpperCase();
-    if (st === 'ACTIVA' || st === 'DEMO') {
-      planCode = String(sub.planCode || 'demo')
+  if (isSaas()) {
+    const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
+    if (sub) {
+      const st = String(sub.estado || '')
         .trim()
-        .toLowerCase();
+        .toUpperCase();
+      if (st === 'ACTIVA' || st === 'DEMO') {
+        planCode = String(sub.planCode || 'demo')
+          .trim()
+          .toLowerCase();
+      }
     }
   }
   const incluidoPlan = await saasPlanAccesoRepository.planPermiteFactilizaServicioNombre(pool, planCode, nombreServicio);

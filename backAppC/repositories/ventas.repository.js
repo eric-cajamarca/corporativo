@@ -1090,38 +1090,44 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
   return result.recordset || [];
 };
 
-/** Anula/elimina lógicamente una venta (eliminado=1). Restaura stock, elimina movimientos caja. No permitido si ya enviado a SUNAT.
+/** Anula/elimina lógicamente una venta (eliminado=1). Restaura stock, elimina movimientos caja. No permitido si SUNAT ya aceptó (1/2/3), salvo nota de venta (NV).
+ * @param {string|string[]} idEmpresaOLista - Empresa del JWT o lista (gestora + gestionadas) para resolver la venta.
  * @param {string|null|undefined} idUsuarioEjecutor - JWT sub si Ventas.idUsuario es null (movimiento inventario)
  */
-exports.anularVentaRepo = async (pool, idVenta, idEmpresa, idUsuarioEjecutor = null) => {
+exports.anularVentaRepo = async (pool, idVenta, idEmpresaOLista, idUsuarioEjecutor = null) => {
+  const idsEmpresa = (Array.isArray(idEmpresaOLista) ? idEmpresaOLista : [idEmpresaOLista]).filter(Boolean);
+  if (idsEmpresa.length === 0) {
+    return { ok: false, error: 'Empresa no válida.' };
+  }
   const stockRepository = require('./stock.repository');
   const inventarioRepository = require('./inventario.repository');
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
-    const ventaRow = await transaction.request()
-      .input('idVenta', sql.Int, idVenta)
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
-        SELECT v.idVenta, v.idEstadoSunat, v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario,
+    const reqV = transaction.request().input('idVenta', sql.Int, idVenta);
+    const inEmp = bindUniqueIdentifiersIn(reqV, idsEmpresa, 'anuEmp');
+    const ventaRow = await reqV.query(`
+        SELECT v.idEmpresa, v.idVenta, v.idEstadoSunat, v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario,
           ISNULL(v.eliminado, 0) AS eliminado,
           UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-        WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
+        WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inEmp})
       `);
     const venta = ventaRow.recordset && ventaRow.recordset[0];
     if (!venta) {
       await transaction.rollback();
       return { ok: false, error: 'Venta no encontrada.' };
     }
+    const idEmpresa = venta.idEmpresa;
     if (venta.eliminado) {
       await transaction.rollback();
       return { ok: false, error: 'El comprobante ya fue anulado.' };
     }
     const codAnular = String(venta.codigoComprobante || '').trim().toUpperCase();
     const esNotaVentaAnular = codAnular === 'NV';
-    if (!esNotaVentaAnular && (venta.idEstadoSunat === 1 || venta.idEstadoSunat === 2 || venta.idEstadoSunat === 3)) {
+    const idSun = venta.idEstadoSunat != null ? Number(venta.idEstadoSunat) : null;
+    if (!esNotaVentaAnular && (idSun === 1 || idSun === 2 || idSun === 3)) {
       await transaction.rollback();
       return { ok: false, error: 'No se puede eliminar: el comprobante ya fue enviado o aceptado en SUNAT.' };
     }

@@ -213,8 +213,8 @@
   </div>
 </main>
 
-<!-- Modal detalle por concepto -->
-<div class="modal fade" [class.show]="mostrarModalDetalle" [style.display]="mostrarModalDetalle ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+<!-- Modal detalle por concepto (z-index vía .arqueo-caja-modal-layer: por encima del backdrop global styles.css) -->
+<div class="modal fade arqueo-caja-modal-layer" [class.show]="mostrarModalDetalle" [style.display]="mostrarModalDetalle ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
@@ -261,10 +261,10 @@
     </div>
   </div>
 </div>
-<div class="modal-backdrop fade show" *ngIf="mostrarModalDetalle" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalDetalle"></div>
 
 <!-- Modal detalle por forma de pago (Ingresos / Egresos) -->
-<div class="modal fade" [class.show]="mostrarModalDetalleFormaPago" [style.display]="mostrarModalDetalleFormaPago ? 'block' : 'none'" tabindex="-1" style="z-index: 1050;">
+<div class="modal fade arqueo-caja-modal-layer" [class.show]="mostrarModalDetalleFormaPago" [style.display]="mostrarModalDetalleFormaPago ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
@@ -309,10 +309,10 @@
     </div>
   </div>
 </div>
-<div class="modal-backdrop fade show" *ngIf="mostrarModalDetalleFormaPago" style="z-index: 1040;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalDetalleFormaPago"></div>
 
 <!-- Modal PDF Arqueo -->
-<div class="modal fade" [class.show]="mostrarModalPdf" [style.display]="mostrarModalPdf ? 'block' : 'none'" tabindex="-1" style="z-index: 1060;">
+<div class="modal fade arqueo-caja-modal-layer" [class.show]="mostrarModalPdf" [style.display]="mostrarModalPdf ? 'block' : 'none'" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header bg-danger text-white">
@@ -359,6 +359,6 @@
     </div>
   </div>
 </div>
-<div class="modal-backdrop fade show" *ngIf="mostrarModalPdf" style="z-index: 1050;"></div>
+<div class="modal-backdrop fade show" *ngIf="mostrarModalPdf"></div>
 
 

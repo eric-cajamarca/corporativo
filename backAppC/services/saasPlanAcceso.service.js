@@ -1,3 +1,4 @@
+const { isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const saasPlanAccesoRepository = require('../repositories/saasPlanAcceso.repository');
 
@@ -6,6 +7,7 @@ const saasPlanAccesoRepository = require('../repositories/saasPlanAcceso.reposit
  * Sin suscripción activa/demo: se asume empresarial (compatibilidad instalaciones previas).
  */
 async function obtenerPlanCodeActivo(pool, idEmpresa) {
+  if (!isSaas()) return 'empresarial';
   const row = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
   if (!row) return 'empresarial';
   const st = String(row.estado || '')
@@ -33,6 +35,7 @@ function nivelPlan(planCode) {
  */
 async function filtrarNavegacionPorPlan(pool, idEmpresa, items) {
   if (!items || !Array.isArray(items)) return items;
+  if (!isSaas()) return items;
   const planCode = await obtenerPlanCodeActivo(pool, idEmpresa);
   const nv = nivelPlan(planCode);
 

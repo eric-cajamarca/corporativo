@@ -189,8 +189,15 @@ exports.listarNotasCreditoDebito = async (pool, idempresa, query) => {
   });
 };
 
-exports.anularVenta = async (pool, idEmpresa, idVenta, user) =>
-  ventasRepository.anularVentaRepo(pool, idVenta, idEmpresa, idUsuarioDesdePayloadUser(user));
+exports.anularVenta = async (pool, idEmpresaUsuario, idVenta, user) => {
+  const idsPermitidos = await idsEmpresaParaComprobanteVenta(pool, idEmpresaUsuario);
+  return ventasRepository.anularVentaRepo(
+    pool,
+    idVenta,
+    idsPermitidos.length > 0 ? idsPermitidos : [idEmpresaUsuario],
+    idUsuarioDesdePayloadUser(user)
+  );
+};
 
 exports.postCobrarVentaAgrupada = async (pool, user, idVentaAgrupada, body) => {
   const { detallePago, idApertura, cuotasCredito } = body || {};

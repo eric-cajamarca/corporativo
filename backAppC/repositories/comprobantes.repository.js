@@ -2,6 +2,26 @@ const sql = require('mssql');
 
 const ALIAS_TABLA = /^[A-Za-z0-9]+$/;
 
+/**
+ * Fila de catálogo Comprobantes por código (ej. RA = comunicación de baja) para correlativo / serie.
+ */
+async function obtenerComprobantePorCodigoRepo(pool, idEmpresa, codigo) {
+  const c = String(codigo || '')
+    .trim()
+    .slice(0, 10);
+  if (!c) return null;
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('codigo', sql.VarChar(10), c)
+    .query(
+      `SELECT TOP 1 idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
+       FROM Comprobantes
+       WHERE idEmpresa = @idEmpresa AND LTRIM(RTRIM(codigo)) = @codigo`
+    );
+  return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+}
+
 async function listarPorEmpresaYuso(pool, idEmpresa, uso) {
   let sqlText =
     'SELECT idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra FROM Comprobantes WHERE idEmpresa = @idEmpresa';
@@ -87,6 +107,7 @@ async function actualizar(pool, idEmpresa, idComprobante, updates) {
 }
 
 module.exports = {
+  obtenerComprobantePorCodigoRepo,
   listarPorEmpresaYuso,
   listarPorTablaAlias,
   insertar,

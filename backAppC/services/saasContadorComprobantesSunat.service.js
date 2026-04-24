@@ -1,3 +1,4 @@
+const { isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const empresaSuscripcionUsoRepository = require('../repositories/empresaSuscripcionUso.repository');
 
@@ -21,6 +22,7 @@ function transicionSumaUnComprobante(idEstadoAnterior, idEstadoNuevo) {
  * Tras actualizar ComprobantesElectronicos (factura, boleta, NC, ND, etc.).
  */
 async function registrarTransicionComprobanteElectronico(poolOrTx, idEmpresa, idEstadoAnterior, idEstadoNuevo) {
+  if (!isSaas()) return;
   if (!idEmpresa || !transicionSumaUnComprobante(idEstadoAnterior, idEstadoNuevo)) return;
   await empresaSuscripcionRepository.incrementarContadorComprobantesSunatAceptados(poolOrTx, idEmpresa);
 }
@@ -44,7 +46,7 @@ async function registrarTransicionComunicacionBaja(poolOrTx, idEmpresa, idEstado
  * (incluye comprobantes aceptados antes de existir el contador).
  */
 async function obtenerUsadosComprobantesSunatEfectivo(pool, idEmpresa) {
-  if (!idEmpresa) return 0;
+  if (!isSaas() || !idEmpresa) return 0;
   const [desdeTablas, row] = await Promise.all([
     empresaSuscripcionUsoRepository.contarComprobantesSunatDesdeTablas(pool, idEmpresa),
     empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa)

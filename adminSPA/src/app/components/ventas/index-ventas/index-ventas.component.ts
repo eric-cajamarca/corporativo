@@ -338,6 +338,20 @@ export class IndexVentasComponent implements OnInit {
     return (v.codigoEstadoSunat || '').trim() === '08';
   }
 
+  /** idEstadoSunat numérico (evita fallos si el API devuelve string). */
+  private idEstadoSunatNum(v: VentaListado): number | null {
+    const id = v?.idEstadoSunat;
+    if (id == null) return null;
+    const n = Number(id);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** SUNAT ya aceptó el comprobante (no se debe anular ni reenviar como borrador). */
+  private sunatEstadoAceptado(v: VentaListado): boolean {
+    const id = this.idEstadoSunatNum(v);
+    return id === 1 || id === 2 || id === 3;
+  }
+
   /** 7 = Pendiente de envío; 1 = Aceptado; 3 = Aceptado con obs.; 4 = Rechazado; 6 = Error envío. */
   estadoSunatLabel(idEstadoSunat: number | undefined): string {
     if (idEstadoSunat == null) return 'Pendiente';
@@ -355,10 +369,11 @@ export class IndexVentasComponent implements OnInit {
     return id != null ? String(id).trim() : '';
   }
 
-  /** True si se debe mostrar el botón Enviar a SUNAT. */
+  /** True si se debe mostrar el botón Enviar a SUNAT (no aplica si ya fue aceptado o anulado en historial). */
   puedeEnviarSunat(v: VentaListado): boolean {
     if (v.eliminado) return false;
     if (this.esComprobanteAnuladoSunat(v)) return false;
+    if (this.sunatEstadoAceptado(v)) return false;
     if (this.idComprobanteStr(v) === '') return false;
     if (this.useResumenDiarioBoletas && (v.tipoComprobante === '03' || (v.nombreComprobante || '').toLowerCase().includes('boleta'))) return false;
     return true;
@@ -402,7 +417,7 @@ export class IndexVentasComponent implements OnInit {
   private filaFacturadoNetoSunat(v: VentaListado): boolean {
     if (v.eliminado) return false;
     if (this.esComprobanteAnuladoSunat(v)) return false;
-    const id = v.idEstadoSunat;
+    const id = this.idEstadoSunatNum(v);
     if (id !== 1 && id !== 2 && id !== 3) return false;
     return this.tipoSunatCatalogo(v) != null;
   }
@@ -451,17 +466,19 @@ export class IndexVentasComponent implements OnInit {
   puedeEditarVenta(v: VentaListado): boolean {
     if (v.eliminado) return false;
     if (this.esComprobanteAnuladoSunat(v)) return false;
-    const id = v?.idEstadoSunat;
-    if (!this.esNotaVentaSinSunat(v) && (id === 1 || id === 2 || id === 3)) return false;
+    if (!this.esNotaVentaSinSunat(v) && this.sunatEstadoAceptado(v)) return false;
     if (this.esCotizacionONotaVenta(v) && !this.dentro24HorasDesdeEmision(v)) return false;
     return true;
   }
 
+  /**
+   * Anular en historial: restaura stock en servidor y deja la fila tachada.
+   * Permitido si SUNAT no aceptó (rechazo, error envío, pendiente, etc.); no si ya aceptó (1/2/3), salvo nota de venta sin SUNAT.
+   */
   puedeEliminarVenta(v: VentaListado): boolean {
     if (v.eliminado) return false;
     if (this.esComprobanteAnuladoSunat(v)) return false;
-    const id = v?.idEstadoSunat;
-    if (!this.esNotaVentaSinSunat(v) && (id === 1 || id === 2 || id === 3)) return false;
+    if (!this.esNotaVentaSinSunat(v) && this.sunatEstadoAceptado(v)) return false;
     return true;
   }
 
@@ -473,7 +490,11 @@ export class IndexVentasComponent implements OnInit {
 
   confirmarAnularVenta(v: VentaListado): void {
     if (!this.puedeEliminarVenta(v)) return;
-    if (!confirm(`¿Anular el comprobante ${v.compVenta || v.idVenta}? Se restaurará el stock y el registro quedará tachado en el historial.`)) {
+    const extra =
+      !this.esNotaVentaSinSunat(v) && !this.sunatEstadoAceptado(v)
+        ? ' Este comprobante no fue aceptado por SUNAT; al anular se devuelve el stock y dejará de mostrarse “Enviar a SUNAT”.'
+        : '';
+    if (!confirm(`¿Anular el comprobante ${v.compVenta || v.idVenta}? Se restaurará el stock y el registro quedará tachado en el historial.${extra}`)) {
       return;
     }
     this.anulandoIdVenta = v.idVenta;
@@ -1030,7 +1051,7 @@ export class IndexVentasComponent implements OnInit {
         ? {
             empresa: empresaPdf,
             titulo: 'Comprobantes (gestora y empresas gestionadas)',
-            columnas: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+            columnas: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
             filas: this.ventasEmpresa.map((v, i) => [
               i + 1,
               (v.razonSocialEmpresa || '').trim() || '—',
@@ -1039,6 +1060,7 @@ export class IndexVentasComponent implements OnInit {
               this.etiquetaDocAfectadoListado(v),
               v.clienteRuc || '—',
               v.clienteRazonSocial || '—',
+              (v.condicionPago || '—').trim() || '—',
               `S/ ${Number(v.total).toFixed(2)}`,
               this.etiquetaEstadoSunatListado(v)
             ])
@@ -1046,13 +1068,14 @@ export class IndexVentasComponent implements OnInit {
         : {
             empresa: empresaPdf,
             titulo: 'Lista de Ventas Agrupadas',
-            columnas: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+            columnas: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Condición', 'Sucursal', 'Total (S/)', 'Estado Pago'],
             filas: this.ventas.map((v, i) => [
               i + 1,
               this.formatearFecha(v.fEmision),
               v.idVentaAgrupada || '—',
               v.clienteRuc || '—',
               v.clienteRazonSocial || '—',
+              '—',
               v.sucursal || '—',
               `S/ ${Number(v.total).toFixed(2)}`,
               this.estadoPagoLabel(v.idEstadoPago)
@@ -1061,7 +1084,7 @@ export class IndexVentasComponent implements OnInit {
       : {
           empresa: empresaPdf,
           titulo: 'Lista de Ventas',
-          columnas: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+          columnas: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
           filas: this.ventasEmpresa.map((v, i) => [
             i + 1,
             this.formatearFecha(v.fEmision),
@@ -1069,6 +1092,7 @@ export class IndexVentasComponent implements OnInit {
             this.etiquetaDocAfectadoListado(v),
             v.clienteRuc || '—',
             v.clienteRazonSocial || '—',
+            (v.condicionPago || '—').trim() || '—',
             `S/ ${Number(v.total).toFixed(2)}`,
             this.etiquetaEstadoSunatListado(v)
           ])
@@ -1098,7 +1122,7 @@ export class IndexVentasComponent implements OnInit {
             title: 'Comprobantes (gestora y gestionadas)',
             filename: `ventas_${new Date().getTime()}`,
             worksheetName: 'Ventas',
-            columns: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+            columns: ['#', 'Empresa', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
             rows: this.ventasEmpresa.map((v, i) => [
               i + 1,
               (v.razonSocialEmpresa || '').trim() || '—',
@@ -1107,6 +1131,7 @@ export class IndexVentasComponent implements OnInit {
               this.etiquetaDocAfectadoListado(v),
               v.clienteRuc || '—',
               v.clienteRazonSocial || '—',
+              (v.condicionPago || '—').trim() || '—',
               Number(v.total),
               this.etiquetaEstadoSunatListado(v)
             ])
@@ -1115,13 +1140,14 @@ export class IndexVentasComponent implements OnInit {
             title: 'Lista de Ventas Agrupadas',
             filename: `ventas_${new Date().getTime()}`,
             worksheetName: 'Ventas',
-            columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Sucursal', 'Total (S/)', 'Estado Pago'],
+            columns: ['#', 'Fecha', 'ID Venta', 'RUC Cliente', 'Cliente', 'Condición', 'Sucursal', 'Total (S/)', 'Estado Pago'],
             rows: this.ventas.map((v, i) => [
               i + 1,
               this.formatearFecha(v.fEmision),
               v.idVentaAgrupada || '—',
               v.clienteRuc || '—',
               v.clienteRazonSocial || '—',
+              '—',
               v.sucursal || '—',
               Number(v.total),
               this.estadoPagoLabel(v.idEstadoPago)
@@ -1131,7 +1157,7 @@ export class IndexVentasComponent implements OnInit {
           title: 'Lista de Ventas',
           filename: `ventas_${new Date().getTime()}`,
           worksheetName: 'Ventas',
-          columns: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Total (S/)', 'Estado SUNAT'],
+          columns: ['#', 'Fecha', 'Comprobante', 'Doc. afectado (NC/ND)', 'RUC Cliente', 'Cliente', 'Condición', 'Total (S/)', 'Estado SUNAT'],
           rows: this.ventasEmpresa.map((v, i) => [
             i + 1,
             this.formatearFecha(v.fEmision),
@@ -1139,6 +1165,7 @@ export class IndexVentasComponent implements OnInit {
             this.etiquetaDocAfectadoListado(v),
             v.clienteRuc || '—',
             v.clienteRazonSocial || '—',
+            (v.condicionPago || '—').trim() || '—',
             Number(v.total),
             this.etiquetaEstadoSunatListado(v)
           ])

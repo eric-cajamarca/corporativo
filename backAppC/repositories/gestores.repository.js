@@ -1,5 +1,6 @@
 // SIEMPRE usa sql.UniqueIdentifier para UUIDs, sql.VarChar para cadenas (regla 1.4)
 const sql = require('mssql');
+const { isSaas } = require('../config/deployment.config');
 
 /**
  * Obtiene todos los gestores de una empresa
@@ -234,10 +235,21 @@ const guardarConfiguracion = async (pool, idEmpresa, clave, valor, descripcion, 
 };
 
 /**
- * True si la empresa es gestora activa y su plan de suscripción es enterprise.
- * La multi-empresa gestora solo aplica a plan enterprise.
+ * True si la empresa es gestora activa y su plan de suscripción es enterprise (modo SaaS).
+ * Modo enterprise (BD sin tablas SaaS): relación activa en Gestores_Empresas como origen.
  */
 const esEmpresaGestoraActiva = async (pool, idEmpresa) => {
+    if (!isSaas()) {
+        const result = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query(`
+                SELECT COUNT(*) AS n
+                FROM Gestores_Empresas ge
+                WHERE ge.idEmpresaOrigen = @idEmpresa
+                  AND ge.estado = 1
+            `);
+        return Number(result.recordset[0]?.n || 0) > 0;
+    }
     const result = await pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .query(`

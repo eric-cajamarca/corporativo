@@ -1,4 +1,5 @@
 // SIEMPRE valida reglas de negocio aquí (regla 1.3)
+const { isSaas } = require('../config/deployment.config');
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
@@ -102,12 +103,14 @@ const asignarEmpresaGestionada = async (pool, idEmpresaDestino, user) => {
         throw new Error('PERMISO_DENEGADO');
     }
 
-    const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
-    const pc = String(sub?.planCode || '')
-        .trim()
-        .toLowerCase();
-    if (pc !== 'enterprise') {
-        throw new Error('GESTORA_SOLO_PLAN_ENTERPRISE');
+    if (isSaas()) {
+        const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
+        const pc = String(sub?.planCode || '')
+            .trim()
+            .toLowerCase();
+        if (pc !== 'enterprise') {
+            throw new Error('GESTORA_SOLO_PLAN_ENTERPRISE');
+        }
     }
 
     if (!idEmpresaDestino) {
@@ -171,12 +174,14 @@ const activarEmpresaGestionada = async (pool, idGestor, user) => {
         throw new Error('PERMISO_DENEGADO');
     }
 
-    const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
-    const pc = String(sub?.planCode || '')
-        .trim()
-        .toLowerCase();
-    if (pc !== 'enterprise') {
-        throw new Error('GESTORA_SOLO_PLAN_ENTERPRISE');
+    if (isSaas()) {
+        const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
+        const pc = String(sub?.planCode || '')
+            .trim()
+            .toLowerCase();
+        if (pc !== 'enterprise') {
+            throw new Error('GESTORA_SOLO_PLAN_ENTERPRISE');
+        }
     }
 
     return await gestoresRepository.activarGestor(pool, idGestor);
