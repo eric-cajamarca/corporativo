@@ -30,18 +30,79 @@ async function getConfigByNombre(pool, nombre) {
   return result.recordset.length > 0 ? result.recordset[0] : null;
 }
 
+const SELECT_EMPRESA_FACTILIZA_CAMPOS = `
+      idEmpresaFactiliza, idEmpresa, puedeUsar, tokenFactiliza, usuarioSol, passwordSol, rucEmpresa, numeroWhatsApp, activo
+`;
+
 /**
- * Obtiene el acceso Factiliza de una empresa (token, usuario SOL, etc.)
+ * Acceso Factiliza por empresa (token, SOL, RUC).
+ * Orden de resolución:
+ * 1) Tabla canónica EmpresaFactiliza
+ * 2) Misma proyección sobre empresaFaciliza (instalaciones que crearon la tabla con nombre legado pero mismas columnas)
+ * 3) Solo si options.sinteticoDesdePermisos: empresaFaciliza estrecha (idEmpresa, nombreServicio, puedeUsar) —
+ *    agrega permiso global para poder usar tokenDefault de FactilizaConfig (no sustituye fila por servicio en puedeUsarServicio).
  */
-async function getEmpresaFactiliza(pool, idEmpresa) {
-  const result = await pool.request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT idEmpresaFactiliza, idEmpresa, puedeUsar, tokenFactiliza, usuarioSol, passwordSol, rucEmpresa, numeroWhatsApp, activo
+async function getEmpresaFactiliza(pool, idEmpresa, options = {}) {
+  const sinteticoDesdePermisos = options.sinteticoDesdePermisos === true;
+
+  let row = null;
+  try {
+    const result = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+      SELECT ${SELECT_EMPRESA_FACTILIZA_CAMPOS}
       FROM EmpresaFactiliza
       WHERE idEmpresa = @idEmpresa AND activo = 1
     `);
-  return result.recordset.length > 0 ? result.recordset[0] : null;
+    if (result.recordset.length > 0) row = result.recordset[0];
+  } catch (e) {
+    if (!(e && e.number === 208 && /EmpresaFactiliza/i.test(String(e.message || '')))) throw e;
+  }
+  if (row) return row;
+
+  try {
+    const result = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+      SELECT TOP 1 ${SELECT_EMPRESA_FACTILIZA_CAMPOS}
+      FROM empresaFaciliza
+      WHERE idEmpresa = @idEmpresa
+    `);
+    if (result.recordset.length > 0) row = result.recordset[0];
+  } catch (e) {
+    const msg = String(e.message || '');
+    const tablaAusente = e.number === 208 && /empresaFaciliza/i.test(msg);
+    const columnasIncompatibles = e.number === 207 || /Invalid column name/i.test(msg);
+    if (!tablaAusente && !columnasIncompatibles) throw e;
+  }
+  if (row) return row;
+
+  if (!sinteticoDesdePermisos) return null;
+
+  try {
+    const result = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+      SELECT
+        CAST(NULL AS UNIQUEIDENTIFIER) AS idEmpresaFactiliza,
+        @idEmpresa AS idEmpresa,
+        CAST(MAX(CAST(puedeUsar AS INT)) AS BIT) AS puedeUsar,
+        CAST(NULL AS NVARCHAR(MAX)) AS tokenFactiliza,
+        CAST(NULL AS VARCHAR(100)) AS usuarioSol,
+        CAST(NULL AS NVARCHAR(MAX)) AS passwordSol,
+        CAST(NULL AS VARCHAR(11)) AS rucEmpresa,
+        CAST(NULL AS VARCHAR(20)) AS numeroWhatsApp,
+        CAST(1 AS BIT) AS activo
+      FROM empresaFaciliza
+      WHERE idEmpresa = @idEmpresa
+    `);
+    const agg = result.recordset[0];
+    if (!agg || agg.puedeUsar == null || !agg.puedeUsar) return null;
+    return agg;
+  } catch (e) {
+    if (e.number === 208 && /empresaFaciliza/i.test(String(e.message || ''))) return null;
+    throw e;
+  }
 }
 
 /**
@@ -49,7 +110,7 @@ async function getEmpresaFactiliza(pool, idEmpresa) {
  */
 async function getTokenParaEmpresa(pool, idEmpresa) {
   const config = await getConfig(pool);
-  const empresaFactiliza = await getEmpresaFactiliza(pool, idEmpresa);
+  const empresaFactiliza = await getEmpresaFactiliza(pool, idEmpresa, { sinteticoDesdePermisos: true });
   if (!empresaFactiliza || !empresaFactiliza.puedeUsar) return { token: null, puedeUsar: false };
   const token = empresaFactiliza.tokenFactiliza || (config && config.tokenDefault) || null;
   return {
@@ -106,7 +167,7 @@ async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
   if (row.recordset && row.recordset.length > 0) {
     return !!row.recordset[0].puedeUsar;
   }
-  const ef = await getEmpresaFactiliza(pool, idEmpresa);
+  const ef = await getEmpresaFactiliza(pool, idEmpresa, { sinteticoDesdePermisos: false });
   return !!(ef && ef.puedeUsar);
 }
 
