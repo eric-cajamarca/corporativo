@@ -166,6 +166,13 @@
             </div>
           </div>
         </div>
+        @if (esModal) {
+          <div class="d-flex justify-content-end mt-3 pt-3 border-top">
+            <button type="button" class="btn btn-primary" (click)="irSiguienteTabCreacion()">
+              Siguiente <i class="fas fa-arrow-right ms-1"></i>
+            </button>
+          </div>
+        }
       }
       @if (activeTab() === 'inventario') {
         <div class="row">
@@ -210,6 +217,13 @@
             </div>
           }
         </div>
+        @if (esModal) {
+          <div class="d-flex justify-content-end mt-3 pt-3 border-top">
+            <button type="button" class="btn btn-primary" (click)="irSiguienteTabCreacion()">
+              Siguiente <i class="fas fa-arrow-right ms-1"></i>
+            </button>
+          </div>
+        }
       }
       @if (activeTab() === 'precios') {
         <div class="row">
@@ -261,6 +275,18 @@
             </div>
           </div>
         </div>
+        @if (esModal) {
+          <div class="d-flex justify-content-end mt-3 pt-3 border-top">
+            <button type="button" class="btn btn-primary" (click)="guardarProducto()" [disabled]="guardando()">
+              @if (guardando()) {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+              } @else {
+                <i class="fas fa-save me-1"></i>
+              }
+              Guardar producto
+            </button>
+          </div>
+        }
       }
     </form>
     }
@@ -288,12 +314,6 @@
     </div>
     <div class="modal-footer d-flex justify-content-end align-items-center gap-2">
       <button type="button" class="btn btn-secondary" (click)="cancelar()">Cancelar</button>
-      <button type="button" class="btn btn-primary" (click)="guardarProducto()" [disabled]="guardando()">
-        @if (guardando()) {
-          <span class="spinner-border spinner-border-sm me-1"></span>
-        }
-        Guardar producto
-      </button>
     </div>
   }
 }

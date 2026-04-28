@@ -1,0 +1,34 @@
+Paquete "Consulta" — copia de archivos relacionados con consulta de comprobantes SUNAT
+y descarga de PDF vía Factiliza (no se modificaron los originales en backAppC/adminSPA).
+
+Estructura:
+  backAppC/controllers/factilizaController.js
+  backAppC/repositories/factiliza.repository.js
+  backAppC/repositories/facturacion.repository.js   (completarCredenciales SOL; archivo completo)
+  backAppC/repositories/empresaSuscripcion.repository.js
+  backAppC/repositories/saasPlanAcceso.repository.js
+  backAppC/helpers/normalizeXmlComprobante.js
+  backAppC/utils/dbPool.util.js
+  backAppC/utils/cifradoClaveCertificado.util.js
+  backAppC/config/deployment.config.js
+  backAppC/config/jwt.config.js
+  backAppC/middlewares/autenticate.js
+  backAppC/migrations/add_factiliza_pdf_service.sql
+  backAppC/migrations/add_factiliza_ruc_sunat_service.sql
+  backAppC/routes/factilizaConsultaSunat.routes.js   (solo estas 3 rutas; archivo nuevo derivado del router original)
+
+  adminSPA/src/app/services/consulta-xml.service.ts
+  adminSPA/src/app/services/global.ts
+  adminSPA/src/environments/environment.ts
+  adminSPA/src/app/components/facturacion/utils/gre-consulta-compra-sunat.mapper.ts
+
+Rutas HTTP (prefijo /api según app.js del proyecto destino):
+  POST .../consultar-comprobante-sunat
+  POST .../xml
+  POST .../factiliza/pdf
+
+Dependencias npm típicas (backend): express, mssql, jsonwebtoken, moment, xml2js, jszip, dotenv
+Dependencias npm típicas (Angular): @angular/common/http, file-saver, jszip, fast-xml-parser (si usas parseo local del servicio completo)
+
+Nota: facturacion.repository.js importa muchos módulos del monolito; al pegarlo en otro proyecto
+mantén la misma ruta relativa o extrae solo obtenerConfiguracionFacturacionRepo si prefieres un módulo mínimo.

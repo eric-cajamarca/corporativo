@@ -1,5 +1,43 @@
+/* Filtros: botón Buscar legible sobre fondo blanco del body del modal */
+.buscador-prod-filtros .btn-outline-light {
+  color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+.buscador-prod-filtros .btn-outline-light:hover {
+  color: #fff;
+  background-color: var(--bs-primary);
+  border-color: var(--bs-primary);
+}
+
+/* Misma idea que crear venta: tabla con altura acotada */
+.buscador-compra-thead {
+  background-color: #20c997;
+  color: #fff;
+}
+
+.buscador-compra-thead th {
+  border: none;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.buscador-compra-table-wrap {
+  max-height: min(50vh, 420px);
+}
+
+@media (max-width: 991.98px) {
+  .buscador-compra-card {
+    min-height: 3.25rem;
+    border-radius: 0.5rem;
+  }
+}
+
 .table-row-hover:hover {
   background-color: rgba(0, 123, 255, 0.08);
+  cursor: pointer;
+}
+
+.thumb-cell--card {
   cursor: pointer;
 }
 
@@ -35,11 +73,11 @@
   display: block;
 }
 
-/* Lightbox galería (pantalla completa) */
+/* Lightbox galería */
 .visor-fullscreen-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1060;
+  z-index: 2000;
   background: rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
@@ -112,8 +150,12 @@
   right: 0.5rem;
 }
 @media (min-width: 576px) {
-  .visor-btn-ant { left: -60px; }
-  .visor-btn-sig { right: -60px; }
+  .visor-btn-ant {
+    left: -60px;
+  }
+  .visor-btn-sig {
+    right: -60px;
+  }
 }
 .visor-contador {
   position: absolute;

@@ -279,6 +279,38 @@ export class CreateProductoComponent implements OnInit {
     this.activeTab.set(tab);
   }
 
+  /** Orden de pestañas antes de galería (solo flujo creación en modal). */
+  private readonly tabsCreacionOrden = ['basico', 'inventario', 'precios'] as const;
+
+  irSiguienteTabCreacion(): void {
+    const tab = this.activeTab();
+    if (tab === 'basico') {
+      const useCorr = !!this.productoForm.get('useCorrelativo')?.value;
+      const codVal = String(this.productoForm.get('codigo')?.value || '').trim();
+      const codigoOk = useCorr || codVal.length >= 2;
+      if (
+        !codigoOk ||
+        this.productoForm.get('descripcion')?.invalid ||
+        this.productoForm.get('idCategoria')?.invalid ||
+        this.productoForm.get('idMarca')?.invalid ||
+        this.productoForm.get('idPresentacion')?.invalid
+      ) {
+        this.marcarCamposComoTocados();
+        iziToast.show({
+          title: 'Advertencia',
+          titleColor: '#ffc107',
+          message: 'Complete los datos básicos obligatorios antes de continuar',
+          position: 'topRight'
+        });
+        return;
+      }
+    }
+    const idx = this.tabsCreacionOrden.indexOf(tab as (typeof this.tabsCreacionOrden)[number]);
+    if (idx >= 0 && idx < this.tabsCreacionOrden.length - 1) {
+      this.activeTab.set(this.tabsCreacionOrden[idx + 1]);
+    }
+  }
+
   calcularPrecioVenta(): void {
     if (this.loteData.costoUnitario > 0 && this.margenGanancia > 0) {
       this.precioVenta = this.loteData.costoUnitario * (1 + this.margenGanancia / 100);

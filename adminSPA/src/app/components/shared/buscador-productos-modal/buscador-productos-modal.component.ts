@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
@@ -28,6 +28,8 @@ export interface ProductoSeleccionado {
   styleUrl: './buscador-productos-modal.component.css'
 })
 export class BuscadorProductosModalComponent implements OnInit {
+  @ViewChild('inputBuscar') inputBuscar?: ElementRef<HTMLInputElement>;
+
   searchTerm = '';
   productosConst: ProductoSeleccionado[] = [];
   productosFiltrados: ProductoSeleccionado[] = [];
@@ -185,6 +187,19 @@ export class BuscadorProductosModalComponent implements OnInit {
 
   cerrar(): void {
     this.activeModal.dismiss();
+  }
+
+  /**
+   * Enfoca el campo de búsqueda tras abrir el modal (invocado desde el servicio al emitirse `shown`).
+   * Un pequeño retardo evita que el gestor de foco del modal quite el foco durante la animación.
+   */
+  enfocarCampoBusqueda(): void {
+    setTimeout(() => {
+      const el = this.inputBuscar?.nativeElement;
+      if (el) {
+        el.focus({ preventScroll: true });
+      }
+    }, 50);
   }
 
   verImagenes(p: ProductoSeleccionado, event: Event): void {

@@ -60,7 +60,8 @@ import { MovimientoUbicacionComponent } from './components/inventario/movimiento
 import { ListaMovimientosInventarioComponent } from './components/inventario/lista-movimientos-inventario/lista-movimientos-inventario.component';
 import { VentaPorPrioridadComponent } from './components/inventario/venta-por-prioridad/venta-por-prioridad.component';
 import { AsignarStockUbicacionComponent } from './components/inventario/asignar-stock-ubicacion/asignar-stock-ubicacion.component';
-import { MovimientoInventarioComponent } from './components/inventario/movimiento-inventario/movimiento-inventario.component';
+import { IngresoInventarioComponent } from './components/inventario/movimiento-inventario/ingreso-inventario.component';
+import { SalidaInventarioComponent } from './components/inventario/movimiento-inventario/salida-inventario.component';
 import { KardexComponent } from './components/inventario/kardex/kardex.component';
 import { StockActualComponent } from './components/inventario/stock-actual/stock-actual.component';
 import { ProductosVendidosComponent } from './components/inventario/productos-vendidos/productos-vendidos.component';
@@ -223,7 +224,9 @@ export const routes: Routes = [
      { path: 'inventario/stock-actual', component: StockActualComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Stock actual' },
      { path: 'inventario/productos-vendidos', component: ProductosVendidosComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Productos vendidos' },
      { path: 'inventario/productos-comprados', component: ProductosCompradosComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Productos comprados' },
-     { path: 'inventario/ingreso-salida', component: MovimientoInventarioComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Movimiento de inventario' },
+     { path: 'inventario/ingreso-salida', redirectTo: 'inventario/ingresos', pathMatch: 'full' },
+     { path: 'inventario/ingresos', component: IngresoInventarioComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Ingresos de inventario' },
+     { path: 'inventario/salidas', component: SalidaInventarioComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Salidas de inventario' },
 
      { path: 'clientes', component: IndexClientesComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Clientes'},
      { path: 'cliente/create', component: CreateClientesComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Crear Cliente'},

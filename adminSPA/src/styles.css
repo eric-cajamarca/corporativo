@@ -17,3 +17,59 @@
 .modal.show ~ .modal.show ~ .modal.show {
   z-index: 1075 !important;
 }
+
+/* Inventario: modales adaptativos (escritorio lg centrado; viewport menor que sm = pantalla completa) */
+.modal-inventario-dialog.modal-fullscreen-sm-down {
+  margin: 0;
+  max-width: 100%;
+}
+.modal-inventario-dialog.modal-fullscreen-sm-down .modal-content {
+  min-height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+.modal-inventario-dialog.modal-fullscreen-sm-down .modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.modal-inventario-dialog.modal-fullscreen-sm-down .modal-footer {
+  flex-shrink: 0;
+}
+.modal-inventario-dialog .modal-header {
+  flex-shrink: 0;
+}
+@media (min-width: 576px) {
+  .modal-inventario-dialog--crear.modal-lg {
+    max-width: min(42rem, calc(100vw - 2rem));
+  }
+}
+
+/* Buscar productos (NgbModal): igual que crear venta — modal-xl; pantalla completa solo bajo breakpoint lg */
+.buscador-productos-ngb-modal.modal-fullscreen-lg-down {
+  margin: 0;
+  max-width: 100%;
+}
+.buscador-productos-ngb-modal.modal-fullscreen-lg-down .modal-content {
+  min-height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+.buscador-productos-ngb-modal.modal-fullscreen-lg-down .modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.buscador-productos-ngb-modal.modal-fullscreen-lg-down .modal-footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 991.98px) {
+  .buscador-productos-compra-dialog .modal-body {
+    padding-bottom: 1rem;
+  }
+}

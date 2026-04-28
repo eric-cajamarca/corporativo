@@ -33,10 +33,12 @@ export class ProductoCrearModalService {
    */
   abrir(): Promise<ProductoCreadoModalResult | undefined> {
     const modalRef: NgbModalRef = this.modalService.open(CreateProductoComponent, {
-      size: 'xl',
+      size: 'lg',
       centered: true,
       backdrop: 'static',
-      scrollable: true
+      scrollable: true,
+      fullscreen: 'sm',
+      modalDialogClass: 'modal-inventario-dialog modal-inventario-dialog--crear'
     });
 
     return modalRef.result.catch(() => undefined);

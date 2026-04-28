@@ -3,21 +3,30 @@
   <button type="button" class="btn-close btn-close-white" aria-label="Cerrar" (click)="cerrar()"></button>
 </div>
 <div class="modal-body">
-  <div class="row mb-3">
-    <div class="col-md-8">
-      <input type="search" class="form-control" placeholder="Nombre o código..." [(ngModel)]="searchTerm"
-        (input)="buscarProductos()">
+  <div class="row g-2 mb-3 buscador-prod-filtros">
+    <div class="col-12 col-lg-8">
+      <input
+        #inputBuscar
+        type="search"
+        class="form-control"
+        placeholder="Nombre o código..."
+        [(ngModel)]="searchTerm"
+        (input)="buscarProductos()"
+        autocomplete="off"
+      />
     </div>
-    <div class="col-md-4">
-      <button type="button" class="btn btn-outline-success w-100" (click)="buscarProductos()">
+    <div class="col-12 col-lg-4">
+      <button type="button" class="btn btn-outline-light w-100" (click)="buscarProductos()">
         <i class="bi bi-search"></i> Buscar
       </button>
     </div>
   </div>
   <p class="text-muted small mb-0" *ngIf="loading"><i class="bi bi-hourglass-split"></i> Actualizando lista, stock y precios…</p>
-  <div class="table-responsive" style="max-height: 300px;" *ngIf="!loading">
+
+  <!-- Escritorio: tabla (mismo criterio que crear venta: lg en adelante) -->
+  <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap" *ngIf="!loading">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light sticky-top">
+      <thead class="buscador-compra-thead">
         <tr>
           <th *ngIf="productosConImagenes">Imagen</th>
           <th>Código</th>
@@ -27,7 +36,6 @@
           <th>Precio</th>
           <th>Sucursal</th>
           <th>Stock</th>
-          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -44,18 +52,43 @@
           <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
           <td>{{ p.sucursal }}</td>
           <td>{{ p.stock }}</td>
-          <!--<td><i class="bi bi-plus-circle-fill text-success"></i></td>-->
         </tr>
       </tbody>
     </table>
   </div>
+
+  <!-- Móvil / tablet: tarjetas -->
+  <div class="d-lg-none buscador-compra-cards" *ngIf="!loading">
+    <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productosFiltrados">
+      <div class="d-flex gap-2 align-items-start">
+        <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
+          <div class="thumb-cell thumb-cell--card" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
+            <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
+          </div>
+        </div>
+        <div class="flex-grow-1 min-w-0" role="button" (click)="seleccionar(p)">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <span class="fw-semibold text-truncate">{{ p?.codigo }}</span>
+            <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
+          </div>
+          <div class="small mt-1">{{ p?.descripcion }}</div>
+          <div class="small text-muted mt-1">{{ p?.categoria }} · {{ p?.codigoPresentacion }}</div>
+          <div class="small d-flex justify-content-between mt-2">
+            <span class="text-truncate me-1">{{ p?.sucursal }}</span>
+            <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <p class="text-muted small mt-2 mb-0" *ngIf="!loading && productosFiltrados.length === 0">No hay productos que coincidan.</p>
 </div>
 <div class="modal-footer">
   <button type="button" class="btn btn-secondary" (click)="cerrar()">Cerrar</button>
 </div>
 
-<!-- Lightbox galería (solo cuando productosConImagenes y hay imágenes) -->
+<!-- Lightbox galería -->
 <div class="visor-fullscreen-overlay" *ngIf="visorAbierto && imagenesProductoActual.length > 0" (click)="cerrarVisor()">
   <div class="visor-fullscreen-contenido" (click)="$event.stopPropagation()">
     <button type="button" class="visor-btn-cerrar" (click)="cerrarVisor()" aria-label="Cerrar">×</button>

@@ -1,0 +1,317 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header mov-inv-header">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center flex-wrap gap-3">
+      <div class="flex-grow-1 min-w-0">
+        <h1 class="content-title mb-1">{{ tituloPagina }}</h1>
+        <p class="content-subtitle text-muted mb-0">{{ subtituloPagina }}</p>
+      </div>
+      <div class="d-flex flex-column flex-sm-row gap-2 mov-inv-header-actions">
+        @if (modoIngreso) {
+          <a routerLink="/inventario/salidas" class="btn btn-outline-secondary btn-sm text-nowrap">Ir a salidas</a>
+        } @else {
+          <a routerLink="/inventario/ingresos" class="btn btn-outline-secondary btn-sm text-nowrap">Ir a ingresos</a>
+        }
+        <a routerLink="/inventario/movimientos" class="btn btn-outline-primary btn-sm text-nowrap">Ver movimientos</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mov-inv-card shadow-sm">
+    <div class="card-body">
+      <div class="mov-inv-help alert alert-light border small mb-4 mb-lg-3" role="note">
+        <strong>Comprobantes</strong> — {{ textoAyudaComprobantes }}
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="registrar()">
+        <h6 class="text-muted border-bottom pb-2 mb-3 mov-inv-section-title">Cabecera</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-lg-4">
+            <label class="form-label">Tipo de movimiento <span class="text-danger">*</span></label>
+            <select class="form-select" formControlName="tipoMovimiento">
+              <option value="">-- Seleccione tipo --</option>
+              @for (t of tiposMovimiento; track t.codigo) {
+                <option [value]="t.codigo">{{ t.descripcion }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-12 col-lg-4">
+            <label class="form-label">
+              @if (esTransferenciaSucursal()) {
+                Sucursal origen (sale mercadería)
+              } @else {
+                Sucursal
+              }
+              <span class="text-danger">*</span>
+            </label>
+            <select class="form-select" formControlName="idSucursal">
+              <option value="">-- Seleccione sucursal --</option>
+              @for (s of sucursales; track s.idSucursal) {
+                <option [value]="s.idSucursal">{{ s.nombre }}</option>
+              }
+            </select>
+          </div>
+          @if (esTransferenciaSucursal()) {
+            <div class="col-12 col-lg-4">
+              <label class="form-label">Sucursal destino (ingresa mercadería) <span class="text-danger">*</span></label>
+              <select class="form-select" formControlName="idSucursalDestino">
+                <option value="">-- Seleccione destino --</option>
+                @for (s of sucursales; track s.idSucursal) {
+                  <option [value]="s.idSucursal">{{ s.nombre }}</option>
+                }
+              </select>
+              <small class="text-muted d-block mt-1">Use comprobante TF. El costo en destino sale del promedio ponderado de los lotes en origen.</small>
+            </div>
+          }
+          <div class="col-12 col-lg-4">
+            <label class="form-label">Fecha movimiento <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" formControlName="fechaMovimiento" />
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-md-6 col-xl-4">
+            <label class="form-label">
+              Documento
+              @if (esTransferenciaSucursal()) {
+                <span class="text-danger">*</span> (TF — transferencia)
+              } @else {
+                (opcional)
+              }
+            </label>
+            <select class="form-select" formControlName="idComprobante" (change)="onComprobanteChange($event)">
+              <option value="">-- Seleccione comprobante --</option>
+              @for (c of comprobantesInventario; track c.idComprobante) {
+                <option [value]="c.idComprobante">{{ c.codigo }} - {{ c.nombre }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-12 col-md-6 col-xl-4">
+            <label class="form-label">Correlativo</label>
+            <input type="text" class="form-control" formControlName="docRelacionado" readonly />
+          </div>
+          <div class="col-12 col-xl-8">
+            <label class="form-label">Observaciones</label>
+            <input type="text" class="form-control" formControlName="observaciones" placeholder="Opcional" />
+          </div>
+        </div>
+
+        <h6 class="text-muted border-bottom pb-2 mb-3 mt-4 mov-inv-section-title">Detalle del movimiento</h6>
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-start gap-2 mb-3">
+          <span class="text-muted small mov-inv-hint">
+            @if (esTransferenciaSucursal()) {
+              Indique cantidades a enviar desde la sucursal origen; el sistema descuenta allí y crea lote en destino con costo ponderado.
+            } @else if (esEntrada()) {
+              Agregue productos y cantidades. Puede indicar costo unitario, fecha de vencimiento y nº de lote.
+            } @else {
+              Agregue productos y cantidades a dar de baja o transferir.
+            }
+          </span>
+          <div class="d-grid d-sm-flex flex-wrap gap-2 mov-inv-actions">
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFila()">
+              <i class="bi bi-plus-circle me-1"></i> Agregar línea
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success" (click)="abrirBuscadorProductos()">
+              <i class="bi bi-search me-1"></i> Buscar producto
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirCrearProducto()">
+              <i class="bi bi-box-open me-1"></i> Crear producto
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla escritorio -->
+        <div class="d-none d-lg-block table-responsive mov-inv-table-wrap">
+          <table class="table table-bordered table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Producto <span class="text-danger">*</span></th>
+                <th class="mov-inv-col-qty">Cantidad <span class="text-danger">*</span></th>
+                @if (esEntrada()) {
+                  <th class="mov-inv-col-cost">Costo unit.</th>
+                  <th class="mov-inv-col-date">F. venc.</th>
+                  <th class="mov-inv-col-lote">Nº lote</th>
+                }
+                <th class="mov-inv-col-del"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fila of filas; track $index) {
+                <tr>
+                  <td>
+                    <select
+                      class="form-select form-select-sm"
+                      [ngModel]="fila.idProducto"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="fila.idProducto = $event; onProductoChange($index, $event)"
+                    >
+                      <option value="">-- Producto --</option>
+                      @for (p of productos; track p.idProducto) {
+                        <option [value]="p.idProducto">{{ p.descripcion || p.nombre }} ({{ p.codigo || 'N/D' }})</option>
+                      }
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      class="form-control form-control-sm"
+                      min="0.01"
+                      step="0.01"
+                      [(ngModel)]="fila.cantidad"
+                      [ngModelOptions]="{ standalone: true }"
+                    />
+                  </td>
+                  @if (esEntrada()) {
+                    <td>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm"
+                        min="0"
+                        step="0.01"
+                        [(ngModel)]="fila.costoUnitario"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="0"
+                      />
+                    </td>
+                    <td>
+                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        class="form-control form-control-sm"
+                        [(ngModel)]="fila.numeroLote"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="Opc."
+                      />
+                    </td>
+                  }
+                  <td>
+                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarFila($index)" [disabled]="filas.length <= 1" title="Quitar">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tarjetas móvil / tablet -->
+        <div class="d-lg-none mov-inv-line-cards">
+          @for (fila of filas; track $index) {
+            <div class="card mov-inv-line-card mb-3">
+              <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge bg-secondary">Línea {{ $index + 1 }}</span>
+                  <button type="button" class="btn btn-sm btn-outline-danger" (click)="quitarFila($index)" [disabled]="filas.length <= 1" title="Quitar">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+                <label class="form-label small mb-1">Producto <span class="text-danger">*</span></label>
+                <select
+                  class="form-select form-select-sm mb-2"
+                  [ngModel]="fila.idProducto"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="fila.idProducto = $event; onProductoChange($index, $event)"
+                >
+                  <option value="">-- Producto --</option>
+                  @for (p of productos; track p.idProducto) {
+                    <option [value]="p.idProducto">{{ p.descripcion || p.nombre }} ({{ p.codigo || 'N/D' }})</option>
+                  }
+                </select>
+                <label class="form-label small mb-1">Cantidad <span class="text-danger">*</span></label>
+                <input
+                  type="number"
+                  class="form-control form-control-sm mb-2"
+                  min="0.01"
+                  step="0.01"
+                  [(ngModel)]="fila.cantidad"
+                  [ngModelOptions]="{ standalone: true }"
+                />
+                @if (esEntrada()) {
+                  <div class="row g-2">
+                    <div class="col-6">
+                      <label class="form-label small mb-1">Costo unit.</label>
+                      <input
+                        type="number"
+                        class="form-control form-control-sm"
+                        min="0"
+                        step="0.01"
+                        [(ngModel)]="fila.costoUnitario"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-1">F. venc.</label>
+                      <input type="date" class="form-control form-control-sm" [(ngModel)]="fila.fechaVencimiento" [ngModelOptions]="{ standalone: true }" />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label small mb-1">Nº lote</label>
+                      <input
+                        type="text"
+                        class="form-control form-control-sm"
+                        [(ngModel)]="fila.numeroLote"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (esEntrada()) {
+          <div class="row mt-2">
+            <div class="col-md-6"></div>
+            <div class="col-md-6 text-md-end">
+              <strong>Sub total: </strong> {{ subTotal | number: '1.2-2' }}
+            </div>
+          </div>
+        }
+
+        <div class="mt-4 d-grid d-sm-flex gap-2 mov-inv-footer-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="guardando">
+            @if (guardando) {
+              <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            @if (!guardando) {
+              <i class="bi bi-save me-1"></i>
+            }
+            {{ etiquetaBotonGuardar }}
+          </button>
+          <a routerLink="/inventario" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mov-inv-card shadow-sm mt-3">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span class="fw-semibold small mb-0">Actividad reciente (30 días)</span>
+      <a routerLink="/inventario/movimientos" class="btn btn-link btn-sm p-0">Historial completo</a>
+    </div>
+    <div class="card-body py-2">
+      @if (cargandoRecientes) {
+        <p class="text-muted small mb-0">Cargando…</p>
+      } @else if (!movimientosRecientes.length) {
+        <p class="text-muted small mb-0">No hay movimientos de este tipo en el periodo.</p>
+      } @else {
+        <ul class="list-group list-group-flush mov-inv-reciente-list">
+          @for (m of movimientosRecientes; track m.idMovimiento) {
+            <li class="list-group-item px-0 py-2 d-flex flex-column flex-sm-row flex-sm-wrap justify-content-between gap-1">
+              <span class="small fw-medium">{{ etiquetaTipoReciente(m) }}</span>
+              <span class="small text-muted text-sm-end">{{ m.fecha || m.fMovimiento }}</span>
+              <span class="small">{{ textoDocumentoReciente(m) }}</span>
+              <span class="small text-muted">{{ m.sucursal }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+</main>

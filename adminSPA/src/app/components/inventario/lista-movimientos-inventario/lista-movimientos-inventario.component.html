@@ -44,9 +44,12 @@
               }
             </select>
           </div>
-          <div class="col-12 col-lg-3 d-flex flex-column flex-sm-row justify-content-lg-end align-items-stretch align-items-sm-end gap-2">
-            <a routerLink="/inventario/ingreso-salida" class="btn btn-success btn-sm flex-grow-1 flex-lg-grow-0">
-              <i class="bi bi-plus-lg me-1"></i> Nuevo movimiento
+          <div class="col-12 col-lg-3 d-flex flex-column flex-sm-row flex-wrap justify-content-lg-end align-items-stretch align-items-sm-end gap-2">
+            <a routerLink="/inventario/ingresos" class="btn btn-success btn-sm flex-grow-1 flex-lg-grow-0">
+              <i class="bi bi-plus-lg me-1"></i> Nuevo ingreso
+            </a>
+            <a routerLink="/inventario/salidas" class="btn btn-outline-success btn-sm flex-grow-1 flex-lg-grow-0">
+              <i class="bi bi-box-arrow-up me-1"></i> Nueva salida
             </a>
             <button type="button" class="btn btn-outline-dark btn-sm" (click)="limpiarFiltros()" title="Limpiar filtros">
               <i class="bi bi-x-lg"></i>
@@ -77,9 +80,9 @@
           <thead>
             <tr>
               <th class="text-center mi-th-acciones" style="width: 8rem">
-                <a routerLink="/inventario/ingreso-salida" class="text-white text-decoration-none" title="Nuevo movimiento">
+                <span class="text-white" title="Use los botones arriba para nuevo ingreso o salida">
                   <i class="bi bi-plus-lg text-success me-1"></i>Acciones
-                </a>
+                </span>
               </th>
               <th style="width: 6.5rem">Fecha</th>
               <th style="width: 11rem">Tipo</th>
