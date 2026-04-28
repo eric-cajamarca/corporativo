@@ -481,6 +481,7 @@ const obtenerNavegacionSidebar = async (pool, user) => {
             submenu: [
                 { nombre: 'Stock General', ruta: '/inventario', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Stock Actual', ruta: '/inventario/stock-actual', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
+                { nombre: 'Conteo físico', ruta: '/inventario/conteo-fisico', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Kardex', ruta: '/inventario/kardex', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Movimientos', ruta: '/inventario/movimientos', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },
                 { nombre: 'Ingresos y salidas', ruta: '/inventario/ingreso-salida', permiso: 'VER_INVENTARIO', visible: esAdmin || permisos.includes('VER_INVENTARIO') },

@@ -106,8 +106,45 @@ async function actualizar(pool, idEmpresa, idComprobante, updates) {
   return result.rowsAffected[0];
 }
 
+/**
+ * Obtiene comprobante por id y empresa (compat inventario).
+ * Devuelve objeto con forma { recordset: [...] } para compatibilidad.
+ */
+async function obtenerComprobantePorIdEmpresa(conn, idEmpresa, idComprobante) {
+  const result = await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idComprobante', sql.Int, idComprobante)
+    .query(`
+      SELECT TOP 1 idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
+      FROM Comprobantes
+      WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
+    `);
+  return result;
+}
+
+/**
+ * Actualiza correlativo del comprobante (compat inventario/cotizaciones/ventas).
+ */
+async function actualizarNumeroComprobante(conn, idEmpresa, idComprobante, numeroUsado) {
+  const num = parseInt(String(numeroUsado || '0').replace(/^0+/, '') || '0', 10);
+  if (Number.isNaN(num) || num < 0) return;
+  await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idComprobante', sql.Int, idComprobante)
+    .input('numero', sql.Int, num)
+    .query(`
+      UPDATE Comprobantes
+      SET numero = @numero
+      WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
+    `);
+}
+
 module.exports = {
   obtenerComprobantePorCodigoRepo,
+  obtenerComprobantePorIdEmpresa,
+  actualizarNumeroComprobante,
   listarPorEmpresaYuso,
   listarPorTablaAlias,
   insertar,

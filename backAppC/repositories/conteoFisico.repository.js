@@ -1,0 +1,113 @@
+const sql = require('mssql');
+
+exports.insertarSesion = async (transaction, datos) => {
+  const {
+    idSesion,
+    idEmpresa,
+    idSucursal,
+    tipoConteo,
+    observaciones,
+    idUsuarioCreacion
+  } = datos;
+  await transaction.request()
+    .input('idSesion', sql.UniqueIdentifier, idSesion)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('tipoConteo', sql.VarChar(20), tipoConteo)
+    .input('observaciones', sql.NVarChar(500), observaciones || null)
+    .input('idUsuarioCreacion', sql.UniqueIdentifier, idUsuarioCreacion || null)
+    .query(`
+      INSERT INTO InventarioFisicoSesion (idSesion, idEmpresa, idSucursal, tipoConteo, estado, observaciones, idUsuarioCreacion)
+      VALUES (@idSesion, @idEmpresa, @idSucursal, @tipoConteo, 'BORRADOR', @observaciones, @idUsuarioCreacion)
+    `);
+};
+
+exports.obtenerSesionPorId = async (conn, idEmpresa, idSesion) => {
+  const r = await conn.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSesion', sql.UniqueIdentifier, idSesion)
+    .query(`
+      SELECT s.idSesion, s.idEmpresa, s.idSucursal, sc.nombre AS nombreSucursal,
+             s.tipoConteo, s.estado, s.observaciones,
+             CONVERT(VARCHAR(19), s.fCreacion, 120) AS fCreacion
+      FROM InventarioFisicoSesion s
+      INNER JOIN Sucursal sc ON sc.idSucursal = s.idSucursal AND sc.idEmpresa = s.idEmpresa
+      WHERE s.idEmpresa = @idEmpresa AND s.idSesion = @idSesion
+    `);
+  return r.recordset && r.recordset[0] ? r.recordset[0] : null;
+};
+
+exports.listarLineasPorSesion = async (conn, idEmpresa, idSesion) => {
+  const r = await conn.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSesion', sql.UniqueIdentifier, idSesion)
+    .query(`
+      SELECT l.idLinea, l.idSesion, l.idProducto, l.stockSistema, l.stockReal, l.verificado, l.notas,
+             CONVERT(VARCHAR(19), l.fModificacion, 120) AS fModificacion,
+             p.codigo AS productoCodigo, p.descripcion AS productoDescripcion,
+             ISNULL(m.nombre, '') AS marca
+      FROM InventarioFisicoLinea l
+      INNER JOIN InventarioFisicoSesion s ON s.idSesion = l.idSesion AND s.idEmpresa = @idEmpresa
+      INNER JOIN Productos p ON p.idProducto = l.idProducto AND p.idEmpresa = s.idEmpresa
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
+      WHERE l.idSesion = @idSesion
+      ORDER BY p.descripcion
+    `);
+  return r.recordset || [];
+};
+
+exports.validarSucursalPerteneceEmpresa = async (conn, idEmpresa, idSucursal) => {
+  const r = await conn.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .query(`SELECT 1 AS ok FROM Sucursal WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal`);
+  return !!(r.recordset && r.recordset[0]);
+};
+
+/**
+ * Upsert línea: actualiza stockSistema referencia desde caller.
+ */
+exports.upsertLinea = async (transaction, datos) => {
+  const {
+    idSesion,
+    idProducto,
+    stockSistema,
+    stockReal,
+    verificado,
+    notas
+  } = datos;
+  const ver = verificado ? 1 : 0;
+  const sr = stockReal != null && stockReal !== '' ? Number(stockReal) : null;
+
+  const r = await transaction.request()
+    .input('idSesion', sql.UniqueIdentifier, idSesion)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('stockSistema', sql.Decimal(18, 3), stockSistema)
+    .input('stockReal', sql.Decimal(18, 3), sr)
+    .input('verificado', sql.Bit, ver)
+    .input('notas', sql.NVarChar(500), notas || null)
+    .query(`
+      MERGE InventarioFisicoLinea AS t
+      USING (SELECT @idSesion AS idSesion, @idProducto AS idProducto) AS s
+      ON t.idSesion = s.idSesion AND t.idProducto = s.idProducto
+      WHEN MATCHED THEN UPDATE SET
+        stockSistema = @stockSistema,
+        stockReal = @stockReal,
+        verificado = @verificado,
+        notas = @notas,
+        fModificacion = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT (idSesion, idProducto, stockSistema, stockReal, verificado, notas)
+      VALUES (@idSesion, @idProducto, @stockSistema, @stockReal, @verificado, @notas);
+    `);
+  return r.rowsAffected;
+};
+
+exports.marcarSesionCerrada = async (transaction, idEmpresa, idSesion) => {
+  await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSesion', sql.UniqueIdentifier, idSesion)
+    .query(`
+      UPDATE InventarioFisicoSesion SET estado = 'CERRADO'
+      WHERE idEmpresa = @idEmpresa AND idSesion = @idSesion AND estado = 'BORRADOR'
+    `);
+};

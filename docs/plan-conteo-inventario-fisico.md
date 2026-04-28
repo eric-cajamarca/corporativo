@@ -282,8 +282,7 @@ sequenceDiagram
 
 ---
 
-## 11. Riesgos y mitigaciones
-
+## 11. Riesgos y mitigacion
 | Riesgo | Mitigación |
 |--------|------------|
 | Confusión snapshot vs ajuste | Documentar y mostrar en UI: el **movimiento** usa stock **al aplicar**; `stockSistema` en línea es **referencia**. |

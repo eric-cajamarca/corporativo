@@ -1,6 +1,7 @@
 // controllers/inventarioController.js
 const inventarioService = require('../services/inventario.service');
 const kardexService = require('../services/kardex.service');
+const conteoFisicoService = require('../services/conteoFisico.service');
 
 /**
  * POST /api/inventario/movimientos
@@ -207,5 +208,105 @@ exports.productosComprados = async (req, res) => {
     }
     console.error('inventarioController productosComprados:', error);
     return res.status(500).json({ message: error.message || 'Error al obtener productos comprados' });
+  }
+};
+
+/** POST /api/inventario/conteo-fisico/sesiones */
+exports.conteoFisicoCrearSesion = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const idUsuario = req.user.sub || req.user.idUsuario;
+    const resultado = await conteoFisicoService.crearSesion(req.user.empresa, idUsuario, req.body);
+    return res.status(200).json(resultado);
+  } catch (error) {
+    console.error('inventarioController conteoFisicoCrearSesion:', error);
+    return res.status(500).json({ message: error.message || 'Error al crear sesión de conteo' });
+  }
+};
+
+/** GET /api/inventario/conteo-fisico/sesiones/:idSesion */
+exports.conteoFisicoObtenerSesion = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const data = await conteoFisicoService.obtenerSesion(req.user.empresa, req.params.idSesion);
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('inventarioController conteoFisicoObtenerSesion:', error);
+    const msg = error.message || 'Error al obtener sesión';
+    if (msg === 'Sesión no encontrada') {
+      return res.status(404).json({ message: msg });
+    }
+    return res.status(500).json({ message: msg });
+  }
+};
+
+/** GET /api/inventario/conteo-fisico/sesiones/:idSesion/previsualizar */
+exports.conteoFisicoPrevisualizar = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const data = await conteoFisicoService.previsualizarAplicacion(req.user.empresa, req.params.idSesion);
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('inventarioController conteoFisicoPrevisualizar:', error);
+    return res.status(500).json({ message: error.message || 'Error al previsualizar' });
+  }
+};
+
+/** PUT /api/inventario/conteo-fisico/sesiones/:idSesion/lineas/:idProducto */
+exports.conteoFisicoUpsertLinea = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const body = { ...(req.body || {}), idProducto: req.params.idProducto };
+    const data = await conteoFisicoService.upsertLinea(req.user.empresa, req.params.idSesion, body);
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('inventarioController conteoFisicoUpsertLinea:', error);
+    return res.status(500).json({ message: error.message || 'Error al guardar línea' });
+  }
+};
+
+/** POST /api/inventario/conteo-fisico/sesiones/:idSesion/aplicar-movimientos */
+exports.conteoFisicoAplicarMovimientos = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const idUsuario = req.user.sub || req.user.idUsuario;
+    const data = await conteoFisicoService.aplicarMovimientos(
+      req.user.empresa,
+      idUsuario,
+      req.params.idSesion,
+      req.body || {}
+    );
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('inventarioController conteoFisicoAplicarMovimientos:', error);
+    return res.status(500).json({ message: error.message || 'Error al aplicar movimientos' });
+  }
+};
+
+/** GET /api/inventario/conteo-fisico/sesiones/:idSesion/export (JSON para Excel/PDF en cliente; sesión cerrada) */
+exports.conteoFisicoExportData = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const data = await conteoFisicoService.obtenerSesionParaExport(req.user.empresa, req.params.idSesion);
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('inventarioController conteoFisicoExportData:', error);
+    const msg = error.message || 'Error al exportar';
+    if (msg.includes('solo está disponible')) {
+      return res.status(400).json({ message: msg });
+    }
+    return res.status(500).json({ message: msg });
   }
 };

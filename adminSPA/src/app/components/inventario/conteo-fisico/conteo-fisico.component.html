@@ -1,0 +1,294 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-wrap">
+    <div class="content-header">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <div>
+          <h1 class="content-title mb-1">Conteo físico</h1>
+          <p class="content-subtitle text-muted mb-0">
+            Borrador por sucursal; el ajuste se calcula al aplicar frente al stock actual del sistema.
+          </p>
+        </div>
+        @if (idSesionEnCurso) {
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="nuevaSesionDesdeCabecera()">
+            <i class="bi bi-plus-lg me-1"></i> Nueva sesión
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (!idSesionEnCurso) {
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Nueva sesión de conteo</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label small fw-semibold">Sucursal</label>
+              <select class="form-select form-select-sm" [(ngModel)]="idSucursalNuevaSesion">
+                <option value="">Seleccione…</option>
+                @for (s of sucursales; track s.idSucursal) {
+                  <option [ngValue]="s.idSucursal">{{ s.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small fw-semibold">Tipo</label>
+              <select class="form-select form-select-sm" [(ngModel)]="tipoConteoNueva">
+                @for (t of tiposConteo; track t.id) {
+                  <option [ngValue]="t.id">{{ t.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-12 col-md-4 d-flex align-items-end">
+              <button type="button" class="btn btn-primary w-100" (click)="crearSesion()">
+                Crear sesión (borrador)
+              </button>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">Observaciones (opcional)</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="observacionesNueva" maxlength="500" />
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (sesion) {
+      <div class="card shadow-sm mb-3 border-start border-4" [class.border-primary]="esBorrador()" [class.border-secondary]="!esBorrador()">
+        <div class="card-body py-3">
+          <div class="row g-2 align-items-center">
+            <div class="col-12 col-md-8">
+              <div class="fw-semibold">{{ sesion.nombreSucursal }}</div>
+              <div class="small text-muted">
+                {{ sesion.tipoConteo }} · creada {{ sesion.fCreacion }}
+                @if (sesion.observaciones) {
+                  <span> · {{ sesion.observaciones }}</span>
+                }
+              </div>
+            </div>
+            <div class="col-12 col-md-4 text-md-end">
+              @if (sesion.estado === 'BORRADOR') {
+                <span class="badge bg-warning text-dark">Borrador</span>
+              } @else {
+                <span class="badge bg-secondary">Cerrada</span>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (sesion && esBorrador()) {
+      <div class="row g-3">
+        <div class="col-12 col-lg-7">
+          <div class="card shadow-sm mb-3">
+            <div class="card-header fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <span>Búsqueda (stock actual de la sucursal)</span>
+              @if (cargandoBusqueda) {
+                <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+              }
+            </div>
+            <div class="card-body">
+              <label class="form-label small">Buscar producto</label>
+              <input
+                type="text"
+                class="form-control form-control-sm mb-2"
+                [(ngModel)]="buscar"
+                (input)="onBuscarInput()"
+                placeholder="Código, descripción, marca…"
+              />
+              <div class="table-responsive conteo-table-wrap">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Código</th>
+                      <th>Producto</th>
+                      <th class="text-end">Stock sist.</th>
+                      <th class="text-end">Stock real</th>
+                      <th class="text-end"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of resultados; track trackProducto($index, p)) {
+                      @let srLinea = stockRealLineaEnBusqueda(p);
+                      <tr [class.table-active]="productoSeleccionado?.idProducto === p.idProducto">
+                        <td class="text-nowrap">{{ p.codigo }}</td>
+                        <td class="product-desc-cell" [title]="p.descripcion">{{ p.descripcion }}</td>
+                        <td class="text-end">{{ p.stock | number : '1.0-3' }}</td>
+                        <td class="text-end text-nowrap">
+                          @if (srLinea != null) {
+                            {{ srLinea | number : '1.0-3' }}
+                          } @else {
+                            <span class="text-muted small">—</span>
+                          }
+                        </td>
+                        <td class="text-end">
+                          <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirProducto(p)">Elegir</button>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="text-muted text-center py-3">Sin resultados. Escriba para buscar.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <div #detalleConteoCard id="detalleConteoCard" class="card shadow-sm border-primary mb-3 conteo-detalle-card">
+            <div class="card-header fw-semibold">Detalle del conteo</div>
+            <div class="card-body">
+              @if (!productoSeleccionado) {
+                <p class="text-muted small mb-0">Elija un producto de la tabla para registrar stock real y verificado.</p>
+              } @else {
+                <div class="mb-2">
+                  <div class="fw-semibold">{{ productoSeleccionado.descripcion }}</div>
+                  <div class="small text-muted">{{ productoSeleccionado.codigo }} · Stock en sistema: {{ productoSeleccionado.stock | number : '1.0-3' }}</div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-0">Stock real (físico)</label>
+                  <input type="number" class="form-control form-control-sm" [(ngModel)]="stockRealInput" step="0.001" />
+                </div>
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="chkVerif" [(ngModel)]="verificadoInput" />
+                  <label class="form-check-label small" for="chkVerif">Verificado</label>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small mb-0">Notas</label>
+                  <input type="text" class="form-control form-control-sm" [(ngModel)]="notasInput" maxlength="500" />
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-primary btn-sm" (click)="guardarLinea()">Guardar línea</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="limpiarSeleccionProducto()">Cerrar</button>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Líneas guardadas en esta sesión</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Código</th>
+                  <th>Producto</th>
+                  <th class="text-end">Stock ref.</th>
+                  <th class="text-end">Stock real</th>
+                  <th>Verif.</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of lineas; track trackLinea($index, l)) {
+                  <tr>
+                    <td>{{ l.productoCodigo }}</td>
+                    <td class="product-desc-cell" [title]="l.productoDescripcion">{{ l.productoDescripcion }}</td>
+                    <td class="text-end">{{ l.stockSistema | number : '1.0-3' }}</td>
+                    <td class="text-end">{{ l.stockReal != null ? (l.stockReal | number : '1.0-3') : '—' }}</td>
+                    <td>{{ l.verificado ? 'Sí' : 'No' }}</td>
+                    <td class="small text-muted">{{ l.notas || '—' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="text-center text-muted py-3">Aún no hay líneas.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-3 border-warning">
+        <div class="card-header fw-semibold">Previsualización antes de registrar movimientos</div>
+        <div class="card-body">
+          <p class="small text-muted mb-2">
+            El <strong>delta</strong> es <code>stock real</code> menos el <strong>stock actual del sistema en este momento</strong> (no el valor guardado como referencia).
+          </p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="cargarPrevisualizacion()" [disabled]="cargandoPreview">
+              @if (cargandoPreview) {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+              }
+              Previsualizar ajustes
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" (click)="aplicarMovimientos()" [disabled]="aplicando || !previewCargado">
+              @if (aplicando) {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+              }
+              Registrar movimientos y cerrar
+            </button>
+          </div>
+          @if (previewCargado) {
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Producto</th>
+                    <th class="text-end">Stock ref. guardado</th>
+                    <th class="text-end">Stock actual hoy</th>
+                    <th class="text-end">Stock real</th>
+                    <th class="text-end">Delta</th>
+                    <th>Movimiento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of previewFilas; track trackPreview($index, r)) {
+                    <tr>
+                      <td>{{ r.productoDescripcion }}</td>
+                      <td class="text-end">{{ r.stockSistemaAlGuardar | number : '1.0-3' }}</td>
+                      <td class="text-end">{{ r.stockActual | number : '1.0-3' }}</td>
+                      <td class="text-end">{{ r.stockReal != null ? (r.stockReal | number : '1.0-3') : '—' }}</td>
+                      <td class="text-end fw-semibold" [ngClass]="{ 'text-success': (r.delta || 0) > 0, 'text-danger': (r.delta || 0) < 0 }">
+                        {{ r.delta != null ? (r.delta | number : '1.0-3') : '—' }}
+                      </td>
+                      <td class="small">
+                        @if (!r.verificado) {
+                          <span class="text-muted">No verificado (omitido)</span>
+                        } @else if (r.delta === 0) {
+                          <span class="text-muted">Sin ajuste</span>
+                        } @else if (r.seAplicaraMovimiento) {
+                          <span>Reajuste {{ (r.delta || 0) > 0 ? 'positivo' : 'negativo' }}</span>
+                        } @else {
+                          <span class="text-muted">—</span>
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="6" class="text-center text-muted">Sin líneas en la sesión.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (sesion && sesion.estado === 'CERRADO') {
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold">Exportar sesión cerrada</div>
+        <div class="card-body d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-success btn-sm" (click)="exportarExcel()">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Excel
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm" (click)="exportarPdf()">
+            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</main>

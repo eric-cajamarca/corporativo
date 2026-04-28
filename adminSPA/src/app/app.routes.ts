@@ -64,6 +64,7 @@ import { IngresoInventarioComponent } from './components/inventario/movimiento-i
 import { SalidaInventarioComponent } from './components/inventario/movimiento-inventario/salida-inventario.component';
 import { KardexComponent } from './components/inventario/kardex/kardex.component';
 import { StockActualComponent } from './components/inventario/stock-actual/stock-actual.component';
+import { ConteoFisicoComponent } from './components/inventario/conteo-fisico/conteo-fisico.component';
 import { ProductosVendidosComponent } from './components/inventario/productos-vendidos/productos-vendidos.component';
 import { ProductosCompradosComponent } from './components/inventario/productos-comprados/productos-comprados.component';
 import { IndexCajaComponent } from './components/caja/index-caja/index-caja.component';
@@ -222,6 +223,7 @@ export const routes: Routes = [
      { path: 'detalle-compras', component: DetalleComprasComponent,canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Detalle Compra' },
      { path: 'inventario', component: PrincipalInventarioComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Inventario'},
      { path: 'inventario/stock-actual', component: StockActualComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Stock actual' },
+     { path: 'inventario/conteo-fisico', component: ConteoFisicoComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Conteo físico' },
      { path: 'inventario/productos-vendidos', component: ProductosVendidosComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Productos vendidos' },
      { path: 'inventario/productos-comprados', component: ProductosCompradosComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Productos comprados' },
      { path: 'inventario/ingreso-salida', redirectTo: 'inventario/ingresos', pathMatch: 'full' },

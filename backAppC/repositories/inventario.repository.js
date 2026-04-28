@@ -468,3 +468,35 @@ exports.listarStockActual = async (pool, opts) => {
 
   return result.recordset || [];
 };
+
+/**
+ * Stock agregado (suma cantidadDisponible en lotes) para un producto en una sucursal.
+ * @param {import('mssql').Transaction|import('mssql').ConnectionPool} conn Transaction o pool
+ */
+exports.obtenerStockAgregadoProductoSucursal = async (conn, idEmpresa, idSucursal, idProducto) => {
+  const r = await conn.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT CAST(COALESCE(SUM(l.cantidadDisponible), 0) AS DECIMAL(18, 3)) AS stock
+      FROM Lotes l
+      WHERE l.idEmpresa = @idEmpresa AND l.idSucursal = @idSucursal AND l.idProducto = @idProducto
+    `);
+  const row = r.recordset && r.recordset[0];
+  return row ? Number(row.stock) || 0 : 0;
+};
+
+/** Costo unitario del catálogo (para reajuste positivo). */
+exports.obtenerCostoUnitarioProducto = async (conn, idEmpresa, idProducto) => {
+  const r = await conn.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT CAST(ISNULL(p.cUnitario, 0) AS DECIMAL(18, 6)) AS cUnitario
+      FROM Productos p
+      WHERE p.idEmpresa = @idEmpresa AND p.idProducto = @idProducto AND p.estado = 1
+    `);
+  const row = r.recordset && r.recordset[0];
+  return row ? Number(row.cUnitario) || 0 : 0;
+};
