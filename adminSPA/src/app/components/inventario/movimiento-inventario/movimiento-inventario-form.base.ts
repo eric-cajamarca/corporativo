@@ -76,8 +76,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   }
 
   fechaHoy(): string {
-    const d = new Date();
-    return d.toISOString().slice(0, 10);
+    return this.fechaLocalYmd(new Date());
   }
 
   ngOnInit(): void {

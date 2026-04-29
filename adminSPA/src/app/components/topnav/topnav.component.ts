@@ -1,5 +1,6 @@
-import { Component, OnInit, effect, Output, EventEmitter, Input, ChangeDetectorRef } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { Component, OnInit, OnDestroy, effect, Output, EventEmitter, Input, ChangeDetectorRef } from '@angular/core';
+import { Router, RouterModule, NavigationEnd } from '@angular/router';
+import { Subscription, filter, throttleTime, asyncScheduler } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
@@ -15,17 +16,26 @@ import {
   tarjetaMostrarArqueoDemoPlan,
   tarjetaPermiteConsultaPlacaSoat
 } from '../../utils/plan-tarjeta-perfil.util';
+import { AppBannerRibbonComponent } from '../app-banner-ribbon/app-banner-ribbon.component';
+import { AppBannerService } from '../../services/app-banner.service';
 
 declare const iziToast: any;
 
 @Component({
   selector: 'app-topnav',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, ConsultarPlacaModalComponent, ConsultarSoatModalComponent],
+  imports: [
+    FormsModule,
+    RouterModule,
+    CommonModule,
+    ConsultarPlacaModalComponent,
+    ConsultarSoatModalComponent,
+    AppBannerRibbonComponent
+  ],
   templateUrl: './topnav.component.html',
   styleUrl: './topnav.component.css'
 })
-export class TopnavComponent implements OnInit {
+export class TopnavComponent implements OnInit, OnDestroy {
   // Datos del usuario
   public userName: string = '';
   public userRole: string = '';
@@ -67,6 +77,7 @@ export class TopnavComponent implements OnInit {
   private planSuscripcionCode: string | null = null;
   private ultimaEmpresaMiEstado: string | null = null;
   private miEstadoSuscripcionEnVuelo = false;
+  private bannerNavSub?: Subscription;
 
   constructor(
     private router: Router,
@@ -76,7 +87,8 @@ export class TopnavComponent implements OnInit {
     private vehiculosService: VehiculosService,
     private cdr: ChangeDetectorRef,
     private deploymentContext: DeploymentContextService,
-    private saasSubscription: SaasSubscriptionService
+    private saasSubscription: SaasSubscriptionService,
+    private appBanner: AppBannerService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -88,11 +100,13 @@ export class TopnavComponent implements OnInit {
         this.isAuthenticated = true;
         this.cargarTipoCambio();
         this.cargarSoatVencidoCount(true);
+        this.appBanner.refrescar();
       } else {
         this.userName = '';
         this.userRole = '';
         this.empresaNombre = '';
         this.isAuthenticated = false;
+        this.appBanner.limpiar();
         this.tipoCambio = null;
         this.ultimaEmpresaMiEstado = null;
         this.planSuscripcionCode = null;
@@ -173,6 +187,27 @@ export class TopnavComponent implements OnInit {
     }, 600);
     // Cargar notificaciones (ejemplo)
     this.cargarNotificaciones();
+
+    this.bannerNavSub = this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        throttleTime(90_000, asyncScheduler, { leading: true, trailing: true })
+      )
+      .subscribe(() => {
+        if (this.isAuthenticated) {
+          this.appBanner.refrescar();
+        }
+      });
+
+    setTimeout(() => {
+      if (this.isAuthenticated) {
+        this.appBanner.refrescar();
+      }
+    }, 1600);
+  }
+
+  ngOnDestroy(): void {
+    this.bannerNavSub?.unsubscribe();
   }
 
   private cargarSoatVencidoCount(mostrarToast = false): void {
@@ -205,6 +240,7 @@ export class TopnavComponent implements OnInit {
    * Cierra sesión
    */
   logout(): void {
+    this.appBanner.limpiar();
     this.permisosService.limpiarPermisos();
     this.authService.forceLogout();
   }

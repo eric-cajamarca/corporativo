@@ -1,0 +1,29 @@
+<div
+  class="app-banner-ribbon-wrap"
+  *ngIf="banner.avisos().length > 0"
+  [class.sidebar-collapsed]="sidebarCollapsed"
+  role="region"
+  aria-label="Avisos del sistema"
+>
+  <div class="ribbon-inner">
+    <div *ngFor="let a of banner.avisos(); trackBy: trackById" [ngClass]="clasePorSeveridad(a.severity)" class="ribbon-item">
+      <ng-container [ngSwitch]="a.severity">
+        <i *ngSwitchCase="'danger'" class="bi bi-x-octagon ribbon-icon"></i>
+        <i *ngSwitchCase="'warning'" class="bi bi-exclamation-triangle ribbon-icon"></i>
+        <i *ngSwitchCase="'success'" class="bi bi-check-circle ribbon-icon"></i>
+        <i *ngSwitchDefault class="bi bi-info-circle ribbon-icon"></i>
+      </ng-container>
+      <span class="ribbon-text">{{ a.message }}</span>
+      <a *ngIf="a.link" [routerLink]="a.link" class="ribbon-link">{{ a.linkLabel || 'Abrir' }}</a>
+      <button
+        *ngIf="a.dismissible !== false"
+        type="button"
+        class="ribbon-dismiss"
+        (click)="descartar(a, $event)"
+        aria-label="Cerrar aviso"
+      >
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+  </div>
+</div>

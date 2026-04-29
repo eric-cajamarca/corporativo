@@ -26,6 +26,8 @@ export interface AplicarConteoBody {
   observaciones?: string | null;
   docRelacionado?: string | null;
   idComprobante?: string | number | null;
+  /** Fecha/hora local sin Z (YYYY-MM-DDTHH:mm:ss); el servidor la guarda tal cual en SQL. */
+  fechaMovimiento?: string | null;
 }
 
 @Injectable({

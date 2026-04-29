@@ -1,0 +1,98 @@
+.app-banner-ribbon-wrap {
+  position: fixed;
+  top: 64px;
+  left: 260px;
+  right: 0;
+  z-index: 998;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transition: left 0.3s ease;
+}
+
+.app-banner-ribbon-wrap.sidebar-collapsed {
+  left: 70px;
+}
+
+@media (max-width: 991.98px) {
+  .app-banner-ribbon-wrap {
+    left: 0;
+  }
+}
+
+.ribbon-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 5.5rem;
+  overflow-y: auto;
+}
+
+.ribbon-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding: 0.4rem 1rem 0.45rem 0.85rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.ribbon-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.ribbon-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.ribbon-link {
+  flex-shrink: 0;
+  font-weight: 600;
+  text-decoration: underline;
+  color: inherit;
+  opacity: 0.95;
+}
+
+.ribbon-link:hover {
+  opacity: 1;
+}
+
+.ribbon-dismiss {
+  flex-shrink: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: inherit;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-left: auto;
+}
+
+.ribbon-dismiss:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.ribbon-info {
+  background: #e7f1ff;
+  color: #084298;
+}
+
+.ribbon-warning {
+  background: #fff3cd;
+  color: #664d03;
+}
+
+.ribbon-danger {
+  background: #f8d7da;
+  color: #842029;
+}
+
+.ribbon-success {
+  background: #d1e7dd;
+  color: #0f5132;
+}

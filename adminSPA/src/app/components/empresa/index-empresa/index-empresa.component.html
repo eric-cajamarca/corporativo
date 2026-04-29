@@ -524,7 +524,7 @@
                   <tr>
                     <th>Empresa (RUC)</th>
                     @for (servicio of serviciosApiData.servicios; track servicio) {
-                      <th class="text-center">{{ servicio }}</th>
+                      <th class="text-center text-nowrap small">{{ etiquetaColumnaServicioApi(servicio) }}</th>
                     }
                   </tr>
                 </thead>

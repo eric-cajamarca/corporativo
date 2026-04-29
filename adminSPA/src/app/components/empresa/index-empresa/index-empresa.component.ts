@@ -463,6 +463,13 @@ export class IndexEmpresaComponent implements OnInit {
     });
   }
 
+  /** Encabezado de columna más legible (quita prefijo "Factiliza "). */
+  etiquetaColumnaServicioApi(nombre: string): string {
+    const n = (nombre || '').trim();
+    if (!n) return nombre;
+    return n.replace(/^Factiliza\s+/i, '').trim() || n;
+  }
+
   getPuedeUsarServicio(idEmpresa: string, nombreServicio: string): boolean {
     return !!this.asignacionesServiciosApi[idEmpresa]?.[nombreServicio];
   }

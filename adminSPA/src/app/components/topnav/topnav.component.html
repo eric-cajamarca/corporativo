@@ -249,6 +249,8 @@
   </div>
 </nav>
 
+<app-banner-ribbon *ngIf="isAuthenticated" [sidebarCollapsed]="sidebarCollapsed"></app-banner-ribbon>
+
 <!-- Modales globales de consulta Factiliza (placa / SOAT) -->
 <app-consultar-placa-modal
   [visible]="mostrarModalPlaca"

@@ -73,3 +73,8 @@
     padding-bottom: 1rem;
   }
 }
+
+/* Cinta de avisos bajo el navbar: evita que el contenido quede tapado (altura ~2.75rem + borde) */
+body.app-has-banner-ribbon .main-content {
+  margin-top: calc(64px + 2.85rem);
+}

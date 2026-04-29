@@ -6,6 +6,7 @@ const inventarioRepository = require('../repositories/inventario.repository');
 const inventarioService = require('./inventario.service');
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
+const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
 
 function controlUbicacionesDesdeConfig(configRows) {
   const row = configRows && configRows.find((c) => c.clave === 'INVENTARIO_CONTROL_UBICACIONES');
@@ -16,6 +17,18 @@ const TIPOS_CONTEO = new Set(['INICIAL', 'MENSUAL']);
 
 function normTipoConteo(v) {
   return String(v || '').trim().toUpperCase();
+}
+
+/** Fecha/hora civil enviada por el cliente (navegador) o null para GETDATE() en SQL. */
+function fechaMovimientoDesdeBodyAplicar(body) {
+  if (body && body.fechaMovimiento != null && String(body.fechaMovimiento).trim() !== '') {
+    const r = normalizarFechaMovimientoParaSql(body.fechaMovimiento);
+    if (!r) {
+      throw new Error('fechaMovimiento inválida (use YYYY-MM-DD o YYYY-MM-DDTHH:mm:ss, sin Z)');
+    }
+    return r;
+  }
+  return null;
 }
 
 /**
@@ -232,6 +245,8 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
         salida: null
       };
 
+      const fechaMovimientoAplicacion = fechaMovimientoDesdeBodyAplicar(body);
+
       if (itemsPositivos.length > 0) {
         const compIngreso = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
           transaction,
@@ -244,7 +259,7 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
         const movIngresoBody = {
           tipoMovimiento: 'REAJUSTE_POSITIVO',
           idSucursal: sesion.idSucursal,
-          fechaMovimiento: new Date().toISOString(),
+          fechaMovimiento: fechaMovimientoAplicacion,
           docRelacionado: null,
           observaciones: obs,
           idComprobante: compIngreso.idComprobante,
@@ -280,7 +295,7 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
         const movSalidaBody = {
           tipoMovimiento: 'REAJUSTE_NEGATIVO',
           idSucursal: sesion.idSucursal,
-          fechaMovimiento: new Date().toISOString(),
+          fechaMovimiento: fechaMovimientoAplicacion,
           docRelacionado: null,
           observaciones: obs,
           idComprobante: compSalida.idComprobante,

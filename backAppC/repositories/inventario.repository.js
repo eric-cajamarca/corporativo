@@ -1,5 +1,6 @@
 // repositories/inventario.repository.js
 const sql = require('mssql');
+const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
 
 /**
  * Inserta una fila en MovimientosInventario (esquema con idProducto y cantidad NOT NULL).
@@ -23,6 +24,7 @@ exports.insertarFilaMovimiento = async (transaction, datos) => {
     codigoTipoMovimiento,
     fMovimiento
   } = datos;
+  const fMovStr = normalizarFechaMovimientoParaSql(fMovimiento);
   const result = await transaction.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
@@ -37,7 +39,7 @@ exports.insertarFilaMovimiento = async (transaction, datos) => {
     .input('idLote', sql.UniqueIdentifier, idLote || null)
     .input('idGrupoMovimiento', sql.UniqueIdentifier, idGrupoMovimiento || null)
     .input('codigoTipoMovimiento', sql.VarChar(32), codigoTipoMovimiento || null)
-    .input('fMovimiento', sql.DateTime, fMovimiento || null)
+    .input('fMovStr', sql.VarChar(23), fMovStr)
     .query(`
       INSERT INTO MovimientosInventario (
         idEmpresa, idSucursal, idProducto, tipoMovimiento, cantidad, docRelacionado, idComprobante, idUsuario,
@@ -46,7 +48,8 @@ exports.insertarFilaMovimiento = async (transaction, datos) => {
       OUTPUT INSERTED.idMovimiento
       VALUES (
         @idEmpresa, @idSucursal, @idProducto, @tipoMovimiento, @cantidad, @docRelacionado, @idComprobante, @idUsuario,
-        @observaciones, @costoUnitario, @idLote, @idGrupoMovimiento, @codigoTipoMovimiento, ISNULL(@fMovimiento, GETDATE())
+        @observaciones, @costoUnitario, @idLote, @idGrupoMovimiento, @codigoTipoMovimiento,
+        CASE WHEN @fMovStr IS NULL THEN GETDATE() ELSE COALESCE(TRY_CAST(@fMovStr AS DATETIME), GETDATE()) END
       )
     `);
   return result.recordset && result.recordset[0] ? result.recordset[0].idMovimiento : null;

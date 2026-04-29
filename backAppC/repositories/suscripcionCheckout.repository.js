@@ -78,15 +78,43 @@ async function vincularEmpresaCliente(pool, orderNumber, idEmpresaCliente) {
  * Checkouts SaaS asociados a la empresa (vinculados o el origen de la suscripción actual).
  * Incluye demo, emprendedor, profesional, etc.
  */
+const TOP_CHECKOUTS_EMPRESA = 120;
+
+/**
+ * Checkouts asociados a la empresa. Sin OR en un solo scan: UNION + seek por índice (PK en idCheckout).
+ * TOP acota trabajo para el panel "Mi suscripción".
+ */
 async function listarPorEmpresaOCheckoutOrigen(pool, idEmpresa, idCheckoutOrigen) {
   const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-  let filtroOrigen = '';
+  const top = TOP_CHECKOUTS_EMPRESA;
+
+  let q;
   if (idCheckoutOrigen) {
     req.input('idCheckoutOrigen', sql.UniqueIdentifier, idCheckoutOrigen);
-    filtroOrigen = ' OR c.idCheckout = @idCheckoutOrigen';
-  }
-  const r = await req.query(`
-    SELECT
+    q = `
+    SELECT TOP (${top})
+      u.orderNumber,
+      u.planCode,
+      u.billingCycle,
+      u.monto,
+      u.moneda,
+      u.estado,
+      CONVERT(VARCHAR(19), u.fCreacion, 120) AS fCreacion,
+      CONVERT(VARCHAR(19), u.fConfirmacion, 120) AS fConfirmacion
+    FROM (
+      SELECT c.orderNumber, c.planCode, c.billingCycle, c.monto, c.moneda, c.estado, c.fCreacion, c.fConfirmacion
+      FROM dbo.SuscripcionCheckoutPendiente c
+      WHERE c.idEmpresaCliente = @idEmpresa
+      UNION
+      SELECT c.orderNumber, c.planCode, c.billingCycle, c.monto, c.moneda, c.estado, c.fCreacion, c.fConfirmacion
+      FROM dbo.SuscripcionCheckoutPendiente c
+      WHERE c.idCheckout = @idCheckoutOrigen
+    ) u
+    ORDER BY u.fCreacion DESC
+    `;
+  } else {
+    q = `
+    SELECT TOP (${top})
       c.orderNumber,
       c.planCode,
       c.billingCycle,
@@ -95,10 +123,13 @@ async function listarPorEmpresaOCheckoutOrigen(pool, idEmpresa, idCheckoutOrigen
       c.estado,
       CONVERT(VARCHAR(19), c.fCreacion, 120) AS fCreacion,
       CONVERT(VARCHAR(19), c.fConfirmacion, 120) AS fConfirmacion
-    FROM SuscripcionCheckoutPendiente c
-    WHERE c.idEmpresaCliente = @idEmpresa${filtroOrigen}
+    FROM dbo.SuscripcionCheckoutPendiente c
+    WHERE c.idEmpresaCliente = @idEmpresa
     ORDER BY c.fCreacion DESC
-  `);
+    `;
+  }
+
+  const r = await req.query(q);
   return r.recordset || [];
 }
 

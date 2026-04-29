@@ -55,7 +55,7 @@
                         >
                             <i class="bi bi-plus-circle me-1"></i> Nueva Lista
                         </button>
-                        <button class="btn btn-primary ms-2" [disabled]="!listaSeleccionadaId" 
+                        <button class="btn btn-primary ms-2" [disabled]="!puedeGuardar()"
                                 (click)="guardarPrecios()">
                             <i class="bi bi-save me-1"></i> Guardar Precios
                         </button>
@@ -129,13 +129,29 @@
                                 <div class="producto-descripcion">{{producto.descripcion}}</div>
                                 <small class="text-muted producto-sub">{{producto.descripcionPres || 'Sin categoría'}}</small>
                             </td>
-                            <td class="text-end text-muted">{{simboloMoneda}} {{producto.cUnitario || '0.00'}}</td>
+                            <td class="text-end col-c-unit">
+                                <div class="input-group input-group-sm justify-content-end">
+                                 <!--   <span class="input-group-text bg-light">{{simboloMoneda}}</span>-->
+                                    <input type="number"
+                                           class="form-control text-end col-c-unit-input"
+                                           step="0.01"
+                                           min="0"
+                                           [(ngModel)]="producto.nuevoCUnitario"
+                                           (change)="validarCUnitario(producto)">
+                                    <button class="btn btn-outline-secondary" type="button"
+                                            *ngIf="costoUnitarioCambio(producto)"
+                                            (click)="restaurarCUnitario(producto)"
+                                            title="Restaurar costo guardado">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </div>
+                            </td>
                             <td class="text-end">
                                 <span class="fw-semibold">{{simboloMoneda}} {{producto.precioActual || '0.00'}}</span>
                             </td>
                             <td class="text-center col-n-precio">
                                 <div class="input-group input-group-sm justify-content-center">
-                                    <span class="input-group-text bg-light">{{simboloMoneda}}</span>
+                                    <!--<span class="input-group-text bg-light">{{simboloMoneda}}</span>-->
                                     <input type="number" 
                                            class="form-control text-end"
                                            step="0.01" 
@@ -162,19 +178,28 @@
                         </tr>
                     </tbody>
                 </table>
-                <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2 px-2">
+                <nav *ngIf="totalPaginas > 1" class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2 px-2 precios-pagination-nav">
                     <small class="text-muted">
                         Mostrando {{ desdePagina() }} - {{ hastaPagina() }} de {{ totalItems }}
                     </small>
-                    <ul class="pagination pagination-sm mb-0">
+                    <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-center precios-pagination-ul">
+                        <li class="page-item" [class.disabled]="page <= 1">
+                            <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(1)" aria-label="Primera página">&laquo;&laquo;</a>
+                        </li>
                         <li class="page-item" [class.disabled]="page <= 1">
                             <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page - 1)" aria-label="Anterior">&laquo;</a>
                         </li>
-                        <li *ngFor="let p of paginas" class="page-item" [class.active]="page === p">
-                            <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(p)">{{ p }}</a>
+                        <li *ngFor="let item of paginasCompacta()" class="page-item"
+                            [class.active]="!esEllipsis(item) && page === item"
+                            [class.disabled]="esEllipsis(item)">
+                            <a *ngIf="!esEllipsis(item)" class="page-link" href="javascript:void(0)" (click)="cambiarPagina(item)">{{ item }}</a>
+                            <span *ngIf="esEllipsis(item)" class="page-link user-select-none text-muted">…</span>
                         </li>
                         <li class="page-item" [class.disabled]="page >= totalPaginas">
                             <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(page + 1)" aria-label="Siguiente">&raquo;</a>
+                        </li>
+                        <li class="page-item" [class.disabled]="page >= totalPaginas">
+                            <a class="page-link" href="javascript:void(0)" (click)="cambiarPagina(totalPaginas)" aria-label="Última página">&raquo;&raquo;</a>
                         </li>
                     </ul>
                 </nav>

@@ -2,6 +2,7 @@
 const { randomUUID } = require('crypto');
 const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
+const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
 const inventarioRepository = require('../repositories/inventario.repository');
 const productosVendidosRepository = require('../repositories/productosVendidos.repository');
 const productosCompradosRepository = require('../repositories/productosComprados.repository');
@@ -28,6 +29,21 @@ function getConfig(configRows, clave, def) {
 }
 
 const CODIGOS_COMP_INVENTARIO = new Set(['IV', 'II', 'IN', 'SA', 'TF']);
+
+/**
+ * null = usar GETDATE() en INSERT (hora del motor SQL).
+ * string = literal civil YYYY-MM-DD HH:mm:ss sin conversión UTC del driver.
+ */
+function resolverFMovimientoSql(fechaMovimiento) {
+  if (fechaMovimiento == null || String(fechaMovimiento).trim() === '') {
+    return null;
+  }
+  const r = normalizarFechaMovimientoParaSql(fechaMovimiento);
+  if (r == null) {
+    throw new Error('Fecha de movimiento no válida (use YYYY-MM-DD o YYYY-MM-DDTHH:mm:ss sin Z)');
+  }
+  return r;
+}
 
 async function validarSucursalesTransferencia(transaction, idEmpresa, idOrigen, idDestino) {
   const r = await transaction.request()
@@ -116,10 +132,7 @@ async function procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body) 
     }
 
     const idGrupoMovimiento = randomUUID();
-    const fBatch = fechaMovimiento ? new Date(fechaMovimiento) : new Date();
-    if (Number.isNaN(fBatch.getTime())) {
-      throw new Error('Fecha de movimiento no válida');
-    }
+    const fMovSql = resolverFMovimientoSql(fechaMovimiento);
 
     const obsTraslado = `Traslado: ${nombreOrigen} → ${nombreDestino}`;
     const obsBase = observaciones ? String(observaciones).trim() : '';
@@ -185,7 +198,7 @@ async function procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body) 
           idLote: c.idLote || null,
           idGrupoMovimiento,
           codigoTipoMovimiento: tipoCodigoUi,
-          fMovimiento: fBatch
+          fMovimiento: fMovSql
         });
         if (primerIdMovimiento == null) primerIdMovimiento = idMovSal;
       }
@@ -220,7 +233,7 @@ async function procesarTransferenciaEntreSucursales(idEmpresa, idUsuario, body) 
         idLote: idLoteDest,
         idGrupoMovimiento,
         codigoTipoMovimiento: tipoCodigoUi,
-        fMovimiento: fBatch
+        fMovimiento: fMovSql
       });
       if (primerIdMovimiento == null) primerIdMovimiento = idMovEnt;
     }
@@ -324,13 +337,10 @@ async function ejecutarProcesarMovimientoNoTransferencia(transaction, idEmpresa,
     siguienteNumLote = await inventarioRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
   }
 
-  const idGrupoMovimiento = randomUUID();
-  const fBatch = fechaMovimiento ? new Date(fechaMovimiento) : new Date();
-  if (Number.isNaN(fBatch.getTime())) {
-    throw new Error('Fecha de movimiento no válida');
-  }
+    const idGrupoMovimiento = randomUUID();
+    const fMovSql = resolverFMovimientoSql(fechaMovimiento);
 
-  let primerIdMovimiento = null;
+    let primerIdMovimiento = null;
 
   for (const item of items) {
     const cantidad = parseFloat(item.cantidad) || 0;
@@ -380,7 +390,7 @@ async function ejecutarProcesarMovimientoNoTransferencia(transaction, idEmpresa,
             idLote: c.idLote || null,
             idGrupoMovimiento,
             codigoTipoMovimiento: tipoMovimiento,
-            fMovimiento: fBatch
+            fMovimiento: fMovSql
           });
           if (primerIdMovimiento == null) primerIdMovimiento = idMov;
         }
@@ -402,7 +412,7 @@ async function ejecutarProcesarMovimientoNoTransferencia(transaction, idEmpresa,
       idLote,
       idGrupoMovimiento,
       codigoTipoMovimiento: tipoMovimiento,
-      fMovimiento: fBatch
+      fMovimiento: fMovSql
     });
     if (primerIdMovimiento == null) primerIdMovimiento = idMov;
   }

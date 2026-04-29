@@ -210,6 +210,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/utilidades', utilidadesRoutes);
 app.use('/api/permisos', permisosRoutes);
+app.use('/api/avisos', require('./routes/avisos'));
 app.use('/api/gestores', gestoresRoutes);
 app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
@@ -256,12 +257,12 @@ app.listen(PORT, () => {
   } catch (e) {
     console.error('No se pudo iniciar job envío automático SUNAT:', e.message);
   }
-  try {
+  /*//try {
     const guiasTicketJob = require('./jobs/guiasTicket.job');
     guiasTicketJob.iniciar();
   } catch (e) {
     console.error('No se pudo iniciar job guiasTicket:', e.message);
-  }
+  }*/
   try {
     const suscripcionVencimientoJob = require('./jobs/suscripcionVencimiento.job');
     suscripcionVencimientoJob.iniciar();

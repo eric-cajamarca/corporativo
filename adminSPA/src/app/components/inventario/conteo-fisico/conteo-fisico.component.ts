@@ -279,6 +279,13 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Fecha/hora del equipo del usuario (sin Z); el backend la persiste tal cual en SQL. */
+  private fechaHoraLocalParaMovimiento(): string {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+
   aplicarMovimientos(): void {
     if (!this.idSesionEnCurso) {
       return;
@@ -298,7 +305,9 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       return;
     }
     this.aplicando = true;
-    this.conteoService.aplicarMovimientos(this.idSesionEnCurso, {}).subscribe({
+    this.conteoService
+      .aplicarMovimientos(this.idSesionEnCurso, { fechaMovimiento: this.fechaHoraLocalParaMovimiento() })
+      .subscribe({
       next: (r) => {
         this.aplicando = false;
         iziToast.success({ title: 'Listo', message: r.message || 'Aplicado', position: 'topRight' });

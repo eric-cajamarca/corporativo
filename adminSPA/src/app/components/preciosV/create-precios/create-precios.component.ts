@@ -1,9 +1,9 @@
-import { Component, OnInit, ViewChild, ElementRef, signal, inject } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, inject } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
 import { PreciosService } from '../../../services/precios.service';
-import { StockSucursal } from '../../../interfaces/stockSucursal-interface';
 import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
@@ -11,8 +11,34 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
+import { ProductoCreate } from '../../../models/producto.models';
 
 declare var bootstrap: any;
+
+/** Fila en la grilla de precios (respuesta de productos + edición local). */
+export interface ProductoPreciosFila {
+  idProducto: string;
+  codigo?: string;
+  sku?: string;
+  descripcion: string;
+  descripcionPres?: string;
+  idCategoria: number;
+  idMarca: number;
+  idPresentacion: number;
+  cUnitario: number | null;
+  nuevoCUnitario: number;
+  fProduccion?: string | null;
+  fVencimiento?: string | null;
+  tipoProducto?: string;
+  nuevoPrecio: number | null;
+  precioActual?: number;
+  idPrecio?: string | null;
+  fActualizacion?: string;
+  tienePrecio?: boolean;
+  precios?: Record<number, { precio: number; idPrecio?: string; fActualizacion?: string }>;
+}
+
+export type PaginaItemPrecios = number | 'ellipsis';
 
 @Component({
   selector: 'app-create-precios',
@@ -29,26 +55,67 @@ export class CreatePreciosComponent implements OnInit {
 
   // Datos
   listasPrecio: any[] = [];
-  productos: any[] = [];
+  productos: ProductoPreciosFila[] = [];
   monedas: any[] = [];
-  productosFiltrados: any[] = [];
+  productosFiltrados: ProductoPreciosFila[] = [];
   sucursales: any[] = [];
+
+  /** Vecinos del número de página activo (0 = solo página actual entre extremos; más compacto). */
+  readonly paginationDelta = 0;
 
   page = 1;
   pageSize = 10;
   get totalItems(): number {
     return this.productosFiltrados.length;
   }
-  get productosPaginated(): any[] {
+  get productosPaginated(): ProductoPreciosFila[] {
     const start = (this.page - 1) * this.pageSize;
     return this.productosFiltrados.slice(start, start + this.pageSize);
   }
   get totalPaginas(): number {
     return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
   }
-  get paginas(): number[] {
-    return Array.from({ length: this.totalPaginas }, (_, i) => i + 1);
+
+  /**
+   * Páginas a mostrar con elipsis (sin listar todas las páginas).
+   * Si hay pocas páginas, devuelve la secuencia completa.
+   */
+  paginasCompacta(): PaginaItemPrecios[] {
+    const total = this.totalPaginas;
+    const current = this.page;
+    const delta = this.paginationDelta;
+
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+
+    const range: number[] = [];
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        range.push(i);
+      }
+    }
+
+    const out: PaginaItemPrecios[] = [];
+    let prev: number | undefined;
+    for (const i of range) {
+      if (prev !== undefined) {
+        if (i - prev === 2) {
+          out.push(prev + 1);
+        } else if (i - prev > 1) {
+          out.push('ellipsis');
+        }
+      }
+      out.push(i);
+      prev = i;
+    }
+    return out;
   }
+
+  esEllipsis(item: PaginaItemPrecios): item is 'ellipsis' {
+    return item === 'ellipsis';
+  }
+
   desdePagina(): number {
     return (this.page - 1) * this.pageSize + 1;
   }
@@ -129,20 +196,29 @@ export class CreatePreciosComponent implements OnInit {
     });
   }
 
-  cargarProductos(): void {
-    // Aquí deberías implementar el servicio para obtener productos
-    // Por ahora, datos de ejemplo
-    this._productosService.obtenerProductosTodos().subscribe({
-      next: (response: any) => {
-        this.productos = response.data || [];
+  cargarProductos(opciones?: { evitarCache?: boolean }): void {
+    this._productosService.obtenerProductosTodos(opciones).subscribe({
+      next: (response) => {
+        const arr = Array.isArray(response.data) ? response.data : [];
+        const raw = arr as unknown as ProductoPreciosFila[];
+        this.productos = raw.map((p) => ({
+          ...p,
+          nuevoPrecio: p.nuevoPrecio ?? null,
+          nuevoCUnitario:
+            p.cUnitario != null && !Number.isNaN(Number(p.cUnitario)) ? Number(p.cUnitario) : 0
+        }));
         this.productosFiltrados = [...this.productos];
         this.page = 1;
+        if (this.listaSeleccionadaId) {
+          this.productos.forEach((producto) =>
+            this.actualizarPrecioProducto(producto, this.listaSeleccionadaId!)
+          );
+        }
       },
       error: (error) => {
         console.error('Error al cargar productos:', error);
       }
     });
-    
   }
 
   cargarSucursales(): void {
@@ -187,7 +263,7 @@ export class CreatePreciosComponent implements OnInit {
   }
   
   // Método clave: Obtener precio de un producto para una lista específica
-  actualizarPrecioProducto(producto: any, idLista: number): void {
+  actualizarPrecioProducto(producto: ProductoPreciosFila, idLista: number): void {
     // Buscar en el objeto precios
     const precioData = producto.precios && producto.precios[idLista];
     
@@ -214,7 +290,7 @@ export class CreatePreciosComponent implements OnInit {
   
   
   resetearPrecios(): void {
-    this.productos.forEach(producto => {
+    this.productos.forEach((producto) => {
       producto.precioActual = 0.00;
       producto.tienePrecio = false;
     });
@@ -236,8 +312,8 @@ export class CreatePreciosComponent implements OnInit {
     // this.preciosService.listar_precios_producto(this.listaSeleccionadaId).subscribe(...)
     
     // Por ahora, actualizamos los productos con sus precios
-    this.productos.forEach(producto => {
-      producto.precioActual = producto.nuevoPrecio || producto.precioActual;
+    this.productos.forEach((producto) => {
+      producto.precioActual = producto.nuevoPrecio ?? producto.precioActual;
       producto.nuevoPrecio = null;
     });
   }
@@ -319,42 +395,111 @@ export class CreatePreciosComponent implements OnInit {
   }
 
 
-  guardarPrecios(): void {
-        if (!this.listaSeleccionadaId) {
-      alert('Selecciona una lista de precios primero');
-      return;
+  /** True si hay algo que persistir (precios de lista y/o costo unitario). */
+  puedeGuardar(): boolean {
+    if (this.productos.length === 0) {
+      return false;
     }
-    
+    if (this.productos.some((p) => this.costoUnitarioCambio(p))) {
+      return true;
+    }
+    if (!this.listaSeleccionadaId) {
+      return false;
+    }
+    return this.productos.some(
+      (p) => p.nuevoPrecio != null && p.nuevoPrecio !== p.precioActual
+    );
+  }
+
+  guardarPrecios(): void {
     const preciosAGuardar = this.productos
-      .filter(producto => producto.nuevoPrecio && producto.nuevoPrecio !== producto.precioActual)
-      .map(producto => ({
+      .filter(
+        (producto) =>
+          producto.nuevoPrecio != null &&
+          producto.nuevoPrecio !== producto.precioActual
+      )
+      .map((producto) => ({
         idLista: this.listaSeleccionadaId,
         idProducto: producto.idProducto,
-        idPrecio: producto.idPrecio, // Puede ser null para nuevos precios
+        idPrecio: producto.idPrecio,
         precio: producto.nuevoPrecio,
-        idMoneda: this.listaSeleccionada.idMoneda,
-
-        idUsuario: 'USUARIO_ACTUAL' // Obtener del servicio de autenticación
+        idMoneda: this.listaSeleccionada!.idMoneda,
+        idUsuario: 'USUARIO_ACTUAL'
       }));
-    
-      
-    if (preciosAGuardar.length === 0) {
-      alert('No hay precios nuevos para guardar');
+
+    if (preciosAGuardar.length > 0 && !this.listaSeleccionadaId) {
+      alert('Selecciona una lista de precios para guardar los precios de lista');
       return;
     }
-    
-     
 
-    this.preciosService.creaer_precio_producto(preciosAGuardar).subscribe({
-        next: (response) => {
-                  },
-        error: (error) => {
-          console.error('Error al guardar precio:', error);
+    const costosACambiar = this.productos.filter((p) => this.costoUnitarioCambio(p));
+
+    if (preciosAGuardar.length === 0 && costosACambiar.length === 0) {
+      alert('No hay cambios de precio ni de costo unitario para guardar');
+      return;
+    }
+
+    const precios$ =
+      preciosAGuardar.length > 0
+        ? this.preciosService.creaer_precio_producto(preciosAGuardar)
+        : of(null);
+
+    const costos$ =
+      costosACambiar.length > 0
+        ? forkJoin(
+            costosACambiar.map((p) =>
+              this._productosService.actualizarProducto(
+                p.idProducto,
+                this.construirPayloadActualizarCosto(p)
+              )
+            )
+          )
+        : of(null);
+
+    forkJoin({ precios: precios$, costos: costos$ }).subscribe({
+      next: () => {
+        const partes: string[] = [];
+        if (preciosAGuardar.length) {
+          partes.push(`${preciosAGuardar.length} precio(s)`);
         }
-      });
-    
-    alert(`${preciosAGuardar.length} precios guardados correctamente`);
-    this.cargarPreciosProductos();
+        if (costosACambiar.length) {
+          partes.push(`${costosACambiar.length} costo(s) unitario(s)`);
+        }
+        alert(`Guardado correctamente: ${partes.join(' y ')}.`);
+        this.cargarPreciosProductos();
+        this.cargarProductos({ evitarCache: true });
+      },
+      error: (error) => {
+        console.error('Error al guardar precios o costos:', error);
+        alert(
+          error?.error?.message ||
+            'Error al guardar. Revise la consola o intente de nuevo.'
+        );
+      }
+    });
+  }
+
+  costoUnitarioCambio(p: ProductoPreciosFila): boolean {
+    const nu = Number(p.nuevoCUnitario);
+    const orig = Number(p.cUnitario ?? 0);
+    if (Number.isNaN(nu) || nu < 0) {
+      return false;
+    }
+    return Math.abs(nu - orig) > 1e-9;
+  }
+
+  private construirPayloadActualizarCosto(p: ProductoPreciosFila): ProductoCreate {
+    return {
+      Codigo: (p.codigo ?? p.sku ?? '').trim(),
+      idCategoria: Number(p.idCategoria),
+      idMarca: Number(p.idMarca),
+      descripcion: p.descripcion,
+      idPresentacion: Number(p.idPresentacion),
+      cUnitario: Number(p.nuevoCUnitario),
+      fProduccion: p.fProduccion || undefined,
+      fVencimiento: p.fVencimiento || undefined,
+      tipoProducto: p.tipoProducto === 'C' || p.tipoProducto === 'S' ? p.tipoProducto : 'S'
+    };
   }
 
   // Funciones auxiliares
@@ -366,24 +511,37 @@ export class CreatePreciosComponent implements OnInit {
     }
 
     const termino = this.filtroBusqueda.toLowerCase();
-    this.productosFiltrados = this.productos.filter(producto =>
-      (producto.descripcion || '').toLowerCase().includes(termino) ||
-      (producto.codigo || '').toLowerCase().includes(termino)
+    this.productosFiltrados = this.productos.filter(
+      (producto) =>
+        (producto.descripcion || '').toLowerCase().includes(termino) ||
+        (producto.codigo || '').toLowerCase().includes(termino) ||
+        (producto.sku || '').toLowerCase().includes(termino)
     );
     this.page = 1;
   }
 
-  validarPrecio(producto: any): void {
-    if (producto.nuevoPrecio < 0) {
+  validarPrecio(producto: ProductoPreciosFila): void {
+    if (producto.nuevoPrecio != null && producto.nuevoPrecio < 0) {
       producto.nuevoPrecio = 0;
     }
   }
 
-  restaurarPrecio(producto: any): void {
-    producto.nuevoPrecio = producto.precioActual;
+  validarCUnitario(producto: ProductoPreciosFila): void {
+    if (producto.nuevoCUnitario < 0 || Number.isNaN(Number(producto.nuevoCUnitario))) {
+      producto.nuevoCUnitario = Number(producto.cUnitario ?? 0);
+    }
   }
 
-  calcularVariacion(producto: any): string {
+  restaurarPrecio(producto: ProductoPreciosFila): void {
+    producto.nuevoPrecio = producto.precioActual ?? null;
+  }
+
+  restaurarCUnitario(producto: ProductoPreciosFila): void {
+    producto.nuevoCUnitario =
+      producto.cUnitario != null ? Number(producto.cUnitario) : 0;
+  }
+
+  calcularVariacion(producto: ProductoPreciosFila): string {
     if (!producto.precioActual || !producto.nuevoPrecio) return '0';
     const variacion = ((producto.nuevoPrecio - producto.precioActual) / producto.precioActual) * 100;
     return variacion.toFixed(2);

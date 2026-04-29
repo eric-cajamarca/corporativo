@@ -267,6 +267,39 @@
 }
 
 /* =============================================
+   TARJETAS DASHBOARD (productos / alertas): altura uniforme
+   ============================================= */
+
+.dashboard-tile-row .dashboard-tile-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* Alto estable y compartido entre ambas tarjetas; listas hacen scroll si hace falta */
+  height: clamp(18rem, 40vh, 26rem);
+  min-height: 18rem;
+}
+
+.dashboard-tile-row .dashboard-tile-card > .card-header {
+  flex-shrink: 0;
+}
+
+.dashboard-tile-row .dashboard-tile-card > .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-tile-row .product-list,
+.dashboard-tile-row .alerts-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* =============================================
    LISTA DE PRODUCTOS
    ============================================= */
 
