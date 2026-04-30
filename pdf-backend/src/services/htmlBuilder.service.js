@@ -409,6 +409,12 @@ class HtmlBuilderService {
     return String(codigoComp || '').trim() || '01';
   }
 
+  /** Factura, boleta, NC y ND electrónicas: columna U. MEDIDA y formato ticket con código de presentación. */
+  _esComprobanteConUnidadMedidaPdf(codigoComp) {
+    const c = this._normalizarCodigoTipoSunatParaQr(codigoComp);
+    return c === '01' || c === '03' || c === '07' || c === '08';
+  }
+
   _debeMostrarQrYPieSunat(esCotizacion, codigoComprobante) {
     const cod = String(codigoComprobante || '').trim();
     if (esCotizacion || cod === 'CT' || cod === 'NV') return false;
@@ -708,13 +714,40 @@ class HtmlBuilderService {
       }
     }
 
-    const filas = items.map(it => {
+    const incluirUnidadMedida = !esCotizacion && this._esComprobanteConUnidadMedidaPdf(codigoComp);
+
+    const filasPlanas = (Array.isArray(items) ? items : []).map(it => {
       const desc = it.descripcion || it.desc || '';
       const cant = Number(it.cantidad) != null ? Number(it.cantidad) : 0;
       const pUnit = Number(it.pVenta) != null ? Number(it.pVenta) : Number(it.pUnit) || 0;
       const importe = Number(it.total) != null ? Number(it.total) : (Number(it.subtotal) || cant * pUnit);
-      return `<tr><td class="text-center">${cant}</td><td>${desc}</td><td class="text-end">${pUnit.toFixed(2)}</td><td class="text-end">${importe.toFixed(2)}</td></tr>`;
-    }).join('');
+      const um = (it.presentacion != null && String(it.presentacion).trim() !== '')
+        ? String(it.presentacion).trim()
+        : '';
+      const codPres = (it.presentacionCodigo != null && String(it.presentacionCodigo).trim() !== '')
+        ? String(it.presentacionCodigo).trim()
+        : '';
+      return { desc, cant, pUnit, importe, um, codPres };
+    });
+
+    const filas = incluirUnidadMedida
+      ? filasPlanas.map(({ desc, cant, pUnit, importe, um }) =>
+        `<tr><td class="text-center">${cant}</td><td>${this._escapeHtml(um)}</td><td>${this._escapeHtml(desc)}</td><td class="text-end">${pUnit.toFixed(2)}</td><td class="text-end">${importe.toFixed(2)}</td></tr>`
+      ).join('')
+      : filasPlanas.map(({ desc, cant, pUnit, importe }) =>
+        `<tr><td class="text-center">${cant}</td><td>${this._escapeHtml(desc)}</td><td class="text-end">${pUnit.toFixed(2)}</td><td class="text-end">${importe.toFixed(2)}</td></tr>`
+      ).join('');
+
+    const filasTicket = incluirUnidadMedida
+      ? filasPlanas.map(({ desc, cant, pUnit, importe, codPres }) => {
+        const descCol = codPres
+          ? `${this._escapeHtml(codPres)} | ${this._escapeHtml(desc)}`
+          : this._escapeHtml(desc);
+        return `<tr><td>${cant}</td><td>${descCol}</td><td class="num">${pUnit.toFixed(2)}</td><td class="num">${importe.toFixed(2)}</td></tr>`;
+      }).join('')
+      : filasPlanas.map(({ desc, cant, pUnit, importe }) =>
+        `<tr><td>${cant}</td><td>${this._escapeHtml(desc)}</td><td class="num">${pUnit.toFixed(2)}</td><td class="num">${importe.toFixed(2)}</td></tr>`
+      ).join('');
 
     const razonSocial = cliente.rSocial || cliente.razonSocial || '';
     const dirCliente = cliente.direccion || '';
@@ -813,7 +846,7 @@ class HtmlBuilderService {
         razonSocial,
         dirCliente,
         rucCliente,
-        filasItems: filas,
+        filasItems: filasTicket,
         lineasTotales: ticketTotalesHtml,
         cantidadLetras,
         qrDataUri,
@@ -918,7 +951,9 @@ class HtmlBuilderService {
     ${htmlDocMotivoNcNd}
   </div>
   <table class="detalle">
-    <thead><tr><th class="text-center" style="width:10%;">Cant.</th><th style="width:44%;">Descripción</th><th class="text-end" style="width:18%;">P. Unit. (S/)</th><th class="text-end" style="width:18%;">Importe (S/)</th></tr></thead>
+    <thead><tr>${incluirUnidadMedida
+    ? '<th class="text-center" style="width:8%;">Cant.</th><th class="text-center" style="width:12%;">U. MEDIDA</th><th style="width:36%;">Descripción</th><th class="text-end" style="width:16%;">P. Unit. (S/)</th><th class="text-end" style="width:16%;">Importe (S/)</th>'
+    : '<th class="text-center" style="width:10%;">Cant.</th><th style="width:44%;">Descripción</th><th class="text-end" style="width:18%;">P. Unit. (S/)</th><th class="text-end" style="width:18%;">Importe (S/)</th>'}</tr></thead>
     <tbody>${filas}</tbody>
   </table>
   <div class="post-detalle-row">

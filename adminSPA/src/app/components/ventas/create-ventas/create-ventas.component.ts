@@ -113,6 +113,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   public cajas: any[] = [];
   public loading = false;
   public clienteBuscando = false;
+  /** Se incrementa al abrir "Registrar cliente" desde búsqueda sin BD, para que create-clientes reaplique @Input en cada apertura. */
+  public crearClientePreSerial = 0;
 
   public ventas: any = {
     compVenta: '0000-00000000',
@@ -1182,22 +1184,25 @@ abrirModalPrecios(item: any) {
    * consultar la BD y carga los datos.
    */
   buscarORegistrarCliente(): void {
-    const numero = (this.cliente.ruc ?? '').toString().trim();
-    const idDoc = this.ventas.idDocumento;
-    if (!numero) {
+    const digitos = this.normalizarDigitosDocumentoCliente((this.cliente.ruc ?? '').toString());
+    if (!digitos) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese el número de documento (RUC o DNI).', position: 'topRight' });
       return;
     }
-    if (idDoc === this.ID_DOC_RUC && numero.length !== 11) {
-      iziToast.warning({ title: 'Aviso', message: 'El RUC debe tener 11 dígitos.', position: 'topRight' });
+    const inferido = this.inferirIdDocumentoPorLongitudDigitos(digitos);
+    if (inferido == null) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'Ingrese 8 dígitos (DNI) u 11 dígitos (RUC).',
+        position: 'topRight'
+      });
       return;
     }
-    if (idDoc === this.ID_DOC_DNI && numero.length !== 8) {
-      iziToast.warning({ title: 'Aviso', message: 'El DNI debe tener 8 dígitos.', position: 'topRight' });
-      return;
-    }
+    this.ventas.idDocumento = inferido;
+    this.cliente.ruc = digitos;
+
     this.clienteBuscando = true;
-    this._clienteService.obtener_cliente_ruc(numero).subscribe({
+    this._clienteService.obtener_cliente_ruc(digitos).subscribe({
       next: (response) => {
         if (response.data != null && response.data.length > 0) {
           this.aplicarClienteDesdeBd(response.data[0]);
@@ -1205,6 +1210,7 @@ abrirModalPrecios(item: any) {
           iziToast.success({ title: 'OK', message: 'Cliente encontrado en base de datos.', position: 'topRight' });
         } else {
           this.clienteBuscando = false;
+          this.crearClientePreSerial += 1;
           this.abrirModalCrearCliente();
         }
       },
@@ -1241,13 +1247,26 @@ abrirModalPrecios(item: any) {
     this.guardarEstadoProvisional();
   }
 
+  /** Solo dígitos del campo número (RUC/DNI). */
+  private normalizarDigitosDocumentoCliente(raw: string): string {
+    return (raw ?? '').toString().replace(/\D/g, '');
+  }
+
+  /** idDocumento catálogo: RUC=6 (11 dígitos), DNI=1 (8 dígitos). */
+  private inferirIdDocumentoPorLongitudDigitos(digitos: string): string | null {
+    if (digitos.length === 11) return this.ID_DOC_RUC;
+    if (digitos.length === 8) return this.ID_DOC_DNI;
+    return null;
+  }
+
   /** Abre el modal de crear cliente con tipo doc y número pre-cargados (desde venta). */
   abrirModalCrearCliente(): void {
     const modalEl = document.getElementById('modalCrearCliente');
-    if (modalEl) {
-      const modalInst = (window as any).bootstrap?.Modal.getOrCreateInstance(modalEl);
+    if (!modalEl) return;
+    setTimeout(() => {
+      const modalInst = (window as any).bootstrap?.Modal?.getOrCreateInstance(modalEl);
       modalInst?.show();
-    }
+    }, 0);
   }
 
   /** Cuando se registra el cliente desde el modal create-clientes: cierra el modal y vuelve a consultar la BD para cargar los datos. */

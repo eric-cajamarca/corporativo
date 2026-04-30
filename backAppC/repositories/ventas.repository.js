@@ -681,9 +681,12 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           THEN LTRIM(RTRIM(dv.descripcionLinea))
           ELSE p.descripcion
         END AS descripcion,
-        p.codigo
+        p.codigo,
+        LTRIM(RTRIM(ISNULL(pr.descripcion, ''))) AS presentacion,
+        LTRIM(RTRIM(ISNULL(pr.codigo, ''))) AS presentacionCodigo
       FROM DetalleVenta dv
       INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = @idEmpresaVenta
+      LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
       WHERE dv.idVenta = @idVenta
     `);
 
@@ -892,7 +895,9 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       cantEntregada: d.cantEntregada != null ? Number(d.cantEntregada) : 0,
       pVenta: d.pVenta,
       subtotal: d.subtotal,
-      total: d.total
+      total: d.total,
+      presentacion: d.presentacion != null ? String(d.presentacion).trim() : '',
+      presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : ''
     })),
     impuestos
   };

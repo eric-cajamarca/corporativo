@@ -38,6 +38,27 @@ function escXml(s) {
 }
 
 /**
+ * Catálogo SUNAT 05: texto exacto de cac:TaxScheme/cbc:Name en UBL.
+ * SUNAT 2964 si se envía texto de la BD (ej. "Exonerado") en lugar del nombre del catálogo (ej. "EXO").
+ */
+function nombreTributoCatalogo05Xml(codigoSunat) {
+  const c = String(codigoSunat || "").trim();
+  const map = {
+    "1000": "IGV",
+    "1016": "IVAP",
+    "2000": "ISC",
+    "3000": "IR",
+    "7152": "ICBPER",
+    "9995": "EXP",
+    "9996": "GRA",
+    "9997": "EXO",
+    "9998": "INA",
+    "9999": "OTROS"
+  };
+  return map[c] || "";
+}
+
+/**
  * Observaciones / OC según guía SUNAT XML factura UBL 2.1 y orden XSD UBL Invoice 2.1:
  * - Todas las cbc:Note (cat. 52, ej. 1000 y 3000) antes de cbc:DocumentCurrencyCode.
  * - cac:OrderReference después de DocumentCurrencyCode (si no, SUNAT 0306: hijo Note inválido).
@@ -193,18 +214,22 @@ function resolverTributoPrincipal(impuestos, igv) {
   if (esGravado) {
     const igvImp = lista.find(i => String(i.codigoSunat || "").trim() === "1000") ||
       lista.find(i => (Number(i.porcentaje) || 0) > 0);
+    const codTributo = (igvImp && String(igvImp.codigoSunat || "").trim()) ? String(igvImp.codigoSunat).trim() : "1000";
+    const nombreCat = nombreTributoCatalogo05Xml(codTributo);
     return {
-      codTributo: (igvImp && String(igvImp.codigoSunat || "").trim()) ? String(igvImp.codigoSunat).trim() : "1000",
-      nombreTributo: (igvImp && (igvImp.descripcion || "").trim()) ? String(igvImp.descripcion).trim() : "IGV",
+      codTributo,
+      nombreTributo: nombreCat || "IGV",
       afectacionIgv: "10",
       porcentajeIgv: (igvImp && (igvImp.porcentaje != null)) ? String(Number(igvImp.porcentaje)) : "18"
     };
   }
   const exoImp = lista.find(i => String(i.codigoSunat || "").trim() === "9997") ||
     lista.find(i => (Number(i.porcentaje) || 0) === 0);
+  const codTributo = (exoImp && String(exoImp.codigoSunat || "").trim()) ? String(exoImp.codigoSunat).trim() : "9997";
+  const nombreCat = nombreTributoCatalogo05Xml(codTributo);
   return {
-    codTributo: (exoImp && String(exoImp.codigoSunat || "").trim()) ? String(exoImp.codigoSunat).trim() : "9997",
-    nombreTributo: (exoImp && (exoImp.descripcion || "").trim()) ? String(exoImp.descripcion).trim() : "EXO",
+    codTributo,
+    nombreTributo: nombreCat || "EXO",
     afectacionIgv: "20",
     porcentajeIgv: "0"
   };

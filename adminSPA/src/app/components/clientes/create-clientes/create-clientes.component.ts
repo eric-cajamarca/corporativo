@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -18,11 +18,13 @@ declare var $: any;
   templateUrl: './create-clientes.component.html',
   styleUrl: './create-clientes.component.css'
 })
-export class CreateClientesComponent {
+export class CreateClientesComponent implements OnInit, OnChanges {
   /** Cuando se abre desde nueva venta: tipo de documento pre-seleccionado. */
   @Input() idDocumentoPre?: string;
   /** Cuando se abre desde nueva venta: RUC o DNI pre-cargado. */
   @Input() rucPre?: string;
+  /** Contador desde create-ventas: al incrementarse, se vuelven a aplicar idDocumentoPre y rucPre (ngOnInit solo corre una vez). */
+  @Input() preCargarSerial = 0;
   /** Si es true, al registrar no navega a /cliente sino emite clienteCreado. */
   @Input() desdeVenta = false;
   @Output() clienteCreado = new EventEmitter<any>();
@@ -108,23 +110,35 @@ export class CreateClientesComponent {
 
       }
 
-  ngOnInit() {
-    if (this.idDocumentoPre != null && this.idDocumentoPre !== '') {
-      this.clientes.idDocumento = this.idDocumentoPre;
-    }
-    if (this.rucPre != null && this.rucPre !== '') {
-      this.clientes.ruc = this.rucPre;
-    }
+  ngOnInit(): void {
     this._documentosService.obtener_documento().subscribe(
       response => {
         this.documento = response.data;
-        if (this.idDocumentoPre != null && this.idDocumentoPre !== '') {
-          this.clientes.idDocumento = this.idDocumentoPre;
-        }
+        this.aplicarPrecargaDesdeVentaInputs();
       }
     );
-
+    this.aplicarPrecargaDesdeVentaInputs();
     this.select_pais();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.desdeVenta) return;
+    if (changes['idDocumentoPre'] || changes['rucPre'] || changes['preCargarSerial']) {
+      this.aplicarPrecargaDesdeVentaInputs();
+    }
+  }
+
+  /** Rellena tipo y número en el formulario cuando el modal se abre desde nueva venta. */
+  private aplicarPrecargaDesdeVentaInputs(): void {
+    if (!this.desdeVenta) return;
+    const id = this.idDocumentoPre;
+    const r = this.rucPre;
+    if (id != null && String(id).trim() !== '') {
+      this.clientes.idDocumento = String(id).trim();
+    }
+    if (r != null && String(r).trim() !== '') {
+      this.clientes.ruc = String(r).trim();
+    }
   }
 
 

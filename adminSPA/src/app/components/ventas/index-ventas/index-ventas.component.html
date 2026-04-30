@@ -210,7 +210,7 @@
                   <th class="small">Afecta</th>
                   <th>Cliente</th>
                   <th>Condición</th>
-                  <th>Forma pago</th>
+                  <!-- <th>Forma pago</th> -->
                   <th class="text-end">Total</th>
                   <th>Est. SUNAT</th>
                   <th class="text-center">Acciones</th>
@@ -226,8 +226,8 @@
                   <td>
                     <span class="cliente-nombre" title="{{ v.clienteRuc || '' }}">{{ v.clienteRazonSocial || '—' }}</span>
                   </td>
-                  <td>{{ v.condicionPago || '—' }}</td>
-                  <td class="small font-monospace">{{ etiquetaFormaPago(v) }}</td>
+                  <td>{{ v.condicionPago || '—' }} {{ etiquetaFormaPago(v) }}</td>
+                 <!-- <td class="small font-monospace">{{ etiquetaFormaPago(v) }}</td> -->
                   <td class="text-end fw-semibold">{{ formatearMoneda(v.total) }}</td>
                   <td>
                     <span *ngIf="v.eliminado" class="badge bg-secondary">Anulado</span>
