@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -55,7 +55,7 @@ interface DocumentoResponse {
   templateUrl: './create-ventas.component.html',
   styleUrl: './create-ventas.component.css'
 })
-export class CreateVentasComponent implements OnInit {
+export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   public productos: any[] = [];
   private productos_const: any[] = [];
@@ -226,6 +226,41 @@ export class CreateVentasComponent implements OnInit {
     private empresaService: EmpresaService,
     private rubrosService: RubrosService
   ) {}
+
+  /** Referencia al modal Bootstrap “Buscar productos” para registrar/quitar el listener. */
+  private buscadorModalEl: HTMLElement | null = null;
+  /** Handler estable para removeEventListener en ngOnDestroy. */
+  private readonly onBuscadorModalShownBound = (): void => {
+    this.enfocarInputBuscadorModalVentas();
+  };
+
+  ngAfterViewInit(): void {
+    this.buscadorModalEl = document.getElementById('buscadorModal');
+    this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+  }
+
+  ngOnDestroy(): void {
+    this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+    this.buscadorModalEl = null;
+  }
+
+  /**
+   * Pone el foco en el input de búsqueda del modal (Bootstrap suele dejarlo en el botón cerrar).
+   */
+  enfocarInputBuscadorModalVentas(): void {
+    const intentar = () => {
+      const el = document.getElementById('create-ventas-buscador-modal-search');
+      if (el instanceof HTMLInputElement) {
+        el.focus({ preventScroll: true });
+        if (el.value.length > 0) {
+          el.select();
+        }
+      }
+    };
+    intentar();
+    setTimeout(intentar, 80);
+    setTimeout(intentar, 200);
+  }
 
   ngOnInit(): void {
     this.gestoresService.obtenerConfiguracion().subscribe({

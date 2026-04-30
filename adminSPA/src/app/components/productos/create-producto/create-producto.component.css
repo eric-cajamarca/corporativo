@@ -22,11 +22,29 @@
   flex-shrink: 0;
 }
 
+/* Casi toda la ventana al formulario; 60vh dejaba scroll con mucho espacio vacío abajo */
 :host-context(.modal-content) .modal-body {
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
-  max-height: 60vh;
+  max-height: calc(100dvh - 7.25rem);
+}
+
+:host-context(.modal-content) .modal-body .card {
+  box-shadow: none;
+}
+
+:host-context(.modal-content) .card-body {
+  padding: 14px 16px;
+}
+
+:host-context(.modal-content) .nav-tabs {
+  padding: 0 10px;
+}
+
+:host-context(.modal-content) .nav-tabs .nav-link {
+  padding: 10px 14px;
+  font-size: 0.9rem;
 }
 
 :host-context(.modal-content) .modal-footer {
@@ -110,7 +128,7 @@
 .card-footer {
   background: #fff;
   border-top: 1px solid #f1f3f4;
-  padding: 16px 24px;
+  padding: 16px;
 }
 
 /* =============================================

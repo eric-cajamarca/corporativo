@@ -191,15 +191,31 @@ export class BuscadorProductosModalComponent implements OnInit {
 
   /**
    * Enfoca el campo de búsqueda tras abrir el modal (invocado desde el servicio al emitirse `shown`).
-   * Un pequeño retardo evita que el gestor de foco del modal quite el foco durante la animación.
+   * NgbModal suele enfocar antes el primer control del encabezado (p. ej. cerrar); se reintenta unas veces.
    */
   enfocarCampoBusqueda(): void {
-    setTimeout(() => {
-      const el = this.inputBuscar?.nativeElement;
-      if (el) {
-        el.focus({ preventScroll: true });
-      }
-    }, 50);
+    const el = (): HTMLInputElement | null => {
+      const ref = this.inputBuscar?.nativeElement;
+      if (ref) return ref;
+      if (typeof document === 'undefined') return null;
+      const byId = document.getElementById('buscador-productos-modal-search');
+      return byId instanceof HTMLInputElement ? byId : null;
+    };
+
+    const intentar = (ms: number) => {
+      setTimeout(() => {
+        const input = el();
+        if (input) {
+          input.focus({ preventScroll: true });
+          if (input.value.length > 0) {
+            input.select();
+          }
+        }
+      }, ms);
+    };
+    intentar(0);
+    intentar(80);
+    intentar(200);
   }
 
   verImagenes(p: ProductoSeleccionado, event: Event): void {

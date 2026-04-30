@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, signal } from '@angular/core';
 import { ComprasService } from '../../../services/compras.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -29,7 +29,7 @@ declare var bootstrap: any;
   templateUrl: './update-compras.component.html',
   styleUrl: './update-compras.component.css'
 })
-export class UpdateComprasComponent {
+export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
   public compras: any = {
     idEmpresa: '',
     idSucursal: '',
@@ -115,6 +115,36 @@ export class UpdateComprasComponent {
     private modalService: NgbModal
   ) {
     //this.token = this._cookieService.get('token');
+  }
+
+  private buscadorModalEl: HTMLElement | null = null;
+  private readonly onBuscadorModalShownBound = (): void => {
+    this.enfocarInputBuscadorModalCompras();
+  };
+
+  ngAfterViewInit(): void {
+    this.buscadorModalEl = document.getElementById('buscadorModal');
+    this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+  }
+
+  ngOnDestroy(): void {
+    this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+    this.buscadorModalEl = null;
+  }
+
+  enfocarInputBuscadorModalCompras(): void {
+    const intentar = () => {
+      const el = document.getElementById('update-compras-buscador-modal-search');
+      if (el instanceof HTMLInputElement) {
+        el.focus({ preventScroll: true });
+        if (el.value.length > 0) {
+          el.select();
+        }
+      }
+    };
+    intentar();
+    setTimeout(intentar, 80);
+    setTimeout(intentar, 200);
   }
 
   ngOnInit(): void {

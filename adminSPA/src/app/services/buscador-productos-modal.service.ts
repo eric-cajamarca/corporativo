@@ -25,8 +25,8 @@ export class BuscadorProductosModalService {
       size: 'xl',
       centered: false,
       backdrop: 'static',
-      scrollable: true,
-      fullscreen: 'lg',
+      scrollable: false,
+      fullscreen: 'sm',
       modalDialogClass: 'buscador-productos-ngb-modal buscador-productos-compra-dialog'
     });
 

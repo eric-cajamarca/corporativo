@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { AfterViewInit, Component, OnDestroy, signal } from '@angular/core';
 import { ComprasService } from '../../../services/compras.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -56,7 +56,7 @@ interface CuotaCompraSunatForm {
   templateUrl: './create-compras.component.html',
   styleUrl: './create-compras.component.css',
 })
-export class CreateComprasComponent {
+export class CreateComprasComponent implements AfterViewInit, OnDestroy {
   public compras: any = {
     idSucursal: '',
     idComprobante: '',
@@ -202,6 +202,36 @@ export class CreateComprasComponent {
     this.uploadForm = this.fb.group({
       xmlFile: [null],
     });
+  }
+
+  private buscadorModalEl: HTMLElement | null = null;
+  private readonly onBuscadorModalShownBound = (): void => {
+    this.enfocarInputBuscadorModalCompras();
+  };
+
+  ngAfterViewInit(): void {
+    this.buscadorModalEl = document.getElementById('buscadorModal');
+    this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+  }
+
+  ngOnDestroy(): void {
+    this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+    this.buscadorModalEl = null;
+  }
+
+  enfocarInputBuscadorModalCompras(): void {
+    const intentar = () => {
+      const el = document.getElementById('create-compras-buscador-modal-search');
+      if (el instanceof HTMLInputElement) {
+        el.focus({ preventScroll: true });
+        if (el.value.length > 0) {
+          el.select();
+        }
+      }
+    };
+    intentar();
+    setTimeout(intentar, 80);
+    setTimeout(intentar, 200);
   }
 
   ngOnInit(): void {
