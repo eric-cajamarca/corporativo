@@ -699,6 +699,32 @@ export class IndexVentasComponent implements OnInit {
     this.whatsappMensajeHijo = null;
   }
 
+  /** Si el cliente tiene celular en BD, rellena número y mensaje tipo “{nombre} aquí envío tu comprobante”. */
+  private aplicarWhatsappDesdeClientePdf(
+    d: { cliente?: { celular?: string; rSocial?: string; razonSocial?: string } },
+    destino: 'principal' | 'hijo'
+  ): void {
+    const cel = String(d?.cliente?.celular ?? '').trim();
+    const nombre = String(d?.cliente?.rSocial ?? d?.cliente?.razonSocial ?? '').trim();
+    if (destino === 'hijo') {
+      if (cel) {
+        this.whatsappNumberHijo = cel;
+        this.whatsappCaptionHijo = nombre ? `${nombre} aquí envío tu comprobante` : '';
+      } else {
+        this.whatsappNumberHijo = '';
+        this.whatsappCaptionHijo = '';
+      }
+      return;
+    }
+    if (cel) {
+      this.whatsappNumber = cel;
+      this.whatsappCaption = nombre ? `${nombre} aquí envío tu comprobante` : '';
+    } else {
+      this.whatsappNumber = '';
+      this.whatsappCaption = '';
+    }
+  }
+
   abrirFormWhatsappHijo(): void {
     const idVenta = this.idVentaPdfComprobanteHijo;
     if (idVenta == null) return;
@@ -731,7 +757,7 @@ export class IndexVentasComponent implements OnInit {
           nombreArchivo
         };
         this.datosParaWhatsappHijo = { datos, nombreArchivo };
-        this.whatsappNumberHijo = (d.cliente as { celular?: string })?.celular ?? '';
+        this.aplicarWhatsappDesdeClientePdf(d, 'hijo');
         this.mostrarWhatsappFormHijo = true;
       },
       error: (err) => {
@@ -809,7 +835,7 @@ export class IndexVentasComponent implements OnInit {
           nombreArchivo
         };
         this.datosParaWhatsapp = { datos, nombreArchivo };
-        this.whatsappNumber = (d.cliente as { celular?: string })?.celular ?? '';
+        this.aplicarWhatsappDesdeClientePdf(d, 'principal');
         this.mostrarWhatsappForm = true;
       },
       error: (err) => {

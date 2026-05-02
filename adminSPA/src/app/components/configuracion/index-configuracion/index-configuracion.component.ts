@@ -102,7 +102,9 @@ export class IndexConfiguracionComponent implements OnInit {
     descuentoMaximo: 15,
     comisionVendedor: 5,
     /** Si es false, no se acumula descuento en el POS y en PDF el monto de descuentos se muestra 0.00 */
-    usarDescuentoEnTotal: true
+    usarDescuentoEnTotal: true,
+    /** Tras registrar venta en “Nueva venta”, mostrar modal para generar PDF / WhatsApp */
+    mostrarModalPdfTrasRegistrarVenta: true
   };
   public ventasGuardando = false;
 
@@ -553,6 +555,10 @@ export class IndexConfiguracionComponent implements OnInit {
         this.ventas.descuentoMaximo = parseFloat(getVal('VENTAS_DESCUENTO_MAXIMO_PCT', '15')) || 0;
         this.ventas.comisionVendedor = parseFloat(getVal('VENTAS_COMISION_VENDEDOR_PCT', '5')) || 0;
         this.ventas.usarDescuentoEnTotal = interpretarBooleanoConfig(getVal('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
+        this.ventas.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR', 'true'),
+          true
+        );
       },
       error: () => {}
     });
@@ -570,6 +576,12 @@ export class IndexConfiguracionComponent implements OnInit {
         clave: 'VENTAS_USAR_DESCUENTO_EN_TOTAL',
         valor: this.ventas.usarDescuentoEnTotal ? 'true' : 'false',
         descripcion: 'Usar y mostrar descuento en total de venta (PDF); XML SUNAT sin descuento en cabecera',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR',
+        valor: this.ventas.mostrarModalPdfTrasRegistrarVenta ? 'true' : 'false',
+        descripcion: 'Al registrar una venta en Nueva venta, mostrar modal para generar comprobante PDF o WhatsApp',
         tipoDato: 'BOOLEAN'
       }
     ];

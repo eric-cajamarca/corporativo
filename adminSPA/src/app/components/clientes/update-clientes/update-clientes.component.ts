@@ -23,6 +23,8 @@ export class UpdateClientesComponent {
   /** Cuando se usa como modal, el id del cliente a editar (si no se usa la ruta). */
   @Input() idClienteModal: string | number | null = null;
   @Output() cerrar = new EventEmitter<void>();
+  /** Emite tras guardar correctamente en modo modal (p. ej. para refrescar datos en “Nueva venta”). */
+  @Output() clienteActualizado = new EventEmitter<void>();
 
   public filtro: any = "";
   public clientes: any = {
@@ -657,6 +659,9 @@ export class UpdateClientesComponent {
       next: () => {
         if (typeof iziToast !== 'undefined') {
           iziToast.success({ title: 'OK', message: 'Cliente actualizado correctamente.', position: 'topRight' });
+        }
+        if (this.modoModal) {
+          this.clienteActualizado.emit();
         }
       },
       error: (err) => {

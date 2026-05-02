@@ -257,6 +257,12 @@
                           <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
+                          <li *ngIf="!v.eliminado && v.idVenta != null">
+                            <a class="dropdown-item" [routerLink]="['/ventas/create']" [queryParams]="{ duplicarDesdeVenta: v.idVenta }">
+                              <i class="bi bi-files me-2"></i> Duplicar en nueva venta
+                            </a>
+                          </li>
+                          <li *ngIf="!v.eliminado && v.idVenta != null && (puedeEditarVenta(v) || puedeEliminarVenta(v))"><hr class="dropdown-divider"></li>
                           <li *ngIf="puedeEditarVenta(v)">
                             <a class="dropdown-item" [routerLink]="['/ventas/editar', v.idVenta]">
                               <i class="bi bi-pencil me-2"></i> Editar
@@ -375,6 +381,10 @@
                     <i class="bi bi-three-dots-vertical"></i>
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end">
+                    <li *ngIf="!v.eliminado && v.idVenta != null">
+                      <a class="dropdown-item" [routerLink]="['/ventas/create']" [queryParams]="{ duplicarDesdeVenta: v.idVenta }"><i class="bi bi-files me-2"></i> Duplicar en nueva venta</a>
+                    </li>
+                    <li *ngIf="!v.eliminado && v.idVenta != null && (puedeEditarVenta(v) || puedeEliminarVenta(v))"><hr class="dropdown-divider"></li>
                     <li *ngIf="puedeEditarVenta(v)">
                       <a class="dropdown-item" [routerLink]="['/ventas/editar', v.idVenta]"><i class="bi bi-pencil me-2"></i> Editar</a>
                     </li>
@@ -483,6 +493,7 @@
                   <th>Fecha</th>
                   <th class="text-end">Total</th>
                   <th class="text-center">Imprimir</th>
+                  <th class="text-center">Duplicar</th>
                 </tr>
               </thead>
               <tbody>
@@ -499,9 +510,14 @@
                       <i class="bi bi-file-earmark-pdf"></i> PDF
                     </button>
                   </td>
+                  <td class="text-center">
+                    <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/ventas/create']" [queryParams]="{ duplicarDesdeVenta: c.idVenta }" data-bs-dismiss="modal" title="Nueva venta con el mismo detalle">
+                      <i class="bi bi-files"></i>
+                    </a>
+                  </td>
                 </tr>
                 <tr *ngIf="comprobantesVenta.length === 0">
-                  <td colspan="6" class="text-center text-muted">No hay comprobantes.</td>
+                  <td colspan="7" class="text-center text-muted">No hay comprobantes.</td>
                 </tr>
               </tbody>
             </table>

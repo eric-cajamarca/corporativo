@@ -94,7 +94,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let item of carrito; let i = index">
+                    <tr *ngFor="let item of carrito; let i = index" [class.create-ventas-row-stock-alerta]="lineaCarritoStockInsuficiente(item)">
                       <td style="width: 10px; text-align: left;"> {{i + 1}} </td>
                       <td *ngIf="esGestora" style="font-size:11px">
                         <span class="badge bg-info text-dark">{{ item.aliasEmpresa || '' }}</span>
@@ -143,7 +143,7 @@
 
               <!-- Detalle en tarjetas (móvil / tablet < lg) -->
               <div *ngIf="carrito.length > 0" class="d-lg-none create-ventas-cart-cards">
-                <div class="create-ventas-cart-card" *ngFor="let item of carrito; let i = index">
+                <div class="create-ventas-cart-card" *ngFor="let item of carrito; let i = index" [class.create-ventas-cart-card-stock-alerta]="lineaCarritoStockInsuficiente(item)">
                   <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                     <span class="fw-semibold">#{{ i + 1 }} · {{ item.codigo }}</span>
                     <button type="button" class="btn btn-outline-danger btn-sm create-ventas-touch-btn" (click)="eliminarDelCarrito(i)" title="Quitar">
@@ -302,7 +302,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover" (click)="seleccionaProducto(p)">
+              <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover" [class.create-ventas-buscador-row-stock-alerta]="productoBusquedaSinStockSuficiente(p)" (click)="seleccionaProducto(p)">
                 <td *ngIf="productosConImagenes" class="align-middle" (click)="$event.stopPropagation()">
                   <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
                     (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
@@ -326,7 +326,7 @@
         </div>
 
         <div class="d-lg-none buscador-compra-cards">
-          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados">
+          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados" [class.create-ventas-buscador-card-stock-alerta]="productoBusquedaSinStockSuficiente(p)">
             <div class="d-flex gap-2 align-items-start">
               <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
                 <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
@@ -517,9 +517,12 @@
           <div class="col-12" *ngIf="getRazonSocialDisplay() && !cliente.idCliente">
             <div class="alert alert-info py-2 mb-0 small">Cliente no registrado. Se creará al registrar la venta.</div>
           </div>
-          <div class="col-12" *ngIf="cliente.idCliente">
+          <div class="col-12 d-flex flex-wrap gap-2" *ngIf="cliente.idCliente">
+            <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalEditarClienteCompleto()">
+              <i class="bi bi-pencil-square me-1"></i>Editar cliente
+            </button>
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalEditarClienteCredito()" [disabled]="loadingEditClienteCredito">
-              <i class="bi bi-pencil-square me-1"></i>Editar cliente (línea de crédito)
+              <i class="bi bi-credit-card me-1"></i>Línea de crédito
             </button>
           </div>
         </div>
@@ -708,7 +711,13 @@
                 <tr>
                   <td class="text-center">{{ detalle.item }}</td>
                   <td>{{ detalle.descripcion }}</td>
-                  <td class="text-end">{{ detalle.monto | number:'1.2-2' }}</td>
+                  <td class="text-end align-middle p-1">
+                    <input type="number" class="form-control text-end modal-pago-monto-fila"
+                      [(ngModel)]="detalle.monto"
+                      (ngModelChange)="onMontoTablaDetallePagoChange()"
+                      (blur)="normalizarMontoDetallePago(detalle)"
+                      step="0.01" min="0" inputmode="decimal" />
+                  </td>
                   <td>{{ detalle.referencia }}</td>
                   <td class="text-center">
                     <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarDetalle($index)" title="Eliminar">
@@ -1018,6 +1027,73 @@
         <button type="button" class="btn btn-primary" (click)="confirmarCuotasCreditoYRegistrar()">
           <i class="bi bi-check2-circle me-1"></i>Guardar y registrar venta
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: editar cliente completo (desde Información del cliente) -->
+<div class="modal fade" id="modalEditarClienteVenta" tabindex="-1" aria-labelledby="modalEditarClienteVentaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content" *ngIf="idClienteParaEditarModal != null && idClienteParaEditarModal !== ''">
+      <app-update-clientes
+        [modoModal]="true"
+        [idClienteModal]="idClienteParaEditarModal"
+        (clienteActualizado)="onClienteEditadoDesdeModal()"
+        (cerrar)="cerrarModalEditarClienteVenta()">
+      </app-update-clientes>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: comprobante PDF / WhatsApp tras registrar venta -->
+<div class="modal fade" id="pdfModalPostVenta" tabindex="-1" aria-labelledby="pdfModalPostVentaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="pdfModalPostVentaLabel">
+          <i class="bi bi-file-pdf"></i> Generar Comprobante PDF
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Seleccione el formato para el comprobante:</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-primary" [disabled]="postVentaGenerandoPdf" (click)="generarPdfPostVenta('ticket')">
+            <i class="bi bi-receipt"></i> Formato Ticket
+          </button>
+          <button type="button" class="btn btn-outline-primary" [disabled]="postVentaGenerandoPdf" (click)="generarPdfPostVenta('A5')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A5
+          </button>
+          <button type="button" class="btn btn-outline-primary" [disabled]="postVentaGenerandoPdf" (click)="generarPdfPostVenta('A4')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A4
+          </button>
+        </div>
+        <hr class="my-3" />
+        <button type="button" class="btn btn-outline-success w-100" [disabled]="postVentaGenerandoPdf" (click)="abrirFormWhatsappPostVenta()">
+          <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+        </button>
+        <div *ngIf="postVentaMostrarWhatsapp && postVentaDatosWhatsapp" class="mt-3 p-2 border rounded">
+          <label class="form-label small">Número (código país + número, ej. 51999999999)</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="postVentaWhatsappNumero" placeholder="51999999999" />
+          <label class="form-label small">Formato del PDF</label>
+          <select class="form-select form-select-sm mb-2" [(ngModel)]="postVentaWhatsappFormato">
+            <option value="ticket">Ticket</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+          <label class="form-label small">Mensaje opcional (caption)</label>
+          <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="postVentaWhatsappCaption" placeholder="Opcional" />
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" [disabled]="postVentaWhatsappEnviando" (click)="enviarPdfPorWhatsappPostVenta()">
+              <span *ngIf="postVentaWhatsappEnviando"><i class="bi bi-hourglass-split"></i> Enviando...</span>
+              <span *ngIf="!postVentaWhatsappEnviando"><i class="bi bi-send"></i> Enviar</span>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="postVentaWhatsappEnviando" (click)="cerrarPostVentaWhatsappForm()">Cancelar</button>
+          </div>
+          <p class="small mt-2 mb-0" [class.text-success]="postVentaWhatsappMensaje && postVentaWhatsappNumero && !postVentaWhatsappEnviando" [class.text-danger]="postVentaWhatsappMensaje && (postVentaWhatsappEnviando || !postVentaWhatsappNumero)">{{ postVentaWhatsappMensaje }}</p>
+        </div>
+        <p class="text-muted small mt-2 mb-0" *ngIf="postVentaGenerandoPdf && !postVentaMostrarWhatsapp"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
       </div>
     </div>
   </div>

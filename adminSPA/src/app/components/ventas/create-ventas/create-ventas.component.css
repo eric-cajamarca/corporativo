@@ -321,8 +321,36 @@
   visibility: visible !important;
   opacity: 1 !important;
 }
+
+/* Inputs del modal Forma de pago: fuente ligeramente mayor */
+#modalPago .form-control,
+#modalPago .form-select {
+  font-size: 1.0625rem;
+}
+#modalPago .form-label {
+  font-size: 0.9375rem;
+}
+#modalPago .modal-pago-monto-fila {
+  min-width: 5.5rem;
+  max-width: 9rem;
+  margin-left: auto;
+}
 /* Botón Agregar en detalle de pago */
 
+
+/* Stock insuficiente / sin stock: resaltado ámbar (buscador y carrito) */
+.create-ventas-buscador-row-stock-alerta td,
+.create-ventas-row-stock-alerta td {
+  background-color: #fff3cd !important;
+}
+.create-ventas-buscador-card-stock-alerta {
+  background-color: #fff3cd !important;
+  border-color: #ffc107 !important;
+}
+.create-ventas-cart-card-stock-alerta {
+  background-color: #fff3cd;
+  border-color: #ffc107;
+}
 
 /* ---------- MODALES – ESTILO ELEGANTE ---------- */
 .modal-content.shadow-xl {

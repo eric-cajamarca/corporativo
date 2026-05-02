@@ -1,15 +1,16 @@
-import { AfterViewInit, Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TopnavComponent } from '../../topnav/topnav.component';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CategoriaService } from '../../../services/categoria.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { PresentacionService } from '../../../services/presentacion.service';
 import { variosService } from '../../../services/varios.service';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 import { CreateClientesComponent } from '../../clientes/create-clientes/create-clientes.component';
+import { UpdateClientesComponent } from '../../clientes/update-clientes/update-clientes.component';
 import { ClienteService } from '../../../services/cliente.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
@@ -20,7 +21,7 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
-import { VentasService } from '../../../services/ventas.service';
+import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
@@ -39,6 +40,10 @@ import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
+import { PdfService } from '../../../services/pdf.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
+import { numeroALetras } from '../../../utils/numeroALetras';
+import { Empresa } from '../../../interfaces/pdf-interface';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -51,7 +56,7 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-ventas',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent, TopnavComponent, SidebarComponent],
   templateUrl: './create-ventas.component.html',
   styleUrl: './create-ventas.component.css'
 })
@@ -153,6 +158,23 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Hasta que llegue gestores/config, no aplicar descuento lista vs vendido (evita total erróneo con default true). */
   private descuentoEnTotalConfigListo = false;
 
+  /** Config > Ventas: mostrar modal PDF/WhatsApp al registrar venta (por defecto activo). */
+  mostrarModalPdfTrasRegistrarVenta = true;
+
+  /** Modal comprobante PDF tras registrar venta */
+  postVentaIdVenta: number | null = null;
+  postVentaGenerandoPdf = false;
+  postVentaMostrarWhatsapp = false;
+  postVentaDatosWhatsapp: { datos: unknown; nombreArchivo: string } | null = null;
+  postVentaWhatsappNumero = '';
+  postVentaWhatsappCaption = '';
+  postVentaWhatsappFormato: 'A4' | 'A5' | 'ticket' = 'A4';
+  postVentaWhatsappEnviando = false;
+  postVentaWhatsappMensaje: string | null = null;
+
+  /** Edición de cliente existente desde modal “Información del cliente” */
+  idClienteParaEditarModal: number | string | null = null;
+
   public direccionCliente: any;
 
   /** Valores por defecto de estado pedido y estado pago (según configuración). */
@@ -226,7 +248,12 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private hotelPreloadVentaService: HotelPreloadVentaService,
     private valesDespachoService: ValesDespachoService,
     private empresaService: EmpresaService,
-    private rubrosService: RubrosService
+    private rubrosService: RubrosService,
+    private pdfService: PdfService,
+    private whatsappService: WhatsappService,
+    private ngZone: NgZone,
+    private route: ActivatedRoute,
+    private router: Router
   ) {}
 
   /** Referencia al modal Bootstrap “Buscar productos” para registrar/quitar el listener. */
@@ -236,14 +263,34 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.enfocarInputBuscadorModalVentas();
   };
 
+  private pdfPostVentaModalEl: HTMLElement | null = null;
+  private readonly onPdfPostVentaModalHiddenBound = (): void => {
+    this.finalizarFlujoTrasModalPdfPostVenta();
+  };
+
+  private modalEditarClienteEl: HTMLElement | null = null;
+  private readonly onModalEditarClienteHiddenBound = (): void => {
+    this.ngZone.run(() => {
+      this.idClienteParaEditarModal = null;
+    });
+  };
+
   ngAfterViewInit(): void {
     this.buscadorModalEl = document.getElementById('buscadorModal');
     this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
+    this.pdfPostVentaModalEl = document.getElementById('pdfModalPostVenta');
+    this.pdfPostVentaModalEl?.addEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
+    this.modalEditarClienteEl = document.getElementById('modalEditarClienteVenta');
+    this.modalEditarClienteEl?.addEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
   }
 
   ngOnDestroy(): void {
     this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
     this.buscadorModalEl = null;
+    this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
+    this.pdfPostVentaModalEl = null;
+    this.modalEditarClienteEl?.removeEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
+    this.modalEditarClienteEl = null;
   }
 
   /**
@@ -283,11 +330,20 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
             ? (itemDesc as { valor?: string; Valor?: string }).valor
             : (itemDesc as { valor?: string; Valor?: string })?.Valor;
         this.usarDescuentoEnTotal = interpretarBooleanoConfig(vDesc, true);
+        const itemPdfModal = lista.find((c: { clave?: string; Clave?: string }) =>
+          (c.clave || c.Clave || '') === 'VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR'
+        );
+        const vPdfModal =
+          itemPdfModal && (itemPdfModal as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemPdfModal as { valor?: string; Valor?: string }).valor
+            : (itemPdfModal as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(vPdfModal, true);
         this.descuentoEnTotalConfigListo = true;
         this.actualizaTotales();
       },
       error: () => {
         this.descuentoEnTotalConfigListo = true;
+        this.mostrarModalPdfTrasRegistrarVenta = true;
       }
     });
     this._documentosService.obtener_documento1().subscribe({
@@ -332,7 +388,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this._productoService.limpiarCacheListaProductos();
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
-    if (this.hotelPreloadVentaService.hasPreload()) {
+    const duplicarDesde = this.route.snapshot.queryParamMap.get('duplicarDesdeVenta');
+    if (duplicarDesde) {
+      this.procesarDuplicarDesdeVentaSiCorresponde(duplicarDesde);
+    } else if (this.hotelPreloadVentaService.hasPreload()) {
       this.aplicarPreloadDesdeHabitacion();
     } else {
       this.revisarVentasProvisionales();
@@ -383,6 +442,176 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       };
     });
     this.actualizaTotales();
+  }
+
+  /** Quitar query `duplicarDesdeVenta` de la URL tras procesar. */
+  private limpiarQueryDuplicarDesdeVenta(): void {
+    this.router.navigate(['/ventas/create'], { replaceUrl: true });
+  }
+
+  /**
+   * Desde historial de ventas: carga el detalle del comprobante en el carrito (cliente, comprobante y pago manual).
+   */
+  private procesarDuplicarDesdeVentaSiCorresponde(raw: string): void {
+    const idVenta = parseInt(String(raw).trim(), 10);
+    if (Number.isNaN(idVenta) || idVenta < 1) {
+      this.limpiarQueryDuplicarDesdeVenta();
+      return;
+    }
+    this.ventasService.getComprobanteParaPdf(idVenta).subscribe({
+      next: (res) => {
+        const data: ComprobantePdfData | null = res.data ?? null;
+        const items = data?.items;
+        if (!data?.venta || !Array.isArray(items) || items.length === 0) {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.warning({
+              title: 'Duplicar',
+              message: 'No se encontró detalle para duplicar.',
+              position: 'topRight'
+            });
+          }
+          this.limpiarQueryDuplicarDesdeVenta();
+          return;
+        }
+        this.limpiarVenta();
+        this.carrito = this.mapearItemsPdfACarrito(items, data.venta);
+        if (data.venta.idSucursal != null && String(data.venta.idSucursal).trim() !== '') {
+          this.ventas.idSucursal = String(data.venta.idSucursal);
+        }
+        this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+          next: (pr: any) => {
+            if (pr?.data) {
+              this.productos = pr.data;
+              this.productos_const = pr.data;
+              this.stockSucursales_const = pr.data;
+              this.productos_filtrados = Array.isArray(pr.data) ? [...pr.data] : [];
+            }
+            this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
+            this.actualizaTotales();
+            this.guardarEstadoProvisional();
+            if (typeof iziToast !== 'undefined') {
+              iziToast.success({
+                title: 'Duplicado',
+                message: 'Carrito cargado desde el comprobante. Indique cliente, tipo de comprobante y forma de pago.',
+                position: 'topRight'
+              });
+            }
+            this.limpiarQueryDuplicarDesdeVenta();
+          },
+          error: () => {
+            this.actualizaTotales();
+            this.guardarEstadoProvisional();
+            this.limpiarQueryDuplicarDesdeVenta();
+          }
+        });
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Duplicar',
+            message: 'No se pudo cargar el comprobante para duplicar.',
+            position: 'topRight'
+          });
+        }
+        this.limpiarQueryDuplicarDesdeVenta();
+      }
+    });
+  }
+
+  private mapearItemsPdfACarrito(
+    items: ComprobantePdfData['items'],
+    ventaCab: ComprobantePdfData['venta']
+  ): any[] {
+    const idSucursalCab = ventaCab?.idSucursal != null ? String(ventaCab.idSucursal).trim() : '';
+    return items
+      .filter((d) => d.idProducto != null && String(d.idProducto).trim() !== '')
+      .map((d) => {
+        const idProducto = String(d.idProducto);
+        const descLin = (d.descripcion ?? '').toString().trim();
+        const descProd = (d.descripcionProducto ?? descLin).toString().trim();
+        const cantidad = Number(d.cantidad) || 0;
+        const pVenta = Number(d.pVenta) || 0;
+        return {
+          idProducto,
+          codigo: (d.codigo ?? '').toString(),
+          descripcion: descLin || descProd,
+          descripcionOriginal: descProd || descLin,
+          permiteDescripcionEnVenta: !!(d.permiteDescripcionEnVenta === true || Number(d.permiteDescripcionEnVenta) === 1),
+          codigoPresentacion: '',
+          cantidad,
+          pVenta,
+          idSucursal: idSucursalCab || this.ventas.idSucursal
+        };
+      });
+  }
+
+  /** Completa stock, presentación, sucursal y datos multiempresa desde el catálogo en memoria. */
+  enriquecerLineaCarritoDesdeCatalogo(linea: any): void {
+    const list = this.stockSucursales_const || [];
+    const idP = String(linea.idProducto ?? '');
+    const idS = linea.idSucursal != null ? String(linea.idSucursal).trim() : '';
+    const idE = linea.idEmpresa != null ? String(linea.idEmpresa).trim() : '';
+    let match = list.find((r: any) => {
+      if (String(r.idProducto) !== idP) return false;
+      if (idS && r.idSucursal != null && String(r.idSucursal) !== idS) return false;
+      if (this.esGestora && idE) {
+        const re = r.idEmpresa != null ? String(r.idEmpresa) : '';
+        if (re && re !== idE) return false;
+      }
+      return true;
+    });
+    if (!match) {
+      match = list.find((r: any) => String(r.idProducto) === idP);
+    }
+    if (!match) return;
+    linea.stock = match.stock;
+    if (!linea.codigoPresentacion) linea.codigoPresentacion = match.codigoPresentacion ?? '';
+    if (!linea.sucursal) linea.sucursal = match.sucursal ?? '';
+    if (match.idEmpresa != null) {
+      linea.idEmpresa = String(match.idEmpresa);
+      linea.aliasEmpresa = match.aliasEmpresa ?? match.razonSocialEmpresa ?? '';
+    }
+  }
+
+  /** Stock numérico del catálogo o null si no aplica. */
+  private stockNumericoProducto(v: unknown): number | null {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** Modal buscar productos: sin stock o stock ≤ 0. */
+  productoBusquedaSinStockSuficiente(p: any): boolean {
+    const s = this.stockNumericoProducto(p?.stock);
+    return s == null || s <= 0;
+  }
+
+  private obtenerStockDisponibleParaLineaCarrito(item: any): number | null {
+    const list = this.stockSucursales_const || [];
+    const idP = String(item.idProducto ?? '');
+    const idS = item.idSucursal != null ? String(item.idSucursal).trim() : '';
+    const idE = item.idEmpresa != null ? String(item.idEmpresa).trim() : '';
+    let match = list.find((r: any) => {
+      if (String(r.idProducto) !== idP) return false;
+      if (idS && r.idSucursal != null && String(r.idSucursal) !== idS) return false;
+      if (this.esGestora && idE) {
+        const re = r.idEmpresa != null ? String(r.idEmpresa) : '';
+        if (re && re !== idE) return false;
+      }
+      return true;
+    });
+    if (!match) match = list.find((r: any) => String(r.idProducto) === idP);
+    const s = this.stockNumericoProducto(match?.stock ?? item?.stock);
+    return s;
+  }
+
+  /** Carrito: cantidad supera stock conocido o stock 0. */
+  lineaCarritoStockInsuficiente(item: any): boolean {
+    const cant = Number(item?.cantidad) || 0;
+    const disp = this.obtenerStockDisponibleParaLineaCarrito(item);
+    if (disp == null) return false;
+    if (disp <= 0) return true;
+    return cant > disp;
   }
 
   /** Carga estado pedido y estado pago por defecto desde configuración y los aplica a la venta actual. */
@@ -784,6 +1013,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         const existe = this.carrito.find(p => p.idProducto === producto.idProducto);
     if (existe) {
       existe.cantidad += 1;
+      this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
       const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
@@ -792,7 +1022,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         descripcionOriginal: descCat,
         permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1)
       });
-      
+      const agregado = this.carrito[this.carrito.length - 1];
+      this.enriquecerLineaCarritoDesdeCatalogo(agregado);
             }
     this.actualizaTotales();
   }
@@ -998,6 +1229,7 @@ abrirModalPrecios(item: any) {
     if (!isNaN(nuevo)) {
       item.cantidad = nuevo;
     }
+    this.enriquecerLineaCarritoDesdeCatalogo(item);
     this.actualizaTotales();
   }
 
@@ -1438,31 +1670,60 @@ abrirModalPrecios(item: any) {
 
   // Calcular total de la tabla
   calcularTotalTabla(): number {
-    return this.detallePago.reduce((sum: any, item: { monto: any; }) => sum + item.monto, 0);
+    return this.detallePago.reduce(
+      (sum: number, item: { monto?: unknown }) => sum + (Number(item.monto) || 0),
+      0
+    );
   }
 
   // Agregar detalle (guardamos idFormaPago para enviar como idMediosPago al API)
+  /** Si ya existe una fila con la misma forma de pago, suma el monto; si no, agrega fila nueva. */
   agregarDetalle(): void {
     const monto = Math.round((Number(this.detailForm.monto) || 0) * 100) / 100;
     const idForma = this.formaPagoSeleccionada?.idFormaPago != null ? Number(this.formaPagoSeleccionada.idFormaPago) : 0;
-    if (monto > 0 && idForma) {
-      const desc = this.formasPago.find((f: FormaPago) => f.idFormaPago === idForma)?.descripcion || 'Pago';
+    if (monto <= 0 || !idForma) return;
+
+    const desc = this.formasPago.find((f: FormaPago) => Number(f.idFormaPago) === idForma)?.descripcion || 'Pago';
+    const ref = (this.detailForm.referencia || '').trim() || 'N/A';
+
+    const existente = this.detallePago.find((d: { idFormaPago?: unknown }) => Number(d.idFormaPago) === idForma);
+    if (existente) {
+      existente.monto = Math.round(((Number(existente.monto) || 0) + monto) * 100) / 100;
+    } else {
       this.detallePago.push({
         item: this.detallePago.length + 1,
         idFormaPago: idForma,
         descripcion: desc,
         monto,
-        referencia: this.detailForm.referencia || 'N/A'
+        referencia: ref
       });
-      this.detailForm.referencia = '';
-      this.actualizarMontoSaldo();
+      this.detallePago.forEach((item: { item: number }, idx: number) => {
+        item.item = idx + 1;
+      });
     }
+
+    this.detailForm.referencia = '';
+    this.actualizarMontoSaldo();
+    this.guardarEstadoProvisional();
   }
 
   // Eliminar detalle
   eliminarDetalle(index: number): void {
     this.detallePago.splice(index, 1);
     this.detallePago.forEach((item: { item: any; }, idx: number) => item.item = idx + 1);
+    this.actualizarMontoSaldo();
+  }
+
+  /** Monto editable en la tabla del modal: redondea a 2 decimales y no permite negativos. */
+  normalizarMontoDetallePago(detalle: { monto?: unknown }): void {
+    const n = Math.round((Number(detalle.monto) || 0) * 100) / 100;
+    detalle.monto = n < 0 ? 0 : n;
+    this.actualizarMontoSaldo();
+    this.guardarEstadoProvisional();
+  }
+
+  /** Mientras se edita el monto en la tabla, el input “Monto” del formulario muestra el saldo pendiente. */
+  onMontoTablaDetallePagoChange(): void {
     this.actualizarMontoSaldo();
   }
 
@@ -2129,8 +2390,22 @@ abrirModalPrecios(item: any) {
         if (this.esGestora && res.idVentaAgrupada) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
-        this.ventaSesionService.eliminarSesionActiva();
-        this.limpiarVenta();
+        const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
+        const abrirPdf =
+          this.mostrarModalPdfTrasRegistrarVenta && idVentaPdf != null;
+        if (abrirPdf) {
+          this.postVentaIdVenta = idVentaPdf;
+          this.cerrarPostVentaWhatsappForm();
+          setTimeout(() => {
+            const el = document.getElementById('pdfModalPostVenta');
+            if (el && typeof bootstrap !== 'undefined') {
+              bootstrap.Modal.getOrCreateInstance(el).show();
+            }
+          }, 0);
+        } else {
+          this.ventaSesionService.eliminarSesionActiva();
+          this.limpiarVenta();
+        }
       },
       error: (err) => {
         this.loading = false;
@@ -2138,6 +2413,253 @@ abrirModalPrecios(item: any) {
           title: 'Error',
           message: err.error?.error || err.error?.message || 'Error al registrar la venta.'
         });
+      }
+    });
+  }
+
+  private obtenerIdVentaTrasRegistro(res: { ventasEmpresa?: Array<{ idVenta?: number }> }): number | null {
+    const arr = res?.ventasEmpresa;
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    const n = Number(arr[0]?.idVenta);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  private finalizarFlujoTrasModalPdfPostVenta(): void {
+    this.postVentaIdVenta = null;
+    this.cerrarPostVentaWhatsappForm();
+    this.postVentaGenerandoPdf = false;
+    this.ventaSesionService.eliminarSesionActiva();
+    this.limpiarVenta();
+  }
+
+  cerrarPostVentaWhatsappForm(): void {
+    this.postVentaMostrarWhatsapp = false;
+    this.postVentaDatosWhatsapp = null;
+    this.postVentaWhatsappNumero = '';
+    this.postVentaWhatsappCaption = '';
+    this.postVentaWhatsappFormato = 'A4';
+    this.postVentaWhatsappMensaje = null;
+    this.postVentaWhatsappEnviando = false;
+  }
+
+  private aplicarWhatsappDesdeClientePdfPostVenta(d: {
+    cliente?: { celular?: string; rSocial?: string; razonSocial?: string };
+  }): void {
+    const cel = String(d?.cliente?.celular ?? '').trim();
+    const nombre = String(d?.cliente?.rSocial ?? d?.cliente?.razonSocial ?? '').trim();
+    if (cel) {
+      this.postVentaWhatsappNumero = cel;
+      this.postVentaWhatsappCaption = nombre ? `${nombre} aquí envío tu comprobante` : '';
+    } else {
+      this.postVentaWhatsappNumero = '';
+      this.postVentaWhatsappCaption = '';
+    }
+  }
+
+  abrirFormWhatsappPostVenta(): void {
+    const id = this.postVentaIdVenta;
+    if (id == null) return;
+    this.postVentaGenerandoPdf = true;
+    this.postVentaWhatsappMensaje = null;
+    this.ventasService.getComprobanteParaPdf(id).subscribe({
+      next: (res) => {
+        const d = res.data;
+        this.postVentaGenerandoPdf = false;
+        if (!d) return;
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.postVentaDatosWhatsapp = { datos, nombreArchivo };
+        this.aplicarWhatsappDesdeClientePdfPostVenta(d);
+        this.postVentaMostrarWhatsapp = true;
+      },
+      error: (err) => {
+        this.postVentaGenerandoPdf = false;
+        this.postVentaWhatsappMensaje = err?.error?.error || err?.message || 'No se pudieron cargar los datos.';
+      }
+    });
+  }
+
+  enviarPdfPorWhatsappPostVenta(): void {
+    if (!this.postVentaDatosWhatsapp || !this.postVentaWhatsappNumero.trim()) {
+      this.postVentaWhatsappMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.postVentaWhatsappEnviando = true;
+    this.postVentaWhatsappMensaje = null;
+    const { datos, nombreArchivo } = this.postVentaDatosWhatsapp;
+    const formato = this.postVentaWhatsappFormato;
+    this.pdfService.generarPdfComprobanteVenta(datos as never, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this.whatsappService
+            .enviarArchivo(
+              this.postVentaWhatsappNumero.trim(),
+              base64,
+              nombreArchivo,
+              'document',
+              this.postVentaWhatsappCaption.trim() || undefined
+            )
+            .subscribe({
+              next: (r) => {
+                this.postVentaWhatsappEnviando = false;
+                this.postVentaWhatsappMensaje = r.message;
+                if (r.success) setTimeout(() => this.cerrarPostVentaWhatsappForm(), 2000);
+              },
+              error: (err) => {
+                this.postVentaWhatsappEnviando = false;
+                this.postVentaWhatsappMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+              }
+            });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err) => {
+        this.postVentaWhatsappEnviando = false;
+        const e = err?.error;
+        if (e instanceof Blob) {
+          const rdr = new FileReader();
+          rdr.onloadend = () => {
+            try {
+              const json = JSON.parse(rdr.result as string);
+              this.postVentaWhatsappMensaje = json?.error || 'Error al generar el PDF.';
+            } catch {
+              this.postVentaWhatsappMensaje = 'Error al generar el PDF.';
+            }
+          };
+          rdr.readAsText(e);
+        } else {
+          this.postVentaWhatsappMensaje =
+            e && typeof e === 'object' && typeof (e as { error?: string }).error === 'string'
+              ? (e as { error: string }).error
+              : err?.message || 'Error al generar el PDF.';
+        }
+      }
+    });
+  }
+
+  generarPdfPostVenta(formato: 'A4' | 'A5' | 'ticket'): void {
+    const id = this.postVentaIdVenta;
+    if (id == null) return;
+    this.postVentaGenerandoPdf = true;
+    this.ventasService.getComprobanteParaPdf(id).subscribe({
+      next: (res) => {
+        const d = res.data;
+        if (!d) {
+          this.postVentaGenerandoPdf = false;
+          return;
+        }
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.pdfService.generarPdfComprobanteVenta(datos, formato, nombreArchivo).subscribe({
+          next: (blob) => {
+            this.pdfService.previsualizar(blob);
+            this.postVentaGenerandoPdf = false;
+          },
+          error: (err) => {
+            this.postVentaGenerandoPdf = false;
+            const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
+            console.error('Error generar PDF post-venta:', err);
+            iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+          }
+        });
+      },
+      error: (err) => {
+        this.postVentaGenerandoPdf = false;
+        const msg = err?.error?.error || err?.message || 'Error al cargar el comprobante.';
+        iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+      }
+    });
+  }
+
+  abrirModalEditarClienteCompleto(): void {
+    if (!this.cliente?.idCliente || this.cliente.idCliente === '') return;
+    this.idClienteParaEditarModal = this.cliente.idCliente;
+    setTimeout(() => {
+      const el = document.getElementById('modalEditarClienteVenta');
+      if (el && typeof bootstrap !== 'undefined') {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  cerrarModalEditarClienteVenta(): void {
+    const el = document.getElementById('modalEditarClienteVenta');
+    if (el && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getInstance(el)?.hide();
+    }
+  }
+
+  onClienteEditadoDesdeModal(): void {
+    const id = this.cliente?.idCliente;
+    if (id == null || id === '') {
+      this.cerrarModalEditarClienteVenta();
+      return;
+    }
+    this._clienteService.obtener_cliente_id(id).subscribe({
+      next: (r) => {
+        const item = Array.isArray(r.data) ? r.data[0] : r.data;
+        if (item) {
+          this.cliente.rSocial = (item.rSocial ?? item.r_Social ?? '').toString().trim();
+          this.cliente.correo = item.correo ?? '';
+          this.cliente.celular = item.celular ?? '';
+          this.cliente.ruc = item.ruc != null ? String(item.ruc) : this.cliente.ruc;
+          this.cliente.idDocumento = String(item.idDocumento ?? this.cliente.idDocumento);
+        }
+        this._clienteService.obtener_direccionesCliente_idCliente(id).subscribe({
+          next: (dirRes) => {
+            if (dirRes?.data && dirRes.data.length > 0) {
+              this.direccionCliente = dirRes.data[0];
+              this.cliente.direccion = (this.direccionCliente.direccion ?? '').toString();
+            }
+          },
+          error: () => {}
+        });
+        this.guardarEstadoProvisional();
+        this.cerrarModalEditarClienteVenta();
+      },
+      error: () => {
+        this.cerrarModalEditarClienteVenta();
       }
     });
   }

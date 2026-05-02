@@ -162,21 +162,21 @@
               <!-- Efectivo disponible: solo movimientos en efectivo afectan este saldo -->
               <div class="alert alert-info mt-3 mb-0" role="alert">
                 <strong>Efectivo disponible en caja:</strong> {{ formatCurrency(saldoEfectivoDisponible) }}
-                <small class="d-block text-muted mt-1">Solo los movimientos con forma de pago &quot;Efectivo&quot; afectan este saldo. El resto se muestra arriba pero no resta del efectivo.</small>
+                <small class="d-block text-muted mt-1">Solo los movimientos con forma de pago &quot;Efectivo&quot; afectan este saldo.</small>
               </div>
 
               <div class="alert alert-light border mb-3">
                 <div class="row text-center text-md-start">
                   <div class="col-md-6 mb-1 mb-md-0">
-                    <strong>Ventas al crédito</strong> (periodo, vista consolidada):
+                    <strong>Ventas al crédito:</strong>
                     <span class="text-primary ms-1">{{ formatCurrency(ventasCreditoImporte) }}</span>
                   </div>
                   <div class="col-md-6">
-                    <strong>Cobro de créditos</strong> (periodo):
+                    <strong>Cobro de créditos:</strong>
                     <span class="text-success ms-1">{{ formatCurrency(cobroCreditosImporte) }}</span>
                   </div>
                 </div>
-                <small class="text-muted d-block mt-1">Montos desde <em>CreditosClientes.fechaCredito</em> y <em>PagosCuotas.fechaPago</em> (informativo respecto al efectivo por forma de pago).</small>
+                <!--<small class="text-muted d-block mt-1">Montos desde <em>CreditosClientes.fechaCredito</em> y <em>PagosCuotas.fechaPago</em> (informativo respecto al efectivo por forma de pago).</small>-->
               </div>
 
               <div class="mt-4" *ngIf="esGestora && totalesPorEmpresa.length > 0">
