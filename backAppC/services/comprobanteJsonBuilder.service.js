@@ -92,12 +92,13 @@ function buildFacturaBoletaJson(payload, tipoComprobante) {
       razonSocial: toStr(empresa.nombre),
       nombreComercial: toStr(empresa.nombre),
       domicilioFiscal: {
-        ubigueo: "",
+        ubigueo: toStr(empresa.ubigeo),
         direccion: toStr(empresa.direccion),
-        urbanizacion: "",
-        departamento: "",
-        provincia: "",
-        distrito: "",
+        urbanizacion: toStr(empresa.urbanizacion),
+        departamento: toStr(empresa.region),
+        provincia: toStr(empresa.provincia),
+        distrito: toStr(empresa.distrito),
+        codLocal: toStr(empresa.codLocalSunat || empresa.codLocal || "0000").replace(/\D/g, "").padStart(4, "0").slice(-4) || "0000",
         codigoPais: "PE"
       }
     },

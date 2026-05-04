@@ -99,6 +99,14 @@ function textoUblDir(v) {
   return t || "-";
 }
 
+/** Código de establecimiento SUNAT (domicilio fiscal / anexo) desde DireccionEmpresa.codLocal en payload empresa. */
+function codLocalTipoEmisorUbl(empresa) {
+  const raw = toStr(empresa.codLocalSunat || empresa.codLocal || "").replace(/\D/g, "");
+  if (!raw) return "0000";
+  const pad = raw.padStart(4, "0");
+  return pad.length <= 4 ? pad : pad.slice(-4);
+}
+
 function fechaParte(fechaStr) {
   if (!fechaStr) return { fecha: "", hora: "00:00:00" };
   const s = String(fechaStr).trim();
@@ -389,7 +397,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonEmisor}</cbc:RegistrationName>
         <cac:RegistrationAddress>
-          <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
+          <cbc:AddressTypeCode>${escXml(codLocalTipoEmisorUbl(empresa))}</cbc:AddressTypeCode>
           <cbc:CitySubdivisionName>${escXml(emisorUrbanizacion)}</cbc:CitySubdivisionName>
           <cbc:CityName>${escXml(emisorProvincia)}</cbc:CityName>
           <cbc:CountrySubentity>${escXml(emisorRegion)}</cbc:CountrySubentity>
@@ -594,7 +602,7 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonEmisor}</cbc:RegistrationName>
         <cac:RegistrationAddress>
-          <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
+          <cbc:AddressTypeCode>${escXml(codLocalTipoEmisorUbl(empresa))}</cbc:AddressTypeCode>
           <cbc:CitySubdivisionName>${escXml(emisorUrbanizacionNc)}</cbc:CitySubdivisionName>
           <cbc:CityName>${escXml(emisorProvinciaNc)}</cbc:CityName>
           <cbc:CountrySubentity>${escXml(emisorRegionNc)}</cbc:CountrySubentity>
@@ -797,7 +805,7 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>${razonEmisor}</cbc:RegistrationName>
         <cac:RegistrationAddress>
-          <cbc:AddressTypeCode>0000</cbc:AddressTypeCode>
+          <cbc:AddressTypeCode>${escXml(codLocalTipoEmisorUbl(empresa))}</cbc:AddressTypeCode>
           <cbc:CitySubdivisionName>${escXml(emisorUrbanizacionNd)}</cbc:CitySubdivisionName>
           <cbc:CityName>${escXml(emisorProvinciaNd)}</cbc:CityName>
           <cbc:CountrySubentity>${escXml(emisorRegionNd)}</cbc:CountrySubentity>

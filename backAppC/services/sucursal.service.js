@@ -1,4 +1,5 @@
 const sucursalRepository = require('../repositories/sucursal.repository');
+const empresaService = require('./empresa.service');
 
 const E = {
   NO_ACCESS: 'NO_ACCESS',
@@ -60,17 +61,62 @@ async function editarSucursal(pool, user, body) {
   if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
-  const { idSucursal, nombre, direccion } = body || {};
-  if (!idSucursal || !nombre) {
+  const { idSucursal, id, nombre, direccion, idSucursalSeriesPadre } = body || {};
+  const idSuc = idSucursal || id;
+  if (!idSuc || !nombre) {
     throw new Error(E.BAD_REQUEST);
   }
-  return sucursalRepository.actualizarNombreDireccion(
+
+  const actual = await sucursalRepository.obtenerSucursalPorId(pool, idEmpresa, idSuc);
+  if (!actual) throw new Error(E.NOT_FOUND);
+
+  let idPadreSeries = undefined;
+  if (Object.prototype.hasOwnProperty.call(body || {}, 'idSucursalSeriesPadre')) {
+    const raw = idSucursalSeriesPadre;
+    if (raw === '' || raw === null || raw === undefined) {
+      idPadreSeries = null;
+    } else {
+      const s = String(raw).trim();
+      if (String(idSuc).toLowerCase() === s.toLowerCase()) {
+        throw new Error(E.BAD_REQUEST);
+      }
+      const okPadre = await sucursalRepository.existeSucursalEnEmpresa(pool, s, idEmpresa);
+      if (!okPadre) {
+        throw new Error(E.BAD_REQUEST);
+      }
+      idPadreSeries = s;
+    }
+  }
+
+  if (actual.esPrincipal) {
+    idPadreSeries = null;
+  }
+
+  const affected = await sucursalRepository.actualizarNombreDireccion(
     pool,
     idEmpresa,
-    idSucursal,
+    idSuc,
     String(nombre).trim(),
-    direccion != null ? String(direccion) : ''
+    direccion != null ? String(direccion) : '',
+    idPadreSeries
   );
+
+  const finalIdPadreSeries = actual.esPrincipal
+    ? null
+    : idPadreSeries !== undefined
+      ? idPadreSeries
+      : actual.idSucursalSeriesPadre;
+
+  if (!finalIdPadreSeries) {
+    try {
+      await empresaService.asegurarComprobantesPredeterminadosPorSucursal(pool, idEmpresa, idSuc);
+    } catch (error) {
+      console.error('contexto: comprobantes al guardar sucursal (series propias o principal):', error);
+      throw error;
+    }
+  }
+
+  return affected;
 }
 
 async function editarEstadoSucursal(pool, user, idSucursal, body) {

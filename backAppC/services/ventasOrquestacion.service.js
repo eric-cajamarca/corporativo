@@ -29,7 +29,7 @@ async function idsEmpresaParaComprobanteVenta(pool, idEmpresaUsuario) {
 
 exports.idsEmpresaParaComprobanteVenta = idsEmpresaParaComprobanteVenta;
 
-exports.obtenerVentasListado = async (pool, idempresa) => {
+exports.obtenerVentasListado = async (pool, idempresa, opts = {}) => {
   let idsList = [idempresa];
   try {
     const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, idempresa);
@@ -39,7 +39,7 @@ exports.obtenerVentasListado = async (pool, idempresa) => {
   } catch (_) {
     idsList = [idempresa];
   }
-  let list = await ventasRepository.listarPorIdsEmpresas(pool, idsList);
+  let list = await ventasRepository.listarPorIdsEmpresas(pool, idsList, opts || {});
   const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
   const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
   if (rutaFacturador) {

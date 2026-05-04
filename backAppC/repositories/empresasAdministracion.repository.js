@@ -134,7 +134,7 @@ async function obtenerEmpresaCelularEstado(pool, idEmpresa) {
 }
 
 async function actualizarEmpresaSinLogo(pool, row) {
-  return pool
+  const req = pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
     .input('Rubro', sql.VarChar, row.rubro)
@@ -142,14 +142,22 @@ async function actualizarEmpresaSinLogo(pool, row) {
     .input('Celular', sql.VarChar, row.celular)
     .input('nombreComercial', sql.VarChar, row.nombreComercial)
     .input('Correo', sql.VarChar, row.correo)
-    .input('Alias', sql.VarChar, row.alias)
-    .query(
+    .input('Alias', sql.VarChar, row.alias);
+  if (row.permitirVentaMultiSucursal === undefined) {
+    return req.query(
       'UPDATE Empresas SET Rubro = @Rubro, idRubro = @idRubro, Celular = @Celular, nombreComercial = @nombreComercial, Correo = @Correo, Alias = @Alias WHERE idEmpresa = @idEmpresa'
     );
+  }
+  const permitirMulti =
+    row.permitirVentaMultiSucursal === true || row.permitirVentaMultiSucursal === 1 || row.permitirVentaMultiSucursal === '1';
+  req.input('permitirVentaMultiSucursal', sql.Bit, permitirMulti ? 1 : 0);
+  return req.query(
+    'UPDATE Empresas SET Rubro = @Rubro, idRubro = @idRubro, Celular = @Celular, nombreComercial = @nombreComercial, Correo = @Correo, Alias = @Alias, permitirVentaMultiSucursal = @permitirVentaMultiSucursal WHERE idEmpresa = @idEmpresa'
+  );
 }
 
 async function actualizarEmpresaConLogoFilename(pool, row) {
-  return pool
+  const req = pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
     .input('Rubro', sql.VarChar, row.rubro)
@@ -158,10 +166,18 @@ async function actualizarEmpresaConLogoFilename(pool, row) {
     .input('nombreComercial', sql.VarChar, row.nombreComercial)
     .input('Correo', sql.VarChar, row.correo)
     .input('Alias', sql.VarChar, row.alias)
-    .input('Logo', sql.VarChar, row.logoFilename)
-    .query(
+    .input('Logo', sql.VarChar, row.logoFilename);
+  if (row.permitirVentaMultiSucursal === undefined) {
+    return req.query(
       'UPDATE Empresas SET Rubro = @Rubro, idRubro = @idRubro, Celular = @Celular, nombreComercial = @nombreComercial, Correo = @Correo, Alias = @Alias, Logo = @Logo WHERE idEmpresa = @idEmpresa'
     );
+  }
+  const permitirMulti =
+    row.permitirVentaMultiSucursal === true || row.permitirVentaMultiSucursal === 1 || row.permitirVentaMultiSucursal === '1';
+  req.input('permitirVentaMultiSucursal', sql.Bit, permitirMulti ? 1 : 0);
+  return req.query(
+    'UPDATE Empresas SET Rubro = @Rubro, idRubro = @idRubro, Celular = @Celular, nombreComercial = @nombreComercial, Correo = @Correo, Alias = @Alias, Logo = @Logo, permitirVentaMultiSucursal = @permitirVentaMultiSucursal WHERE idEmpresa = @idEmpresa'
+  );
 }
 
 async function actualizarEmpresaEstado(pool, idEmpresa, estado) {
@@ -319,6 +335,27 @@ async function direccionEmpresaSetPrincipalTrue(pool, idDireccionEmpresa) {
     .query('UPDATE DireccionEmpresa SET principal = 1 WHERE idDireccionEmpresa = @idDireccionEmpresa');
 }
 
+/** Sucursales no principales usan series del comprobante de la sucursal padre (migración idSucursalSeriesPadre). */
+async function sucursalVincularSeriesPadreSiSecundaria(pool, idEmpresa, idSucursalNueva) {
+  await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursalNueva', sql.UniqueIdentifier, idSucursalNueva)
+    .query(`
+      UPDATE s
+      SET s.idSucursalSeriesPadre = (
+        SELECT TOP 1 s2.idSucursal
+        FROM Sucursal s2
+        WHERE s2.idEmpresa = @idEmpresa AND s2.idSucursal <> @idSucursalNueva
+        ORDER BY CASE WHEN ISNULL(s2.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, s2.fRegistro ASC
+      )
+      FROM Sucursal s
+      WHERE s.idSucursal = @idSucursalNueva
+        AND s.idEmpresa = @idEmpresa
+        AND ISNULL(s.esPrincipal, 0) = 0
+    `);
+}
+
 module.exports = {
   listarTodasEmpresas,
   obtenerEmpresaPorId,
@@ -347,5 +384,6 @@ module.exports = {
   listarDireccionesEmpresa,
   eliminarDireccionEmpresa,
   direccionEmpresaSetPrincipalFalseTodas,
-  direccionEmpresaSetPrincipalTrue
+  direccionEmpresaSetPrincipalTrue,
+  sucursalVincularSeriesPadreSiSecundaria
 };

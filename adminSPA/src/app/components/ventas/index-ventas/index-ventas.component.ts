@@ -322,7 +322,7 @@ export class IndexVentasComponent implements OnInit {
           alert('No se pudieron cargar los datos del comprobante VA.');
           return;
         }
-        if (!openComprobanteVaTicket(res.data, idVentaAgrupada)) {
+        if (!openComprobanteVaTicket(res.data)) {
           alert('Permita ventanas emergentes para ver e imprimir el ticket VA.');
         }
       },

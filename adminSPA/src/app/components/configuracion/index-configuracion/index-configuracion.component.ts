@@ -3,6 +3,7 @@ import { AdminService } from '../../../services/admin.service';
 import { ComprasService } from '../../../services/compras.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
+import { SucursalService } from '../../../services/sucursal.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { VentasService } from '../../../services/ventas.service';
@@ -159,12 +160,16 @@ export class IndexConfiguracionComponent implements OnInit {
   comprobanteGuardandoId: number | null = null;
   comprobanteCreando = false;
   nuevoComprobante = { codigo: '', nombre: '', serie: '', numero: 1, usarEnVenta: true, usarEnCompra: true };
+  /** Sucursal cuyos comprobantes se editan en el modal (operativa; el API resuelve series padre si aplica). */
+  sucursalesParaComprobantes: Array<{ idSucursal: string; nombre: string; esPrincipal?: boolean | number | string }> = [];
+  idSucursalComprobantes: string | null = null;
 
   constructor(
     private _adminService: AdminService,
     private _comprasService: ComprasService,
     private _impuestoService: ImpuestoService,
     private _comprobanteService: ComprobanteService,
+    private _sucursalService: SucursalService,
     private _empresaService: EmpresaService,
     private _facturacionService: FacturacionService,
     private _ventasService: VentasService,
@@ -891,13 +896,44 @@ export class IndexConfiguracionComponent implements OnInit {
   /** Abre el modal de comprobantes y carga la lista */
   abrirModalComprobantes(): void {
     this.nuevoComprobante = { codigo: '', nombre: '', serie: '', numero: 1, usarEnVenta: true, usarEnCompra: true };
+    this.cargarSucursalesYComprobantes();
+  }
+
+  /** Carga sucursales y, si hace falta, fija la sucursal seleccionada antes de listar comprobantes. */
+  cargarSucursalesYComprobantes(): void {
+    this.comprobantesCargando = true;
+    this._sucursalService.obtener_sucursal_todos().subscribe({
+      next: (res) => {
+        const list = (res?.data ?? []) as Array<{ idSucursal: string; nombre: string; esPrincipal?: boolean | number | string }>;
+        this.sucursalesParaComprobantes = Array.isArray(list) ? list : [];
+        const sigueSiendoValida =
+          this.idSucursalComprobantes &&
+          this.sucursalesParaComprobantes.some((s) => s.idSucursal === this.idSucursalComprobantes);
+        if (!sigueSiendoValida) {
+          const principal = this.sucursalesParaComprobantes.find(
+            (s) => s.esPrincipal === true || s.esPrincipal === 1 || s.esPrincipal === '1'
+          );
+          this.idSucursalComprobantes =
+            principal?.idSucursal ?? this.sucursalesParaComprobantes[0]?.idSucursal ?? null;
+        }
+        this.cargarComprobantes();
+      },
+      error: () => {
+        this.sucursalesParaComprobantes = [];
+        this.idSucursalComprobantes = null;
+        this.cargarComprobantes();
+      }
+    });
+  }
+
+  onCambioSucursalComprobantes(): void {
     this.cargarComprobantes();
   }
 
   /** Carga comprobantes de la empresa */
   cargarComprobantes(): void {
     this.comprobantesCargando = true;
-    this._comprobanteService.obtener_comprobantes().subscribe({
+    this._comprobanteService.obtener_comprobantes(this.idSucursalComprobantes).subscribe({
       next: (response) => {
         this.comprobantes = (response?.data ?? []).map((c: any) => ({
           idComprobante: c.idComprobante,
@@ -971,7 +1007,18 @@ export class IndexConfiguracionComponent implements OnInit {
     const usarEnVenta = this.nuevoComprobante.usarEnVenta !== false;
     const usarEnCompra = this.nuevoComprobante.usarEnCompra !== false;
     this.comprobanteCreando = true;
-    this._comprobanteService.crear({ codigo: cod, nombre: nom, serie: ser, numero, usarEnVenta, usarEnCompra }).subscribe({
+    const idSuc = this.idSucursalComprobantes;
+    this._comprobanteService
+      .crear({
+        codigo: cod,
+        nombre: nom,
+        serie: ser,
+        numero,
+        usarEnVenta,
+        usarEnCompra,
+        ...(idSuc ? { idSucursal: idSuc } : {})
+      })
+      .subscribe({
       next: () => {
         this.comprobanteCreando = false;
         this.nuevoComprobante = { codigo: '', nombre: '', serie: '', numero: 1, usarEnVenta: true, usarEnCompra: true };

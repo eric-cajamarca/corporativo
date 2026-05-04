@@ -219,7 +219,7 @@ export class VentasPendientesPagoComponent implements OnInit {
           }
           return;
         }
-        if (!openComprobanteVaTicket(res.data, idVentaAgrupada) && typeof iziToast !== 'undefined') {
+        if (!openComprobanteVaTicket(res.data) && typeof iziToast !== 'undefined') {
           iziToast.warning({
             title: 'Aviso',
             message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',

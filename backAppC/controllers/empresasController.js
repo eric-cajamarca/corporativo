@@ -337,8 +337,8 @@ const updateEmpresa = async function (req, res, next) {
                 
         const idEmpresa = req.user.empresa;
         const {
-            ruc, correo, celular, nombreComercial, 
-            alias, rubro, idRubro, logoAnterior
+            ruc, correo, celular, nombreComercial,
+            alias, rubro, idRubro, logoAnterior, permitirVentaMultiSucursal
         } = req.body;
 
         // Validación básica
@@ -358,7 +358,7 @@ const updateEmpresa = async function (req, res, next) {
             const result = await empresasAdministracionService.actualizarEmpresaDatosContacto(
                 pool,
                 idEmpresa,
-                { rubro, idRubro, celular, nombreComercial, correo, alias },
+                { rubro, idRubro, celular, nombreComercial, correo, alias, permitirVentaMultiSucursal },
                 req.file ? req.file.filename : null
             );
 

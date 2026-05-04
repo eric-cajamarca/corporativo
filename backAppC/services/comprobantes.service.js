@@ -1,4 +1,5 @@
 const comprobantesRepository = require('../repositories/comprobantes.repository');
+const sucursalRepository = require('../repositories/sucursal.repository');
 
 const E = {
   NO_AUTH: 'NO_AUTH',
@@ -13,11 +14,16 @@ const E = {
   ALIAS_INVALIDO: 'ALIAS_INVALIDO'
 };
 
-async function obtenerComprobantes(pool, user, uso) {
+async function obtenerComprobantes(pool, user, uso, idSucursalQuery) {
   const idEmpresa = user?.empresa;
   if (!user || !idEmpresa) throw new Error(E.NO_AUTH);
   const u = (uso || '').toLowerCase();
-  return comprobantesRepository.listarPorEmpresaYuso(pool, idEmpresa, u);
+  let idSuc = idSucursalQuery && String(idSucursalQuery).trim() ? String(idSucursalQuery).trim() : null;
+  if (idSuc) {
+    const ok = await sucursalRepository.existeSucursalEnEmpresa(pool, idSuc, idEmpresa);
+    if (!ok) idSuc = null;
+  }
+  return comprobantesRepository.listarPorEmpresaYuso(pool, idEmpresa, u, idSuc);
 }
 
 async function obtenerComprobantesAlias(pool, user, alias) {
@@ -80,8 +86,20 @@ async function crearComprobante(pool, user, body) {
   }
   const num = parseInt(numero, 10);
   if (Number.isNaN(num) || num < 0) throw new Error(E.BAD_NUMERO);
+  let idSucursal = body?.idSucursal && String(body.idSucursal).trim() ? String(body.idSucursal).trim() : null;
+  if (idSucursal) {
+    const ok = await sucursalRepository.existeSucursalEnEmpresa(pool, idSucursal, idEmpresa);
+    if (!ok) idSucursal = null;
+  }
+  if (!idSucursal) {
+    idSucursal = await sucursalRepository.obtenerSucursalDefectoComprobantes(pool, idEmpresa);
+  }
+  if (!idSucursal) {
+    throw new Error('No hay sucursal para asociar el comprobante');
+  }
   return comprobantesRepository.insertar(pool, {
     idEmpresa,
+    idSucursal,
     codigo: cod,
     nombre: nom,
     serie: ser,

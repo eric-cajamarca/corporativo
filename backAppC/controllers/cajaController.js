@@ -133,9 +133,15 @@ const cerrarCaja = async (req, res, next) => {
   try {
     const { idApertura, montoFinal, observaciones } = req.body;
 
-    if (!idApertura || montoFinal === undefined || montoFinal < 0) {
+    if (!idApertura) {
       return res.status(400).send({
-        message: 'Datos inválidos: idApertura y montoFinal son requeridos',
+        message: 'Datos inválidos: idApertura es requerido',
+        data: undefined
+      });
+    }
+    if (montoFinal !== undefined && montoFinal !== null && Number(montoFinal) < 0) {
+      return res.status(400).send({
+        message: 'Datos inválidos: montoFinal no puede ser negativo',
         data: undefined
       });
     }

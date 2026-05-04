@@ -58,7 +58,13 @@ const obtenerVentas = async function (req, res) {
     return res.status(401).json({ message: 'No Access' });
   }
   try {
-    const list = await withPool((pool) => ventasOrquestacion.obtenerVentasListado(pool, idempresa));
+    const idSucursal =
+      req.query?.idSucursal != null && String(req.query.idSucursal).trim() !== ''
+        ? String(req.query.idSucursal).trim()
+        : undefined;
+    const optsListado = {};
+    if (idSucursal) optsListado.idSucursal = idSucursal;
+    const list = await withPool((pool) => ventasOrquestacion.obtenerVentasListado(pool, idempresa, optsListado));
     res.json({ data: list });
   } catch (error) {
     console.error('Error al obtener las ventas:', error);

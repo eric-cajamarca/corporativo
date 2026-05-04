@@ -221,15 +221,18 @@ exports.insertarDetallePagoVenta = async (transaction, idVenta, detallePago) => 
 };
 
 /** Lista comprobantes de venta de la empresa con nombre de comprobante, cliente e idComprobanteElectronico para envío SUNAT. */
-exports.listarPorEmpresa = async (pool, idEmpresa) => {
+exports.listarPorEmpresa = async (pool, idEmpresa, opts = {}) => {
+  const idSucursalFiltro = opts.idSucursal && String(opts.idSucursal).trim() ? String(opts.idSucursal).trim() : null;
+  const whereSuc = idSucursalFiltro ? " AND v.idSucursal = @idSucF" : "";
   let result;
   try {
-    result = await pool
-      .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    const req = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+    if (idSucursalFiltro) req.input("idSucF", sql.UniqueIdentifier, idSucursalFiltro);
+    result = await req.query(`
         SELECT
           v.idVenta,
+          v.idSucursal,
+          ISNULL(s.nombre, '') AS nombreSucursal,
           v.compVenta,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.total,
@@ -244,8 +247,8 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
           ISNULL(mp.descripcion, CAST(v.idMediosPago AS VARCHAR(20))) AS condicionPago,
           c.nombre AS nombreComprobante,
           c.codigo AS codigoComprobante,
-          COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
-          COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRuc,
+          COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRazonSocial,
+          COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRuc,
           ce.idComprobanteElectronico,
           ce.tipoComprobante,
           e.ruc AS rucEmpresa,
@@ -255,6 +258,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             ELSE '{' + aggfp.codigos + '}'
           END AS formaPago
         FROM Ventas v
+        LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
         LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
@@ -274,17 +278,18 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             FOR XML PATH(''), TYPE
           ).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS codigos
         ) aggfp
-        WHERE v.idEmpresa = @idEmpresa
+        WHERE v.idEmpresa = @idEmpresa${whereSuc}
         ORDER BY v.fEmision DESC, v.idVenta DESC
       `);
   } catch (err) {
     if (err.message && (err.message.includes('MediosPago') || err.message.includes('FormasPago') || err.message.includes('MovimientosCaja') || err.message.includes('Invalid object'))) {
-      result = await pool
-        .request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .query(`
+      const reqFb = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+      if (idSucursalFiltro) reqFb.input("idSucF", sql.UniqueIdentifier, idSucursalFiltro);
+      result = await reqFb.query(`
           SELECT
             v.idVenta,
+            v.idSucursal,
+            ISNULL(s.nombre, '') AS nombreSucursal,
             v.compVenta,
             CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
             v.total,
@@ -298,20 +303,21 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
             ISNULL(LTRIM(RTRIM(v.compRelacionado)), '') AS compRelacionado,
             c.nombre AS nombreComprobante,
             c.codigo AS codigoComprobante,
-            COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRazonSocial,
-            COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente), '') AS clienteRuc,
+            COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRazonSocial,
+            COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRuc,
             ce.idComprobanteElectronico,
             ce.tipoComprobante,
             e.ruc AS rucEmpresa,
             ISNULL(v.eliminado, 0) AS eliminado,
             '' AS formaPago
           FROM Ventas v
+          LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
           LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
           LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
           LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
           LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
           LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
-          WHERE v.idEmpresa = @idEmpresa
+          WHERE v.idEmpresa = @idEmpresa${whereSuc}
           ORDER BY v.fEmision DESC, v.idVenta DESC
         `);
     } else {
@@ -321,6 +327,8 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
   const rows = result.recordset || [];
   return rows.map((r) => ({
     ...r,
+    idSucursal: r.idSucursal != null ? String(r.idSucursal) : null,
+    nombreSucursal: r.nombreSucursal != null ? String(r.nombreSucursal).trim() : "",
     idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
     tipoComprobante: r.tipoComprobante != null ? String(r.tipoComprobante).trim() : null,
     rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null,
@@ -337,21 +345,26 @@ exports.listarPorEmpresa = async (pool, idEmpresa) => {
  * Lista comprobantes de venta para varias empresas (gestora + gestionadas).
  * Misma forma que listarPorEmpresa, con idEmpresa y razonSocialEmpresa.
  */
-exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
+exports.listarPorIdsEmpresas = async (pool, idsEmpresa, opts = {}) => {
   const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
   if (ids.length === 0) return [];
   if (ids.length === 1) {
-    const rows = await exports.listarPorEmpresa(pool, ids[0]);
+    const rows = await exports.listarPorEmpresa(pool, ids[0], opts);
     return rows.map((r) => ({ ...r, idEmpresa: ids[0], razonSocialEmpresa: '' }));
   }
+  const idSucursalFiltro = opts.idSucursal && String(opts.idSucursal).trim() ? String(opts.idSucursal).trim() : null;
+  const whereSuc = idSucursalFiltro ? " AND v.idSucursal = @idSucF" : "";
   const req = pool.request();
   const inList = bindUniqueIdentifiersIn(req, ids, 'empV');
+  if (idSucursalFiltro) req.input("idSucF", sql.UniqueIdentifier, idSucursalFiltro);
   let result;
   try {
     result = await req.query(`
       SELECT
         v.idEmpresa,
         v.idVenta,
+        v.idSucursal,
+        ISNULL(s.nombre, '') AS nombreSucursal,
         v.compVenta,
         CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
         v.total,
@@ -378,6 +391,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           ELSE '{' + aggfp.codigos + '}'
         END AS formaPago
       FROM Ventas v
+      LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
       LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
       LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
       LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
@@ -397,17 +411,20 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           FOR XML PATH(''), TYPE
         ).value('.', 'NVARCHAR(MAX)'), 1, 1, '') AS codigos
       ) aggfp
-      WHERE v.idEmpresa IN (${inList})
+      WHERE v.idEmpresa IN (${inList})${whereSuc}
       ORDER BY v.fEmision DESC, v.idVenta DESC
     `);
   } catch (err) {
     if (err.message && (err.message.includes('MediosPago') || err.message.includes('FormasPago') || err.message.includes('MovimientosCaja') || err.message.includes('Invalid object'))) {
       const reqFb = pool.request();
       const inListFb = bindUniqueIdentifiersIn(reqFb, ids, 'empV');
+      if (idSucursalFiltro) reqFb.input("idSucF", sql.UniqueIdentifier, idSucursalFiltro);
       result = await reqFb.query(`
         SELECT
           v.idEmpresa,
           v.idVenta,
+          v.idSucursal,
+          ISNULL(s.nombre, '') AS nombreSucursal,
           v.compVenta,
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.total,
@@ -430,12 +447,13 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
           ISNULL(v.eliminado, 0) AS eliminado,
           '' AS formaPago
         FROM Ventas v
+        LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
         LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
         LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
         LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
-        WHERE v.idEmpresa IN (${inListFb})
+        WHERE v.idEmpresa IN (${inListFb})${whereSuc}
         ORDER BY v.fEmision DESC, v.idVenta DESC
       `);
     } else {
@@ -446,6 +464,8 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa) => {
   return rows.map((r) => ({
     ...r,
     idEmpresa: r.idEmpresa != null ? String(r.idEmpresa) : null,
+    idSucursal: r.idSucursal != null ? String(r.idSucursal) : null,
+    nombreSucursal: r.nombreSucursal != null ? String(r.nombreSucursal).trim() : "",
     idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
     tipoComprobante: r.tipoComprobante != null ? String(r.tipoComprobante).trim() : null,
     rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null,
@@ -639,11 +659,36 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   const idEmpresaVenta = cab.idEmpresa;
 
   let empresaResult;
+  const idSucVenta = cab.idSucursal != null ? cab.idSucursal : null;
   try {
-    empresaResult = await pool
-      .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
-      .query(`
+    if (idSucVenta) {
+      empresaResult = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+        .input('idSuc', sql.UniqueIdentifier, idSucVenta)
+        .query(`
+        SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
+          ISNULL(e.rubro, '') AS rubro,
+          ISNULL(e.celular, '') AS celular,
+          ISNULL(e.correo, '') AS correo,
+          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.direccion)), ''), de_prin.direccion, ''))), '') AS direccion,
+          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.ubigeo)), ''), de_prin.ubigeo, ''))), '') AS ubigeo,
+          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.region)), ''), de_prin.region, ''))), '') AS region,
+          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.provincia)), ''), de_prin.provincia, ''))), '') AS provincia,
+          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.distrito)), ''), de_prin.distrito, ''))), '') AS distrito,
+          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.urbanizacion)), ''), de_prin.urbanizacion, ''))), '') AS urbanizacion,
+          ISNULL(NULLIF(LTRIM(RTRIM(de_suc.codLocal)), ''), NULLIF(LTRIM(RTRIM(de_prin.codLocal)), ''), '0000') AS codLocalSunat
+        FROM Empresas e
+        LEFT JOIN Sucursal s ON s.idSucursal = @idSuc AND s.idEmpresa = @idEmpresa
+        LEFT JOIN DireccionEmpresa de_suc ON de_suc.idDireccionEmpresa = s.idDireccionEmpresa
+        LEFT JOIN DireccionEmpresa de_prin ON de_prin.idEmpresa = e.idEmpresa AND de_prin.principal = 1
+        WHERE e.idEmpresa = @idEmpresa
+      `);
+    } else {
+      empresaResult = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+        .query(`
         SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
           ISNULL(e.rubro, '') AS rubro,
           ISNULL(e.celular, '') AS celular,
@@ -653,17 +698,20 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ISNULL(de.region, '') AS region,
           ISNULL(de.provincia, '') AS provincia,
           ISNULL(de.distrito, '') AS distrito,
-          ISNULL(de.urbanizacion, '') AS urbanizacion
+          ISNULL(de.urbanizacion, '') AS urbanizacion,
+          ISNULL(NULLIF(LTRIM(RTRIM(de.codLocal)), ''), '0000') AS codLocalSunat
         FROM Empresas e
         LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
         WHERE e.idEmpresa = @idEmpresa
       `);
+    }
   } catch (err) {
     empresaResult = await pool
       .request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
       .query(`
-        SELECT razon_Social AS nombre, ruc, Logo AS logoArchivo
+        SELECT razon_Social AS nombre, ruc, Logo AS logoArchivo,
+          '0000' AS codLocalSunat
         FROM Empresas WHERE idEmpresa = @idEmpresa
       `);
   }
@@ -812,6 +860,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   const descuentosCabeceraNum = cab.descuentos != null ? Number(cab.descuentos) : 0;
   const descuentosImpresion = usarDescuentoEnTotalPdf ? descuentosCabeceraNum : 0;
 
+  const codLocalSunat =
+    emp && (emp.codLocalSunat != null || emp.codlocalsunat != null)
+      ? String(emp.codLocalSunat != null ? emp.codLocalSunat : emp.codlocalsunat).trim()
+      : '0000';
   const empresaPayload = emp
     ? {
         nombre: emp.nombre,
@@ -822,6 +874,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         provincia: (emp.provincia != null && String(emp.provincia).trim()) ? String(emp.provincia).trim() : '',
         distrito: (emp.distrito != null && String(emp.distrito).trim()) ? String(emp.distrito).trim() : '',
         urbanizacion: (emp.urbanizacion != null && String(emp.urbanizacion).trim()) ? String(emp.urbanizacion).trim() : '',
+        codLocalSunat: codLocalSunat || '0000',
         telefono: (emp.celular != null && String(emp.celular).trim()) ? String(emp.celular).trim() : '',
         rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
         correo: (emp.correo != null && String(emp.correo).trim()) ? String(emp.correo).trim() : '',
@@ -834,6 +887,12 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         nombre: '',
         ruc: '',
         direccion: '',
+        ubigeo: '',
+        region: '',
+        provincia: '',
+        distrito: '',
+        urbanizacion: '',
+        codLocalSunat: '0000',
         telefono: '',
         rubro: '',
         correo: '',

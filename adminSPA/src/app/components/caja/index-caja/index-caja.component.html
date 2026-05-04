@@ -366,6 +366,16 @@
           <i class="bi bi-exclamation-triangle-fill me-2"></i>
           ¿Está seguro de que desea cerrar esta caja? Una vez cerrada, no podrá registrar nuevos movimientos.
         </div>
+        <div class="mb-3">
+          <label for="montoCierre" class="form-label">Monto final contado (opcional)</label>
+          <div class="input-group">
+            <span class="input-group-text">S/</span>
+            <input type="number" class="form-control" id="montoCierre" name="montoCierre"
+                   [(ngModel)]="montoCierre" step="0.01" min="0"
+                   placeholder="Vacío = saldo teórico de la apertura">
+          </div>
+          <small class="text-muted">Si lo omite, el cierre usará el saldo calculado por movimientos.</small>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" (click)="cerrarModales()">Cancelar</button>

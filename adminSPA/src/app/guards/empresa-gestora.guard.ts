@@ -23,6 +23,11 @@ function esRutaPermitidaGestora(path: string): boolean {
   }
   if (path.startsWith('despachos')) return true;
   if (path.startsWith('envios')) return true;
+  /** Colaboradores y roles de la propia empresa gestora (JWT = idEmpresa gestora). */
+  if (path.startsWith('colaborador')) return true;
+  if (path.startsWith('rol')) return true;
+  if (path.startsWith('sucursal')) return true;
+  if (path === 'configuracion' || path.startsWith('configuracion/')) return true;
   return false;
 }
 

@@ -45,8 +45,8 @@ export class CajaService {
     });
   }
 
-  // Cerrar caja
-  cerrarCaja(data: { idCaja: string; observaciones?: string }): Observable<any> {
+  // Cerrar caja (cierra la apertura activa)
+  cerrarCaja(data: { idApertura: string; montoFinal?: number; observaciones?: string }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'caja/cerrar', data, {
       headers: headers,
@@ -56,15 +56,25 @@ export class CajaService {
 
   // Registrar movimiento de caja
   registrarMovimiento(data: {
-    idCaja: string;
+    idApertura: string;
     idTipoMovimientoCaja: number;
-    descripcion: string;
+    concepto: string;
     monto: number;
-    idMedioPago?: string;
-    referencia?: string;
+    idMediosPago?: number | null;
+    idMoneda?: number;
+    observaciones?: string;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.post(this.url+'caja/movimiento', data, {
+    const body = {
+      idApertura: data.idApertura,
+      idTipoMovimientoCaja: data.idTipoMovimientoCaja,
+      concepto: data.concepto,
+      monto: data.monto,
+      idMediosPago: data.idMediosPago ?? undefined,
+      idMoneda: data.idMoneda ?? 1,
+      observaciones: data.observaciones
+    };
+    return this._http.post(this.url+'caja/movimiento', body, {
       headers: headers,
       withCredentials: true
     });

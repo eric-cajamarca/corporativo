@@ -5,7 +5,10 @@ const { withPool } = require('../utils/dbPool.util');
 async function obtener_comprobantes(req, res) {
   try {
     const uso = (req.query?.uso || '').toLowerCase();
-    const data = await withPool((pool) => comprobantesService.obtenerComprobantes(pool, req.user, uso));
+    const idSucursal = req.query?.idSucursal != null && String(req.query.idSucursal).trim() !== ''
+      ? String(req.query.idSucursal).trim()
+      : null;
+    const data = await withPool((pool) => comprobantesService.obtenerComprobantes(pool, req.user, uso, idSucursal));
     return res.status(200).send({ data });
   } catch (error) {
     if (error.message === CE.NO_AUTH) {

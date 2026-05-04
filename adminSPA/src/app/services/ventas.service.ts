@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs';
@@ -92,9 +92,16 @@ export class VentasService {
     return this._http.get<{ data: VentaAgrupadaListado[] }>(this.url + 'ventas/agrupadas', { withCredentials: true });
   }
 
-  /** Lista ventas por empresa (comprobantes). */
-  listarVentasEmpresa(): Observable<{ data: VentaListado[] }> {
-    return this._http.get<{ data: VentaListado[] }>(this.url + 'ventas/listar', { withCredentials: true });
+  /** Lista ventas por empresa (comprobantes). Filtro opcional por sucursal (query idSucursal). */
+  listarVentasEmpresa(idSucursal?: string | null): Observable<{ data: VentaListado[] }> {
+    let params = new HttpParams();
+    if (idSucursal != null && String(idSucursal).trim() !== '') {
+      params = params.set('idSucursal', String(idSucursal).trim());
+    }
+    return this._http.get<{ data: VentaListado[] }>(this.url + 'ventas/listar', {
+      withCredentials: true,
+      params
+    });
   }
 
   /** Notas de crédito y débito emitidas (paginado). Query: buscar, pagina, porPagina. */
@@ -434,6 +441,8 @@ export interface NotaCreditoDebitoListado {
 
 export interface VentaListado {
   idVenta: number;
+  idSucursal?: string | null;
+  nombreSucursal?: string | null;
   /** Empresa emisora del comprobante (consolidado gestora). */
   idEmpresa?: string | null;
   /** Razón social de la empresa emisora (consolidado gestora). */

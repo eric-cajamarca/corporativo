@@ -38,6 +38,8 @@ export class IndexCajaComponent implements OnInit {
   };
 
   public montoInicial = 0;
+  /** Monto contado al cierre; vacío = backend usa saldo teórico */
+  public montoCierre: number | null = null;
   public movimiento = {
     idTipoMovimientoCaja: 0,
     descripcion: '',
@@ -191,6 +193,13 @@ export class IndexCajaComponent implements OnInit {
   }
 
   abrirModalMovimiento(caja: Caja) {
+    if (!caja.cajaAbierta || !caja.idApertura) {
+      iziToast.warning({
+        title: 'Caja cerrada',
+        message: 'Debe abrir la caja antes de registrar movimientos'
+      });
+      return;
+    }
     this.cajaSeleccionada = caja;
     this.movimiento = {
       idTipoMovimientoCaja: 0,
@@ -203,7 +212,15 @@ export class IndexCajaComponent implements OnInit {
   }
 
   abrirModalCierre(caja: Caja) {
+    if (!caja.cajaAbierta || !caja.idApertura) {
+      iziToast.warning({
+        title: 'Caja cerrada',
+        message: 'No hay apertura activa para cerrar'
+      });
+      return;
+    }
     this.cajaSeleccionada = caja;
+    this.montoCierre = null;
     this.mostrarModalCierre = true;
   }
 
@@ -286,23 +303,30 @@ export class IndexCajaComponent implements OnInit {
   }
 
   registrarMovimiento() {
-    if (!this.cajaSeleccionada || !this.movimiento.idTipoMovimientoCaja ||
-        !this.movimiento.descripcion || this.movimiento.monto <= 0) {
+    const idTipo = Number(this.movimiento.idTipoMovimientoCaja);
+    if (!this.cajaSeleccionada?.idApertura || !idTipo ||
+        !this.movimiento.descripcion?.trim() || this.movimiento.monto <= 0) {
       iziToast.warning({
         title: 'Advertencia',
-        message: 'Complete todos los campos requeridos'
+        message: 'Complete todos los campos requeridos (la caja debe estar abierta)'
       });
       return;
     }
 
+    const idMediosRaw = this.movimiento.idMedioPago;
+    const idMediosPago =
+      idMediosRaw !== '' && idMediosRaw != null && !Number.isNaN(Number(idMediosRaw))
+        ? Number(idMediosRaw)
+        : undefined;
+
     this.loading = true;
     this.cajaService.registrarMovimiento({
-      idCaja: this.cajaSeleccionada.idCaja,
-      idTipoMovimientoCaja: this.movimiento.idTipoMovimientoCaja,
-      descripcion: this.movimiento.descripcion,
+      idApertura: this.cajaSeleccionada.idApertura,
+      idTipoMovimientoCaja: idTipo,
+      concepto: this.movimiento.descripcion.trim(),
       monto: this.movimiento.monto,
-      idMedioPago: this.movimiento.idMedioPago || undefined,
-      referencia: this.movimiento.referencia || undefined
+      idMediosPago,
+      observaciones: this.movimiento.referencia?.trim() || undefined
     }).subscribe({
       next: (response) => {
         iziToast.success({
@@ -325,12 +349,19 @@ export class IndexCajaComponent implements OnInit {
   }
 
   cerrarCaja() {
-    if (!this.cajaSeleccionada) return;
+    if (!this.cajaSeleccionada?.idApertura) {
+      iziToast.warning({ title: 'Advertencia', message: 'No hay apertura activa para cerrar' });
+      return;
+    }
 
     this.loading = true;
-    this.cajaService.cerrarCaja({
-      idCaja: this.cajaSeleccionada.idCaja
-    }).subscribe({
+    const payload: { idApertura: string; montoFinal?: number } = {
+      idApertura: this.cajaSeleccionada.idApertura
+    };
+    if (this.montoCierre != null && !Number.isNaN(this.montoCierre)) {
+      payload.montoFinal = this.montoCierre;
+    }
+    this.cajaService.cerrarCaja(payload).subscribe({
       next: (response) => {
         iziToast.success({
           title: 'Éxito',

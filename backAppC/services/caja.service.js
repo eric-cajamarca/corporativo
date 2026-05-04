@@ -154,7 +154,12 @@ exports.registrarMovimientoService = async (pool, user, datos) => {
   try {
     if (generarNumeroRecibo) {
       const codigo = tipoOperacion === "I" ? "RI" : "RE";
-      const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(transaction, idEmpresaOp, codigo);
+      const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(
+        transaction,
+        idEmpresaOp,
+        codigo,
+        datos.idApertura
+      );
       datos.documentoRelacionado = documentoRelacionado;
     }
     const result = await CajaRepository.registrarMovimientoRepo(transaction, userOp, datos);

@@ -10,7 +10,8 @@ const { getDeploymentMode } = require('../config/deployment.config');
 /**
  * Navegación reducida para empresa gestora (tiene empresas gestionadas activas).
  * Consultas: Dashboard + Análisis. Ventas: nueva, historial, cotizaciones.
- * Caja: gestión, ventas pendientes, cobranza, pago proveedores, recibos, arqueo. Despachos: módulo completo. Empresa mínima.
+ * Caja: gestión, ventas pendientes, cobranza, pago proveedores, recibos, arqueo. Despachos: módulo completo.
+ * Configuración mínima: Colaboradores y Roles (rutas permitidas por empresaGestoraGuard en el SPA).
  */
 function construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChofer) {
     const can = (p) => esAdmin || permisos.includes(p);
@@ -120,6 +121,32 @@ function construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChof
             permiso: 'VER_DESPACHOS',
             visible: true,
             submenu: subDespachos
+        });
+    }
+
+    const subConfigGestora = [
+        {
+            nombre: 'Colaboradores',
+            ruta: '/colaborador',
+            permiso: 'VER_USUARIOS',
+            visible: can('VER_USUARIOS')
+        },
+        {
+            nombre: 'Roles',
+            ruta: '/rol',
+            permiso: 'GESTIONAR_ROLES',
+            visible: can('GESTIONAR_ROLES')
+        }
+    ].filter((s) => s.visible);
+    if (subConfigGestora.length > 0) {
+        items.push({
+            modulo: 'CONFIGURACION',
+            nombre: 'Configuración',
+            icono: 'bi bi-gear',
+            ruta: null,
+            permiso: 'VER_CONFIGURACION',
+            visible: true,
+            submenu: subConfigGestora
         });
     }
 

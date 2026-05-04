@@ -866,7 +866,26 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-              <p class="small text-muted mb-3">El <strong>código</strong> es el que exige SUNAT y no se edita. Puede modificar la <strong>serie</strong> y el <strong>número correlativo</strong> por comprobante.</p>
+              <p class="small text-muted mb-2">El <strong>código</strong> es el que exige SUNAT y no se edita. Puede modificar la <strong>serie</strong> y el <strong>número correlativo</strong> por comprobante.</p>
+              @if (sucursalesParaComprobantes.length > 0) {
+                <div class="mb-3">
+                  <label class="form-label fw-semibold" for="selSucursalComprobantes">Sucursal</label>
+                  <select
+                    id="selSucursalComprobantes"
+                    class="form-select"
+                    name="idSucursalComprobantes"
+                    [(ngModel)]="idSucursalComprobantes"
+                    (change)="onCambioSucursalComprobantes()"
+                  >
+                    @for (s of sucursalesParaComprobantes; track s.idSucursal) {
+                      <option [ngValue]="s.idSucursal">{{ s.nombre }}</option>
+                    }
+                  </select>
+                  <small class="text-muted d-block mt-1">
+                    Cada sucursal con series propias tiene su propio juego de correlativos. Si comparte serie con otra sucursal, aquí verá los comprobantes de la sucursal donde vive el correlativo (según «Compartir serie» en editar sucursal).
+                  </small>
+                </div>
+              }
               @if (comprobantesCargando) {
                 <div class="text-center py-4">
                   <span class="spinner-border spinner-border-lg"></span>

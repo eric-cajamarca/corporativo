@@ -353,7 +353,12 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
       const idTipoMovimientoCaja = tipoIngreso.recordset?.[0]?.idTipoMovimientoCaja;
       if (idTipoMovimientoCaja) {
         try {
-          const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(transaction, user.empresa, "RI");
+          const { documentoRelacionado } = await CajaRepository.obtenerSiguienteNumeroReciboRepo(
+            transaction,
+            user.empresa,
+            "RI",
+            datos.idApertura
+          );
           await CajaRepository.registrarMovimientoRepo(transaction, user, {
             idApertura: datos.idApertura,
             idTipoMovimientoCaja,

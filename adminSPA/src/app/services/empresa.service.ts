@@ -217,6 +217,10 @@ export class EmpresaService {
         Object.keys(data).forEach(key => {
             if (key === 'logoAnterior' && data[key] === null) {
                 fd.append(key, ''); // Envía cadena vacía si es null
+            } else if (key === 'logo' && data[key] instanceof File) {
+                fd.append(key, data[key]);
+            } else if (typeof data[key] === 'boolean') {
+                fd.append(key, data[key] ? '1' : '0');
             } else if (data[key] !== null && data[key] !== undefined) {
                 fd.append(key, data[key]);
             }

@@ -224,7 +224,11 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
 
     const resumen = resumenResult.recordset[0];
     const saldoEsperado = resumen.montoInicial + resumen.ingresos - resumen.egresos;
-    const diferencia = datos.montoFinal - saldoEsperado;
+    const montoFinalDeclarado =
+      datos.montoFinal != null && datos.montoFinal !== '' && !Number.isNaN(Number(datos.montoFinal))
+        ? Number(datos.montoFinal)
+        : Number(saldoEsperado);
+    const diferencia = montoFinalDeclarado - saldoEsperado;
 
     // Obtener datos de la apertura
     const req2 = transaction.request();
@@ -245,7 +249,7 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
       .input("idEmpresa", sql.UniqueIdentifier, apertura.idEmpresa)
       .input("idSucursal", sql.UniqueIdentifier, apertura.idSucursal)
       .input("idUsuarioCierre", sql.UniqueIdentifier, user.sub)
-      .input("montoFinal", sql.Decimal(18, 2), datos.montoFinal)
+      .input("montoFinal", sql.Decimal(18, 2), montoFinalDeclarado)
       .input("diferencia", sql.Decimal(18, 2), diferencia)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
       .query(`
@@ -322,19 +326,28 @@ exports.obtenerTipoOperacionPorIdRepo = async (pool, idTipoMovimientoCaja) => {
  * @param {string} codigo - 'RI' o 'RE'
  * @returns {{ serie: string, numeroFormateado: string, documentoRelacionado: string }}
  */
-exports.obtenerSiguienteNumeroReciboRepo = async (transaction, idEmpresa, codigo) => {
+exports.obtenerSiguienteNumeroReciboRepo = async (transaction, idEmpresa, codigo, idApertura) => {
   const cod = (codigo === "RI" || codigo === "RE") ? codigo : null;
   if (!cod) {
     throw new Error("CODIGO_RECIBO_INVALIDO");
   }
+  if (!idApertura) {
+    throw new Error("APERTURA_REQUERIDA_PARA_RECIBO");
+  }
   const result = await transaction.request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("idApertura", sql.UniqueIdentifier, idApertura)
     .input("codigo", sql.VarChar(2), cod)
     .query(`
-      UPDATE Comprobantes
-      SET numero = ISNULL(numero, 0) + 1
+      UPDATE c
+      SET c.numero = ISNULL(c.numero, 0) + 1
       OUTPUT INSERTED.serie, INSERTED.numero
-      WHERE idEmpresa = @idEmpresa AND codigo = @codigo
+      FROM Comprobantes c
+      INNER JOIN AperturasCaja ac ON ac.idApertura = @idApertura
+        AND ac.idEmpresa = @idEmpresa
+        AND c.idEmpresa = ac.idEmpresa
+        AND c.idSucursal = ac.idSucursal
+      WHERE c.codigo = @codigo
     `);
   const row = result.recordset && result.recordset[0];
   if (!row) {

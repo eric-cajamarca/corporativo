@@ -1,40 +1,80 @@
 const sql = require('mssql');
+const { idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
 
 const ALIAS_TABLA = /^[A-Za-z0-9]+$/;
 
 /**
  * Fila de catálogo Comprobantes por código (ej. RA = comunicación de baja) para correlativo / serie.
+ * @param {import('mssql').ConnectionPool} pool
+ * @param {string} idEmpresa
+ * @param {string} codigo
+ * @param {string|null} [idSucursalOperativa] - si viene, filtra por sucursal efectiva (respeta idSucursalSeriesPadre)
  */
-async function obtenerComprobantePorCodigoRepo(pool, idEmpresa, codigo) {
+async function obtenerComprobantePorCodigoRepo(pool, idEmpresa, codigo, idSucursalOperativa = null) {
   const c = String(codigo || '')
     .trim()
     .slice(0, 10);
   if (!c) return null;
+  if (idSucursalOperativa) {
+    const idSuc = await idSucursalComprobantesEfectiva(pool, idSucursalOperativa);
+    const result = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('codigo', sql.VarChar(10), c)
+      .input('idSucursal', sql.UniqueIdentifier, idSuc)
+      .query(
+        `SELECT TOP 1 idComprobante, idEmpresa, idSucursal, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
+         FROM Comprobantes
+         WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal AND LTRIM(RTRIM(codigo)) = @codigo`
+      );
+    return result.recordset && result.recordset[0] ? result.recordset[0] : null;
+  }
   const result = await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('codigo', sql.VarChar(10), c)
     .query(
-      `SELECT TOP 1 idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
-       FROM Comprobantes
-       WHERE idEmpresa = @idEmpresa AND LTRIM(RTRIM(codigo)) = @codigo`
+      `SELECT TOP 1 c.idComprobante, c.idEmpresa, c.idSucursal, c.codigo, c.nombre, c.serie, c.numero, c.activo, c.usarEnVenta, c.usarEnCompra
+       FROM Comprobantes c
+       INNER JOIN Sucursal s ON s.idSucursal = c.idSucursal AND s.idEmpresa = c.idEmpresa
+       WHERE c.idEmpresa = @idEmpresa AND LTRIM(RTRIM(c.codigo)) = @codigo
+       ORDER BY CASE WHEN ISNULL(s.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, s.fRegistro ASC, c.idComprobante ASC`
     );
   return result.recordset && result.recordset[0] ? result.recordset[0] : null;
 }
 
-async function listarPorEmpresaYuso(pool, idEmpresa, uso) {
+/**
+ * @param {string|null} [idSucursalOperativa] - sucursal de trabajo; si null, usa sucursal principal de la empresa
+ */
+async function listarPorEmpresaYuso(pool, idEmpresa, uso, idSucursalOperativa = null) {
+  let idSucFilt = idSucursalOperativa;
+  if (!idSucFilt) {
+    const r = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT TOP 1 idSucursal
+        FROM Sucursal
+        WHERE idEmpresa = @idEmpresa
+        ORDER BY CASE WHEN ISNULL(esPrincipal, 0) = 1 THEN 0 ELSE 1 END, fRegistro ASC
+      `);
+    idSucFilt = r.recordset?.[0]?.idSucursal;
+  }
+  const idSuc = idSucFilt ? await idSucursalComprobantesEfectiva(pool, idSucFilt) : null;
   let sqlText =
-    'SELECT idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra FROM Comprobantes WHERE idEmpresa = @idEmpresa';
+    'SELECT idComprobante, idEmpresa, idSucursal, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra FROM Comprobantes WHERE idEmpresa = @idEmpresa';
+  if (idSuc) {
+    sqlText += ' AND idSucursal = @idSucursal';
+  }
   if (uso === 'venta') {
     sqlText += ' AND usarEnVenta = 1';
   } else if (uso === 'compra') {
     sqlText += ' AND usarEnCompra = 1';
   }
   sqlText += ' ORDER BY codigo';
-  const result = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(sqlText);
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  if (idSuc) req.input('idSucursal', sql.UniqueIdentifier, idSuc);
+  const result = await req.query(sqlText);
   return result.recordset;
 }
 
@@ -50,6 +90,7 @@ async function listarPorTablaAlias(pool, alias) {
 async function insertar(pool, payload) {
   const {
     idEmpresa,
+    idSucursal,
     codigo,
     nombre,
     serie,
@@ -57,9 +98,13 @@ async function insertar(pool, payload) {
     usarEnVenta,
     usarEnCompra
   } = payload;
+  if (!idSucursal) {
+    throw new Error('idSucursal es requerido para crear comprobante');
+  }
   const result = await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
     .input('codigo', sql.VarChar(2), codigo)
     .input('nombre', sql.VarChar(50), nombre)
     .input('serie', sql.VarChar(4), serie)
@@ -67,8 +112,8 @@ async function insertar(pool, payload) {
     .input('usarEnVenta', sql.Bit, usarEnVenta)
     .input('usarEnCompra', sql.Bit, usarEnCompra)
     .query(
-      `INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
-       VALUES (@idEmpresa, @codigo, @nombre, @serie, @numero, 1, @usarEnVenta, @usarEnCompra);
+      `INSERT INTO Comprobantes (idEmpresa, idSucursal, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
+       VALUES (@idEmpresa, @idSucursal, @codigo, @nombre, @serie, @numero, 1, @usarEnVenta, @usarEnCompra);
        SELECT SCOPE_IDENTITY() AS idComprobante;`
     );
   const idNew =
@@ -116,7 +161,7 @@ async function obtenerComprobantePorIdEmpresa(conn, idEmpresa, idComprobante) {
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idComprobante', sql.Int, idComprobante)
     .query(`
-      SELECT TOP 1 idComprobante, idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
+      SELECT TOP 1 idComprobante, idEmpresa, idSucursal, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra
       FROM Comprobantes
       WHERE idEmpresa = @idEmpresa AND idComprobante = @idComprobante
     `);

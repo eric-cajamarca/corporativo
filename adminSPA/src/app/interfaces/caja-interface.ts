@@ -7,6 +7,8 @@ export interface Caja {
   estado: boolean;
   sucursal?: string;
   cajaAbierta?: boolean;
+  /** Apertura activa (estado=1); viene del listado de cajas cuando está abierta */
+  idApertura?: string | null;
   fechaApertura?: string;
   montoInicial?: number;
   usuarioApertura?: string;

@@ -69,6 +69,18 @@ async function obtenerEmpresaCelularEstado(pool, idEmpresa) {
   return empresasAdministracionRepository.obtenerEmpresaCelularEstado(pool, idEmpresa);
 }
 
+/** undefined = no enviar el campo (no tocar BD). */
+function parsePermitirVentaMultiSucursalDesdeBody(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'permitirVentaMultiSucursal')) {
+    return undefined;
+  }
+  const v = body.permitirVentaMultiSucursal;
+  if (v === true || v === 1 || v === '1') return true;
+  if (v === false || v === 0 || v === '0' || v === '' || v == null) return false;
+  const s = String(v).toLowerCase().trim();
+  return s === 'true' || s === 'on';
+}
+
 async function actualizarEmpresaDatosContacto(pool, idEmpresa, body, logoFilename) {
   const {
     rubro,
@@ -80,6 +92,7 @@ async function actualizarEmpresaDatosContacto(pool, idEmpresa, body, logoFilenam
   } = body;
   const idRubroVal =
     idRubro != null && idRubro !== '' ? (typeof idRubro === 'string' ? parseInt(idRubro, 10) : idRubro) : null;
+  const permitirParsed = parsePermitirVentaMultiSucursalDesdeBody(body);
   const row = {
     idEmpresa,
     rubro: rubro || '',
@@ -87,7 +100,8 @@ async function actualizarEmpresaDatosContacto(pool, idEmpresa, body, logoFilenam
     celular: celular || '',
     nombreComercial: nombreComercial || '',
     correo: correo || '',
-    alias: alias || ''
+    alias: alias || '',
+    ...(permitirParsed === undefined ? {} : { permitirVentaMultiSucursal: permitirParsed })
   };
   if (logoFilename) {
     return empresasAdministracionRepository.actualizarEmpresaConLogoFilename(pool, {
@@ -169,6 +183,7 @@ async function crearSucursalEmpresa(pool, payload) {
     fregistro: moment().format('YYYY-MM-DD'),
     estado: true
   });
+  await empresasAdministracionRepository.sucursalVincularSeriesPadreSiSecundaria(pool, idEmpresa, idSucursal);
   return { idSucursal, nombre, direccion };
 }
 

@@ -1,6 +1,33 @@
 const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
 
+/** Catálogo inicial de comprobantes por sucursal (alta empresa o al pasar a series propias). */
+const COMPROBANTES_PREDETERMINADOS = [
+  { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1 },
+  { codigo: '03', nombre: 'Boleta Electrónica', serie: 'B001', numero: 0, activo: 1 },
+  { codigo: 'F7', nombre: 'N.C. Electrónica (Factura)', serie: 'FC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+  { codigo: 'B7', nombre: 'N.C. Electrónica (Boleta)', serie: 'BC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+  { codigo: 'F8', nombre: 'N.D. Electrónica (Factura)', serie: 'FD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+  { codigo: 'B8', nombre: 'N.D. Electrónica (Boleta)', serie: 'BD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+  { codigo: '09', nombre: 'Guía de Remisión Electrónica - Remitente', serie: 'T001', numero: 0, activo: 1 },
+  { codigo: '31', nombre: 'Guía de Remisión Electrónica - Transportista', serie: 'V001', numero: 0, activo: 1 },
+  { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1 },
+  { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1 },
+  { codigo: 'NV', nombre: 'Nota de venta', serie: 'NV01', numero: 0, activo: 1 },
+  { codigo: 'CT', nombre: 'Cotización', serie: 'CT01', numero: 0, activo: 1 },
+  { codigo: 'RE', nombre: 'Recibo de Egreso', serie: 'RE01', numero: 0, activo: 1 },
+  { codigo: 'RI', nombre: 'Recibo de Ingreso', serie: 'RI01', numero: 0, activo: 1 },
+  { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
+  { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
+  { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 },
+  { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 },
+  { codigo: 'II', nombre: 'Inventario Inicial', serie: 'II01', numero: 0, activo: 1 },
+  { codigo: 'IN', nombre: 'Ingreso', serie: 'IN01', numero: 0, activo: 1 },
+  { codigo: 'IV', nombre: 'Inventario', serie: 'IV01', numero: 0, activo: 1 },
+  { codigo: 'SA', nombre: 'Salida', serie: 'SA01', numero: 0, activo: 1 },
+  { codigo: 'TF', nombre: 'Transferencia', serie: 'TF01', numero: 0, activo: 1 }
+];
+
 /**
  * Obtiene datos de empresa/usuario para la respuesta de getEmpresa_login (verificación de token).
  * req.user viene del JWT decodificado (adminLogin).
@@ -68,45 +95,19 @@ exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
  * @param {String} idEmpresa - ID de la empresa
  * @returns {Array} Array con los comprobantes creados
  */
-exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
-        
-    // sql ya importado arriba
-    
-    const comprobantesPredeterminados = [
-        { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1 },
-        { codigo: '03', nombre: 'Boleta Electrónica', serie: 'B001', numero: 0, activo: 1 },
-        { codigo: 'F7', nombre: 'N.C. Electrónica (Factura)', serie: 'FC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-        { codigo: 'B7', nombre: 'N.C. Electrónica (Boleta)', serie: 'BC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-        { codigo: 'F8', nombre: 'N.D. Electrónica (Factura)', serie: 'FD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-        { codigo: 'B8', nombre: 'N.D. Electrónica (Boleta)', serie: 'BD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-        // SUNAT Catálogo 01 (tipo de comprobante): 09 GRE Remitente, 31 GRE Transportista
-        { codigo: '09', nombre: 'Guía de Remisión Electrónica - Remitente', serie: 'T001', numero: 0, activo: 1 },
-        { codigo: '31', nombre: 'Guía de Remisión Electrónica - Transportista', serie: 'V001', numero: 0, activo: 1 },
-        { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1 },
-        { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1 },
-        { codigo: 'NV', nombre: 'Nota de venta', serie: 'NV01', numero: 0, activo: 1 },
-        { codigo: 'CT', nombre: 'Cotización', serie: 'CT01', numero: 0, activo: 1 },
-        { codigo: 'RE', nombre: 'Recibo de Egreso', serie: 'RE01', numero: 0, activo: 1 },
-        { codigo: 'RI', nombre: 'Recibo de Ingreso', serie: 'RI01', numero: 0, activo: 1 },
-        { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
-        { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
-        { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 },
-        { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 },
-        { codigo: 'II', nombre: 'Inventario Inicial', serie: 'II01', numero: 0, activo: 1 },
-        { codigo: 'IN', nombre: 'Ingreso', serie: 'IN01', numero: 0, activo: 1 },
-        { codigo: 'IV', nombre: 'Inventario', serie: 'IV01', numero: 0, activo: 1 },
-        { codigo: 'SA', nombre: 'Salida', serie: 'SA01', numero: 0, activo: 1 },
-        { codigo: 'TF', nombre: 'Transferencia', serie: 'TF01', numero: 0, activo: 1 }
-    ];
-
+exports.crearComprobantesPredeterminados = async (pool, idEmpresa, idSucursal) => {
     const comprobantesCreados = [];
 
+    if (!idSucursal) {
+        throw new Error('idSucursal es requerido para crear comprobantes predeterminados');
+    }
     try {
-        for (const comp of comprobantesPredeterminados) {
+        for (const comp of COMPROBANTES_PREDETERMINADOS) {
             const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
             const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
             const result = await pool.request()
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idSucursal', sql.UniqueIdentifier, idSucursal)
                 .input('codigo', sql.VarChar(2), comp.codigo)
                 .input('nombre', sql.VarChar(50), comp.nombre)
                 .input('serie', sql.VarChar(4), comp.serie)
@@ -115,9 +116,9 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
                 .input('usarEnVenta', sql.Bit, usarEnVenta)
                 .input('usarEnCompra', sql.Bit, usarEnCompra)
                 .query(`
-                    INSERT INTO Comprobantes (idEmpresa, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
+                    INSERT INTO Comprobantes (idEmpresa, idSucursal, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
                     OUTPUT INSERTED.idComprobante
-                    VALUES (@idEmpresa, @codigo, @nombre, @serie, @numero, @activo, @usarEnVenta, @usarEnCompra)
+                    VALUES (@idEmpresa, @idSucursal, @codigo, @nombre, @serie, @numero, @activo, @usarEnVenta, @usarEnCompra)
                 `);
 
             const idComprobante = result.recordset[0].idComprobante;
@@ -133,6 +134,50 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
 };
 
 /**
+ * Inserta comprobantes predeterminados solo si faltan (empresa+sucursal+código).
+ * Usar al pasar una sucursal a series propias (idSucursalSeriesPadre NULL) sin filas en Comprobantes.
+ */
+exports.asegurarComprobantesPredeterminadosPorSucursal = async (pool, idEmpresa, idSucursal) => {
+  if (!idSucursal) {
+    throw new Error('idSucursal es requerido para asegurar comprobantes predeterminados');
+  }
+  const insertados = [];
+  try {
+    for (const comp of COMPROBANTES_PREDETERMINADOS) {
+      const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
+      const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
+      const result = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+        .input('codigo', sql.VarChar(2), comp.codigo)
+        .input('nombre', sql.VarChar(50), comp.nombre)
+        .input('serie', sql.VarChar(4), comp.serie)
+        .input('numero', sql.Int, comp.numero)
+        .input('activo', sql.Bit, comp.activo)
+        .input('usarEnVenta', sql.Bit, usarEnVenta)
+        .input('usarEnCompra', sql.Bit, usarEnCompra)
+        .query(`
+          INSERT INTO Comprobantes (idEmpresa, idSucursal, codigo, nombre, serie, numero, activo, usarEnVenta, usarEnCompra)
+          OUTPUT INSERTED.idComprobante
+          SELECT @idEmpresa, @idSucursal, @codigo, @nombre, @serie, @numero, @activo, @usarEnVenta, @usarEnCompra
+          WHERE NOT EXISTS (
+            SELECT 1 FROM Comprobantes c
+            WHERE c.idEmpresa = @idEmpresa AND c.idSucursal = @idSucursal AND c.codigo = @codigo
+          )
+        `);
+      if (result.recordset && result.recordset[0] && result.recordset[0].idComprobante != null) {
+        insertados.push({ idComprobante: result.recordset[0].idComprobante, ...comp });
+      }
+    }
+    return insertados;
+  } catch (error) {
+    console.error('Error asegurando comprobantes predeterminados por sucursal:', error);
+    throw new Error('Error al asegurar comprobantes predeterminados: ' + error.message);
+  }
+};
+
+/**
  * Crea la sucursal principal para una nueva empresa
  * @param {Object} pool - Conexión a la base de datos
  * @param {String} idEmpresa - ID de la empresa
@@ -141,9 +186,6 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa) => {
  */
 exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
         const direccionSucursal = datosEmpresa.direccion || 'Sin dirección';
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3c0e71'},body:JSON.stringify({sessionId:'3c0e71',location:'empresa.service.crearSucursalPrincipal',message:'direccion used for sucursal',data:{datosEmpresaDireccion:datosEmpresa.direccion,direccionSucursal},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     const idSucursal = uuidv4();
 
     try {
@@ -155,8 +197,8 @@ exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
             .input('telefono', sql.VarChar(20), datosEmpresa.celular || '')
             .input('estado', sql.Bit, 1)
             .query(`
-                INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, telefono, estado, fRegistro)
-                VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @telefono, @estado, GETDATE())
+                INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, telefono, estado, fRegistro, esPrincipal)
+                VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @telefono, @estado, GETDATE(), 1)
             `);
 
                 return { idSucursal, nombre: 'Sucursal Principal' };
@@ -616,20 +658,28 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'roles', mensaje: error.message });
         }
 
-        // 2. Crear comprobantes
-        try {
-            resultado.comprobantes = await exports.crearComprobantesPredeterminados(pool, idEmpresa);
-        } catch (error) {
-            console.error('⚠️ Error creando comprobantes:', error.message);
-            resultado.errores.push({ tipo: 'comprobantes', mensaje: error.message });
-        }
-
-        // 3. Crear sucursal principal (dirección principal de la empresa)
+        // 2. Crear sucursal principal (antes de comprobantes: catálogo exige idSucursal)
         try {
             resultado.sucursal = await exports.crearSucursalPrincipal(pool, idEmpresa, datosEmpresa);
         } catch (error) {
             console.error('⚠️ Error creando sucursal:', error.message);
             resultado.errores.push({ tipo: 'sucursal', mensaje: error.message });
+        }
+
+        // 3. Crear comprobantes en la sucursal principal
+        try {
+            if (resultado.sucursal && resultado.sucursal.idSucursal) {
+                resultado.comprobantes = await exports.crearComprobantesPredeterminados(
+                    pool,
+                    idEmpresa,
+                    resultado.sucursal.idSucursal
+                );
+            } else {
+                throw new Error('No hay sucursal principal; no se pueden crear comprobantes');
+            }
+        } catch (error) {
+            console.error('⚠️ Error creando comprobantes:', error.message);
+            resultado.errores.push({ tipo: 'comprobantes', mensaje: error.message });
         }
 
         // 4. Crear secuencias solo si tenemos comprobantes y sucursal
@@ -788,6 +838,18 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             // Columna puede no existir aún si no se ejecutó la migración
         }
 
+        let permitirVentaMultiSucursal = false;
+        try {
+            const pe = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query('SELECT ISNULL(permitirVentaMultiSucursal, 0) AS v FROM Empresas WHERE idEmpresa = @idEmpresa');
+            if (pe.recordset && pe.recordset[0]) {
+                permitirVentaMultiSucursal = pe.recordset[0].v === true || pe.recordset[0].v === 1;
+            }
+        } catch (_) {
+            // Columna puede no existir si no se aplicó la migración
+        }
+
         return {
             tieneColaboradores: colaboradores.recordset[0].total > 0,
             cantidadColaboradores: colaboradores.recordset[0].total,
@@ -800,6 +862,7 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             tieneClientes: clientes.recordset[0].total > 0,
             cantidadClientes: clientes.recordset[0].total,
             habilitarGuiasElectronicas,
+            permitirVentaMultiSucursal,
             configuracionCompleta:
                 colaboradores.recordset[0].total > 0 &&
                 productos.recordset[0].total > 0 &&

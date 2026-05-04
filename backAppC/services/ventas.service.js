@@ -13,6 +13,8 @@ const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } 
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 const sunatPostPagoService = require('./sunatPostPago.service');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
+const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
+const comprobantesRepository = require('../repositories/comprobantes.repository');
 
 /** Inserta cabecera de venta dentro de una transacción ya iniciada. */
 exports.insertarVentaCabecera = async (transaction, datosVenta, idEmpresa, idUsuario) => {
@@ -218,6 +220,37 @@ const obtenerSucursalPreferentePorProducto = async (transaction, idEmpresa, idPr
       ORDER BY x.qty DESC
     `);
   return rs.recordset?.[0]?.idSucursal || null;
+};
+
+/** Si la empresa tiene permitirVentaMultiSucursal, una VA puede generar varias facturas/boletas hijas (una por sucursal). */
+const leerPermitirVentaMultiSucursal = async (transaction, idEmpresa) => {
+  const r = await transaction.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query('SELECT ISNULL(permitirVentaMultiSucursal, 0) AS v FROM Empresas WHERE idEmpresa = @idEmpresa');
+  const row = r.recordset?.[0];
+  return !!(row && (row.v === true || row.v === 1));
+};
+
+/** Resuelve idSucursal por línea (cabecera explícita → stock del producto → sucursal por defecto). */
+const enriquecerDetallesConSucursalEmpresaDestino = async (transaction, idEmpresaProducto, detsRaw) => {
+  const out = [];
+  for (const det of detsRaw) {
+    let idS = det.idSucursalEmpresa || null;
+    if (idS && !(await validarSucursalEmpresa(transaction, idEmpresaProducto, idS))) {
+      idS = null;
+    }
+    if (!idS && det.idProducto) {
+      idS = await obtenerSucursalPreferentePorProducto(transaction, idEmpresaProducto, String(det.idProducto));
+    }
+    if (!idS) {
+      idS = await obtenerSucursalPorEmpresa(transaction, idEmpresaProducto);
+    }
+    if (!idS) {
+      throw new Error('No se pudo determinar la sucursal de la empresa destino.');
+    }
+    out.push({ ...det, idSucursalEmpresa: idS });
+  }
+  return out;
 };
 
 const asegurarClienteEmpresaConBase = async (transaction, idEmpresaDestino, clienteBase) => {
@@ -439,20 +472,6 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const idClienteEmpresa = clienteSeleccionado.idCliente;
     const idUsuarioEmpresa = user.sub;
 
-    const rCompDestino = await transaction.request()
-      .input('idComprobante', sql.Int, idComprobanteSolicitado)
-      .input('idEmpresa', sql.UniqueIdentifier, user.empresa)
-      .query('SELECT idComprobante, codigo FROM Comprobantes WHERE idComprobante = @idComprobante AND idEmpresa = @idEmpresa');
-    const idComprobanteDestino = rCompDestino.recordset?.[0]?.idComprobante;
-    const codigoComprobante = (rCompDestino.recordset?.[0]?.codigo || '').trim().toUpperCase();
-    if (!idComprobanteDestino) {
-      throw new Error('El comprobante seleccionado no existe en su empresa o no está autorizado.');
-    }
-    if (codigoComprobante === 'F7' || codigoComprobante === 'B7' || codigoComprobante === 'F8' || codigoComprobante === 'B8') {
-      throw new Error('Las notas de crédito/débito (F7/B7/F8/B8) no se emiten desde el punto de venta; use el módulo de notas de crédito / débito.');
-    }
-    const esNotaVenta = codigoComprobante === 'NV';
-
     const sucursalesUnicas = new Set(dets.map(d => d.idSucursalEmpresa).filter(Boolean));
     if (sucursalesUnicas.size > 1) {
       throw new Error('No se permite más de una sucursal en una misma venta.');
@@ -473,6 +492,22 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     if (!(await validarSucursalEmpresa(transaction, user.empresa, idSucursalLinea))) {
       throw new Error('La sucursal de la venta no pertenece a su empresa.');
     }
+
+    const resComp = await resolverIdComprobanteParaSucursal(
+      transaction,
+      user.empresa,
+      idComprobanteSolicitado,
+      idSucursalLinea
+    );
+    if (!resComp) {
+      throw new Error('El comprobante seleccionado no existe para esta sucursal o no está autorizado.');
+    }
+    const idComprobanteDestino = resComp.idComprobante;
+    const codigoComprobante = (resComp.codigo || '').trim().toUpperCase();
+    if (codigoComprobante === 'F7' || codigoComprobante === 'B7' || codigoComprobante === 'F8' || codigoComprobante === 'B8') {
+      throw new Error('Las notas de crédito/débito (F7/B7/F8/B8) no se emiten desde el punto de venta; use el módulo de notas de crédito / débito.');
+    }
+    const esNotaVenta = codigoComprobante === 'NV';
 
     const { numero, serie } = await ventasRepository.obtenerSiguienteNumeroComprobante(
       transaction,
@@ -772,10 +807,13 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     }
 
     // --- Generar comprobante VA para la empresa gestora ---
-    const rCompVA = await transaction.request()
-      .input('idEmpresa', sql.UniqueIdentifier, user.empresa)
-      .query("SELECT idComprobante FROM Comprobantes WHERE idEmpresa = @idEmpresa AND codigo = 'VA'");
-    const idComprobanteVA = rCompVA.recordset?.[0]?.idComprobante;
+    const rowVa = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+      transaction,
+      user.empresa,
+      'VA',
+      idSucursalCobradora
+    );
+    const idComprobanteVA = rowVa?.idComprobante;
     if (!idComprobanteVA) {
       throw new Error('Comprobante "Venta Agrupada" (VA) no configurado en la empresa gestora. Ejecute la migración.');
     }
@@ -834,58 +872,59 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     // --- Crear ventas individuales por empresa gestionada ---
     const avisoStockInsuficiente = [];
     const ventasEmpresa = [];
-    const sucursalPorEmpresa = new Map();
     let sumaHijasTotal = 0;
 
     for (const [idEmpresaStr, dets] of detallesPorEmpresa.entries()) {
       const idEmpresaProducto = idEmpresaStr;
-      const sucursalesUnicas = new Set(dets.map(d => d.idSucursalEmpresa).filter(Boolean));
-      if (sucursalesUnicas.size > 1) {
-        throw new Error('No se permite más de una sucursal por empresa en una misma venta.');
+      const permitirMultiSuc = await leerPermitirVentaMultiSucursal(transaction, idEmpresaProducto);
+      const detsConSucursal = await enriquecerDetallesConSucursalEmpresaDestino(transaction, idEmpresaProducto, dets);
+      const porSucursal = new Map();
+      for (const d of detsConSucursal) {
+        const k = String(d.idSucursalEmpresa).toLowerCase();
+        if (!porSucursal.has(k)) porSucursal.set(k, []);
+        porSucursal.get(k).push(d);
       }
-      let idSucursalEmpresa = sucursalesUnicas.size === 1 ? Array.from(sucursalesUnicas)[0] : null;
-      if (!idSucursalEmpresa) {
-        const primero = dets.find((d) => d.idProducto);
-        idSucursalEmpresa = primero
-          ? await obtenerSucursalPreferentePorProducto(transaction, idEmpresaProducto, String(primero.idProducto))
-          : null;
-      }
-      if (!idSucursalEmpresa) {
-        idSucursalEmpresa = await obtenerSucursalPorEmpresa(transaction, idEmpresaProducto);
-      }
-      if (!idSucursalEmpresa) {
-        throw new Error('No se pudo determinar la sucursal de la empresa destino.');
-      }
-      sucursalPorEmpresa.set(idEmpresaProducto, idSucursalEmpresa);
-
-      const idUsuarioEmpresa = await asegurarUsuarioEmpresaDestino(
-        transaction, idEmpresaProducto, user.empresa, user
-      );
-
-      const idClienteEmpresa = await asegurarClienteEmpresaConBase(
-        transaction, idEmpresaProducto, clienteSeleccionado
-      );
-      if (!idClienteEmpresa) {
-        throw new Error('No se pudo determinar el cliente para la empresa destino.');
+      if (porSucursal.size > 1 && !permitirMultiSuc) {
+        throw new Error(
+          'No se permite más de una sucursal por empresa en una misma venta. ' +
+            'Active en la empresa destino la opción "Permitir venta multi-sucursal" (Empresas.permitirVentaMultiSucursal) ' +
+            'o venda por sucursal en operaciones separadas.'
+        );
       }
 
-      const rCompDestino = await transaction.request()
-        .input('codigo', sql.VarChar(2), tipoComprobanteDestino)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaProducto)
-        .query('SELECT idComprobante, codigo FROM Comprobantes WHERE codigo = @codigo AND idEmpresa = @idEmpresa');
-      const idComprobanteDestino = rCompDestino.recordset?.[0]?.idComprobante;
-      const codigoComprobante = (rCompDestino.recordset?.[0]?.codigo || '').trim().toUpperCase();
-      if (!idComprobanteDestino) {
-        throw new Error(`Comprobante tipo "${tipoComprobanteDestino}" no configurado para empresa destino ${idEmpresaProducto}.`);
-      }
-      const esNotaVenta = codigoComprobante === 'NV';
+      for (const detsPart of porSucursal.values()) {
+        const idSucursalEmpresa = detsPart[0].idSucursalEmpresa;
 
-      const { numero, serie } = await ventasRepository.obtenerSiguienteNumeroComprobante(
-        transaction, idEmpresaProducto, idComprobanteDestino
-      );
-      const compVenta = serie + '-' + numero;
+        const idUsuarioEmpresa = await asegurarUsuarioEmpresaDestino(
+          transaction, idEmpresaProducto, user.empresa, user
+        );
 
-      const totalesEmpresa = calcularTotales(dets);
+        const idClienteEmpresa = await asegurarClienteEmpresaConBase(
+          transaction, idEmpresaProducto, clienteSeleccionado
+        );
+        if (!idClienteEmpresa) {
+          throw new Error('No se pudo determinar el cliente para la empresa destino.');
+        }
+
+        const idSucCompDest = await idSucursalComprobantesEfectiva(transaction, idSucursalEmpresa);
+        const rCompDestino = await transaction.request()
+          .input('codigo', sql.VarChar(2), tipoComprobanteDestino.slice(0, 2))
+          .input('idEmpresa', sql.UniqueIdentifier, idEmpresaProducto)
+          .input('idSuc', sql.UniqueIdentifier, idSucCompDest)
+          .query('SELECT idComprobante, codigo FROM Comprobantes WHERE codigo = @codigo AND idEmpresa = @idEmpresa AND idSucursal = @idSuc');
+        const idComprobanteDestino = rCompDestino.recordset?.[0]?.idComprobante;
+        const codigoComprobante = (rCompDestino.recordset?.[0]?.codigo || '').trim().toUpperCase();
+        if (!idComprobanteDestino) {
+          throw new Error(`Comprobante tipo "${tipoComprobanteDestino}" no configurado para empresa destino ${idEmpresaProducto}.`);
+        }
+        const esNotaVenta = codigoComprobante === 'NV';
+
+        const { numero, serie } = await ventasRepository.obtenerSiguienteNumeroComprobante(
+          transaction, idEmpresaProducto, idComprobanteDestino
+        );
+        const compVenta = serie + '-' + numero;
+
+        const totalesEmpresa = calcularTotales(detsPart);
       sumaHijasTotal += totalesEmpresa.total;
       let descuentosHija = totalesEmpresa.descuentos;
       const propSub =
@@ -936,7 +975,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const ventaResult = await ventasRepository.insertar(transaction, ventaDatos, idEmpresaProducto, idUsuarioEmpresa);
       const idVenta = ventaResult.recordset[0].idVenta;
 
-      for (const det of dets) {
+      for (const det of detsPart) {
         const cantPedida = parseFloat(det.cantidad) || 0;
         const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
 
@@ -1051,7 +1090,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
 
       const idVentaEmpresa = ventaEmpresaRow?.idVentaEmpresa;
       if (idVentaEmpresa) {
-        for (const det of dets) {
+        for (const det of detsPart) {
           await ventasRepository.insertarDetalleVentaEmpresa(transaction, {
             idVentaEmpresa,
             idProducto: det.idProducto,
@@ -1079,6 +1118,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         total: totalesEmpresa.total,
         idSucursal: idSucursalEmpresa,
       });
+      }
     }
 
     // --- Auditoria: registrar CREACION ---
@@ -1181,7 +1221,22 @@ exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, pa
     throw new Error('El vale no tiene detalle.');
   }
 
-  const { numero, serie } = await ventasRepository.obtenerSiguienteNumeroComprobante(transaction, idEmpresa, idComprobante);
+  const resCompVale = await resolverIdComprobanteParaSucursal(
+    transaction,
+    idEmpresa,
+    idComprobante,
+    vale.idSucursal
+  );
+  if (!resCompVale) {
+    throw new Error('El comprobante de liquidación no existe para la sucursal del vale.');
+  }
+  const idComprobanteLiquidacion = resCompVale.idComprobante;
+
+  const { numero, serie } = await ventasRepository.obtenerSiguienteNumeroComprobante(
+    transaction,
+    idEmpresa,
+    idComprobanteLiquidacion
+  );
   const compVenta = serie + '-' + numero;
   const totalVenta = detalleVale.reduce((sum, d) => sum + (Number(d.total) || 0), 0);
   const fEmision = getNowLocalSQLString();
@@ -1191,7 +1246,7 @@ exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, pa
     serie,
     numero,
     compVenta,
-    idComprobante,
+    idComprobante: idComprobanteLiquidacion,
     fEmision,
     fVencimiento: fEmision,
     idCliente: vale.idCliente,

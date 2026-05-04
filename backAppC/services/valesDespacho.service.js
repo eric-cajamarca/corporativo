@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 const valesDespachoRepository = require('../repositories/valesDespacho.repository');
+const comprobantesRepository = require('../repositories/comprobantes.repository');
 
 exports.listar = async (idEmpresa, filtros) => {
   return withPool((pool) => valesDespachoRepository.listar(pool, idEmpresa, filtros));
@@ -23,11 +24,13 @@ exports.crear = async (idEmpresa, idUsuario, body) => {
     const transaction = new sql.Transaction(pool);
     try {
       await transaction.begin();
-      const compVD = await pool.request()
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .query("SELECT idComprobante, serie FROM Comprobantes WHERE idEmpresa = @idEmpresa AND codigo = 'VD'");
-      const rowVD = compVD.recordset && compVD.recordset[0];
-      if (!rowVD) throw new Error('No existe comprobante Vale Despacho (VD) para esta empresa. Configure el comprobante VD.');
+      if (!body.idSucursal) {
+        throw new Error('idSucursal es requerido para crear el vale de despacho');
+      }
+      const rowVD = await comprobantesRepository.obtenerComprobantePorCodigoRepo(transaction, idEmpresa, 'VD', body.idSucursal);
+      if (!rowVD) {
+        throw new Error('No existe comprobante Vale Despacho (VD) para esta sucursal. Configure el comprobante VD.');
+      }
       const idComprobanteVD = rowVD.idComprobante;
       const serie = rowVD.serie || 'VD01';
 

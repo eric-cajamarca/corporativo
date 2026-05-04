@@ -62,7 +62,7 @@ export class SucursalService {
   }
 
   editar_sucursal_idEmpresa(sucursal:any):Observable<any>{
-    let id = sucursal.id;
+    const id = sucursal.idSucursal || sucursal.id;
     let params = JSON.stringify(sucursal);
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'sucursal/'+id,params,{

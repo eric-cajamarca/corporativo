@@ -791,14 +791,15 @@ exports.obtenerComprobanteOrigenParaNotaRepo = async (pool, idComprobanteElectro
 };
 
 /** Obtiene idComprobante por codigo (F7/B7 NC, F8/B8 ND internos) de la empresa. */
-exports.obtenerIdComprobantePorCodigoRepo = async (pool, idEmpresa, codigo) => {
+exports.obtenerIdComprobantePorCodigoRepo = async (pool, idEmpresa, codigo, idSucursal) => {
   const result = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("codigo", sql.VarChar(2), String(codigo || "").trim())
+    .input("idSucursal", sql.UniqueIdentifier, idSucursal)
     .query(`
       SELECT idComprobante, serie, numero FROM Comprobantes
-      WHERE idEmpresa = @idEmpresa AND codigo = @codigo
+      WHERE idEmpresa = @idEmpresa AND codigo = @codigo AND idSucursal = @idSucursal
     `);
   return result.recordset && result.recordset[0] ? result.recordset[0] : null;
 };
@@ -852,7 +853,7 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
       tn === "08"
         ? codigoInternoNotaDebitoPorOrigen(ceOrigen.tipoComprobante)
         : codigoInternoNotaCreditoPorOrigen(ceOrigen.tipoComprobante);
-    const compNota = await exports.obtenerIdComprobantePorCodigoRepo(pool, idEmpresa, codigoInterno);
+    const compNota = await exports.obtenerIdComprobantePorCodigoRepo(pool, idEmpresa, codigoInterno, ventaOrigen.idSucursal);
     if (!compNota) {
       await transaction.rollback();
       throw new Error(

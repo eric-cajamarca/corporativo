@@ -50,6 +50,7 @@
                   <th>Registro</th>
                   <th>Estado</th>
                   <th>Principal</th>
+                  <th>Series</th>
                   <th class="text-end">Acción</th>
                 </tr>
               </thead>
@@ -68,6 +69,7 @@
                       {{ item.esPrincipal ? 'Principal' : 'No principal' }}
                     </span>
                   </td>
+                  <td class="small">{{ etiquetaSeries(item) }}</td>
                   <td class="text-end">
                     <!-- Dropdown de opciones con Bootstrap nativo -->
                     <div class="dropdown">

@@ -5,11 +5,27 @@ async function listarResumenPorEmpresa(pool, idEmpresa) {
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query(
-      `SELECT idSucursal, nombre,
-              CONVERT(VARCHAR(10), fregistro, 23) AS fregistro
-       FROM Sucursal WHERE idEmpresa = @idEmpresa`
+      `SELECT idSucursal, nombre, direccion,
+              CONVERT(VARCHAR(10), fregistro, 23) AS fregistro,
+              ISNULL(esPrincipal, 0) AS esPrincipal,
+              idSucursalSeriesPadre
+       FROM Sucursal WHERE idEmpresa = @idEmpresa
+       ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
     );
   return result.recordset;
+}
+
+async function obtenerSucursalPorId(pool, idEmpresa, idSucursal) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .query(
+      `SELECT TOP 1 idSucursal, idEmpresa, nombre, direccion, ISNULL(esPrincipal, 0) AS esPrincipal,
+              idSucursalSeriesPadre, CONVERT(VARCHAR(10), fregistro, 23) AS fregistro
+       FROM Sucursal WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa`
+    );
+  return result.recordset[0] || null;
 }
 
 async function listarTodosPorEmpresa(pool, idEmpresa) {
@@ -21,6 +37,21 @@ async function listarTodosPorEmpresa(pool, idEmpresa) {
        ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
     );
   return result.recordset;
+}
+
+/** Sucursal por defecto para catálogo Comprobantes (principal o la más antigua). */
+async function obtenerSucursalDefectoComprobantes(pool, idEmpresa) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1 idSucursal
+      FROM Sucursal
+      WHERE idEmpresa = @idEmpresa
+      ORDER BY CASE WHEN ISNULL(esPrincipal, 0) = 1 THEN 0 ELSE 1 END, fregistro ASC
+    `);
+  const row = result.recordset && result.recordset[0];
+  return row && row.idSucursal ? row.idSucursal : null;
 }
 
 async function existeSucursalEnEmpresa(pool, idSucursal, idEmpresa) {
@@ -49,17 +80,26 @@ async function marcarSucursalPrincipal(pool, idSucursal, idEmpresa) {
     );
 }
 
-async function actualizarNombreDireccion(pool, idEmpresa, idSucursal, nombre, direccion) {
-  const result = await pool
+async function actualizarNombreDireccion(pool, idEmpresa, idSucursal, nombre, direccion, idSucursalSeriesPadre) {
+  const req = pool
     .request()
     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('nombre', sql.VarChar(100), nombre)
-    .input('direccion', sql.VarChar(500), direccion ?? '')
-    .query(
+    .input('direccion', sql.VarChar(500), direccion ?? '');
+  if (idSucursalSeriesPadre === undefined) {
+    const result = await req.query(
       `UPDATE Sucursal SET nombre = @nombre, direccion = @direccion, fregistro = GETDATE()
        WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa`
     );
+    return result.rowsAffected;
+  }
+  req.input('idSucursalSeriesPadre', sql.UniqueIdentifier, idSucursalSeriesPadre || null);
+  const result = await req.query(
+    `UPDATE Sucursal SET nombre = @nombre, direccion = @direccion,
+            idSucursalSeriesPadre = @idSucursalSeriesPadre, fregistro = GETDATE()
+     WHERE idSucursal = @idSucursal AND idEmpresa = @idEmpresa`
+  );
   return result.rowsAffected;
 }
 
@@ -164,6 +204,8 @@ async function eliminarLote(pool, idEmpresa, idLote) {
 module.exports = {
   listarResumenPorEmpresa,
   listarTodosPorEmpresa,
+  obtenerSucursalDefectoComprobantes,
+  obtenerSucursalPorId,
   existeSucursalEnEmpresa,
   quitarPrincipalTodas,
   marcarSucursalPrincipal,

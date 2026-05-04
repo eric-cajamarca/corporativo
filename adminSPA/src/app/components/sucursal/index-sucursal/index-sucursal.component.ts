@@ -52,6 +52,20 @@ export class IndexSucursalComponent {
   }
 
   /** Alta de sucursal/dirección vía «Editar empresa»; desactiva si el plan ya no admite más. */
+  etiquetaSeries(s: { idSucursal?: string; nombre?: string; esPrincipal?: boolean | number | string; idSucursalSeriesPadre?: string | null }): string {
+    const ep = s?.esPrincipal;
+    const esP = !!(ep === true || ep === 1 || ep === '1');
+    if (esP) {
+      return 'Propias (principal)';
+    }
+    const pad = s?.idSucursalSeriesPadre;
+    if (pad == null || pad === '') {
+      return 'Propias';
+    }
+    const padre = this.sucursales.find((x: { idSucursal: string }) => String(x.idSucursal).toLowerCase() === String(pad).toLowerCase());
+    return padre ? `Compartidas (${padre.nombre})` : 'Compartidas';
+  }
+
   puedeIrCrearNuevaSucursal(): boolean {
     const lp = this._permisosService.limitesPlan();
     if (!lp) {

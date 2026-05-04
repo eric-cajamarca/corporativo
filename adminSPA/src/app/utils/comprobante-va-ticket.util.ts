@@ -19,7 +19,7 @@ function fmtN(n: number | undefined | null): string {
 /**
  * HTML único del comprobante Venta Agrupada: formato ticket (≈80mm), listo para imprimir.
  */
-export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVentaAgrupada: string): string {
+export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string {
   const d = data;
   const tipoLabel = escapeHtmlVa(d.venta.tipoComprobanteDestinoNombre || d.venta.tipoComprobanteDestino || '');
   const comp = escapeHtmlVa(d.venta.compVenta || '—');
@@ -54,8 +54,6 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVenta
       : Number(d.venta.descuentos);
   const showSub = !Number.isNaN(sub) && sub > 0;
   const showIgv = !Number.isNaN(igv) && igv > 0;
-
-  const barcodeUrl = `https://barcode.tec-it.com/barcode.ashx?data=${encodeURIComponent(idVentaAgrupada)}&code=Code128&translate-esc=true&dpi=96`;
 
   return `<!DOCTYPE html><html lang="es"><head>
 <meta charset="utf-8"/>
@@ -120,9 +118,6 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVenta
     padding-top: 6px;
     border-top: 2px solid #000;
   }
-  .barcode { margin-top: 10px; text-align: center; }
-  .barcode img { height: 48px; max-width: 100%; }
-  .id-uuid { font-size: 8px; color: #666; margin-top: 6px; word-break: break-all; }
   .acciones {
     margin-top: 14px;
     display: flex;
@@ -173,10 +168,6 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVenta
       <div class="row"><span>Descuentos</span><span>S/ ${fmtN(desc)}</span></div>
       <div class="row total-final"><span>TOTAL</span><span>S/ ${fmtN(d.venta.total)}</span></div>
     </div>
-    <div class="barcode">
-      <img src="${barcodeUrl}" alt="" width="200" height="50"/>
-    </div>
-    <div class="center id-uuid">${escapeHtmlVa(idVentaAgrupada)}</div>
     ${d.venta.observaciones ? `<div class="meta tiny" style="margin-top:6px">${escapeHtmlVa(d.venta.observaciones)}</div>` : ''}
   </div>
   <div class="acciones no-print">
@@ -187,10 +178,10 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData, idVenta
 }
 
 /** Abre ventana solo con ticket VA (no PDF ni otros formatos). */
-export function openComprobanteVaTicket(data: ComprobanteVAPdfData, idVentaAgrupada: string): boolean {
+export function openComprobanteVaTicket(data: ComprobanteVAPdfData): boolean {
   const w = window.open('', '_blank');
   if (!w) return false;
-  w.document.write(buildComprobanteVaTicketHtml(data, idVentaAgrupada));
+  w.document.write(buildComprobanteVaTicketHtml(data));
   w.document.close();
   return true;
 }

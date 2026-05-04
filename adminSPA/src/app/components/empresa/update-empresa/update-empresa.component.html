@@ -115,6 +115,19 @@
                         <textarea type="text" class="form-control" name="rubro" [(ngModel)]="empresas.rubro"
                             placeholder="Descripcion del giro del negocio" appFormatSentence></textarea>
                     </div>
+                    <div class="mb-3 border-top pt-3 mt-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="chkPermitirMultiSuc"
+                                name="permitirVentaMultiSucursal"
+                                [(ngModel)]="empresas.permitirVentaMultiSucursal">
+                            <label class="form-check-label" for="chkPermitirMultiSuc">
+                                Permitir venta multi-sucursal
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            En ventas agrupadas (empresa gestora), permite líneas de <strong>más de una sucursal</strong> de esta empresa en una misma operación; se generará un comprobante hijo por cada sucursal.
+                        </small>
+                    </div>
                 </div>
 
                 <div style="margin-bottom: 20px; text-align: left; margin-left: 20px;">
@@ -150,6 +163,19 @@
                         <label for="celular" class="form-label">Teléfono</label>
                         <input type="tel" class="form-control" name="celular" [(ngModel)]="empresas.celular"
                             placeholder="Ingrese el teléfono (opcional)">
+                    </div>
+                    <div class="mb-3 border-top pt-3 mt-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="chkPermitirMultiSucDni"
+                                name="permitirVentaMultiSucursalDni"
+                                [(ngModel)]="empresas.permitirVentaMultiSucursal">
+                            <label class="form-check-label" for="chkPermitirMultiSucDni">
+                                Permitir venta multi-sucursal
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            En ventas agrupadas, permite más de una sucursal por operación para esta empresa.
+                        </small>
                     </div>
                 </div>
             </div>

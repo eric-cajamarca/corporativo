@@ -356,6 +356,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.sucursales.length && !this.ventas.idSucursal) {
           this.ventas.idSucursal = this.sucursales[0].idSucursal;
         }
+        this.cargarComprobantesVentaInicial();
       },
       error: () => {}
     });
@@ -365,6 +366,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.cajas.length > 0 && this.cajas[0].idSucursal && !this.ventas.idSucursal) {
           this.ventas.idSucursal = this.cajas[0].idSucursal;
         }
+        this.cargarComprobantesVentaInicial();
       },
       error: () => {}
     });
@@ -697,6 +699,19 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ventaSesionService.eliminarSesionActiva();
     this.limpiarVenta();
   }
+  /** Catálogo Comprobantes (venta) para la sucursal operativa; sin idSucursal no llama al API. */
+  private cargarComprobantesVentaInicial(): void {
+    if (!this.ventas.idSucursal || String(this.ventas.idSucursal).trim() === '') {
+      return;
+    }
+    this._comprobanteService.obtenerComprobantesVenta(this.ventas.idSucursal).subscribe({
+      next: (response) => {
+        this.comprobantes = response.data || [];
+      },
+      error: () => {}
+    });
+  }
+
   /** Consulta productos para refrescar stock (p. ej. tras registrar una venta). */
   cargarProductos(opciones?: { evitarCache?: boolean }): void {
     this._productoService.obtenerProductosTodos(opciones).subscribe({
@@ -754,13 +769,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       error: () => {}
     });
 
-    this._comprobanteService.obtenerComprobantesVenta().subscribe(
-      (response) => {
-        this.comprobantes = response.data;
-              },
-      (error) => {
-              }
-    );
+    this.cargarComprobantesVentaInicial();
 
     this._tablasSunatService.obtener_moneda().subscribe(
       (response) => {
@@ -921,7 +930,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (compPrevio) {
       this.sincronizarTipoComprobanteDestinoDesdeCodigo(compPrevio.codigo);
     }
-    this._comprobanteService.obtenerComprobantesVenta().subscribe({
+    this._comprobanteService.obtenerComprobantesVenta(this.ventas.idSucursal).subscribe({
       next: (response) => {
         const lista = response.data || [];
         this.comprobantes = lista;
@@ -2672,7 +2681,7 @@ abrirModalPrecios(item: any) {
           iziToast.warning({ title: 'Aviso', message: 'No se pudieron cargar los datos del comprobante VA.', position: 'topRight' });
           return;
         }
-        if (!openComprobanteVaTicket(res.data, idVentaAgrupada)) {
+        if (!openComprobanteVaTicket(res.data)) {
           iziToast.warning({
             title: 'Aviso',
             message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',

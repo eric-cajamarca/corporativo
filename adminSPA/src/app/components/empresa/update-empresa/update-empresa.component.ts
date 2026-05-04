@@ -164,6 +164,10 @@ export class UpdateEmpresaComponent {
       response => {
                 //convetir el array response.data a un objeto this.empresas
         this.empresas = response.data[0];
+        const p = this.empresas?.permitirVentaMultiSucursal;
+        this.empresas.permitirVentaMultiSucursal = !!(
+          p === true || p === 1 || p === '1' || String(p).toLowerCase() === 'true'
+        );
               }
     );
     this._rubrosService.listar({ activo: true }).subscribe(res => { this.rubros = res.data || []; });
