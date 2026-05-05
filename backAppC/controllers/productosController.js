@@ -319,8 +319,13 @@ const crear_producto = async (req, res) => {
     res.status(200).send({ data: resultado.idProducto });
   } catch (error) {
     console.error("crear_producto error:", error.message);
-    res.status(500).send({
-      message: error.message && error.message.length < 200 ? error.message : "Error al crear los productos",
+    const msg = error && error.message ? String(error.message) : '';
+    const esConflictoCodigo =
+      msg.includes('código en su empresa') ||
+      msg.includes('CODIGO_PRODUCTO_DUPLICADO') ||
+      (error && error.number === 2627);
+    res.status(esConflictoCodigo ? 409 : 500).send({
+      message: msg && msg.length < 220 ? msg : "Error al crear los productos",
       data: undefined,
     });
   }

@@ -56,10 +56,8 @@ async function crearProductoConTransaccion(pool, params) {
           String(datosProducto.Codigo || '').trim()
         );
         if (Number(chkCodigo.recordset?.[0]?.n) > 0) {
-          datosProducto.Codigo = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpresa);
+          throw new Error('CODIGO_PRODUCTO_DUPLICADO');
         }
-      } else {
-        datosProducto.Codigo = await obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpresa);
       }
 
       await ProductosRepository.insertarProducto(transaction, datosProducto);
@@ -113,6 +111,9 @@ async function crearProductoConTransaccion(pool, params) {
       const msg = String(err.message || '');
       const dupCodigo =
         err.number === 2627 && (/codigo/i.test(msg) || /duplicate key/i.test(msg) || /UNIQUE KEY/i.test(msg));
+      if (!usarCorrelativo && (err.message === 'CODIGO_PRODUCTO_DUPLICADO' || dupCodigo)) {
+        throw new Error('Ya existe un producto con ese código en su empresa. Use un código diferente o seleccione el producto existente para registrar stock en la sucursal correcta.');
+      }
       if (dupCodigo && attempt < maxIntentosCodigo) {
         lastDupErr = err;
         continue;

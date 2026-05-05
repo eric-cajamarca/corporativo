@@ -40,6 +40,7 @@ export class IndexProductoComponent {
   public token: any = "";
   public filtro = '';
   public load_estado = false;
+  public mostrarColumnaSucursal = false;
   /** Id de producto mientras se envía PATCH estado (desactivar/activar). */
   public desactivandoId: string | null = null;
   /** Configuración inventario: galería de imágenes habilitada */
@@ -114,12 +115,26 @@ export class IndexProductoComponent {
 
   ngOnInit(): void {
     this.initData();
+    this.cargarConfiguracionSucursalEmpresa();
     this._gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
         this.productosConImagenes = item ? String(item.valor).toLowerCase() === 'true' : false;
       },
       error: () => {}
+    });
+  }
+
+  private cargarConfiguracionSucursalEmpresa(): void {
+    this._sucursalService.obtener_sucursal_todos().subscribe({
+      next: (response: any) => {
+        const sucursales = Array.isArray(response?.data) ? response.data : [];
+        this.mostrarColumnaSucursal = sucursales.length > 1;
+      },
+      error: (error: any) => {
+        this.mostrarColumnaSucursal = false;
+        console.error('Error al cargar sucursales de empresa:', error);
+      }
     });
   }
 
@@ -264,6 +279,7 @@ export class IndexProductoComponent {
         incluye(item.descripcion) ||
         incluye(item.categoria) ||
         incluye(item.marca) ||
+        incluye(item.sucursal) ||
         incluye(item.codigoPresentacion) ||
         incluye(item.fProduccion) ||
         incluye(item.fVencimiento) ||

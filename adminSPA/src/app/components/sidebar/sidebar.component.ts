@@ -390,7 +390,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
    * Toggle del sidebar en móvil
    */
   toggleMobileSidebar(): void {
-    this.isMobileOpen.set(!this.isMobileOpen());
+    const opening = !this.isMobileOpen();
+    this.isMobileOpen.set(opening);
+    // En móvil, si el usuario dejó colapsado en desktop, expandimos solo vista para poder usar submenús.
+    if (opening && this.isCollapsed()) {
+      this.isCollapsed.set(false);
+    }
   }
 
   /**
@@ -423,15 +428,30 @@ export class SidebarComponent implements OnInit, OnDestroy {
    */
   navigateTo(ruta: string | null): void {
     if (ruta) {
-      if (ruta === '/ventas/create') {
-        const segments = ruta.split('/').filter(Boolean);
+      const target = this.normalizarRuta(ruta);
+      if (target === '/ventas/create') {
+        const segments = target.split('/').filter(Boolean);
         const url = this.router.serializeUrl(this.router.createUrlTree(segments));
         window.open(url, '_blank');
+        this.closeMobileSidebar();
       } else {
-        this.router.navigate([ruta]);
+        // En móviles, cerrar el sidebar ANTES puede interrumpir el click/navegación.
+        // Primero navegamos, luego cerramos el panel.
+        this.router.navigateByUrl(target).then((ok) => {
+          if (!ok) {
+            console.error('No se pudo navegar a ruta de sidebar:', target);
+          }
+          this.closeMobileSidebar();
+        });
       }
-      this.closeMobileSidebar();
     }
+  }
+
+  /** Normaliza rutas de menú para navegación absoluta consistente (desktop/móvil). */
+  private normalizarRuta(ruta: string): string {
+    const r = String(ruta || '').trim();
+    if (!r) return '/home';
+    return r.startsWith('/') ? r : `/${r}`;
   }
 
   /**

@@ -70,13 +70,14 @@
           *ngIf="!item.tipo && !item.submenu && item.visible !== false" 
           class="nav-item"
           [class.active]="isRouteActive(item.ruta || null)">
-          <a 
+          <button
+            type="button"
             class="nav-link" 
-            (click)="navigateTo(item.ruta || null); $event.preventDefault()"
+            (click)="navigateTo(item.ruta || null)"
             [title]="isCollapsed() ? item.nombre : ''">
             <i class="nav-icon" [class]="item.icono"></i>
             <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
-          </a>
+          </button>
         </li>
 
         <!-- Item con submenú -->
@@ -85,14 +86,15 @@
           class="nav-item has-submenu"
           [class.open]="isSubmenuOpen(item.modulo || '')"
           [class.active]="isSubmenuOpen(item.modulo || '')">
-          <a 
+          <button
+            type="button"
             class="nav-link" 
-            (click)="toggleSubmenu(item.modulo || ''); $event.preventDefault()"
+            (click)="toggleSubmenu(item.modulo || '')"
             [title]="isCollapsed() ? item.nombre : ''">
             <i class="nav-icon" [class]="item.icono"></i>
             <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
             <i class="submenu-arrow bi bi-chevron-down" *ngIf="!isCollapsed()"></i>
-          </a>
+          </button>
           
           <!-- Submenú -->
           <ul class="submenu" [class.show]="isSubmenuOpen(item.modulo || '') && !isCollapsed()">
@@ -101,12 +103,13 @@
                 *ngIf="subItem.visible !== false"
                 class="submenu-item"
                 [class.active]="isRouteActive(subItem.ruta)">
-                <a 
+                <button
+                  type="button"
                   class="submenu-link" 
-                  (click)="navigateTo(subItem.ruta); $event.preventDefault()">
+                  (click)="navigateTo(subItem.ruta)">
                   <i class="bi bi-circle submenu-dot"></i>
                   <span>{{subItem.nombre}}</span>
-                </a>
+                </button>
               </li>
             </ng-container>
           </ul>
@@ -117,7 +120,7 @@
             <ul class="tooltip-menu">
               <ng-container *ngFor="let subItem of item.submenu">
                 <li *ngIf="subItem.visible !== false">
-                  <a (click)="navigateTo(subItem.ruta); $event.preventDefault()">
+                  <a href="#" (click)="navigateTo(subItem.ruta); $event.preventDefault()">
                     {{subItem.nombre}}
                   </a>
                 </li>

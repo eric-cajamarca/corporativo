@@ -66,6 +66,7 @@
               <tr>
                 <th>Codigo</th>
                 <th>Marca</th>
+                <th *ngIf="mostrarColumnaSucursal">Sucursal</th>
                 <th>Descripción</th>
                 <th>U.Med.</th>
                 <th>C.Unit.</th>
@@ -86,6 +87,9 @@
                 </td>
                 <td>
                   <span>{{ item.marca || '—' }}</span>
+                </td>
+                <td *ngIf="mostrarColumnaSucursal">
+                  <span>{{ item.sucursal || '—' }}</span>
                 </td>
                 <td>
                   <span>{{item.descripcion}}</span>

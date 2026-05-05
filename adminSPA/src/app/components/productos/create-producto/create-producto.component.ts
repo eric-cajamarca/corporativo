@@ -410,10 +410,16 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       error: (error) => {
         this.guardando.set(false);
         console.error('Error:', error);
+        const apiMsg = String(error?.error?.message || error?.message || '').trim();
+        const status = Number(error?.status || 0);
+        const mensaje =
+          status === 409
+            ? (apiMsg || 'Ya existe un producto con ese código. Use un código diferente o seleccione el producto existente para registrar stock en la sucursal correcta.')
+            : (apiMsg || 'Error al crear el producto');
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
-          message: error.error?.message || 'Error al crear el producto',
+          message: mensaje,
           position: 'topRight'
         });
       }

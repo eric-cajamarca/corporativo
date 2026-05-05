@@ -683,32 +683,33 @@ class HtmlBuilderService {
   <title>${titulo} ${compVenta}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 1px; color: #000; width: 80mm; max-width: 80mm; }
+    body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 1px; color: #000; width: 80mm; max-width: 80mm; }
     .ticket-center { text-align: center; }
     .ticket-logo { max-width: 50px; max-height: 40px; margin: 0 auto 2px; display: block; }
-    .ticket-empresa { font-weight: bold; font-size: 10px; margin: 2px 0; line-height: 1.2; color: #000; }
-    .ticket-ruc { font-size: 10px; color: #000; }
-    .ticket-dir, .ticket-rubro, .ticket-cel, .ticket-correo { font-size: 10px; margin: 1px 0; color: #000; }
+    .ticket-empresa { font-weight: bold; font-size: 11px; margin: 2px 0; line-height: 1.2; color: #000; }
+    .ticket-ruc { font-size: 11px; color: #000; }
+    .ticket-dir, .ticket-rubro, .ticket-cel, .ticket-correo { font-size: 11px; margin: 1px 0; color: #000; }
     .ticket-sep { border: none; border-top: 1px dashed #000; margin: 3px 0; }
-    .ticket-comprobante { font-weight: bold; font-size: 10px; margin: 2px 0; color: #000; }
-    .ticket-fecha { font-size: 10px; margin-bottom: 4px; color: #000; }
-    .ticket-cliente { text-align: left; font-size: 10px; line-height: 1.25; margin: 4px 0; color: #000; }
+    .ticket-comprobante { font-weight: bold; font-size: 11px; margin: 2px 0; color: #000; }
+    .ticket-num-doc { font-size: 11px; color: #000; }
+    .ticket-fecha { font-size: 11px; margin-bottom: 4px; color: #000; }
+    .ticket-cliente { text-align: left; font-size: 11px; line-height: 1.25; margin: 4px 0; color: #000; }
     .ticket-cliente strong { display: inline; }
-    table.ticket-detalle { width: 100%; border-collapse: collapse; font-size: 10px; margin: 4px 0; color: #000; }
+    table.ticket-detalle { width: 100%; border-collapse: collapse; font-size: 11px; margin: 4px 0; color: #000; }
     table.ticket-detalle th, table.ticket-detalle td { padding: 1px 2px; border-bottom: 1px solid #000; }
     table.ticket-detalle th { text-align: left; font-weight: bold; }
     .ticket-detalle .num { text-align: right; }
-    .ticket-totales { font-size: 10px; margin: 4px 0; color: #000; }
+    .ticket-totales { font-size: 11px; margin: 4px 0; color: #000; }
     .ticket-totales td.num { text-align: right; }
-    .ticket-totales tr.total-final { font-weight: bold; font-size: 10px; }
-    .ticket-son { font-size: 10px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; color: #000; }
-    .ticket-final { margin-top: 2px; padding: 0; font-size: 10px; color: #000; }
+    .ticket-totales tr.total-final { font-weight: bold; font-size: 11px; }
+    .ticket-son { font-size: 11px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; color: #000; }
+    .ticket-final { margin-top: 2px; padding: 0; font-size: 11px; color: #000; }
     .ticket-final .txt { margin-bottom: 2px; }
     .ticket-sunat-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 4px; margin-top: 4px; width: 100%; }
     .ticket-sunat-text { flex: 1; min-width: 0; text-align: left; color: #000; }
-    .ticket-sunat-text .pie-sunat-electronico { font-size: 9px !important; line-height: 1.35 !important; margin: 0 !important; color: #000 !important; }
+    .ticket-sunat-text .pie-sunat-electronico { font-size: 11px !important; line-height: 1.35 !important; margin: 0 !important; color: #000 !important; }
     .ticket-sunat-text .pie-sunat-electronico div { color: #000 !important; }
-    .ticket-final .pie-sunat-electronico { font-size: 9px !important; line-height: 1.35 !important; color: #000 !important; }
+    .ticket-final .pie-sunat-electronico { font-size: 11px !important; line-height: 1.35 !important; color: #000 !important; }
     .ticket-final .pie-sunat-electronico div { color: #000 !important; }
     .ticket-sunat-qr { flex-shrink: 0; }
     .ticket-sunat-qr img { width: 2cm; height: 2cm; max-width: 100%; object-fit: contain; display: block; }
@@ -731,7 +732,7 @@ class HtmlBuilderService {
   <hr class="ticket-sep">
   <div class="ticket-center">
     <div class="ticket-comprobante">${titulo}</div>
-    <div>${compVenta}</div>
+    <div class="ticket-num-doc">${compVenta}</div>
     <div class="ticket-fecha">Fecha: ${fEmision}</div>
   </div>
   <hr class="ticket-sep">
@@ -754,8 +755,8 @@ class HtmlBuilderService {
     ${lineasTotales}
   </table>
   <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
-  ${cuentasBancarias.length > 0 ? '<hr class="ticket-sep"><div style="font-size:10px;color:#000;"><strong>CUENTAS BANCARIAS:</strong><br>' + cuentasBancarias.join('<br>') + '</div>' : ''}
-  ${observaciones ? '<hr class="ticket-sep"><div style="font-size:10px;color:#000;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
+  ${cuentasBancarias.length > 0 ? '<hr class="ticket-sep"><div style="font-size:11px;color:#000;"><strong>CUENTAS BANCARIAS:</strong><br>' + cuentasBancarias.join('<br>') + '</div>' : ''}
+  ${observaciones ? '<hr class="ticket-sep"><div style="font-size:11px;color:#000;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
   ${tablaCuotasHtml || ''}
   <div class="ticket-final">
     ${pieSunatHtml || ''}
@@ -944,7 +945,7 @@ class HtmlBuilderService {
         `<tr${l.total ? ' class="total-final"' : ''}><td>${l.label}</td><td class="num" style="text-align:right">${Number(l.value).toFixed(2)}</td></tr>`
       ).join('');
       const ticketCuotasHtml = cuotas.length > 0 && mostrarCuotasPdf
-        ? `<hr class="ticket-sep"><div style="font-size:10px;color:#000;"><strong>Cuotas a pagar</strong><table style="width:100%;font-size:10px;border-collapse:collapse;color:#000;"><tr><th>F.Pago</th><th>Nro</th><th class="num">Total</th></tr>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td>${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="num">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</table></div>`
+        ? `<hr class="ticket-sep"><div style="font-size:11px;color:#000;"><strong>Cuotas a pagar</strong><table style="width:100%;font-size:11px;border-collapse:collapse;color:#000;"><tr><th>F.Pago</th><th>Nro</th><th class="num">Total</th></tr>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td>${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="num">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</table></div>`
         : '';
       return this._buildTicketComprobanteHtml({
         empresa,

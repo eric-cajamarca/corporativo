@@ -211,7 +211,11 @@ th{background:#f2f2f2;font-weight:bold;text-align:center}
         html = datos.html;
     }
 
-    const pdfBuffer = await generatePdfFromHtml(html, fontSizeNum, formatoPdf);
+    let pdfFontSize = fontSizeNum;
+    if (tipo === 'comprobante-venta' && formatoPdf === 'ticket' && typeof fontSize !== 'number') {
+      pdfFontSize = 11;
+    }
+    const pdfBuffer = await generatePdfFromHtml(html, pdfFontSize, formatoPdf);
 
     const nombreArchivo = datos.nombreArchivo || 'documento.pdf';
     res.setHeader('Content-Type', 'application/pdf');
