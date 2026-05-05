@@ -1,13 +1,10 @@
-/*
-  styles.css global: .modal.show ~ .modal-backdrop.show { z-index: 1060 !important }
-  deja el backdrop encima del modal manual (mismo patrón que index-caja / pago-proveedores).
-*/
+/* Diálogo por encima del backdrop (orden DOM .modal → .modal-backdrop) */
 :host .modal.show {
-  z-index: 1070 !important;
+  z-index: 1055;
 }
 
 :host .modal-backdrop.show {
-  z-index: 1065 !important;
+  z-index: 1050;
 }
 
 :host {

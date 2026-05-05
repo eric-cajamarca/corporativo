@@ -66,10 +66,28 @@ h2{
     color: rgb(98, 99, 110);
 }
 
-/* Modal Crear despacho */
-:host .modal {
+/* Modal Crear despacho: diálogo por encima del backdrop (mismo criterio que Bootstrap 5) */
+:host .modal-backdrop {
   z-index: 1050;
 }
-:host .modal-backdrop {
-  z-index: 1040;
+:host .modal {
+  z-index: 1055;
+}
+
+/* Acordeón: botón imprimir al lado del título (sin <button> anidado) */
+.accordion-despacho-header {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+.accordion-despacho-header .accordion-button {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.accordion-despacho-header .btn-despacho-ticket {
+  flex: 0 0 auto;
+  align-self: stretch;
+  border-radius: 0;
+  border: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.125);
 }

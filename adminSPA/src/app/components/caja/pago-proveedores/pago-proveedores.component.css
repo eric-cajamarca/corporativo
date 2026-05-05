@@ -1,13 +1,10 @@
-/*
-  styles.css global: .modal.show ~ .modal-backdrop.show { z-index: 1060 !important }
-  con el modal en ~1050/1055 el backdrop queda encima y bloquea el formulario (igual que index-caja).
-*/
+/* Diálogo por encima del backdrop (orden DOM .modal → .modal-backdrop) */
 :host .modal.show {
-  z-index: 1070 !important;
+  z-index: 1055;
 }
 
 :host .modal-backdrop.show {
-  z-index: 1065 !important;
+  z-index: 1050;
 }
 
 /* Layout: espacio para sidebar (260px) y topnav (64px) */

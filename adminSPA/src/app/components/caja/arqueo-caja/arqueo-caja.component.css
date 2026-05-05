@@ -93,12 +93,12 @@ button.btn-sm i {
   font-size: 0.8rem;
 }
 
-/**
- * styles.css global: .modal.show ~ .modal-backdrop.show { z-index: 1060 !important; }
- * Eso deja el backdrop por encima de modales con z-index ~1055 (Bootstrap), cubriendo el diálogo.
- * Los modales de arqueo deben quedar por encima de ese backdrop.
- */
+/* Modales arqueo: mismo patrón .modal → .modal-backdrop (diálogo encima del oscurecido) */
+:host .modal-backdrop.show {
+  z-index: 1050;
+}
+
 :host .arqueo-caja-modal-layer.modal.show {
-  z-index: 1080 !important;
+  z-index: 1055;
 }
 

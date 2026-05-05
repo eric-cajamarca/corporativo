@@ -40,3 +40,11 @@
   .envio-card:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
+
+/* Modales Ver / Editar: mismo orden DOM .modal → .modal-backdrop */
+:host .modal-backdrop {
+  z-index: 1050;
+}
+:host .modal {
+  z-index: 1055;
+}

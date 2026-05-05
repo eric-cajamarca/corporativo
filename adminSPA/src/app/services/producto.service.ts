@@ -61,8 +61,13 @@ export class ProductoService {
     );
   }
 
-  obtenerProductosCompras(): Observable<ProductoResponse> {
-    return this._http.get<ProductoResponse>(this.url + 'productos/compras', {
+  /** Lista para modal de compras; `evitarCache` fuerza GET fresco (p. ej. producto recién creado). */
+  obtenerProductosCompras(opciones?: { evitarCache?: boolean }): Observable<ProductoResponse> {
+    let u = this.url + 'productos/compras';
+    if (opciones?.evitarCache) {
+      u += (u.includes('?') ? '&' : '?') + '_=' + encodeURIComponent(String(Date.now()));
+    }
+    return this._http.get<ProductoResponse>(u, {
       withCredentials: true
     });
   }
@@ -87,6 +92,19 @@ export class ProductoService {
     return this._http.put<ProductoResponse>(this.url + 'productos/' + id, producto, {
       withCredentials: true
     }).pipe(
+      tap(() => {
+        this.limpiarCacheListaProductos();
+      })
+    );
+  }
+
+  /** Activa o desactiva el producto (PATCH; no elimina). Requiere rol Administrador en el backend. */
+  actualizarEstadoProducto(id: string, activo: boolean): Observable<ProductoResponse> {
+    return this._http.patch<ProductoResponse>(
+      `${this.url}productos/${id}/estado`,
+      { activo },
+      { withCredentials: true }
+    ).pipe(
       tap(() => {
         this.limpiarCacheListaProductos();
       })

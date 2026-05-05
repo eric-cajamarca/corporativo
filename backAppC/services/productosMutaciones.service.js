@@ -162,8 +162,65 @@ async function actualizarProducto(pool, detalle) {
   return ProductosRepository.actualizarProductoFlexible(pool, detalle);
 }
 
+/**
+ * Activa o desactiva el producto (no elimina). idEmpresa desde contexto de seguridad.
+ */
+async function actualizarEstadoProducto(pool, idProducto, idEmpresa, activo) {
+  const on =
+    activo === true ||
+    activo === 1 ||
+    activo === '1' ||
+    String(activo).toLowerCase() === 'true';
+  const off =
+    activo === false ||
+    activo === 0 ||
+    activo === '0' ||
+    String(activo).toLowerCase() === 'false';
+  if (!on && !off) {
+    throw new Error('Indique activo: true o false.');
+  }
+  return ProductosRepository.actualizarEstadoProductoPorId(pool, idProducto, idEmpresa, on);
+}
+
+/**
+ * Elimina producto e inventario/precios asociados en una transacción.
+ * No borra si hay líneas en ventas o compras (mensaje claro para el cliente).
+ */
 async function eliminarProducto(pool, idProducto, idEmpresa) {
-  return ProductosRepository.eliminarProductoPorId(pool, idProducto, idEmpresa);
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  let committed = false;
+  try {
+    const lineasHistoricas = await ProductosRepository.contarLineasHistoricasVentasCompras(
+      transaction,
+      idProducto,
+      idEmpresa
+    );
+    if (lineasHistoricas > 0) {
+      throw new Error(
+        'No se puede eliminar el producto porque tiene líneas en ventas o compras. Desactívelo (estado inactivo) en la ficha del producto.'
+      );
+    }
+    await ProductosRepository.eliminarFilasRelacionadasProducto(transaction, idProducto, idEmpresa);
+    const resultado = await ProductosRepository.eliminarProductoPorId(transaction, idProducto, idEmpresa);
+    await transaction.commit();
+    committed = true;
+    return resultado;
+  } catch (err) {
+    if (!committed) {
+      try {
+        await transaction.rollback();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (err && err.number === 547) {
+      throw new Error(
+        'No se puede eliminar el producto: sigue vinculado a otros registros del sistema (p. ej. variantes con stock propio, módulos adicionales).'
+      );
+    }
+    throw err;
+  }
 }
 
 module.exports = {
@@ -173,5 +230,6 @@ module.exports = {
   actualizarProductoCompra,
   crearProductoCompra,
   actualizarProducto,
+  actualizarEstadoProducto,
   eliminarProducto
 };

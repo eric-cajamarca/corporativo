@@ -76,6 +76,16 @@
   max-width: 100%;
 }
 
+.mov-inv-celda-producto {
+  min-width: 11rem;
+  max-width: 28rem;
+  vertical-align: middle;
+}
+
+.mov-inv-celda-producto-placeholder {
+  line-height: 1.35;
+}
+
 .mov-inv-col-qty {
   width: 6.5rem;
 }

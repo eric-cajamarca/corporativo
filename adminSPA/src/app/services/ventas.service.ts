@@ -421,6 +421,7 @@ export interface ComprobanteVAPdfData {
     aliasEmpresa?: string;
     sucursal?: string;
     idEmpresaProducto?: string;
+    marca?: string;
   }>;
 }
 

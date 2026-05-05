@@ -65,7 +65,7 @@
             <thead class="table-primary" style="position: sticky; top: 0; z-index: 100;">
               <tr>
                 <th>Codigo</th>
-                <th>Categoría</th>
+                <th>Marca</th>
                 <th>Descripción</th>
                 <th>U.Med.</th>
                 <th>C.Unit.</th>
@@ -76,7 +76,8 @@
               </tr>
             </thead>
             <tbody class="font-size-base">
-              <tr *ngFor="let item of productos | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
+              <tr *ngFor="let item of productos | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize"
+                [class.producto-fila-inactiva]="!productoEstaActivo(item)">
                 <td>
     
                   <span>
@@ -84,7 +85,7 @@
                   </span>
                 </td>
                 <td>
-                  <span>{{item.categoria}} </span>
+                  <span>{{ item.marca || '—' }}</span>
                 </td>
                 <td>
                   <span>{{item.descripcion}}</span>
@@ -121,7 +122,15 @@
                       <a class="dropdown-item" *ngIf="item.idProducto && productosConImagenes" (click)="abrirGaleriaProducto(item)">
                         <i class="bi bi-images me-1"></i> Galería de imágenes
                       </a>
-                      <a style="cursor: pointer;" class="dropdown-item text-danger" *ngIf="item.idProducto" data-bs-toggle="modal"
+                      <a href="#" class="dropdown-item text-warning" *ngIf="item.idProducto && esAdministradorProductos() && productoEstaActivo(item)"
+                        (click)="desactivarProducto(item.idProducto); $event.preventDefault()">
+                        <i class="bi bi-eye-slash me-1"></i> Desactivar producto
+                      </a>
+                      <a href="#" class="dropdown-item text-success" *ngIf="item.idProducto && esAdministradorProductos() && !productoEstaActivo(item)"
+                        (click)="activarProducto(item.idProducto); $event.preventDefault()">
+                        <i class="bi bi-eye me-1"></i> Activar producto
+                      </a>
+                      <a style="cursor: pointer;" class="dropdown-item text-danger" *ngIf="item.idProducto && esAdministradorProductos()" data-bs-toggle="modal"
                         [attr.data-bs-target]="'#delete-'+item.idProducto">
                         <i class="bi bi-trash me-1"></i> Eliminar
                       </a>
@@ -167,12 +176,23 @@
                                 
                             </div>
                             <div class="modal-body">
-                                <p>Está seguro que desea este producto?.</p>
+                                <p>¿Está seguro que desea <strong>eliminar</strong> este producto? Esta acción no se puede deshacer.</p>
+                                <p *ngIf="productoEstaActivo(item)" class="text-muted small mb-0">
+                                  Si el sistema no permite borrarlo (ventas, compras u otros vínculos), use
+                                  <strong>Desactivar producto</strong>: seguirá en el listado tachado y no se mostrará al vender.
+                                </p>
                             </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
-                                <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold" (click)="setEliminar(item.idProducto)">Sí, Eliminar</button>
-                
+                            <div class="modal-footer flex-wrap gap-2 justify-content-end">
+                                <button type="button" class="btn btn-secondary font-weight-bold" data-bs-dismiss="modal">Cerrar</button>
+                                <button *ngIf="productoEstaActivo(item) && esAdministradorProductos() && desactivandoId !== item.idProducto && !load_estado" type="button"
+                                  class="btn btn-warning font-weight-bold" (click)="desactivarProducto(item.idProducto)">
+                                  <i class="bi bi-eye-slash me-1"></i> Desactivar (no eliminar)
+                                </button>
+                                <button *ngIf="desactivandoId === item.idProducto" type="button" class="btn btn-warning" disabled>
+                                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                  Desactivando…
+                                </button>
+                                <button *ngIf="!load_estado && desactivandoId !== item.idProducto" type="button" class="btn btn-danger font-weight-bold" (click)="setEliminar(item.idProducto)">Sí, eliminar</button>
                                 <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
                                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                     Eliminando...

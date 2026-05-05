@@ -1,2 +1,8 @@
-/* Modal minimalista */
+/* Modal minimalista: backdrop debajo del diálogo (orden DOM modal → backdrop) */
+:host .modal-backdrop {
+  z-index: 1050;
+}
+:host .modal {
+  z-index: 1055;
+}
 

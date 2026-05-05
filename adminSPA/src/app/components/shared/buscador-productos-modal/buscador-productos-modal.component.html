@@ -17,7 +17,7 @@
       />
     </div>
     <div class="col-12 col-lg-4">
-      <button type="button" class="btn btn-outline-light w-100" (click)="buscarProductos()">
+      <button type="button" class="btn btn-outline-light w-100" (click)="recargarProductosDesdeServidor()">
         <i class="bi bi-search"></i> Buscar
       </button>
     </div>
@@ -31,8 +31,9 @@
         <tr>
           <th *ngIf="productosConImagenes">Imagen</th>
           <th>Código</th>
-          <th>Categoría</th>
-          <th>Producto</th>
+          <th class="efaf-buscador-col-cat">Categoría</th>
+          <th class="efaf-buscador-col-marca">Marca</th>
+          <th class="efaf-buscador-col-desc">Producto</th>
           <th>U.Medida</th>
           <th>Precio</th>
           <th>Sucursal</th>
@@ -40,15 +41,16 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let p of productosFiltrados" role="button" class="table-row-hover" (click)="seleccionar(p)">
+        <tr *ngFor="let p of productosFiltrados" role="button" class="table-row-hover" [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p)" (click)="seleccionar(p)">
           <td *ngIf="productosConImagenes" class="align-middle p-1" (click)="$event.stopPropagation()">
             <div class="thumb-cell" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
               <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
             </div>
           </td>
           <td>{{ p.codigo }}</td>
-          <td>{{ p.categoria }}</td>
-          <td>{{ p.descripcion }}</td>
+          <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
+          <td class="efaf-buscador-col-marca" [title]="marcaColumna(p)">{{ marcaColumna(p) }}</td>
+          <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
           <td>{{ p.codigoPresentacion }}</td>
           <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
           <td>{{ p.sucursal }}</td>
@@ -60,7 +62,7 @@
 
   <!-- Móvil / tablet: tarjetas -->
   <div class="d-lg-none buscador-compra-cards" *ngIf="!loading">
-    <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productosFiltrados">
+    <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productosFiltrados" [class.efaf-buscador-card-sin-stock]="sinStockBusqueda(p)">
       <div class="d-flex gap-2 align-items-start">
         <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
           <div class="thumb-cell thumb-cell--card" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
@@ -73,7 +75,7 @@
             <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
           </div>
           <div class="small mt-1">{{ p?.descripcion }}</div>
-          <div class="small text-muted mt-1">{{ p?.categoria }} · {{ p?.codigoPresentacion }}</div>
+          <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumna(p) }} · {{ p?.codigoPresentacion }}</div>
           <div class="small d-flex justify-content-between mt-2">
             <span class="text-truncate me-1">{{ p?.sucursal }}</span>
             <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>

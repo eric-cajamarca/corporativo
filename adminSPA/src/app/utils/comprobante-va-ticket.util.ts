@@ -26,12 +26,17 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
   const itemsHtml = (d.items || [])
     .map((it) => {
       const alias = escapeHtmlVa(it.aliasEmpresa || '');
-      const desc = escapeHtmlVa(it.descripcion || it.codigo || 'Ítem');
+      const marcaRaw = String((it as { marca?: string }).marca || '').trim();
+      const descBase = String(it.descripcion || it.codigo || 'Ítem').trim();
+      const descConcat = marcaRaw && descBase ? `${descBase} - ${marcaRaw}` : descBase || marcaRaw || 'Ítem';
+      const desc = escapeHtmlVa(descConcat);
       const cod = escapeHtmlVa(it.codigo || '');
       const suc = escapeHtmlVa(it.sucursal || '');
-      const linea1 = alias ? `<span class="muted">${alias}</span> ` : '';
-      const lineaSuc = suc ? `<div class="muted tiny">${suc}</div>` : '';
-      const codPart = cod ? `<span class="muted tiny">${cod}</span> ` : '';
+      const linea1 = alias ? `<span class="ticket-secundario">${alias}</span> · ` : '';
+      const lineaSuc = suc
+        ? `<div class="item-suc ticket-secundario" aria-label="Sucursal">${suc}</div>`
+        : '';
+      const codPart = cod ? `<span class="ticket-secundario">${cod}</span> · ` : '';
       return `<div class="item-block">
         <div class="item-desc">${linea1}${codPart}${desc}${lineaSuc}</div>
         <div class="item-qty">${fmtN(it.cantidad)} × ${fmtN(it.pVenta)}</div>
@@ -63,9 +68,11 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
   * { box-sizing: border-box; }
   body {
     font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 10px;
     margin: 0;
     padding: 12px;
     background: #e9ecef;
+    color: #000000;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -75,28 +82,53 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     background: #fff;
     padding: 10px 12px 14px;
     box-shadow: 0 1px 6px rgba(0,0,0,.12);
+    color: #000000;
   }
   .center { text-align: center; }
   .logo-wrap { margin-bottom: 6px; }
   .logo-img { max-height: 44px; max-width: 100%; object-fit: contain; }
-  .empresa { font-weight: 700; font-size: 13px; line-height: 1.25; }
-  .ruc { font-size: 11px; margin-top: 2px; }
-  .dir { font-size: 9px; color: #444; margin-top: 4px; line-height: 1.2; }
+  .empresa { font-weight: 700; font-size: 10px; line-height: 1.25; color: #000; }
+  .ruc { font-size: 10px; margin-top: 2px; color: #000; }
+  .dir { font-size: 10px; color: #000; margin-top: 4px; line-height: 1.2; }
   .divider {
     border: none;
-    border-top: 1px dashed #222;
+    border-top: 1px dashed #000;
     margin: 8px 0;
   }
   .titulo-va {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: .04em;
     text-transform: uppercase;
+    color: #000;
   }
-  .comp-num { font-size: 15px; font-weight: 800; margin: 4px 0; }
-  .meta { font-size: 10px; color: #333; }
-  .muted { color: #666; font-size: 9px; }
-  .tiny { font-size: 8px; }
+  .comp-num { font-size: 11px; font-weight: 800; margin: 4px 0; color: #000; letter-spacing: 0.02em; }
+  .meta { font-size: 10px; color: #000; }
+  /**
+   * Secundario: siempre negro (#000) para impresora B/N.
+   * Jerarquía sin gris: tamaño 9px + cursiva + sangría/borde (el gris claro no se ve al imprimir).
+   */
+  .ticket-secundario {
+    color: #000;
+    font-size: 9px;
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.2;
+  }
+  .ticket-suc-cab {
+    color: #000;
+    font-size: 9px;
+    font-weight: 600;
+    font-style: normal;
+    margin-top: 3px;
+    letter-spacing: 0.02em;
+  }
+  .ticket-suc-cab .ticket-secundario { font-weight: 400; font-style: italic; }
+  .item-suc {
+    margin-top: 3px;
+    padding: 2px 0 0 6px;
+    border-left: 2px solid #000;
+  }
   .item-block {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -104,19 +136,21 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     gap: 0 6px;
     font-size: 10px;
     padding: 4px 0;
-    border-bottom: 1px dotted #ccc;
+    border-bottom: 1px dotted #000;
+    color: #000;
   }
   .item-desc { grid-column: 1 / -1; line-height: 1.25; }
-  .item-qty { color: #555; font-size: 9px; }
-  .item-tot { text-align: right; font-weight: 600; }
-  .totales { margin-top: 8px; font-size: 11px; }
+  .item-qty { color: #000; font-size: 10px; }
+  .item-tot { text-align: right; font-weight: 600; color: #000; }
+  .totales { margin-top: 8px; font-size: 10px; color: #000; }
   .totales .row { display: flex; justify-content: space-between; margin: 2px 0; }
   .total-final {
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 800;
     margin-top: 6px;
     padding-top: 6px;
     border-top: 2px solid #000;
+    color: #000;
   }
   .acciones {
     margin-top: 14px;
@@ -136,8 +170,11 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
   .btn-print { background: #0d6efd; color: #fff; }
   .btn-close { background: #6c757d; color: #fff; }
   @media print {
-    body { background: #fff; padding: 0; }
-    .ticket { box-shadow: none; max-width: none; width: 80mm; }
+    body { background: #fff; padding: 0; color: #000 !important; }
+    .ticket { box-shadow: none; max-width: none; width: 80mm; color: #000 !important; }
+    .ticket-secundario, .ticket-suc-cab, .item-suc, .meta, .empresa, .item-block, .item-qty, .item-tot {
+      color: #000 !important;
+    }
     .no-print { display: none !important; }
     @page { size: 80mm auto; margin: 2mm; }
   }
@@ -153,12 +190,12 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     <div class="center comp-num">${comp}</div>
     <div class="center meta">Destino: <strong>${tipoLabel}</strong></div>
     <div class="center meta">${escapeHtmlVa(d.venta.fEmision || '')}</div>
-    ${d.venta.sucursal ? `<div class="center meta tiny">Suc.: ${escapeHtmlVa(d.venta.sucursal)}</div>` : ''}
+    ${d.venta.sucursal ? `<div class="center ticket-suc-cab">Suc.: <span class="ticket-secundario">${escapeHtmlVa(d.venta.sucursal)}</span></div>` : ''}
     <hr class="divider"/>
     <div class="meta"><strong>Cliente</strong></div>
     <div class="meta">${escapeHtmlVa(d.cliente?.rSocial || d.cliente?.razonSocial || '—')}</div>
     <div class="meta">${escapeHtmlVa(d.cliente?.ruc || '')}</div>
-    ${d.cliente?.direccion ? `<div class="meta tiny">${escapeHtmlVa(d.cliente.direccion)}</div>` : ''}
+    ${d.cliente?.direccion ? `<div class="meta ticket-secundario">${escapeHtmlVa(d.cliente.direccion)}</div>` : ''}
     <hr class="divider"/>
     <div class="meta" style="margin-bottom:4px"><strong>Detalle</strong></div>
     ${itemsHtml}
@@ -168,7 +205,7 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
       <div class="row"><span>Descuentos</span><span>S/ ${fmtN(desc)}</span></div>
       <div class="row total-final"><span>TOTAL</span><span>S/ ${fmtN(d.venta.total)}</span></div>
     </div>
-    ${d.venta.observaciones ? `<div class="meta tiny" style="margin-top:6px">${escapeHtmlVa(d.venta.observaciones)}</div>` : ''}
+    ${d.venta.observaciones ? `<div class="meta ticket-secundario" style="margin-top:6px">${escapeHtmlVa(d.venta.observaciones)}</div>` : ''}
   </div>
   <div class="acciones no-print">
     <button type="button" class="btn btn-print" onclick="window.print()">Imprimir</button>

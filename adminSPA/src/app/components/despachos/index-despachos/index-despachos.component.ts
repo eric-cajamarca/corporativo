@@ -25,6 +25,7 @@ export interface DetalleVentaLinea {
   idProducto: string;
   productoCodigo: string;
   productoDescripcion: string;
+  productoMarca?: string;
   cantidad: number;
   cantEntregada: number;
   cantPendiente: number;
@@ -166,6 +167,8 @@ export class IndexDespachosComponent implements OnInit {
   cantADespacharPanel: Record<number, number> = {};
   enviandoCrear = false;
   generandoPdf = false;
+  /** Tras crear despacho, abrir ticket PDF si está marcado */
+  imprimirTicketAlCrearDespacho = true;
 
   // Delivery desde despacho
   modoEntregaPanel: 'RECOJO' | 'DELIVERY' = 'RECOJO';
@@ -637,6 +640,11 @@ export class IndexDespachosComponent implements OnInit {
         this.cerrarModalCrearDespacho();
         if (typeof iziToast !== 'undefined') iziToast.success({ title: 'Despacho creado', position: 'topRight' });
 
+        const idNuevoDespacho = res?.data?.idDespacho as string | undefined;
+        if (this.imprimirTicketAlCrearDespacho && idNuevoDespacho) {
+          this.imprimirTicketTrasCrearDespacho(idNuevoDespacho);
+        }
+
         if (this.modoEntregaPanel === 'DELIVERY') {
           const payload: any = {
             idVenta: String(r.venta.idVenta),
@@ -701,6 +709,153 @@ export class IndexDespachosComponent implements OnInit {
     this.router.navigate(['/ventas/create']);
   }
 
+  /**
+   * Ticket del despacho (productos despachados, fecha/hora). Usa detalle en caché o lo pide al API.
+   * @param event Opcional: usar stopPropagation si el clic está en el acordeón.
+   */
+  imprimirTicketDespachoUnico(
+    d: VentaDespachosResult['despachos'][number],
+    event?: Event
+  ): void {
+    event?.stopPropagation?.();
+    const cached = this.detallePorDespacho[d.idDespacho];
+    if (cached && cached.length > 0) {
+      this.emitirPdfTicketDespacho(cached, d);
+      return;
+    }
+    this.generandoPdf = true;
+    this.despachoService.obtenerDetalleDespacho(d.idDespacho).subscribe({
+      next: (res) => {
+        const list = (res?.data ?? []) as NonNullable<(typeof this.detallePorDespacho)[string]>;
+        if (!list.length) {
+          this.generandoPdf = false;
+          if (typeof iziToast !== 'undefined') {
+            iziToast.warning({ title: 'Sin líneas', message: 'No hay productos en este despacho para imprimir.', position: 'topRight' });
+          }
+          return;
+        }
+        this.detallePorDespacho[d.idDespacho] = list;
+        list.forEach((lin: { idDetalleDespacho: string; cantidadDespachada: number }) => {
+          this.cantADespacharEdicion[lin.idDetalleDespacho] = Number(lin.cantidadDespachada) || 0;
+          this.devolucionCantidadPorDetalle[lin.idDetalleDespacho] = 0;
+          this.devolucionNotasPorDetalle[lin.idDetalleDespacho] = '';
+        });
+        this.emitirPdfTicketDespacho(list, d);
+      },
+      error: () => {
+        this.generandoPdf = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: 'No se pudo cargar el detalle para imprimir.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  /** Tras crear despacho: cabecera desde tipo elegido y detalle recién persistido */
+  private imprimirTicketTrasCrearDespacho(idDespacho: string): void {
+    const tipoNombre =
+      this.tiposDespacho.find((t) => t.idTipoDespacho === this.idTipoDespachoPanel)?.nombre || 'Despacho';
+    this.generandoPdf = true;
+    this.despachoService.obtenerDetalleDespacho(idDespacho).subscribe({
+      next: (res) => {
+        const list = (res?.data ?? []) as Array<{
+          idDetalleDespacho: string;
+          productoCodigo: string;
+          productoDescripcion: string;
+          cantidadDespachada: number;
+          ubicacionOrigen?: string | null;
+          ubicacionDestino?: string | null;
+          fechaDespacho?: string | null;
+        }>;
+        if (!list.length) {
+          this.generandoPdf = false;
+          return;
+        }
+        const cab: VentaDespachosResult['despachos'][number] = {
+          idDespacho,
+          idVenta: this.resultado?.venta.idVenta ?? 0,
+          fechaDespacho: list[0]?.fechaDespacho || '',
+          estado: 'COMPLETADO',
+          observaciones: null,
+          tipoDespacho: tipoNombre,
+          usuarioDespacho: '',
+          totalLineas: list.length,
+          lineasDespachadas: list.length
+        };
+        this.emitirPdfTicketDespacho(list, cab);
+      },
+      error: () => {
+        this.generandoPdf = false;
+      }
+    });
+  }
+
+  private emitirPdfTicketDespacho(
+    lineas: Array<{
+      productoCodigo: string;
+      productoDescripcion: string;
+      cantidadDespachada: number;
+      ubicacionOrigen?: string | null;
+      ubicacionDestino?: string | null;
+    }>,
+    cab: VentaDespachosResult['despachos'][number]
+  ): void {
+    const r = this.resultado;
+    if (!r?.venta) {
+      this.generandoPdf = false;
+      return;
+    }
+    this.generandoPdf = true;
+    this.empresaService.getEmpresa$().subscribe({
+      next: (emp) => {
+        const empAny = emp as unknown as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa = {
+          logo: logoStr,
+          nombre: emp.nombre ?? '',
+          ruc: emp.ruc ?? '',
+          direccion: emp.direccion ?? '',
+          telefono: emp.telefono ?? ''
+        };
+        const venta = { ...r.venta };
+        const cliente = { razonSocial: r.venta.clienteRazonSocial || '', ruc: r.venta.clienteRuc || '' };
+        const items = lineas.map((lin) => ({
+          productoCodigo: lin.productoCodigo,
+          productoDescripcion: lin.productoDescripcion,
+          cantidadDespachada: lin.cantidadDespachada,
+          ubicaciones: lin.ubicacionOrigen || lin.ubicacionDestino || '—'
+        }));
+        const despacho = {
+          tipoDespacho: cab.tipoDespacho,
+          fechaDespacho: cab.fechaDespacho,
+          estado: cab.estado
+        };
+        const datos = {
+          empresa,
+          venta,
+          cliente,
+          items,
+          despacho,
+          titulo: 'Ticket de despacho',
+          columnas: ['Código', 'Descripción', 'Despachado', 'Ubicación']
+        };
+        const nombreArchivo = `ticket-despacho-${(r.venta.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
+        this.pdfService.generarPdfComprobanteDespacho(datos, 'ticket', nombreArchivo).subscribe({
+          next: (blob) => {
+            this.pdfService.previsualizar(blob);
+            this.generandoPdf = false;
+          },
+          error: () => {
+            this.generandoPdf = false;
+          }
+        });
+      },
+      error: () => {
+        this.generandoPdf = false;
+      }
+    });
+  }
+
   imprimirComprobanteDespacho(formato: 'A4' | 'A5' | 'ticket'): void {
     const r = this.resultado;
     if (!r?.venta || !r?.detalleVenta?.length) return;
@@ -721,6 +876,7 @@ export class IndexDespachosComponent implements OnInit {
         const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => ({
           productoCodigo: dv.productoCodigo,
           productoDescripcion: dv.productoDescripcion,
+          marca: dv.productoMarca,
           cantidad: dv.cantPendiente ?? dv.cantidad,
           ubicaciones: dv.ubicaciones || ''
         }));
@@ -778,6 +934,7 @@ export class IndexDespachosComponent implements OnInit {
         const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => ({
           productoCodigo: dv.productoCodigo,
           productoDescripcion: dv.productoDescripcion,
+          marca: dv.productoMarca,
           cantidad: dv.cantPendiente ?? dv.cantidad,
           ubicaciones: dv.ubicaciones || ''
         }));

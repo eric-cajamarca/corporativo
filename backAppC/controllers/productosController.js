@@ -407,6 +407,51 @@ const actualizar_producto = async function (req, res) {
   // }
 };
 
+/** PATCH /productos/:id/estado — solo Administrador (misma política que eliminar). */
+const actualizar_estado_producto = async function (req, res) {
+  const idProducto = req.params.id;
+  const idEmpresa = req.user && req.user.empresa;
+  const activo = req.body && req.body.activo;
+
+  if (!req.user) {
+    return res.status(500).send({ message: 'No Access', data: undefined });
+  }
+  if (req.user.rol !== 'Administrador') {
+    return res.status(403).send({
+      message: 'No tiene permisos para cambiar el estado del producto',
+      data: undefined,
+    });
+  }
+  if (activo === undefined) {
+    return res.status(400).send({ message: 'Envíe { "activo": true|false }', data: undefined });
+  }
+
+  try {
+    const resultado = await withPool(async (pool) =>
+      productosMutacionesService.actualizarEstadoProducto(pool, idProducto, idEmpresa, activo)
+    );
+    const ra = resultado && resultado.rowsAffected;
+    const filas =
+      Array.isArray(ra) ? ra.reduce((a, b) => a + (Number(b) || 0), 0) : Number(ra) || 0;
+    if (filas === 0) {
+      return res.status(404).send({
+        message: 'No se encontró el producto en su empresa o no hubo cambios.',
+        data: undefined,
+      });
+    }
+    res.status(200).send({ data: resultado.rowsAffected });
+  } catch (error) {
+    console.error('actualizar_estado_producto:', error);
+    res.status(500).send({
+      message:
+        error && error.message && String(error.message).length < 220
+          ? error.message
+          : 'Error al actualizar el estado del producto',
+      data: undefined,
+    });
+  }
+};
+
 const eliminar_producto = async function (req, res) {
   const idProducto = req.params.id;
   let idEmpresa = req.user.empresa;
@@ -420,12 +465,19 @@ const eliminar_producto = async function (req, res) {
 
         res.status(200).send({ data: productos.rowsAffected });
       } catch (error) {
-                res
-          .status(500)
-          .send({
-            message: "Error al eliminar los productos",
-            data: undefined,
-          });
+        console.error("eliminar_producto:", error);
+        const msg =
+          (error && error.message) ||
+          "Error al eliminar el producto.";
+        const conflicto =
+          typeof msg === "string" &&
+          (msg.includes("No se puede eliminar") ||
+            msg.includes("ventas o compras") ||
+            msg.includes("vinculado"));
+        res.status(conflicto ? 409 : 500).send({
+          message: msg,
+          data: undefined,
+        });
       }
     } else {
       res
@@ -537,5 +589,6 @@ module.exports = {
   crear_producto,
   gestionProductos_Compras,
   actualizar_producto,
+  actualizar_estado_producto,
   eliminar_producto,
 };

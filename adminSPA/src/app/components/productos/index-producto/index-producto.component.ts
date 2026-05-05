@@ -19,6 +19,7 @@ import { GestoresService } from '../../../services/gestores.service';
 import { ProductoGaleriaModalService } from '../../../services/producto-galeria-modal.service';
 import { ExcelService } from '../../../services/excel.service';
 import { ImportacionProductosValidarData, ImportacionProductosEjecutarData } from '../../../models/producto.models';
+import { AuthService } from '../../../services/auth.service';
 
 declare var iziToast: any;
  declare var bootstrap: any;
@@ -39,6 +40,8 @@ export class IndexProductoComponent {
   public token: any = "";
   public filtro = '';
   public load_estado = false;
+  /** Id de producto mientras se envía PATCH estado (desactivar/activar). */
+  public desactivandoId: string | null = null;
   /** Configuración inventario: galería de imágenes habilitada */
   public productosConImagenes = false;
 
@@ -94,6 +97,7 @@ export class IndexProductoComponent {
     private _productoGaleriaModal: ProductoGaleriaModalService,
     private _excelService: ExcelService,
     public sidebarState: SidebarStateService,
+    private _auth: AuthService,
   ) {
    // this.token = this._cookieService.get('token');
   }
@@ -259,6 +263,7 @@ export class IndexProductoComponent {
         incluye(item.codigo) ||
         incluye(item.descripcion) ||
         incluye(item.categoria) ||
+        incluye(item.marca) ||
         incluye(item.codigoPresentacion) ||
         incluye(item.fProduccion) ||
         incluye(item.fVencimiento) ||
@@ -287,43 +292,137 @@ export class IndexProductoComponent {
   }
 
 
-  setEliminar(id: string) {
-    this._productoService.eliminarProducto(id).subscribe(
-      (response: any) => {
-        if (response.data == undefined) {
-          iziToast.show({
-            title: 'ERROR',
-            titleColor: '#FF0000',
-            color: '#FFF',
-            class: 'text-danger',
-            position: 'topRight',
-            message: 'Error al eliminar el producto'
+  /** Solo administrador puede eliminar o cambiar estado (alineado con API). */
+  esAdministradorProductos(): boolean {
+    const r = this._auth.userData()?.rol;
+    return String(r ?? '').trim() === 'Administrador';
+  }
+
+  /** Catálogo activo (listado puede incluir inactivos con estilo distinto). */
+  productoEstaActivo(item: { estado?: unknown } | null | undefined): boolean {
+    if (!item) return true;
+    const e = item.estado;
+    if (e === undefined || e === null) return true;
+    if (e === true || e === 1 || e === '1') return true;
+    if (e === false || e === 0 || e === '0') return false;
+    return true;
+  }
+
+  desactivarProducto(idProducto: string): void {
+    this.desactivandoId = idProducto;
+    this._productoService.actualizarEstadoProducto(idProducto, false).subscribe({
+      next: () => {
+        this.desactivandoId = null;
+        this.cerrarModalEliminarProducto(idProducto);
+        this.initData();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Listo',
+            message: 'Producto desactivado. No aparecerá en el buscador de nueva venta.',
+            position: 'topRight'
           });
-          
-        } else {
-          this.initData();
+        }
+      },
+      error: (error: any) => {
+        this.desactivandoId = null;
+        console.error('Error al desactivar producto:', error);
+        const msg =
+          error?.error?.message ||
+          error?.message ||
+          'No se pudo desactivar el producto.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
+      }
+    });
+  }
 
-          // Cierra el modal manualmente
-          const modal = document.getElementById('.modal-backdrop');
-          const modalInstance = bootstrap.Modal.getInstance(modal);
-          modalInstance?.hide();
+  activarProducto(idProducto: string): void {
+    this.desactivandoId = idProducto;
+    this._productoService.actualizarEstadoProducto(idProducto, true).subscribe({
+      next: () => {
+        this.desactivandoId = null;
+        this.initData();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Listo', message: 'Producto activado.', position: 'topRight' });
+        }
+      },
+      error: (error: any) => {
+        this.desactivandoId = null;
+        console.error('Error al activar producto:', error);
+        const msg =
+          error?.error?.message ||
+          error?.message ||
+          'No se pudo activar el producto.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
+      }
+    });
+  }
 
-          // $('body').removeClass('modal-open');
-          // $('.modal-backdrop').remove();
-          // //habilitar el scroll en el body en el componente
-          // $('body').css('overflow-y', 'auto');
+  /** Indica si el backend reportó filas afectadas al eliminar */
+  private eliminacionProductoExitosa(data: unknown): boolean {
+    if (data === undefined || data === null) return false;
+    if (typeof data === 'number') return data > 0;
+    if (Array.isArray(data)) return data.some((n) => Number(n) > 0);
+    return true;
+  }
 
+  /** Cierra el modal Bootstrap de confirmación por id de producto */
+  private cerrarModalEliminarProducto(idProducto: string): void {
+    const el = document.getElementById(`delete-${idProducto}`);
+    if (!el || typeof bootstrap === 'undefined') return;
+    const inst = bootstrap.Modal.getInstance(el) ?? bootstrap.Modal.getOrCreateInstance(el);
+    inst.hide();
+  }
+
+  setEliminar(id: string): void {
+    this.load_estado = true;
+    this._productoService.eliminarProducto(id).subscribe({
+      next: (response: any) => {
+        this.load_estado = false;
+        this.cerrarModalEliminarProducto(id);
+
+        if (!this.eliminacionProductoExitosa(response?.data)) {
+          const msg =
+            (response?.message && String(response.message).trim()) ||
+            'No se pudo eliminar el producto (¿sin permisos de administrador o restricción en base de datos?).';
+          if (typeof iziToast !== 'undefined') {
+            iziToast.show({
+              title: 'ERROR',
+              titleColor: '#FF0000',
+              color: '#FFF',
+              class: 'text-danger',
+              position: 'topRight',
+              message: msg
+            });
+          }
+          return;
         }
 
+        this.initData();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Listo', message: 'Producto eliminado.', position: 'topRight' });
+        }
       },
-      (error: any) => {
+      error: (error: any) => {
+        this.load_estado = false;
+        this.cerrarModalEliminarProducto(id);
         console.error('Error al eliminar producto:', error);
+        const msg =
+          error?.error?.message ||
+          error?.message ||
+          'Error al eliminar el producto (p. ej. está referenciado en ventas o lotes).';
+        const hint =
+          error?.status === 409
+            ? ' Use «Desactivar producto» en Opciones si desea ocultarlo en ventas.'
+            : '';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg + hint, position: 'topRight' });
+        }
       }
-    );
-
-
-
-
+    });
   }
 
   onPageChange(newPage: number) {

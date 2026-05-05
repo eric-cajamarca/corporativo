@@ -731,10 +731,12 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         END AS descripcion,
         p.codigo,
         LTRIM(RTRIM(ISNULL(pr.descripcion, ''))) AS presentacion,
-        LTRIM(RTRIM(ISNULL(pr.codigo, ''))) AS presentacionCodigo
+        LTRIM(RTRIM(ISNULL(pr.codigo, ''))) AS presentacionCodigo,
+        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca
       FROM DetalleVenta dv
       INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = @idEmpresaVenta
       LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
       WHERE dv.idVenta = @idVenta
     `);
 
@@ -956,7 +958,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       subtotal: d.subtotal,
       total: d.total,
       presentacion: d.presentacion != null ? String(d.presentacion).trim() : '',
-      presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : ''
+      presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : '',
+      marca: d.marca != null ? String(d.marca).trim() : ''
     })),
     impuestos
   };
@@ -1766,8 +1769,11 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
         dva.idDetalleVA, dva.idProducto, dva.cantidad, dva.pVenta,
         dva.descuento, dva.subtotal, dva.total,
         dva.descripcionProducto, dva.codigoProducto,
-        dva.aliasEmpresa, dva.sucursal, dva.idEmpresaProducto
+        dva.aliasEmpresa, dva.sucursal, dva.idEmpresaProducto,
+        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca
       FROM DetalleVentaAgrupada dva
+      LEFT JOIN Productos p ON p.idProducto = dva.idProducto AND p.idEmpresa = dva.idEmpresaProducto
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
       WHERE dva.idVentaAgrupada = @idVentaAgrupada
       ORDER BY dva.idDetalleVA
     `);
@@ -1870,7 +1876,8 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       total: d.total,
       aliasEmpresa: d.aliasEmpresa || '',
       sucursal: d.sucursal || '',
-      idEmpresaProducto: d.idEmpresaProducto
+      idEmpresaProducto: d.idEmpresaProducto,
+      marca: d.marca != null ? String(d.marca).trim() : ''
     })),
     impuestos: impuestosVa
   };

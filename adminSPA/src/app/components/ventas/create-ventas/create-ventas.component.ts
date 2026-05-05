@@ -23,6 +23,7 @@ import { ModalPreciosComponent } from '../../modal-precios/modal-precios.compone
 import { ModalService } from '../../../services/modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
+import { marcaProductoEnLista, productoActivoParaVenta, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
 import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
@@ -486,7 +487,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
               this.productos = pr.data;
               this.productos_const = pr.data;
               this.stockSucursales_const = pr.data;
-              this.productos_filtrados = Array.isArray(pr.data) ? [...pr.data] : [];
+              this.buscarProductos();
             }
             this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
             this.actualizaTotales();
@@ -573,6 +574,13 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       linea.idEmpresa = String(match.idEmpresa);
       linea.aliasEmpresa = match.aliasEmpresa ?? match.razonSocialEmpresa ?? '';
     }
+    const marcaCat = marcaProductoEnLista(match as Record<string, unknown>);
+    if (marcaCat) {
+      (linea as Record<string, unknown>)['nombreMarca'] =
+        (match as Record<string, unknown>)['nombreMarca'] ??
+        (match as Record<string, unknown>)['marca'] ??
+        marcaCat;
+    }
   }
 
   /** Stock numérico del catálogo o null si no aplica. */
@@ -584,8 +592,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Modal buscar productos: sin stock o stock ≤ 0. */
   productoBusquedaSinStockSuficiente(p: any): boolean {
-    const s = this.stockNumericoProducto(p?.stock);
-    return s == null || s <= 0;
+    return productoSinStockEnBusqueda(p as Record<string, unknown>);
   }
 
   private obtenerStockDisponibleParaLineaCarrito(item: any): number | null {
@@ -720,13 +727,23 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.productos = response.data;
           this.productos_const = this.productos;
           this.stockSucursales_const = this.productos;
-          this.productos_filtrados = this.stockSucursales_const;
+          this.buscarProductos();
         }
       },
       error: (err) => {
         console.error('Error al cargar productos:', err);
       }
     });
+  }
+
+  /** Recarga catálogo desde BD y mantiene el texto del input (solo filtra de nuevo). */
+  recargarCatalogoProductosModal(): void {
+    this.cargarProductos({ evitarCache: true });
+  }
+
+  marcaColumnaVentas(p: any): string {
+    const t = marcaProductoEnLista(p as Record<string, unknown>);
+    return t || '—';
   }
 
   // Función para cargar todos los productos
@@ -737,7 +754,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.productos = response.data;
           this.productos_const = this.productos;
           this.stockSucursales_const = this.productos;
-          this.productos_filtrados = Array.isArray(this.stockSucursales_const) ? [...this.stockSucursales_const] : [];
+          this.buscarProductos();
         }
       },
       (error: any) => {
@@ -849,32 +866,35 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
+    const activos = (this.stockSucursales_const || []).filter((item: any) =>
+      productoActivoParaVenta(item as Record<string, unknown>)
+    );
     if (term === '') {
-      this.productos_filtrados = this.stockSucursales_const;
+      this.productos_filtrados = activos;
     } else {
-      this.productos_filtrados = this.stockSucursales_const.filter(
-        (item: any) => {
-          const descripcion = (item.descripcion ?? '').toString().toLowerCase();
-          const codigo = (item.codigo ?? '').toString().toLowerCase();
-          const marca = (item.nombre ?? '').toString().toLowerCase();
-          const alias = (item.aliasEmpresa ?? '').toString().toLowerCase();
-          const sucursal = (item.sucursal ?? '').toString().toLowerCase();
-          return (
-            descripcion.includes(term) ||
-            codigo.includes(term) ||
-            marca.includes(term) ||
-            alias.includes(term) ||
-            sucursal.includes(term)
-          );
-        }
-      );
+      this.productos_filtrados = activos.filter((item: any) => {
+        const descripcion = (item.descripcion ?? '').toString().toLowerCase();
+        const codigo = (item.codigo ?? '').toString().toLowerCase();
+        const marcaCol = marcaProductoEnLista(item as Record<string, unknown>).toLowerCase();
+        const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
+        const alias = (item.aliasEmpresa ?? '').toString().toLowerCase();
+        const sucursal = (item.sucursal ?? '').toString().toLowerCase();
+        return (
+          descripcion.includes(term) ||
+          codigo.includes(term) ||
+          marcaCol.includes(term) ||
+          marcaLegacy.includes(term) ||
+          alias.includes(term) ||
+          sucursal.includes(term)
+        );
+      });
     }
   }
 
   // Función para limpiar la búsqueda
   limpiarBusqueda(): void {
     this.searchTerm = '';
-    this.productos_filtrados = this.stockSucursales_const;
+    this.buscarProductos();
   }
 
   /** Retorna el idMediosPago de CONTADO para usar como valor por defecto. */

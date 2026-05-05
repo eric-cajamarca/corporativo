@@ -338,14 +338,9 @@
 /* Botón Agregar en detalle de pago */
 
 
-/* Stock insuficiente / sin stock: resaltado ámbar (buscador y carrito) */
-.create-ventas-buscador-row-stock-alerta td,
+/* Stock insuficiente / sin stock: resaltado ámbar (carrito; buscador usa estilos globales .efaf-buscador-*) */
 .create-ventas-row-stock-alerta td {
   background-color: #fff3cd !important;
-}
-.create-ventas-buscador-card-stock-alerta {
-  background-color: #fff3cd !important;
-  border-color: #ffc107 !important;
 }
 .create-ventas-cart-card-stock-alerta {
   background-color: #fff3cd;

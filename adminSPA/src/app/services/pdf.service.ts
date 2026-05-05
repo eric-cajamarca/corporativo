@@ -35,7 +35,7 @@ export class PdfService {
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,
-      { datos: payload, tipo: 'comprobante-venta', fontSize: formato === 'ticket' ? 8 : 10, formato },
+      { datos: payload, tipo: 'comprobante-venta', fontSize: 10, formato },
       { responseType: 'blob' }
     );
   }
@@ -53,9 +53,11 @@ export class PdfService {
   generarPdfComprobanteDespacho(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    /** Ticket térmico: 11px para legibilidad en recojo / almacén */
+    const fontTicket = 11;
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,
-      { datos: payload, tipo: 'comprobante-despacho', fontSize: formato === 'ticket' ? 8 : 10, formato },
+      { datos: payload, tipo: 'comprobante-despacho', fontSize: formato === 'ticket' ? fontTicket : 10, formato },
       { responseType: 'blob' }
     );
   }

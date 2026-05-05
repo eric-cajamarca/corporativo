@@ -109,3 +109,10 @@
   padding-top: 0.4rem;
   padding-bottom: 0.4rem;
 }
+
+/* Producto inactivo: tachado y texto naranja (sigue visible en administración) */
+.productos-tabla-compacta tbody tr.producto-fila-inactiva td {
+  color: #e65100;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}

@@ -21,6 +21,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { ConsultaXMLService } from '../../../services/consulta-xml.service';
+import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
 import { saveAs } from 'file-saver';
 import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
@@ -689,16 +690,14 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
 
     this._productoService.obtenerProductosCompras().subscribe(
       (response) => {
-                if (response.data != undefined) {
+        if (response.data != undefined) {
           this.productos = response.data;
-
-          // this.productos = response.data;
-          // console.log('this.productos como objeto',this.productos);
         }
         this.productos_const = this.productos;
-              },
+        this.buscarProductos();
+      },
       (error) => {
-              }
+      }
     );
 
     this._comprasService.obtener_correlativo_empresa().subscribe({
@@ -1909,27 +1908,48 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
 
   buscarProductos(): void {
     const term: string = this.searchTerm.toLowerCase().trim();
-        
     if (term === '') {
-      // Si no hay término de búsqueda, mostrar todos los productos
       this.productos_filtrados = this.productos_const;
-          } else {
-      // Filtrar por código o descripción (uso includes en lugar de test)
-      this.productos_filtrados = this.productos_const.filter(
-        (item: any) => {
-          const descripcion = (item.descripcion ?? '').toString().toLowerCase();
-          const codigo = (item.codigo ?? '').toString().toLowerCase();
-          const marca = (item.nombre ?? '').toString().toLowerCase();
-          return (
-            descripcion.includes(term) ||
-            codigo.includes(term) ||
-            marca.includes(term)
-          );
-        }
-      );
+    } else {
+      this.productos_filtrados = this.productos_const.filter((item: any) => {
+        const descripcion = (item.descripcion ?? '').toString().toLowerCase();
+        const codigo = (item.codigo ?? '').toString().toLowerCase();
+        const marcaCol = marcaProductoEnLista(item).toLowerCase();
+        const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
+        const categoria = (item.categoria ?? '').toString().toLowerCase();
+        return (
+          descripcion.includes(term) ||
+          codigo.includes(term) ||
+          marcaCol.includes(term) ||
+          marcaLegacy.includes(term) ||
+          categoria.includes(term)
+        );
+      });
     }
-    
-      }
+  }
+
+  /** Vuelve a cargar productos desde BD y reaplica el filtro sin tocar el input. */
+  recargarProductosModalCompras(): void {
+    this._productoService.obtenerProductosCompras({ evitarCache: true }).subscribe({
+      next: (response) => {
+        if (response.data != undefined) {
+          this.productos = response.data;
+        }
+        this.productos_const = this.productos;
+        this.buscarProductos();
+      },
+      error: () => {}
+    });
+  }
+
+  marcaColumnaCompras(p: any): string {
+    const t = marcaProductoEnLista(p as Record<string, unknown>);
+    return t || '—';
+  }
+
+  productoSinStockEnBusquedaModal(p: unknown): boolean {
+    return productoSinStockEnBusqueda(p as Record<string, unknown>);
+  }
 
   agregarDetallesCompra(producto: any): void {
     const idSucursal =

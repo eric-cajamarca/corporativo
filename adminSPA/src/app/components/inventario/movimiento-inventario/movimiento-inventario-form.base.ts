@@ -41,7 +41,6 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   form: FormGroup;
   tiposMovimiento: TipoMovimientoItem[] = [];
   sucursales: { idSucursal?: string; nombre?: string }[] = [];
-  productos: { idProducto?: string; codigo?: string; descripcion?: string; nombre?: string }[] = [];
   comprobantesInventario: { idComprobante?: string; codigo?: string; nombre?: string; serie?: string; numero?: string | number }[] = [];
   filas: FilaDetalle[] = [];
   movimientosRecientes: MovimientoInventarioCabecera[] = [];
@@ -82,7 +81,6 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
   ngOnInit(): void {
     this.cargarTipos();
     this.cargarSucursales();
-    this.cargarProductos();
     this.cargarComprobantesInventario();
     this.cargarMovimientosRecientes();
     this.form.get('tipoMovimiento')?.valueChanges.subscribe((tipo) => {
@@ -164,16 +162,6 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
         this.sucursales = res?.data || [];
       },
       error: () => iziToast.error({ title: 'Error', message: 'No se pudieron cargar sucursales', position: 'topRight' })
-    });
-  }
-
-  cargarProductos(): void {
-    this.productoService.obtenerProductosTodos().subscribe({
-      next: (res) => {
-        const data = res?.data;
-        this.productos = Array.isArray(data) ? data : data ? [data] : [];
-      },
-      error: () => iziToast.error({ title: 'Error', message: 'No se pudieron cargar productos', position: 'topRight' })
     });
   }
 
@@ -260,7 +248,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     if (!creado) {
       return;
     }
-    this.cargarProductos();
+    this.productoService.limpiarCacheListaProductos();
     const idSuc = creado.idSucursalLote;
     const sucCtrl = this.form.get('idSucursal');
     if (idSuc && (!sucCtrl?.value || sucCtrl.value === '')) {
@@ -307,22 +295,25 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     }
     fila.idProducto = String(p.idProducto);
     fila.codigo = p.codigo || '';
-    fila.descripcion = p.descripcion || '';
+    const nombreAlt = p['nombre'];
+    fila.descripcion = String(
+      p.descripcion || (typeof nombreAlt === 'string' ? nombreAlt : '') || ''
+    ).trim();
     if (!fila.cantidad || fila.cantidad <= 0) {
       fila.cantidad = 1;
     }
+    this.productoService.limpiarCacheListaProductos();
   }
 
   quitarFila(index: number): void {
     this.filas.splice(index, 1);
   }
 
-  onProductoChange(index: number, idProducto: string): void {
-    const p = this.productos.find((x) => x.idProducto === idProducto);
-    if (p) {
-      this.filas[index].codigo = p.codigo || '';
-      this.filas[index].descripcion = p.descripcion || p.nombre || '';
-    }
+  /** Descripción mostrada en el detalle (viene del buscador o del alta de producto). */
+  descripcionProductoEnFila(f: FilaDetalle): string {
+    const t = (f.descripcion || '').trim();
+    if (t) return t;
+    return f.idProducto ? 'Producto' : '';
   }
 
   get subTotal(): number {

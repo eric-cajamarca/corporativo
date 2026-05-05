@@ -27,7 +27,18 @@
 
 
 
+/* Área de tabla: alto fijo 600px y scroll interno; cabecera pegajosa al desplazar */
+.stock-tabla-scroll-wrap {
+  height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .stock-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   background: #1a3a5c;
   color: #fff;
   font-weight: 600;
@@ -36,6 +47,7 @@
   letter-spacing: 0.03em;
   border: none;
   vertical-align: middle;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
 }
 
 .stock-table tbody td {

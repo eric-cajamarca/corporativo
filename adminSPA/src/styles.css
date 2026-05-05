@@ -1,11 +1,9 @@
 /**
  * Modales apilados (p. ej. NgbModal encima de Bootstrap Modal en compras).
- * Sin esto, el segundo backdrop/diálogo puede quedar por debajo o el foco queda atrapado en el modal inferior.
+ * No usar `.modal.show ~ .modal-backdrop`: en muchos templates el backdrop va *después* del `.modal`
+ * y subir su z-index dejaba el oscurecido encima del diálogo (modal “deshabilitado”).
+ * Si hace falta otro nivel, use clases por pantalla (p. ej. :host en index-caja) o backdropClass en NgbModal.
  */
-.modal.show ~ .modal-backdrop.show {
-  z-index: 1060 !important;
-}
-
 .modal.show ~ .modal.show {
   z-index: 1065 !important;
 }
@@ -73,4 +71,37 @@
 /* Cinta de avisos bajo el navbar: evita que el contenido quede tapado (altura ~2.75rem + borde) */
 body.app-has-banner-ribbon .main-content {
   margin-top: calc(64px + 2.85rem);
+}
+
+/* Búsqueda de productos (modales): categoría y marca angostas con ellipsis; más ancho para descripción */
+th.efaf-buscador-col-cat,
+td.efaf-buscador-col-cat {
+  max-width: 9rem;
+  width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+th.efaf-buscador-col-marca,
+td.efaf-buscador-col-marca {
+  max-width: 7rem;
+  width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+th.efaf-buscador-col-desc,
+td.efaf-buscador-col-desc {
+  min-width: 12rem;
+}
+
+/* Sin stock en listado de búsqueda (fila tabla / tarjeta móvil) */
+.efaf-buscador-row-sin-stock td {
+  background-color: #fff3cd !important;
+}
+.efaf-buscador-card-sin-stock {
+  background-color: #fff3cd !important;
+  border-color: #ffc107 !important;
 }

@@ -108,42 +108,64 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 
-// Middleware CORS - M?s restrictivo para producci?n
+/**
+ * Orígenes explícitos (FRONTEND_URL, localhost, CORS_EXTRA_ORIGINS coma-separada).
+ */
+function buildStaticAllowedOrigins() {
+  const extra = (process.env.CORS_EXTRA_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return [
+    'http://localhost:4200',
+    'http://127.0.0.1:4200',
+    process.env.FRONTEND_URL,
+    ...extra
+  ].filter(Boolean);
+}
+
+/**
+ * En desarrollo: permitir front servido desde IP de LAN (otra PC / ng serve --host).
+ * No aplica en production.
+ */
+function isPrivateNetworkDevOrigin(origin) {
+  if (process.env.NODE_ENV === 'production') return false;
+  if (process.env.CORS_ALLOW_LAN === '0') return false;
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const h = u.hostname;
+    if (h === 'localhost' || h === '127.0.0.1') return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Middleware CORS: lista explícita + LAN en desarrollo (ver .env.example)
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permitir requests sin origin (como mobile apps)
     if (!origin) return callback(null, true);
 
-    const allowedOrigins = [
-      'http://localhost:4200',  // Desarrollo
-      'http://127.0.0.1:4200',  // Desarrollo alternativo
-      process.env.FRONTEND_URL  // Variable de entorno para producci?n
-    ].filter(Boolean); // Remover valores undefined
-
+    const allowedOrigins = buildStaticAllowedOrigins();
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, true);
     }
+    if (isPrivateNetworkDevOrigin(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  maxAge: 86400 // Cache preflight por 24 horas
+  maxAge: 86400
 };
 
 app.use(cors(corsOptions));
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-
-  // res.header('Access-Control-Allow-Headers', 'Authorization, X-API-KEY, Origin, X-Requested-With, Content-Type, Access-Control-Allow-Request-Method');
-  // res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
-  // res.header('Allow', 'GET, PUT, POST, DELETE, OPTIONS');
-  next();
-});
 
 // Ruta de prueba para conexi?n a DB
 app.get('/database', async (req, res) => {

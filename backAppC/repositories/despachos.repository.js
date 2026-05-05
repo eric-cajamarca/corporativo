@@ -331,13 +331,15 @@ exports.obtenerDetalleVentaParaDespachoRepo = async (pool, idEmpresa, idVenta) =
       dv.idProducto,
       p.codigo AS productoCodigo,
       p.descripcion AS productoDescripcion,
+      LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS productoMarca,
       dv.cantidad,
       ISNULL(dv.cantEntregada, 0) AS cantEntregada,
       (dv.cantidad - ISNULL(dv.cantEntregada, 0)) AS cantPendiente,
       v.idSucursal
     FROM DetalleVenta dv
-    INNER JOIN Productos p ON p.idProducto = dv.idProducto
     INNER JOIN Ventas v ON v.idVenta = dv.idVenta AND v.idEmpresa = @idEmpresa
+    INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = v.idEmpresa
+    LEFT JOIN Marcas m ON m.idMarca = p.idMarca
     WHERE dv.idVenta = @idVenta
     ORDER BY p.descripcion
   `);

@@ -18,6 +18,7 @@ import { ProveedoresService } from '../../../services/proveedores.service';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
+import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -413,11 +414,39 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
           }
         }
         this.productos_const = this.productos;
+        this.buscarProductos();
       },
       (error: any) => {
         console.error('Error al cargar productos:', error);
       }
     );
+  }
+
+  recargarProductosModalUpdateCompras(): void {
+    this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe(
+      (response: any) => {
+        if (response.data != undefined) {
+          this.productos = response.data;
+          if (this.detalleCompras?.length) {
+            this.llenarDetalleCompras();
+          }
+        }
+        this.productos_const = this.productos;
+        this.buscarProductos();
+      },
+      (error: any) => {
+        console.error('Error al cargar productos:', error);
+      }
+    );
+  }
+
+  marcaColumnaUpdateCompras(p: any): string {
+    const t = marcaProductoEnLista(p as Record<string, unknown>);
+    return t || '—';
+  }
+
+  productoSinStockEnBusquedaModal(p: unknown): boolean {
+    return productoSinStockEnBusqueda(p as Record<string, unknown>);
   }
 
   obtenerStockSucursal() {
@@ -682,8 +711,16 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
       this.productos_filtrados = (this.productos_const || []).filter((item: any) => {
         const descripcion = (item.descripcion ?? '').toString().toLowerCase();
         const codigo = (item.codigo ?? '').toString().toLowerCase();
-        const marca = (item.marca ?? '').toString().toLowerCase();
-        return descripcion.includes(term) || codigo.includes(term) || marca.includes(term);
+        const marcaCol = marcaProductoEnLista(item).toLowerCase();
+        const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
+        const categoria = (item.categoria ?? '').toString().toLowerCase();
+        return (
+          descripcion.includes(term) ||
+          codigo.includes(term) ||
+          marcaCol.includes(term) ||
+          marcaLegacy.includes(term) ||
+          categoria.includes(term)
+        );
       });
     }
   }

@@ -84,6 +84,7 @@
                       <th>Item</th>
                       <th *ngIf="esGestora">Empresa</th>
                       <th>Código</th>
+                      <th>Marca</th>
                       <th>Producto</th>
                       <th>U.Medida</th>
                       <th>Cantidad</th>
@@ -100,6 +101,7 @@
                         <span class="badge bg-info text-dark">{{ item.aliasEmpresa || '' }}</span>
                       </td>
                       <td>{{ item.codigo }}</td>
+                      <td>{{ marcaColumnaVentas(item) }}</td>
                       <td style="width: 400px; text-align: left; " [attr.contenteditable]="item.permiteDescripcionEnVenta ? true : null" class="editable"
                       [class.text-muted]="!item.permiteDescripcionEnVenta"
                       (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}
@@ -155,6 +157,7 @@
                   </div>
                   <div class="small text-muted mb-1">Producto</div>
                   <div [attr.contenteditable]="item.permiteDescripcionEnVenta ? true : null" class="editable create-ventas-cart-desc mb-2" [class.text-muted]="!item.permiteDescripcionEnVenta" (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}</div>
+                  <div class="small mb-2"><span class="text-muted">Marca</span> {{ marcaColumnaVentas(item) }}</div>
                   <div class="row g-2 small">
                     <div class="col-6">
                       <span class="text-muted">U.Medida</span>
@@ -280,7 +283,7 @@
               (input)="buscarProductos()">
           </div>
           <div class="col-12 col-lg-4">
-            <button type="button" class="btn btn-outline-light w-100" (click)="buscarProductos()">
+            <button type="button" class="btn btn-outline-light w-100" (click)="recargarCatalogoProductosModal()">
               <i class="bi bi-search"></i> Buscar
             </button>
           </div>
@@ -293,8 +296,9 @@
                 <th *ngIf="productosConImagenes">Imagen</th>
                 <th *ngIf="muestraEmpresaEnBuscadorVentas()">Empresa</th>
                 <th>Código</th>
-                <th>Categoría</th>
-                <th>Producto</th>
+                <th class="efaf-buscador-col-cat">Categoría</th>
+                <th class="efaf-buscador-col-marca">Marca</th>
+                <th class="efaf-buscador-col-desc">Producto</th>
                 <th>U.Medida</th>
                 <th>Precio</th>
                 <th>Sucursal</th>
@@ -302,7 +306,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover" [class.create-ventas-buscador-row-stock-alerta]="productoBusquedaSinStockSuficiente(p)" (click)="seleccionaProducto(p)">
+              <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover" [class.efaf-buscador-row-sin-stock]="productoBusquedaSinStockSuficiente(p)" (click)="seleccionaProducto(p)">
                 <td *ngIf="productosConImagenes" class="align-middle" (click)="$event.stopPropagation()">
                   <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
                     (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
@@ -314,8 +318,9 @@
                   <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
                 </td>
                 <td>{{ p.codigo }}</td>
-                <td>{{ p.categoria }}</td>
-                <td>{{ p.descripcion }}</td>
+                <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
+                <td class="efaf-buscador-col-marca" [title]="marcaColumnaVentas(p)">{{ marcaColumnaVentas(p) }}</td>
+                <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
                 <td>{{ p.codigoPresentacion }}</td>
                 <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                 <td>{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</td>
@@ -326,7 +331,7 @@
         </div>
 
         <div class="d-lg-none buscador-compra-cards">
-          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados" [class.create-ventas-buscador-card-stock-alerta]="productoBusquedaSinStockSuficiente(p)">
+          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados" [class.efaf-buscador-card-sin-stock]="productoBusquedaSinStockSuficiente(p)">
             <div class="d-flex gap-2 align-items-start">
               <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
                 <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
@@ -342,7 +347,7 @@
                 </div>
                 <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorVentas()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
                 <div class="small mt-1">{{ p?.descripcion }}</div>
-                <div class="small text-muted mt-1">{{ p?.categoria }} · {{ p?.codigoPresentacion }}</div>
+                <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaVentas(p) }} · {{ p?.codigoPresentacion }}</div>
                 <div class="small d-flex justify-content-between mt-2">
                   <span class="text-truncate me-1">{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</span>
                   <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>

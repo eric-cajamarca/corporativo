@@ -11,6 +11,7 @@ import { HotelService, type Reserva, type ProductoHabitacion, type ConsumoHabita
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
+import { productoActivoParaVenta } from '../../../utils/producto-busqueda.util';
 
 type EstadoReserva = 'vigente' | 'sin_efecto';
 
@@ -176,7 +177,9 @@ export class VentasHotelesComponent implements OnInit {
     this.productoService.obtenerProductosTodos().subscribe({
       next: (r) => {
         const data = (r as { data?: unknown[] }).data ?? [];
-        this.productosParaConsumo = data.map((p: unknown) => this.mapearProductoParaConsumo(p));
+        this.productosParaConsumo = data
+          .filter((p: unknown) => productoActivoParaVenta(p as Record<string, unknown>))
+          .map((p: unknown) => this.mapearProductoParaConsumo(p));
         this.showModalConsumo.set(true);
       },
       error: () => { this.productosParaConsumo = []; this.showModalConsumo.set(true); }
@@ -225,6 +228,20 @@ export class VentasHotelesComponent implements OnInit {
         return descripcion.includes(term) || codigo.includes(term) || categoria.includes(term);
       });
     }
+  }
+
+  /** Recarga catálogo desde BD y reaplica el filtro del input (p. ej. producto recién creado). */
+  recargarProductosConsumoDesdeServidor(): void {
+    this.productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+      next: (r) => {
+        const data = (r as { data?: unknown[] }).data ?? [];
+        this.productosParaConsumo = data
+          .filter((p: unknown) => productoActivoParaVenta(p as Record<string, unknown>))
+          .map((p: unknown) => this.mapearProductoParaConsumo(p));
+        this.buscarProductosConsumo();
+      },
+      error: () => {}
+    });
   }
 
   seleccionarProductoConsumo(p: ProductoParaConsumo): void {
@@ -288,7 +305,9 @@ export class VentasHotelesComponent implements OnInit {
     this.productoService.obtenerProductosTodos().subscribe({
       next: (r) => {
         const data = (r as { data?: unknown[] }).data ?? [];
-        this.productosParaConsumo = data.map((p: unknown) => this.mapearProductoParaConsumo(p));
+        this.productosParaConsumo = data
+          .filter((p: unknown) => productoActivoParaVenta(p as Record<string, unknown>))
+          .map((p: unknown) => this.mapearProductoParaConsumo(p));
       },
       error: () => {}
     });

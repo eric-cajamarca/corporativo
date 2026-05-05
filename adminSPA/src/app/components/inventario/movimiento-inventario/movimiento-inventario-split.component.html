@@ -139,18 +139,17 @@
             <tbody>
               @for (fila of filas; track $index) {
                 <tr>
-                  <td>
-                    <select
-                      class="form-select form-select-sm"
-                      [ngModel]="fila.idProducto"
-                      [ngModelOptions]="{ standalone: true }"
-                      (ngModelChange)="fila.idProducto = $event; onProductoChange($index, $event)"
-                    >
-                      <option value="">-- Producto --</option>
-                      @for (p of productos; track p.idProducto) {
-                        <option [value]="p.idProducto">{{ p.descripcion || p.nombre }} ({{ p.codigo || 'N/D' }})</option>
+                  <td class="mov-inv-celda-producto">
+                    @if (fila.idProducto) {
+                      @if (fila.codigo) {
+                        <div class="text-muted small text-uppercase mb-0">{{ fila.codigo }}</div>
                       }
-                    </select>
+                      <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
+                    } @else {
+                      <span class="text-muted small mov-inv-celda-producto-placeholder">
+                        Use <strong>Buscar producto</strong> o <strong>Crear producto</strong> para asignar esta línea.
+                      </span>
+                    }
                   </td>
                   <td>
                     <input
@@ -210,17 +209,18 @@
                   </button>
                 </div>
                 <label class="form-label small mb-1">Producto <span class="text-danger">*</span></label>
-                <select
-                  class="form-select form-select-sm mb-2"
-                  [ngModel]="fila.idProducto"
-                  [ngModelOptions]="{ standalone: true }"
-                  (ngModelChange)="fila.idProducto = $event; onProductoChange($index, $event)"
-                >
-                  <option value="">-- Producto --</option>
-                  @for (p of productos; track p.idProducto) {
-                    <option [value]="p.idProducto">{{ p.descripcion || p.nombre }} ({{ p.codigo || 'N/D' }})</option>
+                <div class="border rounded bg-light px-2 py-2 mb-2 small mov-inv-celda-producto">
+                  @if (fila.idProducto) {
+                    @if (fila.codigo) {
+                      <div class="text-muted text-uppercase mb-0">{{ fila.codigo }}</div>
+                    }
+                    <div class="fw-medium">{{ descripcionProductoEnFila(fila) }}</div>
+                  } @else {
+                    <span class="text-muted mov-inv-celda-producto-placeholder">
+                      Use <strong>Buscar producto</strong> o <strong>Crear producto</strong>.
+                    </span>
                   }
-                </select>
+                </div>
                 <label class="form-label small mb-1">Cantidad <span class="text-danger">*</span></label>
                 <input
                   type="number"

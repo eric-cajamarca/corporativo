@@ -1,4 +1,4 @@
-import { Component, OnInit, Optional, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, Optional, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -60,7 +60,7 @@ interface Sucursal {
   templateUrl: './create-producto.component.html',
   styleUrl: './create-producto.component.css'
 })
-export class CreateProductoComponent implements OnInit {
+export class CreateProductoComponent implements OnInit, OnDestroy {
   // Formulario
   productoForm!: FormGroup;
   
@@ -98,8 +98,8 @@ export class CreateProductoComponent implements OnInit {
   resultadosBusqueda: any[] = [];
   mostrarResultados = false;
   buscandoProducto = false;
-  private todosProductos: any[] = [];
-  private productosYaCargados = false;
+  /** Debounce para consultar catálogo en servidor sin un cache obsoleto en memoria. */
+  private busquedaCopiarTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** true cuando se abre como modal (desde ProductoCrearModalService) */
   esModal = false;
@@ -129,6 +129,13 @@ export class CreateProductoComponent implements OnInit {
     public sidebarState: SidebarStateService
   ) {
     this.esModal = !!this.activeModal;
+  }
+
+  ngOnDestroy(): void {
+    if (this.busquedaCopiarTimer != null) {
+      clearTimeout(this.busquedaCopiarTimer);
+      this.busquedaCopiarTimer = null;
+    }
   }
 
   ngOnInit(): void {
@@ -374,8 +381,7 @@ export class CreateProductoComponent implements OnInit {
             message: 'Producto creado correctamente',
             position: 'topRight'
           });
-          this.productosYaCargados = false;
-          this.todosProductos = [];
+          this.productoService.limpiarCacheListaProductos();
           if (this.productosConImagenes && idProducto) {
             this.idProductoCreado = idProducto;
             this.imagenesProducto = [];
@@ -476,42 +482,57 @@ export class CreateProductoComponent implements OnInit {
   }
 
   buscarProductoBase(): void {
-    const texto = this.textoBusqueda.trim().toLowerCase();
-    if (texto.length < 2) {
+    if (this.busquedaCopiarTimer != null) {
+      clearTimeout(this.busquedaCopiarTimer);
+      this.busquedaCopiarTimer = null;
+    }
+
+    const textoRaw = this.textoBusqueda.trim();
+    if (textoRaw.length < 2) {
       this.resultadosBusqueda = [];
       this.mostrarResultados = false;
+      this.buscandoProducto = false;
       return;
     }
 
-    if (this.productosYaCargados) {
-      this.filtrarProductos(texto);
-      return;
-    }
+    const texto = textoRaw.toLowerCase();
+    this.busquedaCopiarTimer = setTimeout(() => {
+      this.busquedaCopiarTimer = null;
+      this.consultarProductosParaCopiarDesdeServidor(texto);
+    }, 320);
+  }
 
+  /**
+   * Lista siempre desde API (evitarCache) para incluir productos recién dados de alta
+   * y no depender de la copia en memoria del ProductoService.
+   */
+  private consultarProductosParaCopiarDesdeServidor(texto: string): void {
     this.buscandoProducto = true;
-    this.productoService.obtenerProductosTodos().subscribe({
+    this.productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
       next: (res) => {
-        this.todosProductos = Array.isArray(res.data) ? res.data : [];
-        this.productosYaCargados = true;
+        const lista = Array.isArray(res.data) ? res.data : [];
         this.buscandoProducto = false;
-        this.filtrarProductos(texto);
+        this.resultadosBusqueda = this.filtrarListaProductos(lista, texto);
+        this.mostrarResultados = this.resultadosBusqueda.length > 0;
       },
       error: () => {
         this.buscandoProducto = false;
+        this.resultadosBusqueda = [];
+        this.mostrarResultados = false;
       }
     });
   }
 
-  private filtrarProductos(texto: string): void {
-    this.resultadosBusqueda = this.todosProductos
-      .filter((p: any) =>
-        (p.descripcion || '').toLowerCase().includes(texto) ||
-        (p.codigo || '').toLowerCase().includes(texto) ||
-        (p.categoria || '').toLowerCase().includes(texto) ||
-        (p.marca || '').toLowerCase().includes(texto)
+  private filtrarListaProductos(lista: any[], texto: string): any[] {
+    return lista
+      .filter(
+        (p: any) =>
+          (p.descripcion || '').toLowerCase().includes(texto) ||
+          (p.codigo || '').toLowerCase().includes(texto) ||
+          (p.categoria || '').toLowerCase().includes(texto) ||
+          (p.marca || '').toLowerCase().includes(texto)
       )
       .slice(0, 10);
-    this.mostrarResultados = this.resultadosBusqueda.length > 0;
   }
 
   seleccionarProductoBase(producto: any): void {

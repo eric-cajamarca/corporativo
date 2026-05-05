@@ -77,6 +77,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
             p.tipoProducto,
             p.fProduccion,
             p.fVencimiento,
+            p.estado,
             ISNULL(e.alias, e.nombreComercial) as aliasEmpresa,
             e.razon_Social as razonSocialEmpresa
         FROM (
@@ -91,6 +92,49 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
         INNER JOIN Empresas e ON ss.idEmpresa = e.idEmpresa
         WHERE ss.idEmpresa IN (${inClause})
+
+        UNION ALL
+
+        SELECT 
+            p.idProducto,
+            p.idEmpresa,
+            p.codigo,
+            p.idCategoria,
+            c2.nombre as categoria,
+            p.descripcion,
+            ISNULL(p.permiteDescripcionEnVenta, 0) AS permiteDescripcionEnVenta,
+            p.idMarca,
+            m2.nombre as marca,
+            p.idPresentacion,
+            pr2.codigo as codigoPresentacion,
+            pr2.descripcion as descripcionPres,
+            def.idSucursal,
+            s2.nombre as sucursal,
+            p.cUnitario,
+            CAST(0 AS DECIMAL(18, 3)) AS stock,
+            p.tipoProducto,
+            p.fProduccion,
+            p.fVencimiento,
+            p.estado,
+            ISNULL(e2.alias, e2.nombreComercial) as aliasEmpresa,
+            e2.razon_Social as razonSocialEmpresa
+        FROM Productos p
+        INNER JOIN Categorias c2 ON p.idCategoria = c2.idCategoria
+        INNER JOIN Presentacion pr2 ON p.idPresentacion = pr2.idPresentacion
+        INNER JOIN Marcas m2 ON p.idMarca = m2.idMarca
+        INNER JOIN Empresas e2 ON p.idEmpresa = e2.idEmpresa
+        CROSS APPLY (
+          SELECT TOP 1 su.idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+          ORDER BY su.nombre
+        ) def
+        INNER JOIN Sucursal s2 ON s2.idSucursal = def.idSucursal
+        WHERE p.idEmpresa IN (${inClause})
+        AND NOT EXISTS (
+          SELECT 1 FROM Lotes l
+          WHERE l.idProducto = p.idProducto AND l.idEmpresa = p.idEmpresa
+        )
       `);
 
     // Obtener precios por separado
@@ -164,6 +208,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
         tipoProducto: producto.tipoProducto,
         fProduccion: producto.fProduccion,
         fVencimiento: producto.fVencimiento,
+        estado: !!(producto.estado === true || producto.estado === 1),
         precios: preciosProducto,
         aliasEmpresa: producto.aliasEmpresa || '',
         razonSocialEmpresa: producto.razonSocialEmpresa || '',
@@ -620,12 +665,126 @@ exports.insertarProductoCompraValores = async (transaction, detalle) => {
     );
 };
 
-exports.eliminarProductoPorId = async (pool, idProducto, idEmpresa) => {
-  return pool
+/**
+ * Cuenta líneas en ventas o compras que impiden borrar el producto (integridad documental).
+ * @param {import('mssql').Transaction} transaction
+ */
+exports.contarLineasHistoricasVentasCompras = async (transaction, idProducto, idEmpresa) => {
+  const r = await transaction
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT
+        ISNULL((
+          SELECT COUNT_BIG(1) FROM DetalleVenta dv
+          INNER JOIN Ventas v ON v.idVenta = dv.idVenta
+          WHERE dv.idProducto = @idProducto AND v.idEmpresa = @idEmpresa
+        ), 0)
+        + ISNULL((
+          SELECT COUNT_BIG(1) FROM DetalleCompras dc
+          INNER JOIN Compras c ON c.idCompra = dc.idCompra AND c.idEmpresa = dc.idEmpresa
+          WHERE dc.idProducto = @idProducto AND c.idEmpresa = @idEmpresa
+        ), 0) AS n
+    `);
+  return Number(r.recordset[0]?.n || 0);
+};
+
+/**
+ * Elimina dependencias de inventario/precios/etc. No borra Productos ni valida ventas/compras.
+ * @param {import('mssql').Transaction} transaction
+ */
+exports.eliminarFilasRelacionadasProducto = async (transaction, idProducto, idEmpresa) => {
+  const exec = (sql) =>
+    transaction
+      .request()
+      .input('idProducto', sql.UniqueIdentifier, idProducto)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(sql);
+
+  await exec(`
+    IF OBJECT_ID('dbo.ConsumoHabitacion','U') IS NOT NULL
+      DELETE FROM dbo.ConsumoHabitacion WHERE idEmpresa = @idEmpresa AND (idProducto = @idProducto OR idProductoHabitacion = @idProducto);
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.Tanques','U') IS NOT NULL
+      DELETE FROM dbo.Tanques WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto;
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.InventarioFisicoLinea','U') IS NOT NULL
+      DELETE FROM dbo.InventarioFisicoLinea WHERE idProducto = @idProducto;
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.DetalleValeDespacho','U') IS NOT NULL
+      DELETE FROM dbo.DetalleValeDespacho WHERE idProducto = @idProducto;
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.DetalleCotizacion','U') IS NOT NULL AND COL_LENGTH('dbo.DetalleCotizacion','idProducto') IS NOT NULL
+      DELETE FROM dbo.DetalleCotizacion WHERE idProducto = @idProducto;
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.Reservas','U') IS NOT NULL AND COL_LENGTH('dbo.Reservas', 'idProductoHabitacion') IS NOT NULL
+      UPDATE dbo.Reservas SET idProductoHabitacion = NULL WHERE idProductoHabitacion = @idProducto;
+  `);
+  await exec(`DELETE FROM DetalleDespachos WHERE idProducto = @idProducto;`);
+  await exec(`DELETE FROM ProductosCompuestos WHERE idProductoHijo = @idProducto;`);
+  await exec(`DELETE FROM ProductosCompuestos WHERE idProductoPadre = @idProducto;`);
+  await exec(`
+    IF OBJECT_ID('dbo.VarianteAtributos','U') IS NOT NULL AND OBJECT_ID('dbo.VariantesProducto','U') IS NOT NULL
+      DELETE va FROM dbo.VarianteAtributos va
+      INNER JOIN dbo.VariantesProducto vp ON vp.idVariante = va.idVariante
+      WHERE vp.idProductoBase = @idProducto;
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.VariantesProducto','U') IS NOT NULL
+      DELETE FROM dbo.VariantesProducto WHERE idProductoBase = @idProducto;
+  `);
+  await exec(`
+    IF OBJECT_ID('dbo.MovimientosDetalle','U') IS NOT NULL
+      DELETE md FROM dbo.MovimientosDetalle md
+      INNER JOIN dbo.MovimientosInventario m ON m.idMovimiento = md.idMovimiento
+      WHERE m.idEmpresa = @idEmpresa AND m.idProducto = @idProducto;
+  `);
+  await exec(
+    `DELETE FROM MovimientosInventario WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto;`
+  );
+  await exec(`
+    IF OBJECT_ID('dbo.LotesUbicacion','U') IS NOT NULL
+      DELETE lu FROM dbo.LotesUbicacion lu
+      INNER JOIN dbo.Lotes l ON l.idLote = lu.idLote
+      WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto;
+  `);
+  await exec(`DELETE FROM Lotes WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto;`);
+  await exec(`
+    IF OBJECT_ID('dbo.StockSucursal','U') IS NOT NULL
+      DELETE FROM dbo.StockSucursal WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto;
+  `);
+  await exec(`DELETE FROM PreciosProducto WHERE idProducto = @idProducto;`);
+  await exec(`
+    IF OBJECT_ID('dbo.DetalleAsientos','U') IS NOT NULL
+      UPDATE dbo.DetalleAsientos SET idProducto = NULL WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto;
+  `);
+};
+
+/** DELETE de la fila en Productos (usar tras eliminarFilasRelacionadasProducto). Acepta pool o transacción. */
+exports.eliminarProductoPorId = async (poolOrTransaction, idProducto, idEmpresa) => {
+  return poolOrTransaction
     .request()
     .input('idProducto', sql.UniqueIdentifier, idProducto)
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query('DELETE FROM Productos WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa');
+};
+
+/** Solo cambia el bit estado (catálogo activo/inactivo). */
+exports.actualizarEstadoProductoPorId = async (pool, idProducto, idEmpresa, estadoActivo) => {
+  return pool
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('estado', sql.Bit, estadoActivo ? 1 : 0)
+    .query(
+      'UPDATE Productos SET estado = @estado WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa'
+    );
 };
 
 exports.actualizarProductoFlexible = async (pool, detalle) => {

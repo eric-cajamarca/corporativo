@@ -16,6 +16,16 @@ class HtmlBuilderService {
       .replace(/'/g, '&#39;');
   }
 
+  /** Texto de ítem para PDF: descripción + marca si existe (sin HTML). */
+  _descripcionProductoPdfLinea(it) {
+    const item = it && typeof it === 'object' ? it : {};
+    const base = String(item.descripcion ?? item.desc ?? item.productoDescripcion ?? '').trim();
+    const marca = String(item.marca ?? item.nombreMarca ?? item.productoMarca ?? '').trim();
+    if (marca && base) return `${base} - ${marca}`;
+    if (marca) return marca;
+    return base;
+  }
+
   _normalizarCondicionPago(venta = {}) {
     const codigo = String(venta.codigoCondicionPago || '').trim();
     const raw = String(venta.condicionPago || '').trim().toLowerCase();
@@ -304,6 +314,102 @@ class HtmlBuilderService {
   }
 
   /**
+   * Ticket de despacho: estilo cotización, solo negro sobre blanco, sin cajas grises/azules.
+   * Encabezado con logo de empresa (data URI). Texto base 11px.
+   */
+  async construirHtmlDespachoTicketCotizacionBn(params) {
+    const titulo = this._escapeHtml(String(params.titulo || 'Ticket de despacho'));
+    const datos = params.datos && typeof params.datos === 'object' ? params.datos : {};
+    const empresa = datos.empresa && typeof datos.empresa === 'object' ? datos.empresa : {};
+    const venta = datos.venta && typeof datos.venta === 'object' ? datos.venta : {};
+    const cliente = datos.cliente && typeof datos.cliente === 'object' ? datos.cliente : {};
+    const dsp = datos.despacho && typeof datos.despacho === 'object' ? datos.despacho : null;
+    const columnas = Array.isArray(params.columnas) ? params.columnas : [];
+    const filas = Array.isArray(params.filas) ? params.filas : [];
+
+    const logoSrc = await this._resolveLogoToDataUri(empresa.logo || '');
+    const nombreEmp = this._escapeHtml(String(empresa.nombre || '').trim());
+    const rucEmp = this._escapeHtml(String(empresa.ruc || '').trim());
+    const dirEmp = this._escapeHtml(String(empresa.direccion || '').trim());
+    const telEmp = this._escapeHtml(String(empresa.telefono || '').trim());
+
+    const metaLines = [rucEmp ? `RUC: ${rucEmp}` : '', dirEmp ? `Dirección: ${dirEmp}` : '', telEmp ? `Tel.: ${telEmp}` : '']
+      .filter(Boolean)
+      .join('<br>');
+
+    const bloqueDespacho = dsp
+      ? `<div class="seccion">
+  <div class="seccion-tit">Despacho</div>
+  <div class="fila-kv"><span class="k">Tipo</span><span class="v">${this._escapeHtml(String(dsp.tipoDespacho || '—'))}</span></div>
+  <div class="fila-kv"><span class="k">Fecha y hora</span><span class="v">${this._escapeHtml(String(dsp.fechaDespacho || '—'))}</span></div>
+  <div class="fila-kv"><span class="k">Estado</span><span class="v">${this._escapeHtml(String(dsp.estado || '—'))}</span></div>
+</div>`
+      : '';
+
+    const bloqueVenta =
+      venta && Object.keys(venta).length && cliente && Object.keys(cliente).length
+        ? `<div class="seccion">
+  <div class="seccion-tit">Comprobante y cliente</div>
+  <div class="fila-kv"><span class="k">Comprobante</span><span class="v">${this._escapeHtml(String(venta.compVenta || '—'))}</span></div>
+  <div class="fila-kv"><span class="k">Cliente</span><span class="v">${this._escapeHtml(String(cliente.razonSocial || cliente.rSocial || '—'))}</span></div>
+  <div class="fila-kv"><span class="k">RUC / DNI</span><span class="v">${this._escapeHtml(String(cliente.ruc || '—'))}</span></div>
+  <div class="fila-kv"><span class="k">idVenta</span><span class="v">${this._escapeHtml(String(venta.idVenta ?? '—'))}</span></div>
+</div>`
+        : '';
+
+    const th = columnas.map((c) => `<th>${this._escapeHtml(String(c))}</th>`).join('');
+    const tr = filas
+      .map((fila) => {
+        const row = Array.isArray(fila) ? fila : [];
+        const tds = row
+          .map((celda) => {
+            const v = celda !== undefined && celda !== null ? String(celda) : '';
+            return `<td>${this._escapeHtml(v)}</td>`;
+          })
+          .join('');
+        return `<tr>${tds}</tr>`;
+      })
+      .join('');
+
+    const fechaRep = this._escapeHtml(new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }));
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${titulo}</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; margin: 0; padding: 10px 8px; }
+    .hdr-logo { text-align: center; margin-bottom: 6px; }
+    .hdr-logo img { max-width: 160px; max-height: 72px; object-fit: contain; display: inline-block; vertical-align: middle; }
+    .empresa-nombre { text-align: center; font-weight: bold; font-size: 11px; margin: 4px 0 2px; color: #000; }
+    .empresa-meta { text-align: center; font-size: 10px; line-height: 1.35; color: #000; margin-bottom: 10px; }
+    .titulo-doc { font-weight: bold; font-size: 12px; text-align: center; text-transform: uppercase; letter-spacing: 0.02em; margin: 10px 0 4px; padding-bottom: 4px; border-bottom: 1px solid #000; color: #000; }
+    .fecha-doc { font-size: 10px; text-align: center; margin-bottom: 12px; color: #000; }
+    .seccion { margin-bottom: 10px; padding: 8px 10px; border: 1px solid #000; background: #fff; }
+    .seccion-tit { font-weight: bold; font-size: 11px; margin: 0 0 6px; padding-bottom: 3px; border-bottom: 1px solid #000; color: #000; }
+    .fila-kv { display: table; width: 100%; font-size: 11px; margin-bottom: 3px; color: #000; }
+    .fila-kv .k { display: table-cell; width: 34%; font-weight: bold; vertical-align: top; padding-right: 6px; }
+    .fila-kv .v { display: table-cell; vertical-align: top; }
+    table.prod { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; color: #000; }
+    table.prod th, table.prod td { border: 1px solid #000; padding: 4px 5px; vertical-align: top; }
+    table.prod th { background: #fff; font-weight: bold; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="hdr-logo"><img src="${logoSrc}" alt=""></div>
+  ${nombreEmp ? `<div class="empresa-nombre">${nombreEmp}</div>` : ''}
+  ${metaLines ? `<div class="empresa-meta">${metaLines}</div>` : ''}
+  <div class="titulo-doc">${titulo}</div>
+  <div class="fecha-doc">Impreso: ${fechaRep}</div>
+  ${bloqueDespacho}
+  ${bloqueVenta}
+  <table class="prod"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>
+</body>
+</html>`;
+  }
+
+  /**
    * Construye tabla HTML desde arrays de datos
    * @param {string[]} headers - Nombres de columnas
    * @param {Array<Array>} filas - Array de arrays con datos
@@ -340,7 +446,8 @@ class HtmlBuilderService {
    * Imagen por defecto cuando la empresa no tiene logo (SVG inline para no depender de red).
    */
   _defaultLogoDataUri() {
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="70" viewBox="0 0 100 70"><rect width="100" height="70" fill="#f5f5f5" stroke="#ddd" stroke-width="1"/><text x="50" y="38" dominant-baseline="middle" text-anchor="middle" fill="#999" font-size="11" font-family="Arial">Logo</text></svg>';
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="56" viewBox="0 0 120 56"><rect width="120" height="56" fill="#fff" stroke="#000" stroke-width="1"/><text x="60" y="30" dominant-baseline="middle" text-anchor="middle" fill="#000" font-size="10" font-family="Arial">Sin logo</text></svg>';
     return 'data:image/svg+xml,' + encodeURIComponent(svg);
   }
 
@@ -541,7 +648,7 @@ class HtmlBuilderService {
     const hashEsc = (resumenHash && String(resumenHash).trim())
       ? String(resumenHash).trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')
       : '—';
-    return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;margin:0;padding:0;">
+    return `<div class="pie-sunat-electronico" style="font-size:8px;line-height:1.45;text-align:left;margin:0;padding:0;color:#000;">
       <div>* Bienes transferidos en la Amazonía para ser consumidos en la misma</div>
       <div>* Representación impresa de ${titulo}</div>
       <div>* Generado desde el sistema del contribuyente</div>
@@ -576,30 +683,33 @@ class HtmlBuilderService {
   <title>${titulo} ${compVenta}</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 8px; margin: 0; padding: 1px; color: #000; width: 80mm; max-width: 80mm; }
+    body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 1px; color: #000; width: 80mm; max-width: 80mm; }
     .ticket-center { text-align: center; }
     .ticket-logo { max-width: 50px; max-height: 40px; margin: 0 auto 2px; display: block; }
-    .ticket-empresa { font-weight: bold; font-size: 9px; margin: 2px 0; line-height: 1.2; }
-    .ticket-ruc { font-size: 7px; }
-    .ticket-dir, .ticket-rubro, .ticket-cel, .ticket-correo { font-size: 6px; margin: 1px 0; }
+    .ticket-empresa { font-weight: bold; font-size: 10px; margin: 2px 0; line-height: 1.2; color: #000; }
+    .ticket-ruc { font-size: 10px; color: #000; }
+    .ticket-dir, .ticket-rubro, .ticket-cel, .ticket-correo { font-size: 10px; margin: 1px 0; color: #000; }
     .ticket-sep { border: none; border-top: 1px dashed #000; margin: 3px 0; }
-    .ticket-comprobante { font-weight: bold; font-size: 9px; margin: 2px 0; }
-    .ticket-fecha { font-size: 7px; margin-bottom: 4px; }
-    .ticket-cliente { text-align: left; font-size: 7px; line-height: 1.25; margin: 4px 0; }
+    .ticket-comprobante { font-weight: bold; font-size: 10px; margin: 2px 0; color: #000; }
+    .ticket-fecha { font-size: 10px; margin-bottom: 4px; color: #000; }
+    .ticket-cliente { text-align: left; font-size: 10px; line-height: 1.25; margin: 4px 0; color: #000; }
     .ticket-cliente strong { display: inline; }
-    table.ticket-detalle { width: 100%; border-collapse: collapse; font-size: 7px; margin: 4px 0; }
-    table.ticket-detalle th, table.ticket-detalle td { padding: 1px 2px; border-bottom: 1px solid #eee; }
+    table.ticket-detalle { width: 100%; border-collapse: collapse; font-size: 10px; margin: 4px 0; color: #000; }
+    table.ticket-detalle th, table.ticket-detalle td { padding: 1px 2px; border-bottom: 1px solid #000; }
     table.ticket-detalle th { text-align: left; font-weight: bold; }
     .ticket-detalle .num { text-align: right; }
-    .ticket-totales { font-size: 7px; margin: 4px 0; }
+    .ticket-totales { font-size: 10px; margin: 4px 0; color: #000; }
     .ticket-totales td.num { text-align: right; }
-    .ticket-totales tr.total-final { font-weight: bold; font-size: 8px; }
-    .ticket-son { font-size: 7px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; }
-    .ticket-final { margin-top: 2px; padding: 0; font-size: 6px; }
+    .ticket-totales tr.total-final { font-weight: bold; font-size: 10px; }
+    .ticket-son { font-size: 10px; margin: 4px 0; border-top: 1px dashed #000; padding-top: 4px; color: #000; }
+    .ticket-final { margin-top: 2px; padding: 0; font-size: 10px; color: #000; }
     .ticket-final .txt { margin-bottom: 2px; }
     .ticket-sunat-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 4px; margin-top: 4px; width: 100%; }
-    .ticket-sunat-text { flex: 1; min-width: 0; text-align: left; }
-    .ticket-sunat-text .pie-sunat-electronico { font-size: 5px !important; line-height: 1.35 !important; margin: 0 !important; }
+    .ticket-sunat-text { flex: 1; min-width: 0; text-align: left; color: #000; }
+    .ticket-sunat-text .pie-sunat-electronico { font-size: 9px !important; line-height: 1.35 !important; margin: 0 !important; color: #000 !important; }
+    .ticket-sunat-text .pie-sunat-electronico div { color: #000 !important; }
+    .ticket-final .pie-sunat-electronico { font-size: 9px !important; line-height: 1.35 !important; color: #000 !important; }
+    .ticket-final .pie-sunat-electronico div { color: #000 !important; }
     .ticket-sunat-qr { flex-shrink: 0; }
     .ticket-sunat-qr img { width: 2cm; height: 2cm; max-width: 100%; object-fit: contain; display: block; }
     .ticket-final .barcode-venta { margin-top: 1px; text-align: center; }
@@ -640,12 +750,12 @@ class HtmlBuilderService {
     <tbody>${filasItems}</tbody>
   </table>
   <hr class="ticket-sep">
-  <table class="ticket-totales" style="width:100%; font-size:7px;">
+  <table class="ticket-totales" style="width:100%;">
     ${lineasTotales}
   </table>
   <div class="ticket-son"><strong>SON:</strong> ${cantidadLetras || ''}</div>
-  ${cuentasBancarias.length > 0 ? '<hr class="ticket-sep"><div style="font-size:7px;"><strong>CUENTAS BANCARIAS:</strong><br>' + cuentasBancarias.join('<br>') + '</div>' : ''}
-  ${observaciones ? '<hr class="ticket-sep"><div style="font-size:7px;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
+  ${cuentasBancarias.length > 0 ? '<hr class="ticket-sep"><div style="font-size:10px;color:#000;"><strong>CUENTAS BANCARIAS:</strong><br>' + cuentasBancarias.join('<br>') + '</div>' : ''}
+  ${observaciones ? '<hr class="ticket-sep"><div style="font-size:10px;color:#000;"><strong>OBSERVACIONES:</strong><br>' + (observaciones || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' : ''}
   ${tablaCuotasHtml || ''}
   <div class="ticket-final">
     ${pieSunatHtml || ''}
@@ -717,7 +827,7 @@ class HtmlBuilderService {
     const incluirUnidadMedida = !esCotizacion && this._esComprobanteConUnidadMedidaPdf(codigoComp);
 
     const filasPlanas = (Array.isArray(items) ? items : []).map(it => {
-      const desc = it.descripcion || it.desc || '';
+      const desc = this._descripcionProductoPdfLinea(it);
       const cant = Number(it.cantidad) != null ? Number(it.cantidad) : 0;
       const pUnit = Number(it.pVenta) != null ? Number(it.pVenta) : Number(it.pUnit) || 0;
       const importe = Number(it.total) != null ? Number(it.total) : (Number(it.subtotal) || cant * pUnit);
@@ -834,7 +944,7 @@ class HtmlBuilderService {
         `<tr${l.total ? ' class="total-final"' : ''}><td>${l.label}</td><td class="num" style="text-align:right">${Number(l.value).toFixed(2)}</td></tr>`
       ).join('');
       const ticketCuotasHtml = cuotas.length > 0 && mostrarCuotasPdf
-        ? `<hr class="ticket-sep"><div style="font-size:7px;"><strong>Cuotas a pagar</strong><table style="width:100%;font-size:6px;border-collapse:collapse;"><tr><th>F.Pago</th><th>Nro</th><th class="num">Total</th></tr>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td>${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="num">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</table></div>`
+        ? `<hr class="ticket-sep"><div style="font-size:10px;color:#000;"><strong>Cuotas a pagar</strong><table style="width:100%;font-size:10px;border-collapse:collapse;color:#000;"><tr><th>F.Pago</th><th>Nro</th><th class="num">Total</th></tr>${cuotas.map(c => `<tr><td>${c.fechaPago || '—'}</td><td>${c.numeroCuota != null ? c.numeroCuota : '—'}</td><td class="num">${Number(c.total != null ? c.total : c.montoCuota || 0).toFixed(2)}</td></tr>`).join('')}</table></div>`
         : '';
       return this._buildTicketComprobanteHtml({
         empresa,

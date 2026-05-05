@@ -5,11 +5,14 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
+import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
 
 export interface ProductoSeleccionado {
   idProducto: string;
   codigo: string;
   descripcion: string;
+  marca?: string;
+  nombreMarca?: string;
   idPresentacion?: number;
   codigoPresentacion?: string;
   pVenta: number;
@@ -83,10 +86,10 @@ export class BuscadorProductosModalComponent implements OnInit {
     });
   }
 
-  cargarProductos(): void {
+  cargarProductos(opciones?: { evitarCache?: boolean }): void {
     this.loading = true;
     this.cdr.detectChanges();
-    this.productoService.obtenerProductosTodos().subscribe({
+    this.productoService.obtenerProductosTodos(opciones).subscribe({
       next: (response: any) => {
         const raw = response?.data;
         let data: any[] = [];
@@ -99,12 +102,9 @@ export class BuscadorProductosModalComponent implements OnInit {
           else if (Array.isArray(raw.data)) data = raw.data;
         }
         this.productosConst = data;
-        this.productosFiltrados = [...this.productosConst];
         this.loading = false;
         this.cdr.detectChanges();
-        if (this.productosConImagenes && this.productosFiltrados.length > 0) {
-          this.productosFiltrados.forEach((p) => this.cargarPrimeraImagenSiNecesario(p));
-        }
+        this.buscarProductos();
       },
       error: () => {
         this.productosConst = [];
@@ -158,6 +158,23 @@ export class BuscadorProductosModalComponent implements OnInit {
     }
   }
 
+  /** Texto de marca para columna (API: marca / nombreMarca). */
+  marcaColumna(p: ProductoSeleccionado): string {
+    const t = marcaProductoEnLista(p as Record<string, unknown>);
+    return t || '—';
+  }
+
+  sinStockBusqueda(p: ProductoSeleccionado): boolean {
+    return productoSinStockEnBusqueda(p as Record<string, unknown>);
+  }
+
+  /**
+   * Vuelve a consultar el catálogo en el servidor y reaplica el filtro del input sin modificarlo.
+   */
+  recargarProductosDesdeServidor(): void {
+    this.cargarProductos({ evitarCache: true });
+  }
+
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
     if (term === '') {
@@ -167,12 +184,14 @@ export class BuscadorProductosModalComponent implements OnInit {
     this.productosFiltrados = this.productosConst.filter((item: any) => {
       const descripcion = (item.descripcion ?? '').toString().toLowerCase();
       const codigo = (item.codigo ?? '').toString().toLowerCase();
-      const marca = (item.nombre ?? '').toString().toLowerCase();
+      const marcaCol = marcaProductoEnLista(item).toLowerCase();
+      const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
       const categoria = (item.categoria ?? '').toString().toLowerCase();
       return (
         descripcion.includes(term) ||
         codigo.includes(term) ||
-        marca.includes(term) ||
+        marcaCol.includes(term) ||
+        marcaLegacy.includes(term) ||
         categoria.includes(term)
       );
     });

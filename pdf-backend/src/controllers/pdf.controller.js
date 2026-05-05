@@ -161,28 +161,49 @@ th{background:#f2f2f2;font-weight:bold;text-align:center}
         const columnas = datos.columnas || ['Código', 'Descripción', 'Cantidad', 'Ubicación'];
         const filas = datos.filas || (datos.items || []).map(it => [
           it.codigo || it.productoCodigo || '—',
-          it.descripcion || it.productoDescripcion || '—',
-          it.cantidad ?? it.cantPendiente ?? '—',
+          htmlBuilder._descripcionProductoPdfLinea(it) || '—',
+          it.cantidadDespachada != null ? it.cantidadDespachada : (it.cantidad ?? it.cantPendiente ?? '—'),
           it.ubicaciones || it.ubicacion || '—'
         ]);
-        const bloqueVenta = (datos.venta && datos.cliente)
-          ? `
+        if (formatoPdf === 'ticket') {
+          html = await htmlBuilder.construirHtmlDespachoTicketCotizacionBn({
+            titulo: datos.titulo || 'Ticket de despacho',
+            datos,
+            columnas,
+            filas
+          });
+        } else {
+          const dsp = datos.despacho && typeof datos.despacho === 'object' ? datos.despacho : null;
+          const bloqueDespacho = dsp
+            ? `
+          <div class="bloque-datos bloque-comprobante">
+            <h3 class="bloque-titulo">Despacho</h3>
+            <table class="tabla-datos-inline">
+              <tr><td><strong>Tipo:</strong></td><td>${htmlBuilder._escapeHtml(dsp.tipoDespacho || '—')}</td></tr>
+              <tr><td><strong>Fecha y hora:</strong></td><td>${htmlBuilder._escapeHtml(String(dsp.fechaDespacho || '—'))}</td></tr>
+              <tr><td><strong>Estado:</strong></td><td>${htmlBuilder._escapeHtml(String(dsp.estado || '—'))}</td></tr>
+            </table>
+          </div>`
+            : '';
+          const bloqueVenta = (datos.venta && datos.cliente)
+            ? `
           <div class="bloque-datos bloque-comprobante">
             <h3 class="bloque-titulo">Comprobante y cliente</h3>
             <table class="tabla-datos-inline">
-              <tr><td><strong>Comprobante:</strong></td><td>${datos.venta.compVenta || '—'}</td></tr>
-              <tr><td><strong>Cliente:</strong></td><td>${datos.cliente.razonSocial || datos.cliente.rSocial || '—'}</td></tr>
-              <tr><td><strong>RUC/DNI:</strong></td><td>${datos.cliente.ruc || '—'}</td></tr>
-              <tr><td><strong>idVenta:</strong></td><td>${datos.venta.idVenta ?? '—'}</td></tr>
+              <tr><td><strong>Comprobante:</strong></td><td>${htmlBuilder._escapeHtml(String(datos.venta.compVenta || '—'))}</td></tr>
+              <tr><td><strong>Cliente:</strong></td><td>${htmlBuilder._escapeHtml(String(datos.cliente.razonSocial || datos.cliente.rSocial || '—'))}</td></tr>
+              <tr><td><strong>RUC/DNI:</strong></td><td>${htmlBuilder._escapeHtml(String(datos.cliente.ruc || '—'))}</td></tr>
+              <tr><td><strong>idVenta:</strong></td><td>${htmlBuilder._escapeHtml(String(datos.venta.idVenta ?? '—'))}</td></tr>
             </table>
           </div>`
-          : '';
-        html = htmlBuilder.construirHtmlReporte({
-          titulo: datos.titulo || 'Comprobante de despacho',
-          empresa: datos.empresa || {},
-          contenidoAntesTabla: bloqueVenta,
-          tablaHtml: htmlBuilder.construirTablaHtml(columnas, filas)
-        });
+            : '';
+          html = htmlBuilder.construirHtmlReporte({
+            titulo: datos.titulo || 'Comprobante de despacho',
+            empresa: datos.empresa || {},
+            contenidoAntesTabla: bloqueDespacho + bloqueVenta,
+            tablaHtml: htmlBuilder.construirTablaHtml(columnas, filas)
+          });
+        }
         break;
       }
 

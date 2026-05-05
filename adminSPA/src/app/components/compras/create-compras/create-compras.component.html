@@ -774,7 +774,7 @@
                                                 [(ngModel)]="searchTerm" (input)="buscarProductos()">
                                         </div>
                                         <div class="col-12 col-lg-4">
-                                            <button type="button" class="btn btn-outline-light w-100" (click)="buscarProductos()">
+                                            <button type="button" class="btn btn-outline-light w-100" (click)="recargarProductosModalCompras()">
                                                 <i class="bi bi-search"></i> Buscar
                                             </button>
                                         </div>
@@ -786,8 +786,9 @@
                                                 <tr>
                                                     <th *ngIf="muestraEmpresaEnBuscadorCompras()">Empresa</th>
                                                     <th>Código</th>
-                                                    <th>Categoría</th>
-                                                    <th>Producto</th>
+                                                    <th class="efaf-buscador-col-cat">Categoría</th>
+                                                    <th class="efaf-buscador-col-marca">Marca</th>
+                                                    <th class="efaf-buscador-col-desc">Producto</th>
                                                     <th>U.Medida</th>
                                                     <th>Precio ref.</th>
                                                     <th>Sucursal</th>
@@ -796,13 +797,15 @@
                                             </thead>
                                             <tbody>
                                                 <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover"
+                                                    [class.efaf-buscador-row-sin-stock]="productoSinStockEnBusquedaModal(p)"
                                                     (click)="seleccionaProducto(p)">
                                                     <td *ngIf="muestraEmpresaEnBuscadorCompras()">
                                                         <span class="badge bg-light text-dark">{{ p.aliasEmpresa || p.razonSocialEmpresa || '—' }}</span>
                                                     </td>
                                                     <td>{{ p.codigo }}</td>
-                                                    <td>{{ p.categoria }}</td>
-                                                    <td>{{ p.descripcion }}</td>
+                                                    <td class="efaf-buscador-col-cat" [title]="p.categoria">{{ p.categoria }}</td>
+                                                    <td class="efaf-buscador-col-marca" [title]="marcaColumnaCompras(p)">{{ marcaColumnaCompras(p) }}</td>
+                                                    <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
                                                     <td>{{ p.codigoPresentacion }}</td>
                                                     <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                                                     <td>{{ p.sucursal }}</td>
@@ -814,14 +817,14 @@
 
                                     <div class="d-lg-none buscador-compra-cards">
                                         <button type="button" class="btn btn-outline-secondary w-100 text-start mb-2 p-3 buscador-compra-card"
-                                            *ngFor="let p of productos_filtrados" (click)="seleccionaProducto(p)">
+                                            *ngFor="let p of productos_filtrados" [class.efaf-buscador-card-sin-stock]="productoSinStockEnBusquedaModal(p)" (click)="seleccionaProducto(p)">
                                             <div class="d-flex justify-content-between align-items-start gap-2">
                                                 <span class="fw-semibold text-truncate">{{ p.codigo }}</span>
                                                 <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
                                             </div>
                                             <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorCompras()">{{ p.aliasEmpresa || p.razonSocialEmpresa || '—' }}</div>
                                             <div class="small mt-1">{{ p.descripcion }}</div>
-                                            <div class="small text-muted mt-1">{{ p.categoria }} · {{ p.codigoPresentacion }}</div>
+                                            <div class="small text-muted mt-1">{{ p.categoria }} · {{ marcaColumnaCompras(p) }} · {{ p.codigoPresentacion }}</div>
                                             <div class="small d-flex justify-content-between mt-2">
                                                 <span>{{ p.sucursal }}</span>
                                                 <span>Stock: {{ p.stock }}</span>
