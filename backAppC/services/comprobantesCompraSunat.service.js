@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
 const { withPool } = require('../utils/dbPool.util');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const comprasRepository = require('../repositories/compras.repository');
 const comprobantesCompraSunatRepository = require('../repositories/comprobantesCompraSunat.repository');
 const cuotasCompraSunatRepository = require('../repositories/cuotasCompraSunat.repository');
@@ -186,11 +187,6 @@ exports.listarPorEmpresaParaUsuario = async (user, query) => {
     e.statusCode = 401;
     throw e;
   }
-  if (user.rol !== 'Administrador' && user.rol !== 'Almacenero') {
-    const e = new Error('No tiene permisos para realizar esta acción');
-    e.statusCode = 403;
-    throw e;
-  }
   const opts = {
     rucEmisor: query.rucEmisor,
     razonSocial: query.razonSocial,
@@ -199,5 +195,8 @@ exports.listarPorEmpresaParaUsuario = async (user, query) => {
     condicionPago: query.condicionPago,
     tipoDocumento: query.tipoDocumento
   };
-  return withPool((pool) => comprobantesCompraSunatRepository.listarPorIdEmpresa(pool, user.empresa, opts));
+  return withPool(async (pool) => {
+    await assertAlgunoPermiso(pool, user, 'VER_COMPRAS', 'CREAR_COMPRAS', 'EDITAR_COMPRAS', 'GESTIONAR_LOTES');
+    return comprobantesCompraSunatRepository.listarPorIdEmpresa(pool, user.empresa, opts);
+  });
 };

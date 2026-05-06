@@ -25,7 +25,7 @@ const obtener_sucursales_usuario = async function (req, res) {
     } catch (error) {
         console.error('Error en obtener_sucursales_usuario:', error.message);
 
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (error.message === 'PERMISO_DENEGADO' || error.message === 'NO_PERMISSIONS') {
             return res.status(403).json({
                 message: 'No tiene permisos para ver las sucursales de este usuario',
                 data: undefined
@@ -89,7 +89,7 @@ const obtener_usuarios_sucursal = async function (req, res) {
     } catch (error) {
         console.error('Error en obtener_usuarios_sucursal:', error.message);
 
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (error.message === 'PERMISO_DENEGADO' || error.message === 'NO_PERMISSIONS') {
             return res.status(403).json({
                 message: 'No tiene permisos para esta acción',
                 data: undefined
@@ -132,7 +132,7 @@ const asignar_usuario_sucursal = async function (req, res) {
     } catch (error) {
         console.error('Error en asignar_usuario_sucursal:', error.message);
 
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (error.message === 'PERMISO_DENEGADO' || error.message === 'NO_PERMISSIONS') {
             return res.status(403).json({
                 message: 'No tiene permisos para esta acción',
                 data: undefined
@@ -307,7 +307,7 @@ const actualizar_asignaciones = async function (req, res) {
     } catch (error) {
         console.error('Error en actualizar_asignaciones:', error.message);
 
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (error.message === 'PERMISO_DENEGADO' || error.message === 'NO_PERMISSIONS') {
             return res.status(403).json({
                 message: 'No tiene permisos para esta acción',
                 data: undefined
@@ -348,7 +348,7 @@ const obtener_sucursales_con_asignacion = async function (req, res) {
     } catch (error) {
         console.error('Error en obtener_sucursales_con_asignacion:', error.message);
 
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (error.message === 'PERMISO_DENEGADO' || error.message === 'NO_PERMISSIONS') {
             return res.status(403).json({
                 message: 'No tiene permisos para esta acción',
                 data: undefined

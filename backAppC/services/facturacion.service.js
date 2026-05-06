@@ -1,4 +1,5 @@
 const FacturacionRepository = require('../repositories/facturacion.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const guiaElectronicaRepository = require('../repositories/guiaElectronica.repository');
 const facturadorSunatService = require('./facturadorSunat.service');
 const firmaXmlSunat = require('./firmaXmlSunat.service');
@@ -26,9 +27,7 @@ exports.actualizarConfiguracionFacturacionService = async (pool, user, datos) =>
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
 
   const result = await FacturacionRepository.actualizarConfiguracionFacturacionRepo(pool, user, datos);
   return result;
@@ -37,7 +36,7 @@ exports.actualizarConfiguracionFacturacionService = async (pool, user, datos) =>
 /** Sube y guarda el certificado digital (PFX) y su clave para firma de XML. Requiere configuración de facturación existente. */
 exports.actualizarCertificadoFacturacionService = async (pool, user, certificadoBuffer, claveCertificado) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
   if (!certificadoBuffer || !Buffer.isBuffer(certificadoBuffer)) throw new Error("CERTIFICADO_REQUERIDO");
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
   if (!config) throw new Error("CONFIGURACION_FACTURACION_REQUERIDA");
@@ -64,9 +63,7 @@ exports.generarComprobanteElectronicoService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'CREAR_VENTAS', 'EDITAR_VENTAS', 'VER_VENTAS');
 
   // Validar que la venta existe
   const ventaValida = await FacturacionRepository.validarVentaEmpresaRepo(pool, datos.idVenta, user.empresa);
@@ -90,9 +87,7 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
 
   const comprobanteValido = await FacturacionRepository.validarComprobanteEmpresaRepo(pool, idComprobanteElectronico, user.empresa);
   if (!comprobanteValido) {

@@ -2,6 +2,15 @@ const CajaServices = require('../services/caja.service');
 const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 const { withPool } = require('../utils/dbPool.util');
 
+/** Acepta número o string con separadores (ej. "10,757.1"). */
+function parseMontoRequest(val) {
+  if (val == null || val === '') return NaN;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : NaN;
+  const s = String(val).replace(/\s/g, '').replace(/,/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
 /** Si no viene idEmpresaOperacion en query, el servicio de caja usa todas las empresas permitidas (gestora + gestionadas). */
 async function resolverIdEmpresaOperacionFiltroMovimientos(pool, user, rawQuery) {
   if (rawQuery == null) return undefined;
@@ -195,9 +204,29 @@ const registrarMovimiento = async (req, res, next) => {
       observaciones
     } = req.body;
 
-    if (!idApertura || !idTipoMovimientoCaja || !concepto || monto === undefined || monto <= 0) {
+    const idTipoNum = idTipoMovimientoCaja != null && idTipoMovimientoCaja !== ''
+      ? Number(idTipoMovimientoCaja)
+      : NaN;
+    const montoNum = parseMontoRequest(monto);
+    const conceptoTxt = concepto != null ? String(concepto).trim() : '';
+    const tieneConceptoCatalogo =
+      idConcepto != null && String(idConcepto).trim() !== '';
+
+    if (!idApertura || !Number.isFinite(idTipoNum) || idTipoNum <= 0) {
       return res.status(400).send({
-        message: 'Datos inválidos: idApertura, idTipoMovimientoCaja, concepto y monto son requeridos',
+        message: 'Datos inválidos: idApertura e idTipoMovimientoCaja (tipo de ingreso/egreso) son requeridos.',
+        data: undefined
+      });
+    }
+    if (!conceptoTxt && !tieneConceptoCatalogo) {
+      return res.status(400).send({
+        message: 'Datos inválidos: indique concepto (texto) o concepto del catálogo (idConcepto).',
+        data: undefined
+      });
+    }
+    if (!Number.isFinite(montoNum) || montoNum <= 0) {
+      return res.status(400).send({
+        message: 'Datos inválidos: el monto debe ser un número mayor a 0.',
         data: undefined
       });
     }
@@ -205,11 +234,11 @@ const registrarMovimiento = async (req, res, next) => {
     const result = await withPool((pool) =>
       CajaServices.registrarMovimientoService(pool, req.user, {
         idApertura,
-        idTipoMovimientoCaja,
+        idTipoMovimientoCaja: idTipoNum,
         fechaMovimiento: fechaMovimiento || null,
-        concepto,
+        concepto: conceptoTxt || concepto || '',
         idConcepto: idConcepto || null,
-        monto,
+        monto: montoNum,
         idMediosPago,
         idMoneda,
         documentoRelacionado,
@@ -252,7 +281,9 @@ const registrarMovimiento = async (req, res, next) => {
     }
     if (error.message === 'COMPROBANTE_RI_RE_NO_CONFIGURADO') {
       return res.status(400).send({
-        message: 'No está configurado el comprobante RI o RE para esta empresa. Ejecute la migración de Comprobantes.',
+        message:
+          'No hay fila en Comprobantes con código RI o RE para la misma empresa y la misma sucursal que la caja abierta ' +
+          '(AperturasCaja.idSucursal = Comprobantes.idSucursal). Revise catálogo de comprobantes por sucursal, no solo por empresa.',
         data: undefined
       });
     }
@@ -428,18 +459,21 @@ const actualizarMovimientoCaja = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { concepto, idConcepto, monto, idMediosPago, documentoRelacionado, observaciones } = req.body;
-    if (!concepto || monto === undefined || monto <= 0) {
+    const conceptoUpd = concepto != null ? String(concepto).trim() : '';
+    const tieneCat = idConcepto != null && String(idConcepto).trim() !== '';
+    const montoUpd = parseMontoRequest(monto);
+    if ((!conceptoUpd && !tieneCat) || !Number.isFinite(montoUpd) || montoUpd <= 0) {
       return res.status(400).send({
-        message: 'concepto y monto son requeridos',
+        message: 'concepto (o idConcepto) y monto válido son requeridos',
         data: undefined
       });
     }
     const updated = await withPool((pool) =>
       CajaServices.actualizarMovimientoCajaService(pool, req.user, {
         idMovimientoCaja: id,
-        concepto,
+        concepto: conceptoUpd || concepto || '',
         idConcepto: idConcepto || null,
-        monto,
+        monto: montoUpd,
         idMediosPago: idMediosPago || null,
         documentoRelacionado: documentoRelacionado || null,
         observaciones: observaciones || null

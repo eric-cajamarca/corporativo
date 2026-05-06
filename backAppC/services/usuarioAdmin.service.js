@@ -1,8 +1,10 @@
 const moment = require('moment');
 const usuarioRepository = require('../repositories/usuario.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function obtenerColaboradorConRol(pool, user, idUsuario) {
-  if (!user || user.rol !== 'Administrador') throw new Error('NO_PERM');
+  if (!user) throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_ROLES', 'EDITAR_USUARIOS', 'VER_USUARIOS');
   const rows = await usuarioRepository.obtenerUsuarioConRolPorIdUsuario(pool, idUsuario, user.empresa);
   if (!rows.length) {
     const err = new Error('NOT_FOUND');

@@ -9,6 +9,7 @@ const {
   CLAVE_CONFIG_DEFAULT,
   normalizeUuid
 } = require("../utils/cajaOperacionEmpresa.util");
+const { assertAlgunoPermiso } = require("../utils/autorizacionPermisos.util");
 
 
 /** Empresa del JWT + empresas gestionadas (misma lista que usa la gestora en ventas) para ver movimientos consolidados. */
@@ -265,7 +266,7 @@ exports.obtenerTiposMovimientoCajaService = async (pool, user) => {
 
 exports.crearTipoMovimientoCajaService = async (pool, user, datos) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  await assertAlgunoPermiso(pool, user, "EDITAR_CONFIGURACION");
   if (!datos.nombre || !datos.tipo) throw new Error("Nombre y tipo son obligatorios.");
   const tipo = (datos.tipo === "I" || datos.tipo === "E") ? datos.tipo : null;
   if (!tipo) throw new Error("Tipo debe ser I (Ingreso) o E (Egreso).");
@@ -274,7 +275,7 @@ exports.crearTipoMovimientoCajaService = async (pool, user, datos) => {
 
 exports.actualizarTipoMovimientoCajaService = async (pool, user, id, datos) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  await assertAlgunoPermiso(pool, user, "EDITAR_CONFIGURACION");
   if (!datos.nombre || !datos.tipo) throw new Error("Nombre y tipo son obligatorios.");
   const tipo = (datos.tipo === "I" || datos.tipo === "E") ? datos.tipo : null;
   if (!tipo) throw new Error("Tipo debe ser I (Ingreso) o E (Egreso).");
@@ -283,7 +284,7 @@ exports.actualizarTipoMovimientoCajaService = async (pool, user, id, datos) => {
 
 exports.eliminarTipoMovimientoCajaService = async (pool, user, id) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador") throw new Error("NO_PERMISSIONS");
+  await assertAlgunoPermiso(pool, user, "EDITAR_CONFIGURACION");
   const deleted = await CajaRepository.eliminarTipoMovimientoCajaRepo(pool, id);
   if (deleted === 0) throw new Error("Tipo de movimiento no encontrado.");
 };

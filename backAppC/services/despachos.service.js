@@ -1,6 +1,7 @@
 const sql = require("mssql");
 const DespachosRepository = require("../repositories/despachos.repository");
 const gestoresRepository = require("../repositories/gestores.repository");
+const { assertAlgunoPermiso } = require("../utils/autorizacionPermisos.util");
 
 async function puedeUsuarioOperarEmpresaDespacho(pool, user, idEmpresaDestino) {
   if (!user?.empresa || !idEmpresaDestino) return false;
@@ -13,9 +14,7 @@ exports.obtenerDespachosVentaService = async (pool, user, idVenta, query = {}) =
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
 
   const idEmp = query.idEmpresa ? String(query.idEmpresa).trim() : String(user.empresa);
   if (!(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmp))) {
@@ -31,9 +30,7 @@ exports.crearDespachoService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
 
   const idEmpresaOperativa = datos.idEmpresa ? String(datos.idEmpresa).trim() : String(user.empresa);
   if (!(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmpresaOperativa))) {
@@ -77,9 +74,7 @@ exports.actualizarCantidadDespachadaService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "EDITAR_DESPACHOS", "CREAR_DESPACHOS");
 
   const idEmp = await DespachosRepository.obtenerIdEmpresaDesdeDetalleDespachoRepo(
     pool,
@@ -107,9 +102,7 @@ exports.finalizarDespachoService = async (pool, user, idDespacho) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "EDITAR_DESPACHOS", "CREAR_DESPACHOS");
 
   const idEmp = await DespachosRepository.obtenerIdEmpresaDesdeDespachoRepo(pool, idDespacho);
   if (!idEmp || !(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmp))) {
@@ -130,6 +123,8 @@ exports.obtenerTiposDespachoService = async (pool, user) => {
     throw new Error("NO_ACCESS");
   }
 
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
+
   const tipos = await DespachosRepository.obtenerTiposDespachoRepo(pool);
   return tipos;
 };
@@ -139,9 +134,7 @@ exports.obtenerEstadoDespachosService = async (pool, user) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
 
   const estado = await DespachosRepository.obtenerEstadoDespachosRepo(pool, user.empresa);
   return estado;
@@ -150,6 +143,7 @@ exports.obtenerEstadoDespachosService = async (pool, user) => {
 /** Buscar venta por compVenta o idVenta; devuelve venta + despachos + entregadoMismoDia. */
 exports.buscarVentaDespachosService = async (pool, user, query) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
   const compVenta = query.compVenta ? String(query.compVenta).trim() : null;
   const idVenta = query.idVenta != null && query.idVenta !== "" ? query.idVenta : null;
   if (!compVenta && !idVenta) return null;
@@ -163,6 +157,7 @@ exports.buscarVentaDespachosService = async (pool, user, query) => {
 /** Obtener detalle de un despacho (DetalleDespachos). */
 exports.obtenerDetalleDespachoService = async (pool, user, idDespacho) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
   const idEmp = await DespachosRepository.obtenerIdEmpresaDesdeDespachoRepo(pool, idDespacho);
   if (!idEmp || !(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmp))) {
     throw new Error("NO_ACCESS");
@@ -173,6 +168,7 @@ exports.obtenerDetalleDespachoService = async (pool, user, idDespacho) => {
 /** Detalle de venta por idVenta para despacho (cantidad, cantEntregada, cantPendiente, ubicaciones). */
 exports.obtenerDetalleVentaParaDespachoService = async (pool, user, idVenta, query = {}) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
   const idEmp = query.idEmpresa ? String(query.idEmpresa).trim() : String(user.empresa);
   if (!(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmp))) {
     throw new Error("NO_PERMISSIONS");
@@ -186,9 +182,7 @@ const UUID_REGEX =
 /** Búsqueda venta agrupada para despachos (empresa gestora): id VA, número VA, RUC o nombre cliente. */
 exports.buscarVentaAgrupadaDespachoGestoraService = async (pool, user, query) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "VER_DESPACHOS", "CREAR_DESPACHOS", "EDITAR_DESPACHOS");
   const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
   if (!esGestora) throw new Error("NO_ES_GESTORA");
 

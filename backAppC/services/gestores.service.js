@@ -1,6 +1,7 @@
 // SIEMPRE valida reglas de negocio aquí (regla 1.3)
 const { isSaas } = require('../config/deployment.config');
 const gestoresRepository = require('../repositories/gestores.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
@@ -27,10 +28,7 @@ const obtenerEmpresasGestionadas = async (pool, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    // Solo administradores pueden ver gestores
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     return await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
 };
@@ -43,9 +41,7 @@ const obtenerTodosGestores = async (pool, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     return await gestoresRepository.obtenerGestoresPorEmpresa(pool, user.empresa);
 };
@@ -58,9 +54,7 @@ const buscarEmpresaPorRuc = async (pool, ruc, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     // Validar RUC
     if (!ruc || ruc.length !== 11) {
@@ -99,9 +93,7 @@ const asignarEmpresaGestionada = async (pool, idEmpresaDestino, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     if (isSaas()) {
         const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
@@ -151,9 +143,7 @@ const removerEmpresaGestionada = async (pool, idGestor, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     if (!idGestor) {
         throw new Error('ID_GESTOR_REQUERIDO');
@@ -170,9 +160,7 @@ const activarEmpresaGestionada = async (pool, idGestor, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     if (isSaas()) {
         const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, user.empresa);
@@ -195,9 +183,7 @@ const eliminarEmpresaGestionada = async (pool, idGestor, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'GESTIONAR_GESTORES');
 
     return await gestoresRepository.eliminarGestor(pool, idGestor);
 };
@@ -243,8 +229,9 @@ const guardarConfiguracion = async (pool, configuraciones, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (!puedeEditarConfiguracionEmpresa(user)) {
-        throw new Error('PERMISO_DENEGADO');
+    const jwtPuede = puedeEditarConfiguracionEmpresa(user);
+    if (!jwtPuede) {
+        await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
     }
 
     if (!Array.isArray(configuraciones)) {

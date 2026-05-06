@@ -1,5 +1,6 @@
 const gestoresRepository = require('../repositories/gestores.repository');
 const proveedorRepository = require('../repositories/proveedor.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function idsEmpresaConGestionadas(pool, idEmpresaRaiz) {
   const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaRaiz);
@@ -8,7 +9,7 @@ async function idsEmpresaConGestionadas(pool, idEmpresaRaiz) {
 
 async function crearProveedor(pool, user, body) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador' && user.rol !== 'Almacenero') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'CREAR_PROVEEDORES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const { idDocumento, ruc, rSocial, correo, celular, condicion } = body;
@@ -34,7 +35,7 @@ async function listarProveedores(pool, user) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_PROVEEDORES', 'CREAR_PROVEEDORES', 'EDITAR_PROVEEDORES');
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   return proveedorRepository.listarPorEmpresas(pool, ids);
 }
@@ -43,7 +44,7 @@ async function listarPorRuc(pool, user, ruc) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_PROVEEDORES', 'CREAR_PROVEEDORES', 'EDITAR_PROVEEDORES');
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   return proveedorRepository.listarPorRucEmpresas(pool, ids, ruc);
 }
@@ -52,7 +53,7 @@ async function listarPorId(pool, user, idProveedor) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Almacenero') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_PROVEEDORES', 'CREAR_PROVEEDORES', 'EDITAR_PROVEEDORES');
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   return proveedorRepository.listarPorIdProveedorEmpresas(pool, ids, idProveedor);
 }
@@ -61,7 +62,7 @@ async function actualizarProveedor(pool, user, idProveedor, body) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const { idDocumento, ruc, rSocial, correo, celular, condicion } = body;
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   const updateResult = await proveedorRepository.actualizarEnEmpresas(pool, ids, {
@@ -83,7 +84,7 @@ async function actualizarProveedor(pool, user, idProveedor, body) {
 
 async function eliminarProveedor(pool, user, idProveedor) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const tiene = await proveedorRepository.tieneCompras(pool, idProveedor);
@@ -99,7 +100,7 @@ async function eliminarProveedor(pool, user, idProveedor) {
 
 async function cambiarCondicion(pool, user, idProveedor, condicionActual) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const nuevacondicion = condicionActual === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
@@ -108,7 +109,7 @@ async function cambiarCondicion(pool, user, idProveedor, condicionActual) {
 
 async function cambiarEstado(pool, user, idProveedor, estadoBody) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const nuevoEstado = estadoBody ? 0 : 1;
@@ -117,7 +118,7 @@ async function cambiarEstado(pool, user, idProveedor, estadoBody) {
 
 async function crearDireccion(pool, user, body) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const idEmpresa = user.empresa;
   const {
     idProveedor,
@@ -150,20 +151,20 @@ async function crearDireccion(pool, user, body) {
 
 async function listarDireccionesEmpresa(pool, user) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_PROVEEDORES', 'EDITAR_PROVEEDORES');
   return proveedorRepository.listarDireccionesPorEmpresa(pool, user.empresa);
 }
 
 async function listarDireccionesPorProveedor(pool, user, idProveedor) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_PROVEEDORES', 'EDITAR_PROVEEDORES');
   const ids = await idsEmpresaConGestionadas(pool, user.empresa);
   return proveedorRepository.listarDireccionesPorProveedorYEmpresas(pool, ids, idProveedor);
 }
 
 async function actualizarDireccion(pool, user, idDireccionProveedor, body) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const row = await proveedorRepository.obtenerDireccionPorId(pool, idDireccionProveedor, user.empresa);
   if (!row) throw new Error('NOT_FOUND');
   const {
@@ -197,7 +198,7 @@ async function actualizarDireccion(pool, user, idDireccionProveedor, body) {
 
 async function eliminarDireccion(pool, user, idDireccionProveedor) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_PROVEEDORES');
   const row = await proveedorRepository.obtenerDireccionPorId(pool, idDireccionProveedor, user.empresa);
   if (!row) throw new Error('NOT_FOUND');
   return proveedorRepository.eliminarDireccion(pool, idDireccionProveedor);

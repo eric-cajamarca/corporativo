@@ -2,6 +2,7 @@
 const ProductosRepository = require('../repositories/productos.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const permisosService = require('./permisos.service');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 exports.obtenerProductosTodosService = async (pool, user) => {
   if (!user) {
@@ -40,9 +41,7 @@ exports.obtenerProductosComprasService = async (pool, user) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "VER_COMPRAS", "CREAR_COMPRAS", "EDITAR_COMPRAS", "VER_PRODUCTOS");
 
   const productos = await ProductosRepository.obtenerProductosCompras(pool, user.empresa);
   return productos;
@@ -54,9 +53,7 @@ exports.obtenerProductoPorIdService = async (pool, idProducto, user) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, "VER_PRODUCTOS", "CREAR_PRODUCTOS", "EDITAR_PRODUCTOS", "CREAR_COMPRAS", "EDITAR_COMPRAS");
 
   // Validar que idProducto sea UUID válido
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

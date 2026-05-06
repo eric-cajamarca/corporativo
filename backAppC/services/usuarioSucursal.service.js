@@ -1,5 +1,6 @@
 // SIEMPRE valida reglas de negocio aquí (regla 1.3)
 const usuarioSucursalRepository = require('../repositories/usuarioSucursal.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 /**
  * Obtiene las sucursales asignadas a un usuario
@@ -9,9 +10,9 @@ const obtenerSucursalesUsuario = async (pool, idUsuario, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    // El usuario puede ver sus propias sucursales o un admin puede ver las de cualquiera
-    if (idUsuario !== user.idUsuario && user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
+    const idSelf = user.sub || user.idUsuario;
+    if (String(idUsuario) !== String(idSelf)) {
+        await assertAlgunoPermiso(pool, user, 'EDITAR_USUARIOS', 'GESTIONAR_ROLES', 'GESTIONAR_SUCURSALES');
     }
 
     return await usuarioSucursalRepository.obtenerSucursalesUsuario(pool, idUsuario, user.empresa);
@@ -36,9 +37,7 @@ const obtenerUsuariosSucursal = async (pool, idSucursal, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'EDITAR_USUARIOS', 'GESTIONAR_ROLES', 'GESTIONAR_SUCURSALES');
 
     return await usuarioSucursalRepository.obtenerUsuariosSucursal(pool, idSucursal, user.empresa);
 };
@@ -51,9 +50,7 @@ const asignarUsuarioSucursal = async (pool, idUsuario, idSucursal, esDefault, us
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'EDITAR_USUARIOS', 'GESTIONAR_ROLES', 'GESTIONAR_SUCURSALES');
 
     if (!idUsuario || !idSucursal) {
         throw new Error('DATOS_REQUERIDOS');
@@ -70,9 +67,7 @@ const desasignarUsuarioSucursal = async (pool, idUsuarioSucursal, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'EDITAR_USUARIOS', 'GESTIONAR_ROLES', 'GESTIONAR_SUCURSALES');
 
     return await usuarioSucursalRepository.desasignarUsuarioSucursal(pool, idUsuarioSucursal);
 };
@@ -139,9 +134,7 @@ const actualizarAsignaciones = async (pool, idUsuario, sucursalesIds, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'EDITAR_USUARIOS', 'GESTIONAR_ROLES', 'GESTIONAR_SUCURSALES');
 
     if (!idUsuario || !Array.isArray(sucursalesIds)) {
         throw new Error('DATOS_REQUERIDOS');
@@ -163,9 +156,7 @@ const obtenerSucursalesConAsignacion = async (pool, idUsuario, user) => {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    if (user.rol !== 'Administrador') {
-        throw new Error('PERMISO_DENEGADO');
-    }
+    await assertAlgunoPermiso(pool, user, 'EDITAR_USUARIOS', 'GESTIONAR_ROLES', 'GESTIONAR_SUCURSALES');
 
     return await usuarioSucursalRepository.obtenerSucursalesConAsignacion(pool, idUsuario, user.empresa);
 };

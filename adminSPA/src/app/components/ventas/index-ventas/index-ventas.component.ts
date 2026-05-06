@@ -9,7 +9,7 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { VentasService, VentaAgrupadaListado, ComprobanteVentaAgrupada, VentaListado } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
-import { FacturacionService } from '../../../services/facturacion.service';
+import { FacturacionService, ComunicacionBajaHistorialItem } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
@@ -39,6 +39,16 @@ export class IndexVentasComponent implements OnInit {
   loading = true;
   ventaSeleccionada: VentaListado | null = null;
   exportandoLista = false;
+  /** PDF reporte contabilidad SUNAT (solo no gestora). */
+  exportandoReporteContabilidad = false;
+  reporteContabilidadBlob: Blob | null = null;
+  reporteContabilidadNombreArchivo = '';
+  resumenReporteContabilidad = '';
+  mostrarFormWhatsappReporteContabilidad = false;
+  whatsappReporteContabilidadNumber = '';
+  whatsappReporteContabilidadCaption = '';
+  enviandoWhatsappReporteContabilidad = false;
+  whatsappReporteContabilidadMensaje: string | null = null;
   generandoPdf = false;
   enviandoSunatId: string | null = null;
   consultandoEstadoId: string | null = null;
@@ -404,6 +414,33 @@ export class IndexVentasComponent implements OnInit {
 
   esNotaDebitoListado(v: VentaListado): boolean {
     return this.tipoSunatCatalogo(v) === '08';
+  }
+
+  /** Factura/Boleta/NC/ND con SUNAT aceptado (1–3) o baja aceptada por RA (código estado 08). */
+  private incluirEnReporteContabilidadSunat(v: VentaListado): boolean {
+    if (v.eliminado) return false;
+    if (this.tipoSunatCatalogo(v) == null) return false;
+    return this.sunatEstadoAceptado(v) || this.esComprobanteAnuladoSunat(v);
+  }
+
+  private etiquetaTipoSunatContabilidad(v: VentaListado): string {
+    const t = this.tipoSunatCatalogo(v);
+    if (t === '01') return 'Factura';
+    if (t === '03') return 'Boleta';
+    if (t === '07') return 'Nota de crédito';
+    if (t === '08') return 'Nota de débito';
+    return (v.nombreComprobante || '—').trim() || '—';
+  }
+
+  private comunicacionBajaValidaContabilidad(c: ComunicacionBajaHistorialItem): boolean {
+    const id = c.idEstadoSunat;
+    return id === 1 || id === 2 || id === 3 || id === 8;
+  }
+
+  private etiquetaEstadoRaContabilidad(item: ComunicacionBajaHistorialItem): string {
+    const t = (item.descripcionEstadoSunat ?? '').trim();
+    if (t) return t;
+    return this.estadoSunatLabel(typeof item.idEstadoSunat === 'number' ? item.idEstadoSunat : undefined);
   }
 
   /** Texto del comprobante modificado por NC/ND (serie-número). */
@@ -1058,6 +1095,258 @@ export class IndexVentasComponent implements OnInit {
 
   min(a: number, b: number): number {
     return Math.min(a, b);
+  }
+
+  /** Rango de fechas del filtro actual (para listar RA en coherencia con el listado). */
+  private fechasReporteComunicacionesBaja(): { fechaDesde?: string; fechaHasta?: string } {
+    if (this.filtroFecha === 'all') return {};
+    if (this.filtroFecha === 'today') {
+      const n = new Date();
+      const hoy = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+      return { fechaDesde: hoy, fechaHasta: hoy };
+    }
+    if (this.filtroFecha === 'month') {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const ultimo = new Date(y, now.getMonth() + 1, 0).getDate();
+      return { fechaDesde: `${y}-${m}-01`, fechaHasta: `${y}-${m}-${String(ultimo).padStart(2, '0')}` };
+    }
+    if (this.filtroFecha === 'range') {
+      const d = (this.fechaDesde || '').trim();
+      const h = (this.fechaHasta || '').trim();
+      const out: { fechaDesde?: string; fechaHasta?: string } = {};
+      if (d) out.fechaDesde = d.slice(0, 10);
+      if (h) out.fechaHasta = h.slice(0, 10);
+      return out;
+    }
+    return {};
+  }
+
+  /** Pagina todas las comunicaciones de baja y deja solo estados válidos para contabilidad. */
+  private obtenerComunicacionesBajaParaReporte(
+    desde: string | undefined,
+    hasta: string | undefined,
+    callback: (items: ComunicacionBajaHistorialItem[]) => void,
+    onError: (e: unknown) => void
+  ): void {
+    const acum: ComunicacionBajaHistorialItem[] = [];
+    let pagina = 1;
+    const porPagina = 100;
+    const next = (): void => {
+      this.facturacionService
+        .listarComunicacionesBaja({ fechaDesde: desde, fechaHasta: hasta, pagina, porPagina })
+        .subscribe({
+          next: (res) => {
+            const chunk = res?.data ?? [];
+            const total = res?.total ?? 0;
+            acum.push(...chunk);
+            if (chunk.length === 0 || acum.length >= total) {
+              callback(acum.filter((c) => this.comunicacionBajaValidaContabilidad(c)));
+            } else {
+              pagina += 1;
+              next();
+            }
+          },
+          error: (err) => onError(err)
+        });
+    };
+    next();
+  }
+
+  private abrirModalPostReporteContabilidad(): void {
+    setTimeout(() => {
+      const el = document.getElementById('modalPostReporteContabilidad');
+      const bs = (window as unknown as { bootstrap?: { Modal: { getOrCreateInstance: (e: Element) => { show: () => void } } } }).bootstrap;
+      if (el && bs) {
+        bs.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  limpiarEstadoReporteContabilidad(): void {
+    this.reporteContabilidadBlob = null;
+    this.reporteContabilidadNombreArchivo = '';
+    this.resumenReporteContabilidad = '';
+    this.mostrarFormWhatsappReporteContabilidad = false;
+    this.whatsappReporteContabilidadNumber = '';
+    this.whatsappReporteContabilidadCaption = '';
+    this.whatsappReporteContabilidadMensaje = null;
+    this.enviandoWhatsappReporteContabilidad = false;
+  }
+
+  private emitirPdfReporteContabilidad(comps: VentaListado[], ras: ComunicacionBajaHistorialItem[], resumenLinea: string): void {
+    const emp = this.empresa;
+    const empresaPdf = {
+      logo: emp?.logo ?? '',
+      nombre: emp?.nombre ?? '',
+      ruc: emp?.ruc ?? '',
+      direccion: emp?.direccion ?? '',
+      telefono: emp?.telefono ?? ''
+    };
+    type FilaOrd = { clave: string; celdas: (string | number)[] };
+    const tmp: FilaOrd[] = [];
+    for (const v of comps) {
+      const clave = (v.fEmision || '').slice(0, 19).replace(' ', 'T');
+      tmp.push({
+        clave,
+        celdas: [
+          this.etiquetaTipoSunatContabilidad(v),
+          this.formatearFecha(v.fEmision),
+          v.compVenta || '—',
+          this.etiquetaDocAfectadoListado(v),
+          v.clienteRuc || '—',
+          v.clienteRazonSocial || '—',
+          ((v.condicionPago || '—').trim() || '—') as string,
+          `S/ ${Number(v.total).toFixed(2)}`,
+          this.etiquetaEstadoSunatListado(v)
+        ]
+      });
+    }
+    for (const c of ras) {
+      const clave = String(c.fechaComunicacion || '').slice(0, 19).replace(' ', 'T');
+      const corr = (c.numeroCorrelativo || '').trim() || '—';
+      tmp.push({
+        clave,
+        celdas: [
+          'Comunicación de baja (RA)',
+          this.formatearFecha(String(c.fechaComunicacion || '')),
+          `RA-${corr}`,
+          '—',
+          '—',
+          '—',
+          '—',
+          '—',
+          this.etiquetaEstadoRaContabilidad(c)
+        ]
+      });
+    }
+    tmp.sort((a, b) => (a.clave < b.clave ? 1 : a.clave > b.clave ? -1 : 0));
+    const filas = tmp.map((row, i) => [i + 1, ...row.celdas]);
+    this.resumenReporteContabilidad = resumenLinea;
+    const datos = {
+      empresa: empresaPdf,
+      titulo: 'Reporte contabilidad — comprobantes SUNAT y comunicaciones de baja',
+      columnas: [
+        '#',
+        'Tipo',
+        'Fecha',
+        'Comprobante / correlativo',
+        'Doc. afectado (NC/ND)',
+        'RUC cliente',
+        'Cliente',
+        'Condición',
+        'Total (S/)',
+        'Estado SUNAT'
+      ],
+      filas
+    };
+    const nombreArchivo = `reporte_contabilidad_sunat_${new Date().getTime()}.pdf`;
+    this.pdfService.generarPdfDinamico(datos, 'lista-ventas', 9).subscribe({
+      next: (blob) => {
+        this.reporteContabilidadBlob = blob;
+        this.reporteContabilidadNombreArchivo = nombreArchivo;
+        this.whatsappReporteContabilidadCaption = 'Reporte contabilidad SUNAT (comprobantes y RA)';
+        this.exportandoReporteContabilidad = false;
+        this.pdfService.previsualizar(blob);
+        this.abrirModalPostReporteContabilidad();
+      },
+      error: (err) => {
+        this.exportandoReporteContabilidad = false;
+        const msg = (err as { error?: { error?: string } })?.error?.error || (err as Error)?.message || 'Error al generar el PDF.';
+        console.error('Error reporte contabilidad PDF:', err);
+        alert(msg);
+      }
+    });
+  }
+
+  /** Solo empresas no gestoras: PDF con comprobantes 01/03/07/08 aceptados o dados de baja ante SUNAT + RA aceptadas. */
+  generarReporteContabilidadPdf(): void {
+    if (this.esGestora) return;
+    const comps = this.ventasEmpresa.filter((v) => this.incluirEnReporteContabilidadSunat(v));
+    const { fechaDesde, fechaHasta } = this.fechasReporteComunicacionesBaja();
+    this.exportandoReporteContabilidad = true;
+    this.limpiarEstadoReporteContabilidad();
+    this.obtenerComunicacionesBajaParaReporte(
+      fechaDesde,
+      fechaHasta,
+      (ras) => {
+        if (comps.length === 0 && ras.length === 0) {
+          this.exportandoReporteContabilidad = false;
+          alert('No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.');
+          return;
+        }
+        const resumen = `${comps.length} comprobante(s) electrónico(s); ${ras.length} comunicación(es) de baja (RA).`;
+        this.emitirPdfReporteContabilidad(comps, ras, resumen);
+      },
+      (err) => {
+        console.error('Error al listar comunicaciones de baja para reporte:', err);
+        if (comps.length === 0) {
+          this.exportandoReporteContabilidad = false;
+          alert('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
+          return;
+        }
+        const resumen = `${comps.length} comprobante(s) electrónico(s); RA no incluida (error al cargar el historial).`;
+        this.emitirPdfReporteContabilidad(comps, [], resumen);
+      }
+    );
+  }
+
+  descargarReporteContabilidadPdf(): void {
+    if (!this.reporteContabilidadBlob) return;
+    this.pdfService.descargar(this.reporteContabilidadBlob, this.reporteContabilidadNombreArchivo || 'reporte_contabilidad.pdf');
+  }
+
+  abrirFormWhatsappReporteContabilidad(): void {
+    this.mostrarFormWhatsappReporteContabilidad = true;
+    this.whatsappReporteContabilidadMensaje = null;
+  }
+
+  cerrarFormWhatsappReporteContabilidad(): void {
+    this.mostrarFormWhatsappReporteContabilidad = false;
+    this.whatsappReporteContabilidadMensaje = null;
+  }
+
+  enviarReporteContabilidadWhatsapp(): void {
+    if (!this.reporteContabilidadBlob || !this.reporteContabilidadNombreArchivo) {
+      this.whatsappReporteContabilidadMensaje = 'No hay PDF generado.';
+      return;
+    }
+    if (!this.whatsappReporteContabilidadNumber.trim()) {
+      this.whatsappReporteContabilidadMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsappReporteContabilidad = true;
+    this.whatsappReporteContabilidadMensaje = null;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+      this.whatsappService
+        .enviarArchivo(
+          this.whatsappReporteContabilidadNumber.trim(),
+          base64,
+          this.reporteContabilidadNombreArchivo,
+          'document',
+          this.whatsappReporteContabilidadCaption.trim() || undefined
+        )
+        .subscribe({
+          next: (res) => {
+            this.enviandoWhatsappReporteContabilidad = false;
+            this.whatsappReporteContabilidadMensaje = res.message;
+            if (res.success) {
+              setTimeout(() => {
+                this.cerrarFormWhatsappReporteContabilidad();
+              }, 2000);
+            }
+          },
+          error: (err) => {
+            this.enviandoWhatsappReporteContabilidad = false;
+            this.whatsappReporteContabilidadMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+          }
+        });
+    };
+    reader.readAsDataURL(this.reporteContabilidadBlob);
   }
 
   /** Exporta la lista actual (filtrada) de ventas a PDF (vista previa). */

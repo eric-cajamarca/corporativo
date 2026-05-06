@@ -10,7 +10,7 @@ const crearDireccionCliente = async (req, res) => {
     if (error.message === DE.NO_AUTH) {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === DE.NO_ROL) {
+    if (error.message === DE.NO_ROL || error.message === 'NO_PERMISSIONS') {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('direccionClientes.crear:', error);
@@ -26,7 +26,7 @@ const listarDireccionClientes = async (req, res) => {
     if (error.message === DE.NO_AUTH) {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === DE.NO_ROL) {
+    if (error.message === DE.NO_ROL || error.message === 'NO_PERMISSIONS') {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('direccionClientes.listar:', error);
@@ -44,7 +44,7 @@ const listarDireccionesClientes_idCliente = async (req, res) => {
     if (error.message === DE.NO_AUTH) {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === DE.NO_ROL) {
+    if (error.message === DE.NO_ROL || error.message === 'NO_PERMISSIONS') {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('direccionClientes.listarPorCliente:', error);
@@ -63,7 +63,7 @@ const actualizarDireccionCliente = async (req, res) => {
     if (error.message === DE.NO_AUTH) {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === DE.NO_ROL) {
+    if (error.message === DE.NO_ROL || error.message === 'NO_PERMISSIONS') {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('direccionClientes.actualizar:', error);
@@ -82,7 +82,7 @@ const eliminarDireccionCliente = async (req, res) => {
     if (error.message === DE.NO_AUTH) {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === DE.NO_ROL) {
+    if (error.message === DE.NO_ROL || error.message === 'NO_PERMISSIONS') {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('direccionClientes.eliminar:', error);

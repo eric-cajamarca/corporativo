@@ -1,5 +1,6 @@
 const sucursalRepository = require('../repositories/sucursal.repository');
 const empresaService = require('./empresa.service');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 const E = {
   NO_ACCESS: 'NO_ACCESS',
@@ -27,7 +28,7 @@ function normalizarFechaRegistro(rows) {
 
 async function obtenerSucursalResumen(pool, user) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   const rows = await sucursalRepository.listarResumenPorEmpresa(pool, idEmpresa);
@@ -38,7 +39,7 @@ async function obtenerSucursalTodos(pool, user) {
   if (!user) throw new Error(E.NO_ACCESS);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   const rows = await sucursalRepository.listarTodosPorEmpresa(pool, idEmpresa);
   return normalizarFechaRegistro(rows);
 }
@@ -47,7 +48,7 @@ async function establecerPrincipal(pool, user, idSucursal) {
   if (!user) throw new Error(E.NO_ACCESS);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO_403);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   if (!idSucursal) throw new Error(E.BAD_REQUEST);
   const existe = await sucursalRepository.existeSucursalEnEmpresa(pool, idSucursal, idEmpresa);
   if (!existe) throw new Error(E.NOT_FOUND);
@@ -58,7 +59,7 @@ async function establecerPrincipal(pool, user, idSucursal) {
 
 async function editarSucursal(pool, user, body) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   const { idSucursal, id, nombre, direccion, idSucursalSeriesPadre } = body || {};
@@ -121,7 +122,7 @@ async function editarSucursal(pool, user, body) {
 
 async function editarEstadoSucursal(pool, user, idSucursal, body) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO_403);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   const estado = body?.estado;
@@ -133,7 +134,7 @@ async function editarEstadoSucursal(pool, user, idSucursal, body) {
 
 async function eliminarTodasSucursalesEmpresa(pool, user) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   return sucursalRepository.eliminarTodasPorEmpresa(pool, idEmpresa);
@@ -141,7 +142,7 @@ async function eliminarTodasSucursalesEmpresa(pool, user) {
 
 async function obtenerStockSucursalProducto(pool, user, idProducto, idSucursal) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'VER_INVENTARIO', 'GESTIONAR_LOTES');
   if (!user.empresa || !idSucursal || !idProducto) throw new Error(E.BAD_REQUEST);
   return sucursalRepository.listarLotesPorSucursalProducto(
     pool,
@@ -155,13 +156,13 @@ async function obtenerStockSucursalesEmpresa(pool, user) {
   if (!user) throw new Error(E.NO_ACCESS);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
-  if (user.rol !== 'Administrador' && user.rol !== 'Almacenero') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'VER_INVENTARIO', 'GESTIONAR_LOTES');
   return sucursalRepository.listarLotesStockPorEmpresa(pool, idEmpresa);
 }
 
 async function crearStockLote(pool, user, body) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador' && user.rol !== 'Almacenero') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_LOTES');
   const idEmpresa = user.empresa;
   const { idSucursal, idProducto, cantidad, costoUnitario } = body || {};
   const cantidadVal = parseFloat(cantidad) || 0;
@@ -200,7 +201,7 @@ async function editarStockLote(pool, user, idLote, body) {
 
 async function eliminarStockLote(pool, user, idLote) {
   if (!user) throw new Error(E.NO_ACCESS);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_PERMISO);
+  await assertAlgunoPermiso(pool, user, 'GESTIONAR_LOTES');
   const idEmpresa = user.empresa;
   return sucursalRepository.eliminarLote(pool, idEmpresa, idLote);
 }

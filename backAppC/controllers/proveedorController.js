@@ -1,6 +1,10 @@
 const proveedorService = require('../services/proveedor.service');
 const { withPool } = require('../utils/dbPool.util');
 
+function sinPermProveedor(msg) {
+  return msg === 'NO_PERM' || msg === 'NO_PERMISSIONS';
+}
+
 const crearProveedor = async function (req, res) {
   if (!req.user) {
     return res.status(500).send({ message: 'No Access' });
@@ -12,7 +16,7 @@ const crearProveedor = async function (req, res) {
     if (err.code === 'RUC_DUPLICADO') {
       return res.status(409).send({ message: 'El RUC ya existe en su empresa', data: undefined });
     }
-    if (err.message === 'NO_PERM' || err.message === 'NO_EMPRESA') {
+    if (sinPermProveedor(err.message) || err.message === 'NO_EMPRESA') {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('crearProveedor:', err);
@@ -28,8 +32,10 @@ const listarProveedores = async function (req, res) {
     const data = await withPool((pool) => proveedorService.listarProveedores(pool, req.user));
     res.status(200).send({ message: 'Lista de proveedores', data });
   } catch (err) {
-    if (err.message === 'NO_PERM' || err.message === 'NO_EMPRESA') {
-      return res.status(403).send({ message: err.message === 'NO_PERM' ? 'No tiene permisos para realizar esta acción' : 'No autorizado: falta empresa en token' });
+    if (sinPermProveedor(err.message) || err.message === 'NO_EMPRESA') {
+      return res.status(403).send({
+        message: sinPermProveedor(err.message) ? 'No tiene permisos para realizar esta acción' : 'No autorizado: falta empresa en token'
+      });
     }
     console.error('listarProveedores:', err);
     res.status(500).send({ message: err.message, data: undefined });
@@ -45,7 +51,7 @@ const listarProveedores_ruc = async function (req, res) {
     const data = await withPool((pool) => proveedorService.listarPorRuc(pool, req.user, ruc));
     res.status(200).send({ message: 'Lista de Proveedores', data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('listarProveedores_ruc:', err);
@@ -62,7 +68,7 @@ const listarProveedores_id = async function (req, res) {
     const data = await withPool((pool) => proveedorService.listarPorId(pool, req.user, idProveedor));
     res.status(200).send({ message: 'Lista de proveedores', data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('listarProveedores_id:', err);
@@ -82,7 +88,7 @@ const actualizarProveedor = async function (req, res) {
     if (err.code === 'NOT_FOUND') {
       return res.status(404).send({ message: 'Proveedor no encontrado o no pertenece a su empresa', data: undefined });
     }
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('actualizarProveedor:', err);
@@ -102,7 +108,7 @@ const eliminarProveedor = async function (req, res) {
     if (err.code === 'TIENE_COMPRAS') {
       return res.status(400).send({ message: 'El proveedor tiene compras asociadas, no se puede eliminar', data: undefined });
     }
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('eliminarProveedor:', err);
@@ -120,7 +126,7 @@ const cambiarEstadoProveedor = async function (req, res) {
     const rows = await withPool((pool) => proveedorService.cambiarEstado(pool, req.user, idProveedor, estado));
     res.status(200).send({ message: 'Proveedor eliminado', data: rows });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('cambiarEstadoProveedor:', err);
@@ -136,7 +142,7 @@ const crearDireccionProveedor = async function (req, res) {
     const r = await withPool((pool) => proveedorService.crearDireccion(pool, req.user, req.body));
     res.status(200).send({ message: 'DireccionProveedor creado', data: r.rowsAffected });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('crearDireccionProveedor:', err);
@@ -152,7 +158,7 @@ const listarDireccionProveedores = async function (req, res) {
     const data = await withPool((pool) => proveedorService.listarDireccionesEmpresa(pool, req.user));
     res.status(200).send({ message: 'Lista de DireccionProveedores', data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('listarDireccionProveedores:', err);
@@ -171,7 +177,7 @@ const listarDirecciones_idProveedor = async function (req, res) {
     );
     res.status(200).send({ message: 'Lista de DireccionProveedores', data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('listarDirecciones_idProveedor:', err);
@@ -193,7 +199,7 @@ const actualizarDireccionProveedor = async function (req, res) {
     if (err.message === 'NOT_FOUND') {
       return res.status(404).send({ message: 'Dirección no encontrada', data: undefined });
     }
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('actualizarDireccionProveedor:', err);
@@ -213,7 +219,7 @@ const eliminarDireccionProveedor = async function (req, res) {
     if (err.message === 'NOT_FOUND') {
       return res.status(404).send({ message: 'Dirección no encontrada', data: undefined });
     }
-    if (err.message === 'NO_PERM') {
+    if (sinPermProveedor(err.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('eliminarDireccionProveedor:', err);

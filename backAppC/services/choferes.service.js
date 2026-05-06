@@ -1,13 +1,11 @@
 const ChoferesRepository = require('../repositories/choferes.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 exports.listarChoferesService = async (pool, user) => {
   if (!user) throw new Error('NO_ACCESS');
   if (!user.empresa) throw new Error('NO_ACCESS');
 
-  // Solo admin/vendedor necesitan ver y administrar choferes.
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') {
-    throw new Error('NO_PERMISSIONS');
-  }
+  await assertAlgunoPermiso(pool, user, 'VER_ENVIOS', 'VER_DESPACHOS', 'CREAR_DESPACHOS', 'EDITAR_DESPACHOS');
 
   return await ChoferesRepository.listarChoferesRepo(pool, user.empresa);
 };
@@ -15,7 +13,7 @@ exports.listarChoferesService = async (pool, user) => {
 exports.listarUsuariosChoferRolService = async (pool, user) => {
   if (!user) throw new Error('NO_ACCESS');
   if (!user.empresa) throw new Error('NO_ACCESS');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERMISSIONS');
+  await assertAlgunoPermiso(pool, user, 'VER_ENVIOS', 'VER_DESPACHOS', 'CREAR_DESPACHOS', 'EDITAR_DESPACHOS');
 
   return await ChoferesRepository.listarUsuariosChoferRolRepo(pool, user.empresa);
 };
@@ -23,7 +21,7 @@ exports.listarUsuariosChoferRolService = async (pool, user) => {
 exports.crearOActualizarChoferService = async (pool, user, { idUsuarioChofer, idVehiculo }) => {
   if (!user) throw new Error('NO_ACCESS');
   if (!user.empresa) throw new Error('NO_ACCESS');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERMISSIONS');
+  await assertAlgunoPermiso(pool, user, 'VER_ENVIOS', 'CREAR_DESPACHOS', 'EDITAR_DESPACHOS');
 
   // Validar que el usuario existe y pertenece a la empresa.
   const usuarioValido = await ChoferesRepository.validarUsuarioChoferEmpresaRepo(pool, user.empresa, idUsuarioChofer);

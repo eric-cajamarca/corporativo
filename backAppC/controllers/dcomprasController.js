@@ -13,7 +13,7 @@ const obtener_detalle_compras_idcompra = async function (req, res) {
     const data = await withPool((pool) => detalleComprasService.obtenerDetallePorCompra(pool, req.user, idCompra));
     res.status(200).send({ data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('obtener_detalle_compras_idcompra:', err);
@@ -36,7 +36,7 @@ const crear_detalle_compras_idcompra = async function (req, res) {
       idLote: result.idLote
     });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('crear_detalle_compras_idcompra error:', err);

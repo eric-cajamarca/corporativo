@@ -12,7 +12,7 @@ const crearCliente = async function (req, res) {
     if (err.code === 'RUC_DUPLICADO') {
       return res.status(200).send({ message: 'El ruc ya existe', data: undefined });
     }
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('crearCliente:', err);
@@ -28,8 +28,8 @@ const listarClientes = async function (req, res) {
     const data = await withPool((pool) => clientesService.listarClientes(pool, req.user));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {
-    if (err.message === 'NO_PERM' || err.message === 'NO_EMPRESA') {
-      return res.status(403).send({ message: err.message === 'NO_PERM' ? 'No tiene permisos para realizar esta acción' : 'No autorizado: falta empresa en token' });
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS') || err.message === 'NO_EMPRESA') {
+      return res.status(403).send({ message: (err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS') ? 'No tiene permisos para realizar esta acción' : 'No autorizado: falta empresa en token' });
     }
     console.error('listarClientes:', err);
     res.status(500).send({ message: err.message, data: undefined });
@@ -45,7 +45,7 @@ const listarClientes_ruc = async function (req, res) {
     const data = await withPool((pool) => clientesService.listarPorRuc(pool, req.user, ruc));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('listarClientes_ruc:', err);
@@ -62,7 +62,7 @@ const listarClientes_id = async function (req, res) {
     const data = await withPool((pool) => clientesService.listarPorId(pool, req.user, idCliente));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('listarClientes_id:', err);
@@ -82,7 +82,7 @@ const actualizarCliente = async function (req, res) {
     if (err.code === 'NOT_FOUND') {
       return res.status(404).send({ message: 'Cliente no encontrado o no pertenece a su empresa', data: undefined });
     }
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('actualizarCliente:', err);
@@ -99,7 +99,7 @@ const eliminarCliente = async function (req, res) {
     const n = await withPool((pool) => clientesService.eliminarCliente(pool, req.user, idCliente));
     res.status(200).send({ message: 'Cliente eliminado', data: n });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(403).send({ message: 'No tiene permisos para realizar esta acción' });
     }
     console.error('eliminarCliente:', err);
@@ -117,7 +117,7 @@ const cambiarEstadoCliente = async function (req, res) {
     const rows = await withPool((pool) => clientesService.cambiarEstado(pool, req.user, idCliente, estado));
     res.status(200).send({ message: 'Cliente eliminado', data: rows });
   } catch (err) {
-    if (err.message === 'NO_PERM') {
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('cambiarEstadoCliente:', err);

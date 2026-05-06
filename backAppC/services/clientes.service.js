@@ -1,5 +1,6 @@
 const gestoresRepository = require('../repositories/gestores.repository');
 const clientesRepository = require('../repositories/clientes.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function idsEmpresaConGestionadas(pool, idEmpresaRaiz) {
   const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaRaiz);
@@ -8,7 +9,7 @@ async function idsEmpresaConGestionadas(pool, idEmpresaRaiz) {
 
 async function crearCliente(pool, user, body) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'CREAR_CLIENTES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const { idDocumento, ruc, rSocial, correo, celular, condicion, sujetoCredito, lineaCredito } = body;
@@ -39,7 +40,7 @@ async function listarClientes(pool, user) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_CLIENTES', 'CREAR_CLIENTES', 'EDITAR_CLIENTES');
   return clientesRepository.listarPorEmpresa(pool, idEmpresa);
 }
 
@@ -47,7 +48,7 @@ async function listarPorRuc(pool, user, ruc) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_CLIENTES', 'CREAR_CLIENTES', 'EDITAR_CLIENTES');
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   return clientesRepository.listarPorRucEmpresas(pool, ids, ruc);
 }
@@ -56,7 +57,7 @@ async function listarPorId(pool, user, idCliente) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_CLIENTES', 'CREAR_CLIENTES', 'EDITAR_CLIENTES');
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   return clientesRepository.listarPorIdClienteEmpresas(pool, ids, idCliente);
 }
@@ -65,7 +66,7 @@ async function actualizarCliente(pool, user, idCliente, body) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const { idDocumento, ruc, rSocial, correo, celular, condicion, sujetoCredito, lineaCredito } = body;
   const esSujetoCredito =
     sujetoCredito === true || sujetoCredito === 1 || String(sujetoCredito).toLowerCase() === 'true';
@@ -94,7 +95,7 @@ async function eliminarCliente(pool, user, idCliente) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const ids = await idsEmpresaConGestionadas(pool, idEmpresa);
   const deleteResult = await clientesRepository.eliminarEnEmpresas(pool, ids, idCliente);
   return deleteResult.rowsAffected[0];
@@ -102,7 +103,7 @@ async function eliminarCliente(pool, user, idCliente) {
 
 async function cambiarCondicion(pool, user, idCliente, condicionActual) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const nuevacondicion = condicionActual === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
@@ -111,7 +112,7 @@ async function cambiarCondicion(pool, user, idCliente, condicionActual) {
 
 async function cambiarEstado(pool, user, idCliente, estadoBody) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const nuevoEstado = estadoBody ? 0 : 1;

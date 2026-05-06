@@ -2,6 +2,10 @@
 const { withPool } = require('../utils/dbPool.util');
 const gestoresService = require('../services/gestores.service');
 
+function esErrorPermisoGestores(msg) {
+  return msg === 'PERMISO_DENEGADO' || msg === 'NO_PERMISSIONS';
+}
+
 /**
  * Obtiene las empresas gestionadas
  */
@@ -23,7 +27,7 @@ const obtener_empresas_gestionadas = async function (req, res) {
     } catch (error) {
         console.error('Error en obtener_empresas_gestionadas:', error.message);
 
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (esErrorPermisoGestores(error.message)) {
             return res.status(403).json({
                 message: 'No tiene permisos para realizar esta acción',
                 data: undefined
@@ -57,6 +61,12 @@ const obtener_todos_gestores = async function (req, res) {
 
     } catch (error) {
         console.error('Error en obtener_todos_gestores:', error.message);
+        if (esErrorPermisoGestores(error.message)) {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
+                data: undefined
+            });
+        }
         res.status(500).json({
             message: 'Error al obtener gestores',
             data: undefined
@@ -104,6 +114,13 @@ const buscar_empresa_ruc = async function (req, res) {
         if (error.message === 'NO_PUEDE_GESTIONARSE_A_SI_MISMO') {
             return res.status(400).json({
                 message: 'No puede asignarse a sí mismo como empresa gestionada',
+                data: undefined
+            });
+        }
+
+        if (esErrorPermisoGestores(error.message)) {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
                 data: undefined
             });
         }
@@ -166,6 +183,13 @@ const asignar_empresa_gestionada = async function (req, res) {
             });
         }
 
+        if (esErrorPermisoGestores(error.message)) {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
+                data: undefined
+            });
+        }
+
         res.status(500).json({
             message: 'Error al asignar empresa',
             data: undefined
@@ -195,6 +219,12 @@ const remover_empresa_gestionada = async function (req, res) {
 
     } catch (error) {
         console.error('Error en remover_empresa_gestionada:', error.message);
+        if (esErrorPermisoGestores(error.message)) {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
+                data: undefined
+            });
+        }
         res.status(500).json({
             message: 'Error al remover empresa',
             data: undefined
@@ -230,6 +260,12 @@ const activar_empresa_gestionada = async function (req, res) {
                 data: undefined
             });
         }
+        if (esErrorPermisoGestores(error.message)) {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
+                data: undefined
+            });
+        }
         res.status(500).json({
             message: 'Error al activar empresa',
             data: undefined
@@ -259,6 +295,12 @@ const eliminar_empresa_gestionada = async function (req, res) {
 
     } catch (error) {
         console.error('Error en eliminar_empresa_gestionada:', error.message);
+        if (esErrorPermisoGestores(error.message)) {
+            return res.status(403).json({
+                message: 'No tiene permisos para realizar esta acción',
+                data: undefined
+            });
+        }
         res.status(500).json({
             message: 'Error al eliminar empresa',
             data: undefined
@@ -349,9 +391,9 @@ const guardar_configuracion = async function (req, res) {
                 data: undefined
             });
         }
-        if (error.message === 'PERMISO_DENEGADO') {
+        if (esErrorPermisoGestores(error.message)) {
             return res.status(403).json({
-                message: 'No tiene permiso para guardar la configuración (se requiere Administrador o superAdmin).',
+                message: 'No tiene permiso para guardar la configuración (se requiere permiso de configuración o rol administrador/superAdmin).',
                 data: undefined
             });
         }

@@ -1,16 +1,17 @@
 const sql = require('mssql');
 const detalleComprasRepository = require('../repositories/detalleCompras.repository');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function obtenerDetallePorCompra(pool, user, idCompra) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'VER_COMPRAS', 'CREAR_COMPRAS', 'EDITAR_COMPRAS');
   return detalleComprasRepository.listarPorCompra(pool, user.empresa, idCompra);
 }
 
 async function crearDetalleCompraCompleto(pool, user, body) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador' && user.rol !== 'Almacenero') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'CREAR_COMPRAS', 'EDITAR_COMPRAS', 'GESTIONAR_LOTES');
   const {
     idSucursal,
     idCompra,
@@ -97,7 +98,7 @@ async function actualizarDetalleInterno(pool, detalle) {
 
 async function eliminarDetallePorCompra(pool, user, idCompra) {
   if (!user) throw new Error('NO_AUTH');
-  if (user.rol !== 'Administrador') throw new Error('NO_PERM');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_COMPRAS');
   return detalleComprasRepository.eliminarPorCompra(pool, idCompra);
 }
 

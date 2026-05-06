@@ -143,37 +143,25 @@ const updateAdmin = async (req, res, next) => {
 };
 
 const obtener_datos_colaborador_admin = async (req, res, next) => {
-    const { id } = req.params;
-    let data;
-
-        
-
-    if (req.user) {
-        if (req.user.rol == 'Administrador') {
-                        try {
-
-                await withPool(async (pool) => {
-                    const row = await usuarioAdminService.obtenerColaboradorConRol(pool, req.user, id);
-                    data = [row];
-                    res.status(200).send({ data });
-                });
-
-            } catch (error) {
-                if (error.code === 'NOT_FOUND') {
-                    return res.status(404).send({ message: 'Usuario no encontrado', data: undefined });
-                }
-                console.error('Error al obtener colaborador admin:', error);
-                return next(error);
-            }
-        } else {
-            res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
-        }
-
-
+  const { id } = req.params;
+  if (!req.user) {
+    return res.status(500).send({ message: 'No Access' });
+  }
+  try {
+    await withPool(async (pool) => {
+      const row = await usuarioAdminService.obtenerColaboradorConRol(pool, req.user, id);
+      res.status(200).send({ data: [row] });
+    });
+  } catch (error) {
+    if (error.message === 'NO_PERM' || error.message === 'NO_PERMISSIONS') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
-    else {
-        res.status(500).send({ message: 'No Access' });
+    if (error.code === 'NOT_FOUND') {
+      return res.status(404).send({ message: 'Usuario no encontrado', data: undefined });
     }
+    console.error('Error al obtener colaborador admin:', error);
+    return next(error);
+  }
 };
 
 

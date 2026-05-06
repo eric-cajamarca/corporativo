@@ -1,6 +1,10 @@
 const documentoService = require('../services/documento.service');
 const { withPool } = require('../utils/dbPool.util');
 
+function sinPermisoDocumento(msg) {
+  return msg === 'NO_PERMISOS' || msg === 'NO_PERMISSIONS';
+}
+
 async function crearDocumento(req, res) {
   try {
     const data = await withPool((pool) => documentoService.crearDocumento(pool, req.user, req.body));
@@ -9,7 +13,7 @@ async function crearDocumento(req, res) {
     if (error.message === 'NO_ACCESS') {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === 'NO_PERMISOS') {
+    if (sinPermisoDocumento(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('documento.crearDocumento:', error);
@@ -25,7 +29,7 @@ async function listarDocumentos(req, res) {
     if (error.message === 'NO_ACCESS') {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === 'NO_PERMISOS') {
+    if (sinPermisoDocumento(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('documento.listarDocumentos:', error);
@@ -44,7 +48,7 @@ async function actualizarDocumento(req, res) {
     if (error.message === 'NO_ACCESS') {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === 'NO_PERMISOS') {
+    if (sinPermisoDocumento(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('documento.actualizarDocumento:', error);
@@ -61,7 +65,7 @@ async function eliminarDocumento(req, res) {
     if (error.message === 'NO_ACCESS') {
       return res.status(500).send({ message: 'No Access' });
     }
-    if (error.message === 'NO_PERMISOS') {
+    if (sinPermisoDocumento(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     console.error('documento.eliminarDocumento:', error);

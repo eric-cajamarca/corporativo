@@ -3,6 +3,7 @@ const {
   resolverIdEmpresaOperacionCaja,
   obtenerEmpresasPermitidasOperacionCaja
 } = require('../utils/cajaOperacionEmpresa.util');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function idsEmpresaCreditosDesdeQuery(pool, user, idEmpresaOperacion) {
   if (idEmpresaOperacion != null && String(idEmpresaOperacion).trim() !== "") {
@@ -18,9 +19,7 @@ exports.obtenerCreditosClienteService = async (pool, user, idCliente, idEmpresaO
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'VER_CREDITOS', 'CREAR_CREDITOS', 'REGISTRAR_PAGOS');
 
   const ids = await idsEmpresaCreditosDesdeQuery(pool, user, idEmpresaOperacion);
   if (ids.length === 0) {
@@ -35,9 +34,7 @@ exports.crearCreditoService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'CREAR_CREDITOS');
 
   const clienteValido = await CreditosRepository.validarClienteEmpresaRepo(pool, datos.idCliente, user.empresa);
   if (!clienteValido) {
@@ -60,9 +57,7 @@ exports.obtenerCuotasCreditoService = async (pool, user, idCredito, idEmpresaOpe
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'VER_CREDITOS', 'CREAR_CREDITOS', 'REGISTRAR_PAGOS');
 
   const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
   const cuotas = await CreditosRepository.obtenerCuotasCreditoRepo(pool, idE, idCredito);
@@ -74,9 +69,7 @@ exports.pagarCuotaService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertAlgunoPermiso(pool, user, 'REGISTRAR_PAGOS', 'CREAR_CREDITOS');
 
   const idE = await resolverIdEmpresaOperacionCaja(pool, user, datos.idEmpresaOperacion);
   const userOp = { ...user, empresa: idE };
@@ -95,6 +88,8 @@ exports.obtenerResumenCreditosService = async (pool, user, idEmpresaOperacion) =
     throw new Error("NO_ACCESS");
   }
 
+  await assertAlgunoPermiso(pool, user, 'VER_CREDITOS', 'CREAR_CREDITOS', 'REGISTRAR_PAGOS');
+
   const ids = await idsEmpresaCreditosDesdeQuery(pool, user, idEmpresaOperacion);
   if (ids.length === 0) {
     throw new Error("NO_ACCESS");
@@ -108,6 +103,8 @@ exports.obtenerCuotasPendientesService = async (pool, user, dias = 7, idEmpresaO
     throw new Error("NO_ACCESS");
   }
 
+  await assertAlgunoPermiso(pool, user, 'VER_CREDITOS', 'CREAR_CREDITOS', 'REGISTRAR_PAGOS');
+
   const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
   const cuotas = await CreditosRepository.obtenerCuotasPendientesRepo(pool, idE, dias);
   return cuotas;
@@ -117,6 +114,8 @@ exports.obtenerEficienciaCobrosService = async (pool, user, idEmpresaOperacion) 
   if (!user) {
     throw new Error("NO_ACCESS");
   }
+
+  await assertAlgunoPermiso(pool, user, 'VER_CREDITOS', 'CREAR_CREDITOS', 'REGISTRAR_PAGOS');
 
   const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacion);
   const eficiencia = await CreditosRepository.obtenerEficienciaCobrosRepo(pool, idE);

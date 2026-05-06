@@ -1,4 +1,5 @@
 const documentoRepository = require('../repositories/documento.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 function asegurarUsuario(user) {
   if (!user) {
@@ -6,22 +7,9 @@ function asegurarUsuario(user) {
   }
 }
 
-function asegurarRol(user) {
-  asegurarUsuario(user);
-  if (!user.rol) {
-    throw new Error('NO_PERMISOS');
-  }
-}
-
-function asegurarAdministrador(user) {
-  asegurarUsuario(user);
-  if (user.rol !== 'Administrador') {
-    throw new Error('NO_PERMISOS');
-  }
-}
-
 async function crearDocumento(pool, user, body) {
-  asegurarRol(user);
+  asegurarUsuario(user);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
   const idDocumento = body?.idDocumento;
   const nombre = body?.nombre;
   const descripcion = body?.descripcion;
@@ -36,12 +24,13 @@ async function crearDocumento(pool, user, body) {
 }
 
 async function listarDocumentos(pool, user) {
-  asegurarRol(user);
+  asegurarUsuario(user);
   return documentoRepository.listarDocumentos(pool);
 }
 
 async function actualizarDocumento(pool, user, idDocumento, body) {
-  asegurarAdministrador(user);
+  asegurarUsuario(user);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
   const nombre = body?.nombre;
   const descripcion = body?.descripcion;
   if (!idDocumento || nombre === undefined || descripcion === undefined) {
@@ -55,7 +44,8 @@ async function actualizarDocumento(pool, user, idDocumento, body) {
 }
 
 async function eliminarDocumento(pool, user, idDocumento) {
-  asegurarAdministrador(user);
+  asegurarUsuario(user);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CONFIGURACION');
   if (!idDocumento) {
     throw new Error('idDocumento requerido');
   }

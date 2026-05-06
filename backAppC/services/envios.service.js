@@ -1,18 +1,32 @@
 const EnviosRepository = require('../repositories/envios.repository');
+const { assertAlgunoPermiso, tieneAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
+
+/** Coordinación de envíos (programación, listados, edición). */
+async function assertEnviosStaff(pool, user) {
+  await assertAlgunoPermiso(pool, user, 'VER_ENVIOS');
+}
+
+/** Ver envíos o actuar como chofer en campo. */
+async function assertEnviosStaffOChofer(pool, user) {
+  await assertAlgunoPermiso(pool, user, 'VER_ENVIOS', 'VER_ENVIOS_CHOFER');
+}
+
+async function esSoloChoferEnvios(pool, user) {
+  if (user.rol === 'Administrador') return false;
+  const staff = await tieneAlgunoPermiso(pool, user, 'VER_ENVIOS');
+  if (staff) return false;
+  return user.rol === 'Chofer' || (await tieneAlgunoPermiso(pool, user, 'VER_ENVIOS_CHOFER'));
+}
 
 exports.obtenerEnviosProgramadosService = async (pool, user, filtros = {}) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
   return await EnviosRepository.obtenerEnviosProgramadosRepo(pool, user.empresa, filtros);
 };
 
 exports.obtenerDetalleEnvioService = async (pool, user, idEnvio) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor" && user.rol !== "Chofer") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaffOChofer(pool, user);
   const detalle = await EnviosRepository.obtenerDetalleEnvioRepo(pool, idEnvio, user.empresa);
   if (detalle === null) throw new Error("ENVIO_NO_ENCONTRADO");
   return detalle;
@@ -23,9 +37,7 @@ exports.obtenerEnviosVentaService = async (pool, user, idVenta) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
 
   const envios = await EnviosRepository.obtenerEnviosVentaRepo(pool, user.empresa, idVenta);
   return envios;
@@ -36,9 +48,7 @@ exports.crearEnvioService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
 
   // Validar que la venta existe y pertenece a la empresa
   const ventaValida = await EnviosRepository.validarVentaEmpresaRepo(pool, datos.idVenta, user.empresa);
@@ -95,9 +105,7 @@ exports.actualizarEstadoEnvioService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor" && user.rol !== "Chofer") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaffOChofer(pool, user);
 
   // Validar que el envío existe
   const envioInfo = await EnviosRepository.obtenerEnvioParaValidarRolRepo(pool, datos.idEnvio, user.empresa);
@@ -105,10 +113,9 @@ exports.actualizarEstadoEnvioService = async (pool, user, datos) => {
     throw new Error("ENVIO_NO_ENCONTRADO");
   }
 
-  // Validar permiso por rol
-  const esChofer = user.rol === 'Chofer';
-  if (esChofer) {
-    // El chofer solo puede actualizar envíos asignados a su usuario.
+  const soloChofer = await esSoloChoferEnvios(pool, user);
+  if (soloChofer) {
+    // Chofer (o solo permiso chofer): solo envíos asignados a su usuario.
     if (!envioInfo.idChoferUsuario || envioInfo.idChoferUsuario !== user.sub) {
       throw new Error("NO_PERMISSIONS");
     }
@@ -126,9 +133,7 @@ exports.actualizarEstadoEnvioService = async (pool, user, datos) => {
 
 exports.actualizarEnvioService = async (pool, user, datos) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
   const result = await EnviosRepository.actualizarEnvioRepo(pool, user, datos);
   if (result === null) throw new Error("ENVIO_NO_ENCONTRADO");
   return result;
@@ -136,9 +141,7 @@ exports.actualizarEnvioService = async (pool, user, datos) => {
 
 exports.eliminarEnvioService = async (pool, user, idEnvio) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
   const ok = await EnviosRepository.eliminarEnvioRepo(pool, idEnvio, user.empresa);
   if (!ok) throw new Error("ENVIO_NO_ENCONTRADO");
   return { mensaje: "Envío eliminado" };
@@ -149,9 +152,7 @@ exports.asignarTransportistaService = async (pool, user, datos) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
 
   // Validar que el envío existe
   const envioValido = await EnviosRepository.validarEnvioEmpresaRepo(pool, datos.idEnvio, user.empresa);
@@ -174,6 +175,8 @@ exports.obtenerTransportistasService = async (pool, user) => {
     throw new Error("NO_ACCESS");
   }
 
+  await assertEnviosStaff(pool, user);
+
   const transportistas = await EnviosRepository.obtenerTransportistasRepo(pool, user.empresa);
   return transportistas;
 };
@@ -194,6 +197,8 @@ exports.obtenerTiposEnvioService = async (pool, user) => {
     throw new Error("NO_ACCESS");
   }
 
+  await assertEnviosStaffOChofer(pool, user);
+
   const tipos = await EnviosRepository.obtenerTiposEnvioRepo(pool);
   return tipos;
 };
@@ -202,6 +207,8 @@ exports.obtenerEstadosEnvioService = async (pool, user) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
+
+  await assertEnviosStaffOChofer(pool, user);
 
   const estados = await EnviosRepository.obtenerEstadosEnvioRepo(pool);
   return estados;
@@ -212,9 +219,7 @@ exports.obtenerEnviosPorEstadoService = async (pool, user, estado) => {
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
 
   const envios = await EnviosRepository.obtenerEnviosPorEstadoRepo(pool, user.empresa, estado);
   return envios;
@@ -225,9 +230,7 @@ exports.obtenerEnviosPorTransportistaService = async (pool, user, idTransportist
     throw new Error("NO_ACCESS");
   }
 
-  if (user.rol !== "Administrador" && user.rol !== "Vendedor") {
-    throw new Error("NO_PERMISSIONS");
-  }
+  await assertEnviosStaff(pool, user);
 
   const envios = await EnviosRepository.obtenerEnviosPorTransportistaRepo(pool, user.empresa, idTransportista);
   return envios;
@@ -236,7 +239,9 @@ exports.obtenerEnviosPorTransportistaService = async (pool, user, idTransportist
 // Mis envíos (rol Chofer)
 exports.obtenerEnviosMisChoferesService = async (pool, user) => {
   if (!user) throw new Error("NO_ACCESS");
-  if (user.rol !== 'Chofer') throw new Error("NO_PERMISSIONS");
+  if (user.rol !== 'Chofer') {
+    await assertAlgunoPermiso(pool, user, 'VER_ENVIOS_CHOFER');
+  }
 
   return await EnviosRepository.obtenerEnviosPorChoferRepo(pool, user.empresa, user.sub);
 };

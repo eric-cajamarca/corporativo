@@ -2,12 +2,17 @@ const sucursalService = require('../services/sucursal.service');
 const { withPool } = require('../utils/dbPool.util');
 const { errores: E } = sucursalService;
 
+/** Permisos por rol en BD (assertAlgunoPermiso) o legado NO_PERMISO / NO_PERMISO_403. */
+function sinPermisoSucursal(msg) {
+  return msg === E.NO_PERMISO || msg === E.NO_PERMISO_403 || msg === 'NO_PERMISSIONS';
+}
+
 const obtener_sucursal_idempresa = async (req, res) => {
   try {
     const data = await withPool((pool) => sucursalService.obtenerSucursalResumen(pool, req.user));
     res.status(200).send({ message: 'succes', data });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.FALTA_EMPRESA) {
@@ -23,7 +28,7 @@ const obtener_sucursal_todos = async (req, res) => {
     const data = await withPool((pool) => sucursalService.obtenerSucursalTodos(pool, req.user));
     res.status(200).send({ data });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.FALTA_EMPRESA) {
@@ -45,7 +50,7 @@ const establecer_sucursal_principal = async (req, res) => {
     if (error.message === E.FALTA_EMPRESA) {
       return res.status(403).send({ message: 'No autorizado: falta empresa en token', data: undefined });
     }
-    if (error.message === E.NO_PERMISO_403) {
+    if (error.message === E.NO_PERMISO_403 || error.message === 'NO_PERMISSIONS') {
       return res.status(403).send({ message: 'Sin permisos', data: undefined });
     }
     if (error.message === E.BAD_REQUEST) {
@@ -64,7 +69,7 @@ const editar_sucursal_idEmpresa = async (req, res) => {
     const rows = await withPool((pool) => sucursalService.editarSucursal(pool, req.user, req.body));
     res.status(200).send({ message: 'Sucursal editada correctamente', data: rows });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.FALTA_EMPRESA) {
@@ -88,7 +93,7 @@ const editar_estado_idsucursal = async (req, res) => {
     if (error.message === E.NO_ACCESS) {
       return res.status(401).send({ message: 'No Access', data: undefined });
     }
-    if (error.message === E.NO_PERMISO_403) {
+    if (error.message === E.NO_PERMISO_403 || error.message === 'NO_PERMISSIONS') {
       return res.status(403).send({ message: 'No tiene permisos', data: undefined });
     }
     if (error.message === E.FALTA_EMPRESA) {
@@ -107,7 +112,7 @@ const eliminar_sucursal_idempresa = async (req, res) => {
     const rows = await withPool((pool) => sucursalService.eliminarTodasSucursalesEmpresa(pool, req.user));
     res.status(200).send({ message: 'Sucursal eliminada correctamente', data: rows });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.FALTA_EMPRESA) {
@@ -127,7 +132,7 @@ const obtener_stock_sucursal_idProducto = async (req, res) => {
     );
     res.status(200).send({ data });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.BAD_REQUEST) {
@@ -143,7 +148,7 @@ const obtener_stock_sucursales_idempresa = async (req, res) => {
     const data = await withPool((pool) => sucursalService.obtenerStockSucursalesEmpresa(pool, req.user));
     res.status(200).send({ data });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.FALTA_EMPRESA) {
@@ -161,6 +166,9 @@ const crear_stock_sucursal_idEmpresa = async (req, res) => {
       await withPool((pool) => sucursalService.editarStockLote(pool, req.user, idLote, req.body));
       return res.status(200).send({ success: true });
     } catch (error) {
+      if (sinPermisoSucursal(error.message)) {
+        return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+      }
       if (error.message === E.BAD_REQUEST) {
         return res.status(400).send({ message: 'ID de lote y cantidad válida son requeridos' });
       }
@@ -175,7 +183,7 @@ const crear_stock_sucursal_idEmpresa = async (req, res) => {
     await withPool((pool) => sucursalService.crearStockLote(pool, req.user, req.body));
     res.status(200).send({ data: 1, message: 'Lote creado correctamente' });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS || error.message === E.BAD_REQUEST) {
@@ -207,7 +215,7 @@ const eliminar_stock_sucursal = async (req, res) => {
     const n = await withPool((pool) => sucursalService.eliminarStockLote(pool, req.user, req.params.id));
     res.status(200).send({ data: n });
   } catch (error) {
-    if (error.message === E.NO_PERMISO) {
+    if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
     if (error.message === E.NO_ACCESS) {

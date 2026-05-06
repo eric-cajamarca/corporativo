@@ -2,6 +2,7 @@ const sql = require('mssql');
 const devolucionesDespachoRepository = require('../repositories/devolucionesDespacho.repository');
 const despachosRepository = require('../repositories/despachos.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function puedeUsuarioOperarEmpresaDespacho(pool, user, idEmpresaDestino) {
   if (!user?.empresa || !idEmpresaDestino) return false;
@@ -11,7 +12,7 @@ async function puedeUsuarioOperarEmpresaDespacho(pool, user, idEmpresaDestino) {
 
 exports.crearDevolucionDespachoService = async (pool, user, payload) => {
   if (!user || !user.empresa || !user.sub) throw new Error('NO_ACCESS');
-  if (user.rol !== 'Administrador' && user.rol !== 'Vendedor') throw new Error('NO_PERMISSIONS');
+  await assertAlgunoPermiso(pool, user, 'EDITAR_DESPACHOS', 'CREAR_DESPACHOS');
 
   const { idDespacho, items } = payload;
   if (!idDespacho || !Array.isArray(items) || items.length === 0) {
@@ -36,6 +37,7 @@ exports.crearDevolucionDespachoService = async (pool, user, payload) => {
 
 exports.listarDevolucionesPorDespachoService = async (pool, user, idDespacho) => {
   if (!user || !user.empresa) throw new Error('NO_ACCESS');
+  await assertAlgunoPermiso(pool, user, 'VER_DESPACHOS', 'CREAR_DESPACHOS', 'EDITAR_DESPACHOS');
   const idEmp = await despachosRepository.obtenerIdEmpresaDesdeDespachoRepo(pool, idDespacho);
   if (!idEmp || !(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmp))) {
     throw new Error('DESPACHO_NO_ENCONTRADO');
@@ -45,6 +47,7 @@ exports.listarDevolucionesPorDespachoService = async (pool, user, idDespacho) =>
 
 exports.obtenerDetalleDevolucionService = async (pool, user, idDevolucionDespacho) => {
   if (!user || !user.empresa) throw new Error('NO_ACCESS');
+  await assertAlgunoPermiso(pool, user, 'VER_DESPACHOS', 'CREAR_DESPACHOS', 'EDITAR_DESPACHOS');
   const row = await pool.request()
     .input('id', sql.UniqueIdentifier, idDevolucionDespacho)
     .query(`SELECT idEmpresa FROM DevolucionesDespacho WHERE idDevolucionDespacho = @id`);

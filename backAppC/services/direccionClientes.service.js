@@ -1,10 +1,11 @@
 const direccionClientesRepository = require('../repositories/direccionClientes.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 const E = { NO_AUTH: 'NO_AUTH', NO_ROL: 'NO_ROL' };
 
-function asegurarAdmin(user) {
+async function asegurarClienteDirecciones(pool, user) {
   if (!user) throw new Error(E.NO_AUTH);
-  if (user.rol !== 'Administrador') throw new Error(E.NO_ROL);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES', 'VER_CLIENTES');
 }
 
 function normalizarPayloadCrear(body) {
@@ -24,7 +25,7 @@ function normalizarPayloadCrear(body) {
 }
 
 async function crear(pool, user, body) {
-  asegurarAdmin(user);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const idEmpresa = user.empresa;
   const payload = normalizarPayloadCrear(body);
   if (payload.idCliente == null) throw new Error('idCliente requerido');
@@ -37,14 +38,14 @@ async function listar(pool, user) {
 }
 
 async function listarPorCliente(pool, user, idCliente) {
-  asegurarAdmin(user);
+  await asegurarClienteDirecciones(pool, user);
   const id = parseInt(idCliente, 10);
   if (Number.isNaN(id)) throw new Error('idCliente inválido');
   return direccionClientesRepository.listarPorCliente(pool, user.empresa, id);
 }
 
 async function actualizar(pool, user, idDireccion, body) {
-  asegurarAdmin(user);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const id = parseInt(idDireccion, 10);
   if (Number.isNaN(id)) throw new Error('id inválido');
   const {
@@ -76,7 +77,7 @@ async function actualizar(pool, user, idDireccion, body) {
 }
 
 async function eliminar(pool, user, idDireccion) {
-  asegurarAdmin(user);
+  await assertAlgunoPermiso(pool, user, 'EDITAR_CLIENTES');
   const id = parseInt(idDireccion, 10);
   if (Number.isNaN(id)) throw new Error('id inválido');
   return direccionClientesRepository.eliminar(pool, user.empresa, id);

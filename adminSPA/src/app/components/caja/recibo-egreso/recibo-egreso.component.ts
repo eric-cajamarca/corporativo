@@ -363,16 +363,29 @@ export class ReciboEgresoComponent implements OnInit {
     this.editandoId = null;
   }
 
+  /** Concepto de texto o al menos catálogo (idConcepto); el backend puede completar la descripción. */
+  private formTieneConcepto(): boolean {
+    const txt = (this.form.concepto || '').trim();
+    const idCat = (this.form.idConcepto || '').trim();
+    return !!(txt || idCat);
+  }
+
+  private formImporteValido(): boolean {
+    const n = Number(this.form.importe);
+    return Number.isFinite(n) && n > 0;
+  }
+
   abrirModalFormaPago(): void {
-    if (!this.form.concepto.trim() || this.form.importe <= 0) {
-      iziToast.warning({ title: 'Advertencia', message: 'Concepto e importe son obligatorios.' });
+    if (!this.formTieneConcepto() || !this.formImporteValido()) {
+      iziToast.warning({ title: 'Advertencia', message: 'Concepto (texto o catálogo) e importe mayor a 0 son obligatorios.' });
       return;
     }
     if (!this.editandoId && !this.form.idApertura) {
       iziToast.warning({ title: 'Advertencia', message: 'Debe haber una caja abierta para registrar el egreso.' });
       return;
     }
-    if (!this.form.idTipoMovimientoCaja) {
+    const idTipo = Number(this.form.idTipoMovimientoCaja);
+    if (!Number.isFinite(idTipo) || idTipo <= 0) {
       iziToast.warning({ title: 'Advertencia', message: 'No hay tipo de movimiento Egreso configurado.' });
       return;
     }
@@ -441,13 +454,14 @@ export class ReciboEgresoComponent implements OnInit {
       iziToast.warning({ title: 'Advertencia', message: 'Debe haber una caja abierta para registrar el egreso.' });
       return;
     }
-    if (!this.form.idTipoMovimientoCaja) {
+    const idTipoGuardar = Number(this.form.idTipoMovimientoCaja);
+    if (!Number.isFinite(idTipoGuardar) || idTipoGuardar <= 0) {
       iziToast.warning({ title: 'Advertencia', message: 'No hay tipo de movimiento Egreso configurado. Configure TiposMovimientoCaja en la base de datos.' });
       return;
     }
     this.cajaService.registrarMovimientoEgreso({
       idApertura: this.form.idApertura,
-      idTipoMovimientoCaja: this.form.idTipoMovimientoCaja,
+      idTipoMovimientoCaja: idTipoGuardar,
       fechaMovimiento: this.form.fechaEmision || undefined,
       concepto: this.form.concepto,
       idConcepto: this.form.idConcepto || undefined,
