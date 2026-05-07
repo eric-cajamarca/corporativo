@@ -15,6 +15,8 @@ const sunatPostPagoService = require('./sunatPostPago.service');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
 const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
+const usuarioSucursalRepository = require('../repositories/usuarioSucursal.repository');
+const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
 
 /** Inserta cabecera de venta dentro de una transacción ya iniciada. */
 exports.insertarVentaCabecera = async (transaction, datosVenta, idEmpresa, idUsuario) => {
@@ -229,6 +231,22 @@ const leerPermitirVentaMultiSucursal = async (transaction, idEmpresa) => {
     .query('SELECT ISNULL(permitirVentaMultiSucursal, 0) AS v FROM Empresas WHERE idEmpresa = @idEmpresa');
   const row = r.recordset?.[0];
   return !!(row && (row.v === true || row.v === 1));
+};
+
+/** En venta POS restringida, usuario no-admin debe operar en una sucursal asignada y activa. */
+const assertAccesoUsuarioASucursal = async (transaction, user, idEmpresa, idSucursal) => {
+  if (!idSucursal) return;
+  if (user && user.rol === 'Administrador') return;
+  const idUsuario = idUsuarioDesdePayloadUser(user);
+  if (!idUsuario) return;
+  const asignadas = await usuarioSucursalRepository.obtenerSucursalesActivasUsuario(transaction, idUsuario, idEmpresa);
+  if (!Array.isArray(asignadas) || asignadas.length === 0) {
+    throw new Error('Su usuario no tiene sucursales activas asignadas. Solicite la asignación al administrador.');
+  }
+  const ok = asignadas.some((s) => String(s.idSucursal || '').toLowerCase() === String(idSucursal).toLowerCase());
+  if (!ok) {
+    throw new Error('No tiene acceso a la sucursal seleccionada para esta venta.');
+  }
 };
 
 /** Resuelve idSucursal por línea (cabecera explícita → stock del producto → sucursal por defecto). */
@@ -492,6 +510,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     if (!(await validarSucursalEmpresa(transaction, user.empresa, idSucursalLinea))) {
       throw new Error('La sucursal de la venta no pertenece a su empresa.');
     }
+    await assertAccesoUsuarioASucursal(transaction, user, user.empresa, idSucursalLinea);
 
     const resComp = await resolverIdComprobanteParaSucursal(
       transaction,
@@ -737,6 +756,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     if (!idSucursalCobradora) {
       throw new Error('No se pudo determinar la sucursal de la empresa cobradora.');
     }
+    await assertAccesoUsuarioASucursal(transaction, user, user.empresa, idSucursalCobradora);
 
     const fechaEmisionConHora = fechaEmisionConHoraActual(venta.fEmision);
     const fVencimientoSQL = getFechaSoloSQLString(venta.fVencimiento) || fechaEmisionConHora;

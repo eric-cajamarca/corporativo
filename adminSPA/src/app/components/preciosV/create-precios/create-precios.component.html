@@ -103,7 +103,7 @@
                             <span class="input-group-text bg-light">
                                 <i class="bi bi-search text-secondary"></i>
                             </span>
-                            <input type="text" class="form-control" placeholder="Buscar producto por nombre o SKU..."
+                            <input type="text" class="form-control" placeholder="Buscar por nombre, SKU, código o marca..."
                                    [(ngModel)]="filtroBusqueda" (input)="filtrarProductos()">
                         </div>
                     </div>
@@ -115,6 +115,7 @@
                     <thead class="table-light">
                         <tr>
                             <th scope="col">SKU / código</th>
+                            <th scope="col">Marca</th>
                             <th scope="col">Producto</th>
                             <th scope="col" class="text-end">C. Unit.</th>
                             <th scope="col" class="text-end">P. Actual</th>
@@ -125,6 +126,7 @@
                     <tbody>
                         <tr *ngFor="let producto of productosPaginated">
                             <td class="sku-cell">{{producto.sku || producto.codigo}}</td>
+                            <td class="marca-cell">{{ producto.marca || '—' }}</td>                            
                             <td class="descripcion-cell">
                                 <div class="producto-descripcion">{{producto.descripcion}}</div>
                                 <small class="text-muted producto-sub">{{producto.descripcionPres || 'Sin categoría'}}</small>

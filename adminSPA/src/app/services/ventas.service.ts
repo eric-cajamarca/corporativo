@@ -406,7 +406,17 @@ export interface ComprobanteVAPdfData {
     observaciones?: string;
     sucursal?: string;
   };
-  empresa: { nombre: string; ruc?: string; direccion?: string; telefono?: string; rubro?: string; correo?: string; logo?: string };
+  empresa: {
+    nombre: string;
+    ruc?: string;
+    direccion?: string;
+    telefono?: string;
+    rubro?: string;
+    correo?: string;
+    logo?: string;
+    /** Sucursales registradas de la empresa cobradora; si > 1 se muestra sucursal por ítem en el ticket VA. */
+    cantidadSucursales?: number;
+  };
   cliente: { rSocial?: string; razonSocial?: string; ruc?: string; celular?: string; direccion?: string; tipoDocSunat?: string };
   items: Array<{
     idDetalleVA?: number;

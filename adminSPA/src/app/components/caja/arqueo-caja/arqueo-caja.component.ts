@@ -34,6 +34,17 @@ export interface ArqueoTotalesPorEmpresaFila {
   totalEgresos: number;
 }
 
+export interface ArqueoTotalesPorSucursalFila {
+  idSucursal: string;
+  nombreSucursal: string;
+  idCaja: string;
+  movimientos: { concepto: string; tipoOperacion: string; formaPago: string; importe: number }[];
+  ventasCredito?: { importe?: number };
+  cobroCreditos?: { importe?: number };
+  totalIngresos: number;
+  totalEgresos: number;
+}
+
 @Component({
   selector: 'app-arqueo-caja',
   standalone: true,
@@ -78,6 +89,7 @@ export class ArqueoCajaComponent implements OnInit {
 
   public esGestora = false;
   public totalesPorEmpresa: ArqueoTotalesPorEmpresaFila[] = [];
+  public totalesPorSucursal: ArqueoTotalesPorSucursalFila[] = [];
 
   mostrarModalPdf = false;
   generandoPdf = false;
@@ -211,6 +223,7 @@ export class ArqueoCajaComponent implements OnInit {
     this.totalIngresos = 0;
     this.totalEgresos = 0;
     this.totalesPorEmpresa = [];
+    this.totalesPorSucursal = [];
 
     // Llamada al backend: devuelve data (filas crudas), ventasCredito y cobroCreditos
     this.cajaService.obtenerArqueoDinamico({
@@ -306,6 +319,22 @@ export class ArqueoCajaComponent implements OnInit {
               movimientos: pe.movimientos || [],
               ventasCredito: pe.ventasCredito,
               cobroCreditos: pe.cobroCreditos,
+              totalIngresos: t.ingresos,
+              totalEgresos: t.egresos
+            };
+          });
+        }
+        const porSuc = (response as any).totalesPorSucursal;
+        if (Array.isArray(porSuc) && porSuc.length > 0) {
+          this.totalesPorSucursal = porSuc.map((ps: any) => {
+            const t = ArqueoCajaComponent.totalesDesdeFilasMovimiento(ps.movimientos || []);
+            return {
+              idSucursal: ps.idSucursal,
+              nombreSucursal: ps.nombreSucursal || '',
+              idCaja: ps.idCaja,
+              movimientos: ps.movimientos || [],
+              ventasCredito: ps.ventasCredito,
+              cobroCreditos: ps.cobroCreditos,
               totalIngresos: t.ingresos,
               totalEgresos: t.egresos
             };

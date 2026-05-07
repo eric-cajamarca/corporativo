@@ -43,6 +43,7 @@ import { ProductosImagenService, ImagenProducto } from '../../../services/produc
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
+import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 
@@ -198,6 +199,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Empresa gestora: venta corporativa con comprobante VA. */
   esGestora = false;
+  permitirVentaMultiSucursal = false;
+  sucursalesUsuarioAsignadas: SucursalUsuario[] = [];
+  sucursalesPermitidasVenta: Sucursal[] = [];
+  bloqueoPorSucursalUsuario = false;
+  private ultimaSucursalSeleccionada = '';
   tipoComprobanteDestino = 'NV';
   comprobantesDestinoOpciones = [
     { codigo: 'NV', nombre: 'Nota de Venta' },
@@ -252,6 +258,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private rubrosService: RubrosService,
     private pdfService: PdfService,
     private whatsappService: WhatsappService,
+    private usuarioSucursalService: UsuarioSucursalService,
     private ngZone: NgZone,
     private route: ActivatedRoute,
     private router: Router
@@ -357,6 +364,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.sucursales.length && !this.ventas.idSucursal) {
           this.ventas.idSucursal = this.sucursales[0].idSucursal;
         }
+        this.resolverSucursalesPermitidasVenta();
         this.cargarComprobantesVentaInicial();
       },
       error: () => {}
@@ -367,6 +375,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         if (this.cajas.length > 0 && this.cajas[0].idSucursal && !this.ventas.idSucursal) {
           this.ventas.idSucursal = this.cajas[0].idSucursal;
         }
+        this.resolverSucursalesPermitidasVenta();
         this.cargarComprobantesVentaInicial();
       },
       error: () => {}
@@ -383,11 +392,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (res) => {
         const estado = res?.data;
         this.esGestora = !!estado?.esGestora;
+        this.cargarPermitirVentaMultiSucursal();
       },
       error: () => {
         this.esGestora = false;
+        this.cargarPermitirVentaMultiSucursal();
       }
     });
+    this.cargarSucursalesUsuario();
     this._productoService.limpiarCacheListaProductos();
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
@@ -850,6 +862,112 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.esGestora;
   }
 
+  private cargarPermitirVentaMultiSucursal(): void {
+    this.empresaService.refreshEmpresaFromApi().subscribe({
+      next: (emp) => {
+        const raw = (emp as unknown as { permitirVentaMultiSucursal?: unknown })?.permitirVentaMultiSucursal;
+        this.permitirVentaMultiSucursal = raw === true || raw === 1 || raw === '1';
+        this.resolverSucursalesPermitidasVenta();
+      },
+      error: () => {
+        this.permitirVentaMultiSucursal = false;
+        this.resolverSucursalesPermitidasVenta();
+      }
+    });
+  }
+
+  private cargarSucursalesUsuario(): void {
+    this.usuarioSucursalService.cargarMisSucursales().subscribe({
+      next: (res) => {
+        this.sucursalesUsuarioAsignadas = Array.isArray(res?.data) ? res.data : [];
+        this.resolverSucursalesPermitidasVenta();
+      },
+      error: () => {
+        this.sucursalesUsuarioAsignadas = [];
+        this.resolverSucursalesPermitidasVenta();
+      }
+    });
+  }
+
+  private resolverSucursalesPermitidasVenta(): void {
+    if (this.esGestora || this.permitirVentaMultiSucursal) {
+      this.sucursalesPermitidasVenta = [...this.sucursales];
+      this.bloqueoPorSucursalUsuario = false;
+      this.buscarProductos();
+      return;
+    }
+    const idsAsignadas = new Set(
+      (this.sucursalesUsuarioAsignadas || []).map((s) => String(s.idSucursal || '').toLowerCase()).filter(Boolean)
+    );
+    if (idsAsignadas.size === 0) {
+      this.sucursalesPermitidasVenta = [];
+      this.bloqueoPorSucursalUsuario = true;
+      this.ventas.idSucursal = '';
+      this.comprobantes = [];
+      this.buscarProductos();
+      return;
+    }
+    this.sucursalesPermitidasVenta = (this.sucursales || []).filter((s) =>
+      idsAsignadas.has(String(s.idSucursal || '').toLowerCase())
+    );
+    this.bloqueoPorSucursalUsuario = this.sucursalesPermitidasVenta.length === 0;
+    if (!this.bloqueoPorSucursalUsuario) {
+      const actual = String(this.ventas.idSucursal || '').toLowerCase();
+      const existeActual = this.sucursalesPermitidasVenta.some((s) => String(s.idSucursal).toLowerCase() === actual);
+      if (!existeActual) {
+        const def = (this.sucursalesUsuarioAsignadas.find((s) => s.esDefault) || this.sucursalesUsuarioAsignadas[0])?.idSucursal;
+        const permitidaDefault = this.sucursalesPermitidasVenta.find((s) => String(s.idSucursal).toLowerCase() === String(def || '').toLowerCase());
+        this.ventas.idSucursal = permitidaDefault?.idSucursal || this.sucursalesPermitidasVenta[0].idSucursal;
+      }
+      this.ultimaSucursalSeleccionada = String(this.ventas.idSucursal || '');
+      if (!this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal)) {
+        const conCaja = this.sucursalesPermitidasVenta.find((s) => this.tieneCajaAbiertaEnSucursal(s.idSucursal));
+        if (conCaja) {
+          this.ventas.idSucursal = conCaja.idSucursal;
+          this.ultimaSucursalSeleccionada = String(conCaja.idSucursal || '');
+        }
+      }
+    }
+    this.buscarProductos();
+    this.cargarComprobantesVentaInicial();
+  }
+
+  private tieneCajaAbiertaEnSucursal(idSucursal: string | null | undefined): boolean {
+    const id = String(idSucursal || '').trim();
+    if (!id) return false;
+    return (this.cajas || []).some((c: any) =>
+      String(c?.idSucursal || '').trim() === id && !!c?.idApertura && !!c?.cajaAbierta
+    );
+  }
+
+  private obtenerCajaAbiertaSucursal(idSucursal: string | null | undefined): any | null {
+    const id = String(idSucursal || '').trim();
+    if (!id) return null;
+    return (this.cajas || []).find((c: any) =>
+      String(c?.idSucursal || '').trim() === id && !!c?.idApertura && !!c?.cajaAbierta
+    ) || null;
+  }
+
+  onSucursalVentaChange(): void {
+    const idNueva = String(this.ventas.idSucursal || '').trim();
+    if (this.carrito.length > 0 && !this.permitirVentaMultiSucursal && !this.esGestora) {
+      const ok = confirm('Cambiar de sucursal limpiará el carrito actual para evitar mezclar stock. ¿Desea continuar?');
+      if (!ok) {
+        this.ventas.idSucursal = this.ultimaSucursalSeleccionada;
+        return;
+      }
+      this.carrito = [];
+      this.actualizaTotales();
+    }
+    if (!idNueva) {
+      this.comprobantes = [];
+      return;
+    }
+    this.ultimaSucursalSeleccionada = idNueva;
+    this.buscarProductos();
+    this.cargarComprobantesVentaInicial();
+  }
+
   /**
    * Cotización "agrupada" (corporativa / multi-empresa): solo empresa gestora y solo si el carrito
    * mezcla productos de más de una empresa. Evita marcar agrupada en gestionadas (todas las líneas llevan idEmpresa propio).
@@ -866,9 +984,13 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
-    const activos = (this.stockSucursales_const || []).filter((item: any) =>
+    let activos = (this.stockSucursales_const || []).filter((item: any) =>
       productoActivoParaVenta(item as Record<string, unknown>)
     );
+    if (!this.esGestora && !this.permitirVentaMultiSucursal && this.ventas.idSucursal) {
+      const idSuc = String(this.ventas.idSucursal);
+      activos = activos.filter((item: any) => String(item?.idSucursal || '') === idSuc);
+    }
     if (term === '') {
       this.productos_filtrados = activos;
     } else {
@@ -1039,7 +1161,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   agregarAlCarrito(producto: any): void {
-        const existe = this.carrito.find(p => p.idProducto === producto.idProducto);
+    const existe = this.carrito.find(p =>
+      String(p.idProducto) === String(producto.idProducto) &&
+      String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
+      String(p.idEmpresa || '') === String(producto.idEmpresa || '')
+    );
     if (existe) {
       existe.cantidad += 1;
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
@@ -1074,15 +1200,19 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const term = raw.toLowerCase();
 
+      const fuente = (!this.esGestora && !this.permitirVentaMultiSucursal && this.ventas.idSucursal)
+        ? (this.stockSucursales_const || []).filter((item: any) => String(item?.idSucursal || '') === String(this.ventas.idSucursal))
+        : (this.stockSucursales_const || []);
+
       // 1) Buscar coincidencia exacta en producto.Codigo
-      let encontrado = this.stockSucursales_const.find((item: any) => {
+      let encontrado = fuente.find((item: any) => {
         const codigo = (item.codigo ?? '').toString().toLowerCase();
         return codigo === term;
       });
 
       // 2) Si no hay exacta, buscar por inclusión (parcial)
       if (!encontrado) {
-        encontrado = this.stockSucursales_const.find((item: any) => {
+        encontrado = fuente.find((item: any) => {
           const codigo = (item.codigo ?? '').toString().toLowerCase();
           return codigo.includes(term);
         });
@@ -1090,7 +1220,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // 3) (Opcional) buscar por idProducto si la entrada es numérica y no se encontró por código
       if (!encontrado && /^\d+$/.test(term)) {
-        encontrado = this.stockSucursales_const.find((item: any) => String(item.idProducto) === term || String(item.idProducto) === term);
+        encontrado = fuente.find((item: any) => String(item.idProducto) === term || String(item.idProducto) === term);
       }
 
       this.productoEncontrado = encontrado ?? null;
@@ -1886,6 +2016,13 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'Seleccione tipo de comprobante (Datos del Comprobante).' });
       return;
     }
+    if (this.bloqueoPorSucursalUsuario && !this.esGestora && !this.permitirVentaMultiSucursal) {
+      iziToast.warning({
+        title: 'Sucursal no asignada',
+        message: 'Su usuario no tiene sucursales asignadas o activas. Solicite al administrador su asignación.'
+      });
+      return;
+    }
     if (!this.ventas.idSucursal && this.cajas.length > 0 && this.cajas[0].idSucursal) {
       this.ventas.idSucursal = this.cajas[0].idSucursal;
     }
@@ -1894,6 +2031,13 @@ abrirModalPrecios(item: any) {
     }
     if (!this.ventas.idSucursal) {
       iziToast.warning({ title: 'Advertencia', message: 'No se pudo determinar la sucursal. Abra una caja o configure sucursales.' });
+      return;
+    }
+    if (!this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal)) {
+      iziToast.warning({
+        title: 'Caja requerida',
+        message: 'No hay una caja abierta para la sucursal seleccionada. Abra caja para continuar.'
+      });
       return;
     }
     const ruc = (this.cliente?.ruc ?? '').toString().trim();
@@ -2391,8 +2535,9 @@ abrirModalPrecios(item: any) {
     this.completarDetallePagoCreditoPendiente(detallePago);
 
     let idApertura: string | undefined;
-    if (detallePago.length > 0 && this.cajas.length > 0) {
-      idApertura = this.cajas[0].idApertura;
+    if (detallePago.length > 0) {
+      const cajaSucursal = this.obtenerCajaAbiertaSucursal(this.ventas.idSucursal);
+      idApertura = cajaSucursal?.idApertura;
     }
 
     const cuotasCredito =

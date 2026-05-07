@@ -4,7 +4,12 @@ const guiaElectronicaRepository = require('../repositories/guiaElectronica.repos
 const facturadorSunatService = require('./facturadorSunat.service');
 const firmaXmlSunat = require('./firmaXmlSunat.service');
 const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
-const { nombreArchivoComprobante, leerXmlComprobante } = require('../utils/facturadorSunat.util');
+const path = require('path');
+const fs = require('fs');
+const { nombreArchivoComprobante } = require('../utils/facturadorSunat.util');
+
+/** Misma carpeta que al enviar con SUNAT directo (facturacion.repository / envioDirectoSunat). */
+const CARPETA_XML_FIRMADOS_SUNAT = path.join(process.cwd(), 'xml_firmados_sunat');
 const debugSunatLog = require('../utils/debugSunatLog.util');
 const { ymdLima, minutosDesdeMedianocheLima, parseHoraEnvioSunat } = require('../utils/limaSunat.util');
 
@@ -194,8 +199,6 @@ exports.obtenerXmlComprobanteService = async (pool, user, idComprobanteElectroni
   if (!user) throw new Error("NO_ACCESS");
   const comp = await FacturacionRepository.obtenerComprobanteParaEnvioRepo(pool, idComprobanteElectronico, user.empresa);
   if (!comp) throw new Error("COMPROBANTE_NO_ENCONTRADO");
-  const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
-  if (!config?.rutaCarpetaFacturadorSunat) throw new Error("CONFIG_FACTURADOR_INCOMPLETA");
   const nombreArchivo = nombreArchivoComprobante({
     ruc: comp.rucEmpresa,
     tipoComprobante: comp.tipoComprobante,
@@ -203,9 +206,16 @@ exports.obtenerXmlComprobanteService = async (pool, user, idComprobanteElectroni
     numero: comp.numero
   });
   const base = nombreArchivo.replace(/\.json$/i, "");
-  const result = leerXmlComprobante(config.rutaCarpetaFacturadorSunat, base);
-  if (!result.ok) throw new Error(result.error || "XML no encontrado");
-  return result.contenido;
+  const rutaXml = path.join(CARPETA_XML_FIRMADOS_SUNAT, `${base}.xml`);
+  if (!fs.existsSync(rutaXml)) {
+    throw new Error("XML no encontrado");
+  }
+  try {
+    return fs.readFileSync(rutaXml, "utf8");
+  } catch (err) {
+    console.error("obtenerXmlComprobanteService: error al leer xml_firmados_sunat:", err);
+    throw new Error("XML no encontrado");
+  }
 };
 
 /** Genera y firma el XML UBL del comprobante (envío directo) y devuelve { xml, nombreBase } para descarga. */

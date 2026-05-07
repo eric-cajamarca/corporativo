@@ -386,7 +386,6 @@ const obtenerXmlComprobante = async (req, res, next) => {
   } catch (error) {
     if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: undefined });
     if (error.message === "COMPROBANTE_NO_ENCONTRADO") return res.status(404).send({ message: "Comprobante no encontrado", data: undefined });
-    if (error.message === "CONFIG_FACTURADOR_INCOMPLETA") return res.status(400).send({ message: "Configure la carpeta del Facturador SUNAT", data: undefined });
     if (error.message && (error.message.includes("XML") || error.message.includes("no encontrado"))) return res.status(404).send({ message: error.message, data: undefined });
     console.error("Error obtener XML comprobante:", error);
     return next(error);

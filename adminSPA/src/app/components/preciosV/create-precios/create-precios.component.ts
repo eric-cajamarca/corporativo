@@ -24,6 +24,8 @@ export interface ProductoPreciosFila {
   descripcionPres?: string;
   idCategoria: number;
   idMarca: number;
+  /** Nombre de marca (lista de productos / precios). */
+  marca?: string;
   idPresentacion: number;
   cUnitario: number | null;
   nuevoCUnitario: number;
@@ -515,7 +517,8 @@ export class CreatePreciosComponent implements OnInit {
       (producto) =>
         (producto.descripcion || '').toLowerCase().includes(termino) ||
         (producto.codigo || '').toLowerCase().includes(termino) ||
-        (producto.sku || '').toLowerCase().includes(termino)
+        (producto.sku || '').toLowerCase().includes(termino) ||
+        (producto.marca || '').toLowerCase().includes(termino)
     );
     this.page = 1;
   }

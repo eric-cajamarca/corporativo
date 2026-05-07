@@ -204,6 +204,34 @@
                   </table>
                 </div>
               </div>
+
+              <div class="mt-4" *ngIf="totalesPorSucursal.length > 0">
+                <h6 class="fw-bold text-center mb-2">Arqueo por sucursal/caja (consolidado arriba)</h6>
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Sucursal</th>
+                        <th>Caja</th>
+                        <th class="text-end">Total ingresos</th>
+                        <th class="text-end">Total egresos</th>
+                        <th class="text-end">Ventas crédito</th>
+                        <th class="text-end">Cobro créditos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let ps of totalesPorSucursal">
+                        <td>{{ ps.nombreSucursal || ps.idSucursal }}</td>
+                        <td class="small">{{ ps.idCaja }}</td>
+                        <td class="text-end">{{ formatCurrency(ps.totalIngresos) }}</td>
+                        <td class="text-end">{{ formatCurrency(ps.totalEgresos) }}</td>
+                        <td class="text-end">{{ formatCurrency(importeArqueoCredito(ps.ventasCredito)) }}</td>
+                        <td class="text-end">{{ formatCurrency(importeArqueoCredito(ps.cobroCreditos)) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
     
             </div>
           </div>

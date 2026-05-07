@@ -671,13 +671,22 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ISNULL(e.rubro, '') AS rubro,
           ISNULL(e.celular, '') AS celular,
           ISNULL(e.correo, '') AS correo,
-          ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.direccion)), ''), de_prin.direccion, ''))), '') AS direccion,
+          ISNULL(LTRIM(RTRIM(COALESCE(
+            NULLIF(LTRIM(RTRIM(de_suc.direccion)), ''),
+            NULLIF(LTRIM(RTRIM(s.direccion)), ''),
+            NULLIF(LTRIM(RTRIM(de_prin.direccion)), ''),
+            ''
+          ))), '') AS direccion,
           ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.ubigeo)), ''), de_prin.ubigeo, ''))), '') AS ubigeo,
           ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.region)), ''), de_prin.region, ''))), '') AS region,
           ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.provincia)), ''), de_prin.provincia, ''))), '') AS provincia,
           ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.distrito)), ''), de_prin.distrito, ''))), '') AS distrito,
           ISNULL(LTRIM(RTRIM(COALESCE(NULLIF(LTRIM(RTRIM(de_suc.urbanizacion)), ''), de_prin.urbanizacion, ''))), '') AS urbanizacion,
-          ISNULL(NULLIF(LTRIM(RTRIM(de_suc.codLocal)), ''), NULLIF(LTRIM(RTRIM(de_prin.codLocal)), ''), '0000') AS codLocalSunat
+          COALESCE(
+            NULLIF(LTRIM(RTRIM(de_suc.codLocal)), ''),
+            NULLIF(LTRIM(RTRIM(de_prin.codLocal)), ''),
+            '0000'
+          ) AS codLocalSunat
         FROM Empresas e
         LEFT JOIN Sucursal s ON s.idSucursal = @idSuc AND s.idEmpresa = @idEmpresa
         LEFT JOIN DireccionEmpresa de_suc ON de_suc.idDireccionEmpresa = s.idDireccionEmpresa
@@ -706,13 +715,21 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       `);
     }
   } catch (err) {
+    console.error('obtenerComprobanteParaPdf empresa (fallback):', err);
     empresaResult = await pool
       .request()
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
       .query(`
-        SELECT razon_Social AS nombre, ruc, Logo AS logoArchivo,
+        SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
+          ISNULL(e.rubro, '') AS rubro,
+          ISNULL(e.celular, '') AS celular,
+          ISNULL(e.correo, '') AS correo,
+          ISNULL(LTRIM(RTRIM(de.direccion)), '') AS direccion,
+          '' AS ubigeo, '' AS region, '' AS provincia, '' AS distrito, '' AS urbanizacion,
           '0000' AS codLocalSunat
-        FROM Empresas WHERE idEmpresa = @idEmpresa
+        FROM Empresas e
+        LEFT JOIN DireccionEmpresa de ON de.idEmpresa = e.idEmpresa AND de.principal = 1
+        WHERE e.idEmpresa = @idEmpresa
       `);
   }
 
@@ -1762,6 +1779,11 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
     `);
   const emp = empResult.recordset && empResult.recordset[0];
 
+  const sucursalesCountResult = await pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaCobradora)
+    .query(`SELECT COUNT(1) AS cnt FROM Sucursal WHERE idEmpresa = @idEmpresa`);
+  const cantidadSucursalesEmpresa = Number(sucursalesCountResult.recordset?.[0]?.cnt) || 0;
+
   const itemsResult = await pool.request()
     .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
     .query(`
@@ -1854,8 +1876,9 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       telefono: (emp.celular || '').trim(),
       rubro: (emp.rubro || '').trim(),
       correo: (emp.correo || '').trim(),
-      logo: logoUrl
-    } : { nombre: '', ruc: '', direccion: '', telefono: '', logo: `${base}/assets/img/01.jpg` },
+      logo: logoUrl,
+      cantidadSucursales: cantidadSucursalesEmpresa
+    } : { nombre: '', ruc: '', direccion: '', telefono: '', logo: `${base}/assets/img/01.jpg`, cantidadSucursales: 0 },
     cliente: {
       rSocial: cab.clienteRazonSocial,
       razonSocial: cab.clienteRazonSocial,

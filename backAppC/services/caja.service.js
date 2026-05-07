@@ -48,6 +48,16 @@ const opcionesVistaCajaDelegacion = async (pool, idEmpresaUsuario) => {
   }
 };
 
+const bindIdsInQuery = (request, ids, prefix) => {
+  const list = [];
+  (Array.isArray(ids) ? ids : [ids]).filter(Boolean).forEach((id, i) => {
+    const key = `${prefix}${i}`;
+    request.input(key, sql.UniqueIdentifier, id);
+    list.push(`@${key}`);
+  });
+  return list;
+};
+
 /** Administrador tiene todo; si no, debe tener al menos uno de los permisos indicados. */
 const tienePermisoCaja = async (pool, user, ...nombresPermiso) => {
   if (!user) return false;
@@ -322,6 +332,52 @@ exports.obtenerArqueoDinamicoService = async (pool, user, filtros) => {
       });
     }
   }
+  let totalesPorSucursal;
+  const idCajaFiltro = filtros?.idCaja;
+  if (!idCajaFiltro || idCajaFiltro === 'TODAS') {
+    const reqCajas = pool.request();
+    const inEmp = bindIdsInQuery(reqCajas, idsEmpresa, 'arqSucEmp');
+    if (inEmp.length > 0) {
+      const rsCajas = await reqCajas.query(`
+        SELECT c.idCaja, c.idEmpresa, c.idSucursal, ISNULL(s.nombre, '') AS nombreSucursal
+        FROM Cajas c
+        INNER JOIN Sucursal s ON s.idSucursal = c.idSucursal
+        WHERE c.idEmpresa IN (${inEmp.join(',')})
+      `);
+      const cajas = rsCajas.recordset || [];
+      totalesPorSucursal = [];
+      for (const c of cajas) {
+        const part = await CajaRepository.obtenerArqueoDinamicoRepo(
+          pool,
+          [c.idEmpresa],
+          { ...(filtros || {}), idCaja: c.idCaja },
+          null
+        );
+        const movs = part.movimientos || [];
+        if (!movs.length && !(part.ventasCredito?.importe > 0) && !(part.cobroCreditos?.importe > 0)) {
+          continue;
+        }
+        let ingresos = 0;
+        let egresos = 0;
+        for (const m of movs) {
+          const tipo = (m?.tipoOperacion || 'I') === 'E' ? 'E' : 'I';
+          const imp = Number(m?.importe || 0);
+          if (tipo === 'I') ingresos += imp;
+          else egresos += imp;
+        }
+        totalesPorSucursal.push({
+          idSucursal: c.idSucursal,
+          nombreSucursal: c.nombreSucursal || '',
+          idCaja: c.idCaja,
+          movimientos: movs,
+          ventasCredito: part.ventasCredito || { concepto: 'VENTA_CREDITO', importe: 0 },
+          cobroCreditos: part.cobroCreditos || { concepto: 'COBRO CREDITOS', importe: 0 },
+          totalIngresos: ingresos,
+          totalEgresos: egresos
+        });
+      }
+    }
+  }
 
-  return { ...result, totalesPorEmpresa };
+  return { ...result, totalesPorEmpresa, totalesPorSucursal };
 };
