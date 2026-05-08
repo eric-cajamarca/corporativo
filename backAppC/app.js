@@ -125,17 +125,18 @@ function buildStaticAllowedOrigins() {
 }
 
 /**
- * En desarrollo: permitir front servido desde IP de LAN (otra PC / ng serve --host).
- * No aplica en production.
+ * Origen en red privada / local (LAN, ng serve --host, sistema.local).
+ * Si CORS_ALLOW_LAN=0, no se aplica (solo lista explícita + FRONTEND_URL).
+ * En NODE_ENV=production sigue activo salvo CORS_ALLOW_LAN=0 (despliegue LAN tras Nginx).
  */
-function isPrivateNetworkDevOrigin(origin) {
-  if (process.env.NODE_ENV === 'production') return false;
+function isPrivateLanOrigin(origin) {
   if (process.env.CORS_ALLOW_LAN === '0') return false;
   try {
     const u = new URL(origin);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
     const h = u.hostname;
     if (h === 'localhost' || h === '127.0.0.1') return true;
+    if (h.endsWith('.local')) return true;
     if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
     if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true;
@@ -145,7 +146,7 @@ function isPrivateNetworkDevOrigin(origin) {
   }
 }
 
-// Middleware CORS: lista explícita + LAN en desarrollo (ver .env.example)
+// Middleware CORS: lista explícita + LAN (ver .env.example, DESPLIEGUE-LAN.md)
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -154,7 +155,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    if (isPrivateNetworkDevOrigin(origin)) {
+    if (isPrivateLanOrigin(origin)) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));

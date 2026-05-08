@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { global } from './global';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 import { Empresa } from '../models/empresa.model';
 
 @Injectable({
@@ -15,7 +16,7 @@ export class EmpresaService {
   private _router: any;
   public idUser:any;
   private empresa = new Empresa(
-    'http://localhost:3000/api/obtener_logo/logo-1746675338771-466791498.png',
+    `${environment.API_URL}obtener_logo/logo-1746675338771-466791498.png`,
     'Mi Empresa S.A.C.',
     '00000000000',
     '',
@@ -47,7 +48,7 @@ export class EmpresaService {
     if (response.data?.[0]) {
       const empresaData = response.data[0];
             // Construye URL completa del logo usando el nombre del archivo
-      empresaData.logo = `http://localhost:3000/api/obtener_logo/${empresaData.logo}`;
+      empresaData.logo = `${environment.API_URL}obtener_logo/${empresaData.logo}`;
       this.empresaSubject.next(empresaData);
           }
   });

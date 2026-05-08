@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface ExcelData {
   title?: string;
@@ -14,7 +15,7 @@ export interface ExcelData {
   providedIn: 'root'
 })
 export class ExcelService {
-  private readonly baseUrl = 'http://localhost:3002/api/reports';
+  private readonly baseUrl = environment.PDF_API_BASE.replace(/\/$/, '');
 
   constructor(private http: HttpClient) {}
 

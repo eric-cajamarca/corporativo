@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { Empresa } from '../interfaces/pdf-interface'; // Ajusta tu ruta
 
 export interface PdfDatosDinamicos {
@@ -16,7 +17,7 @@ export interface PdfDatosDinamicos {
   providedIn: 'root'
 })
 export class PdfService {
-  private readonly baseUrl = 'http://localhost:3002/api/reports';
+  private readonly baseUrl = environment.PDF_API_BASE.replace(/\/$/, '');
 
   constructor(private http: HttpClient) {}
 

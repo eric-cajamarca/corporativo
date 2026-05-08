@@ -6,6 +6,8 @@
 export const environment = {
   production: false,
   API_URL: '/api/',
+  /** pdf-backend vía proxy (dev) o Nginx /api/reports → :3002 (LAN/prod). */
+  PDF_API_BASE: '/api/reports',
   /** Valor por defecto si falla GET /public/config/deployment. En SaaS real use `saas`. */
   deploymentMode: 'enterprise' as 'saas' | 'enterprise',
   FRONTEND_URL: 'http://localhost:4200',

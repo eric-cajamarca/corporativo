@@ -1,0 +1,60 @@
+# Ejemplo para Nginx en Windows (copiar a C:\nginx\conf\nginx.conf o incluir desde ahí).
+# Ajustar:
+#   - server_name (IP o sistema.local)
+#   - root → ruta real al build de Angular: .../adminSPA/dist/admin-spa/browser
+#
+# Tras clonar el repo y hacer: cd adminSPA && npm run build:lan
+
+worker_processes  1;
+
+error_log  logs/error.log;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    server {
+        listen       80;
+        server_name  sistema.local 192.168.1.47;
+
+        # Ruta al output de Angular (ver adminSPA/angular.json → outputPath)
+        root   "C:/ruta/al/repo/adminSPA/dist/admin-spa/browser";
+        index  index.html;
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Más específico primero: pdf-backend (Nginx elige el prefijo más largo que coincida)
+        location ^~ /api/reports/ {
+            proxy_pass http://127.0.0.1:3002;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Sin barra final en proxy_pass: conserva /api/... hacia backAppC
+        location ^~ /api/ {
+            proxy_pass http://127.0.0.1:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+    }
+}
