@@ -1,5 +1,8 @@
-# Backend (monorepo: solo adminSPA tenía .gitignore)
-backAppC/node_modules/
+# Dependencias — en cada servidor: npm ci (no subir node_modules)
+**/node_modules/
+
+# Angular — en cada servidor: ng build (adminSPA/.gitignore ya ignora /dist; refuerzo desde raíz)
+adminSPA/dist/
 
 # Logs y depuración local
 *.log
@@ -9,16 +12,41 @@ debug-*.log
 backAppC/scripts/_*.js
 backAppC/utils/bash_write_test.txt
 
-# Cursor
+# Carpetas locales: documentación, respaldos, copias de consulta, artefactos SUNAT de referencia
 .cursor/
+Consulta/
+deploy/
+docs/
+documentacion/
+ops/
+otros/
+respaldo/
 
-# Variables de entorno locales (no subir valores reales)
+# Caché / pruebas (por si se generan fuera de adminSPA/.gitignore)
+**/.angular/cache/
+**/coverage/
+**/playwright-report/
+**/test-results/
+
+# Variables de entorno — usar solo *.example versionados
 .env
 .env.local
 .env.production
 .env.development
 **/.env.local
-# Backend: credenciales (explícito; si ya se subió antes, ejecutar: git rm --cached backAppC/.env)
 backAppC/.env
+pdf-backend/.env
+adminSPA/.env
 
-# Plantillas SIN secretos: sí se versionan (p. ej. backAppC/.env.example)
+# Notas / scripts de prueba con datos sensibles (no subir)
+planes_comerciales_saas_fb6b3258.plan.md
+test_login.js
+
+# Copias de base de datos accidentales en el repo
+*.bak
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Plantillas SIN secretos: sí se versionan (p. ej. backAppC/.env.example, pdf-backend/.env.example)

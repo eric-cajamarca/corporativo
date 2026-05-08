@@ -1,6 +1,0 @@
-Culqi
-documentacion:https://apidocs.culqi.com/
-
-izipay
-documentacion: https://developers.izipay.pe/
-https://developers.izipay.pe/api/

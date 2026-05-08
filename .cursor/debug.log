@@ -1,9 +1,0 @@
-{"location":"ventasController.js:condicionCredito","message":"venta credito check","data":{"condicionCredito":true,"idCliente":2,"total":80,"idVenta":38,"idMediosPago":"6","descMedioPago":"CRÉDITO"},"timestamp":1771386499514,"hypothesisId":"H1"}
-{"location":"ventasController.js:antes crearCredito","message":"crearCreditoService will be called","data":{"idVenta":38,"idCliente":2,"montoTotal":80},"timestamp":1771386499530,"hypothesisId":"H2"}
-{"location":"creditos.service.js:crearCreditoService","message":"entry","data":{"rol":"Administrador","idVenta":38,"idCliente":2},"timestamp":1771386499533,"hypothesisId":"H5"}
-{"location":"creditos.service.js:clienteValido","message":"validar cliente","data":{"clienteValido":true},"timestamp":1771386499553,"hypothesisId":"H2"}
-{"location":"creditos.service.js:antes repo","message":"calling crearCreditoRepo","data":{"idVenta":38},"timestamp":1771386499562,"hypothesisId":"H4"}
-{"location":"creditos.service.js:ventaValida","message":"validar venta","data":{"ventaValida":true,"idVenta":38},"timestamp":1771386499561,"hypothesisId":"H3"}
-{"location":"creditos.repository.js:crearCreditoRepo","message":"entry","data":{"idVenta":38,"idCliente":2,"montoTotal":80,"plazoDias":11},"timestamp":1771386499563,"hypothesisId":"H4"}
-{"location":"creditos.repository.js:after INSERT credito","message":"idCredito","data":{"idCredito":"C4920663-1A7A-4A73-B636-2AA0B914043F"},"timestamp":1771386499581,"hypothesisId":"H4"}
-{"hypothesisId":"H3","location":"pdf.controller.js:generatePdf","message":"PDF backend recibido empresa.logo","data":{"hasEmpresa":true,"logo":"http://localhost:3000/logos/logo-1771125669214-287835511.jpg","empresaKeys":["logo","nombre","ruc","direccion","telefono","rubro","correo"]},"timestamp":1771449592770}
