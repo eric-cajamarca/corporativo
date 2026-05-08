@@ -1071,10 +1071,21 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       const idProducto = d.idProducto;
       const cantidad = Number(d.cantidad) || 0;
       const pVenta = Number(d.pVenta) || 0;
-      const totalItem = Number(d.total) != null ? Number(d.total) : cantidad * pVenta;
-      const subtotalItem = cantidad * pVenta;
       const descuento = Number(d.descuento) || 0;
-      const igv = d.igv != null ? (d.igv ? 1 : 0) : 0;
+      const subtotalItem =
+        d.subtotal != null && d.subtotal !== '' && Number.isFinite(Number(d.subtotal))
+          ? Number(d.subtotal)
+          : cantidad * pVenta;
+      const totalItem =
+        d.total != null && d.total !== '' && Number.isFinite(Number(d.total))
+          ? Number(d.total)
+          : subtotalItem;
+      let igv = 0;
+      if (d.igv != null) {
+        igv = d.igv ? 1 : 0;
+      } else if (totalItem > subtotalItem + 0.001) {
+        igv = 1;
+      }
       const isc = d.isc != null ? (d.isc ? 1 : 0) : 0;
       let costoUnitario = Number(d.costoUnitario) || 0;
       let costoTotal = Number(d.costoTotal) || 0;

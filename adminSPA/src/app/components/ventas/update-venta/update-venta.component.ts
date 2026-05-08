@@ -1,14 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
-import { VentasService, ComprobantePdfData, DetalleVentaEdicionPayload } from '../../../services/ventas.service';
+import { VentasService, ComprobantePdfData, DetalleVentaEdicionPayload, VentaEdicionPayload } from '../../../services/ventas.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
+import { ImpuestoService } from '../../../services/impuesto.service';
+import { Impuesto } from '../../../interfaces/impuesto.interface';
 
 export interface ClienteOption {
   idCliente: number;
@@ -51,9 +55,17 @@ export class UpdateVentaComponent implements OnInit {
   clienteRazonSocial = '';
   clienteRuc = '';
   clientes: ClienteOption[] = [];
+  /** Total del comprobante (igual criterio que nueva venta). */
   total = 0;
+  /** Suma de cantidad × p. venta (antes de impuestos añadidos). */
+  subtotalOperativo = 0;
+  montoIgv = 0;
+  montoExonerado = 0;
   idSucursal: string | null = null;
   detalles: DetalleEdicion[] = [];
+
+  /** Impuestos activos de la empresa (misma fuente que nueva venta). */
+  impuestosActivosEmpresa: Impuesto[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -61,6 +73,7 @@ export class UpdateVentaComponent implements OnInit {
     private ventasService: VentasService,
     private buscadorProductosModal: BuscadorProductosModalService,
     private clienteService: ClienteService,
+    private impuestoService: ImpuestoService,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -71,9 +84,16 @@ export class UpdateVentaComponent implements OnInit {
       this.loading = false;
       return;
     }
-    this.ventasService.getComprobanteParaPdf(this.idVenta).subscribe({
-      next: (res) => {
-        const data: ComprobantePdfData | null = res.data ?? null;
+
+    forkJoin({
+      comp: this.ventasService.getComprobanteParaPdf(this.idVenta),
+      imp: this.impuestoService.obtenerTodos().pipe(catchError(() => of({ data: [] as Impuesto[] })))
+    }).subscribe({
+      next: ({ comp, imp }) => {
+        const list: Impuesto[] = imp?.data || [];
+        this.impuestosActivosEmpresa = list.filter((i) => this.impuestoEstaActivo(i));
+
+        const data: ComprobantePdfData | null = comp?.data ?? null;
         if (!data) {
           this.loading = false;
           return;
@@ -108,7 +128,6 @@ export class UpdateVentaComponent implements OnInit {
         this.idCliente = v.idCliente != null ? Number(v.idCliente) : null;
         this.clienteRazonSocial = (data.cliente?.razonSocial || data.cliente?.rSocial || '').toString();
         this.clienteRuc = (data.cliente?.ruc || '').toString();
-        this.total = Number(v.total) || 0;
         this.cargarClientes();
         this.idSucursal = v.idSucursal != null ? String(v.idSucursal) : null;
         this.detalles = (data.items || []).map((d: any) => {
@@ -166,14 +185,111 @@ export class UpdateVentaComponent implements OnInit {
     }
   }
 
+  private redondear2(n: number): number {
+    return Math.round((Number(n) || 0) * 100) / 100;
+  }
 
+  private impuestoEstaActivo(impuesto: Impuesto): boolean {
+    const estado: unknown = (impuesto as { estado?: unknown })?.estado;
+    if (estado === true || estado === 1) return true;
+    if (estado === false || estado === 0 || estado == null) return false;
+    const s = String(estado).trim().toLowerCase();
+    return s === '1' || s === 'true' || s === 'activo' || s === 'activa';
+  }
+
+  /**
+   * Misma lógica que `actualizaTotales` en nueva venta (sin descuento por lista).
+   * Actualiza totales de pantalla y líneas `d.total` como importe de línea mostrado (base o bruto según caso).
+   */
   recalcularTotal(): void {
-    let sum = 0;
-    this.detalles.forEach((d) => {
-      d.total = Math.round(d.cantidad * d.pVenta * 100) / 100;
-      sum += d.total;
+    const descuentos = 0;
+    let subTotal = 0;
+    this.detalles.forEach((item) => {
+      const cant = Number(item.cantidad) || 0;
+      const pVenta = Number(item.pVenta) || 0;
+      subTotal += this.redondear2(pVenta * cant);
     });
-    this.total = Math.round(sum * 100) / 100;
+    subTotal = this.redondear2(subTotal);
+    const neto = this.redondear2(subTotal - descuentos);
+
+    const tieneIGV = this.impuestosActivosEmpresa.some((i) =>
+      (i.descripcion || '').toUpperCase().includes('IGV')
+    );
+
+    let exonerado = 0;
+    if (tieneIGV) {
+      exonerado = 0;
+    } else {
+      exonerado = neto;
+    }
+
+    const igvImpuesto = this.impuestosActivosEmpresa.find((i) =>
+      (i.descripcion || '').toUpperCase().includes('IGV')
+    );
+
+    let igv = 0;
+    if (igvImpuesto) {
+      const porcentaje = Number(igvImpuesto.porcentaje) || 0;
+      const igvMontoCalc = this.redondear2(neto * (porcentaje / 100));
+      const pIncluyeIGV = !!igvImpuesto.pIncluyeIGV;
+      if (!pIncluyeIGV) {
+        igv = igvMontoCalc;
+      }
+    }
+
+    const otrosImpuestos = this.impuestosActivosEmpresa.filter((i) => {
+      const d = (i.descripcion || '').toUpperCase();
+      return !d.includes('IGV') && d !== 'EXO';
+    });
+
+    let totalImpuestosASumar = igv;
+    for (const imp of otrosImpuestos) {
+      const porcentaje = Number(imp.porcentaje) || 0;
+      const monto = this.redondear2(neto * (porcentaje / 100));
+      const pIncluyeIGVImp = !!imp.pIncluyeIGV;
+      const esISC = (imp.descripcion || '').toUpperCase().includes('ISC');
+      if (esISC || !pIncluyeIGVImp) {
+        totalImpuestosASumar += monto;
+      }
+    }
+
+    const totalComprobante = this.redondear2(neto + totalImpuestosASumar);
+
+    this.subtotalOperativo = subTotal;
+    this.montoIgv = igv;
+    this.montoExonerado = exonerado;
+    this.total = totalComprobante;
+
+    const porcentajeIgv = igvImpuesto ? Number(igvImpuesto.porcentaje) || 0 : 0;
+    const pIncluyeIGV = !!igvImpuesto?.pIncluyeIGV;
+    const afectoIgvPorLinea =
+      !!igvImpuesto && !pIncluyeIGV && porcentajeIgv > 0 && tieneIGV;
+
+    if (afectoIgvPorLinea) {
+      const bases = this.detalles.map((d) => {
+        const cant = Number(d.cantidad) || 0;
+        const p = Number(d.pVenta) || 0;
+        return this.redondear2(cant * p);
+      });
+      const igvLines = bases.map((b) => this.redondear2(b * (porcentajeIgv / 100)));
+      let sumIgvLines = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
+      const diff = this.redondear2(igv - sumIgvLines);
+      if (igvLines.length && Math.abs(diff) >= 0.005) {
+        igvLines[igvLines.length - 1] = this.redondear2(igvLines[igvLines.length - 1] + diff);
+      }
+      this.montoIgv = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
+      this.detalles.forEach((d, idx) => {
+        const base = bases[idx];
+        const igvL = igvLines[idx];
+        d.total = this.redondear2(base + igvL);
+      });
+    } else {
+      this.detalles.forEach((d) => {
+        const cant = Number(d.cantidad) || 0;
+        const p = Number(d.pVenta) || 0;
+        d.total = this.redondear2(cant * p);
+      });
+    }
   }
 
   formatearMoneda(value: number): string {
@@ -221,6 +337,164 @@ export class UpdateVentaComponent implements OnInit {
     this.router.navigate(['/ventas']);
   }
 
+  /**
+   * Arma cabecera y detalle persistibles, alineados con nueva venta y con líneas gravadas
+   * (subtotal base, total con IGV) para coherencia en JSON SUNAT.
+   */
+  private construirPayloadGuardado(): {
+    venta: VentaEdicionPayload;
+    detalles: DetalleVentaEdicionPayload[];
+  } {
+    const descuentos = 0;
+    let subTotal = 0;
+    this.detalles.forEach((item) => {
+      const cant = Number(item.cantidad) || 0;
+      const pVenta = Number(item.pVenta) || 0;
+      subTotal += this.redondear2(pVenta * cant);
+    });
+    subTotal = this.redondear2(subTotal);
+    const neto = this.redondear2(subTotal - descuentos);
+
+    const tieneIGV = this.impuestosActivosEmpresa.some((i) =>
+      (i.descripcion || '').toUpperCase().includes('IGV')
+    );
+
+    let exonerado = 0;
+    if (tieneIGV) {
+      exonerado = 0;
+    } else {
+      exonerado = neto;
+    }
+
+    const igvImpuesto = this.impuestosActivosEmpresa.find((i) =>
+      (i.descripcion || '').toUpperCase().includes('IGV')
+    );
+
+    const porcentajeIgv = igvImpuesto ? Number(igvImpuesto.porcentaje) || 0 : 0;
+    const pIncluyeIGV = !!igvImpuesto?.pIncluyeIGV;
+
+    let igvMonto = 0;
+    if (igvImpuesto && !pIncluyeIGV) {
+      igvMonto = this.redondear2(neto * (porcentajeIgv / 100));
+    }
+
+    const otrosImpuestos = this.impuestosActivosEmpresa.filter((i) => {
+      const d = (i.descripcion || '').toUpperCase();
+      return !d.includes('IGV') && d !== 'EXO';
+    });
+
+    let totalImpuestosASumar = igvMonto;
+    for (const imp of otrosImpuestos) {
+      const porcentaje = Number(imp.porcentaje) || 0;
+      const monto = this.redondear2(neto * (porcentaje / 100));
+      const pIncluyeIGVImp = !!imp.pIncluyeIGV;
+      const esISC = (imp.descripcion || '').toUpperCase().includes('ISC');
+      if (esISC || !pIncluyeIGVImp) {
+        totalImpuestosASumar += monto;
+      }
+    }
+
+    const otrosSinIgv = this.redondear2(totalImpuestosASumar - igvMonto);
+
+    const detallesPayload: DetalleVentaEdicionPayload[] = [];
+    const afectoIgvPorLinea =
+      !!igvImpuesto && !pIncluyeIGV && porcentajeIgv > 0 && tieneIGV;
+
+    if (afectoIgvPorLinea) {
+      const bases = this.detalles.map((d) => {
+        const cant = Number(d.cantidad) || 0;
+        const p = Number(d.pVenta) || 0;
+        return this.redondear2(cant * p);
+      });
+      const igvLines = bases.map((b) => this.redondear2(b * (porcentajeIgv / 100)));
+      let sumIgvLines = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
+      const diff = this.redondear2(igvMonto - sumIgvLines);
+      if (igvLines.length && Math.abs(diff) >= 0.005) {
+        igvLines[igvLines.length - 1] = this.redondear2(igvLines[igvLines.length - 1] + diff);
+      }
+      sumIgvLines = this.redondear2(igvLines.reduce((a, b) => a + b, 0));
+
+      this.detalles.forEach((d, idx) => {
+        const subL = bases[idx];
+        const totL = this.redondear2(subL + igvLines[idx]);
+        detallesPayload.push({
+          idProducto: d.idProducto,
+          cantidad: d.cantidad,
+          pVenta: d.pVenta,
+          descuento: d.descuento,
+          subtotal: subL,
+          total: totL,
+          igv: true,
+          descripcionLinea: this.descripcionLineaEdicion(d)
+        });
+      });
+
+      const totalComprobante = this.redondear2(neto + sumIgvLines + otrosSinIgv);
+
+      const venta: VentaEdicionPayload = {
+        fEmision: this.fEmision
+          ? this.fEmision + 'T00:00:00'
+          : (() => {
+              const n = new Date();
+              const y = n.getFullYear(),
+                m = String(n.getMonth() + 1).padStart(2, '0'),
+                d = String(n.getDate()).padStart(2, '0');
+              return `${y}-${m}-${d}T00:00:00`;
+            })(),
+        idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
+        subtotal: neto,
+        igv: sumIgvLines,
+        exonerado,
+        gratuito: 0,
+        otrosCargos: 0,
+        descuentos,
+        total: totalComprobante
+      };
+
+      return { venta, detalles: detallesPayload };
+    }
+
+    this.detalles.forEach((d) => {
+      const cant = Number(d.cantidad) || 0;
+      const p = Number(d.pVenta) || 0;
+      const subL = this.redondear2(cant * p);
+      detallesPayload.push({
+        idProducto: d.idProducto,
+        cantidad: d.cantidad,
+        pVenta: d.pVenta,
+        descuento: d.descuento,
+        subtotal: subL,
+        total: subL,
+        igv: false,
+        descripcionLinea: this.descripcionLineaEdicion(d)
+      });
+    });
+
+    const totalComprobante = this.redondear2(neto + totalImpuestosASumar);
+
+    const venta: VentaEdicionPayload = {
+      fEmision: this.fEmision
+        ? this.fEmision + 'T00:00:00'
+        : (() => {
+            const n = new Date();
+            const y = n.getFullYear(),
+              m = String(n.getMonth() + 1).padStart(2, '0'),
+              d = String(n.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}T00:00:00`;
+          })(),
+      idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
+      subtotal: subTotal,
+      igv: igvMonto,
+      exonerado,
+      gratuito: 0,
+      otrosCargos: 0,
+      descuentos,
+      total: totalComprobante
+    };
+
+    return { venta, detalles: detallesPayload };
+  }
+
   guardar(): void {
     if (this.idVenta == null || this.noEditable) return;
     if (this.detalles.length === 0) {
@@ -228,22 +502,7 @@ export class UpdateVentaComponent implements OnInit {
       return;
     }
     this.saving = true;
-    const ventaPayload = {
-      fEmision: this.fEmision ? this.fEmision + 'T00:00:00' : (() => { const n = new Date(); const y = n.getFullYear(), m = String(n.getMonth() + 1).padStart(2, '0'), d = String(n.getDate()).padStart(2, '0'); return `${y}-${m}-${d}T00:00:00`; })(),
-      idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
-      subtotal: this.total / 1.18,
-      igv: this.total - this.total / 1.18,
-      descuentos: 0,
-      total: this.total
-    };
-    const detallesPayload: DetalleVentaEdicionPayload[] = this.detalles.map((d) => ({
-      idProducto: d.idProducto,
-      cantidad: d.cantidad,
-      pVenta: d.pVenta,
-      descuento: d.descuento,
-      total: d.total,
-      descripcionLinea: this.descripcionLineaEdicion(d)
-    }));
+    const { venta: ventaPayload, detalles: detallesPayload } = this.construirPayloadGuardado();
     this.ventasService.actualizarVenta(this.idVenta, { venta: ventaPayload, detalles: detallesPayload }).subscribe({
       next: () => {
         this.saving = false;

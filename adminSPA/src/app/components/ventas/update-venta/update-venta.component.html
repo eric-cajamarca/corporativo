@@ -34,8 +34,13 @@
               <input type="date" class="form-control" [(ngModel)]="fEmision">
             </div>
             <div class="col-md-4">
-              <label class="form-label">Total</label>
-              <input type="text" class="form-control fw-semibold" [value]="formatearMoneda(total)" readonly>
+              <label class="form-label">Totales (según impuestos activos)</label>
+              <div class="form-control bg-light small py-2 mb-0">
+                <div class="d-flex justify-content-between"><span>Subtotal ítems</span><span>{{ formatearMoneda(subtotalOperativo) }}</span></div>
+                <div class="d-flex justify-content-between" *ngIf="montoIgv > 0"><span>IGV</span><span>{{ formatearMoneda(montoIgv) }}</span></div>
+                <div class="d-flex justify-content-between" *ngIf="montoExonerado > 0"><span>Exonerado</span><span>{{ formatearMoneda(montoExonerado) }}</span></div>
+                <div class="d-flex justify-content-between fw-semibold border-top pt-1 mt-1"><span>Total</span><span>{{ formatearMoneda(total) }}</span></div>
+              </div>
             </div>
           </div>
           <div class="row mb-3">

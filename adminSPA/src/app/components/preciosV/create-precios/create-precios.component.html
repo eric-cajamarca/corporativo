@@ -31,13 +31,14 @@
                                     [(ngModel)]="listaSeleccionadaId" 
                                     (ngModelChange)="onListaSeleccionada()">
                                 <option [value]="null">-- Seleccionar lista --</option>
+                                <option [value]="LISTA_TODAS">TODAS</option>
                                 <option *ngFor="let lista of listasPrecio" [value]="lista.idLista" 
                                         [attr.data-moneda]="lista.idMoneda" [attr.data-conigv]="lista.conIgv">
                                     {{lista.nombre}} {{lista.principal ? '(Principal)' : ''}}
                                 </option>
                             </select>
                             <button class="btn btn-outline-primary" type="button" 
-                                    [disabled]="!listaSeleccionadaId"
+                                    [disabled]="!listaSeleccionadaId || listaSeleccionadaId === LISTA_TODAS"
                                     (click)="editarListaSeleccionada()">
                                 <i class="bi bi-pencil"></i>
                             </button>
@@ -116,6 +117,7 @@
                         <tr>
                             <th scope="col">SKU / código</th>
                             <th scope="col">Marca</th>
+                            <th scope="col" *ngIf="mostrarColumnaSucursal">Sucursal</th>
                             <th scope="col">Producto</th>
                             <th scope="col" class="text-end">C. Unit.</th>
                             <th scope="col" class="text-end">P. Actual</th>
@@ -126,7 +128,8 @@
                     <tbody>
                         <tr *ngFor="let producto of productosPaginated">
                             <td class="sku-cell">{{producto.sku || producto.codigo}}</td>
-                            <td class="marca-cell">{{ producto.marca || '—' }}</td>                            
+                            <td class="marca-cell">{{ producto.marca || '—' }}</td>
+                            <td class="sucursal-cell" *ngIf="mostrarColumnaSucursal">{{ producto.sucursal || '—' }}</td>
                             <td class="descripcion-cell">
                                 <div class="producto-descripcion">{{producto.descripcion}}</div>
                                 <small class="text-muted producto-sub">{{producto.descripcionPres || 'Sin categoría'}}</small>
@@ -153,21 +156,29 @@
                             </td>
                             <td class="text-center col-n-precio">
                                 <div class="input-group input-group-sm justify-content-center">
-                                    <!--<span class="input-group-text bg-light">{{simboloMoneda}}</span>-->
-                                    <input type="number" 
+                                    <input *ngIf="listaSeleccionadaId !== LISTA_TODAS"
+                                           type="number"
                                            class="form-control text-end"
-                                           step="0.01" 
+                                           step="0.01"
                                            min="0"
                                            [(ngModel)]="producto.nuevoPrecio"
                                            [placeholder]="producto.precioActual?.toString() || '0.00'"
                                            (change)="validarPrecio(producto)">
+                                    <input *ngIf="listaSeleccionadaId === LISTA_TODAS"
+                                           type="text"
+                                           readonly
+                                           class="form-control text-end"
+                                           style="cursor: pointer;"
+                                           placeholder="Clic para editar listas"
+                                           (click)="abrirModalPreciosTodasPara(producto)"
+                                           (focus)="abrirModalPreciosTodasPara(producto)">
                                     <button class="btn btn-outline-secondary" type="button"
-                                            *ngIf="producto.precioActual && producto.nuevoPrecio !== producto.precioActual"
+                                            *ngIf="listaSeleccionadaId !== LISTA_TODAS && producto.precioActual && producto.nuevoPrecio !== producto.precioActual"
                                             (click)="restaurarPrecio(producto)">
                                         <i class="bi bi-arrow-counterclockwise"></i>
                                     </button>
                                 </div>
-                                <small class="text-muted" *ngIf="producto.precioActual && producto.nuevoPrecio">
+                                <small class="text-muted" *ngIf="listaSeleccionadaId !== LISTA_TODAS && producto.precioActual && producto.nuevoPrecio">
                                     <span [class.text-success]="producto.nuevoPrecio > producto.precioActual"
                                           [class.text-danger]="producto.nuevoPrecio < producto.precioActual">
                                         {{calcularVariacion(producto)}}%
@@ -338,3 +349,32 @@
     </div>
   </div>  
 </main>
+
+<div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,.45);" *ngIf="mostrarModalPreciosTodas">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Precios por lista (TODAS)</h5>
+        <button type="button" class="btn-close" (click)="cancelarModalPreciosTodas()"></button>
+      </div>
+      <div class="modal-body">
+        <ng-container *ngIf="productoModalTodas">
+          <p class="small text-muted mb-2">
+            Producto: <strong>{{ productoModalTodas.descripcion }}</strong>
+          </p>
+        </ng-container>
+        <p class="small text-muted">
+          Ingrese el precio por cada lista activa. Los cambios se guardan al confirmar.
+        </p>
+        <div class="mb-3" *ngFor="let l of preciosTodasListas">
+          <label class="form-label">{{ l.nombre }}</label>
+          <input type="number" class="form-control" [(ngModel)]="l.precio" min="0" step="0.01" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cancelarModalPreciosTodas()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="confirmarModalPreciosTodas()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>

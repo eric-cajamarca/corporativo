@@ -70,6 +70,9 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   presentaciones: Presentacion[] = [];
   sucursales: Sucursal[] = [];
   listasPrecio: any[] = [];
+  readonly LISTA_TODAS = '__TODAS__';
+  mostrarModalPreciosTodas = false;
+  preciosPorListaModal: Array<{ idLista: number; nombre: string; precio: number }> = [];
   correlativo: { idCorrelativo?: string; numero?: number; [key: string]: unknown } = { numero: 0 };
   private codigoManual = '';
 
@@ -342,6 +345,15 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const idListaSel = this.productoForm.get('idListaPrecio')?.value;
+    if (idListaSel === this.LISTA_TODAS) {
+      this.abrirModalPreciosTodas();
+      return;
+    }
+    this.guardarProductoInterno();
+  }
+
+  private guardarProductoInterno(preciosPorLista?: Array<{ idLista: number; precio: number }>): void {
     this.guardando.set(true);
 
     const v = this.productoForm.value;
@@ -366,7 +378,11 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         ubicacion: this.loteData.ubicacion
       } : null,
       precioVenta: this.precioVenta && this.precioVenta > 0 ? this.precioVenta : 0,
-      idListaPrecio: v.idListaPrecio != null && v.idListaPrecio !== '' ? Number(v.idListaPrecio) : null,
+      idListaPrecio:
+        v.idListaPrecio != null && v.idListaPrecio !== '' && v.idListaPrecio !== this.LISTA_TODAS
+          ? Number(v.idListaPrecio)
+          : null,
+      preciosPorLista: Array.isArray(preciosPorLista) ? preciosPorLista : undefined,
       permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta
     };
 
@@ -424,6 +440,37 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
         });
       }
     });
+  }
+
+  abrirModalPreciosTodas(): void {
+    this.preciosPorListaModal = (this.listasPrecio || []).map((l: any) => ({
+      idLista: Number(l.idLista),
+      nombre: String(l.nombre || 'Lista'),
+      precio: this.precioVenta && this.precioVenta > 0 ? Number(this.precioVenta) : 0
+    }));
+    this.mostrarModalPreciosTodas = true;
+  }
+
+  cancelarModalPreciosTodas(): void {
+    this.mostrarModalPreciosTodas = false;
+  }
+
+  confirmarGuardarConTodas(): void {
+    if (!this.preciosPorListaModal.length) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        message: 'No hay listas activas para registrar precios.',
+        position: 'topRight'
+      });
+      return;
+    }
+    const precios = this.preciosPorListaModal.map((x) => ({
+      idLista: Number(x.idLista),
+      precio: Number.isFinite(Number(x.precio)) && Number(x.precio) >= 0 ? Number(x.precio) : 0
+    }));
+    this.mostrarModalPreciosTodas = false;
+    this.guardarProductoInterno(precios);
   }
 
   onCheckboxChangeCorrelativo(): void {

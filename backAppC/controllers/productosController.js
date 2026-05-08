@@ -211,6 +211,7 @@ const crear_producto = async (req, res) => {
     idListaPrecio,
     useCorrelativo,
     permiteDescripcionEnVenta,
+    preciosPorLista,
   } = req.body;
 
   const idEmpresa = req.user.empresa;
@@ -296,12 +297,21 @@ const crear_producto = async (req, res) => {
       if (!datosProducto.idUsuario) {
         return { __sinUsuario: true };
       }
+      const preciosPorListaNorm = Array.isArray(preciosPorLista)
+        ? preciosPorLista
+            .map((p) => ({
+              idLista: p?.idLista != null ? parseInt(p.idLista, 10) : null,
+              precio: p?.precio != null && !Number.isNaN(parseFloat(p.precio)) ? parseFloat(p.precio) : 0
+            }))
+            .filter((p) => p.idLista != null && !Number.isNaN(p.idLista) && p.precio >= 0)
+        : null;
       return productosMutacionesService.crearProductoConTransaccion(pool, {
         datosProducto,
         usarCorrelativo: usarCorrelativo,
         lote,
         precioVenta,
         idListaPrecio,
+        preciosPorLista: preciosPorListaNorm,
         idEmpresa
       });
     });

@@ -74,7 +74,9 @@ export interface ImportacionProductosValidarData {
     descripcion: string;
     cantidadInicial: number;
     costoUnitario: number;
-    precioListaCliente: number;
+    precioNormal: number;
+    precioCliente: number;
+    precioMayorista: number;
   }>;
 }
 
@@ -85,4 +87,10 @@ export interface ImportacionProductosEjecutarData {
   detalle: Array<{ fila: number; idProducto: string; codigo: string }>;
   erroresValidacion: Array<{ fila: number; codigo: string; mensajes: string[] }>;
   erroresEjecucion: Array<{ fila: number; codigo: string; mensajes: string[] }>;
+  noImportadosExcel?: {
+    fileName: string;
+    mimeType: string;
+    base64: string;
+    total: number;
+  } | null;
 }

@@ -205,11 +205,18 @@ export class IndexProductoComponent {
       next: (res) => {
         this.importandoEjecucion = false;
         this.resultadoEjecucionImportacion = res.data;
+        const noImport = res.data?.noImportadosExcel;
+        if (noImport?.base64) {
+          const blob = this.base64AExcelBlob(noImport.base64, noImport.mimeType);
+          this._excelService.descargar(blob, noImport.fileName || 'productos_no_importados.xlsx');
+        }
         this.initData();
         if (typeof iziToast !== 'undefined') {
           iziToast.success({
             title: 'Importación',
-            message: `Se registraron ${res.data.insertados} producto(s).`,
+            message: noImport?.total
+              ? `Se registraron ${res.data.insertados} producto(s). Se descargó Excel de no importados (${noImport.total}).`
+              : `Se registraron ${res.data.insertados} producto(s).`,
             position: 'topRight'
           });
         }
@@ -222,6 +229,16 @@ export class IndexProductoComponent {
         }
       }
     });
+  }
+
+  private base64AExcelBlob(base64: string, mimeType: string): Blob {
+    const binary = atob(base64 || '');
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   }
 
   abrirGaleriaProducto(item: { idProducto?: string; codigo?: string; descripcion?: string }): void {

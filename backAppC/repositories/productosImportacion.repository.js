@@ -101,10 +101,28 @@ async function existeCodigoProducto(pool, idEmpresa, codigo) {
   return Number(r.recordset?.[0]?.n || 0) > 0;
 }
 
+/**
+ * Obtiene listas activas por nombre para importación de precios.
+ * Se buscan las listas operativas: normal, cliente y mayorista.
+ */
+async function obtenerListasPrecioBaseImportacion(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idLista, idMoneda, nombre, ISNULL(principal, 0) AS principal
+      FROM dbo.ListasPrecio
+      WHERE idEmpresa = @idEmpresa
+        AND ISNULL(activo, 1) = 1
+    `);
+  return r.recordset || [];
+}
+
 module.exports = {
   obtenerIdSucursalPrincipal,
   obtenerIdPresentacionPorCodigo,
   obtenerIdCategoriaPorAlias,
   obtenerIdMarcaPorAlias,
-  existeCodigoProducto
+  existeCodigoProducto,
+  obtenerListasPrecioBaseImportacion
 };

@@ -291,6 +291,9 @@ export interface VentaEdicionPayload {
   idCliente?: number;
   subtotal: number;
   igv: number;
+  exonerado?: number;
+  gratuito?: number;
+  otrosCargos?: number;
   descuentos: number;
   total: number;
 }

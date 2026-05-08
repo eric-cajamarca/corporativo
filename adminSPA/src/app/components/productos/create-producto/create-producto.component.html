@@ -239,6 +239,7 @@
             <label class="form-label">Lista de precios</label>
             <select class="form-select" formControlName="idListaPrecio">
               <option value="">Seleccione...</option>
+              <option [value]="LISTA_TODAS">TODAS</option>
               @for (lista of listasPrecio; track lista.idLista) {
                 <option [value]="lista.idLista">{{ lista.nombre }}</option>
               }
@@ -367,4 +368,33 @@
     </div>
   }
   </main>
+}
+
+@if (mostrarModalPreciosTodas) {
+  <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,.45);">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Registrar precios para todas las listas</h5>
+          <button type="button" class="btn-close" (click)="cancelarModalPreciosTodas()"></button>
+        </div>
+        <div class="modal-body">
+          @for (p of preciosPorListaModal; track p.idLista) {
+            <div class="mb-3">
+              <label class="form-label">{{ p.nombre }}</label>
+              <div class="input-group">
+                <span class="input-group-text">S/</span>
+                <input type="number" class="form-control" [(ngModel)]="p.precio" [ngModelOptions]="{standalone: true}" min="0" step="0.01" placeholder="0.00">
+              </div>
+            </div>
+          }
+          <small class="text-muted">Puede registrar 0 en cualquier lista.</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cancelarModalPreciosTodas()">Cancelar</button>
+          <button type="button" class="btn btn-primary" (click)="confirmarGuardarConTodas()">Guardar producto</button>
+        </div>
+      </div>
+    </div>
+  </div>
 }

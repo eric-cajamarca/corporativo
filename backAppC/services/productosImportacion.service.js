@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
 const productosMutacionesService = require('./productosMutaciones.service');
 
-const MAX_FILAS = 2000;
+const MAX_FILAS = 4000;
 const MAX_BYTES = 8 * 1024 * 1024;
 
 function asegurarPuedeImportar(user) {
@@ -35,6 +35,62 @@ function leerCelda(mapaNorm, aliases) {
   return '';
 }
 
+function normalizarNumeroFlexible(valueRaw) {
+  let txt = String(valueRaw ?? '').trim();
+  if (!txt) return '';
+  txt = txt.replace(/\s+/g, '');
+  if (txt.includes(',') && txt.includes('.')) {
+    const lastComma = txt.lastIndexOf(',');
+    const lastDot = txt.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // Formato: 1.234,56
+      txt = txt.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Formato: 1,234.56
+      txt = txt.replace(/,/g, '');
+    }
+    return txt;
+  }
+  if (txt.includes(',')) {
+    const parts = txt.split(',');
+    if (parts.length > 2) {
+      txt = `${parts.slice(0, -1).join('')}.${parts[parts.length - 1]}`;
+    } else {
+      txt = txt.replace(',', '.');
+    }
+    return txt;
+  }
+  if (txt.includes('.')) {
+    const parts = txt.split('.');
+    if (parts.length > 2) {
+      txt = `${parts.slice(0, -1).join('')}.${parts[parts.length - 1]}`;
+    }
+    return txt;
+  }
+  return txt;
+}
+
+function parseNumeroFlexible(valueRaw) {
+  const txt = normalizarNumeroFlexible(valueRaw);
+  if (txt === '') return NaN;
+  return parseFloat(txt);
+}
+
+function parsePrecioImportacion(valueRaw, fieldLabel, errores) {
+  const txt = normalizarNumeroFlexible(valueRaw);
+  if (txt === '') return 0;
+  const v = parseFloat(txt);
+  if (Number.isNaN(v)) {
+    errores.push(`${fieldLabel} inválido`);
+    return 0;
+  }
+  if (v < 0) {
+    errores.push(`${fieldLabel} no puede ser negativo`);
+    return 0;
+  }
+  return v;
+}
+
 /**
  * Convierte fila genérica de sheet_to_json a objeto normalizado (claves internas).
  */
@@ -50,12 +106,26 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
     'cantidad'
   ]);
   const costoStr = leerCelda(mapaNorm, ['costounitario', 'costo unitario', 'cunitario', 'costo']);
-  const precioStr = leerCelda(mapaNorm, [
+  const precioClienteStr = leerCelda(mapaNorm, [
     'preciolistacliente',
     'precio lista cliente',
+    'preciocliente',
+    'precio cliente',
     'precioventa',
     'precio venta',
     'precio lista'
+  ]);
+  const precioNormalStr = leerCelda(mapaNorm, [
+    'preciolistanormal',
+    'precio lista normal',
+    'precionormal',
+    'precio normal'
+  ]);
+  const precioMayoristaStr = leerCelda(mapaNorm, [
+    'preciolistamayorista',
+    'precio lista mayorista',
+    'preciomayorista',
+    'precio mayorista'
   ]);
   const categoriaAlias = leerCelda(mapaNorm, ['categoria', 'categoría']);
   const marcaAlias = leerCelda(mapaNorm, ['marca']);
@@ -67,7 +137,9 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
     presentacionCodigo,
     cantidadStr,
     costoStr,
-    precioStr,
+    precioClienteStr,
+    precioNormalStr,
+    precioMayoristaStr,
     categoriaAlias,
     marcaAlias
   };
@@ -106,7 +178,9 @@ function parseBufferAObjetos(buffer) {
       !row.presentacionCodigo &&
       !row.cantidadStr &&
       !row.costoStr &&
-      !row.precioStr &&
+      !row.precioClienteStr &&
+      !row.precioNormalStr &&
+      !row.precioMayoristaStr &&
       !row.categoriaAlias &&
       !row.marcaAlias;
     if (!vacia) {
@@ -123,14 +197,50 @@ function generarPlantillaBuffer() {
     'presentacion',
     'cantidadInicial',
     'costoUnitario',
-    'precioListaCliente',
+    'precioNormal',
+    'precioCliente',
+    'precioMayorista',
     'categoria',
     'marca'
   ];
-  const ejemplo = ['EJEMPLO001', 'Producto de demostración', 'NIU', 10, 5.5, 8.99, 'VARIOS', 'SM'];
+  const ejemplo = ['EJEMPLO001', 'Producto de demostración', 'NIU', 10, 5.5, 9.9, 8.99, 8.5, 'VARIOS', 'SM'];
   const ws = XLSX.utils.aoa_to_sheet([headers, ejemplo]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+function nombreNormalizadoLista(v) {
+  return String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\(.*?\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolverListasPrecioImportacion(listas) {
+  const out = {
+    normal: null,
+    cliente: null,
+    mayorista: null
+  };
+  for (const l of listas || []) {
+    const n = nombreNormalizadoLista(l?.nombre);
+    if (!out.normal && n.includes('precio normal')) out.normal = l;
+    if (!out.cliente && n.includes('precio cliente')) out.cliente = l;
+    if (!out.mayorista && n.includes('precio mayorista')) out.mayorista = l;
+  }
+  return out;
+}
+
+function generarNoImportadosBuffer(rowsNoImportados) {
+  const headers = ['fila', 'codigo', 'descripcion', 'motivo'];
+  const body = (rowsNoImportados || []).map((r) => [r.fila, r.codigo || '', r.descripcion || '', r.motivo || '']);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'NoImportados');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
@@ -143,7 +253,15 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     throw new Error('SIN_SUCURSAL_PRINCIPAL');
   }
 
+  const listasDisponibles = await productosImportacionRepository.obtenerListasPrecioBaseImportacion(pool, idEmpresa);
+  const listasPrecio = resolverListasPrecioImportacion(listasDisponibles);
   const errores = [];
+  if (!listasPrecio.normal) errores.push({ fila: 1, codigo: '', mensajes: ['No existe lista activa "Precio Normal".'] });
+  if (!listasPrecio.cliente) errores.push({ fila: 1, codigo: '', mensajes: ['No existe lista activa "Precio Cliente".'] });
+  if (!listasPrecio.mayorista) errores.push({ fila: 1, codigo: '', mensajes: ['No existe lista activa "Precio Mayorista".'] });
+  if (errores.length > 0) {
+    return { filasResueltas: [], errores, idSucursal, listasPrecio };
+  }
   const vistosCodigo = new Map();
 
   const filasResueltas = [];
@@ -154,12 +272,14 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     if (!f.codigo) msgs.push('Falta codigo');
     if (!f.descripcion) msgs.push('Falta descripcion');
     if (!f.presentacionCodigo) msgs.push('Falta presentacion (código ej. NIU)');
-    const costo = parseFloat(String(f.costoStr).replace(',', '.'));
+    const costo = parseNumeroFlexible(f.costoStr);
     if (Number.isNaN(costo) || costo < 0) msgs.push('costoUnitario inválido');
-    const precio = parseFloat(String(f.precioStr).replace(',', '.'));
-    if (Number.isNaN(precio) || precio <= 0) msgs.push('precioListaCliente debe ser > 0');
-    const cantidadInicial = parseFloat(String(f.cantidadStr).replace(',', '.'));
-    if (Number.isNaN(cantidadInicial) || cantidadInicial < 0) msgs.push('cantidadInicial inválida');
+    const precioNormal = parsePrecioImportacion(f.precioNormalStr, 'precioNormal', msgs);
+    const precioCliente = parsePrecioImportacion(f.precioClienteStr, 'precioCliente', msgs);
+    const precioMayorista = parsePrecioImportacion(f.precioMayoristaStr, 'precioMayorista', msgs);
+    const cantidadInicialRaw = parseNumeroFlexible(f.cantidadStr);
+    if (Number.isNaN(cantidadInicialRaw)) msgs.push('cantidadInicial inválida');
+    const cantidadInicial = Number.isNaN(cantidadInicialRaw) ? 0 : Math.max(0, cantidadInicialRaw);
 
     const ck = f.codigo.toUpperCase();
     if (vistosCodigo.has(ck)) {
@@ -212,13 +332,16 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       idCategoria,
       idMarca,
       cUnitario: costo,
-      precioListaCliente: precio,
+      precioCliente,
+      precioNormal,
+      precioMayorista,
       cantidadInicial,
-      idSucursal
+      idSucursal,
+      listasPrecio
     });
   }
 
-  return { filasResueltas, errores, idSucursal };
+  return { filasResueltas, errores, idSucursal, listasPrecio };
 }
 
 async function validarArchivo(pool, user, buffer) {
@@ -237,7 +360,9 @@ async function validarArchivo(pool, user, buffer) {
       descripcion: r.descripcion,
       cantidadInicial: r.cantidadInicial,
       costoUnitario: r.cUnitario,
-      precioListaCliente: r.precioListaCliente
+      precioNormal: r.precioNormal,
+      precioCliente: r.precioCliente,
+      precioMayorista: r.precioMayorista
     }))
   };
 }
@@ -249,12 +374,28 @@ async function ejecutarImportacion(pool, user, buffer) {
   const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
 
   if (filasResueltas.length === 0) {
+    const noImportados = (errores || []).map((e) => ({
+      fila: e.fila,
+      codigo: e.codigo || '',
+      descripcion: '',
+      motivo: (e.mensajes || []).join('; ')
+    }));
+    const noImportadosExcel =
+      noImportados.length > 0
+        ? {
+            fileName: `productos_no_importados_${Date.now()}.xlsx`,
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            base64: generarNoImportadosBuffer(noImportados).toString('base64'),
+            total: noImportados.length
+          }
+        : null;
     return {
       total: filas.length,
       insertados: 0,
       detalle: [],
       erroresValidacion: errores,
-      erroresEjecucion: []
+      erroresEjecucion: [],
+      noImportadosExcel
     };
   }
 
@@ -307,8 +448,25 @@ async function ejecutarImportacion(pool, user, buffer) {
         datosProducto,
         usarCorrelativo: false,
         lote,
-        precioVenta: r.precioListaCliente,
+        precioVenta: r.precioCliente,
         idListaPrecio: null,
+        preciosPorLista: [
+          {
+            idLista: r.listasPrecio.normal.idLista,
+            idMoneda: r.listasPrecio.normal.idMoneda,
+            precio: r.precioNormal
+          },
+          {
+            idLista: r.listasPrecio.cliente.idLista,
+            idMoneda: r.listasPrecio.cliente.idMoneda,
+            precio: r.precioCliente
+          },
+          {
+            idLista: r.listasPrecio.mayorista.idLista,
+            idMoneda: r.listasPrecio.mayorista.idMoneda,
+            precio: r.precioMayorista
+          }
+        ],
         idEmpresa
       });
       if (resultado.errorLista) {
@@ -326,12 +484,38 @@ async function ejecutarImportacion(pool, user, buffer) {
     }
   }
 
+  const noImportados = [
+    ...errores.map((e) => ({
+      fila: e.fila,
+      codigo: e.codigo || '',
+      descripcion: '',
+      motivo: (e.mensajes || []).join('; ')
+    })),
+    ...erroresEjecucion.map((e) => ({
+      fila: e.fila,
+      codigo: e.codigo || '',
+      descripcion: '',
+      motivo: (e.mensajes || []).join('; ')
+    }))
+  ];
+  let noImportadosExcel = null;
+  if (noImportados.length > 0) {
+    const buffer = generarNoImportadosBuffer(noImportados);
+    noImportadosExcel = {
+      fileName: `productos_no_importados_${Date.now()}.xlsx`,
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      base64: buffer.toString('base64'),
+      total: noImportados.length
+    };
+  }
+
   return {
     total: filas.length,
     insertados: insertados.length,
     detalle: insertados,
     erroresValidacion: errores,
-    erroresEjecucion
+    erroresEjecucion,
+    noImportadosExcel
   };
 }
 

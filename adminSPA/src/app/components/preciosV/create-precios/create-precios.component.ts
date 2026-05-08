@@ -38,6 +38,9 @@ export interface ProductoPreciosFila {
   fActualizacion?: string;
   tienePrecio?: boolean;
   precios?: Record<number, { precio: number; idPrecio?: string; fActualizacion?: string }>;
+  /** Stock / fila operativa (Lotes); nombre de sucursal activa. */
+  idSucursal?: string;
+  sucursal?: string;
 }
 
 export type PaginaItemPrecios = number | 'ellipsis';
@@ -51,6 +54,7 @@ export type PaginaItemPrecios = number | 'ellipsis';
 
 })
 export class CreatePreciosComponent implements OnInit {
+  readonly LISTA_TODAS = '__TODAS__';
   @ViewChild('modalNuevaLista') modalNuevaLista!: ElementRef;
 
   private readonly permisosService = inject(PermisosService);
@@ -61,6 +65,8 @@ export class CreatePreciosComponent implements OnInit {
   monedas: any[] = [];
   productosFiltrados: ProductoPreciosFila[] = [];
   sucursales: any[] = [];
+  /** Columna sucursal solo si hay más de una sucursal activa en la empresa. */
+  mostrarColumnaSucursal = false;
 
   /** Vecinos del número de página activo (0 = solo página actual entre extremos; más compacto). */
   readonly paginationDelta = 0;
@@ -130,7 +136,7 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   // Estado
-  listaSeleccionadaId: number | null = null;
+  listaSeleccionadaId: number | string | null = null;
   listaSeleccionada: any = null;
   listaEditar: any = null;
   filtroBusqueda: string = '';
@@ -139,8 +145,11 @@ export class CreatePreciosComponent implements OnInit {
   // Formulario
   formListaPrecio: FormGroup;
   
-  // Modal
+  // Modal precios multi-lista (solo cuando la lista principal es TODAS)
   modal: any;
+  mostrarModalPreciosTodas = false;
+  productoModalTodas: ProductoPreciosFila | null = null;
+  preciosTodasListas: Array<{ idLista: number; nombre: string; idMoneda: number; precio: number }> = [];
 
   
   constructor(
@@ -211,9 +220,10 @@ export class CreatePreciosComponent implements OnInit {
         }));
         this.productosFiltrados = [...this.productos];
         this.page = 1;
-        if (this.listaSeleccionadaId) {
+        const idLista = this.obtenerIdListaNumericoSeleccionado();
+        if (idLista != null) {
           this.productos.forEach((producto) =>
-            this.actualizarPrecioProducto(producto, this.listaSeleccionadaId!)
+            this.actualizarPrecioProducto(producto, idLista)
           );
         }
       },
@@ -224,13 +234,14 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   cargarSucursales(): void {
-    // Implementar servicio para obtener sucursales
-    this._sucursalService.obtener_sucursal_idempresa().subscribe({
+    this._sucursalService.obtener_sucursal_idempresa(false).subscribe({
       next: (response) => {
         this.sucursales = response.data || [];
-              },
+        this.mostrarColumnaSucursal = Array.isArray(this.sucursales) && this.sucursales.length > 1;
+      },
       error: (error) => {
         console.error('Error al cargar sucursales:', error);
+        this.mostrarColumnaSucursal = false;
       }
     });
   }
@@ -248,20 +259,39 @@ export class CreatePreciosComponent implements OnInit {
 
   // Eventos
   onListaSeleccionada(): void {
+    if (this.listaSeleccionadaId === this.LISTA_TODAS) {
+      this.listaSeleccionada = null;
+      this.simboloMoneda = 'S/.';
+      this.resetearPrecios();
+      this.productos.forEach((p) => {
+        p.nuevoPrecio = null;
+      });
+      return;
+    }
     this.listaSeleccionada = this.listasPrecio.find(
       lista => lista.idLista == this.listaSeleccionadaId
     );
     
     if (this.listaSeleccionada) {
+      const idLista = this.obtenerIdListaNumericoSeleccionado();
+      if (idLista == null) return;
       // Actualizar símbolo de moneda
       this.simboloMoneda = this.listaSeleccionada.idMoneda === 2 ? '$' : 'S/.';
        // Actualizar precioActual en cada producto
       this.productos.forEach(producto => {
-        this.actualizarPrecioProducto(producto, this.listaSeleccionadaId!);
+        this.actualizarPrecioProducto(producto, idLista);
       });
       // Cargar precios para esta lista
       this.cargarPreciosProductos();
     }
+  }
+
+  private obtenerIdListaNumericoSeleccionado(): number | null {
+    if (this.listaSeleccionadaId == null || this.listaSeleccionadaId === this.LISTA_TODAS) {
+      return null;
+    }
+    const n = Number(this.listaSeleccionadaId);
+    return Number.isNaN(n) ? null : n;
   }
   
   // Método clave: Obtener precio de un producto para una lista específica
@@ -405,6 +435,9 @@ export class CreatePreciosComponent implements OnInit {
     if (this.productos.some((p) => this.costoUnitarioCambio(p))) {
       return true;
     }
+    if (this.listaSeleccionadaId === this.LISTA_TODAS) {
+      return false;
+    }
     if (!this.listaSeleccionadaId) {
       return false;
     }
@@ -414,33 +447,45 @@ export class CreatePreciosComponent implements OnInit {
   }
 
   guardarPrecios(): void {
-    const preciosAGuardar = this.productos
-      .filter(
-        (producto) =>
-          producto.nuevoPrecio != null &&
-          producto.nuevoPrecio !== producto.precioActual
-      )
-      .map((producto) => ({
-        idLista: this.listaSeleccionadaId,
-        idProducto: producto.idProducto,
-        idPrecio: producto.idPrecio,
-        precio: producto.nuevoPrecio,
-        idMoneda: this.listaSeleccionada!.idMoneda,
-        idUsuario: 'USUARIO_ACTUAL'
-      }));
+    const productosConCambioPrecio = this.productos.filter(
+      (producto) => producto.nuevoPrecio != null && producto.nuevoPrecio !== producto.precioActual
+    );
+    const costosACambiar = this.productos.filter((p) => this.costoUnitarioCambio(p));
+
+    if (this.listaSeleccionadaId === this.LISTA_TODAS) {
+      if (costosACambiar.length === 0) {
+        alert(
+          'Con "TODAS" seleccionada, haga clic en "N. Precio" de un producto para editar todas sus listas. Use "Guardar Precios" solo para cambios de costo unitario.'
+        );
+        return;
+      }
+      this.ejecutarGuardado([], costosACambiar);
+      return;
+    }
+
+    const preciosAGuardar = productosConCambioPrecio.map((producto) => ({
+      idLista: this.listaSeleccionadaId,
+      idProducto: producto.idProducto,
+      idPrecio: producto.idPrecio,
+      precio: producto.nuevoPrecio,
+      idMoneda: this.listaSeleccionada!.idMoneda,
+      idUsuario: 'USUARIO_ACTUAL'
+    }));
 
     if (preciosAGuardar.length > 0 && !this.listaSeleccionadaId) {
       alert('Selecciona una lista de precios para guardar los precios de lista');
       return;
     }
 
-    const costosACambiar = this.productos.filter((p) => this.costoUnitarioCambio(p));
-
     if (preciosAGuardar.length === 0 && costosACambiar.length === 0) {
       alert('No hay cambios de precio ni de costo unitario para guardar');
       return;
     }
 
+    this.ejecutarGuardado(preciosAGuardar, costosACambiar);
+  }
+
+  private ejecutarGuardado(preciosAGuardar: any[], costosACambiar: ProductoPreciosFila[]): void {
     const precios$ =
       preciosAGuardar.length > 0
         ? this.preciosService.creaer_precio_producto(preciosAGuardar)
@@ -481,6 +526,55 @@ export class CreatePreciosComponent implements OnInit {
     });
   }
 
+  abrirModalPreciosTodasPara(producto: ProductoPreciosFila): void {
+    if (this.listaSeleccionadaId !== this.LISTA_TODAS) {
+      return;
+    }
+    this.productoModalTodas = producto;
+    const base = this.listasPrecio || [];
+    this.preciosTodasListas = base.map((l: any) => {
+      const idLista = Number(l.idLista);
+      const precioData = producto.precios?.[idLista];
+      const precioRaw = precioData?.precio != null ? Number(precioData.precio) : 0;
+      return {
+        idLista,
+        nombre: String(l.nombre || 'Lista'),
+        idMoneda: Number(l.idMoneda || 1),
+        precio: Number.isNaN(precioRaw) ? 0 : precioRaw
+      };
+    });
+    this.mostrarModalPreciosTodas = true;
+  }
+
+  cancelarModalPreciosTodas(): void {
+    this.mostrarModalPreciosTodas = false;
+    this.productoModalTodas = null;
+  }
+
+  confirmarModalPreciosTodas(): void {
+    const prod = this.productoModalTodas;
+    if (!prod) {
+      this.mostrarModalPreciosTodas = false;
+      return;
+    }
+    const preciosAGuardar: any[] = [];
+    for (const l of this.preciosTodasListas) {
+      const precio = Number(l.precio);
+      const precioData = prod.precios?.[l.idLista];
+      preciosAGuardar.push({
+        idLista: l.idLista,
+        idProducto: prod.idProducto,
+        idPrecio: precioData?.idPrecio ?? null,
+        precio: Number.isNaN(precio) || precio < 0 ? 0 : precio,
+        idMoneda: l.idMoneda,
+        idUsuario: 'USUARIO_ACTUAL'
+      });
+    }
+    this.mostrarModalPreciosTodas = false;
+    this.productoModalTodas = null;
+    this.ejecutarGuardado(preciosAGuardar, []);
+  }
+
   costoUnitarioCambio(p: ProductoPreciosFila): boolean {
     const nu = Number(p.nuevoCUnitario);
     const orig = Number(p.cUnitario ?? 0);
@@ -518,7 +612,8 @@ export class CreatePreciosComponent implements OnInit {
         (producto.descripcion || '').toLowerCase().includes(termino) ||
         (producto.codigo || '').toLowerCase().includes(termino) ||
         (producto.sku || '').toLowerCase().includes(termino) ||
-        (producto.marca || '').toLowerCase().includes(termino)
+        (producto.marca || '').toLowerCase().includes(termino) ||
+        (producto.sucursal || '').toLowerCase().includes(termino)
     );
     this.page = 1;
   }

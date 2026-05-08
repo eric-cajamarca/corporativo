@@ -39,7 +39,7 @@ async function obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpres
  * @returns {{ ok: true, idProducto }} | {{ errorLista: true }}
  */
 async function crearProductoConTransaccion(pool, params) {
-  const { datosProducto, usarCorrelativo, lote, precioVenta, idListaPrecio, idEmpresa } = params;
+  const { datosProducto, usarCorrelativo, lote, precioVenta, idListaPrecio, idEmpresa, preciosPorLista } = params;
   const maxIntentosCodigo = 12;
   let committed = false;
   let lastDupErr = null;
@@ -75,32 +75,48 @@ async function crearProductoConTransaccion(pool, params) {
         });
       }
 
-      const precioVal = parseFloat(precioVenta);
-      if (!Number.isNaN(precioVal) && precioVal > 0) {
-        let lista = null;
-        if (idListaPrecio != null && idListaPrecio !== '') {
-          const listaResult = await preciosVRepository.obtenerListaPorId(
-            transaction,
-            parseInt(idListaPrecio, 10),
-            idEmpresa
-          );
-          lista = listaResult && listaResult.recordset && listaResult.recordset[0];
-          if (!lista) {
-            await transaction.rollback();
-            return { errorLista: true };
-          }
-        } else {
-          const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
-          lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
-        }
-        if (lista && lista.idLista && lista.idMoneda) {
+      const preciosMulti = Array.isArray(preciosPorLista) ? preciosPorLista : [];
+      if (preciosMulti.length > 0) {
+        for (const p of preciosMulti) {
+          const pv = parseFloat(p?.precio);
+          if (Number.isNaN(pv) || pv < 0) continue;
+          if (!p?.idLista || !p?.idMoneda) continue;
           await preciosVRepository.crearPrecioProducto(transaction, {
-            idLista: lista.idLista,
+            idLista: p.idLista,
             idProducto: datosProducto.idProducto,
-            precio: precioVal,
-            idMoneda: lista.idMoneda,
+            precio: pv,
+            idMoneda: p.idMoneda,
             idUsuario: datosProducto.idUsuario
           });
+        }
+      } else {
+        const precioVal = parseFloat(precioVenta);
+        if (!Number.isNaN(precioVal) && precioVal > 0) {
+          let lista = null;
+          if (idListaPrecio != null && idListaPrecio !== '') {
+            const listaResult = await preciosVRepository.obtenerListaPorId(
+              transaction,
+              parseInt(idListaPrecio, 10),
+              idEmpresa
+            );
+            lista = listaResult && listaResult.recordset && listaResult.recordset[0];
+            if (!lista) {
+              await transaction.rollback();
+              return { errorLista: true };
+            }
+          } else {
+            const listaPrincipal = await preciosVRepository.verificarPrincipalExistente(transaction, idEmpresa);
+            lista = listaPrincipal && listaPrincipal.recordset && listaPrincipal.recordset[0];
+          }
+          if (lista && lista.idLista && lista.idMoneda) {
+            await preciosVRepository.crearPrecioProducto(transaction, {
+              idLista: lista.idLista,
+              idProducto: datosProducto.idProducto,
+              precio: precioVal,
+              idMoneda: lista.idMoneda,
+              idUsuario: datosProducto.idUsuario
+            });
+          }
         }
       }
 
