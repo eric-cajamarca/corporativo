@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
@@ -29,26 +29,42 @@ export class SucursalService {
   // //////////////////////////////////////////////////////////////////////////////////////////
   // api.get('/stocksucursal',auth.auth, sucursalController.obtener_stock_sucursal_idProducto);
 
-  obtener_sucursal_todos():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'sucursal',{
-      headers:headers,
+  /** Por defecto solo sucursales activas. Usar incluirInactivas en administración de sucursales o edición de una inactiva. */
+  obtener_sucursal_todos(incluirInactivas = false): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let params = new HttpParams();
+    if (incluirInactivas) {
+      params = params.set('incluirInactivas', 'true');
+    }
+    return this._http.get(this.url + 'sucursal', {
+      headers,
+      params,
       withCredentials: true
     });
   }
 
-  obtener_sucursal_idempresa():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'sucursalempresa',{
-      headers:headers,
+  obtener_sucursal_idempresa(incluirInactivas = false): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let params = new HttpParams();
+    if (incluirInactivas) {
+      params = params.set('incluirInactivas', 'true');
+    }
+    return this._http.get(this.url + 'sucursalempresa', {
+      headers,
+      params,
       withCredentials: true
     });
   }
 
-  obtener_sucursal_idempresa1():Observable<ApiResponse<Sucursal[]>>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get<ApiResponse<Sucursal[]>>(this.url+'sucursalempresa',{
-      headers:headers,
+  obtener_sucursal_idempresa1(incluirInactivas = false): Observable<ApiResponse<Sucursal[]>> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let params = new HttpParams();
+    if (incluirInactivas) {
+      params = params.set('incluirInactivas', 'true');
+    }
+    return this._http.get<ApiResponse<Sucursal[]>>(this.url + 'sucursalempresa', {
+      headers,
+      params,
       withCredentials: true
     });
   }

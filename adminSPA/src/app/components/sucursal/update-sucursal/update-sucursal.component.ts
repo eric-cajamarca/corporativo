@@ -39,7 +39,7 @@ export class UpdateSucursalComponent implements OnInit {
   ngOnInit(): void {
     this._Route.params.subscribe((params) => {
       this.id = params['id'];
-      this._sucursalService.obtener_sucursal_idempresa().subscribe({
+      this._sucursalService.obtener_sucursal_idempresa(true).subscribe({
         next: (response) => {
           const list = response?.data || [];
           const found = list.find((s: { idSucursal: string }) => s.idSucursal === this.id);

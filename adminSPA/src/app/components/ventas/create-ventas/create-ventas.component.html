@@ -387,24 +387,10 @@
       </div>
       <div class="modal-body p-4">
         <div class="row g-3">
-          <div class="col-12" *ngIf="bloqueoPorSucursalUsuario && !esGestora && !permitirVentaMultiSucursal">
+          <div class="col-12" *ngIf="bloqueoPorSucursalUsuario">
             <div class="alert alert-warning py-2 mb-0">
               Su usuario no tiene sucursales activas asignadas. Solicite la asignación al administrador para continuar con ventas.
             </div>
-          </div>
-          <div class="col-md-6" *ngIf="!esGestora">
-            <label class="form-label">Sucursal de venta</label>
-            <select
-              class="form-select"
-              [(ngModel)]="ventas.idSucursal"
-              (ngModelChange)="onSucursalVentaChange()"
-              [disabled]="bloqueoPorSucursalUsuario || (!permitirVentaMultiSucursal && sucursalesPermitidasVenta.length <= 1)">
-              <option value="" disabled>Seleccione...</option>
-              <option *ngFor="let s of (permitirVentaMultiSucursal ? sucursales : sucursalesPermitidasVenta)" [value]="s.idSucursal">
-                {{ s.nombre }}
-              </option>
-            </select>
-            <small class="text-muted" *ngIf="!permitirVentaMultiSucursal">Con multi-sucursal desactivado, la venta usará una sola sucursal operativa.</small>
           </div>
           <div class="col-md-6">
             <label class="form-label">Tipo de comprobante</label>

@@ -199,6 +199,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Empresa gestora: venta corporativa con comprobante VA. */
   esGestora = false;
+  /** Empresa gestionada por otra (token es empresa destino en Gestores_Empresas). */
+  esEmpresaGestionada = false;
   permitirVentaMultiSucursal = false;
   sucursalesUsuarioAsignadas: SucursalUsuario[] = [];
   sucursalesPermitidasVenta: Sucursal[] = [];
@@ -392,10 +394,12 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (res) => {
         const estado = res?.data;
         this.esGestora = !!estado?.esGestora;
+        this.esEmpresaGestionada = !!(estado as { esEmpresaGestionada?: boolean })?.esEmpresaGestionada;
         this.cargarPermitirVentaMultiSucursal();
       },
       error: () => {
         this.esGestora = false;
+        this.esEmpresaGestionada = false;
         this.cargarPermitirVentaMultiSucursal();
       }
     });
@@ -889,29 +893,76 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private resolverSucursalesPermitidasVenta(): void {
-    if (this.esGestora || this.permitirVentaMultiSucursal) {
-      this.sucursalesPermitidasVenta = [...this.sucursales];
-      this.bloqueoPorSucursalUsuario = false;
-      this.buscarProductos();
-      return;
-    }
-    const idsAsignadas = new Set(
-      (this.sucursalesUsuarioAsignadas || []).map((s) => String(s.idSucursal || '').toLowerCase()).filter(Boolean)
+  private idsSucursalesAsignadasActivas(): Set<string> {
+    return new Set(
+      (this.sucursalesUsuarioAsignadas || [])
+        .map((s) => String(s.idSucursal || '').toLowerCase())
+        .filter(Boolean)
     );
-    if (idsAsignadas.size === 0) {
-      this.sucursalesPermitidasVenta = [];
-      this.bloqueoPorSucursalUsuario = true;
+  }
+
+  private obtenerCatalogoProductosOperativo(): any[] {
+    let activos = (this.stockSucursales_const || []).filter((item: any) =>
+      productoActivoParaVenta(item as Record<string, unknown>)
+    );
+    const idsAsignadas = this.idsSucursalesAsignadasActivas();
+    if (idsAsignadas.size > 0) {
+      activos = activos.filter((item: any) =>
+        idsAsignadas.has(String(item?.idSucursal || '').toLowerCase())
+      );
+    }
+    if (this.permitirVentaMultiSucursal) {
+      return activos;
+    }
+    if (!this.esGestora) {
+      // Varias sucursales asignadas: ya acotado por ids; no recortar otra vez a ventas.idSucursal.
+      if (idsAsignadas.size > 1) {
+        return activos;
+      }
+      // Una asignación: el bloque inicial ya dejó solo esa sucursal; filtrar de nuevo por ventas.idSucursal
+      // (a menudo la principal) eliminaba el stock de la sucursal asignada o mostraba todo si aún no cargaban mis-sucursales.
+      if (idsAsignadas.size === 1) {
+        return activos;
+      }
+      // Empresa gestionada: el API de productos no filtra por UsuarioSucursal; sin filas de asignación (ej. admin sin UsuarioSucursal)
+      // no forzar catálogo solo a la sucursal del selector.
+      if (this.esEmpresaGestionada) {
+        return activos;
+      }
+      if (this.ventas.idSucursal) {
+        const idSuc = String(this.ventas.idSucursal);
+        return activos.filter((item: any) => String(item?.idSucursal || '') === idSuc);
+      }
+      return activos;
+    }
+    const sucursalFijaPorEmpresa = new Map<string, string>();
+    return activos.filter((item: any) => {
+      const idEmpresa = String(item?.idEmpresa || '').trim();
+      const idSucursal = String(item?.idSucursal || '').trim();
+      if (!idEmpresa || !idSucursal) return false;
+      const fijada = sucursalFijaPorEmpresa.get(idEmpresa);
+      if (!fijada) {
+        sucursalFijaPorEmpresa.set(idEmpresa, idSucursal);
+        return true;
+      }
+      return fijada === idSucursal;
+    });
+  }
+
+  private resolverSucursalesPermitidasVenta(): void {
+    const idsAsignadas = this.idsSucursalesAsignadasActivas();
+    const sucursalesActivas = (this.sucursales || []).filter((s: any) => (s?.estado ?? true) !== false);
+    this.sucursalesPermitidasVenta = idsAsignadas.size > 0
+      ? sucursalesActivas.filter((s) => idsAsignadas.has(String(s.idSucursal || '').toLowerCase()))
+      : sucursalesActivas;
+    this.bloqueoPorSucursalUsuario = idsAsignadas.size > 0 && this.sucursalesPermitidasVenta.length === 0;
+    if (this.bloqueoPorSucursalUsuario) {
       this.ventas.idSucursal = '';
       this.comprobantes = [];
       this.buscarProductos();
       return;
     }
-    this.sucursalesPermitidasVenta = (this.sucursales || []).filter((s) =>
-      idsAsignadas.has(String(s.idSucursal || '').toLowerCase())
-    );
-    this.bloqueoPorSucursalUsuario = this.sucursalesPermitidasVenta.length === 0;
-    if (!this.bloqueoPorSucursalUsuario) {
+    if (!this.permitirVentaMultiSucursal && this.sucursalesPermitidasVenta.length > 0) {
       const actual = String(this.ventas.idSucursal || '').toLowerCase();
       const existeActual = this.sucursalesPermitidasVenta.some((s) => String(s.idSucursal).toLowerCase() === actual);
       if (!existeActual) {
@@ -927,6 +978,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.ultimaSucursalSeleccionada = String(conCaja.idSucursal || '');
         }
       }
+    } else if (!this.ventas.idSucursal && this.sucursalesPermitidasVenta.length > 0) {
+      this.ventas.idSucursal = this.sucursalesPermitidasVenta[0].idSucursal;
+      this.ultimaSucursalSeleccionada = String(this.ventas.idSucursal || '');
     }
     this.buscarProductos();
     this.cargarComprobantesVentaInicial();
@@ -984,13 +1038,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   buscarProductos(): void {
     const term = this.searchTerm.toLowerCase().trim();
-    let activos = (this.stockSucursales_const || []).filter((item: any) =>
-      productoActivoParaVenta(item as Record<string, unknown>)
-    );
-    if (!this.esGestora && !this.permitirVentaMultiSucursal && this.ventas.idSucursal) {
-      const idSuc = String(this.ventas.idSucursal);
-      activos = activos.filter((item: any) => String(item?.idSucursal || '') === idSuc);
-    }
+    const activos = this.obtenerCatalogoProductosOperativo();
     if (term === '') {
       this.productos_filtrados = activos;
     } else {
@@ -1161,6 +1209,21 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   agregarAlCarrito(producto: any): void {
+    if (!this.permitirVentaMultiSucursal) {
+      const idEmpresaNuevo = String(producto?.idEmpresa || '').trim();
+      const idSucursalNuevo = String(producto?.idSucursal || this.ventas.idSucursal || '').trim();
+      const mezclaSucursalMismaEmpresa = this.carrito.find((p) =>
+        String(p?.idEmpresa || '').trim() === idEmpresaNuevo &&
+        String(p?.idSucursal || '').trim() !== idSucursalNuevo
+      );
+      if (mezclaSucursalMismaEmpresa) {
+        iziToast.warning({
+          title: 'Sucursal restringida',
+          message: 'Con multi-sucursal desactivado solo puede usar una sucursal por empresa en la venta.'
+        });
+        return;
+      }
+    }
     const existe = this.carrito.find(p =>
       String(p.idProducto) === String(producto.idProducto) &&
       String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
@@ -1200,9 +1263,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const term = raw.toLowerCase();
 
-      const fuente = (!this.esGestora && !this.permitirVentaMultiSucursal && this.ventas.idSucursal)
-        ? (this.stockSucursales_const || []).filter((item: any) => String(item?.idSucursal || '') === String(this.ventas.idSucursal))
-        : (this.stockSucursales_const || []);
+      const fuente = this.obtenerCatalogoProductosOperativo();
 
       // 1) Buscar coincidencia exacta en producto.Codigo
       let encontrado = fuente.find((item: any) => {
@@ -1384,10 +1445,15 @@ abrirModalPrecios(item: any) {
   }
 
   actualizaCantidad(item: any, el: any) {
-    const nuevo = parseInt(el.target.innerText.trim(), 10);
-    if (!isNaN(nuevo)) {
-      item.cantidad = nuevo;
+    const raw = (el.target?.innerText ?? '')
+      .replace(/[^\d.,\-]/g, '')
+      .replace(',', '.')
+      .trim();
+    let nuevo = parseFloat(raw);
+    if (Number.isNaN(nuevo) || nuevo < 0) {
+      nuevo = Number(item.cantidad) || 0;
     }
+    item.cantidad = Math.round(nuevo * 1e6) / 1e6;
     this.enriquecerLineaCarritoDesdeCatalogo(item);
     this.actualizaTotales();
   }
@@ -2016,7 +2082,7 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'Seleccione tipo de comprobante (Datos del Comprobante).' });
       return;
     }
-    if (this.bloqueoPorSucursalUsuario && !this.esGestora && !this.permitirVentaMultiSucursal) {
+    if (this.bloqueoPorSucursalUsuario) {
       iziToast.warning({
         title: 'Sucursal no asignada',
         message: 'Su usuario no tiene sucursales asignadas o activas. Solicite al administrador su asignación.'

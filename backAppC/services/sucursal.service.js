@@ -1,6 +1,7 @@
 const sucursalRepository = require('../repositories/sucursal.repository');
 const empresaService = require('./empresa.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
+const { idsSucursalesFiltroCatalogo, assertSucursalPermitidaParaUsuario } = require('../utils/sucursalUsuarioScope.util');
 
 const E = {
   NO_ACCESS: 'NO_ACCESS',
@@ -8,7 +9,8 @@ const E = {
   NO_PERMISO_403: 'NO_PERMISO_403',
   FALTA_EMPRESA: 'FALTA_EMPRESA',
   NOT_FOUND: 'NOT_FOUND',
-  BAD_REQUEST: 'BAD_REQUEST'
+  BAD_REQUEST: 'BAD_REQUEST',
+  SUCURSAL_NO_PERMITIDA: 'SUCURSAL_NO_PERMITIDA'
 };
 
 function idEmpresaDesdeUser(user) {
@@ -26,21 +28,25 @@ function normalizarFechaRegistro(rows) {
   });
 }
 
-async function obtenerSucursalResumen(pool, user) {
+async function obtenerSucursalResumen(pool, user, opciones = {}) {
   if (!user) throw new Error(E.NO_ACCESS);
   await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
-  const rows = await sucursalRepository.listarResumenPorEmpresa(pool, idEmpresa);
+  const incluirInactivas = !!opciones.incluirInactivas;
+  const idsUsuario = incluirInactivas ? null : await idsSucursalesFiltroCatalogo(pool, user);
+  const rows = await sucursalRepository.listarResumenPorEmpresa(pool, idEmpresa, !incluirInactivas, idsUsuario);
   return rows;
 }
 
-async function obtenerSucursalTodos(pool, user) {
+async function obtenerSucursalTodos(pool, user, opciones = {}) {
   if (!user) throw new Error(E.NO_ACCESS);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
-  const rows = await sucursalRepository.listarTodosPorEmpresa(pool, idEmpresa);
+  const incluirInactivas = !!opciones.incluirInactivas;
+  const idsUsuario = incluirInactivas ? null : await idsSucursalesFiltroCatalogo(pool, user);
+  const rows = await sucursalRepository.listarTodosPorEmpresa(pool, idEmpresa, !incluirInactivas, idsUsuario);
   return normalizarFechaRegistro(rows);
 }
 
@@ -144,6 +150,7 @@ async function obtenerStockSucursalProducto(pool, user, idProducto, idSucursal) 
   if (!user) throw new Error(E.NO_ACCESS);
   await assertAlgunoPermiso(pool, user, 'VER_INVENTARIO', 'GESTIONAR_LOTES');
   if (!user.empresa || !idSucursal || !idProducto) throw new Error(E.BAD_REQUEST);
+  await assertSucursalPermitidaParaUsuario(pool, user, idSucursal);
   return sucursalRepository.listarLotesPorSucursalProducto(
     pool,
     user.empresa,
@@ -157,7 +164,8 @@ async function obtenerStockSucursalesEmpresa(pool, user) {
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   await assertAlgunoPermiso(pool, user, 'VER_INVENTARIO', 'GESTIONAR_LOTES');
-  return sucursalRepository.listarLotesStockPorEmpresa(pool, idEmpresa);
+  const idsFiltro = await idsSucursalesFiltroCatalogo(pool, user);
+  return sucursalRepository.listarLotesStockPorEmpresa(pool, idEmpresa, idsFiltro);
 }
 
 async function crearStockLote(pool, user, body) {
@@ -171,6 +179,7 @@ async function crearStockLote(pool, user, body) {
       ? parseFloat(costoUnitario)
       : 0;
   if (!idSucursal || !idProducto) throw new Error(E.BAD_REQUEST);
+  await assertSucursalPermitidaParaUsuario(pool, user, idSucursal);
   await sucursalRepository.insertarLote(pool, {
     idEmpresa,
     idSucursal,
@@ -203,6 +212,9 @@ async function eliminarStockLote(pool, user, idLote) {
   if (!user) throw new Error(E.NO_ACCESS);
   await assertAlgunoPermiso(pool, user, 'GESTIONAR_LOTES');
   const idEmpresa = user.empresa;
+  const idSucLote = await sucursalRepository.obtenerIdSucursalDeLote(pool, idEmpresa, idLote);
+  if (!idSucLote) throw new Error(E.NOT_FOUND);
+  await assertSucursalPermitidaParaUsuario(pool, user, idSucLote);
   return sucursalRepository.eliminarLote(pool, idEmpresa, idLote);
 }
 

@@ -1,17 +1,25 @@
 const sql = require('mssql');
 
-async function listarResumenPorEmpresa(pool, idEmpresa) {
-  const result = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(
-      `SELECT idSucursal, nombre, direccion,
-              CONVERT(VARCHAR(10), fregistro, 23) AS fregistro,
-              ISNULL(esPrincipal, 0) AS esPrincipal,
-              idSucursalSeriesPadre
-       FROM Sucursal WHERE idEmpresa = @idEmpresa
-       ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
-    );
+async function listarResumenPorEmpresa(pool, idEmpresa, soloActivas = true, idsSucursalesUsuario = null) {
+  const filtroActiva = soloActivas ? ' AND ISNULL(estado, 1) = 1 ' : '';
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  let filtroUsuario = '';
+  if (Array.isArray(idsSucursalesUsuario) && idsSucursalesUsuario.length > 0) {
+    const ph = idsSucursalesUsuario.map((id, i) => {
+      const p = `idSucUs${i}`;
+      req.input(p, sql.UniqueIdentifier, id);
+      return `@${p}`;
+    });
+    filtroUsuario = ` AND idSucursal IN (${ph.join(', ')}) `;
+  }
+  const result = await req.query(
+    `SELECT idSucursal, nombre, direccion,
+            CONVERT(VARCHAR(10), fregistro, 23) AS fregistro,
+            ISNULL(esPrincipal, 0) AS esPrincipal,
+            idSucursalSeriesPadre
+     FROM Sucursal WHERE idEmpresa = @idEmpresa ${filtroActiva}${filtroUsuario}
+     ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
+  );
   return result.recordset;
 }
 
@@ -28,14 +36,22 @@ async function obtenerSucursalPorId(pool, idEmpresa, idSucursal) {
   return result.recordset[0] || null;
 }
 
-async function listarTodosPorEmpresa(pool, idEmpresa) {
-  const result = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(
-      `SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa
-       ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
-    );
+async function listarTodosPorEmpresa(pool, idEmpresa, soloActivas = true, idsSucursalesUsuario = null) {
+  const filtroActiva = soloActivas ? ' AND ISNULL(estado, 1) = 1 ' : '';
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  let filtroUsuario = '';
+  if (Array.isArray(idsSucursalesUsuario) && idsSucursalesUsuario.length > 0) {
+    const ph = idsSucursalesUsuario.map((id, i) => {
+      const p = `idSucUsTot${i}`;
+      req.input(p, sql.UniqueIdentifier, id);
+      return `@${p}`;
+    });
+    filtroUsuario = ` AND idSucursal IN (${ph.join(', ')}) `;
+  }
+  const result = await req.query(
+    `SELECT * FROM Sucursal WHERE idEmpresa = @idEmpresa ${filtroActiva}${filtroUsuario}
+     ORDER BY CASE WHEN ISNULL(esPrincipal,0) = 1 THEN 0 ELSE 1 END, nombre`
+  );
   return result.recordset;
 }
 
@@ -47,7 +63,7 @@ async function obtenerSucursalDefectoComprobantes(pool, idEmpresa) {
     .query(`
       SELECT TOP 1 idSucursal
       FROM Sucursal
-      WHERE idEmpresa = @idEmpresa
+      WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1
       ORDER BY CASE WHEN ISNULL(esPrincipal, 0) = 1 THEN 0 ELSE 1 END, fregistro ASC
     `);
   const row = result.recordset && result.recordset[0];
@@ -123,6 +139,16 @@ async function eliminarTodasPorEmpresa(pool, idEmpresa) {
   return result.rowsAffected;
 }
 
+async function obtenerIdSucursalDeLote(pool, idEmpresa, idLote) {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idLote', sql.UniqueIdentifier, idLote)
+    .query('SELECT TOP 1 idSucursal FROM Lotes WHERE idEmpresa = @idEmpresa AND idLote = @idLote');
+  const row = result.recordset && result.recordset[0];
+  return row && row.idSucursal ? row.idSucursal : null;
+}
+
 async function listarLotesPorSucursalProducto(pool, idEmpresa, idSucursal, idProducto) {
   const result = await pool
     .request()
@@ -141,11 +167,18 @@ async function listarLotesPorSucursalProducto(pool, idEmpresa, idSucursal, idPro
   return result.recordset;
 }
 
-async function listarLotesStockPorEmpresa(pool, idEmpresa) {
-  const result = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query(`
+async function listarLotesStockPorEmpresa(pool, idEmpresa, idsSucursalesFiltro = null) {
+  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  let filtroSuc = '';
+  if (Array.isArray(idsSucursalesFiltro) && idsSucursalesFiltro.length > 0) {
+    const ph = idsSucursalesFiltro.map((id, i) => {
+      const p = `idSucStock${i}`;
+      req.input(p, sql.UniqueIdentifier, id);
+      return `@${p}`;
+    });
+    filtroSuc = ` AND l.idSucursal IN (${ph.join(', ')}) `;
+  }
+  const result = await req.query(`
       SELECT l.idLote, l.idEmpresa, l.idSucursal, l.idProducto, l.cantidadDisponible AS cantidad,
              l.costoUnitario, l.fechaIngreso, l.fechaVencimiento,
              p.codigo, p.descripcion, p.cUnitario, p.idCategoria, p.idMarca, p.idPresentacion,
@@ -153,11 +186,11 @@ async function listarLotesStockPorEmpresa(pool, idEmpresa) {
              pr.codigo AS codigoPresentacion, pr.descripcion AS descripcionPres
       FROM Lotes l
       INNER JOIN Productos p ON l.idProducto = p.idProducto
-      INNER JOIN Sucursal s ON l.idSucursal = s.idSucursal
+      INNER JOIN Sucursal s ON l.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
       LEFT JOIN Categorias c ON p.idCategoria = c.idCategoria
       LEFT JOIN Marcas m ON p.idMarca = m.idMarca
       LEFT JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
-      WHERE l.idEmpresa = @idEmpresa AND l.cantidadDisponible > 0
+      WHERE l.idEmpresa = @idEmpresa AND l.cantidadDisponible > 0 ${filtroSuc}
       ORDER BY s.nombre, p.descripcion, l.fechaIngreso DESC
     `);
   return result.recordset;
@@ -205,6 +238,7 @@ module.exports = {
   listarResumenPorEmpresa,
   listarTodosPorEmpresa,
   obtenerSucursalDefectoComprobantes,
+  obtenerIdSucursalDeLote,
   obtenerSucursalPorId,
   existeSucursalEnEmpresa,
   quitarPrincipalTodas,

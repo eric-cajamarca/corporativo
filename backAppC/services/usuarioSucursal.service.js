@@ -22,11 +22,12 @@ const obtenerSucursalesUsuario = async (pool, idUsuario, user) => {
  * Obtiene las sucursales activas del usuario actual
  */
 const obtenerMisSucursales = async (pool, user) => {
-    if (!user || !user.empresa || !user.idUsuario) {
+    const idUsuario = user.sub || user.idUsuario;
+    if (!user || !user.empresa || !idUsuario) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    return await usuarioSucursalRepository.obtenerSucursalesActivasUsuario(pool, user.idUsuario, user.empresa);
+    return await usuarioSucursalRepository.obtenerSucursalesActivasUsuario(pool, idUsuario, user.empresa);
 };
 
 /**
@@ -76,14 +77,15 @@ const desasignarUsuarioSucursal = async (pool, idUsuarioSucursal, user) => {
  * Establece una sucursal como default
  */
 const establecerSucursalDefault = async (pool, idSucursal, user) => {
-    if (!user || !user.empresa || !user.idUsuario) {
+    const idUsuario = user.sub || user.idUsuario;
+    if (!user || !user.empresa || !idUsuario) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
     // Verificar que el usuario tenga acceso a la sucursal
     const tieneAcceso = await usuarioSucursalRepository.verificarAccesoSucursal(
         pool, 
-        user.idUsuario, 
+        idUsuario, 
         idSucursal
     );
 
@@ -93,7 +95,7 @@ const establecerSucursalDefault = async (pool, idSucursal, user) => {
 
     return await usuarioSucursalRepository.establecerSucursalDefault(
         pool, 
-        user.idUsuario, 
+        idUsuario, 
         idSucursal, 
         user.empresa
     );
@@ -103,7 +105,8 @@ const establecerSucursalDefault = async (pool, idSucursal, user) => {
  * Verifica si el usuario tiene acceso a una sucursal
  */
 const verificarAcceso = async (pool, idSucursal, user) => {
-    if (!user || !user.idUsuario) {
+    const idUsuario = user.sub || user.idUsuario;
+    if (!user || !idUsuario) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
@@ -112,18 +115,19 @@ const verificarAcceso = async (pool, idSucursal, user) => {
         return true;
     }
 
-    return await usuarioSucursalRepository.verificarAccesoSucursal(pool, user.idUsuario, idSucursal);
+    return await usuarioSucursalRepository.verificarAccesoSucursal(pool, idUsuario, idSucursal);
 };
 
 /**
  * Obtiene la sucursal default del usuario actual
  */
 const obtenerSucursalDefault = async (pool, user) => {
-    if (!user || !user.empresa || !user.idUsuario) {
+    const idUsuario = user.sub || user.idUsuario;
+    if (!user || !user.empresa || !idUsuario) {
         throw new Error('USUARIO_NO_VALIDO');
     }
 
-    return await usuarioSucursalRepository.obtenerSucursalDefault(pool, user.idUsuario, user.empresa);
+    return await usuarioSucursalRepository.obtenerSucursalDefault(pool, idUsuario, user.empresa);
 };
 
 /**

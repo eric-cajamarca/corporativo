@@ -264,6 +264,21 @@ const esEmpresaGestoraActiva = async (pool, idEmpresa) => {
     return Number(result.recordset[0]?.n || 0) > 0;
 };
 
+/** True si la empresa es destino de una relación de gestión activa (empresa gestionada). */
+const esEmpresaGestionadaActiva = async (pool, idEmpresa) => {
+  if (!idEmpresa) return false;
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT COUNT(*) AS n
+      FROM Gestores_Empresas ge
+      WHERE ge.idEmpresaDestino = @idEmpresa
+        AND ge.estado = 1
+    `);
+  return Number(result.recordset[0]?.n || 0) > 0;
+};
+
 /** True si idEmpresaOrigen gestiona activamente a idEmpresaDestino. */
 const verificarGestorGestionaEmpresa = async (pool, idEmpresaOrigen, idEmpresaDestino) => {
     if (!idEmpresaOrigen || !idEmpresaDestino) return false;
@@ -284,6 +299,7 @@ module.exports = {
     obtenerEmpresasGestionadas,
     obtenerGestoresDeEmpresa,
     esEmpresaGestoraActiva,
+    esEmpresaGestionadaActiva,
     verificarGestorGestionaEmpresa,
     asignarGestor,
     removerGestor,

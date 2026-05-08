@@ -7,9 +7,17 @@ function sinPermisoSucursal(msg) {
   return msg === E.NO_PERMISO || msg === E.NO_PERMISO_403 || msg === 'NO_PERMISSIONS';
 }
 
+/** Query incluirInactivas=true incluye sucursales con estado = 0 (solo pantallas administración/edición sucursal). */
+function incluirInactivasDesdeQuery(req) {
+  const v = req.query?.incluirInactivas;
+  return v === '1' || v === 'true';
+}
+
 const obtener_sucursal_idempresa = async (req, res) => {
   try {
-    const data = await withPool((pool) => sucursalService.obtenerSucursalResumen(pool, req.user));
+    const data = await withPool((pool) =>
+      sucursalService.obtenerSucursalResumen(pool, req.user, { incluirInactivas: incluirInactivasDesdeQuery(req) })
+    );
     res.status(200).send({ message: 'succes', data });
   } catch (error) {
     if (sinPermisoSucursal(error.message)) {
@@ -25,7 +33,9 @@ const obtener_sucursal_idempresa = async (req, res) => {
 
 const obtener_sucursal_todos = async (req, res) => {
   try {
-    const data = await withPool((pool) => sucursalService.obtenerSucursalTodos(pool, req.user));
+    const data = await withPool((pool) =>
+      sucursalService.obtenerSucursalTodos(pool, req.user, { incluirInactivas: incluirInactivasDesdeQuery(req) })
+    );
     res.status(200).send({ data });
   } catch (error) {
     if (sinPermisoSucursal(error.message)) {
@@ -135,6 +145,12 @@ const obtener_stock_sucursal_idProducto = async (req, res) => {
     if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
     }
+    if (error.message === E.NOT_FOUND) {
+      return res.status(404).send({ message: 'Sucursal o recurso no encontrado', data: undefined });
+    }
+    if (error.message === E.SUCURSAL_NO_PERMITIDA) {
+      return res.status(403).send({ message: 'No tiene acceso a operar en esta sucursal', data: undefined });
+    }
     if (error.message === E.NO_ACCESS || error.message === E.BAD_REQUEST) {
       return res.status(500).send({ message: 'No Access', data: undefined });
     }
@@ -175,6 +191,9 @@ const crear_stock_sucursal_idEmpresa = async (req, res) => {
       if (error.message === E.NOT_FOUND) {
         return res.status(404).send({ message: 'Lote no encontrado' });
       }
+      if (error.message === E.SUCURSAL_NO_PERMITIDA) {
+        return res.status(403).send({ message: 'No tiene acceso a operar en esta sucursal' });
+      }
       console.error('crear_stock_sucursal_idEmpresa (editar lote):', error.message);
       return res.status(500).send({ message: 'Error al actualizar el lote', data: undefined });
     }
@@ -189,6 +208,12 @@ const crear_stock_sucursal_idEmpresa = async (req, res) => {
     if (error.message === E.NO_ACCESS || error.message === E.BAD_REQUEST) {
       return res.status(500).send({ message: 'No Access', data: undefined });
     }
+    if (error.message === E.SUCURSAL_NO_PERMITIDA) {
+      return res.status(403).send({ message: 'No tiene acceso a operar en esta sucursal', data: undefined });
+    }
+    if (error.message === E.NOT_FOUND) {
+      return res.status(404).send({ message: 'Sucursal no válida para su usuario', data: undefined });
+    }
     console.error('crear_stock_sucursal_idEmpresa:', error.message);
     res.status(500).send({ message: 'Error al crear el lote', data: undefined });
   }
@@ -201,6 +226,9 @@ const editar_stock_sucursal = async (req, res) => {
   } catch (error) {
     if (error.message === E.BAD_REQUEST) {
       return res.status(400).send({ message: 'ID de lote y cantidad válida son requeridos' });
+    }
+    if (error.message === E.SUCURSAL_NO_PERMITIDA) {
+      return res.status(403).send({ message: 'No tiene acceso a operar en esta sucursal' });
     }
     if (error.message === E.NOT_FOUND) {
       return res.status(404).send({ message: 'Lote no encontrado' });
@@ -217,6 +245,12 @@ const eliminar_stock_sucursal = async (req, res) => {
   } catch (error) {
     if (sinPermisoSucursal(error.message)) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    if (error.message === E.SUCURSAL_NO_PERMITIDA) {
+      return res.status(403).send({ message: 'No tiene acceso a operar en esta sucursal', data: undefined });
+    }
+    if (error.message === E.NOT_FOUND) {
+      return res.status(404).send({ message: 'Lote no encontrado', data: undefined });
     }
     if (error.message === E.NO_ACCESS) {
       return res.status(500).send({ message: 'No Access', data: undefined });

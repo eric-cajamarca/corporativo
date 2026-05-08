@@ -3,6 +3,7 @@ const ProductosRepository = require('../repositories/productos.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const permisosService = require('./permisos.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
+const { idsSucursalesFiltroCatalogo } = require('../utils/sucursalUsuarioScope.util');
 
 exports.obtenerProductosTodosService = async (pool, user) => {
   if (!user) {
@@ -32,7 +33,8 @@ exports.obtenerProductosTodosService = async (pool, user) => {
   } else {
     idsEmpresa = [user.empresa];
   }
-  const productos = await ProductosRepository.obtenerProductosTodosMultiEmpresaRepo(pool, idsEmpresa);
+  const idsSucFiltro = await idsSucursalesFiltroCatalogo(pool, user);
+  const productos = await ProductosRepository.obtenerProductosTodosMultiEmpresaRepo(pool, idsEmpresa, idsSucFiltro);
   return productos;
 };
 
@@ -43,7 +45,8 @@ exports.obtenerProductosComprasService = async (pool, user) => {
 
   await assertAlgunoPermiso(pool, user, "VER_COMPRAS", "CREAR_COMPRAS", "EDITAR_COMPRAS", "VER_PRODUCTOS");
 
-  const productos = await ProductosRepository.obtenerProductosCompras(pool, user.empresa);
+  const idsSucFiltro = await idsSucursalesFiltroCatalogo(pool, user);
+  const productos = await ProductosRepository.obtenerProductosCompras(pool, user.empresa, idsSucFiltro);
   return productos;
 };
 

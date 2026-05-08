@@ -49,13 +49,17 @@ const construirInClause = (request, ids, prefijo) => {
   return params.length > 0 ? params.join(', ') : null;
 };
 
-exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
+exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucursalesFiltro = null) => {
   try {
     const ids = (idsEmpresa || []).filter(Boolean);
     if (ids.length === 0) return [];
     // Primero, obtener productos básicos
     const request = pool.request();
     const inClause = construirInClause(request, ids, 'idEmpresa');
+    const sucFilt = (idsSucursalesFiltro || []).filter(Boolean);
+    const inSucClause = sucFilt.length > 0 ? construirInClause(request, sucFilt, 'idSuc') : null;
+    const filtroSucursalSql = inSucClause ? ` AND ss.idSucursal IN (${inSucClause}) ` : '';
+    const crossApplySucursalExtra = inSucClause ? ` AND su.idSucursal IN (${inSucClause}) ` : '';
     const result = await request.query(`
         SELECT 
             ss.idProducto,
@@ -88,10 +92,10 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
         INNER JOIN Productos p ON ss.idProducto = p.idProducto
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
-        INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal
+        INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
         INNER JOIN Empresas e ON ss.idEmpresa = e.idEmpresa
-        WHERE ss.idEmpresa IN (${inClause})
+        WHERE ss.idEmpresa IN (${inClause}) ${filtroSucursalSql}
 
         UNION ALL
 
@@ -127,9 +131,11 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
           SELECT TOP 1 su.idSucursal
           FROM Sucursal su
           WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+            ${crossApplySucursalExtra}
           ORDER BY su.nombre
         ) def
-        INNER JOIN Sucursal s2 ON s2.idSucursal = def.idSucursal
+        INNER JOIN Sucursal s2 ON s2.idSucursal = def.idSucursal AND ISNULL(s2.estado, 1) = 1
         WHERE p.idEmpresa IN (${inClause})
         AND NOT EXISTS (
           SELECT 1 FROM Lotes l
@@ -324,16 +330,24 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa) => {
 //   }
 // };
 
-exports.obtenerProductosCompras = async (pool, idEmpresa) => {
+exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = null) => {
   try {
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productos.repository.js:obtenerProductosCompras:entry',message:'pool at entry',data:{poolConnected:pool?.connected},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
     // #endregion
     // Primero, obtener productos básicos (obtenerProductosCompras)
-    const result = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .query(`
+    const reqCompras = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    let filtroSucCompras = '';
+    const sf = (idsSucursalesFiltro || []).filter(Boolean);
+    if (sf.length > 0) {
+      const ph = sf.map((id, i) => {
+        const k = `idSucComp${i}`;
+        reqCompras.input(k, sql.UniqueIdentifier, id);
+        return `@${k}`;
+      });
+      filtroSucCompras = ` AND ss.idSucursal IN (${ph.join(', ')}) `;
+    }
+    const result = await reqCompras.query(`
         SELECT 
             ss.idProducto,
             p.codigo,
@@ -355,9 +369,9 @@ exports.obtenerProductosCompras = async (pool, idEmpresa) => {
         INNER JOIN Productos p ON ss.idProducto = p.idProducto
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
-        INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal
+        INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
-        WHERE ss.idEmpresa = @idEmpresa
+        WHERE ss.idEmpresa = @idEmpresa ${filtroSucCompras}
       `);
 
     // #region agent log

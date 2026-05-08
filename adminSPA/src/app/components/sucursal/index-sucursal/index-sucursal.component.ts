@@ -75,7 +75,7 @@ export class IndexSucursalComponent {
   }
 
   obtenerSucursales(){
-    this._sucursalcervice.obtener_sucursal_todos().subscribe(
+    this._sucursalcervice.obtener_sucursal_todos(true).subscribe(
       response=>{
         this.sucursales = response.data || [];
         this.sucursales_const = [...this.sucursales];

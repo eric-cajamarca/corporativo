@@ -48,8 +48,8 @@ const obtenerSucursalesActivasUsuario = async (pool, idUsuario, idEmpresa) => {
             INNER JOIN Sucursal s ON us.idSucursal = s.idSucursal
             WHERE us.idUsuario = @idUsuario
             AND s.idEmpresa = @idEmpresa
-            AND us.estado = 1
-            AND s.estado = 1
+            AND ISNULL(us.estado, 1) = 1
+            AND ISNULL(s.estado, 1) = 1
             ORDER BY us.esDefault DESC, s.codigo
         `);
     return result.recordset;
@@ -170,8 +170,8 @@ const verificarAccesoSucursal = async (pool, idUsuario, idSucursal) => {
             INNER JOIN Sucursal s ON us.idSucursal = s.idSucursal
             WHERE us.idUsuario = @idUsuario 
             AND us.idSucursal = @idSucursal
-            AND us.estado = 1
-            AND s.estado = 1
+            AND ISNULL(us.estado, 1) = 1
+            AND ISNULL(s.estado, 1) = 1
         `);
     return result.recordset.length > 0;
 };
@@ -192,8 +192,8 @@ const obtenerSucursalDefault = async (pool, idUsuario, idEmpresa) => {
             INNER JOIN Sucursal s ON us.idSucursal = s.idSucursal
             WHERE us.idUsuario = @idUsuario
             AND s.idEmpresa = @idEmpresa
-            AND us.estado = 1
-            AND s.estado = 1
+            AND ISNULL(us.estado, 1) = 1
+            AND ISNULL(s.estado, 1) = 1
             ORDER BY us.esDefault DESC
         `);
     return result.recordset[0] || null;
