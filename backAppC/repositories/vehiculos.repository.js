@@ -1,5 +1,13 @@
 const sql = require("mssql");
 
+function bindUuidInList(request, ids, prefix) {
+  const list = [...new Set((ids || []).filter(Boolean))];
+  list.forEach((id, i) => {
+    request.input(`${prefix}${i}`, sql.UniqueIdentifier, id);
+  });
+  return { list, inClause: list.map((_, i) => `@${prefix}${i}`).join(", ") };
+}
+
 /**
  * Guarda o actualiza vehículo por placa + idEmpresa e inserta registro de SOAT.
  * vehiculo: { placa, marca, modelo, color, serie, motor, vin }
@@ -91,6 +99,44 @@ exports.listarVehiculosRepo = async (pool, idEmpresa) => {
       ) s
       WHERE v.idEmpresa = @idEmpresa
       ORDER BY v.placa
+    `);
+  return result.recordset || [];
+};
+
+/**
+ * Vehículos de varias empresas (gestora + gestionadas).
+ * @param {string[]} idsEmpresa
+ */
+exports.listarVehiculosConsolidadoGestoraRepo = async (pool, idsEmpresa) => {
+  const request = pool.request();
+  const { list, inClause } = bindUuidInList(request, idsEmpresa, "ve");
+  if (list.length === 0) return [];
+  const result = await request.query(`
+      SELECT
+        v.idVehiculo,
+        v.placa,
+        v.marca,
+        v.modelo,
+        v.color,
+        v.serie,
+        v.motor,
+        v.vin,
+        v.idEmpresa,
+        em.razon_Social AS razonSocialEmpresa,
+        CONVERT(VARCHAR(19), v.fRegistro, 120) AS fRegistro,
+        s.estado AS soatEstado,
+        s.fechaFin AS soatFechaFin,
+        s.nombreCompania AS soatCompania
+      FROM Vehiculos v
+      INNER JOIN Empresas em ON em.idEmpresa = v.idEmpresa
+      OUTER APPLY (
+        SELECT TOP 1 estado, fechaFin, nombreCompania
+        FROM VehiculoSoat
+        WHERE idVehiculo = v.idVehiculo
+        ORDER BY fRegistro DESC
+      ) s
+      WHERE v.idEmpresa IN (${inClause})
+      ORDER BY em.razon_Social, v.placa
     `);
   return result.recordset || [];
 };

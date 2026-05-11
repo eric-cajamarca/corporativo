@@ -36,31 +36,39 @@ export class CreateCategoriaComponent {
   ngOnInit(): void {
   }
 
-  registrar(registroForm:any) {
-        this._categoriaService.crear_categoria(this.categorias).subscribe(
-      response=>{
-                        if(response == undefined){
-                    
-        }else{
-                    iziToast.show({
-            title: 'SUCCESS',
-            titleColor: '#008000',
-            color: '#FFF',
-            class: 'text-success',
-            position: 'topRight',
-            message: 'La categoría se creó correctamente',
-          });
-
-          //redireccionar a la lista de marcas
-          if (this.activeModal) {
-            this.activeModal.close(true);
-          } else {
-            this._router.navigate(['/categorias']);
-          }
-
+  registrar(_registroForm: unknown): void {
+    this._categoriaService.crear_categoria(this.categorias).subscribe({
+      next: (response: { data?: { idCategoria?: number; IdCategoria?: number } }) => {
+        const raw = response?.data ?? response;
+        const idCategoria =
+          raw != null && typeof raw === 'object' ? Number((raw as { idCategoria?: number }).idCategoria) : NaN;
+        iziToast.show({
+          title: 'SUCCESS',
+          titleColor: '#008000',
+          color: '#FFF',
+          class: 'text-success',
+          position: 'topRight',
+          message: 'La categoría se creó correctamente'
+        });
+        if (this.activeModal) {
+          this.activeModal.close(
+            Number.isFinite(idCategoria) && idCategoria > 0 ? { idCategoria } : { ok: true }
+          );
+        } else {
+          this._router.navigate(['/categorias']);
         }
+      },
+      error: () => {
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#c00',
+          color: '#FFF',
+          class: 'text-danger',
+          position: 'topRight',
+          message: 'No se pudo crear la categoría'
+        });
       }
-    );
+    });
   }
 
   cancelar(): void {

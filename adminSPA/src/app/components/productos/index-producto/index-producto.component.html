@@ -35,7 +35,7 @@
                     style="text-align: right; margin-bottom: 20px;">crear nueva compra</button> -->
       </div>
   
-      <ng-container *ngIf="productos.length === 0">
+      <ng-container *ngIf="catalogoInicialCargado && productos_const.length === 0">
         <div class="row">
           <div class="col-12">
             <div class="alert alert-danger" role="alert">
@@ -47,7 +47,7 @@
         </div>
       </ng-container>
 
-      <ng-container *ngIf="productos.length > 0">
+      <ng-container *ngIf="catalogoInicialCargado && productos_const.length > 0">
         <div class="card-body card-body-busqueda-productos py-2 px-3">
           <div class="input-group input-group-merge">
             <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
@@ -77,6 +77,14 @@
               </tr>
             </thead>
             <tbody class="font-size-base">
+              <tr *ngIf="productos.length === 0">
+                <td [attr.colspan]="mostrarColumnaSucursal ? 9 : 8" class="text-center text-muted py-4">
+                  <p class="mb-2">No se encontraron productos que coincidan con la búsqueda.</p>
+                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="limpiarFiltroBusqueda()">
+                    Ver todos los productos
+                  </button>
+                </td>
+              </tr>
               <tr *ngFor="let item of productos | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize"
                 [class.producto-fila-inactiva]="!productoEstaActivo(item)">
                 <td>

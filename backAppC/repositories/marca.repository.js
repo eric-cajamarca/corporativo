@@ -26,10 +26,12 @@ async function insertar(pool, idEmpresa, payload) {
     .input('descripcion', sql.VarChar(200), descripcion ?? '')
     .input('contacto', sql.VarChar(100), contacto ?? '')
     .input('paginaWeb', sql.VarChar(100), paginaWeb ?? '')
-    .query(
-      'INSERT INTO Marcas (idEmpresa, nombre, descripcion, contacto, paginaWeb, estado) VALUES (@idEmpresa, @nombre, @descripcion, @contacto, @paginaWeb, 1)'
-    );
-  return result.recordset;
+    .query(`
+      INSERT INTO Marcas (idEmpresa, nombre, descripcion, contacto, paginaWeb, estado)
+      OUTPUT INSERTED.idMarca AS idMarca
+      VALUES (@idEmpresa, @nombre, @descripcion, @contacto, @paginaWeb, 1)
+    `);
+  return result.recordset?.[0] || null;
 }
 
 async function actualizar(pool, idEmpresa, idMarca, payload) {

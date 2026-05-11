@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const devolucionesDespachoRepository = require('../repositories/devolucionesDespacho.repository');
 const despachosRepository = require('../repositories/despachos.repository');
+const EnviosRepository = require('../repositories/envios.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
@@ -27,12 +28,38 @@ exports.crearDevolucionDespachoService = async (pool, user, payload) => {
   const despachoValido = await despachosRepository.validarDespachoEmpresaRepo(pool, idDespacho, idEmp);
   if (!despachoValido) throw new Error('DESPACHO_NO_ENCONTRADO');
 
-  return await devolucionesDespachoRepository.crearDevolucionDespachoRepo(
+  const result = await devolucionesDespachoRepository.crearDevolucionDespachoRepo(
     pool,
     idEmp,
     user.sub,
     payload
   );
+  if (result?.ok && idDespacho && user.sub) {
+    try {
+      const sumRes = await pool
+        .request()
+        .input('idDespacho', sql.UniqueIdentifier, idDespacho)
+        .query(`
+          SELECT ISNULL(SUM(cantidadDespachada), 0) AS totalDesp
+          FROM DetalleDespachos
+          WHERE idDespacho = @idDespacho
+        `);
+      const totalDesp = Number(sumRes.recordset?.[0]?.totalDesp ?? 0);
+      if (totalDesp <= 0) {
+        await EnviosRepository.marcarEnviosPorDespachoAEstadoNombreRepo(
+          pool,
+          idDespacho,
+          idEmp,
+          'AGENDADO',
+          user.sub,
+          'Tras devolución total en despacho (cancelación de envío)'
+        );
+      }
+    } catch (err) {
+      console.error('contexto: no se pudo marcar envío AGENDADO tras devolución:', err);
+    }
+  }
+  return result;
 };
 
 exports.listarDevolucionesPorDespachoService = async (pool, user, idDespacho) => {

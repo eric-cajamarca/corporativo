@@ -921,6 +921,35 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         pdfColorPrimario: cfgMap.PDF_COLOR_PRIMARIO || '#0B5FA5'
       };
 
+  let tieneDespachosPdf = false;
+  try {
+    const rDespPdf = await pool
+      .request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+      .query(`
+        SELECT COUNT(*) AS n
+        FROM DetalleDespachos dd
+        INNER JOIN DetalleVenta dv ON dv.idDetalle = dd.idDetalleVenta
+        INNER JOIN Ventas v ON v.idVenta = dv.idVenta AND v.idEmpresa = @idEmpresa
+        WHERE dv.idVenta = @idVenta
+      `);
+    tieneDespachosPdf = Number((rDespPdf.recordset[0] || {}).n) > 0;
+  } catch (_) {
+    tieneDespachosPdf = false;
+  }
+
+  let tieneNotasCreditoDebitoPdf = false;
+  try {
+    tieneNotasCreditoDebitoPdf = await exports.ventaTieneNotasCreditoDebito(
+      pool,
+      idEmpresaVenta,
+      cab.compVenta != null ? String(cab.compVenta).trim() : ''
+    );
+  } catch (_) {
+    tieneNotasCreditoDebitoPdf = false;
+  }
+
   return {
     venta: {
       idVenta: cab.idVenta,
@@ -951,7 +980,9 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       observaciones: cab.observaciones != null ? String(cab.observaciones).trim() : '',
       tipoComprobanteRef: cab.tipoComprobanteRef != null ? String(cab.tipoComprobanteRef).trim() : '',
       codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : '',
-      eliminado: !!cab.eliminado
+      eliminado: !!cab.eliminado,
+      tieneDespachos: tieneDespachosPdf,
+      tieneNotasCreditoDebito: tieneNotasCreditoDebitoPdf
     },
     empresa: empresaPayload,
     cliente: {
@@ -982,8 +1013,54 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   };
 };
 
-/** Actualiza cabecera y detalle de una venta. Solo permitir cuando idEstadoSunat no sea Aceptado (1,2,3). Cotización (CT): solo dentro de 24 h de emisión. */
-exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, detalles) => {
+/** True si hay líneas de despacho ligadas al detalle de esta venta (bloquea edición de comprobante). */
+exports.ventaTieneDespachos = async (pool, idVenta, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input('idVenta', sql.Int, idVenta)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT COUNT(*) AS n
+      FROM DetalleDespachos dd
+      INNER JOIN DetalleVenta dv ON dv.idDetalle = dd.idDetalleVenta
+      INNER JOIN Ventas v ON v.idVenta = dv.idVenta AND v.idEmpresa = @idEmpresa
+      WHERE dv.idVenta = @idVenta
+    `);
+  return Number((r.recordset[0] || {}).n) > 0;
+};
+
+/** True si existe una venta NC/ND no anulada cuyo compRelacionado coincide con el comprobante origen (serie-número). */
+exports.ventaTieneNotasCreditoDebito = async (pool, idEmpresa, compVenta) => {
+  const cv = compVenta != null ? String(compVenta).trim() : '';
+  if (!cv) return false;
+  const compRel = cv.length > 30 ? cv.slice(0, 30) : cv;
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('compRel', sql.VarChar(30), compRel)
+    .query(`
+      SELECT COUNT(*) AS n
+      FROM Ventas vnc
+      INNER JOIN Comprobantes c2 ON c2.idComprobante = vnc.idComprobante AND c2.idEmpresa = vnc.idEmpresa
+      WHERE vnc.idEmpresa = @idEmpresa
+        AND ISNULL(vnc.eliminado, 0) = 0
+        AND UPPER(LTRIM(RTRIM(ISNULL(c2.codigo, '')))) IN ('B7', 'F7', 'B8', 'F8', '07', '08')
+        AND RTRIM(LTRIM(UPPER(ISNULL(vnc.compRelacionado, '')))) = RTRIM(LTRIM(UPPER(@compRel)))
+    `);
+  return Number((r.recordset[0] || {}).n) > 0;
+};
+
+/** Actualiza cabecera y detalle de una venta. Solo permitir cuando idEstadoSunat no sea Aceptado (1,2,3). Cotización (CT): solo dentro de 24 h de emisión.
+ * Si hay despachos registrados, no se edita (falla antes o aquí). Con despachos = 0, sincroniza stock ante cambios de cantidad/producto.
+ * @param {{ idUsuarioEjecutor?: string|null }} [opciones]
+ */
+exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, detalles, opciones = {}) => {
+  const { idUsuarioEjecutor = null } = opciones || {};
+  const stockRepository = require('./stock.repository');
+  const inventarioRepository = require('./inventario.repository');
+  const stockService = require('../services/stock.service');
+  const gestoresRepository = require('./gestores.repository');
+
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
@@ -991,7 +1068,9 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       .input('idVenta', sql.Int, idVenta)
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .query(`
-        SELECT ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, c.codigo AS codigoComprobante, v.fEmision
+        SELECT ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, c.codigo AS codigoComprobante, v.fEmision,
+          v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario,
+          ISNULL(v.total, 0) AS totalAnterior, v.idEstadoPago, v.idVentaAgrupada
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         WHERE v.idVenta = @idVenta AND v.idEmpresa = @idEmpresa
@@ -1007,6 +1086,8 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     }
     const idEstadoSunat = rowChk.idEstadoSunat;
     const codComp = String(rowChk.codigoComprobante || '').trim().toUpperCase();
+    /** Cotización (CT): no mover lotes ni movimientos de inventario al editar. */
+    const sincronizarStockEdicion = codComp !== 'CT';
     const esNotaVentaSinSunat = codComp === 'NV';
     if (!esNotaVentaSinSunat && (idEstadoSunat === 1 || idEstadoSunat === 2 || idEstadoSunat === 3)) {
       await transaction.rollback();
@@ -1020,6 +1101,47 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         return { ok: false, error: 'No se puede editar: la cotización/nota de venta solo admite edición dentro de las 24 horas posteriores a su emisión.' };
       }
     }
+    let idSucursal = rowChk.idSucursal;
+    if (!idSucursal) {
+      const rsSuc = await transaction
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT TOP 1 idSucursal FROM Sucursal
+          WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1
+          ORDER BY CASE WHEN ISNULL(esPrincipal, 0) = 1 THEN 0 ELSE 1 END, fregistro ASC
+        `);
+      idSucursal = rsSuc.recordset && rsSuc.recordset[0] && rsSuc.recordset[0].idSucursal;
+    }
+    if (!idSucursal) {
+      await transaction.rollback();
+      return { ok: false, error: 'No se pudo determinar la sucursal de la venta para ajustar stock.' };
+    }
+    const compVenta = rowChk.compVenta != null ? String(rowChk.compVenta).trim() : '';
+    const idComprobanteCab = rowChk.idComprobante;
+    const idUsuarioMov = idUsuarioEjecutor || rowChk.idUsuario;
+    const totalAnteriorCab = Number(rowChk.totalAnterior) || 0;
+    const idEstadoPagoInicial = rowChk.idEstadoPago != null ? Number(rowChk.idEstadoPago) : 1;
+    const idVentaAgrupadaCab = rowChk.idVentaAgrupada;
+
+    const rsDespN0 = await transaction.request().input('idVenta', sql.Int, idVenta).query(`
+      SELECT COUNT(*) AS n
+      FROM DetalleDespachos dd
+      INNER JOIN DetalleVenta dv ON dv.idDetalle = dd.idDetalleVenta
+      WHERE dv.idVenta = @idVenta
+    `);
+    if (Number((rsDespN0.recordset[0] || {}).n) > 0) {
+      await transaction.rollback();
+      return { ok: false, error: 'No se puede editar: el comprobante tiene despachos registrados.' };
+    }
+    if (await exports.ventaTieneNotasCreditoDebito(pool, idEmpresa, compVenta)) {
+      await transaction.rollback();
+      return {
+        ok: false,
+        error: 'No se puede editar: existen notas de crédito o débito vinculadas a este comprobante.'
+      };
+    }
+
     const fEmisionRaw = cabecera.fEmision || null;
     const fEmision = fEmisionRaw != null ? (getFechaSoloSQLString(fEmisionRaw) || String(fEmisionRaw).trim().slice(0, 19).replace('T', ' ') + (String(fEmisionRaw).length <= 10 ? ' 00:00:00.000' : '.000')) : null;
     const idCliente = cabecera.idCliente != null ? Number(cabecera.idCliente) : null;
@@ -1064,9 +1186,180 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
           WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
         `);
     }
-    await transaction.request()
-      .input('idVenta', sql.Int, idVenta)
-      .query('DELETE FROM DetalleVenta WHERE idVenta = @idVenta');
+
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+    const getConfig = (clave, def) => (configRows.find((c) => c.clave === clave)?.valor ?? def);
+    const permitirVentasNegativas =
+      String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
+    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+
+    const EPS_Q = 0.0001;
+
+    const restauraY_MOV_EN = async (idProductoRestore, cantRestore, costoU) => {
+      if (!sincronizarStockEdicion) return;
+      const cant = parseFloat(cantRestore) || 0;
+      if (cant <= 0 || !idProductoRestore) return;
+      await stockRepository.restaurarStockEnLotes(transaction, {
+        idEmpresa,
+        idSucursal,
+        idProducto: idProductoRestore,
+        cantidad: cant
+      });
+      if (idUsuarioMov) {
+        await inventarioRepository.insertarFilaMovimiento(transaction, {
+          idEmpresa,
+          idSucursal,
+          idProducto: idProductoRestore,
+          tipoMovimiento: 'EN',
+          cantidad: cant,
+          docRelacionado: compVenta,
+          idComprobante: idComprobanteCab,
+          idUsuario: idUsuarioMov,
+          observaciones: 'Edición de venta — devolución de stock',
+          costoUnitario: costoU != null ? Number(costoU) : 0,
+          idLote: null
+        });
+      }
+    };
+
+    const descuentoVacioRet = (costoFallback) => ({
+      costoTotalDescontado: 0,
+      cantidadDescontada: 0,
+      costoUnitarioProm: Number(costoFallback) || 0
+    });
+
+    const descuentaY_MOV_SA = async (idProductoDesc, cantPedida, costoFallback) => {
+      if (!sincronizarStockEdicion) return descuentoVacioRet(costoFallback);
+      const cantPed = parseFloat(cantPedida) || 0;
+      if (cantPed <= 0 || !idProductoDesc) return descuentoVacioRet(costoFallback);
+      const stockDisponible = await stockService.obtenerStockDisponible(transaction, idEmpresa, idProductoDesc, idSucursal);
+      if (!permitirVentasNegativas && stockDisponible + EPS_Q < cantPed) {
+        throw new Error(
+          `Stock insuficiente al guardar la edición. Disponible: ${stockDisponible}, solicitado: ${cantPed}.`
+        );
+      }
+      const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPed, stockDisponible) : cantPed;
+      if (cantidadADescontar <= 0) return descuentoVacioRet(costoFallback);
+      const resultadoDescuento = await stockService.descontarDesdeLotes(
+        transaction,
+        {
+          idEmpresa,
+          idSucursal,
+          idProducto: idProductoDesc,
+          cantidad: cantidadADescontar
+        },
+        { controlUbicaciones }
+      );
+      const consumosPorLote = resultadoDescuento?.consumosPorLote || [];
+      const costoTotalLinea = Array.isArray(consumosPorLote)
+        ? consumosPorLote.reduce(
+            (acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0),
+            0
+          )
+        : 0;
+      const costoUnitarioProm =
+        cantidadADescontar > 0 ? costoTotalLinea / cantidadADescontar : Number(costoFallback) || 0;
+      if (cantidadADescontar > 0 && idUsuarioMov) {
+        if (Array.isArray(consumosPorLote) && consumosPorLote.length > 0) {
+          for (const c of consumosPorLote) {
+            const cantTomada = Number(c.cantidadTomada) || 0;
+            if (cantTomada <= 0) continue;
+            await inventarioRepository.insertarFilaMovimiento(transaction, {
+              idEmpresa,
+              idSucursal,
+              idProducto: idProductoDesc,
+              tipoMovimiento: 'SA',
+              cantidad: cantTomada,
+              docRelacionado: compVenta,
+              idComprobante: idComprobanteCab,
+              idUsuario: idUsuarioMov,
+              observaciones: 'Edición de venta — salida de stock',
+              costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
+              idLote: c.idLote || null
+            });
+          }
+        } else {
+          await inventarioRepository.insertarFilaMovimiento(transaction, {
+            idEmpresa,
+            idSucursal,
+            idProducto: idProductoDesc,
+            tipoMovimiento: 'SA',
+            cantidad: cantidadADescontar,
+            docRelacionado: compVenta,
+            idComprobante: idComprobanteCab,
+            idUsuario: idUsuarioMov,
+            observaciones: 'Edición de venta — salida de stock',
+            costoUnitario: costoUnitarioProm,
+            idLote: null
+          });
+        }
+      }
+      return {
+        costoTotalDescontado: costoTotalLinea,
+        cantidadDescontada: cantidadADescontar,
+        costoUnitarioProm
+      };
+    };
+
+    const rsExist = await transaction.request().input('idVenta', sql.Int, idVenta).query(`
+      SELECT idDetalle, idProducto, cantidad, ISNULL(costoUnitario, 0) AS costoUnitario, ISNULL(costoTotal, 0) AS costoTotal
+      FROM DetalleVenta WHERE idVenta = @idVenta
+    `);
+    const detalleInicialPorId = new Map(
+      (rsExist.recordset || []).map((r) => [
+        Number(r.idDetalle),
+        {
+          idProducto: r.idProducto,
+          cantidad: Number(r.cantidad) || 0,
+          costoUnitario: Number(r.costoUnitario) || 0,
+          costoTotal: Number(r.costoTotal) || 0
+        }
+      ])
+    );
+
+    const idsDetalleEnPayload = new Set();
+    for (const d of detalles) {
+      const idDet = d.idDetalle != null ? parseInt(String(d.idDetalle), 10) : NaN;
+      if (Number.isInteger(idDet) && idDet > 0) idsDetalleEnPayload.add(idDet);
+    }
+
+    for (const [idDet, oldRow] of detalleInicialPorId) {
+      if (!idsDetalleEnPayload.has(idDet)) {
+        await restauraY_MOV_EN(oldRow.idProducto, oldRow.cantidad, oldRow.costoUnitario);
+      }
+    }
+
+    for (const d of detalles) {
+      const idDetallePayload0 = d.idDetalle != null ? parseInt(String(d.idDetalle), 10) : NaN;
+      const idEx0 =
+        Number.isInteger(idDetallePayload0) && idDetallePayload0 > 0 && detalleInicialPorId.has(idDetallePayload0)
+          ? idDetallePayload0
+          : null;
+      if (idEx0 == null) continue;
+      const oldRow0 = detalleInicialPorId.get(idEx0);
+      const newQty0 = Number(d.cantidad) || 0;
+      const newProd0 = d.idProducto;
+      const sameProd0 =
+        oldRow0 &&
+        newProd0 &&
+        String(oldRow0.idProducto).toLowerCase() === String(newProd0).toLowerCase();
+      if (!sameProd0) {
+        await restauraY_MOV_EN(oldRow0.idProducto, oldRow0.cantidad, oldRow0.costoUnitario);
+      } else if (newQty0 + EPS_Q < oldRow0.cantidad) {
+        await restauraY_MOV_EN(oldRow0.idProducto, oldRow0.cantidad - newQty0, oldRow0.costoUnitario);
+      }
+    }
+
+    for (const idDet of detalleInicialPorId.keys()) {
+      if (!idsDetalleEnPayload.has(idDet)) {
+        await transaction
+          .request()
+          .input('idDetalle', sql.Int, idDet)
+          .input('idVenta', sql.Int, idVenta)
+          .query('DELETE FROM DetalleVenta WHERE idDetalle = @idDetalle AND idVenta = @idVenta');
+      }
+    }
+
     for (const d of detalles) {
       const idProducto = d.idProducto;
       const cantidad = Number(d.cantidad) || 0;
@@ -1087,6 +1380,22 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         igv = 1;
       }
       const isc = d.isc != null ? (d.isc ? 1 : 0) : 0;
+      const idDetallePayload = d.idDetalle != null ? parseInt(String(d.idDetalle), 10) : NaN;
+      const idDetalleExistente =
+        Number.isInteger(idDetallePayload) && idDetallePayload > 0 && detalleInicialPorId.has(idDetallePayload)
+          ? idDetallePayload
+          : null;
+      const oldRowFull = idDetalleExistente ? detalleInicialPorId.get(idDetalleExistente) : null;
+      const oldQtyLine = oldRowFull ? Number(oldRowFull.cantidad) || 0 : 0;
+      const sameProdLine =
+        oldRowFull &&
+        idProducto &&
+        String(oldRowFull.idProducto).toLowerCase() === String(idProducto).toLowerCase();
+      const priceOnlyLine =
+        idDetalleExistente && oldRowFull && sameProdLine && Math.abs(cantidad - oldQtyLine) < EPS_Q;
+      const qtyDecreaseLine =
+        idDetalleExistente && oldRowFull && sameProdLine && cantidad + EPS_Q < oldQtyLine && oldQtyLine > EPS_Q;
+
       let costoUnitario = Number(d.costoUnitario) || 0;
       let costoTotal = Number(d.costoTotal) || 0;
       const rawLinea = d.descripcionLinea != null ? d.descripcionLinea : d.descripcionVenta;
@@ -1095,7 +1404,14 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         const t = String(rawLinea).trim();
         descripcionLineaIns = t ? (t.length > 500 ? t.slice(0, 500) : t) : null;
       }
-      if (costoTotal === 0 && cantidad > 0) {
+      if (priceOnlyLine && oldRowFull) {
+        costoUnitario = Number(oldRowFull.costoUnitario) || 0;
+        costoTotal = Number(oldRowFull.costoTotal) || 0;
+      } else if (qtyDecreaseLine && oldRowFull) {
+        const ratio = cantidad / oldQtyLine;
+        costoTotal = (Number(oldRowFull.costoTotal) || 0) * ratio;
+        costoUnitario = cantidad > EPS_Q ? costoTotal / cantidad : 0;
+      } else if (sincronizarStockEdicion && costoTotal === 0 && cantidad > 0) {
         const rLote = await transaction.request()
           .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
           .input('idProducto', sql.UniqueIdentifier, idProducto)
@@ -1110,7 +1426,81 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       } else if (costoTotal > 0 && costoUnitario === 0 && cantidad > 0) {
         costoUnitario = costoTotal / cantidad;
       }
-      await transaction.request()
+
+      if (idDetalleExistente != null) {
+        const upd = await transaction
+          .request()
+          .input('idVenta', sql.Int, idVenta)
+          .input('idDetalle', sql.Int, idDetalleExistente)
+          .input('idProducto', sql.UniqueIdentifier, idProducto)
+          .input('cantidad', sql.Decimal(18, 3), cantidad)
+          .input('pVenta', sql.Decimal(18, 5), pVenta)
+          .input('descuento', sql.Decimal(18, 2), descuento)
+          .input('subtotal', sql.Decimal(18, 2), subtotalItem)
+          .input('igv', sql.Bit, igv)
+          .input('isc', sql.Bit, isc)
+          .input('total', sql.Decimal(18, 2), totalItem)
+          .input('idEstadoPedido', sql.Int, 1)
+          .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
+          .input('costoTotal', sql.Decimal(18, 6), costoTotal)
+          .input('descripcionLinea', sql.NVarChar(500), descripcionLineaIns)
+          .query(`
+            UPDATE DetalleVenta SET
+              idProducto = @idProducto,
+              cantidad = @cantidad,
+              pVenta = @pVenta,
+              descuento = @descuento,
+              subtotal = @subtotal,
+              igv = @igv,
+              isc = @isc,
+              total = @total,
+              idEstadoPedido = @idEstadoPedido,
+              costoUnitario = @costoUnitario,
+              costoTotal = @costoTotal,
+              descripcionLinea = @descripcionLinea,
+              cantEntregada = 0
+            WHERE idVenta = @idVenta AND idDetalle = @idDetalle
+          `);
+        const nAfectadas = Number(Array.isArray(upd.rowsAffected) ? upd.rowsAffected[0] : upd.rowsAffected) || 0;
+        if (nAfectadas > 0) {
+          const oldRow = detalleInicialPorId.get(idDetalleExistente);
+          if (oldRow) {
+            const oldQty = Number(oldRow.cantidad) || 0;
+            const sameProd =
+              oldRow.idProducto &&
+              idProducto &&
+              String(oldRow.idProducto).toLowerCase() === String(idProducto).toLowerCase();
+            let retDesc = descuentoVacioRet(costoUnitario);
+            if (!sameProd) {
+              retDesc = await descuentaY_MOV_SA(idProducto, cantidad, costoUnitario);
+            } else if (cantidad > oldQty + EPS_Q) {
+              retDesc = await descuentaY_MOV_SA(idProducto, cantidad - oldQty, costoUnitario);
+            }
+            if (!sameProd || cantidad > oldQty + EPS_Q) {
+              const oldCT0 = Number(oldRow.costoTotal) || 0;
+              let costoTn;
+              let costoUn;
+              if (!sameProd) {
+                costoTn = retDesc.costoTotalDescontado;
+                costoUn = cantidad > EPS_Q ? costoTn / cantidad : 0;
+              } else {
+                costoTn = oldCT0 + retDesc.costoTotalDescontado;
+                costoUn = cantidad > EPS_Q ? costoTn / cantidad : 0;
+              }
+              await transaction
+                .request()
+                .input('idDetalle', sql.Int, idDetalleExistente)
+                .input('cu', sql.Decimal(18, 6), costoUn)
+                .input('ct', sql.Decimal(18, 6), costoTn)
+                .query('UPDATE DetalleVenta SET costoUnitario = @cu, costoTotal = @ct WHERE idDetalle = @idDetalle');
+            }
+          }
+          continue;
+        }
+      }
+
+      const insRes = await transaction
+        .request()
         .input('idVenta', sql.Int, idVenta)
         .input('idProducto', sql.UniqueIdentifier, idProducto)
         .input('cantidad', sql.Decimal(18, 3), cantidad)
@@ -1127,9 +1517,220 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         .input('descripcionLinea', sql.NVarChar(500), descripcionLineaIns)
         .query(`
           INSERT INTO DetalleVenta (idVenta, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total, cantEntregada, idEstadoPedido, costoUnitario, costoTotal, descripcionLinea)
+          OUTPUT INSERTED.idDetalle AS idDetalle
           VALUES (@idVenta, @idProducto, @cantidad, @pVenta, @descuento, @subtotal, @igv, @isc, @total, @cantEntregada, @idEstadoPedido, @costoUnitario, @costoTotal, @descripcionLinea)
         `);
+      const newIdDetalle = insRes.recordset && insRes.recordset[0] && insRes.recordset[0].idDetalle;
+      const retIns = await descuentaY_MOV_SA(idProducto, cantidad, costoUnitario);
+      if (newIdDetalle != null && (retIns.costoTotalDescontado > EPS_Q || cantidad > EPS_Q)) {
+        const ctN = retIns.costoTotalDescontado || 0;
+        const cuN = cantidad > EPS_Q ? ctN / cantidad : 0;
+        await transaction
+          .request()
+          .input('idDetalle', sql.Int, newIdDetalle)
+          .input('cu', sql.Decimal(18, 6), cuN)
+          .input('ct', sql.Decimal(18, 6), ctN)
+          .query('UPDATE DetalleVenta SET costoUnitario = @cu, costoTotal = @ct WHERE idDetalle = @idDetalle');
+      }
     }
+
+    const newTotalFinal = Number(total) || 0;
+    if (idEstadoPagoInicial === 2 && totalAnteriorCab > 0.01 && Math.abs(newTotalFinal - totalAnteriorCab) > 0.009) {
+      const factorPago = newTotalFinal / totalAnteriorCab;
+      const sumDpvAntes = await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .query(`SELECT ISNULL(SUM(monto), 0) AS s FROM DetallePagoVenta WHERE idVenta = @idVenta`);
+      const sDpvAntes = Number((sumDpvAntes.recordset[0] || {}).s) || 0;
+      if (sDpvAntes > 0.01 && Math.abs(sDpvAntes - totalAnteriorCab) < 0.05) {
+        await transaction
+          .request()
+          .input('idVenta', sql.Int, idVenta)
+          .input('factor', sql.Decimal(18, 8), factorPago)
+          .query(`UPDATE DetallePagoVenta SET monto = ROUND(monto * @factor, 2) WHERE idVenta = @idVenta`);
+        const sumDpvDesp = await transaction
+          .request()
+          .input('idVenta', sql.Int, idVenta)
+          .query(`SELECT ISNULL(SUM(monto), 0) AS s FROM DetallePagoVenta WHERE idVenta = @idVenta`);
+        const sDpvDesp = Number((sumDpvDesp.recordset[0] || {}).s) || 0;
+        const driftDpv = Math.round((newTotalFinal - sDpvDesp) * 100) / 100;
+        if (Math.abs(driftDpv) >= 0.01) {
+          await transaction
+            .request()
+            .input('idVenta', sql.Int, idVenta)
+            .input('drift', sql.Decimal(18, 2), driftDpv)
+            .query(`
+              UPDATE TOP (1) DetallePagoVenta SET monto = monto + @drift
+              WHERE idVenta = @idVenta
+            `);
+        }
+      }
+      const sumMcAntes = await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT ISNULL(SUM(mc.monto), 0) AS s
+          FROM MovimientosCaja mc
+          INNER JOIN TiposMovimientoCaja t ON t.idTipoMovimientoCaja = mc.idTipoMovimientoCaja
+          WHERE mc.idVenta = @idVenta AND mc.idEmpresa = @idEmpresa AND t.nombre = 'VENTA_CONTADO'
+        `);
+      const sMcAntes = Number((sumMcAntes.recordset[0] || {}).s) || 0;
+      if (sMcAntes > 0.01 && Math.abs(sMcAntes - totalAnteriorCab) < 0.05) {
+        await transaction
+          .request()
+          .input('idVenta', sql.Int, idVenta)
+          .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+          .input('factor', sql.Decimal(18, 8), factorPago)
+          .query(`
+            UPDATE mc SET mc.monto = ROUND(mc.monto * @factor, 2)
+            FROM MovimientosCaja mc
+            INNER JOIN TiposMovimientoCaja t ON t.idTipoMovimientoCaja = mc.idTipoMovimientoCaja
+            WHERE mc.idVenta = @idVenta AND mc.idEmpresa = @idEmpresa AND t.nombre = 'VENTA_CONTADO'
+          `);
+        const sumMcDesp = await transaction
+          .request()
+          .input('idVenta', sql.Int, idVenta)
+          .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+          .query(`
+            SELECT ISNULL(SUM(mc.monto), 0) AS s
+            FROM MovimientosCaja mc
+            INNER JOIN TiposMovimientoCaja t ON t.idTipoMovimientoCaja = mc.idTipoMovimientoCaja
+            WHERE mc.idVenta = @idVenta AND mc.idEmpresa = @idEmpresa AND t.nombre = 'VENTA_CONTADO'
+          `);
+        const sMcDesp = Number((sumMcDesp.recordset[0] || {}).s) || 0;
+        const driftMc = Math.round((newTotalFinal - sMcDesp) * 100) / 100;
+        if (Math.abs(driftMc) >= 0.01) {
+          const rTopMc = await transaction
+            .request()
+            .input('idVenta', sql.Int, idVenta)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query(`
+              SELECT TOP 1 mc.idMovimientoCaja
+              FROM MovimientosCaja mc
+              INNER JOIN TiposMovimientoCaja t ON t.idTipoMovimientoCaja = mc.idTipoMovimientoCaja
+              WHERE mc.idVenta = @idVenta AND mc.idEmpresa = @idEmpresa AND t.nombre = 'VENTA_CONTADO'
+              ORDER BY mc.idMovimientoCaja ASC
+            `);
+          const idMcAdj = rTopMc.recordset && rTopMc.recordset[0] && rTopMc.recordset[0].idMovimientoCaja;
+          if (idMcAdj != null) {
+            await transaction
+              .request()
+              .input('idMc', sql.Int, idMcAdj)
+              .input('drift', sql.Decimal(18, 2), driftMc)
+              .query(`UPDATE MovimientosCaja SET monto = monto + @drift WHERE idMovimientoCaja = @idMc`);
+          }
+        }
+      }
+    }
+
+    if (idVentaAgrupadaCab) {
+      const rVe = await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT ve.idVentaEmpresa
+          FROM VentaEmpresa ve
+          WHERE ve.idVenta = @idVenta AND ve.idEmpresa = @idEmpresa AND ISNULL(ve.eliminado, 0) = 0
+        `);
+      const idVeRow = rVe.recordset && rVe.recordset[0];
+      if (idVeRow && idVeRow.idVentaEmpresa) {
+        const idVE = idVeRow.idVentaEmpresa;
+        const idVA = idVentaAgrupadaCab;
+        await transaction
+          .request()
+          .input('idVE', sql.UniqueIdentifier, idVE)
+          .input('subtotal', sql.Decimal(18, 2), subtotal)
+          .input('igv', sql.Decimal(18, 2), igv)
+          .input('exonerado', sql.Decimal(18, 2), exonerado)
+          .input('gratuito', sql.Decimal(18, 2), gratuito)
+          .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
+          .input('descuentos', sql.Decimal(18, 2), descuentos)
+          .input('total', sql.Decimal(18, 2), total)
+          .input('fEmision', sql.VarChar(23), fEmision)
+          .query(`
+            UPDATE VentaEmpresa SET
+              subtotal = @subtotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito,
+              otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total,
+              fEmision = CAST(@fEmision AS DATETIME),
+              fVencimiento = CAST(@fEmision AS DATETIME)
+            WHERE idVentaEmpresa = @idVE
+          `);
+        await transaction
+          .request()
+          .input('idVE', sql.UniqueIdentifier, idVE)
+          .query(`DELETE FROM DetalleVentaEmpresa WHERE idVentaEmpresa = @idVE`);
+        await transaction
+          .request()
+          .input('idVE', sql.UniqueIdentifier, idVE)
+          .input('idVenta', sql.Int, idVenta)
+          .query(`
+            INSERT INTO DetalleVentaEmpresa (
+              idVentaEmpresa, idProducto, cantidad, pVenta, descuento, subtotal, igv, isc, total,
+              cantEntregada, idEstadoPedido, costoUnitario, costoTotal
+            )
+            SELECT @idVE, dv.idProducto, dv.cantidad, dv.pVenta, dv.descuento, dv.subtotal, dv.igv, dv.isc, dv.total,
+              dv.cantEntregada, dv.idEstadoPedido, dv.costoUnitario, dv.costoTotal
+            FROM DetalleVenta dv WHERE dv.idVenta = @idVenta
+          `);
+        const agg = await transaction
+          .request()
+          .input('idVA', sql.UniqueIdentifier, idVA)
+          .query(`
+            SELECT
+              ISNULL(SUM(subtotal), 0) AS sSub,
+              ISNULL(SUM(igv), 0) AS sIgv,
+              ISNULL(SUM(descuentos), 0) AS sDesc,
+              ISNULL(SUM(total), 0) AS sTot
+            FROM VentaEmpresa
+            WHERE idVentaAgrupada = @idVA AND ISNULL(eliminado, 0) = 0
+          `);
+        const ar = agg.recordset && agg.recordset[0];
+        if (ar) {
+          await transaction
+            .request()
+            .input('idVA', sql.UniqueIdentifier, idVA)
+            .input('subtotal', sql.Decimal(18, 2), Number(ar.sSub) || 0)
+            .input('igv', sql.Decimal(18, 2), Number(ar.sIgv) || 0)
+            .input('descuentos', sql.Decimal(18, 2), Number(ar.sDesc) || 0)
+            .input('total', sql.Decimal(18, 2), Number(ar.sTot) || 0)
+            .query(`
+              UPDATE VentaAgrupada SET subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total
+              WHERE idVentaAgrupada = @idVA
+            `);
+        }
+        await transaction
+          .request()
+          .input('idVA', sql.UniqueIdentifier, idVA)
+          .query(`DELETE FROM DetalleVentaAgrupada WHERE idVentaAgrupada = @idVA`);
+        await transaction
+          .request()
+          .input('idVA', sql.UniqueIdentifier, idVA)
+          .query(`
+            INSERT INTO DetalleVentaAgrupada (
+              idVentaAgrupada, idProducto, idEmpresaProducto, aliasEmpresa, sucursal,
+              cantidad, pVenta, descuento, subtotal, igv, total, descripcionProducto, codigoProducto
+            )
+            SELECT
+              @idVA,
+              dv.idProducto,
+              ve.idEmpresa,
+              NULL,
+              ISNULL(LTRIM(RTRIM(s.nombre)), ''),
+              dv.cantidad, dv.pVenta, ISNULL(dv.descuento, 0), dv.subtotal, dv.igv, dv.total,
+              p.descripcion,
+              p.codigo
+            FROM VentaEmpresa ve
+            INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
+            INNER JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
+            INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = ve.idEmpresa
+            LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = ve.idEmpresa
+            WHERE ve.idVentaAgrupada = @idVA AND ISNULL(ve.eliminado, 0) = 0
+          `);
+      }
+    }
+
     await transaction.commit();
     return { ok: true };
   } catch (err) {

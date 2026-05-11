@@ -16,7 +16,15 @@ export class EnviosService {
   }
 
   // Obtener envíos programados (listado para pantalla Envios programados)
-  obtenerEnviosProgramados(filtros?: { idEstadoEnvio?: number; fechaDesde?: string; fechaHasta?: string; ruc?: string; cliente?: string }): Observable<any> {
+  obtenerEnviosProgramados(filtros?: {
+    idEstadoEnvio?: number;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    ruc?: string;
+    cliente?: string;
+    /** Empresa gestora: listar envíos de la empresa gestionada (UUID). */
+    idEmpresa?: string;
+  }): Observable<any> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     let params: Record<string, string> = {};
     if (filtros) {
@@ -25,6 +33,7 @@ export class EnviosService {
       if (filtros.fechaHasta) params['fechaHasta'] = filtros.fechaHasta;
       if (filtros.ruc) params['ruc'] = filtros.ruc;
       if (filtros.cliente) params['cliente'] = filtros.cliente;
+      if (filtros.idEmpresa) params['idEmpresa'] = filtros.idEmpresa;
     }
     return this._http.get(this.url + 'envios/', {
       headers,
@@ -69,10 +78,13 @@ export class EnviosService {
   }
 
   // Obtener envíos por venta
-  obtenerEnviosPorVenta(idVenta: string): Observable<any> {
+  obtenerEnviosPorVenta(idVenta: string, idEmpresa?: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    const params: Record<string, string> = {};
+    if (idEmpresa) params['idEmpresa'] = idEmpresa;
     return this._http.get(this.url+'envios/venta/' + idVenta, {
       headers: headers,
+      params: Object.keys(params).length ? params : undefined,
       withCredentials: true
     });
   }
@@ -80,12 +92,16 @@ export class EnviosService {
   // Crear nuevo envío
   crearEnvio(data: {
     idVenta: string;
+    /** Empresa dueña de la venta/despacho (obligatorio si opera empresa gestora). */
+    idEmpresa?: string;
     idDespacho?: string;
     idTipoEnvio: number;
     idTransportista?: string;
     idChofer?: string;
     idVehiculoEntrega?: string;
     idEstadoEnvioInicial?: number;
+    /** yyyy-MM-dd o ISO; se guarda en Envios.fechaProgramada */
+    fechaProgramada?: string;
     fechaEntregaEstimada?: string;
     costoEnvio: number;
     direccionEntrega: string;
@@ -129,16 +145,20 @@ export class EnviosService {
   }
 
   // Obtener transportistas
-  obtenerTransportistas(): Observable<any> {
+  obtenerTransportistas(idEmpresa?: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    const params: Record<string, string> = {};
+    if (idEmpresa) params['idEmpresa'] = idEmpresa;
     return this._http.get(this.url+'envios/transportistas', {
       headers: headers,
+      params: Object.keys(params).length ? params : undefined,
       withCredentials: true
     });
   }
 
   // Crear transportista (delivery externo)
   crearTransportista(data: {
+    idEmpresa?: string;
     nombres: string;
     apellidos: string;
     documento: string;
@@ -192,10 +212,13 @@ export class EnviosService {
   }
 
   // Obtener envíos por transportista
-  obtenerEnviosPorTransportista(idTransportista: string): Observable<any> {
+  obtenerEnviosPorTransportista(idTransportista: string, idEmpresa?: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    const params: Record<string, string> = {};
+    if (idEmpresa) params['idEmpresa'] = idEmpresa;
     return this._http.get(this.url+'envios/transportista/' + idTransportista, {
       headers: headers,
+      params: Object.keys(params).length ? params : undefined,
       withCredentials: true
     });
   }

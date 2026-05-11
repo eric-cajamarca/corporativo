@@ -34,31 +34,38 @@ export class CreateMarcaComponent {
   ngOnInit(): void {
   }
 
-  registrar(registroForm:any) {
-        this._marcaService.crearMarca(this.marca).subscribe(
-      response=>{
-                        if(response == undefined){
-                    
-        }else{
-                    iziToast.show({
-            title: 'SUCCESS',
-            titleColor: '#008000',
-            color: '#FFF',
-            class: 'text-success',
-            position: 'topRight',
-            message: 'La marca se creó correctamente',
-          });
-
-          //redireccionar a la lista de marcas
-          if (this.activeModal) {
-            this.activeModal.close(true);
-          } else {
-            this._router.navigate(['/marcas']);
-          }
-
+  registrar(_registroForm: unknown): void {
+    this._marcaService.crearMarca(this.marca).subscribe({
+      next: (response: { data?: { idMarca?: number; IdMarca?: number } }) => {
+        const raw = response?.data ?? response;
+        const idMarca = raw != null && typeof raw === 'object' ? Number((raw as { idMarca?: number }).idMarca) : NaN;
+        iziToast.show({
+          title: 'SUCCESS',
+          titleColor: '#008000',
+          color: '#FFF',
+          class: 'text-success',
+          position: 'topRight',
+          message: 'La marca se creó correctamente'
+        });
+        if (this.activeModal) {
+          this.activeModal.close(
+            Number.isFinite(idMarca) && idMarca > 0 ? { idMarca } : { ok: true }
+          );
+        } else {
+          this._router.navigate(['/marcas']);
         }
+      },
+      error: () => {
+        iziToast.show({
+          title: 'Error',
+          titleColor: '#c00',
+          color: '#FFF',
+          class: 'text-danger',
+          position: 'topRight',
+          message: 'No se pudo crear la marca'
+        });
       }
-    );
+    });
   }
 
   cancelar(): void {

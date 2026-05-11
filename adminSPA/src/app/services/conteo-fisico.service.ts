@@ -20,6 +20,11 @@ export interface UpsertLineaConteoBody {
   stockReal?: number | null;
   verificado?: boolean;
   notas?: string | null;
+  /** Solo se envían si cambiaron respecto al producto al elegirlo (requiere permiso editar producto en servidor). */
+  descripcion?: string;
+  idCategoria?: number;
+  idPresentacion?: number;
+  idMarca?: number;
 }
 
 export interface AplicarConteoBody {

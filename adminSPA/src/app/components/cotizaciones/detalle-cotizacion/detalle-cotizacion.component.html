@@ -13,6 +13,14 @@
           <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalPdf()">
             <i class="bi bi-file-pdf"></i> Imprimir PDF
           </button>
+          <a
+            *ngIf="idCotizacion"
+            class="btn btn-outline-success btn-sm"
+            [routerLink]="['/ventas/create']"
+            [queryParams]="{ duplicarDesdeCotizacion: idCotizacion }"
+            title="Cargar ítems en nueva venta">
+            <i class="bi bi-files"></i> Duplicar en nueva venta
+          </a>
           <button type="button" class="btn btn-primary btn-sm" (click)="editar()">
             <i class="bi bi-pencil"></i> Editar
           </button>

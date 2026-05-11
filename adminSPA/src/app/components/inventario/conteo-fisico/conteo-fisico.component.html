@@ -86,9 +86,14 @@
           <div class="card shadow-sm mb-3">
             <div class="card-header fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
               <span>Búsqueda (stock actual de la sucursal)</span>
-              @if (cargandoBusqueda) {
-                <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-              }
+              <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalCrearProducto()">
+                  <i class="bi bi-plus-lg me-1"></i>Crear producto
+                </button>
+                @if (cargandoBusqueda) {
+                  <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                }
+              </div>
             </div>
             <div class="card-body">
               <label class="form-label small">Buscar producto</label>
@@ -100,31 +105,33 @@
                 placeholder="Código, descripción, marca…"
               />
               <div class="table-responsive conteo-table-wrap">
-                <table class="table table-sm table-hover align-middle mb-0">
+                <table class="table table-sm table-hover align-middle mb-0 conteo-stock-table">
                   <thead class="table-light">
                     <tr>
-                      <th>Código</th>
-                      <th>Producto</th>
-                      <th class="text-end">Stock sist.</th>
-                      <th class="text-end">Stock real</th>
-                      <th class="text-end"></th>
+                      <th class="conteo-col-codigo">Código</th>
+                      <th class="conteo-col-producto">Producto</th>
+                      <th class="text-end conteo-col-stock">Stock sist.</th>
+                      <th class="text-end conteo-col-stock">Stock real</th>
+                      <th class="text-end conteo-col-accion"></th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (p of resultados; track trackProducto($index, p)) {
                       @let srLinea = stockRealLineaEnBusqueda(p);
                       <tr [class.table-active]="productoSeleccionado?.idProducto === p.idProducto">
-                        <td class="text-nowrap">{{ p.codigo }}</td>
-                        <td class="product-desc-cell" [title]="p.descripcion">{{ p.descripcion }}</td>
-                        <td class="text-end">{{ p.stock | number : '1.0-3' }}</td>
-                        <td class="text-end text-nowrap">
+                        <td class="text-nowrap align-middle conteo-col-codigo">{{ p.codigo }}</td>
+                        <td class="align-middle conteo-col-producto">
+                          <div class="product-desc-clip" [title]="p.descripcion">{{ p.descripcion }}</div>
+                        </td>
+                        <td class="text-end align-middle conteo-col-stock">{{ p.stock | number : '1.0-3' }}</td>
+                        <td class="text-end text-nowrap align-middle conteo-col-stock">
                           @if (srLinea != null) {
                             {{ srLinea | number : '1.0-3' }}
                           } @else {
                             <span class="text-muted small">—</span>
                           }
                         </td>
-                        <td class="text-end">
+                        <td class="text-end align-middle conteo-col-accion">
                           <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirProducto(p)">Elegir</button>
                         </td>
                       </tr>
@@ -151,14 +158,67 @@
                   <div class="fw-semibold">{{ productoSeleccionado.descripcion }}</div>
                   <div class="small text-muted">{{ productoSeleccionado.codigo }} · Stock en sistema: {{ productoSeleccionado.stock | number : '1.0-3' }}</div>
                 </div>
+                <div class="border rounded px-2 py-2 mb-3 bg-light">
+                  <div class="small fw-semibold text-muted mb-2">Datos del producto (opcional)</div>
+                  <div class="mb-2">
+                    <label class="form-label small mb-0">Descripción</label>
+                    <input type="text" class="form-control form-control-sm" [(ngModel)]="descripcionEdit" maxlength="200" />
+                  </div>
+                  <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-0">
+                      <label class="form-label small mb-0">Marca</label>
+                      <button type="button" class="btn btn-link btn-sm py-0 px-0 small" (click)="abrirModalCrearMarca()">
+                        Crear marca
+                      </button>
+                    </div>
+                    <select class="form-select form-select-sm" [(ngModel)]="idMarcaEdit">
+                      <option [ngValue]="null">Seleccione…</option>
+                      @for (m of marcasSelect; track m.idMarca) {
+                        <option [ngValue]="m.idMarca">{{ m.nombre }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-12 col-sm-6">
+                      <div class="d-flex justify-content-between align-items-center mb-0">
+                        <label class="form-label small mb-0">Categoría</label>
+                        <button type="button" class="btn btn-link btn-sm py-0 px-0 small" (click)="abrirModalCrearCategoria()">
+                          Crear categoría
+                        </button>
+                      </div>
+                      <select class="form-select form-select-sm" [(ngModel)]="idCategoriaEdit">
+                        <option [ngValue]="null">Seleccione…</option>
+                        @for (c of categoriasSelect; track c.idCategoria) {
+                          <option [ngValue]="c.idCategoria">{{ c.nombre }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label small mb-0">Presentación</label>
+                      <select class="form-select form-select-sm" [(ngModel)]="idPresentacionEdit">
+                        <option [ngValue]="null">Seleccione…</option>
+                        @for (pr of presentacionesSelect; track pr.idPresentacion) {
+                          <option [ngValue]="pr.idPresentacion">{{ pr.label }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  <p class="small text-muted mb-0 mt-2">
+                    Si modifica descripción, marca, categoría o presentación y guarda, se actualiza el maestro del producto (requiere permiso de editar/crear productos).
+                  </p>
+                </div>
                 <div class="mb-2">
                   <label class="form-label small mb-0">Stock real (físico)</label>
                   <input type="number" class="form-control form-control-sm" [(ngModel)]="stockRealInput" step="0.001" />
                 </div>
-                <div class="form-check mb-2">
+                <div class="form-check mb-1">
                   <input class="form-check-input" type="checkbox" id="chkVerif" [(ngModel)]="verificadoInput" />
                   <label class="form-check-label small" for="chkVerif">Verificado</label>
                 </div>
+                <p class="small text-muted mb-2">
+                  Marque <strong>Verificado</strong> cuando haya revisado físicamente el ítem. Si el stock real coincide con el del sistema, en la previsualización verá «Sin ajuste» (no se genera movimiento), pero la línea queda registrada en la sesión.
+                  Las líneas <strong>sin</strong> verificar no se incluyen al aplicar movimientos.
+                </p>
                 <div class="mb-3">
                   <label class="form-label small mb-0">Notas</label>
                   <input type="text" class="form-control form-control-sm" [(ngModel)]="notasInput" maxlength="500" />
@@ -191,8 +251,10 @@
               <tbody>
                 @for (l of lineas; track trackLinea($index, l)) {
                   <tr>
-                    <td>{{ l.productoCodigo }}</td>
-                    <td class="product-desc-cell" [title]="l.productoDescripcion">{{ l.productoDescripcion }}</td>
+                    <td class="text-nowrap align-middle">{{ l.productoCodigo }}</td>
+                    <td class="align-middle">
+                      <div class="product-desc-clip" [title]="l.productoDescripcion">{{ l.productoDescripcion }}</div>
+                    </td>
                     <td class="text-end">{{ l.stockSistema | number : '1.0-3' }}</td>
                     <td class="text-end">{{ l.stockReal != null ? (l.stockReal | number : '1.0-3') : '—' }}</td>
                     <td>{{ l.verificado ? 'Sí' : 'No' }}</td>

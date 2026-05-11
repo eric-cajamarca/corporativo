@@ -299,6 +299,8 @@ export interface VentaEdicionPayload {
 }
 
 export interface DetalleVentaEdicionPayload {
+  /** Conservar al editar línea existente (stock y FK despachos). */
+  idDetalle?: number;
   idProducto: string;
   cantidad: number;
   pVenta: number;
@@ -336,6 +338,10 @@ export interface ComprobantePdfData {
     total: number;
     resumenHash?: string;
     eliminado?: boolean;
+    /** Si true, el backend no permite editar el comprobante (hay despachos). */
+    tieneDespachos?: boolean;
+    /** Si true, el backend no permite editar (hay NC/ND vinculadas). */
+    tieneNotasCreditoDebito?: boolean;
     cuotas?: Array<{ numeroCuota?: number; fechaPago?: string; total?: number }>;
   };
   empresa: {

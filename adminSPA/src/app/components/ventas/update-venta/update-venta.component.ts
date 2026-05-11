@@ -120,6 +120,14 @@ export class UpdateVentaComponent implements OnInit {
           this.noEditable = true;
           this.mensajeNoEditable =
             'La cotización / nota de venta solo puede editarse dentro de las 24 horas posteriores a su emisión.';
+        } else if (v.tieneDespachos === true) {
+          this.noEditable = true;
+          this.mensajeNoEditable =
+            'El comprobante tiene despachos registrados. No se puede editar.';
+        } else if (v.tieneNotasCreditoDebito === true) {
+          this.noEditable = true;
+          this.mensajeNoEditable =
+            'El comprobante tiene notas de crédito o débito vinculadas. No se puede editar.';
         } else {
           this.noEditable = false;
         }
@@ -459,6 +467,7 @@ export class UpdateVentaComponent implements OnInit {
       const p = Number(d.pVenta) || 0;
       const subL = this.redondear2(cant * p);
       detallesPayload.push({
+        ...(d.idDetalle != null && d.idDetalle > 0 ? { idDetalle: d.idDetalle } : {}),
         idProducto: d.idProducto,
         cantidad: d.cantidad,
         pVenta: d.pVenta,

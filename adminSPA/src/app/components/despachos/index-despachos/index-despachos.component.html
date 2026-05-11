@@ -286,6 +286,9 @@
                         <p *ngIf="d.observaciones" class="small text-muted mb-2">{{ d.observaciones }}</p>
                         <div *ngIf="loadingDetalle[d.idDespacho]" class="text-center py-2">Cargando detalle…</div>
                         <div *ngIf="!loadingDetalle[d.idDespacho] && (detallePorDespacho[d.idDespacho]?.length || 0) > 0" class="table-responsive">
+                          <p class="small text-muted mb-2" *ngIf="d.estado === 'PENDIENTE' || d.estado === 'EN_PROCESO'">
+                            <i class="bi bi-info-circle me-1"></i>Indique la cantidad retirada del almacén y pulse <strong>Guardar</strong> para marcar la línea como despachada.
+                          </p>
                           <table class="table table-sm table-striped">
                             <thead>
                               <tr>
@@ -295,7 +298,7 @@
                                 <th>Despachada</th>
                                 <th>Pendiente</th>
                                 <th>Ubicación</th>
-                                <!-- <th>Cant. a despachar</th> -->
+                                <th>Cant. a registrar</th>
                                 <th>Estado</th>
                                 <th></th>
                               </tr>
@@ -308,23 +311,21 @@
                                 <td>{{ lin.cantidadDespachada }}</td>
                                 <td>{{ pendienteLinea(lin) }}</td>
                                 <td class="small">{{ lin.ubicacionOrigen || lin.ubicacionDestino || '—' }}</td>
-                                <!-- <td>
-                                  <input type="number" class="form-control form-control-sm" style="width:5rem"
+                                <td>
+                                  <input *ngIf="pendienteLinea(lin) > 0" type="number" class="form-control form-control-sm" style="width:5.5rem"
                                     [(ngModel)]="cantADespacharEdicion[lin.idDetalleDespacho]"
                                     [max]="lin.cantidadSolicitada" min="0" step="0.001"
-                                    placeholder="0">
+                                    [title]="'Máximo: ' + lin.cantidadSolicitada">
+                                  <span *ngIf="pendienteLinea(lin) <= 0" class="text-muted small">—</span>
                                 </td>
-                                -->
                                 <td><span class="badge" [ngClass]="lin.estado === 'DESPACHADO' ? 'bg-success' : 'bg-warning'">{{ lin.estado }}</span></td>
-                                <!--
                                 <td>
-                                  <button type="button" class="btn btn-sm btn-outline-primary"
+                                  <button *ngIf="pendienteLinea(lin) > 0" type="button" class="btn btn-sm btn-outline-primary"
                                     [disabled]="guardandoCantidad[lin.idDetalleDespacho]"
                                     (click)="guardarCantidadDespachada(d.idDespacho, lin.idDetalleDespacho, cantADespacharEdicion[lin.idDetalleDespacho] ?? lin.cantidadDespachada)">
                                     {{ guardandoCantidad[lin.idDetalleDespacho] ? '...' : 'Guardar' }}
                                   </button>
                                 </td>
-                                -->
                               </tr>
                             </tbody>
                           </table>
@@ -337,6 +338,7 @@
                           <h6 class="mb-2">Crear devolución</h6>
                           <p class="small text-muted mb-2">
                             Registra devoluciones por líneas entregadas. Esto ajusta la cantidad entregada y repone stock.
+                            Si hay envío vinculado a este despacho y devuelve <strong>toda</strong> la mercadería despachada, el envío pasará a <strong>AGENDADO</strong> y podrá eliminarse desde Envíos programados.
                           </p>
                           <div class="table-responsive" *ngIf="(detallePorDespacho[d.idDespacho]?.length || 0) > 0">
                             <table class="table table-sm table-bordered">
@@ -539,9 +541,18 @@
               <option value="RECOJO">Recojo</option>
               <option value="DELIVERY">Delivery</option>
             </select>
+            <div class="form-text small" *ngIf="modoEntregaPanel === 'DELIVERY'">
+              Con delivery, el despacho queda en pendiente hasta que almacén confirme la carga; el envío se programa aparte.
+            </div>
           </div>
 
           <div *ngIf="modoEntregaPanel === 'DELIVERY'">
+            <div class="mb-3" *ngIf="esGestora">
+              <label class="form-label small">Fecha de envío <span class="text-danger">*</span></label>
+              <input type="date" class="form-control form-control-sm" [(ngModel)]="fechaEnvioDeliveryPanel" />
+              <div class="form-text">Programación del envío (empresa gestora).</div>
+            </div>
+
             <div class="mb-3">
               <label class="form-label small">Tipo de delivery</label>
               <select class="form-select form-select-sm" [(ngModel)]="tipoDeliveryPanel">
@@ -549,7 +560,7 @@
                 <option value="EXTERNO">Delivery externo</option>
               </select>
               <div class="form-text" *ngIf="tipoDeliveryPanel === 'INTERNO' && choferesInternos.length === 0">
-                No hay choferes internos registrados. Registra uno para poder asignarlo al envío.
+                No hay choferes internos en ninguna empresa vinculada. Registre chofer y vehículo en al menos una gestionada.
               </div>
             </div>
 
@@ -562,7 +573,7 @@
               <label class="form-label small">Seleccionar chofer</label>
               <select class="form-select form-select-sm" [(ngModel)]="idChoferSeleccionado" [disabled]="choferesInternos.length === 0">
                 <option *ngFor="let c of choferesInternos" [ngValue]="c.idChofer">
-                  {{ c.nombres }} {{ c.apellidos }} {{ c.placa ? ('- ' + c.placa) : '' }}
+                  {{ c.nombres }} {{ c.apellidos }}{{ c.placa ? ' - ' + c.placa : '' }}<ng-container *ngIf="esGestora && c.razonSocialEmpresa"> · {{ c.razonSocialEmpresa }}</ng-container>
                 </option>
               </select>
               <div class="mt-2">
@@ -576,7 +587,7 @@
               <label class="form-label small">Seleccionar transportista externo</label>
               <select class="form-select form-select-sm" [(ngModel)]="idTransportistaSeleccionado">
                 <option *ngFor="let t of transportistasExternos" [ngValue]="t.idTransportista">
-                  {{ t.nombres }} {{ t.apellidos }} {{ t.placa ? ('- ' + t.placa) : '' }}
+                  {{ t.nombres }} {{ t.apellidos }}{{ t.placa ? ' - ' + t.placa : '' }}<ng-container *ngIf="esGestora && t.razonSocialEmpresa"> · {{ t.razonSocialEmpresa }}</ng-container>
                 </option>
               </select>
               <div class="mt-2">
@@ -616,6 +627,8 @@
 <!-- Modal: registrar chofer interno + vehículo -->
 <app-registrar-chofer-vehiculo-modal
   [visible]="modalRegistrarChoferVisible"
+  [esGestora]="esGestora"
+  [idEmpresaFiltro]="idEmpresaDespachoActiva"
   (saved)="onChoferVehiculoGuardado()"
   (closed)="modalRegistrarChoferVisible = false">
 </app-registrar-chofer-vehiculo-modal>
@@ -623,6 +636,7 @@
 <!-- Modal: registrar transportista externo -->
 <app-registrar-transportista-modal
   [visible]="modalRegistrarTransportistaVisible"
+  [idEmpresaDestino]="idEmpresaDespachoActiva"
   (saved)="onTransportistaGuardado()"
   (closed)="modalRegistrarTransportistaVisible = false">
 </app-registrar-transportista-modal>

@@ -18,6 +18,7 @@ import {
 } from '../../utils/plan-tarjeta-perfil.util';
 import { AppBannerRibbonComponent } from '../app-banner-ribbon/app-banner-ribbon.component';
 import { AppBannerService } from '../../services/app-banner.service';
+import { ConsultarPlacaModalOpenerService } from '../../services/consultar-placa-modal-opener.service';
 
 declare const iziToast: any;
 
@@ -78,6 +79,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
   private ultimaEmpresaMiEstado: string | null = null;
   private miEstadoSuscripcionEnVuelo = false;
   private bannerNavSub?: Subscription;
+  private placaModalOpenSub?: Subscription;
 
   constructor(
     private router: Router,
@@ -88,7 +90,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private deploymentContext: DeploymentContextService,
     private saasSubscription: SaasSubscriptionService,
-    private appBanner: AppBannerService
+    private appBanner: AppBannerService,
+    private consultarPlacaOpener: ConsultarPlacaModalOpenerService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -204,10 +207,16 @@ export class TopnavComponent implements OnInit, OnDestroy {
         this.appBanner.refrescar();
       }
     }, 1600);
+
+    this.placaModalOpenSub = this.consultarPlacaOpener.openRequested$.subscribe(() => {
+      this.mostrarModalPlaca = true;
+      this.cdr.markForCheck();
+    });
   }
 
   ngOnDestroy(): void {
     this.bannerNavSub?.unsubscribe();
+    this.placaModalOpenSub?.unsubscribe();
   }
 
   private cargarSoatVencidoCount(mostrarToast = false): void {
@@ -258,6 +267,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
 
   onCerrarModalPlaca(): void {
     this.mostrarModalPlaca = false;
+    this.consultarPlacaOpener.notificarCerrado();
     this.cargarSoatVencidoCount(false);
   }
 

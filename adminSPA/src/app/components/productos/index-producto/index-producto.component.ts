@@ -37,6 +37,8 @@ export class IndexProductoComponent {
   
   public productos: Array<any> = [];
   public productos_const: Array<any> = [];
+  /** Evita mostrar "sin productos" antes de la primera respuesta del API. */
+  public catalogoInicialCargado = false;
   public token: any = "";
   public filtro = '';
   public load_estado = false;
@@ -210,7 +212,7 @@ export class IndexProductoComponent {
           const blob = this.base64AExcelBlob(noImport.base64, noImport.mimeType);
           this._excelService.descargar(blob, noImport.fileName || 'productos_no_importados.xlsx');
         }
-        this.initData();
+        this.initData(true);
         if (typeof iziToast !== 'undefined') {
           iziToast.success({
             title: 'Importación',
@@ -247,8 +249,8 @@ export class IndexProductoComponent {
     this._productoGaleriaModal.abrir(item.idProducto, etiqueta).catch(() => {});
   }
 
-  initData() {
-    this._productoService.obtenerProductosTodos().subscribe(
+  initData(evitarCache = false) {
+    this._productoService.obtenerProductosTodos(evitarCache ? { evitarCache: true } : undefined).subscribe(
       (response: any) => {
         if (response.data == undefined) {
           iziToast.show({
@@ -264,11 +266,20 @@ export class IndexProductoComponent {
           this.productos = response.data;
           this.productos_const = response.data;
         }
+        this.catalogoInicialCargado = true;
       },
       (error: any) => {
         console.error('Error al cargar productos:', error);
+        this.catalogoInicialCargado = true;
       }
     );
+  }
+
+  /** Restaura el listado completo en memoria sin nueva petición (tras búsqueda sin resultados). */
+  limpiarFiltroBusqueda(): void {
+    this.filtro = '';
+    this.page = 1;
+    this.productos = [...this.productos_const];
   }
 
   /**

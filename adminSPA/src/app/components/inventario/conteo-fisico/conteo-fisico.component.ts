@@ -4,12 +4,19 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { MovimientoInventarioService } from '../../../services/movimiento-inventario.service';
 import { SucursalService } from '../../../services/sucursal.service';
-import { ConteoFisicoService } from '../../../services/conteo-fisico.service';
+import { CategoriaService } from '../../../services/categoria.service';
+import { MarcaService } from '../../../services/marca.service';
+import { PresentacionService } from '../../../services/presentacion.service';
+import { ConteoFisicoService, UpsertLineaConteoBody } from '../../../services/conteo-fisico.service';
+import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
+import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
+import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { StockActualItem } from '../../../models/stock-actual.model';
@@ -37,7 +44,12 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   sidebarState = inject(SidebarStateService);
   private inventarioApi = inject(MovimientoInventarioService);
   private sucursalService = inject(SucursalService);
+  private categoriaService = inject(CategoriaService);
+  private marcaService = inject(MarcaService);
+  private presentacionService = inject(PresentacionService);
   private conteoService = inject(ConteoFisicoService);
+  private modalService = inject(NgbModal);
+  private productoCrearModal = inject(ProductoCrearModalService);
   private excelService = inject(ExcelService);
   private pdfService = inject(PdfService);
   private route = inject(ActivatedRoute);
@@ -62,6 +74,17 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   stockRealInput: number | null = null;
   verificadoInput = false;
   notasInput = '';
+
+  /** Catálogos para editar maestro del producto en el panel lateral */
+  categoriasSelect: Array<{ idCategoria: number; nombre: string }> = [];
+  marcasSelect: Array<{ idMarca: number; nombre: string }> = [];
+  presentacionesSelect: Array<{ idPresentacion: number; label: string }> = [];
+  descripcionEdit = '';
+  idCategoriaEdit: number | null = null;
+  idMarcaEdit: number | null = null;
+  idPresentacionEdit: number | null = null;
+  private snapshotMaestro: { descripcion: string; idCategoria: number; idMarca: number; idPresentacion: number } | null =
+    null;
 
   previewFilas: ConteoFisicoPreviewFila[] = [];
   previewCargado = false;
@@ -102,6 +125,163 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private cargarCatalogosMaestro(): void {
+    if (!this.sesion?.idEmpresa) {
+      return;
+    }
+    /* GET /categorias ya filtra por empresa del JWT; la ruta categoriasempresa/:id no está montada en backAppC. */
+    this.categoriaService.obtener_categorias().subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.categoriasSelect = arr
+          .filter((c: { estado?: boolean | number }) => c.estado !== false && c.estado !== 0)
+          .map((c: { idCategoria?: number; nombre?: string }) => ({
+            idCategoria: Number(c.idCategoria),
+            nombre: String(c.nombre || '').trim()
+          }))
+          .filter((c) => Number.isFinite(c.idCategoria) && c.idCategoria > 0 && c.nombre);
+      },
+      error: () => {
+        this.categoriasSelect = [];
+      }
+    });
+    this.presentacionService.obtener_presentaciones().subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.presentacionesSelect = arr
+          .map((p: { idPresentacion?: number; codigo?: string; descripcion?: string; Descripcion?: string }) => {
+            const id = Number(p.idPresentacion);
+            const cod = String(p.codigo || '').trim();
+            const desc = String(p.descripcion ?? p.Descripcion ?? '').trim();
+            /* Mostrar primero la descripción legible (SUNAT); código solo si no hay texto. */
+            const label = desc || cod || String(id);
+            return { idPresentacion: id, label };
+          })
+          .filter((p) => Number.isFinite(p.idPresentacion) && p.idPresentacion > 0);
+      },
+      error: () => {
+        this.presentacionesSelect = [];
+      }
+    });
+    this.marcaService.obtener_marcas().subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.marcasSelect = arr
+          .filter((m: { estado?: boolean | number }) => m.estado !== false && m.estado !== 0)
+          .map((m: { idMarca?: number; nombre?: string }) => ({
+            idMarca: Number(m.idMarca),
+            nombre: String(m.nombre || '').trim()
+          }))
+          .filter((m) => Number.isFinite(m.idMarca) && m.idMarca > 0 && m.nombre);
+      },
+      error: () => {
+        this.marcasSelect = [];
+      }
+    });
+  }
+
+  abrirModalCrearMarca(): void {
+    const ref = this.modalService.open(CreateMarcaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg'
+    });
+    ref.result
+      .then((res: unknown) => {
+        const id = this.parseIdMarcaCreada(res);
+        if (id != null) {
+          this.recargarSoloMarcasYSeleccionar(id);
+        } else {
+          this.cargarCatalogosMaestro();
+        }
+      })
+      .catch(() => this.cargarCatalogosMaestro());
+  }
+
+  abrirModalCrearCategoria(): void {
+    const ref = this.modalService.open(CreateCategoriaComponent, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      size: 'lg'
+    });
+    ref.result
+      .then((res: unknown) => {
+        const id = this.parseIdCategoriaCreada(res);
+        if (id != null) {
+          this.recargarSoloCategoriasYSeleccionar(id);
+        } else {
+          this.cargarCatalogosMaestro();
+        }
+      })
+      .catch(() => this.cargarCatalogosMaestro());
+  }
+
+  private parseIdMarcaCreada(res: unknown): number | null {
+    if (res && typeof res === 'object' && 'idMarca' in res) {
+      const n = Number((res as { idMarca?: unknown }).idMarca);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
+  }
+
+  private parseIdCategoriaCreada(res: unknown): number | null {
+    if (res && typeof res === 'object' && 'idCategoria' in res) {
+      const n = Number((res as { idCategoria?: unknown }).idCategoria);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
+  }
+
+  private recargarSoloMarcasYSeleccionar(idMarca: number): void {
+    this.marcaService.obtener_marcas().subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.marcasSelect = arr
+          .filter((m: { estado?: boolean | number }) => m.estado !== false && m.estado !== 0)
+          .map((m: { idMarca?: number; nombre?: string }) => ({
+            idMarca: Number(m.idMarca),
+            nombre: String(m.nombre || '').trim()
+          }))
+          .filter((m) => Number.isFinite(m.idMarca) && m.idMarca > 0 && m.nombre);
+        this.idMarcaEdit = idMarca;
+      },
+      error: () => this.cargarCatalogosMaestro()
+    });
+  }
+
+  private recargarSoloCategoriasYSeleccionar(idCategoria: number): void {
+    this.categoriaService.obtener_categorias().subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.categoriasSelect = arr
+          .filter((c: { estado?: boolean | number }) => c.estado !== false && c.estado !== 0)
+          .map((c: { idCategoria?: number; nombre?: string }) => ({
+            idCategoria: Number(c.idCategoria),
+            nombre: String(c.nombre || '').trim()
+          }))
+          .filter((c) => Number.isFinite(c.idCategoria) && c.idCategoria > 0 && c.nombre);
+        this.idCategoriaEdit = idCategoria;
+      },
+      error: () => this.cargarCatalogosMaestro()
+    });
+  }
+
+  abrirModalCrearProducto(): void {
+    void this.productoCrearModal.abrir().then((creado) => {
+      if (creado) {
+        iziToast.success({ title: 'Producto', message: 'Producto creado. Actualice la búsqueda si no aparece.', position: 'topRight' });
+        this.buscarCatalogo();
+      }
+    });
   }
 
   private cargarSucursales(): void {
@@ -155,7 +335,12 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
         this.previewCargado = false;
         this.previewFilas = [];
         if (this.sesion?.estado === 'BORRADOR') {
+          this.cargarCatalogosMaestro();
           this.buscarCatalogo();
+        } else {
+          this.categoriasSelect = [];
+          this.marcasSelect = [];
+          this.presentacionesSelect = [];
         }
       },
       error: (err) => {
@@ -210,7 +395,20 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       this.stockRealInput = Number(p.stock) || 0;
       this.notasInput = '';
     }
-    this.verificadoInput = true;
+    this.descripcionEdit = String(p.descripcion || '');
+    const idCat = p.idCategoria != null && p.idCategoria !== undefined ? Number(p.idCategoria) : NaN;
+    const idPres = p.idPresentacion != null && p.idPresentacion !== undefined ? Number(p.idPresentacion) : NaN;
+    const idMar = p.idMarca != null && p.idMarca !== undefined ? Number(p.idMarca) : NaN;
+    this.idCategoriaEdit = Number.isFinite(idCat) && idCat > 0 ? idCat : null;
+    this.idPresentacionEdit = Number.isFinite(idPres) && idPres > 0 ? idPres : null;
+    this.idMarcaEdit = Number.isFinite(idMar) && idMar > 0 ? idMar : null;
+    this.snapshotMaestro = {
+      descripcion: this.descripcionEdit.trim(),
+      idCategoria: this.idCategoriaEdit ?? 0,
+      idMarca: this.idMarcaEdit ?? 0,
+      idPresentacion: this.idPresentacionEdit ?? 0
+    };
+    this.verificadoInput = existente ? !!existente.verificado : false;
     setTimeout(() => {
       const el = this.detalleConteoRef()?.nativeElement;
       if (el) {
@@ -234,21 +432,84 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     this.stockRealInput = null;
     this.verificadoInput = false;
     this.notasInput = '';
+    this.descripcionEdit = '';
+    this.idCategoriaEdit = null;
+    this.idMarcaEdit = null;
+    this.idPresentacionEdit = null;
+    this.snapshotMaestro = null;
+  }
+
+  /** True si el usuario cambió descripción, categoría o presentación respecto al producto al elegirlo. */
+  private maestroCatalogoCambio(): boolean {
+    if (!this.snapshotMaestro) {
+      return false;
+    }
+    const cat = this.idCategoriaEdit != null && Number.isFinite(this.idCategoriaEdit) ? Number(this.idCategoriaEdit) : 0;
+    const mar = this.idMarcaEdit != null && Number.isFinite(this.idMarcaEdit) ? Number(this.idMarcaEdit) : 0;
+    const pres =
+      this.idPresentacionEdit != null && Number.isFinite(this.idPresentacionEdit) ? Number(this.idPresentacionEdit) : 0;
+    return (
+      String(this.descripcionEdit ?? '').trim() !== this.snapshotMaestro.descripcion ||
+      cat !== this.snapshotMaestro.idCategoria ||
+      mar !== this.snapshotMaestro.idMarca ||
+      pres !== this.snapshotMaestro.idPresentacion
+    );
   }
 
   guardarLinea(): void {
     if (!this.idSesionEnCurso || !this.productoSeleccionado) {
       return;
     }
+    const body: UpsertLineaConteoBody = {
+      stockReal: this.stockRealInput,
+      verificado: this.verificadoInput,
+      notas: this.notasInput?.trim() || null
+    };
+    if (this.maestroCatalogoCambio()) {
+      const descTrim = String(this.descripcionEdit ?? '').trim();
+      if (!descTrim) {
+        iziToast.error({ title: 'Validación', message: 'La descripción no puede quedar vacía.', position: 'topRight' });
+        return;
+      }
+      if (this.idCategoriaEdit == null || this.idPresentacionEdit == null || this.idMarcaEdit == null) {
+        iziToast.error({
+          title: 'Validación',
+          message: 'Seleccione categoría, marca y presentación para guardar los cambios del producto.',
+          position: 'topRight'
+        });
+        return;
+      }
+      body.descripcion = descTrim;
+      body.idCategoria = Number(this.idCategoriaEdit);
+      body.idMarca = Number(this.idMarcaEdit);
+      body.idPresentacion = Number(this.idPresentacionEdit);
+    }
     this.conteoService
-      .upsertLinea(this.idSesionEnCurso, this.productoSeleccionado.idProducto, {
-        stockReal: this.stockRealInput,
-        verificado: this.verificadoInput,
-        notas: this.notasInput?.trim() || null
-      })
+      .upsertLinea(this.idSesionEnCurso, this.productoSeleccionado.idProducto, body)
       .subscribe({
         next: (r) => {
           this.lineas = r.lineas || [];
+          if (this.snapshotMaestro && this.productoSeleccionado) {
+            const cat = this.idCategoriaEdit != null ? Number(this.idCategoriaEdit) : 0;
+            const mar = this.idMarcaEdit != null ? Number(this.idMarcaEdit) : 0;
+            const pres = this.idPresentacionEdit != null ? Number(this.idPresentacionEdit) : 0;
+            this.snapshotMaestro = {
+              descripcion: String(this.descripcionEdit ?? '').trim(),
+              idCategoria: cat,
+              idMarca: mar,
+              idPresentacion: pres
+            };
+          }
+          if (this.productoSeleccionado) {
+            const idMar = this.idMarcaEdit != null ? Number(this.idMarcaEdit) : NaN;
+            this.productoSeleccionado = {
+              ...this.productoSeleccionado,
+              descripcion: String(this.descripcionEdit ?? '').trim(),
+              idCategoria: this.idCategoriaEdit ?? undefined,
+              idMarca: Number.isFinite(idMar) && idMar > 0 ? idMar : this.productoSeleccionado.idMarca,
+              idPresentacion: this.idPresentacionEdit ?? undefined
+            };
+          }
           iziToast.success({ title: 'Línea', message: 'Guardada', position: 'topRight' });
           this.previewCargado = false;
           this.buscarCatalogo();

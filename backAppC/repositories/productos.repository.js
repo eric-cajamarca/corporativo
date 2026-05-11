@@ -59,7 +59,36 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
     const sucFilt = (idsSucursalesFiltro || []).filter(Boolean);
     const inSucClause = sucFilt.length > 0 ? construirInClause(request, sucFilt, 'idSuc') : null;
     const filtroSucursalSql = inSucClause ? ` AND ss.idSucursal IN (${inSucClause}) ` : '';
-    const crossApplySucursalExtra = inSucClause ? ` AND su.idSucursal IN (${inSucClause}) ` : '';
+    /*
+      Productos sin lotes: si hay filtro por sucursales de usuario, un CROSS APPLY estricto puede devolver 0 filas
+      (p. ej. asignación desalineada) y el producto desaparece del listado. Se usa OUTER APPLY filtrado + fallback principal.
+    */
+    const applySucursalSinLotes = inSucClause
+      ? `OUTER APPLY (
+          SELECT TOP 1 su.idSucursal AS idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+            AND su.idSucursal IN (${inSucClause})
+          ORDER BY su.nombre
+        ) defFilt
+        OUTER APPLY (
+          SELECT TOP 1 su.idSucursal AS idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+          ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+        ) defFb`
+      : `CROSS APPLY (
+          SELECT TOP 1 su.idSucursal AS idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+          ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+        ) defFb`;
+    const idSucursalSinLotesExpr = inSucClause
+      ? 'COALESCE(defFilt.idSucursal, defFb.idSucursal)'
+      : 'defFb.idSucursal';
     const result = await request.query(`
         SELECT 
             ss.idProducto,
@@ -112,7 +141,7 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
             p.idPresentacion,
             pr2.codigo as codigoPresentacion,
             pr2.descripcion as descripcionPres,
-            def.idSucursal,
+            ${idSucursalSinLotesExpr} AS idSucursal,
             s2.nombre as sucursal,
             p.cUnitario,
             CAST(0 AS DECIMAL(18, 3)) AS stock,
@@ -127,15 +156,8 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
         INNER JOIN Presentacion pr2 ON p.idPresentacion = pr2.idPresentacion
         INNER JOIN Marcas m2 ON p.idMarca = m2.idMarca
         INNER JOIN Empresas e2 ON p.idEmpresa = e2.idEmpresa
-        CROSS APPLY (
-          SELECT TOP 1 su.idSucursal
-          FROM Sucursal su
-          WHERE su.idEmpresa = p.idEmpresa
-            AND ISNULL(su.estado, 1) = 1
-            ${crossApplySucursalExtra}
-          ORDER BY su.nombre
-        ) def
-        INNER JOIN Sucursal s2 ON s2.idSucursal = def.idSucursal AND ISNULL(s2.estado, 1) = 1
+        ${applySucursalSinLotes}
+        INNER JOIN Sucursal s2 ON s2.idSucursal = ${idSucursalSinLotesExpr} AND ISNULL(s2.estado, 1) = 1
         WHERE p.idEmpresa IN (${inClause})
         AND NOT EXISTS (
           SELECT 1 FROM Lotes l
@@ -790,6 +812,37 @@ exports.eliminarProductoPorId = async (poolOrTransaction, idProducto, idEmpresa)
 };
 
 /** Solo cambia el bit estado (catálogo activo/inactivo). */
+/**
+ * Actualiza solo descripción, categoría y presentación (pantalla conteo físico).
+ * Acepta pool o transacción.
+ */
+exports.actualizarMaestroConteoFisico = async (conn, { idEmpresa, idProducto, descripcion, idCategoria, idPresentacion, idMarca }) => {
+  const desc = descripcion != null ? String(descripcion).trim().substring(0, 200) : null;
+  if (!desc) {
+    throw new Error('La descripción no puede quedar vacía');
+  }
+  const req = conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('descripcion', sql.VarChar(200), desc)
+    .input('idCategoria', sql.Int, idCategoria)
+    .input('idPresentacion', sql.Int, idPresentacion);
+  if (idMarca != null && Number.isInteger(Number(idMarca)) && Number(idMarca) > 0) {
+    req.input('idMarca', sql.Int, Number(idMarca));
+    return req.query(`
+      UPDATE dbo.Productos
+      SET descripcion = @descripcion, idCategoria = @idCategoria, idPresentacion = @idPresentacion, idMarca = @idMarca
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND estado = 1
+    `);
+  }
+  return req.query(`
+    UPDATE dbo.Productos
+    SET descripcion = @descripcion, idCategoria = @idCategoria, idPresentacion = @idPresentacion
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND estado = 1
+  `);
+};
+
 exports.actualizarEstadoProductoPorId = async (pool, idProducto, idEmpresa, estadoActivo) => {
   return pool
     .request()

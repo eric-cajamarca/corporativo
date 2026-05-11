@@ -85,6 +85,13 @@
                   <button type="button" class="btn btn-sm btn-outline-info me-1" title="Editar" (click)="editar(c)">
                     <i class="bi bi-pencil"></i>
                   </button>
+                  <a
+                    class="btn btn-sm btn-outline-success me-1"
+                    title="Duplicar en nueva venta"
+                    [routerLink]="['/ventas/create']"
+                    [queryParams]="{ duplicarDesdeCotizacion: c.idCotizacion }">
+                    <i class="bi bi-files"></i>
+                  </a>
                   <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="eliminar(c)">
                     <i class="bi bi-trash"></i>
                   </button>

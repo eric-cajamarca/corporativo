@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { global } from './global';
@@ -16,6 +16,9 @@ export interface VehiculoRegistro {
   soatEstado?: string;
   soatFechaFin?: string;
   soatCompania?: string;
+  /** Listado consolidado (empresa gestora). */
+  idEmpresa?: string;
+  razonSocialEmpresa?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -33,10 +36,17 @@ export class VehiculosService {
     );
   }
 
-  listarVehiculos(): Observable<{ data: VehiculoRegistro[] }> {
+  listarVehiculos(opts?: { alcanceGestora?: boolean; idEmpresa?: string }): Observable<{ data: VehiculoRegistro[] }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    let params = new HttpParams();
+    if (opts?.alcanceGestora) {
+      params = params.set('alcance', 'gestora');
+    } else if (opts?.idEmpresa) {
+      params = params.set('idEmpresa', opts.idEmpresa);
+    }
     return this.http.get<{ data: VehiculoRegistro[] }>(`${this.url}vehiculos`, {
       headers,
+      params,
       withCredentials: true
     });
   }

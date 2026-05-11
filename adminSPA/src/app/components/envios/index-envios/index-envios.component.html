@@ -23,12 +23,12 @@
                   </select>
                 </div>
                 <div class="col-12 col-md-6 col-lg-2">
-                  <label class="form-label small">Fecha desde</label>
-                  <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaDesde">
+                  <label class="form-label small">Fecha envío desde</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaDesde" title="Filtra por fecha programada o fecha de solicitud">
                 </div>
                 <div class="col-12 col-md-6 col-lg-2">
-                  <label class="form-label small">Fecha hasta</label>
-                  <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaHasta">
+                  <label class="form-label small">Fecha envío hasta</label>
+                  <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaHasta" title="Filtra por fecha programada o fecha de solicitud">
                 </div>
                 <div class="col-12 col-md-6 col-lg-2">
                   <label class="form-label small">RUC</label>
@@ -96,6 +96,23 @@
                     <p class="mb-0 small" *ngIf="envio.transportista && !envio.chofer">
                       <i class="bi bi-truck me-1"></i>{{ envio.transportista }}
                     </p>
+                    <div class="mt-2" *ngIf="estadosEnvio.length">
+                      <label class="form-label small mb-0">Estado del envío</label>
+                      <select
+                        class="form-select form-select-sm"
+                        [ngModel]="envio.idEstadoEnvio"
+                        (ngModelChange)="cambiarEstadoDesdeCard(envio, $event)"
+                        [disabled]="actualizandoEstadoEnvio() === envio.idEnvio"
+                      >
+                        <option *ngFor="let ee of estadosOpcionesCard(envio)" [ngValue]="ee.idEstadoEnvio">{{ ee.nombre }}</option>
+                      </select>
+                    </div>
+                    <div class="mt-2">
+                      <button type="button" class="btn btn-sm btn-primary w-100" (click)="irADespachos(envio)"
+                        title="Abrir despachos y buscar por este comprobante">
+                        <i class="bi bi-box-seam me-1"></i>Ir a despachos
+                      </button>
+                    </div>
                   </div>
                   <div class="card-footer bg-transparent border-0 py-2 d-flex gap-1 flex-wrap">
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalVer(envio)">
@@ -105,7 +122,8 @@
                       <i class="bi bi-pencil"></i> Editar
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger"
-                      [disabled]="eliminando() === envio.idEnvio"
+                      [disabled]="eliminando() === envio.idEnvio || !esEstadoAgendado(envio)"
+                      [title]="esEstadoAgendado(envio) ? 'Eliminar envío' : 'Solo eliminable en AGENDADO (tras devolución total en despachos)'"
                       (click)="confirmarEliminar(envio)">
                       <span *ngIf="eliminando() !== envio.idEnvio"><i class="bi bi-trash"></i> Eliminar</span>
                       <span *ngIf="eliminando() === envio.idEnvio">...</span>
@@ -203,16 +221,16 @@
         </div>
         <div class="mb-3">
           <label class="form-label small">Chofer interno</label>
-          <select class="form-select form-select-sm" [(ngModel)]="editForm.idChofer">
+          <select class="form-select form-select-sm" [(ngModel)]="editForm.idChofer" [compareWith]="compararIdsUuid">
             <option [ngValue]="null">— Ninguno —</option>
             <option *ngFor="let c of choferes" [ngValue]="c.idChofer">
-              {{ c.nombres }} {{ c.apellidos }} {{ c.placa ? ('- ' + c.placa) : '' }}
+              {{ c.nombres }} {{ c.apellidos }}{{ c.placa ? ' - ' + c.placa : '' }}
             </option>
           </select>
         </div>
         <div class="mb-3">
           <label class="form-label small">Transportista externo</label>
-          <select class="form-select form-select-sm" [(ngModel)]="editForm.idTransportista">
+          <select class="form-select form-select-sm" [(ngModel)]="editForm.idTransportista" [compareWith]="compararIdsUuid">
             <option [ngValue]="null">— Ninguno —</option>
             <option *ngFor="let t of transportistas" [ngValue]="t.idTransportista">
               {{ t.nombres }} {{ t.apellidos }}

@@ -22,13 +22,30 @@ const guardarVehiculoYSoat = async (req, res) => {
 
 const listarVehiculos = async (req, res) => {
   try {
-    const idEmpresa = req.user?.empresa;
-    if (!idEmpresa) {
+    if (!req.user?.empresa) {
       return res.status(401).json({ message: "No autorizado: falta empresa en token" });
     }
-    const list = await withPool(async (pool) => vehiculosService.listarVehiculosService(pool, idEmpresa));
+    const consolidado = String(req.query.alcance || "").toLowerCase() === "gestora";
+    const idEmpresaQ =
+      req.query.idEmpresa != null && String(req.query.idEmpresa).trim() !== ""
+        ? String(req.query.idEmpresa).trim()
+        : null;
+    if (consolidado && idEmpresaQ) {
+      return res.status(400).json({ message: "No use idEmpresa junto con alcance=gestora" });
+    }
+    const list = await withPool(async (pool) =>
+      vehiculosService.listarVehiculosService(pool, req.user, {
+        consolidadoGestora: consolidado,
+        idEmpresa: idEmpresaQ
+      })
+    );
     return res.status(200).json({ data: list });
   } catch (err) {
+    if (err.message === "NO_ACCESS") return res.status(401).json({ message: "No autorizado" });
+    if (err.message === "NO_PERMISSIONS") return res.status(403).json({ message: "No tiene permisos" });
+    if (err.message === "NO_ES_GESTORA") {
+      return res.status(403).json({ message: "Solo empresas gestoras activas pueden listar de forma consolidada" });
+    }
     console.error("vehiculosController.listarVehiculos:", err?.message || err);
     return res.status(500).json({ message: err?.message || "Error al listar vehículos" });
   }

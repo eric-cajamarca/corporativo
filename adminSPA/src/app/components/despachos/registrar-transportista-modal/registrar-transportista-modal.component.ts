@@ -14,6 +14,8 @@ declare const iziToast: any;
 })
 export class RegistrarTransportistaModalComponent implements OnChanges {
   @Input() visible = false;
+  /** Empresa gestora: crear transportista en la empresa del comprobante hijo. */
+  @Input() idEmpresaDestino: string | null = null;
   @Output() closed = new EventEmitter<void>();
   @Output() saved = new EventEmitter<void>();
 
@@ -53,29 +55,41 @@ export class RegistrarTransportistaModalComponent implements OnChanges {
   }
 
   guardar(): void {
-    const payload = {
-      nombres: this.nombres.trim(),
-      apellidos: this.apellidos.trim(),
-      documento: this.documento.trim().toUpperCase(),
-      licencia: this.licencia.trim() || null,
-      celular: this.celular.trim(),
-      email: this.email.trim() || null,
-      vehiculo: this.vehiculo.trim() || null,
-      placa: this.placa.trim().toUpperCase() || null
-    };
+    const nombres = this.nombres.trim();
+    const apellidos = this.apellidos.trim();
+    const documento = this.documento.trim().toUpperCase();
+    const celular = this.celular.trim();
+    const vehiculo = this.vehiculo.trim();
+    const placa = this.placa.trim().toUpperCase();
 
-    if (!payload.nombres || !payload.apellidos || !payload.documento || !payload.celular) {
+    if (!nombres || !apellidos || !documento || !celular) {
       iziToast.warning({ title: 'Aviso', message: 'Complete los campos requeridos.', position: 'topRight' });
       return;
     }
-    if (!payload.placa || !payload.vehiculo) {
+    if (!placa || !vehiculo) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese vehículo y placa.', position: 'topRight' });
       return;
     }
 
+    const payload: Record<string, unknown> = {
+      nombres,
+      apellidos,
+      documento,
+      licencia: this.licencia.trim() || null,
+      celular,
+      email: this.email.trim() || null,
+      vehiculo: vehiculo || null,
+      placa: placa || null
+    };
+
     this.cargando = true;
 
-    this.enviosService.crearTransportista(payload).subscribe({
+    const idEmp = (this.idEmpresaDestino || '').trim();
+    if (idEmp) {
+      payload['idEmpresa'] = idEmp;
+    }
+
+    this.enviosService.crearTransportista(payload as any).subscribe({
       next: () => {
         iziToast.success({ title: 'OK', message: 'Delivery externo registrado.', position: 'topRight' });
         this.cargando = false;

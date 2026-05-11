@@ -13,6 +13,13 @@ exports.crearCotizacion = async (transaction, payload, idEmpresa, idUsuario) => 
   if (cotizacion.idCliente == null || cotizacion.idCliente === '') {
     throw new Error('El cliente es obligatorio.');
   }
+  const idCliCab = Number(cotizacion.idCliente);
+  if (!Number.isFinite(idCliCab) || idCliCab < 1) {
+    throw new Error('El identificador de cliente no es válido.');
+  }
+  if (!(await cotizacionesRepository.clientePerteneceAEmpresa(transaction, idEmpresa, idCliCab))) {
+    throw new Error('El cliente no existe en esta empresa o no corresponde al usuario actual.');
+  }
   const total = Number(cotizacion.total) || 0;
   if (total < 0) {
     throw new Error('El total debe ser mayor o igual a cero.');
@@ -43,7 +50,7 @@ exports.crearCotizacion = async (transaction, payload, idEmpresa, idUsuario) => 
     fEmision,
     fVencimiento,
     idDocumento: cotizacion.idDocumento != null ? String(cotizacion.idDocumento).substring(0, 1) : '1',
-    idCliente: Number(cotizacion.idCliente),
+    idCliente: idCliCab,
     moneda: cotizacion.moneda || null,
     idCondicionPago: cotizacion.idCondicionPago != null ? Number(cotizacion.idCondicionPago) : null,
     total,

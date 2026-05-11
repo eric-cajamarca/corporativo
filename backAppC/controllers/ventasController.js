@@ -375,7 +375,7 @@ const actualizarVentaEdicion = async (req, res) => {
   }
   try {
     const out = await withPool((pool) =>
-      ventasOrquestacion.actualizarVentaEdicion(pool, idEmpresa, idVenta, cabecera, detalles)
+      ventasOrquestacion.actualizarVentaEdicion(pool, idEmpresa, idVenta, cabecera, detalles, req.user)
     );
     if (!out.ok) {
       return res.status(out.status).json({ error: out.error });

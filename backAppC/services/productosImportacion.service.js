@@ -101,6 +101,8 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
   const cantidadStr = leerCelda(mapaNorm, [
     'cantidadinicial',
     'cantidad inicial',
+    'cantidadinici',
+    'cantidadini',
     'stockinicial',
     'stock inicial',
     'cantidad'
@@ -125,7 +127,8 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
     'preciolistamayorista',
     'precio lista mayorista',
     'preciomayorista',
-    'precio mayorista'
+    'precio mayorista',
+    'preciomayori'
   ]);
   const categoriaAlias = leerCelda(mapaNorm, ['categoria', 'categoría']);
   const marcaAlias = leerCelda(mapaNorm, ['marca']);
@@ -155,7 +158,27 @@ function parseBufferAObjetos(buffer) {
     throw new Error('EXCEL_SIN_HOJAS');
   }
   const sheet = wb.Sheets[nombreHoja];
-  const filasRaw = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  const optsBase = { defval: '', raw: false, blankrows: false };
+  let filasRaw;
+  const ref = sheet['!ref'];
+  if (ref) {
+    const decoded = XLSX.utils.decode_range(ref);
+    const filasEnRango = decoded.e.r - decoded.s.r + 1;
+    /*
+      Excel a veces guarda !ref hasta la última fila de la hoja (p. ej. A1:J1048571) aunque solo
+      haya datos en las primeras filas. sheet_to_json devolvería >1M filas y dispara DEMASIADAS_FILAS.
+      Se relee acotando a cabecera + máximo MAX_FILAS filas de datos (misma regla de negocio).
+    */
+    if (filasEnRango > MAX_FILAS + 1) {
+      const cappedEndR = decoded.s.r + MAX_FILAS;
+      const limitedRange = { s: decoded.s, e: { r: cappedEndR, c: decoded.e.c } };
+      filasRaw = XLSX.utils.sheet_to_json(sheet, { ...optsBase, range: limitedRange });
+    } else {
+      filasRaw = XLSX.utils.sheet_to_json(sheet, optsBase);
+    }
+  } else {
+    filasRaw = XLSX.utils.sheet_to_json(sheet, optsBase);
+  }
   if (!Array.isArray(filasRaw) || filasRaw.length === 0) {
     throw new Error('EXCEL_SIN_DATOS');
   }
@@ -277,7 +300,9 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     const precioNormal = parsePrecioImportacion(f.precioNormalStr, 'precioNormal', msgs);
     const precioCliente = parsePrecioImportacion(f.precioClienteStr, 'precioCliente', msgs);
     const precioMayorista = parsePrecioImportacion(f.precioMayoristaStr, 'precioMayorista', msgs);
-    const cantidadInicialRaw = parseNumeroFlexible(f.cantidadStr);
+    /* Columna vacía o ausente (p. ej. encabezado truncado en Excel) = stock inicial 0 */
+    const cantidadInicialRaw =
+      f.cantidadStr === '' || f.cantidadStr == null ? 0 : parseNumeroFlexible(f.cantidadStr);
     if (Number.isNaN(cantidadInicialRaw)) msgs.push('cantidadInicial inválida');
     const cantidadInicial = Number.isNaN(cantidadInicialRaw) ? 0 : Math.max(0, cantidadInicialRaw);
 

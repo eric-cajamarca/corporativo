@@ -95,7 +95,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idEmpresa, idVenta, baseUrl) =>
 exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresa, idVentaAgrupada, baseUrl) =>
   ventasRepository.obtenerComprobanteVAParaPdf(pool, idEmpresa, idVentaAgrupada, baseUrl);
 
-exports.actualizarVentaEdicion = async (pool, idEmpresa, idVenta, cabecera, detalles) => {
+exports.actualizarVentaEdicion = async (pool, idEmpresa, idVenta, cabecera, detalles, user) => {
   const idsEmpresa = await idsEmpresaParaComprobanteVenta(pool, idEmpresa);
   const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idsEmpresa);
   if (!data || !data.venta) {
@@ -115,10 +115,47 @@ exports.actualizarVentaEdicion = async (pool, idEmpresa, idVenta, cabecera, deta
     };
   }
   const idEmpresaVenta = data.venta.idEmpresa || idEmpresa;
-  const result = await ventasRepository.actualizarVentaCompleta(pool, idVenta, idEmpresaVenta, {
-    ...cabecera,
-    idEstadoSunat
-  }, detalles);
+  if (await ventasRepository.ventaTieneDespachos(pool, idVenta, idEmpresaVenta)) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'No se puede editar: el comprobante tiene despachos registrados.'
+    };
+  }
+  if (
+    await ventasRepository.ventaTieneNotasCreditoDebito(
+      pool,
+      idEmpresaVenta,
+      String(data.venta.compVenta || '').trim()
+    )
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'No se puede editar: existen notas de crédito o débito vinculadas a este comprobante.'
+    };
+  }
+  const idUsuarioEjecutor = user ? idUsuarioDesdePayloadUser(user) : null;
+  let result;
+  try {
+    result = await ventasRepository.actualizarVentaCompleta(
+      pool,
+      idVenta,
+      idEmpresaVenta,
+      {
+        ...cabecera,
+        idEstadoSunat
+      },
+      detalles,
+      { idUsuarioEjecutor }
+    );
+  } catch (err) {
+    const msg = err && err.message ? String(err.message) : '';
+    if (msg.includes('Stock insuficiente')) {
+      return { ok: false, status: 400, error: msg };
+    }
+    throw err;
+  }
   if (result && result.ok === false) {
     return { ok: false, status: 400, error: result.error || 'No se pudo actualizar' };
   }

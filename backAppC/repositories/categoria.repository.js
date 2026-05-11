@@ -24,10 +24,12 @@ async function insertar(pool, idEmpresa, { nombre, descripcion, estado }) {
     .input('nombre', sql.VarChar(200), nombre)
     .input('descripcion', sql.VarChar(200), descripcion)
     .input('estado', sql.Bit, estado)
-    .query(
-      'INSERT INTO Categorias (idEmpresa,nombre,descripcion,estado) VALUES (@idEmpresa,@nombre,@descripcion,@estado)'
-    );
-  return result.rowsAffected;
+    .query(`
+      INSERT INTO Categorias (idEmpresa, nombre, descripcion, estado)
+      OUTPUT INSERTED.idCategoria AS idCategoria
+      VALUES (@idEmpresa, @nombre, @descripcion, @estado)
+    `);
+  return result.recordset?.[0] || null;
 }
 
 async function actualizar(pool, idEmpresa, idCategoria, { nombre, descripcion }) {

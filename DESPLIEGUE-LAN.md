@@ -313,3 +313,15 @@ Select-String -Path "C:\ruta\al\repo\adminSPA\dist\admin-spa\browser\*.js" -Patt
 ### Migraciones SQL
 
 Ejecutar los scripts en `backAppC/migrations` y `backAppC/migraciones nuevas` según el procedimiento de tu equipo (SSMS / `sqlcmd` / scripts PowerShell del proyecto).
+
+
+
+Qué haces tú en cada entorno
+Entorno	Comando / notas
+Desarrollo
+ng serve como siempre; levanta 3000, 3002 y el proxy.
+Servidor
+cd adminSPA && npm run build:lan; copiar dist/admin-spa/browser; Nginx según infra/lan/nginx.conf.example; pm2 start infra/lan/ecosystem.config.cjs; .env de producción con FRONTEND_URL / API_BASE_URL como en la guía.
+Instalación pública (internet): en backAppC y si aplica en pdf-backend, define CORS_ALLOW_LAN=0 y lista solo orígenes conocidos en FRONTEND_URL / CORS_EXTRA_ORIGINS.
+
+Seguridad: el script de prueba test_login.js sigue ignorado por Git; si alguna vez lo usaste con datos reales, cambia esa contraseña.

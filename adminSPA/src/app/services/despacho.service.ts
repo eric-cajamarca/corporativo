@@ -37,6 +37,8 @@ export class DespachoService {
     observaciones?: string;
     idEmpresa?: string;
     detalles?: Array<{ idDetalle: number; idProducto: string; cantidadADespachar: number }>;
+    /** Con delivery: líneas en PENDIENTE hasta confirmar carga en almacén (no marca mercadería despachada aún). */
+    mercaderiaPendienteDeCarga?: boolean;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'despachos/', data, {

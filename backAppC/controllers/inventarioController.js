@@ -265,7 +265,7 @@ exports.conteoFisicoUpsertLinea = async (req, res) => {
       return res.status(401).json({ message: 'No autorizado' });
     }
     const body = { ...(req.body || {}), idProducto: req.params.idProducto };
-    const data = await conteoFisicoService.upsertLinea(req.user.empresa, req.params.idSesion, body);
+    const data = await conteoFisicoService.upsertLinea(req.user, req.params.idSesion, body);
     return res.status(200).json(data);
   } catch (error) {
     console.error('inventarioController conteoFisicoUpsertLinea:', error);

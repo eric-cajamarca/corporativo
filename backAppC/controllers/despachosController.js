@@ -37,7 +37,8 @@ const crearDespacho = async (req, res) => {
       idTipoDespacho,
       observaciones,
       detalles,
-      idEmpresa
+      idEmpresa,
+      mercaderiaPendienteDeCarga
     } = req.body;
 
     // Validación básica
@@ -58,7 +59,8 @@ const crearDespacho = async (req, res) => {
         idTipoDespacho,
         observaciones,
         detalles: Array.isArray(detalles) ? detalles : undefined,
-        ...(idEmpresaOperativa ? { idEmpresa: idEmpresaOperativa } : {})
+        ...(idEmpresaOperativa ? { idEmpresa: idEmpresaOperativa } : {}),
+        ...(mercaderiaPendienteDeCarga === true ? { mercaderiaPendienteDeCarga: true } : {})
       })
     );
 

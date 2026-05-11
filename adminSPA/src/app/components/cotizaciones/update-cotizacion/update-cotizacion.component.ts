@@ -13,6 +13,9 @@ declare var iziToast: any;
 
 interface DetalleEdicion {
   idDetalleCotizacion?: number;
+  idProducto?: string | null;
+  idEmpresaProducto?: string | null;
+  aliasEmpresa?: string | null;
   cantidad: number;
   codigo: string;
   descripcion: string;
@@ -22,7 +25,7 @@ interface DetalleEdicion {
   igv: number;
   ISC: number;
   total: number;
-  idSucursal: number;
+  idSucursal: string | number;
 }
 
 @Component({
@@ -84,6 +87,9 @@ export class UpdateCotizacionComponent implements OnInit {
         if (data?.detalles?.length) {
           this.detalles = data.detalles.map((d: any) => ({
             idDetalleCotizacion: d.idDetalleCotizacion,
+            idProducto: d.idProducto != null ? String(d.idProducto) : null,
+            idEmpresaProducto: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : null,
+            aliasEmpresa: d.aliasEmpresa != null ? String(d.aliasEmpresa) : null,
             cantidad: Number(d.cantidad) || 0,
             codigo: d.codigo || '',
             descripcion: d.descripcion || '',
@@ -93,7 +99,7 @@ export class UpdateCotizacionComponent implements OnInit {
             igv: Number(d.igv) || 0,
             ISC: Number(d.ISC) || 0,
             total: Number(d.total) || 0,
-            idSucursal: d.idSucursal ?? 1
+            idSucursal: d.idSucursal ?? ''
           }));
         } else {
           this.detalles = [];
@@ -133,9 +139,7 @@ export class UpdateCotizacionComponent implements OnInit {
       : undefined;
     this.buscadorProductosModal.abrir(idSucursal).then((producto: ProductoSeleccionado | null) => {
       if (producto == null) return;
-      const idSucursalDetalle = this.detalles.length > 0
-        ? this.detalles[0].idSucursal
-        : 1;
+      const idSucursalDetalle = this.detalles.length > 0 ? this.detalles[0].idSucursal : undefined;
       const pVenta = Number(producto.pVenta) || 0;
       const nuevoDetalle: DetalleEdicion = {
         cantidad: 1,
@@ -147,7 +151,12 @@ export class UpdateCotizacionComponent implements OnInit {
         igv: 0,
         ISC: 0,
         total: pVenta,
-        idSucursal: idSucursalDetalle
+        idSucursal: idSucursalDetalle ?? '',
+        idProducto: producto.idProducto != null ? String(producto.idProducto) : undefined,
+        idEmpresaProducto:
+          producto['idEmpresa'] != null ? String(producto['idEmpresa']) : undefined,
+        aliasEmpresa:
+          producto['aliasEmpresa'] != null ? String(producto['aliasEmpresa']) : undefined
       };
       this.detalles.push(nuevoDetalle);
       this.recalcularTotal();
@@ -160,6 +169,13 @@ export class UpdateCotizacionComponent implements OnInit {
 
   guardar(): void {
     if (this.idCotizacion == null) return;
+    if (this.idCliente == null || !Number.isFinite(Number(this.idCliente)) || Number(this.idCliente) < 1) {
+      iziToast.warning({
+        title: 'Cliente',
+        message: 'Seleccione un cliente válido de la empresa antes de guardar.'
+      });
+      return;
+    }
     if (this.detalles.length === 0) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un ítem.' });
       return;
@@ -190,7 +206,10 @@ export class UpdateCotizacionComponent implements OnInit {
         codigo: d.codigo,
         descripcion: d.descripcion,
         idPresentacion: d.idPresentacion,
-        idSucursal: d.idSucursal
+        idSucursal: d.idSucursal,
+        idProducto: d.idProducto != null ? d.idProducto : undefined,
+        idEmpresaProducto: d.idEmpresaProducto != null ? d.idEmpresaProducto : undefined,
+        aliasEmpresa: d.aliasEmpresa != null ? d.aliasEmpresa : undefined
       }))
     };
     this.cotizacionesService.actualizar(this.idCotizacion, payload).subscribe({

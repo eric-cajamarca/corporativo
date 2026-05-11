@@ -1,5 +1,6 @@
 const sql = require("mssql");
 const DespachosRepository = require("../repositories/despachos.repository");
+const EnviosRepository = require("../repositories/envios.repository");
 const gestoresRepository = require("../repositories/gestores.repository");
 const { assertAlgunoPermiso } = require("../utils/autorizacionPermisos.util");
 
@@ -94,6 +95,21 @@ exports.actualizarCantidadDespachadaService = async (pool, user, datos) => {
   }
 
   const result = await DespachosRepository.actualizarCantidadDespachadaRepo(pool, user, datos);
+  const cant = Number(datos.cantidadDespachada) || 0;
+  if (cant > 0 && result?.idDespacho && user.sub) {
+    try {
+      await EnviosRepository.marcarEnviosPorDespachoAEstadoNombreRepo(
+        pool,
+        result.idDespacho,
+        idEmp,
+        "EN_PREPARACION",
+        user.sub,
+        "Retiro/cantidad registrada en despacho"
+      );
+    } catch (err) {
+      console.error("contexto: no se pudo marcar envío EN_PREPARACION tras guardar despacho:", err);
+    }
+  }
   return result;
 };
 

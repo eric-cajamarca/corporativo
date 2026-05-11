@@ -3,6 +3,10 @@ export interface StockActualItem {
   idEmpresa: string;
   codigo: string;
   descripcion: string;
+  /** IDs para edición de maestro en conteo físico (listarStockActual). */
+  idCategoria?: number;
+  idPresentacion?: number;
+  idMarca?: number;
   categoria: string;
   marca: string;
   unidad: string;

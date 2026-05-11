@@ -13,6 +13,28 @@ const E = {
   SUCURSAL_NO_PERMITIDA: 'SUCURSAL_NO_PERMITIDA'
 };
 
+/** Listado de sucursales (resumen/todos): operaciones que necesitan elegir sucursal sin ser admin de sucursales. */
+const PERMISOS_LISTAR_SUCURSALES_OPERATIVO = [
+  'GESTIONAR_SUCURSALES',
+  'VER_CAJA',
+  'ABRIR_CAJA',
+  'CERRAR_CAJA',
+  'REGISTRAR_MOVIMIENTOS',
+  'VER_ARQUEO',
+  'CREAR_COMPRAS',
+  'EDITAR_COMPRAS',
+  'VER_COMPRAS',
+  'VER_INVENTARIO',
+  'GESTIONAR_LOTES',
+  'CREAR_VENTAS',
+  'EDITAR_VENTAS',
+  'VER_VENTAS',
+  'VER_PRODUCTOS',
+  'CREAR_PRECIOS',
+  'EDITAR_PRECIOS',
+  'TRANSFERIR_STOCK'
+];
+
 function idEmpresaDesdeUser(user) {
   return user?.empresa || user?.idEmpresa || null;
 }
@@ -30,11 +52,14 @@ function normalizarFechaRegistro(rows) {
 
 async function obtenerSucursalResumen(pool, user, opciones = {}) {
   if (!user) throw new Error(E.NO_ACCESS);
-  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
+  await assertAlgunoPermiso(pool, user, ...PERMISOS_LISTAR_SUCURSALES_OPERATIVO);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
   const incluirInactivas = !!opciones.incluirInactivas;
-  const idsUsuario = incluirInactivas ? null : await idsSucursalesFiltroCatalogo(pool, user);
+  const rol = (user.rol || '').toString();
+  const sinFiltroUsuarioSucursal =
+    rol === 'Administrador' || rol === 'superAdmin' || incluirInactivas;
+  const idsUsuario = sinFiltroUsuarioSucursal ? null : await idsSucursalesFiltroCatalogo(pool, user);
   const rows = await sucursalRepository.listarResumenPorEmpresa(pool, idEmpresa, !incluirInactivas, idsUsuario);
   return rows;
 }
@@ -43,9 +68,12 @@ async function obtenerSucursalTodos(pool, user, opciones = {}) {
   if (!user) throw new Error(E.NO_ACCESS);
   const idEmpresa = idEmpresaDesdeUser(user);
   if (!idEmpresa) throw new Error(E.FALTA_EMPRESA);
-  await assertAlgunoPermiso(pool, user, 'GESTIONAR_SUCURSALES');
+  await assertAlgunoPermiso(pool, user, ...PERMISOS_LISTAR_SUCURSALES_OPERATIVO);
   const incluirInactivas = !!opciones.incluirInactivas;
-  const idsUsuario = incluirInactivas ? null : await idsSucursalesFiltroCatalogo(pool, user);
+  const rol = (user.rol || '').toString();
+  const sinFiltroUsuarioSucursal =
+    rol === 'Administrador' || rol === 'superAdmin' || incluirInactivas;
+  const idsUsuario = sinFiltroUsuarioSucursal ? null : await idsSucursalesFiltroCatalogo(pool, user);
   const rows = await sucursalRepository.listarTodosPorEmpresa(pool, idEmpresa, !incluirInactivas, idsUsuario);
   return normalizarFechaRegistro(rows);
 }

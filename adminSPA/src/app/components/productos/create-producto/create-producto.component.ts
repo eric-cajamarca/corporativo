@@ -502,18 +502,40 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     });
   }
 
-  recargarCategorias(): void {
+  recargarCategorias(onDone?: () => void): void {
     this.categoriaService.obtener_categorias().subscribe({
-      next: (response) => { this.categorias = response.data || []; },
+      next: (response) => {
+        this.categorias = response.data || [];
+        onDone?.();
+      },
       error: () => {}
     });
   }
 
-  recargarMarcas(): void {
+  recargarMarcas(onDone?: () => void): void {
     this.marcaService.obtener_marcas().subscribe({
-      next: (response) => { this.marcas = response.data || []; },
+      next: (response) => {
+        this.marcas = response.data || [];
+        onDone?.();
+      },
       error: () => {}
     });
+  }
+
+  private parseIdCategoriaModal(res: unknown): number | null {
+    if (res && typeof res === 'object' && 'idCategoria' in res) {
+      const n = Number((res as { idCategoria?: unknown }).idCategoria);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
+  }
+
+  private parseIdMarcaModal(res: unknown): number | null {
+    if (res && typeof res === 'object' && 'idMarca' in res) {
+      const n = Number((res as { idMarca?: unknown }).idMarca);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
   }
 
   /** Une variantes de columnas del API/SQL (p. ej. Descripcion) al modelo del formulario. */
@@ -626,9 +648,16 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       keyboard: false,
       size: 'lg'
     });
-    modalRef.result.finally(() => {
-      this.recargarCategorias();
-    });
+    modalRef.result
+      .then((res: unknown) => {
+        const id = this.parseIdCategoriaModal(res);
+        if (id != null) {
+          this.recargarCategorias(() => this.productoForm.patchValue({ idCategoria: String(id) }));
+        } else {
+          this.recargarCategorias();
+        }
+      })
+      .catch(() => this.recargarCategorias());
   }
 
   abrirNuevaMarca(): void {
@@ -638,9 +667,16 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       keyboard: false,
       size: 'lg'
     });
-    modalRef.result.finally(() => {
-      this.recargarMarcas();
-    });
+    modalRef.result
+      .then((res: unknown) => {
+        const id = this.parseIdMarcaModal(res);
+        if (id != null) {
+          this.recargarMarcas(() => this.productoForm.patchValue({ idMarca: String(id) }));
+        } else {
+          this.recargarMarcas();
+        }
+      })
+      .catch(() => this.recargarMarcas());
   }
 
   private marcarCamposComoTocados(): void {

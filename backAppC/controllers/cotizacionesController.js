@@ -25,7 +25,10 @@ const crear = async (req, res) => {
   } catch (error) {
     console.error('Error crear cotización:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
+      const msg = error && error.message ? String(error.message) : '';
+      const esVal =
+        /obligatorio|válido|no existe|no corresponde|empresa/i.test(msg);
+      res.status(esVal ? 400 : 500).json({ error: msg || 'Error al crear cotización.' });
     }
   }
 };
@@ -89,11 +92,23 @@ const actualizar = async (req, res) => {
   if (!cotizacion) {
     return res.status(400).json({ error: 'Falta cabecera de cotización' });
   }
+  const idCliAct = Number(cotizacion.idCliente);
+  if (!Number.isFinite(idCliAct) || idCliAct < 1) {
+    return res.status(400).json({ error: 'El cliente es obligatorio y debe ser válido.' });
+  }
   try {
     await withPool(async (pool) => {
       const transaction = new sql.Transaction(pool);
       await transaction.begin();
       try {
+        const okCli = await cotizacionesRepository.clientePerteneceAEmpresa(transaction, idEmpresa, idCliAct);
+        if (!okCli) {
+          await transaction.rollback();
+          if (!res.headersSent) {
+            res.status(400).json({ error: 'El cliente no pertenece a esta empresa.' });
+          }
+          return;
+        }
         const datosCabecera = {
           serie: cotizacion.serie,
           numero: cotizacion.numero,
@@ -101,7 +116,7 @@ const actualizar = async (req, res) => {
           fEmision: cotizacion.fEmision ? String(cotizacion.fEmision).substring(0, 10) : null,
           fVencimiento: cotizacion.fVencimiento ? String(cotizacion.fVencimiento).substring(0, 10) : null,
           idDocumento: cotizacion.idDocumento != null ? String(cotizacion.idDocumento).substring(0, 1) : '1',
-          idCliente: Number(cotizacion.idCliente),
+          idCliente: idCliAct,
           moneda: cotizacion.moneda || null,
           idCondicionPago: cotizacion.idCondicionPago != null ? Number(cotizacion.idCondicionPago) : null,
           total: Number(cotizacion.total) || 0,
@@ -147,7 +162,9 @@ const actualizar = async (req, res) => {
   } catch (error) {
     console.error('Error actualizar cotización:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
+      const msg = error && error.message ? String(error.message) : '';
+      const esVal = /obligatorio|válido|no pertenece|empresa/i.test(msg);
+      res.status(esVal ? 400 : 500).json({ error: msg || 'Error al actualizar cotización.' });
     }
   }
 };

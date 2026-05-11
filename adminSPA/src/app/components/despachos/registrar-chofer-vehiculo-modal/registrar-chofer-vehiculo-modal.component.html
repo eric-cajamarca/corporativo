@@ -11,9 +11,14 @@
 
         <div class="mb-3">
           <label class="form-label small">Conductor (usuario con rol Chofer)</label>
-          <select class="form-select form-select-sm" [(ngModel)]="usuarioChoferSeleccionado">
+          <select
+            class="form-select form-select-sm"
+            [(ngModel)]="usuarioChoferSeleccionado"
+            (ngModelChange)="onUsuarioChoferCambiado()"
+          >
             <option *ngFor="let u of usuariosChofer" [ngValue]="u.idUsuario">
-              {{ u.nombres }} {{ u.apellidos }} - {{ u.email }}
+              {{ u.nombres }} {{ u.apellidos }} — {{ u.email
+              }}<span *ngIf="esListadoConsolidadoGestora() && u.razonSocialEmpresa"> · {{ u.razonSocialEmpresa }}</span>
             </option>
           </select>
         </div>
@@ -23,7 +28,8 @@
           <div *ngIf="cargandoVehiculos" class="text-muted small mb-2">Cargando vehículos…</div>
           <select class="form-select form-select-sm" [(ngModel)]="idVehiculoSeleccionado" [disabled]="vehiculos.length === 0">
             <option *ngFor="let v of vehiculos" [ngValue]="v.idVehiculo">
-              {{ v.placa }} {{ v.marca ? ('- ' + v.marca) : '' }} {{ v.modelo ? (v.marca ? ' ' : '- ' + v.modelo) : '' }}
+              {{ v.placa }} {{ v.marca ? ('- ' + v.marca) : '' }} {{ v.modelo ? (v.marca ? ' ' : '- ' + v.modelo) : ''
+              }}<span *ngIf="esListadoConsolidadoGestora() && v.razonSocialEmpresa"> · {{ v.razonSocialEmpresa }}</span>
             </option>
           </select>
           <div class="form-text" *ngIf="vehiculos.length === 0">
@@ -53,10 +59,3 @@
 </div>
 
 <div class="modal-backdrop fade show" *ngIf="visible"></div>
-
-<!-- Modal: consultar placa (Factiliza) y registrar Vehiculos -->
-<app-consultar-placa-modal
-  [visible]="modalConsultarPlacaVisible"
-  (closed)="onConsultarPlacaCerrado()">
-</app-consultar-placa-modal>
-

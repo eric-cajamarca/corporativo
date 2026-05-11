@@ -1,17 +1,20 @@
 const sql = require("mssql");
 const { getNowLocal, getNowLocalSQLString, getFechaSoloSQLString } = require("../utils/fechaHoraLocal.util");
 
-exports.obtenerEnviosProgramadosRepo = async (pool, idEmpresa, filtros = {}) => {
-  const request = pool.request();
-  request.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
-
-  const whereClauses = ["e.idEmpresa = @idEmpresa"];
+/** Añade filtros opcionales (estado, fechas, RUC, cliente) al WHERE de envíos programados. */
+function appendFiltrosEnviosProgramadosWhere(request, filtros, whereClauses) {
   if (filtros.idEstadoEnvio != null && String(filtros.idEstadoEnvio).trim() !== "") {
     whereClauses.push("e.idEstadoEnvio = @idEstadoEnvio");
     request.input("idEstadoEnvio", sql.Int, parseInt(filtros.idEstadoEnvio, 10));
   }
-  const fechaDesde = filtros.fechaDesde != null && String(filtros.fechaDesde).trim() !== "" ? String(filtros.fechaDesde).trim().substring(0, 10) : null;
-  const fechaHasta = filtros.fechaHasta != null && String(filtros.fechaHasta).trim() !== "" ? String(filtros.fechaHasta).trim().substring(0, 10) : null;
+  const fechaDesde =
+    filtros.fechaDesde != null && String(filtros.fechaDesde).trim() !== ""
+      ? String(filtros.fechaDesde).trim().substring(0, 10)
+      : null;
+  const fechaHasta =
+    filtros.fechaHasta != null && String(filtros.fechaHasta).trim() !== ""
+      ? String(filtros.fechaHasta).trim().substring(0, 10)
+      : null;
   if (fechaDesde) {
     whereClauses.push("CONVERT(VARCHAR(10), ISNULL(e.fechaProgramada, e.fechaSolicitud), 120) >= @fechaDesde");
     request.input("fechaDesde", sql.VarChar(10), fechaDesde);
@@ -23,18 +26,29 @@ exports.obtenerEnviosProgramadosRepo = async (pool, idEmpresa, filtros = {}) => 
   const ruc = filtros.ruc != null && String(filtros.ruc).trim() !== "" ? String(filtros.ruc).trim() : null;
   const cliente = filtros.cliente != null && String(filtros.cliente).trim() !== "" ? String(filtros.cliente).trim() : null;
   if (ruc) {
-    whereClauses.push("(c.rSocial LIKE @termRuc OR ISNULL(c.ruc, '') LIKE @termRuc)");
+    whereClauses.push("(ISNULL(c.rSocial, '') LIKE @termRuc OR ISNULL(c.ruc, '') LIKE @termRuc)");
     request.input("termRuc", sql.VarChar(100), "%" + ruc + "%");
   }
   if (cliente) {
-    whereClauses.push("c.rSocial LIKE @termCliente");
+    whereClauses.push(
+      "(ISNULL(c.rSocial, '') LIKE @termCliente OR ISNULL(e.contactoDestinatario, '') LIKE @termCliente)"
+    );
     request.input("termCliente", sql.VarChar(100), "%" + cliente + "%");
   }
+}
+
+exports.obtenerEnviosProgramadosRepo = async (pool, idEmpresa, filtros = {}) => {
+  const request = pool.request();
+  request.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+
+  const whereClauses = ["e.idEmpresa = @idEmpresa"];
+  appendFiltrosEnviosProgramadosWhere(request, filtros, whereClauses);
 
   const whereSql = whereClauses.join(" AND ");
   const query = `
     SELECT
       e.idEnvio,
+      e.idEstadoEnvio,
       e.idChofer,
       e.idTransportista,
       e.fechaSolicitud,
@@ -43,26 +57,89 @@ exports.obtenerEnviosProgramadosRepo = async (pool, idEmpresa, filtros = {}) => 
       e.costoEnvio,
       e.direccionEntrega,
       e.referencia,
-      e.contactoDestinatario,
-      e.telefonoDestinatario,
+      COALESCE(NULLIF(LTRIM(RTRIM(e.contactoDestinatario)), ''), NULLIF(LTRIM(RTRIM(c.rSocial)), '')) AS contactoDestinatario,
+      COALESCE(NULLIF(LTRIM(RTRIM(e.telefonoDestinatario)), ''), NULLIF(LTRIM(RTRIM(c.celular)), '')) AS telefonoDestinatario,
       e.observaciones,
       CONVERT(VARCHAR(10), ISNULL(e.fechaProgramada, e.fechaSolicitud), 120) AS FEnvio,
       te.nombre AS tipoEnvio,
       ee.nombre AS estadoActual,
       ee.color AS colorEstado,
       v.serie + '-' + v.numero AS comprobante,
-      c.rSocial AS cliente,
+      LTRIM(RTRIM(ISNULL(c.rSocial, ISNULL(e.contactoDestinatario, '(Sin cliente en maestro)')))) AS cliente,
       t.nombres + ' ' + t.apellidos AS transportista,
-      ISNULL(uChof.nombres + ' ' + uChof.apellidos, uw.nombres + ' ' + uw.apellidos) AS chofer
+      CASE
+        WHEN NULLIF(LTRIM(RTRIM(ISNULL(uChof.nombres, '') + ' ' + ISNULL(uChof.apellidos, ''))), '') IS NOT NULL
+        THEN LTRIM(RTRIM(ISNULL(uChof.nombres, '') + ' ' + ISNULL(uChof.apellidos, '')))
+        ELSE LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, '')))
+      END AS chofer
     FROM Envios e
     INNER JOIN Ventas v ON e.idVenta = v.idVenta AND v.idEmpresa = e.idEmpresa
-    INNER JOIN Clientes c ON v.idCliente = c.idCliente AND c.idEmpresa = e.idEmpresa
+    LEFT JOIN Clientes c ON v.idCliente = c.idCliente AND c.idEmpresa = v.idEmpresa
     INNER JOIN TiposEnvio te ON e.idTipoEnvio = te.idTipoEnvio
     INNER JOIN EstadosEnvio ee ON e.idEstadoEnvio = ee.idEstadoEnvio
-    INNER JOIN UsuarioWeb uw ON e.idUsuarioEnvio = uw.idUsuario
-    LEFT JOIN Choferes ch ON e.idChofer = ch.idChofer AND ch.idEmpresa = e.idEmpresa
-    LEFT JOIN UsuarioWeb uChof ON ch.idUsuarioChofer = uChof.idUsuario AND uChof.idEmpresa = e.idEmpresa
-    LEFT JOIN Transportistas t ON e.idTransportista = t.idTransportista
+    LEFT JOIN UsuarioWeb uw ON e.idUsuarioEnvio = uw.idUsuario
+    LEFT JOIN Choferes ch ON e.idChofer = ch.idChofer AND ch.estado = 1
+    LEFT JOIN UsuarioWeb uChof ON ch.idUsuarioChofer = uChof.idUsuario AND uChof.idEmpresa = ch.idEmpresa
+    LEFT JOIN Transportistas t ON e.idTransportista = t.idTransportista AND t.estado = 1
+    WHERE ${whereSql}
+    ORDER BY ISNULL(e.fechaProgramada, e.fechaSolicitud) DESC
+  `;
+  const result = await request.query(query);
+  return result.recordset;
+};
+
+/**
+ * Listado para empresa gestora: envíos de la gestora y de todas las empresas gestionadas.
+ * @param {string[]} idsEmpresa
+ */
+exports.obtenerEnviosProgramadosMultiEmpresaRepo = async (pool, idsEmpresa, filtros = {}) => {
+  const list = [...new Set((idsEmpresa || []).filter(Boolean))];
+  if (list.length === 0) return [];
+  const request = pool.request();
+  list.forEach((id, i) => {
+    request.input(`em${i}`, sql.UniqueIdentifier, id);
+  });
+  const inClause = list.map((_, i) => `@em${i}`).join(", ");
+  const whereClauses = [`e.idEmpresa IN (${inClause})`];
+  appendFiltrosEnviosProgramadosWhere(request, filtros, whereClauses);
+
+  const whereSql = whereClauses.join(" AND ");
+  const query = `
+    SELECT
+      e.idEnvio,
+      e.idEstadoEnvio,
+      e.idChofer,
+      e.idTransportista,
+      e.fechaSolicitud,
+      e.fechaProgramada,
+      e.fechaEntrega,
+      e.costoEnvio,
+      e.direccionEntrega,
+      e.referencia,
+      COALESCE(NULLIF(LTRIM(RTRIM(e.contactoDestinatario)), ''), NULLIF(LTRIM(RTRIM(c.rSocial)), '')) AS contactoDestinatario,
+      COALESCE(NULLIF(LTRIM(RTRIM(e.telefonoDestinatario)), ''), NULLIF(LTRIM(RTRIM(c.celular)), '')) AS telefonoDestinatario,
+      e.observaciones,
+      CONVERT(VARCHAR(10), ISNULL(e.fechaProgramada, e.fechaSolicitud), 120) AS FEnvio,
+      te.nombre AS tipoEnvio,
+      ee.nombre AS estadoActual,
+      ee.color AS colorEstado,
+      v.serie + '-' + v.numero AS comprobante,
+      LTRIM(RTRIM(ISNULL(c.rSocial, ISNULL(e.contactoDestinatario, '(Sin cliente en maestro)')))) AS cliente,
+      t.nombres + ' ' + t.apellidos AS transportista,
+      CASE
+        WHEN NULLIF(LTRIM(RTRIM(ISNULL(uChof.nombres, '') + ' ' + ISNULL(uChof.apellidos, ''))), '') IS NOT NULL
+        THEN LTRIM(RTRIM(ISNULL(uChof.nombres, '') + ' ' + ISNULL(uChof.apellidos, '')))
+        ELSE LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, '')))
+      END AS chofer
+    FROM Envios e
+    INNER JOIN Ventas v ON e.idVenta = v.idVenta AND v.idEmpresa = e.idEmpresa
+    LEFT JOIN Clientes c ON v.idCliente = c.idCliente AND c.idEmpresa = v.idEmpresa
+    INNER JOIN TiposEnvio te ON e.idTipoEnvio = te.idTipoEnvio
+    INNER JOIN EstadosEnvio ee ON e.idEstadoEnvio = ee.idEstadoEnvio
+    LEFT JOIN UsuarioWeb uw ON e.idUsuarioEnvio = uw.idUsuario
+    LEFT JOIN Choferes ch ON e.idChofer = ch.idChofer AND ch.estado = 1
+    LEFT JOIN UsuarioWeb uChof ON ch.idUsuarioChofer = uChof.idUsuario AND uChof.idEmpresa = ch.idEmpresa
+    LEFT JOIN Transportistas t ON e.idTransportista = t.idTransportista AND t.estado = 1
     WHERE ${whereSql}
     ORDER BY ISNULL(e.fechaProgramada, e.fechaSolicitud) DESC
   `;
@@ -113,6 +190,15 @@ exports.obtenerDetalleEnvioRepo = async (pool, idEnvio, idEmpresa) => {
     `);
 
   return detalleReq.recordset || [];
+};
+
+/** Empresa dueña del envío (para permisos gestora / operaciones multi-empresa). */
+exports.obtenerIdEmpresaPorEnvioRepo = async (pool, idEnvio) => {
+  const r = await pool
+    .request()
+    .input("idEnvio", sql.UniqueIdentifier, idEnvio)
+    .query(`SELECT idEmpresa FROM Envios WHERE idEnvio = @idEnvio`);
+  return r.recordset?.[0]?.idEmpresa || null;
 };
 
 exports.obtenerEnviosVentaRepo = async (pool, idEmpresa, idVenta) => {
@@ -237,6 +323,32 @@ exports.validarChoferEmpresaRepo = async (pool, idChofer, idEmpresa) => {
   return result.recordset[0].existe > 0;
 };
 
+/** Empresa donde está registrado el chofer (catálogo propio; puede diferir de Envios.idEmpresa en gestora). */
+exports.obtenerIdEmpresaChoferActivaRepo = async (pool, idChofer) => {
+  const result = await pool
+    .request()
+    .input("idChofer", sql.UniqueIdentifier, idChofer)
+    .query(`
+      SELECT TOP 1 idEmpresa
+      FROM Choferes
+      WHERE idChofer = @idChofer AND estado = 1
+    `);
+  return result.recordset?.[0]?.idEmpresa || null;
+};
+
+/** Empresa del transportista externo activo. */
+exports.obtenerIdEmpresaTransportistaActivaRepo = async (pool, idTransportista) => {
+  const result = await pool
+    .request()
+    .input("idTransportista", sql.UniqueIdentifier, idTransportista)
+    .query(`
+      SELECT TOP 1 idEmpresa
+      FROM Transportistas
+      WHERE idTransportista = @idTransportista AND estado = 1
+    `);
+  return result.recordset?.[0]?.idEmpresa || null;
+};
+
 exports.obtenerVehiculoChoferRepo = async (pool, idChofer, idEmpresa) => {
   const result = await pool
     .request()
@@ -253,10 +365,11 @@ exports.obtenerVehiculoChoferRepo = async (pool, idChofer, idEmpresa) => {
 
 exports.crearEnvioRepo = async (pool, user, datos) => {
   const estadoInicial = datos.idEstadoEnvioInicial != null ? datos.idEstadoEnvioInicial : 1;
+  const idEmpresaInsert = datos.idEmpresaOperativa || user.empresa;
 
   const result = await pool
     .request()
-    .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresaInsert)
     .input("idSucursal", sql.UniqueIdentifier, datos.idSucursal || user.sucursal || null)
     .input("idVenta", sql.Int, datos.idVenta)
     .input("idDespacho", sql.UniqueIdentifier, datos.idDespacho || null)
@@ -303,7 +416,7 @@ exports.obtenerEnvioParaValidarRolRepo = async (pool, idEnvio, idEmpresa) => {
         COUNT(*) AS existe,
         MAX(ch.idUsuarioChofer) AS idChoferUsuario
       FROM Envios e
-      LEFT JOIN Choferes ch ON ch.idChofer = e.idChofer AND ch.idEmpresa = e.idEmpresa
+      LEFT JOIN Choferes ch ON ch.idChofer = e.idChofer AND ch.estado = 1
       WHERE e.idEnvio = @idEnvio AND e.idEmpresa = @idEmpresa
     `);
 
@@ -410,6 +523,94 @@ exports.validarEstadoEnvioRepo = async (pool, idEstadoEnvio) => {
     `);
 
   return result.recordset[0].existe > 0;
+};
+
+exports.obtenerNombreEstadoEnvioPorIdRepo = async (pool, idEstadoEnvio) => {
+  const r = await pool
+    .request()
+    .input("id", sql.Int, idEstadoEnvio)
+    .query(`SELECT TOP 1 nombre FROM EstadosEnvio WHERE idEstadoEnvio = @id`);
+  return r.recordset?.[0]?.nombre || null;
+};
+
+exports.obtenerEstadoNombreEnvioPorIdEnvioRepo = async (pool, idEnvio, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input("idEnvio", sql.UniqueIdentifier, idEnvio)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT ee.nombre AS nombreEstado, e.idEstadoEnvio
+      FROM Envios e
+      INNER JOIN EstadosEnvio ee ON ee.idEstadoEnvio = e.idEstadoEnvio
+      WHERE e.idEnvio = @idEnvio AND e.idEmpresa = @idEmpresa
+    `);
+  return r.recordset?.[0] || null;
+};
+
+/**
+ * Envíos vinculados al despacho (Envios.idDespacho): actualiza estado e historial.
+ */
+exports.marcarEnviosPorDespachoAEstadoNombreRepo = async (
+  pool,
+  idDespacho,
+  idEmpresa,
+  nombreEstadoObjetivo,
+  idUsuarioUuid,
+  observacionesHistorial
+) => {
+  const idNuevoRes = await pool
+    .request()
+    .input("nombre", sql.VarChar(40), nombreEstadoObjetivo)
+    .query(`SELECT TOP 1 idEstadoEnvio AS id FROM EstadosEnvio WHERE nombre = @nombre`);
+  const idNuevo = idNuevoRes.recordset?.[0]?.id;
+  if (idNuevo == null) {
+    console.error("marcarEnviosPorDespachoAEstadoNombreRepo: estado no en catálogo:", nombreEstadoObjetivo);
+    return { ok: false };
+  }
+
+  const lista = await pool
+    .request()
+    .input("idDespacho", sql.UniqueIdentifier, idDespacho)
+    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idEnvio, idEstadoEnvio
+      FROM Envios
+      WHERE idEmpresa = @idEmpresa AND idDespacho = @idDespacho
+    `);
+
+  const rows = lista.recordset || [];
+  if (!rows.length) return { ok: true, actualizados: 0 };
+
+  const transaction = pool.transaction();
+  await transaction.begin();
+  try {
+    for (const row of rows) {
+      if (row.idEstadoEnvio === idNuevo) continue;
+      const rq = transaction.request();
+      rq.input("idEnvio", sql.UniqueIdentifier, row.idEnvio);
+      rq.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+      rq.input("idEstadoNuevo", sql.Int, idNuevo);
+      rq.input("idEstadoAnterior", sql.Int, row.idEstadoEnvio);
+      rq.input("idUsuarioCambio", sql.UniqueIdentifier, idUsuarioUuid);
+      rq.input("obs", sql.NVarChar(500), observacionesHistorial || null);
+      await rq.query(`
+        UPDATE Envios SET idEstadoEnvio = @idEstadoNuevo WHERE idEnvio = @idEnvio AND idEmpresa = @idEmpresa
+      `);
+      await rq.query(`
+        INSERT INTO HistorialEstadosEnvio (
+          idEnvio, idEstadoAnterior, idEstadoNuevo, idUsuarioCambio, fechaCambio, observaciones
+        ) VALUES (
+          @idEnvio, @idEstadoAnterior, @idEstadoNuevo, @idUsuarioCambio, GETDATE(), @obs
+        )
+      `);
+    }
+    await transaction.commit();
+    return { ok: true, actualizados: rows.length };
+  } catch (err) {
+    await transaction.rollback();
+    console.error("marcarEnviosPorDespachoAEstadoNombreRepo:", err);
+    throw err;
+  }
 };
 
 exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
@@ -540,10 +741,9 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
   }
 };
 
-exports.obtenerEnviosPorChoferRepo = async (pool, idEmpresa, idChoferUsuario) => {
+exports.obtenerEnviosPorChoferRepo = async (pool, _idEmpresaLegacy, idChoferUsuario) => {
   const result = await pool
     .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("idChoferUsuario", sql.UniqueIdentifier, idChoferUsuario)
     .query(`
       SELECT
@@ -562,14 +762,13 @@ exports.obtenerEnviosPorChoferRepo = async (pool, idEmpresa, idChoferUsuario) =>
         vh.placa AS placaVehiculo
       FROM Envios e
       INNER JOIN Ventas v ON e.idVenta = v.idVenta AND v.idEmpresa = e.idEmpresa
-      INNER JOIN Clientes c ON v.idCliente = c.idCliente AND c.idEmpresa = e.idEmpresa
+      INNER JOIN Clientes c ON v.idCliente = c.idCliente AND c.idEmpresa = v.idEmpresa
       INNER JOIN TiposEnvio te ON e.idTipoEnvio = te.idTipoEnvio
       INNER JOIN EstadosEnvio ee ON e.idEstadoEnvio = ee.idEstadoEnvio
-      INNER JOIN Choferes ch ON e.idChofer = ch.idChofer AND ch.idEmpresa = e.idEmpresa
-      INNER JOIN UsuarioWeb u ON ch.idUsuarioChofer = u.idUsuario AND u.idEmpresa = e.idEmpresa
-      LEFT JOIN Vehiculos vh ON e.idVehiculoEntrega = vh.idVehiculo AND vh.idEmpresa = e.idEmpresa
-      WHERE e.idEmpresa = @idEmpresa
-        AND u.idUsuario = @idChoferUsuario
+      INNER JOIN Choferes ch ON e.idChofer = ch.idChofer AND ch.estado = 1
+      INNER JOIN UsuarioWeb u ON ch.idUsuarioChofer = u.idUsuario AND u.idEmpresa = ch.idEmpresa
+      LEFT JOIN Vehiculos vh ON e.idVehiculoEntrega = vh.idVehiculo AND vh.idEmpresa = ch.idEmpresa
+      WHERE u.idUsuario = @idChoferUsuario
       ORDER BY e.fechaSolicitud DESC
     `);
 
@@ -606,13 +805,46 @@ exports.obtenerTransportistasRepo = async (pool, idEmpresa) => {
         vehiculo,
         placa,
         estado,
-        fRegistro
+        fRegistro,
+        idEmpresa
       FROM Transportistas
       WHERE idEmpresa = @idEmpresa AND estado = 1
       ORDER BY nombres, apellidos
     `);
 
   return result.recordset;
+};
+
+/** Transportistas activos de varias empresas (gestora + gestionadas). */
+exports.obtenerTransportistasMultiEmpresaRepo = async (pool, idsEmpresa) => {
+  const list = [...new Set((idsEmpresa || []).filter(Boolean))];
+  if (list.length === 0) return [];
+  const request = pool.request();
+  list.forEach((id, i) => {
+    request.input(`tm${i}`, sql.UniqueIdentifier, id);
+  });
+  const inClause = list.map((_, i) => `@tm${i}`).join(", ");
+  const result = await request.query(`
+      SELECT
+        t.idTransportista,
+        t.nombres,
+        t.apellidos,
+        t.documento,
+        t.licencia,
+        t.celular,
+        t.email,
+        t.vehiculo,
+        t.placa,
+        t.estado,
+        t.fRegistro,
+        t.idEmpresa,
+        em.razon_Social AS razonSocialEmpresa
+      FROM Transportistas t
+      INNER JOIN Empresas em ON em.idEmpresa = t.idEmpresa
+      WHERE t.idEmpresa IN (${inClause}) AND t.estado = 1
+      ORDER BY em.razon_Social, t.nombres, t.apellidos
+    `);
+  return result.recordset || [];
 };
 
 exports.crearTransportistaRepo = async (pool, idEmpresa, datos) => {

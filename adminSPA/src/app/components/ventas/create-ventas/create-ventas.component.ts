@@ -24,7 +24,11 @@ import { ModalService } from '../../../services/modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { marcaProductoEnLista, productoActivoParaVenta, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
-import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
+import {
+  CotizacionesService,
+  CotizacionListado,
+  CotizacionParaVentaResponse
+} from '../../../services/cotizaciones.service';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { RubrosService } from '../../../services/rubros.service';
@@ -407,8 +411,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this._productoService.limpiarCacheListaProductos();
     this.cargarDatos();
     this.cargarConfigDefaultsVenta();
+    const duplicarDesdeCot = this.route.snapshot.queryParamMap.get('duplicarDesdeCotizacion');
     const duplicarDesde = this.route.snapshot.queryParamMap.get('duplicarDesdeVenta');
-    if (duplicarDesde) {
+    if (duplicarDesdeCot) {
+      this.procesarDuplicarDesdeCotizacionSiCorresponde(duplicarDesdeCot);
+    } else if (duplicarDesde) {
       this.procesarDuplicarDesdeVentaSiCorresponde(duplicarDesde);
     } else if (this.hotelPreloadVentaService.hasPreload()) {
       this.aplicarPreloadDesdeHabitacion();
@@ -466,6 +473,139 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Quitar query `duplicarDesdeVenta` de la URL tras procesar. */
   private limpiarQueryDuplicarDesdeVenta(): void {
     this.router.navigate(['/ventas/create'], { replaceUrl: true });
+  }
+
+  private limpiarQueryDuplicarDesdeCotizacion(): void {
+    this.router.navigate(['/ventas/create'], { replaceUrl: true });
+  }
+
+  /**
+   * Desde historial de cotizaciones: mismo detalle que "Cargar cotización", en carrito limpio (nueva venta).
+   */
+  private procesarDuplicarDesdeCotizacionSiCorresponde(raw: string): void {
+    const idCotizacion = parseInt(String(raw).trim(), 10);
+    if (Number.isNaN(idCotizacion) || idCotizacion < 1) {
+      this.limpiarQueryDuplicarDesdeCotizacion();
+      return;
+    }
+    this.cotizacionesService.obtenerParaVenta(idCotizacion).subscribe({
+      next: (res) => {
+        const data = res.data;
+        if (!this.validarCotizacionParaCarrito(data)) {
+          this.limpiarQueryDuplicarDesdeCotizacion();
+          return;
+        }
+        this.limpiarVenta();
+        this.rellenarCarritoDesdeCotizacionData(data, false);
+        this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+          next: (pr: any) => {
+            if (pr?.data) {
+              this.productos = pr.data;
+              this.productos_const = pr.data;
+              this.stockSucursales_const = pr.data;
+              this.buscarProductos();
+            }
+            this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
+            this.actualizaTotales();
+            this.guardarEstadoProvisional();
+            if (typeof iziToast !== 'undefined') {
+              iziToast.success({
+                title: 'Duplicado',
+                message: 'Carrito cargado desde la cotización. Elija tipo de comprobante y forma de pago.',
+                position: 'topRight'
+              });
+            }
+            this.limpiarQueryDuplicarDesdeCotizacion();
+          },
+          error: () => {
+            this.actualizaTotales();
+            this.guardarEstadoProvisional();
+            this.limpiarQueryDuplicarDesdeCotizacion();
+          }
+        });
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Duplicar',
+            message: 'No se pudo cargar la cotización.',
+            position: 'topRight'
+          });
+        }
+        this.limpiarQueryDuplicarDesdeCotizacion();
+      }
+    });
+  }
+
+  private validarCotizacionParaCarrito(data: CotizacionParaVentaResponse | null | undefined): boolean {
+    if (!data?.cabecera || !data?.detalles?.length) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Aviso', message: 'Cotización sin detalle válido.', position: 'topRight' });
+      }
+      return false;
+    }
+    const conProducto = data.detalles.filter((d) => d.idProducto != null);
+    if (conProducto.length === 0) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'Aviso',
+          message: 'No se encontraron productos por código en esta cotización.',
+          position: 'topRight'
+        });
+      }
+      return false;
+    }
+    return true;
+  }
+
+  /** Asume `validarCotizacionParaCarrito` ya pasó. */
+  private rellenarCarritoDesdeCotizacionData(data: CotizacionParaVentaResponse, cerrarModal: boolean): void {
+    const lineas = data.detalles.filter((d: { idProducto: string | null }) => d.idProducto != null) as Array<{
+      idProducto: string;
+      idEmpresaProducto?: string | null;
+      aliasEmpresa?: string;
+      codigo: string;
+      descripcion: string;
+      codigoPresentacion: string;
+      idPresentacion: number;
+      cantidad: number;
+      pVenta: number;
+      idSucursal?: string;
+      nombreSucursal?: string;
+    }>;
+    this.carrito = lineas.map((d) => ({
+      idProducto: d.idProducto,
+      idEmpresa: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : undefined,
+      codigo: d.codigo,
+      descripcion: d.descripcion,
+      descripcionOriginal: (d.descripcion ?? '').toString().trim(),
+      permiteDescripcionEnVenta: false,
+      codigoPresentacion: d.codigoPresentacion ?? '',
+      cantidad: Number(d.cantidad) || 0,
+      pVenta: Number(d.pVenta) || 0,
+      idSucursal: d.idSucursal,
+      sucursal: (d.nombreSucursal ?? '').trim() || undefined,
+      aliasEmpresa: (d.aliasEmpresa ?? '').trim() || undefined
+    }));
+    const primeraSucursal = lineas[0]?.idSucursal;
+    if (primeraSucursal) {
+      this.ventas.idSucursal = primeraSucursal;
+    }
+    const cab = data.cabecera;
+    if (cab.idCliente != null) {
+      this.cliente.idCliente = cab.idCliente;
+      this.cliente.rSocial = cab.clienteRazonSocial ?? '';
+      this.cliente.ruc = cab.clienteRuc ?? '';
+    }
+    this.actualizaTotales();
+    const modalEl = document.getElementById('modalCotizacion');
+    if (modalEl && cerrarModal) {
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      modal?.hide();
+    }
+    if (cerrarModal && typeof iziToast !== 'undefined') {
+      iziToast.success({ title: 'Éxito', message: 'Cotización cargada en la venta.' });
+    }
   }
 
   /**
@@ -2099,7 +2239,8 @@ abrirModalPrecios(item: any) {
       iziToast.warning({ title: 'Advertencia', message: 'No se pudo determinar la sucursal. Abra una caja o configure sucursales.' });
       return;
     }
-    if (!this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal)) {
+    /** Cotización (CT) no usa caja ni movimientos; no exigir caja abierta (evita falso error en gestora con sucursal de empresa hija). */
+    if (!this.esCotizacion() && !this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal)) {
       iziToast.warning({
         title: 'Caja requerida',
         message: 'No hay una caja abierta para la sucursal seleccionada. Abra caja para continuar.'
@@ -2945,56 +3086,10 @@ abrirModalPrecios(item: any) {
     this.cotizacionesService.obtenerParaVenta(idCotizacion).subscribe({
       next: (res) => {
         const data = res.data;
-        if (!data?.cabecera || !data?.detalles?.length) {
-          iziToast.warning({ title: 'Aviso', message: 'Cotización sin detalle válido.' });
+        if (!data || !this.validarCotizacionParaCarrito(data)) {
           return;
         }
-        const lineas = data.detalles.filter((d: { idProducto: string | null }) => d.idProducto != null) as Array<{
-          idProducto: string;
-          idEmpresaProducto?: string | null;
-          aliasEmpresa?: string;
-          codigo: string;
-          descripcion: string;
-          codigoPresentacion: string;
-          idPresentacion: number;
-          cantidad: number;
-          pVenta: number;
-          idSucursal?: string;
-          nombreSucursal?: string;
-        }>;
-        if (lineas.length === 0) {
-          iziToast.warning({ title: 'Aviso', message: 'No se encontraron productos por código en esta cotización.' });
-          return;
-        }
-        this.carrito = lineas.map((d) => ({
-          idProducto: d.idProducto,
-          idEmpresa: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : undefined,
-          codigo: d.codigo,
-          descripcion: d.descripcion,
-          codigoPresentacion: d.codigoPresentacion ?? '',
-          cantidad: Number(d.cantidad) || 0,
-          pVenta: Number(d.pVenta) || 0,
-          idSucursal: d.idSucursal,
-          sucursal: (d.nombreSucursal ?? '').trim() || undefined,
-          aliasEmpresa: (d.aliasEmpresa ?? '').trim() || undefined
-        }));
-        const primeraSucursal = lineas[0]?.idSucursal;
-        if (primeraSucursal) {
-          this.ventas.idSucursal = primeraSucursal;
-        }
-        const cab = data.cabecera;
-        if (cab.idCliente != null) {
-          this.cliente.idCliente = cab.idCliente;
-          this.cliente.rSocial = cab.clienteRazonSocial ?? '';
-          this.cliente.ruc = cab.clienteRuc ?? '';
-        }
-        this.actualizaTotales();
-        const modalEl = document.getElementById('modalCotizacion');
-        if (modalEl) {
-          const modal = bootstrap.Modal.getInstance(modalEl);
-          modal?.hide();
-        }
-        iziToast.success({ title: 'Éxito', message: 'Cotización cargada en la venta.' });
+        this.rellenarCarritoDesdeCotizacionData(data, true);
       },
       error: (err) => {
         iziToast.error({ title: 'Error', message: err?.error?.error || err?.error?.message || 'Error al cargar la cotización.' });

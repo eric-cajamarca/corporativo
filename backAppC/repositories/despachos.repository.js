@@ -78,7 +78,9 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
       throw new Error("No se pudo determinar la sucursal. Configure al menos una sucursal para la empresa.");
     }
 
-    // Crear el despacho con estado Entregado (COMPLETADO)
+    const mercaderiaPendienteDeCarga = datos.mercaderiaPendienteDeCarga === true;
+    const estadoCabecera = mercaderiaPendienteDeCarga ? "PENDIENTE" : "COMPLETADO";
+
     const reqDespacho = transaction.request();
     const despachoResult = await reqDespacho
       .input("idEmpresa", sql.UniqueIdentifier, idEmpresaOperativa)
@@ -87,6 +89,7 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
       .input("idTipoDespacho", sql.Int, datos.idTipoDespacho)
       .input("idUsuarioDespacho", sql.UniqueIdentifier, user.sub)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
+      .input("estadoCabecera", sql.VarChar(20), estadoCabecera)
       .query(`
         INSERT INTO Despachos (
           idEmpresa, idSucursal, idVenta, idTipoDespacho,
@@ -95,14 +98,22 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
         OUTPUT INSERTED.idDespacho
         VALUES (
           @idEmpresa, @idSucursal, @idVenta, @idTipoDespacho,
-          @idUsuarioDespacho, @observaciones, GETDATE(), 'COMPLETADO'
+          @idUsuarioDespacho, @observaciones, GETDATE(), @estadoCabecera
         )
       `);
 
     const idDespacho = despachoResult.recordset[0].idDespacho;
 
     // Crear detalles: si vienen detalles con cant. por línea, usarlos; si no, crear con todo el pendiente
-    await crearDetallesDespacho(transaction, idDespacho, idEmpresaOperativa, datos.idVenta, datos.idTipoDespacho, datos.detalles);
+    await crearDetallesDespacho(
+      transaction,
+      idDespacho,
+      idEmpresaOperativa,
+      datos.idVenta,
+      datos.idTipoDespacho,
+      datos.detalles,
+      mercaderiaPendienteDeCarga
+    );
 
     // Sincronizar DetalleVenta (cantEntregada, idEstadoPedido) y Ventas.idEstadoPedido
     await sincronizarDetalleVentaYVentaTrasDespacho(transaction, idDespacho, datos.idVenta);
@@ -119,7 +130,15 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
 // Si detallesUsuario está definido (array de { idDetalle, idProducto, cantidadADespachar }), se usan esas cantidades (solo líneas con cantidadADespachar > 0).
 // Si no, se crean líneas con todo el pendiente de la venta.
 // Se usa transaction.request() nuevo en cada consulta para no reutilizar parámetros (evitar EDUPEPARAM).
-async function crearDetallesDespacho(transaction, idDespacho, idEmpresa, idVenta, idTipoDespacho, detallesUsuario) {
+async function crearDetallesDespacho(
+  transaction,
+  idDespacho,
+  idEmpresa,
+  idVenta,
+  idTipoDespacho,
+  detallesUsuario,
+  mercaderiaPendienteDeCarga = false
+) {
   const tipoReq = transaction.request();
   const tipoResult = await tipoReq
     .input("idTipoDespacho", sql.Int, idTipoDespacho)
@@ -130,7 +149,7 @@ async function crearDetallesDespacho(transaction, idDespacho, idEmpresa, idVenta
     for (const d of detallesUsuario) {
       const cantidadADespachar = Number(d.cantidadADespachar) || 0;
       if (cantidadADespachar <= 0) continue;
-      const cantidadDespachadaInicial = requiereCantidad ? 0 : cantidadADespachar;
+      const cantidadDespachadaInicial = mercaderiaPendienteDeCarga ? 0 : requiereCantidad ? 0 : cantidadADespachar;
       const estado = cantidadDespachadaInicial >= cantidadADespachar ? "DESPACHADO" : "PENDIENTE";
       const req = transaction.request();
       await req
@@ -162,7 +181,7 @@ async function crearDetallesDespacho(transaction, idDespacho, idEmpresa, idVenta
 
   for (const row of detalleResult.recordset) {
     const cantPendiente = Number(row.cantPendiente) || 0;
-    const cantidadDespachadaInicial = requiereCantidad ? 0 : cantPendiente;
+    const cantidadDespachadaInicial = mercaderiaPendienteDeCarga ? 0 : requiereCantidad ? 0 : cantPendiente;
     const estado = cantidadDespachadaInicial >= cantPendiente ? "DESPACHADO" : "PENDIENTE";
     const req = transaction.request();
     await req
@@ -236,7 +255,9 @@ exports.actualizarCantidadDespachadaRepo = async (pool, user, datos) => {
   const detalleRow = await req
     .input("idDetalleDespacho", sql.UniqueIdentifier, datos.idDetalleDespacho)
     .query(`
-      SELECT cantidadSolicitada, idDetalleVenta FROM DetalleDespachos WHERE idDetalleDespacho = @idDetalleDespacho
+      SELECT dd.cantidadSolicitada, dd.idDetalleVenta, dd.idDespacho
+      FROM DetalleDespachos dd
+      WHERE dd.idDetalleDespacho = @idDetalleDespacho
     `);
   const row = detalleRow.recordset[0];
   if (!row) throw new Error("DETALLE_NO_ENCONTRADO");
@@ -259,7 +280,33 @@ exports.actualizarCantidadDespachadaRepo = async (pool, user, datos) => {
     `);
 
   await sincronizarCantEntregadaDetalleVenta(pool, row.idDetalleVenta);
-  return { idDetalleDespacho: datos.idDetalleDespacho, estado, cantidadDespachada: datos.cantidadDespachada };
+
+  const idDespacho = row.idDespacho;
+  if (idDespacho) {
+    const reqEst = pool.request().input("idDespacho", sql.UniqueIdentifier, idDespacho);
+    await reqEst.query(`
+      UPDATE Despachos
+      SET estado = CASE
+        WHEN NOT EXISTS (
+          SELECT 1 FROM DetalleDespachos x
+          WHERE x.idDespacho = @idDespacho AND x.estado <> N'DESPACHADO'
+        ) THEN N'COMPLETADO'
+        WHEN EXISTS (
+          SELECT 1 FROM DetalleDespachos x
+          WHERE x.idDespacho = @idDespacho AND x.estado = N'DESPACHADO'
+        ) THEN N'EN_PROCESO'
+        ELSE N'PENDIENTE'
+      END
+      WHERE idDespacho = @idDespacho
+    `);
+  }
+
+  return {
+    idDetalleDespacho: datos.idDetalleDespacho,
+    estado,
+    cantidadDespachada: datos.cantidadDespachada,
+    idDespacho
+  };
 };
 
 function sincronizarCantEntregadaDetalleVenta(pool, idDetalleVenta) {
@@ -432,21 +479,45 @@ exports.obtenerDetalleVentaParaDespachoRepo = async (pool, idEmpresa, idVenta) =
 /** Buscar venta por compVenta (número comprobante) o idVenta. Devuelve venta + lista de despachos + indicador entregado mismo día.
  *  Sin la columna Ventas.idEstadoPedido (migración add_idEstadoPedido_ventas.sql) entregadoMismoDia será siempre false.
  */
+/** Escapa % _ [ ] para usar el literal dentro de un patrón LIKE (SQL Server). */
+function escapeSqlLikeLiteral(s) {
+  return String(s)
+    .replace(/\[/g, "[[]")
+    .replace(/]/g, "[]]")
+    .replace(/%/g, "[%]")
+    .replace(/_/g, "[_]");
+}
+
 exports.buscarVentaDespachosRepo = async (pool, idEmpresa, filtros) => {
-  const { compVenta, idVenta } = filtros;
-  if (!compVenta && !idVenta) return null;
+  const compVentaRaw = filtros.compVenta ? String(filtros.compVenta).trim() : "";
+  const idVentaRaw =
+    filtros.idVenta != null && filtros.idVenta !== "" ? String(filtros.idVenta).trim() : "";
+
+  if (!compVentaRaw && !idVentaRaw) return null;
 
   const req = pool.request();
   req.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
   let whereVenta = "v.idEmpresa = @idEmpresa";
-  if (compVenta) {
-    req.input("compVenta", sql.VarChar(13), String(compVenta).trim());
-    whereVenta += " AND v.compVenta = @compVenta";
+  const orParts = [];
+
+  if (compVentaRaw) {
+    const soloDigitos = /^\d+$/.test(compVentaRaw);
+    const esc = escapeSqlLikeLiteral(compVentaRaw);
+    const patronLike = soloDigitos ? `%${esc}` : `%${esc}%`;
+    req.input("compLike", sql.NVarChar(32), patronLike);
+    orParts.push("v.compVenta LIKE @compLike");
   }
-  if (idVenta != null && idVenta !== '') {
-    req.input("idVenta", sql.Int, parseInt(idVenta, 10));
-    whereVenta += " AND v.idVenta = @idVenta";
+
+  if (idVentaRaw) {
+    const idNum = parseInt(idVentaRaw, 10);
+    if (!Number.isNaN(idNum)) {
+      req.input("idVenta", sql.Int, idNum);
+      orParts.push("v.idVenta = @idVenta");
+    }
   }
+
+  if (!orParts.length) return null;
+  whereVenta += ` AND (${orParts.join(" OR ")})`;
 
   const ventaResult = await req.query(`
     SELECT TOP 1
@@ -467,6 +538,7 @@ exports.buscarVentaDespachosRepo = async (pool, idEmpresa, filtros) => {
     LEFT JOIN EstadoPago ep ON ep.idEstadoPago = v.idEstadoPago
     LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
     WHERE ${whereVenta}
+    ORDER BY v.fEmision DESC, v.idVenta DESC
   `);
   let venta = ventaResult.recordset && ventaResult.recordset[0];
   if (!venta) return null;

@@ -5,7 +5,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { EnviosService } from '../../../services/envios.service';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -174,11 +174,21 @@ export class IndexDespachosComponent implements OnInit {
   modoEntregaPanel: 'RECOJO' | 'DELIVERY' = 'RECOJO';
   tipoDeliveryPanel: 'INTERNO' | 'EXTERNO' = 'INTERNO';
   choferesInternos: ChoferInterno[] = [];
-  transportistasExternos: Array<{ idTransportista: string; nombres: string; apellidos: string; placa?: string; estado?: boolean }> = [];
+  transportistasExternos: Array<{
+    idTransportista: string;
+    nombres: string;
+    apellidos: string;
+    placa?: string;
+    estado?: boolean;
+    idEmpresa?: string;
+    razonSocialEmpresa?: string;
+  }> = [];
   idChoferSeleccionado: string | null = null;
   idTransportistaSeleccionado: string | null = null;
   idTipoEnvioPanel: number | null = null;
   direccionEntregaPanel = 'SIN_DIRECCION';
+  /** Solo gestora + delivery: fecha programada del envío (yyyy-MM-dd). */
+  fechaEnvioDeliveryPanel = '';
 
   // Modal: registrar chofer interno + vehículo
   modalRegistrarChoferVisible = false;
@@ -212,20 +222,66 @@ export class IndexDespachosComponent implements OnInit {
     private whatsappService: WhatsappService,
     private enviosService: EnviosService,
     private choferesService: ChoferesService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
+
+  /** Empresa dueña del despacho (comprobante hijo); obligatorio para catálogos y POST envío en modo gestora. */
+  private idEmpresaCatalogoEnvios(): string | undefined {
+    return this.idEmpresaDespachoActiva?.trim() || undefined;
+  }
+
+  private inicializarFechaEnvioGestora(): void {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    this.fechaEnvioDeliveryPanel = `${y}-${m}-${day}`;
+  }
+
+  private cargarChoferesInternosParaDespacho(): void {
+    const req$ = this.esGestora
+      ? this.choferesService.listarChoferes(undefined, { alcanceGestora: true })
+      : this.choferesService.listarChoferes(this.idEmpresaCatalogoEnvios());
+    req$.subscribe({
+      next: (res: any) => {
+        this.choferesInternos = (res?.data || []) as ChoferInterno[];
+        if (this.choferesInternos.length > 0) {
+          this.tipoDeliveryPanel = 'INTERNO';
+          this.idChoferSeleccionado = this.choferesInternos[0].idChofer;
+        }
+      },
+      error: () => {
+        this.choferesInternos = [];
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (res) => {
         this.esGestora = !!res?.data?.esGestora;
         this.mostrarBusquedaSimple = !this.esGestora;
+        this.intentarBusquedaDesdeQueryParams();
       },
       error: () => {
         this.esGestora = false;
         this.mostrarBusquedaSimple = true;
+        this.intentarBusquedaDesdeQueryParams();
       }
     });
+  }
+
+  /** Desde envíos u otro módulo: /despachos?compVenta=NV01-00000023 */
+  private intentarBusquedaDesdeQueryParams(): void {
+    const qp = this.route.snapshot.queryParamMap;
+    const comp = (qp.get('compVenta') || qp.get('q') || '').trim();
+    if (!comp) return;
+    if (this.esGestora) {
+      this.mostrarBusquedaSimple = true;
+    }
+    this.criterioBusqueda = comp;
+    queueMicrotask(() => this.buscar());
   }
 
   buscarVentaAgrupada(): void {
@@ -346,8 +402,11 @@ export class IndexDespachosComponent implements OnInit {
     this.resultado = null;
     this.loading = true;
     const params: { compVenta?: string; idVenta?: string } = {};
-    const num = /^\d+$/.test(c);
-    if (num) params.idVenta = c; else params.compVenta = c;
+    params.compVenta = c;
+    // idVenta (código escaneado): solo si es numérico sin ceros a la izquierda (evita confundir "00000011" con id 11)
+    if (/^\d+$/.test(c) && !/^0+\d/.test(c)) {
+      params.idVenta = c;
+    }
 
     this.despachoService.buscarVentaDespachos(params).subscribe({
       next: (res) => {
@@ -500,6 +559,11 @@ export class IndexDespachosComponent implements OnInit {
     this.idTipoEnvioPanel = null;
     this.choferesInternos = [];
     this.transportistasExternos = [];
+    if (this.esGestora) {
+      this.inicializarFechaEnvioGestora();
+    } else {
+      this.fechaEnvioDeliveryPanel = '';
+    }
 
     this.enviosService.obtenerTiposEnvio().subscribe({
       next: (res: any) => {
@@ -513,23 +577,18 @@ export class IndexDespachosComponent implements OnInit {
     // Mantener disponibles transportistas para opción EXTERNO si el usuario cambia de modalidad.
     this.cargarTransportistasExternos();
 
-    this.choferesService.listarChoferes().subscribe({
-      next: (res: any) => {
-        this.choferesInternos = (res?.data || []) as ChoferInterno[];
-        if (this.choferesInternos.length > 0) {
-          this.tipoDeliveryPanel = 'INTERNO';
-          this.idChoferSeleccionado = this.choferesInternos[0].idChofer;
-        }
-      }
-    });
+    this.cargarChoferesInternosParaDespacho();
 
     this.modalCrearDespachoAbierto.set(true);
   }
 
   private cargarTransportistasExternos(): void {
-    this.enviosService.obtenerTransportistas().subscribe({
+    const req$ = this.esGestora
+      ? this.enviosService.obtenerTransportistas()
+      : this.enviosService.obtenerTransportistas(this.idEmpresaCatalogoEnvios());
+    req$.subscribe({
       next: (res: any) => {
-        this.transportistasExternos = (res?.data || []) as Array<{ idTransportista: string; nombres: string; apellidos: string; placa?: string; estado?: boolean }>;
+        this.transportistasExternos = (res?.data || []) as typeof this.transportistasExternos;
         this.idTransportistaSeleccionado = this.transportistasExternos[0]?.idTransportista || null;
       },
       error: () => {
@@ -540,7 +599,10 @@ export class IndexDespachosComponent implements OnInit {
   }
 
   private cargarChoferesInternosParaPanel(): void {
-    this.choferesService.listarChoferes().subscribe({
+    const req$ = this.esGestora
+      ? this.choferesService.listarChoferes(undefined, { alcanceGestora: true })
+      : this.choferesService.listarChoferes(this.idEmpresaCatalogoEnvios());
+    req$.subscribe({
       next: (res: any) => {
         this.choferesInternos = (res?.data || []) as ChoferInterno[];
         if (this.choferesInternos.length > 0) {
@@ -548,7 +610,6 @@ export class IndexDespachosComponent implements OnInit {
           this.idChoferSeleccionado = this.choferesInternos[0].idChofer;
         } else {
           this.tipoDeliveryPanel = 'EXTERNO';
-          // Si no hay choferes internos, fallback a transportistas externos
           this.cargarTransportistasExternos();
         }
       },
@@ -608,6 +669,10 @@ export class IndexDespachosComponent implements OnInit {
         iziToast.warning({ title: 'Aviso', message: 'Selecciona/valida el tipo de envío.', position: 'topRight' });
         return;
       }
+      if (this.esGestora && !(this.fechaEnvioDeliveryPanel || '').trim()) {
+        iziToast.warning({ title: 'Aviso', message: 'Indique la fecha de envío.', position: 'topRight' });
+        return;
+      }
       if (this.tipoDeliveryPanel === 'INTERNO' && !this.idChoferSeleccionado) {
         iziToast.warning({ title: 'Aviso', message: 'Selecciona un chofer interno.', position: 'topRight' });
         return;
@@ -625,6 +690,7 @@ export class IndexDespachosComponent implements OnInit {
       observaciones?: string;
       idEmpresa?: string;
       detalles?: Array<{ idDetalle: number; idProducto: string; cantidadADespachar: number }>;
+      mercaderiaPendienteDeCarga?: boolean;
     } = {
       idVenta: String(r.venta.idVenta),
       idTipoDespacho: this.idTipoDespachoPanel,
@@ -633,6 +699,9 @@ export class IndexDespachosComponent implements OnInit {
     };
     if (this.idEmpresaDespachoActiva) {
       bodyCrear.idEmpresa = this.idEmpresaDespachoActiva;
+    }
+    if (this.modoEntregaPanel === 'DELIVERY') {
+      bodyCrear.mercaderiaPendienteDeCarga = true;
     }
     this.despachoService.crearDespacho(bodyCrear).subscribe({
       next: (res: any) => {
@@ -655,6 +724,13 @@ export class IndexDespachosComponent implements OnInit {
             observaciones: undefined,
             idEstadoEnvioInicial: 1
           };
+          const idEmpDespacho = bodyCrear.idEmpresa || this.idEmpresaCatalogoEnvios();
+          if (idEmpDespacho) {
+            payload.idEmpresa = idEmpDespacho;
+          }
+          if (this.esGestora && (this.fechaEnvioDeliveryPanel || '').trim()) {
+            payload.fechaProgramada = (this.fechaEnvioDeliveryPanel || '').trim();
+          }
 
           if (this.tipoDeliveryPanel === 'INTERNO') {
             payload.idChofer = this.idChoferSeleccionado;
@@ -665,6 +741,13 @@ export class IndexDespachosComponent implements OnInit {
           this.enviosService.crearEnvio(payload).subscribe({
             next: () => {
               this.refrescarVistaTrasCambio();
+              if (typeof iziToast !== 'undefined') {
+                iziToast.success({
+                  title: 'Envío registrado',
+                  message: 'El envío quedó vinculado al comprobante. La mercadería sigue pendiente de carga hasta confirmar en despacho.',
+                  position: 'topRight'
+                });
+              }
             },
             error: (err: any) => {
               iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo crear el envío', position: 'topRight' });

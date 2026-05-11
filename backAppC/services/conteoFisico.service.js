@@ -6,6 +6,8 @@ const inventarioRepository = require('../repositories/inventario.repository');
 const inventarioService = require('./inventario.service');
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
+const productosRepository = require('../repositories/productos.repository');
+const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
 
 function controlUbicacionesDesdeConfig(configRows) {
@@ -120,14 +122,62 @@ exports.previsualizarAplicacion = async (idEmpresa, idSesion) => {
   });
 };
 
+async function validarCategoriaEmpresa(pool, idEmpresa, idCategoria) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idCategoria', sql.Int, idCategoria)
+    .query(
+      'SELECT 1 AS ok FROM dbo.Categorias WHERE idEmpresa = @idEmpresa AND idCategoria = @idCategoria AND ISNULL(estado, 1) = 1'
+    );
+  if (!r.recordset || !r.recordset[0]) {
+    throw new Error('La categoría no existe o no pertenece a la empresa');
+  }
+}
+
+async function validarPresentacionExiste(pool, idPresentacion) {
+  const r = await pool
+    .request()
+    .input('idPresentacion', sql.Int, idPresentacion)
+    .query('SELECT 1 AS ok FROM dbo.Presentacion WHERE idPresentacion = @idPresentacion');
+  if (!r.recordset || !r.recordset[0]) {
+    throw new Error('La presentación no es válida');
+  }
+}
+
+async function validarMarcaEmpresa(pool, idEmpresa, idMarca) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idMarca', sql.Int, idMarca)
+    .query(
+      'SELECT 1 AS ok FROM dbo.Marcas WHERE idEmpresa = @idEmpresa AND idMarca = @idMarca AND ISNULL(estado, 1) = 1'
+    );
+  if (!r.recordset || !r.recordset[0]) {
+    throw new Error('La marca no existe o no pertenece a la empresa');
+  }
+}
+
 /**
  * Upsert línea (actualiza referencia stockSistema al guardar).
+ * Opcional: descripcion, idCategoria, idPresentacion, idMarca actualizan el maestro del producto (requiere EDITAR_PRODUCTOS o CREAR_PRODUCTOS, o Administrador).
  */
-exports.upsertLinea = async (idEmpresa, idSesion, body) => {
+exports.upsertLinea = async (user, idSesion, body) => {
+  if (!user || !user.empresa) {
+    throw new Error('NO_ACCESS');
+  }
+  const idEmpresa = user.empresa;
   const { idProducto, stockReal, verificado, notas } = body || {};
   if (!idProducto) {
     throw new Error('idProducto es obligatorio');
   }
+
+  const tieneDescripcion = body && Object.prototype.hasOwnProperty.call(body, 'descripcion');
+  const tieneCategoria = body && Object.prototype.hasOwnProperty.call(body, 'idCategoria');
+  const tienePresentacion = body && Object.prototype.hasOwnProperty.call(body, 'idPresentacion');
+  const tieneMarca = body && Object.prototype.hasOwnProperty.call(body, 'idMarca');
+  const quiereMaestro = tieneDescripcion || tieneCategoria || tienePresentacion || tieneMarca;
+
   return withPool(async (pool) => {
     const sesion = await conteoFisicoRepository.obtenerSesionPorId(pool, idEmpresa, idSesion);
     if (!sesion) {
@@ -136,6 +186,11 @@ exports.upsertLinea = async (idEmpresa, idSesion, body) => {
     if (sesion.estado !== 'BORRADOR') {
       throw new Error('La sesión está cerrada; no se pueden editar líneas');
     }
+
+    if (quiereMaestro && user.rol !== 'Administrador') {
+      await assertAlgunoPermiso(pool, user, 'EDITAR_PRODUCTOS', 'CREAR_PRODUCTOS');
+    }
+
     const stockSistema = await inventarioRepository.obtenerStockAgregadoProductoSucursal(
       pool,
       idEmpresa,
@@ -145,6 +200,48 @@ exports.upsertLinea = async (idEmpresa, idSesion, body) => {
     const transaction = new sql.Transaction(pool);
     try {
       await transaction.begin();
+
+      if (quiereMaestro) {
+        const prod = await productosRepository.obtenerProductoPorIdRepo(transaction, idProducto, idEmpresa);
+        if (!prod) {
+          throw new Error('Producto no encontrado');
+        }
+        const nuevaDesc = tieneDescripcion ? String(body.descripcion ?? '').trim() : String(prod.descripcion || '').trim();
+        const nuevaCat = tieneCategoria ? Number(body.idCategoria) : Number(prod.idCategoria);
+        const nuevaPres = tienePresentacion ? Number(body.idPresentacion) : Number(prod.idPresentacion);
+        const nuevaMar = tieneMarca ? Number(body.idMarca) : Number(prod.idMarca);
+        if (!nuevaDesc) {
+          throw new Error('La descripción no puede quedar vacía');
+        }
+        if (!Number.isInteger(nuevaCat) || nuevaCat < 1) {
+          throw new Error('idCategoria inválido');
+        }
+        if (!Number.isInteger(nuevaPres) || nuevaPres < 1) {
+          throw new Error('idPresentacion inválido');
+        }
+        if (!Number.isInteger(nuevaMar) || nuevaMar < 1) {
+          throw new Error('idMarca inválido');
+        }
+        await validarCategoriaEmpresa(transaction, idEmpresa, nuevaCat);
+        await validarPresentacionExiste(transaction, nuevaPres);
+        await validarMarcaEmpresa(transaction, idEmpresa, nuevaMar);
+        const cambia =
+          nuevaDesc !== String(prod.descripcion || '').trim() ||
+          nuevaCat !== Number(prod.idCategoria) ||
+          nuevaPres !== Number(prod.idPresentacion) ||
+          nuevaMar !== Number(prod.idMarca);
+        if (cambia) {
+          await productosRepository.actualizarMaestroConteoFisico(transaction, {
+            idEmpresa,
+            idProducto,
+            descripcion: nuevaDesc,
+            idCategoria: nuevaCat,
+            idPresentacion: nuevaPres,
+            idMarca: nuevaMar
+          });
+        }
+      }
+
       await conteoFisicoRepository.upsertLinea(transaction, {
         idSesion,
         idProducto,

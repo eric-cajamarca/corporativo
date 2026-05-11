@@ -6,6 +6,10 @@ const factilizaRepository = require('../repositories/factiliza.repository');
 const facturacionRepo = require('../repositories/facturacion.repository');
 const cifradoClaveCertificado = require('../utils/cifradoClaveCertificado.util');
 const { normalizeData } = require('../helpers/normalizeXmlComprobante');
+const {
+  normalizarPlacaParaApi,
+  extraerVehiculoNormalizado
+} = require('../utils/factilizaVehiculo.util');
 
 /**
  * Completa RUC/usuario/clave SOL desde Configuración facturación si faltan en body o EmpresaFactiliza.
@@ -207,38 +211,64 @@ const getTipoCambio = async function (req, res) {
 const getPlaca = async function (req, res){
   try {
     if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_PLACA))) return;
-    const { placa } = req.params;
-    const response = await fetch(`https://api.factiliza.com/v1/placa/info/${placa}`, {
-      headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
-    });
+    const placaNorm = normalizarPlacaParaApi(req.params.placa || '');
+    if (!placaNorm || placaNorm.length < 5) {
+      return res.status(400).json({ message: 'Placa inválida (mínimo 5 caracteres alfanuméricos).', data: null });
+    }
+    const response = await fetch(
+      `https://api.factiliza.com/v1/placa/info/${encodeURIComponent(placaNorm)}`,
+      {
+        headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
+      }
+    );
 
     const dataRes = await response.json();
-    const data = dataRes.data??{}; 
 
-     if (!response.ok || dataRes.status === 404) {   // 404 de Factiliza
-        return res.status(404).json({
-          status: 404,
-          message: dataRes.message || 'No hay Datos',
-          data: null
-        });
-      }
-    // if (!response.ok) throw new Error(response.status);
-    //  const dataRes = await response.json();
-    // const data = dataRes.data??{}; 
-    res.status(200).send({ message: 'Consulta exitosa', data });
+    if (!response.ok || dataRes.status === 404) {
+      return res.status(404).json({
+        status: 404,
+        message: dataRes.message || 'No hay datos de vehículo para esta placa',
+        data: null
+      });
+    }
+
+    const vehiculo = extraerVehiculoNormalizado(dataRes, placaNorm);
+    if (!vehiculo) {
+      console.error(
+        'getPlaca: HTTP OK pero sin payload de vehículo mapeable. Claves en data:',
+        dataRes && dataRes.data != null && typeof dataRes.data === 'object'
+          ? Object.keys(dataRes.data).slice(0, 40).join(',')
+          : String(typeof dataRes?.data)
+      );
+      return res.status(404).json({
+        status: 404,
+        message:
+          dataRes.message ||
+          'La consulta de placa no devolvió datos del vehículo reconocibles. Revise la placa o el servicio Factiliza PLACA.',
+        data: null
+      });
+    }
+
+    res.status(200).send({ message: 'Consulta exitosa', data: vehiculo });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ message: 'Error al consultar el RUC'});
+    console.error('getPlaca:', e);
+    res.status(500).json({ message: 'Error al consultar placa' });
   }
 };
 
 const getSoat = async function (req, res){
   try {
     if (!(await gateFactilizaPlan(req, res, NOMBRE_SERVICIO_SOAT))) return;
-    const { placa } = req.params;
-    const response = await fetch(`https://api.factiliza.com/v1/placa/soat/${placa}`, {
-      headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
-    });
+    const placaNorm = normalizarPlacaParaApi(req.params.placa || '');
+    if (!placaNorm || placaNorm.length < 5) {
+      return res.status(400).json({ message: 'Placa inválida', data: null });
+    }
+    const response = await fetch(
+      `https://api.factiliza.com/v1/placa/soat/${encodeURIComponent(placaNorm)}`,
+      {
+        headers: { Authorization: `Bearer ${process.env.FACTILIZA_TOKEN}` }
+      }
+    );
 
     const dataRes = await response.json();
     const data = dataRes.data??{}; 

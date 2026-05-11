@@ -351,8 +351,8 @@ exports.createAdministrador = async (pool, datos, usuarioAutenticado) => {
         .query(`
           SELECT TOP 1 idSucursal 
           FROM Sucursal 
-          WHERE idEmpresa = @idEmpresa AND estado = 1 
-          ORDER BY fRegistro ASC
+          WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1 
+          ORDER BY CASE WHEN ISNULL(esPrincipal, 0) = 1 THEN 0 ELSE 1 END, fRegistro ASC
         `);
       
       if (sucursalResult.recordset.length > 0) {

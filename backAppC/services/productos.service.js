@@ -33,7 +33,9 @@ exports.obtenerProductosTodosService = async (pool, user) => {
   } else {
     idsEmpresa = [user.empresa];
   }
-  const idsSucFiltro = await idsSucursalesFiltroCatalogo(pool, user);
+  const rol = (user.rol || '').toString();
+  const idsSucFiltro =
+    esAdmin || rol === 'superAdmin' ? null : await idsSucursalesFiltroCatalogo(pool, user);
   const productos = await ProductosRepository.obtenerProductosTodosMultiEmpresaRepo(pool, idsEmpresa, idsSucFiltro);
   return productos;
 };
@@ -45,7 +47,11 @@ exports.obtenerProductosComprasService = async (pool, user) => {
 
   await assertAlgunoPermiso(pool, user, "VER_COMPRAS", "CREAR_COMPRAS", "EDITAR_COMPRAS", "VER_PRODUCTOS");
 
-  const idsSucFiltro = await idsSucursalesFiltroCatalogo(pool, user);
+  const rol = (user.rol || '').toString();
+  const idsSucFiltro =
+    rol === 'Administrador' || rol === 'superAdmin'
+      ? null
+      : await idsSucursalesFiltroCatalogo(pool, user);
   const productos = await ProductosRepository.obtenerProductosCompras(pool, user.empresa, idsSucFiltro);
   return productos;
 };

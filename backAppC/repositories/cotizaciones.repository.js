@@ -18,6 +18,35 @@ async function sucursalPerteneceAEmpresa(transaction, idEmpresa, idSucursal) {
   return !!rs.recordset?.[0]?.ok;
 }
 
+/**
+ * ctx: Transaction o ConnectionPool.
+ * Válido si el cliente pertenece a idEmpresa o a una empresa que esa idEmpresa gestiona (gestora → hija).
+ * idCliente es PK global en Clientes; no exigir cl.idEmpresa = cabecera.idEmpresa (fallaba en cotizaciones de gestora).
+ */
+exports.clientePerteneceAEmpresa = async (ctx, idEmpresa, idCliente) => {
+  const id = Number(idCliente);
+  if (!Number.isFinite(id) || id < 1) return false;
+  if (!idEmpresa) return false;
+  const rCl = await ctx
+    .request()
+    .input('idCliente', sql.Int, id)
+    .query('SELECT idEmpresa FROM Clientes WHERE idCliente = @idCliente');
+  const row = rCl.recordset && rCl.recordset[0];
+  if (!row || !row.idEmpresa) return false;
+  const empCli = row.idEmpresa;
+  if (String(empCli).toLowerCase() === String(idEmpresa).toLowerCase()) return true;
+  const rGe = await ctx
+    .request()
+    .input('idOrigen', sql.UniqueIdentifier, idEmpresa)
+    .input('idDestino', sql.UniqueIdentifier, empCli)
+    .query(`
+      SELECT 1 AS ok
+      FROM Gestores_Empresas
+      WHERE idEmpresaOrigen = @idOrigen AND idEmpresaDestino = @idDestino AND estado = 1
+    `);
+  return !!(rGe.recordset && rGe.recordset[0] && rGe.recordset[0].ok);
+};
+
 /** Sucursal de la empresa con más stock en Lotes para el producto; si no hay, null. */
 async function obtenerSucursalPreferenteLotes(transaction, idEmpresa, idProducto) {
   if (!idEmpresa || !idProducto) return null;
@@ -214,7 +243,7 @@ exports.listarConFiltros = async (pool, idEmpresa, filtros = {}) => {
       comp.codigo AS codigoComprobante,
       ISNULL(c.esCotizacionAgrupada, 0) AS esCotizacionAgrupada
     FROM Cotizaciones c
-    LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente AND cl.idEmpresa = c.idEmpresa
+    LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente
     LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
     ${where}
     ORDER BY c.idCotizacion DESC
@@ -234,7 +263,7 @@ exports.obtenerPorId = async (pool, idCotizacion, idEmpresa) => {
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
-      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente AND cl.idEmpresa = c.idEmpresa
+      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente
       LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
       WHERE c.idCotizacion = @idCotizacion AND c.idEmpresa = @idEmpresa
     `);
@@ -268,7 +297,7 @@ exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
-      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente AND cl.idEmpresa = c.idEmpresa
+      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente
       LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
       WHERE c.idCotizacion = @idCotizacion AND c.idEmpresa = @idEmpresa
     `);
@@ -403,13 +432,14 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
         c.fEmision,
         c.total,
         c.idCliente,
+        cl.idEmpresa AS clienteIdEmpresa,
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
         ISNULL(cl.celular, '') AS clienteCelular,
         (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
       LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
-      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente AND cl.idEmpresa = c.idEmpresa
+      LEFT JOIN Clientes cl ON cl.idCliente = c.idCliente
       WHERE c.idCotizacion = @idCotizacion AND c.idEmpresa = @idEmpresa
     `);
 
@@ -430,18 +460,29 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
   const items = await pool.request()
     .input('idCotizacion', sql.Int, idCotizacion)
     .query(`
-      SELECT cantidad, pVenta, total, descripcion
-      FROM DetalleCotizacion
-      WHERE idCotizacion = @idCotizacion
+      SELECT
+        d.cantidad,
+        d.pVenta,
+        d.total,
+        d.descripcion,
+        d.codigo,
+        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca
+      FROM DetalleCotizacion d
+      LEFT JOIN Productos p ON p.idProducto = d.idProducto AND p.idEmpresa = d.idEmpresa
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
+      WHERE d.idCotizacion = @idCotizacion
+      ORDER BY d.idDetalleCotizacion
     `);
 
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
   let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '') ? String(cab.clienteDireccion).trim() : '';
-  if (!clienteDireccion && cab.idCliente != null) {
+  const idEmpresaDirCliente =
+    cab.clienteIdEmpresa != null ? cab.clienteIdEmpresa : idEmpresa;
+  if (!clienteDireccion && cab.idCliente != null && idEmpresaDirCliente != null) {
     try {
       const dirResult = await pool.request()
         .input('idCliente', sql.Int, cab.idCliente)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaDirCliente)
         .query('SELECT TOP 1 ISNULL(direccion, \'\') AS direccion FROM DireccionClientes WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa ORDER BY idDireccionClientes');
       const dirRow = dirResult.recordset && dirResult.recordset[0];
       if (dirRow && dirRow.direccion) clienteDireccion = String(dirRow.direccion).trim();
@@ -467,8 +508,10 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
     logo: logoUrl
   } : { nombre: '', ruc: '', direccion: '', telefono: '', rubro: '', correo: '', logo: `${base}/assets/img/01.jpg` };
 
-  const detalle = (items.recordset || []).map(d => ({
+  const detalle = (items.recordset || []).map((d) => ({
     descripcion: d.descripcion,
+    codigo: d.codigo != null ? String(d.codigo).trim() : '',
+    marca: d.marca != null ? String(d.marca).trim() : '',
     cantidad: d.cantidad,
     pVenta: d.pVenta,
     subtotal: d.total,

@@ -1,6 +1,8 @@
 import { Component, EventEmitter, Input, Output, inject, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { VehiculosService, VehiculoRegistro } from '../../../services/vehiculos.service';
 
@@ -202,35 +204,95 @@ export class ConsultarPlacaModalComponent implements OnChanges {
   }
 
   consultar(): void {
-    const placaTrim = (this.placa || '').toString().trim().toUpperCase();
+    const placaTrim = (this.placa || '')
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
     if (!placaTrim) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese una placa.', position: 'topRight' });
       return;
     }
+    this.placa = placaTrim;
     this.consultando = true;
     this.vehiculo = null;
     this.soat = null;
 
-    this.factiliza.getPlaca(placaTrim).subscribe({
-      next: (res: any) => {
-        this.vehiculo = res?.data || null;
-      },
-      error: () => {
-        this.vehiculo = null;
-      }
-    });
+    forkJoin({
+      placa: this.factiliza.getPlaca(placaTrim).pipe(catchError(() => of({ data: null }))),
+      soat: this.factiliza.getSoat(placaTrim).pipe(catchError(() => of({ data: null })))
+    })
+      .pipe(finalize(() => (this.consultando = false)))
+      .subscribe({
+        next: ({ placa: resPlaca, soat: resSoat }) => {
+          this.vehiculo = this.normalizarVehiculoDesdeApi(resPlaca?.data, placaTrim);
+          const rawSoat = resSoat?.data;
+          this.soat =
+            rawSoat && typeof rawSoat === 'object' && Object.keys(rawSoat).length > 0 ? rawSoat : null;
 
-    this.factiliza.getSoat(placaTrim).subscribe({
-      next: (res: any) => {
-        this.soat = res?.data || null;
-      },
-      error: () => {
-        this.soat = null;
-      },
-      complete: () => {
-        this.consultando = false;
+          if (!this.vehiculo && this.soat) {
+            this.vehiculo = this.vehiculoDesdeSoatSiVieneEnRespuesta(this.soat, placaTrim);
+          }
+
+          if (!this.vehiculo && !this.soat) {
+            iziToast.warning({
+              title: 'Sin resultados',
+              message: 'No se obtuvo información del vehículo ni del SOAT para esta placa.',
+              position: 'topRight'
+            });
+          } else if (!this.vehiculo && this.soat) {
+            iziToast.warning({
+              title: 'Solo SOAT',
+              message:
+                'Se obtuvo el SOAT, pero no datos del vehículo (consulta SUNAT/MTC). Verifique la placa o intente más tarde; puede guardar solo el SOAT.',
+              position: 'topRight'
+            });
+          }
+        },
+        error: () => {
+          iziToast.error({ title: 'Error', message: 'No se pudo completar la consulta.', position: 'topRight' });
+        }
+      });
+  }
+
+  /** Alinea la respuesta del backend / Factiliza al shape que usa la plantilla. */
+  private normalizarVehiculoDesdeApi(raw: unknown, placaFallback: string): Record<string, string> | null {
+    if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const o = raw as Record<string, unknown>;
+    const pick = (...keys: string[]): string => {
+      for (const k of keys) {
+        const v = o[k];
+        if (v != null && String(v).trim() !== '') return String(v).trim();
       }
-    });
+      return '';
+    };
+    const marca = pick('marca', 'MARCA', 'marca_descripcion', 'marcaDescripcion');
+    const modelo = pick('modelo', 'MODELO', 'modelo_descripcion', 'descripcionModelo', 'descripcion');
+    const color = pick('color', 'COLOR', 'color_descripcion', 'colorDescripcion');
+    const serie = pick('serie', 'SERIE', 'numero_serie', 'numeroSerie', 'nro_serie', 'vin', 'VIN');
+    const vin = pick('vin', 'VIN', 'numero_vin', 'numeroVin');
+    const motor = pick('motor', 'MOTOR', 'numero_motor', 'numeroMotor', 'nro_motor');
+    const placa = pick('placa', 'PLACA', 'numero_placa', 'numeroPlaca') || placaFallback;
+    if (!marca && !modelo && !color && !serie && !vin && !motor) return null;
+    return { placa, marca, modelo, color, serie, vin, motor };
+  }
+
+  /** Algunas respuestas SOAT traen marca/modelo auxiliares. */
+  private vehiculoDesdeSoatSiVieneEnRespuesta(soat: Record<string, unknown>, placa: string): Record<string, string> | null {
+    const pick = (k: string) => {
+      const v = soat[k];
+      return v != null && String(v).trim() !== '' ? String(v).trim() : '';
+    };
+    let marca = pick('marca_vehiculo') || pick('marcaVehiculo') || pick('marca') || pick('MARCA');
+    let modelo = pick('modelo_vehiculo') || pick('modeloVehiculo') || pick('modelo') || pick('MODELO');
+    const mm = pick('marca_modelo') || pick('marcaModelo') || pick('descripcion_vehiculo');
+    if (!marca && !modelo && mm) {
+      const partes = mm.split(/[/|]/).map((x) => x.trim());
+      marca = partes[0] || '';
+      modelo = partes.slice(1).join(' ').trim() || '';
+    }
+    if (!marca && !modelo) return null;
+    return { placa, marca, modelo, color: '', serie: '', vin: '', motor: '' };
   }
 
   guardarVehiculoYSoat(): void {

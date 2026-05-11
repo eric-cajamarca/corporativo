@@ -1,17 +1,21 @@
 import { Component, inject, signal } from '@angular/core';
 
 declare var iziToast: any;
+import { forkJoin } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { EnviosService } from '../../../services/envios.service';
 import { ChoferesService } from '../../../services/choferes.service';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { CajaOperacionContextService } from '../../../services/caja-operacion-context.service';
 
 export interface EnvioProgramado {
   idEnvio: string;
+  idEstadoEnvio?: number | null;
   idChofer?: string | null;
   idTransportista?: string | null;
   FEnvio: string;
@@ -38,10 +42,18 @@ export interface EnvioProgramado {
 export class IndexEnviosComponent {
 
   public sidebarState = inject(SidebarStateService);
+  private cajaOperacionContext = inject(CajaOperacionContextService);
   public enviosProgramados: EnvioProgramado[] = [];
   public loading = true;
   public estadosEnvio: Array<{ idEstadoEnvio: number; nombre: string }> = [];
-  public filtros: { idEstadoEnvio?: number; fechaDesde?: string; fechaHasta?: string; ruc?: string; cliente?: string } = {};
+  public filtros: {
+    idEstadoEnvio?: number;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    ruc?: string;
+    cliente?: string;
+    idEmpresa?: string;
+  } = {};
 
   modalVerVisible = false;
   modalEditarVisible = false;
@@ -70,14 +82,56 @@ export class IndexEnviosComponent {
   };
   guardando = false;
   eliminando = signal<string | null>(null);
+  /** idEnvio cuyo estado se está actualizando desde la tarjeta */
+  actualizandoEstadoEnvio = signal<string | null>(null);
 
   constructor(
     private _enviosService: EnviosService,
-    private _choferesService: ChoferesService
+    private _choferesService: ChoferesService,
+    private _router: Router
   ) { }
 
+  /** Nombre de estado de la tarjeta (API) normalizado para comparar con catálogo. */
+  private nombreEstadoTarjeta(envio: EnvioProgramado): string {
+    return (envio.estadoActual || '').trim().toUpperCase().replace(/\s+/g, '_');
+  }
+
+  esEstadoAgendado(envio: EnvioProgramado): boolean {
+    return this.nombreEstadoTarjeta(envio) === 'AGENDADO';
+  }
+
+  /** Oculta AGENDADO en el combo salvo que el envío ya esté en AGENDADO (no se vuelve atrás manualmente). */
+  estadosOpcionesCard(envio: EnvioProgramado): Array<{ idEstadoEnvio: number; nombre: string }> {
+    const cur = this.nombreEstadoTarjeta(envio);
+    return this.estadosEnvio.filter((ee) => {
+      const n = (ee.nombre || '').trim().toUpperCase().replace(/\s+/g, '_');
+      if (n === 'AGENDADO' && cur !== 'AGENDADO') return false;
+      return true;
+    });
+  }
+
+  irADespachos(envio: EnvioProgramado): void {
+    const comp = (envio.comprobante || '').trim();
+    if (!comp || comp === '—' || comp === '-') {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Sin comprobante', message: 'No hay número de comprobante para buscar en despachos.', position: 'topRight' });
+      }
+      return;
+    }
+    this._router.navigate(['/despachos'], { queryParams: { compVenta: comp } });
+  }
+
   ngOnInit(): void {
-    this.cargarEnvios();
+    this.cajaOperacionContext.cargarContexto().subscribe({
+      next: () => {
+        this.refrescarCatalogosEdicion();
+        this.cargarEnvios();
+      },
+      error: () => {
+        this.refrescarCatalogosEdicion();
+        this.cargarEnvios();
+      }
+    });
     this._enviosService.obtenerEstadosEnvio().subscribe({
       next: (res: any) => {
         const raw = res?.data || res || [];
@@ -88,32 +142,66 @@ export class IndexEnviosComponent {
       },
       error: () => { this.estadosEnvio = []; }
     });
-    this._choferesService.listarChoferes().subscribe({
-      next: (res: any) => this.choferes = (res?.data || []).map((c: any) => ({
-        idChofer: c.idChofer,
-        nombres: c.nombres,
-        apellidos: c.apellidos,
-        placa: c.placa
-      })),
-      error: () => this.choferes = []
-    });
-    this._enviosService.obtenerTransportistas().subscribe({
-      next: (res: any) => this.transportistas = (res?.data || []).map((t: any) => ({
-        idTransportista: t.idTransportista,
-        nombres: t.nombres,
-        apellidos: t.apellidos
-      })),
-      error: () => this.transportistas = []
-    });
+  }
+
+  /**
+   * Catálogo choferes/transportistas: si el usuario tiene varias empresas en contexto (gestora),
+   * siempre listado consolidado aunque en caja tenga seleccionada una gestionada (los envíos pueden usar chofer de otra vinculada).
+   */
+  private refrescarCatalogosEdicion(): void {
+    this.refrescarCatalogosEdicion$().subscribe({ error: () => {} });
+  }
+
+  private refrescarCatalogosEdicion$() {
+    const idEmp = this.cajaOperacionContext.idEmpresaOperacion?.trim() || undefined;
+    const empresasCtx = this.cajaOperacionContext.empresasOperacion || [];
+    const usarConsolidadoGestora = empresasCtx.length > 1;
+    const choferes$ = usarConsolidadoGestora
+      ? this._choferesService.listarChoferes(undefined, { alcanceGestora: true })
+      : this._choferesService.listarChoferes(idEmp);
+    const transportistas$ = usarConsolidadoGestora
+      ? this._enviosService.obtenerTransportistas()
+      : this._enviosService.obtenerTransportistas(idEmp);
+    return forkJoin({ ch: choferes$, tr: transportistas$ }).pipe(
+      map(({ ch, tr }) => {
+        this.choferes = (ch?.data || []).map((c: any) => ({
+          idChofer: c.idChofer,
+          nombres: c.nombres,
+          apellidos: c.apellidos,
+          placa: c.placa
+        }));
+        this.transportistas = (tr?.data || []).map((t: any) => ({
+          idTransportista: t.idTransportista,
+          nombres: t.nombres,
+          apellidos: t.apellidos
+        }));
+        return void 0;
+      })
+    );
+  }
+
+  /** Comparación insensible a mayúsculas para selects con UUID */
+  compararIdsUuid(a: unknown, b: unknown): boolean {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
   }
 
   cargarEnvios(): void {
     this.loading = true;
-    this._enviosService.obtenerEnviosProgramados(this.filtros).subscribe({
+    const idOp = this.cajaOperacionContext.idEmpresaOperacion?.trim();
+    const filtrosReq = { ...this.filtros };
+    if (idOp) {
+      filtrosReq.idEmpresa = idOp;
+    } else {
+      delete filtrosReq.idEmpresa;
+    }
+    this._enviosService.obtenerEnviosProgramados(filtrosReq).subscribe({
       next: (response: any) => {
         const raw = response?.data || [];
         this.enviosProgramados = raw.map((e: any) => ({
           idEnvio: e.idEnvio,
+          idEstadoEnvio: e.idEstadoEnvio != null ? Number(e.idEstadoEnvio) : null,
           idChofer: e.idChofer || null,
           idTransportista: e.idTransportista || null,
           FEnvio: e.FEnvio,
@@ -132,9 +220,16 @@ export class IndexEnviosComponent {
         }));
         this.loading = false;
       },
-      error: () => {
+      error: (err: any) => {
         this.enviosProgramados = [];
         this.loading = false;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'No se pudo cargar envíos',
+            message: err?.error?.message || err?.message || 'Revise permisos VER_ENVIOS o el servidor.',
+            position: 'topRight'
+          });
+        }
       }
     });
   }
@@ -167,17 +262,67 @@ export class IndexEnviosComponent {
 
   abrirModalEditar(envio: EnvioProgramado): void {
     this.envioSeleccionado = envio;
-    const fp = envio.fechaProgramada ? String(envio.fechaProgramada).replace('T', ' ').slice(0, 16) : '';
-    this.editForm = {
-      fechaProgramada: fp,
-      direccionEntrega: envio.direccionEntrega || '',
-      idChofer: envio.idChofer || null,
-      idTransportista: envio.idTransportista || null,
-      contactoDestinatario: envio.contactoDestinatario || '',
-      telefonoDestinatario: envio.telefonoDestinatario || '',
-      observaciones: envio.observaciones || ''
-    };
-    this.modalEditarVisible = true;
+    const rawFp = envio.fechaProgramada ? String(envio.fechaProgramada).trim() : '';
+    const fp =
+      rawFp.length >= 16
+        ? rawFp.replace(' ', 'T').slice(0, 16)
+        : '';
+    this.refrescarCatalogosEdicion$().subscribe({
+      next: () => {
+        this.editForm = {
+          fechaProgramada: fp,
+          direccionEntrega: envio.direccionEntrega === '—' ? '' : envio.direccionEntrega || '',
+          idChofer: envio.idChofer || null,
+          idTransportista: envio.idTransportista || null,
+          contactoDestinatario: (envio.contactoDestinatario || '').trim(),
+          telefonoDestinatario: (envio.telefonoDestinatario || '').trim(),
+          observaciones: (envio.observaciones || '').trim()
+        };
+        this.modalEditarVisible = true;
+      },
+      error: () => {
+        this.editForm = {
+          fechaProgramada: fp,
+          direccionEntrega: envio.direccionEntrega === '—' ? '' : envio.direccionEntrega || '',
+          idChofer: envio.idChofer || null,
+          idTransportista: envio.idTransportista || null,
+          contactoDestinatario: (envio.contactoDestinatario || '').trim(),
+          telefonoDestinatario: (envio.telefonoDestinatario || '').trim(),
+          observaciones: (envio.observaciones || '').trim()
+        };
+        this.modalEditarVisible = true;
+      }
+    });
+  }
+
+  cambiarEstadoDesdeCard(envio: EnvioProgramado, idEstadoEnvio: number): void {
+    if (!envio?.idEnvio || idEstadoEnvio == null || Number.isNaN(idEstadoEnvio)) return;
+    if (envio.idEstadoEnvio === idEstadoEnvio) return;
+    this.actualizandoEstadoEnvio.set(envio.idEnvio);
+    this._enviosService
+      .actualizarEstadoEnvio({
+        idEnvio: envio.idEnvio,
+        idEstadoEnvio
+      })
+      .subscribe({
+        next: () => {
+          this.actualizandoEstadoEnvio.set(null);
+          this.cargarEnvios();
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({ title: 'Estado actualizado', position: 'topRight' });
+          }
+        },
+        error: (err: any) => {
+          this.actualizandoEstadoEnvio.set(null);
+          if (typeof iziToast !== 'undefined') {
+            iziToast.error({
+              title: 'Error',
+              message: err?.error?.message || 'No se pudo cambiar el estado',
+              position: 'topRight'
+            });
+          }
+        }
+      });
   }
 
   cerrarModalEditar(): void {
@@ -218,6 +363,16 @@ export class IndexEnviosComponent {
   }
 
   confirmarEliminar(envio: EnvioProgramado): void {
+    if (!this.esEstadoAgendado(envio)) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'No eliminable',
+          message: 'Solo puede eliminar cuando el envío está en AGENDADO (tras devolver toda la mercadería en despachos).',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
     if (!confirm('¿Está seguro de eliminar este envío programado?')) return;
     this.eliminando.set(envio.idEnvio);
     this._enviosService.eliminarEnvio(envio.idEnvio).subscribe({
