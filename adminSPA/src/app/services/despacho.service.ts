@@ -61,6 +61,19 @@ export class DespachoService {
     });
   }
 
+  /** Registrar cantidades retiradas de varias líneas del mismo despacho (una petición). */
+  registrarCantidadesDespachoBatch(
+    idDespacho: string,
+    items: Array<{ idDetalleDespacho: string; cantidadDespachada: number }>
+  ): Observable<{ message: string; data: { idDespacho: string; todosDetallesDespachados: boolean } }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.put<{ message: string; data: { idDespacho: string; todosDetallesDespachados: boolean } }>(
+      this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/registrar-cantidades',
+      { items },
+      { headers, withCredentials: true }
+    );
+  }
+
   // Finalizar despacho
   finalizarDespacho(idDespacho: string, observaciones?: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});

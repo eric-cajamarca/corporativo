@@ -143,6 +143,59 @@ const actualizarCantidadDespachada = async (req, res) => {
   }
 };
 
+// Registrar cantidades de varias líneas del mismo despacho (almacén)
+const registrarCantidadesDespachoBatch = async (req, res) => {
+  try {
+    const { idDespacho } = req.params;
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).send({
+        message: "Debe enviar al menos una línea con cantidades (items).",
+        data: undefined
+      });
+    }
+
+    const result = await withPool(async (pool) =>
+      DespachosServices.actualizarCantidadesDespachoBatchService(pool, req.user, idDespacho, items)
+    );
+
+    res.status(200).send({
+      message: "Cantidades registradas correctamente",
+      data: result
+    });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    if (error.message === "NO_PERMISSIONS") {
+      return res.status(403).send({
+        message: "No tiene permisos para realizar esta acción",
+        data: undefined
+      });
+    }
+    if (error.message === "DESPACHO_NO_ENCONTRADO" || error.message === "DETALLE_NO_ENCONTRADO") {
+      return res.status(404).send({
+        message: "Despacho o detalle no encontrado",
+        data: undefined
+      });
+    }
+    if (error.message === "ITEMS_VACIOS" || error.message === "CANTIDAD_INVALIDA") {
+      return res.status(400).send({
+        message:
+          error.message === "CANTIDAD_INVALIDA"
+            ? "Alguna cantidad es inválida (debe estar entre 0 y la solicitada en cada línea)."
+            : "Lista de líneas vacía.",
+        data: undefined
+      });
+    }
+    console.error("Error registrar cantidades despacho batch:", error);
+    res.status(500).send({
+      message: "Error al registrar las cantidades",
+      data: undefined
+    });
+  }
+};
+
 // Finalizar despacho
 const finalizarDespacho = async (req, res) => {
   try {
@@ -291,6 +344,7 @@ module.exports = {
   obtenerDespachosVenta,
   crearDespacho,
   actualizarCantidadDespachada,
+  registrarCantidadesDespachoBatch,
   finalizarDespacho,
   obtenerTiposDespacho,
   obtenerEstadoDespachos,

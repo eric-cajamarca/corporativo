@@ -16,3 +16,36 @@ exports.adminLoginRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+
+const recoveryWindowMs =
+  parseInt(process.env.PASSWORD_RECOVERY_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
+const recoveryMax =
+  parseInt(process.env.PASSWORD_RECOVERY_RATE_LIMIT_MAX, 10) || 8;
+
+/** POST /api/recuperar-password — evita abuso y enumeración masiva */
+exports.recuperarPasswordRateLimiter = rateLimit({
+  windowMs: recoveryWindowMs,
+  max: recoveryMax,
+  message: {
+    message: 'Demasiadas solicitudes de recuperación. Espere unos minutos e intente de nuevo.',
+    data: undefined
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const resetWindowMs =
+  parseInt(process.env.PASSWORD_RESET_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
+const resetMax = parseInt(process.env.PASSWORD_RESET_RATE_LIMIT_MAX, 10) || 20;
+
+/** POST /api/restablecer-password */
+exports.restablecerPasswordRateLimiter = rateLimit({
+  windowMs: resetWindowMs,
+  max: resetMax,
+  message: {
+    message: 'Demasiados intentos. Espere unos minutos e intente de nuevo.',
+    data: undefined
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});

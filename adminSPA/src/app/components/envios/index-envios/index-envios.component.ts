@@ -15,6 +15,8 @@ import { CajaOperacionContextService } from '../../../services/caja-operacion-co
 
 export interface EnvioProgramado {
   idEnvio: string;
+  /** Empresa dueña del comprobante / envío (necesaria para búsqueda en despachos como gestora). */
+  idEmpresa?: string | null;
   idEstadoEnvio?: number | null;
   idChofer?: string | null;
   idTransportista?: string | null;
@@ -118,7 +120,12 @@ export class IndexEnviosComponent {
       }
       return;
     }
-    this._router.navigate(['/despachos'], { queryParams: { compVenta: comp } });
+    const idEmp = (envio.idEmpresa || '').trim();
+    const q: Record<string, string> = { compVenta: comp };
+    if (idEmp) {
+      q['idEmpresa'] = idEmp;
+    }
+    this._router.navigate(['/despachos'], { queryParams: q });
   }
 
   ngOnInit(): void {
@@ -201,6 +208,7 @@ export class IndexEnviosComponent {
         const raw = response?.data || [];
         this.enviosProgramados = raw.map((e: any) => ({
           idEnvio: e.idEnvio,
+          idEmpresa: e.idEmpresa ? String(e.idEmpresa).trim() : null,
           idEstadoEnvio: e.idEstadoEnvio != null ? Number(e.idEstadoEnvio) : null,
           idChofer: e.idChofer || null,
           idTransportista: e.idTransportista || null,

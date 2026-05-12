@@ -18,6 +18,15 @@ export interface AdminLoginResponse {
   message: string;
   data: AdminLoginUserData;
 }
+
+export interface SesionDispositivoDto {
+  idRefresh: string;
+  expira: string;
+  creado: string;
+  ipCrear: string | null;
+  userAgentCrear: string | null;
+  esDispositivoActual: boolean;
+}
 import { Observable } from 'rxjs';
 import { global } from './global.js'; // Asegúrate de que la ruta sea correcta
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -112,7 +121,29 @@ export class AdminService {
     });
     
   }
-  
+
+  /** Sesiones activas (refresh) del usuario actual; `esDispositivoActual` marca el navegador de esta petición. */
+  listarSesionesDispositivos(): Observable<{ message: string; data: SesionDispositivoDto[] }> {
+    return this._http.get<{ message: string; data: SesionDispositivoDto[] }>(this.url + 'sesiones_dispositivos', {
+      withCredentials: true
+    });
+  }
+
+  revocarSesionDispositivo(idRefresh: string): Observable<{ message: string; data: { cerroCookies: boolean } }> {
+    return this._http.delete<{ message: string; data: { cerroCookies: boolean } }>(
+      `${this.url}sesiones_dispositivos/${encodeURIComponent(idRefresh)}`,
+      { withCredentials: true }
+    );
+  }
+
+  revocarOtrasSesionesDispositivos(): Observable<{ message: string; data: { success: boolean } }> {
+    return this._http.post<{ message: string; data: { success: boolean } }>(
+      this.url + 'sesiones_dispositivos/revocar_otras',
+      {},
+      { withCredentials: true }
+    );
+  }
+
   
   // admin_login(data: any): Observable<any> {
   //   let headers = new HttpHeaders().set('Content-Type', 'application/json');

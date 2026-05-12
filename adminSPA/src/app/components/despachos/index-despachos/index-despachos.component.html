@@ -287,7 +287,7 @@
                         <div *ngIf="loadingDetalle[d.idDespacho]" class="text-center py-2">Cargando detalle…</div>
                         <div *ngIf="!loadingDetalle[d.idDespacho] && (detallePorDespacho[d.idDespacho]?.length || 0) > 0" class="table-responsive">
                           <p class="small text-muted mb-2" *ngIf="d.estado === 'PENDIENTE' || d.estado === 'EN_PROCESO'">
-                            <i class="bi bi-info-circle me-1"></i>Indique la cantidad retirada del almacén y pulse <strong>Guardar</strong> para marcar la línea como despachada.
+                            <i class="bi bi-info-circle me-1"></i>Indique la cantidad retirada del almacén por línea (máximo lo solicitado) y pulse <strong>Guardar cantidades</strong> para registrar todas las líneas pendientes a la vez.
                           </p>
                           <table class="table table-sm table-striped">
                             <thead>
@@ -300,7 +300,6 @@
                                 <th>Ubicación</th>
                                 <th>Cant. a registrar</th>
                                 <th>Estado</th>
-                                <th></th>
                               </tr>
                             </thead>
                             <tbody>
@@ -319,16 +318,20 @@
                                   <span *ngIf="pendienteLinea(lin) <= 0" class="text-muted small">—</span>
                                 </td>
                                 <td><span class="badge" [ngClass]="lin.estado === 'DESPACHADO' ? 'bg-success' : 'bg-warning'">{{ lin.estado }}</span></td>
-                                <td>
-                                  <button *ngIf="pendienteLinea(lin) > 0" type="button" class="btn btn-sm btn-outline-primary"
-                                    [disabled]="guardandoCantidad[lin.idDetalleDespacho]"
-                                    (click)="guardarCantidadDespachada(d.idDespacho, lin.idDetalleDespacho, cantADespacharEdicion[lin.idDetalleDespacho] ?? lin.cantidadDespachada)">
-                                    {{ guardandoCantidad[lin.idDetalleDespacho] ? '...' : 'Guardar' }}
-                                  </button>
-                                </td>
                               </tr>
                             </tbody>
                           </table>
+                          <div class="d-flex justify-content-end mt-2" *ngIf="(d.estado === 'PENDIENTE' || d.estado === 'EN_PROCESO') && lineasConPendienteDespacho(d.idDespacho).length > 0">
+                            <button
+                              type="button"
+                              class="btn btn-primary btn-sm"
+                              [disabled]="guardandoCantidadesBatch[d.idDespacho]"
+                              (click)="guardarTodasCantidadesDespacho(d)"
+                            >
+                              <span *ngIf="guardandoCantidadesBatch[d.idDespacho]">Guardando…</span>
+                              <span *ngIf="!guardandoCantidadesBatch[d.idDespacho]">Guardar cantidades retiradas</span>
+                            </button>
+                          </div>
                         </div>
                         <div *ngIf="!loadingDetalle[d.idDespacho] && (!detallePorDespacho[d.idDespacho] || detallePorDespacho[d.idDespacho].length === 0)" class="text-muted small">
                           Sin líneas de detalle.

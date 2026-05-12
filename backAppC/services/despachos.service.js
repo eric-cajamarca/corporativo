@@ -95,8 +95,7 @@ exports.actualizarCantidadDespachadaService = async (pool, user, datos) => {
   }
 
   const result = await DespachosRepository.actualizarCantidadDespachadaRepo(pool, user, datos);
-  const cant = Number(datos.cantidadDespachada) || 0;
-  if (cant > 0 && result?.idDespacho && user.sub) {
+  if (result?.todosDetallesDespachados && result?.idDespacho && user.sub) {
     try {
       await EnviosRepository.marcarEnviosPorDespachoAEstadoNombreRepo(
         pool,
@@ -104,12 +103,49 @@ exports.actualizarCantidadDespachadaService = async (pool, user, datos) => {
         idEmp,
         "EN_PREPARACION",
         user.sub,
-        "Retiro/cantidad registrada en despacho"
+        "Todas las líneas del despacho registradas en almacén"
       );
     } catch (err) {
-      console.error("contexto: no se pudo marcar envío EN_PREPARACION tras guardar despacho:", err);
+      console.error("contexto: no se pudo marcar envío EN_PREPARACION tras completar despacho:", err);
     }
   }
+  return result;
+};
+
+exports.actualizarCantidadesDespachoBatchService = async (pool, user, idDespacho, items) => {
+  if (!user) {
+    throw new Error("NO_ACCESS");
+  }
+
+  await assertAlgunoPermiso(pool, user, "EDITAR_DESPACHOS", "CREAR_DESPACHOS");
+
+  const idEmp = await DespachosRepository.obtenerIdEmpresaDesdeDespachoRepo(pool, idDespacho);
+  if (!idEmp || !(await puedeUsuarioOperarEmpresaDespacho(pool, user, idEmp))) {
+    throw new Error("DESPACHO_NO_ENCONTRADO");
+  }
+
+  const despachoValido = await DespachosRepository.validarDespachoEmpresaRepo(pool, idDespacho, idEmp);
+  if (!despachoValido) {
+    throw new Error("DESPACHO_NO_ENCONTRADO");
+  }
+
+  const result = await DespachosRepository.actualizarCantidadesDespachoBatchRepo(pool, user, idDespacho, items);
+
+  if (result?.todosDetallesDespachados && result?.idDespacho && user.sub) {
+    try {
+      await EnviosRepository.marcarEnviosPorDespachoAEstadoNombreRepo(
+        pool,
+        result.idDespacho,
+        idEmp,
+        "EN_PREPARACION",
+        user.sub,
+        "Todas las líneas del despacho registradas en almacén"
+      );
+    } catch (err) {
+      console.error("contexto: no se pudo marcar envío EN_PREPARACION tras completar despacho:", err);
+    }
+  }
+
   return result;
 };
 

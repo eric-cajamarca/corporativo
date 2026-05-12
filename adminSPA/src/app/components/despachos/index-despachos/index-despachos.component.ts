@@ -34,6 +34,7 @@ export interface DetalleVentaLinea {
 
 export interface VentaDespachosResult {
   venta: {
+    idEmpresa?: string;
     idVenta: number;
     compVenta: string;
     serie: string;
@@ -145,7 +146,8 @@ export class IndexDespachosComponent implements OnInit {
     ubicacionDestino?: string | null;
   }>> = {};
   loadingDetalle: Record<string, boolean> = {};
-  guardandoCantidad: Record<string, boolean> = {};
+  /** Un solo guardado por despacho (todas las líneas pendientes). */
+  guardandoCantidadesBatch: Record<string, boolean> = {};
   cantADespacharEdicion: Record<string, number | undefined> = {};
   devolucionCantidadPorDetalle: Record<string, number> = {};
   devolucionNotasPorDetalle: Record<string, string> = {};
@@ -397,12 +399,22 @@ export class IndexDespachosComponent implements OnInit {
       this.resultado = null;
       return;
     }
-    this.idEmpresaDespachoActiva = null;
+    const qp = this.route.snapshot.queryParamMap;
+    const compQp = (qp.get('compVenta') || qp.get('q') || '').trim();
+    const idEmpQp = (qp.get('idEmpresa') || '').trim();
+    if (idEmpQp && compQp && compQp === c) {
+      this.idEmpresaDespachoActiva = idEmpQp;
+    } else {
+      this.idEmpresaDespachoActiva = null;
+    }
     this.errorMsg = '';
     this.resultado = null;
     this.loading = true;
-    const params: { compVenta?: string; idVenta?: string } = {};
+    const params: { compVenta?: string; idVenta?: string; idEmpresa?: string } = {};
     params.compVenta = c;
+    if (this.idEmpresaDespachoActiva) {
+      params.idEmpresa = this.idEmpresaDespachoActiva;
+    }
     // idVenta (código escaneado): solo si es numérico sin ceros a la izquierda (evita confundir "00000011" con id 11)
     if (/^\d+$/.test(c) && !/^0+\d/.test(c)) {
       params.idVenta = c;
@@ -412,7 +424,12 @@ export class IndexDespachosComponent implements OnInit {
       next: (res) => {
         this.loading = false;
         if (res && res.data) {
-          this.resultado = res.data as VentaDespachosResult;
+          const data = res.data as VentaDespachosResult;
+          const idEmpVenta = data.venta?.idEmpresa;
+          if (idEmpVenta) {
+            this.idEmpresaDespachoActiva = String(idEmpVenta).trim();
+          }
+          this.resultado = data;
           this.detallePorDespacho = {};
         } else {
           this.errorMsg = 'Venta no encontrada.';
@@ -426,7 +443,10 @@ export class IndexDespachosComponent implements OnInit {
   }
 
   cargarDetalleDespacho(idDespacho: string): void {
-    if (this.detallePorDespacho[idDespacho] || this.loadingDetalle[idDespacho]) return;
+    if (this.loadingDetalle[idDespacho]) return;
+    // [] es truthy en JS: no usar `if (this.detallePorDespacho[id])` para decidir si recargar.
+    if ((this.detallePorDespacho[idDespacho]?.length ?? 0) > 0) return;
+
     this.loadingDetalle[idDespacho] = true;
     this.despachoService.obtenerDetalleDespacho(idDespacho).subscribe({
       next: (res) => {
@@ -434,7 +454,9 @@ export class IndexDespachosComponent implements OnInit {
         const list = (res && res.data) ? res.data : [];
         this.detallePorDespacho[idDespacho] = list;
         list.forEach((lin: any) => {
-          this.cantADespacharEdicion[lin.idDetalleDespacho] = Number(lin.cantidadDespachada) || 0;
+          const pend = this.pendienteLinea(lin);
+          this.cantADespacharEdicion[lin.idDetalleDespacho] =
+            pend > 0 ? Number(lin.cantidadSolicitada) : Number(lin.cantidadDespachada) || 0;
           this.devolucionCantidadPorDetalle[lin.idDetalleDespacho] = 0;
           this.devolucionNotasPorDetalle[lin.idDetalleDespacho] = '';
         });
@@ -457,24 +479,67 @@ export class IndexDespachosComponent implements OnInit {
     return Math.max(0, s - d);
   }
 
-  guardarCantidadDespachada(idDespacho: string, idDetalleDespacho: string, cantidadDespachada: number): void {
-    const key = idDetalleDespacho;
-    if (this.guardandoCantidad[key]) return;
-    this.guardandoCantidad[key] = true;
-    this.despachoService.actualizarCantidadDetalle({
-      idDetalle: idDetalleDespacho,
-      cantidadDespachada: Number(cantidadDespachada) || 0
-    }).subscribe({
+  /** Líneas del despacho con cantidad pendiente de registrar en almacén. */
+  lineasConPendienteDespacho(idDespacho: string): any[] {
+    const list = this.detallePorDespacho[idDespacho] || [];
+    return list.filter((lin: any) => this.pendienteLinea(lin) > 0);
+  }
+
+  guardarTodasCantidadesDespacho(d: { idDespacho: string }): void {
+    const idDespacho = d.idDespacho;
+    if (this.guardandoCantidadesBatch[idDespacho]) return;
+
+    const pendientes = this.lineasConPendienteDespacho(idDespacho);
+    if (pendientes.length === 0) {
+      iziToast.info({ title: 'Sin pendientes', message: 'No hay líneas pendientes de despacho.', position: 'topRight' });
+      return;
+    }
+
+    const items: Array<{ idDetalleDespacho: string; cantidadDespachada: number }> = [];
+    for (const lin of pendientes) {
+      const idDd = lin.idDetalleDespacho as string;
+      const qty = Number(this.cantADespacharEdicion[idDd]);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        iziToast.warning({
+          title: 'Cantidades incompletas',
+          message: `Indique una cantidad mayor que 0 en todas las líneas pendientes (código ${lin.productoCodigo || idDd}).`,
+          position: 'topRight'
+        });
+        return;
+      }
+      const fullLin = (this.detallePorDespacho[idDespacho] || []).find((x: any) => x.idDetalleDespacho === idDd);
+      const maxSol = fullLin ? Number(fullLin.cantidadSolicitada) : qty;
+      if (qty > maxSol + 1e-9) {
+        iziToast.warning({
+          title: 'Cantidad inválida',
+          message: `La cantidad no puede superar lo solicitado (${maxSol}) en ${lin.productoCodigo || 'línea'}.`,
+          position: 'topRight'
+        });
+        return;
+      }
+      items.push({ idDetalleDespacho: idDd, cantidadDespachada: qty });
+    }
+
+    this.guardandoCantidadesBatch[idDespacho] = true;
+    this.despachoService.registrarCantidadesDespachoBatch(idDespacho, items).subscribe({
       next: () => {
-        this.guardandoCantidad[key] = false;
-        delete this.cantADespacharEdicion[key];
-        this.detallePorDespacho[idDespacho] = [];
+        this.guardandoCantidadesBatch[idDespacho] = false;
+        delete this.detallePorDespacho[idDespacho];
         this.cargarDetalleDespacho(idDespacho);
         if (this.resultado?.detalleVenta) {
           this.refrescarVistaTrasCambio();
         }
+        iziToast.success({
+          title: 'Guardado',
+          message: 'Cantidades de despacho registradas correctamente.',
+          position: 'topRight'
+        });
       },
-      error: () => { this.guardandoCantidad[key] = false; }
+      error: (err) => {
+        this.guardandoCantidadesBatch[idDespacho] = false;
+        const msg = err?.error?.message || 'No se pudieron guardar las cantidades.';
+        iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+      }
     });
   }
 

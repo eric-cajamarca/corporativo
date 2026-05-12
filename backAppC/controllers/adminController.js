@@ -16,8 +16,19 @@ const twoFactorAdminService = require('../services/twoFactorAdmin.service');
 const seguridadAlertasService = require('../services/seguridadAlertas.service');
 const usuarioAdminService = require('../services/usuarioAdmin.service');
 
-/** WhatsApp al celular de la empresa (no bloquea la respuesta HTTP). */
+/** WhatsApp al celular de la empresa (admin) o al número de supervisión (superAdmin). No bloquea la respuesta HTTP. */
 function notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente) {
+  const rol = (datosUsuario.rol || '').toString();
+  if (rol === 'superAdmin') {
+    void seguridadAlertasService.notificarLoginSuperAdminExitoso(pool, {
+      idEmpresa: datosUsuario.idEmpresa,
+      nombres: datosUsuario.nombres,
+      apellidos: datosUsuario.apellidos,
+      email: datosUsuario.email,
+      ipCliente
+    });
+    return;
+  }
   void seguridadAlertasService.notificarLoginAdminExitoso(pool, {
     idEmpresa: datosUsuario.idEmpresa,
     email: datosUsuario.email,
@@ -442,6 +453,12 @@ const recuperarPassword = async (req, res, next) => {
     if (error.message && error.message.includes('SMTP no configurado') && process.env.NODE_ENV !== 'development') {
       return res.status(503).send({ message: 'El envío de correo no está configurado. Contacte al administrador.', data: undefined });
     }
+    if (error.message === 'ERROR_ENVIO_CORREO') {
+      return res.status(503).send({
+        message: 'No se pudo enviar el correo en este momento. Intente más tarde o contacte al administrador.',
+        data: undefined
+      });
+    }
     console.error('Error recuperar password:', error);
     return next(error);
   }
@@ -451,6 +468,95 @@ const recuperarPassword = async (req, res, next) => {
  * POST /restablecer-password
  * Body: { token, newPassword }
  */
+const listarSesionesDispositivos = async (req, res, next) => {
+  if (!req.user || !req.user.sub || !req.user.empresa) {
+    return res.status(401).json({ message: 'No autorizado', data: undefined });
+  }
+  try {
+    await withPool(async (pool) => {
+      const data = await refreshTokenService.listarSesionesDispositivos(
+        pool,
+        req.user.sub,
+        req.user.empresa,
+        req.cookies && req.cookies.refreshToken
+      );
+      res.status(200).json({ message: 'OK', data });
+    });
+  } catch (error) {
+    console.error('listarSesionesDispositivos:', error.message);
+    return next(error);
+  }
+};
+
+const revocarSesionDispositivo = async (req, res, next) => {
+  const { idRefresh } = req.params;
+  if (!req.user || !req.user.sub || !req.user.empresa) {
+    return res.status(401).json({ message: 'No autorizado', data: undefined });
+  }
+  if (!idRefresh) {
+    return res.status(400).json({ message: 'idRefresh requerido', data: undefined });
+  }
+  try {
+    await withPool(async (pool) => {
+      const { cerroCookies } = await refreshTokenService.revocarSesionDispositivoYcookiesSiActual(
+        pool,
+        idRefresh,
+        req.user.sub,
+        req.user.empresa,
+        req.cookies && req.cookies.refreshToken,
+        res
+      );
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: req.user.empresa,
+        idUsuario: req.user.sub,
+        tipo: 'SESION_REVOCADA',
+        detalle: String(idRefresh).slice(0, 80),
+        ipCliente: obtenerIpCliente(req)
+      });
+      res.status(200).json({ message: 'Sesión cerrada', data: { cerroCookies } });
+    });
+  } catch (error) {
+    if (error.message === 'SESION_NO_ENCONTRADA') {
+      return res.status(404).json({ message: 'Sesión no encontrada', data: undefined });
+    }
+    console.error('revocarSesionDispositivo:', error.message);
+    return next(error);
+  }
+};
+
+const revocarOtrasSesionesDispositivos = async (req, res, next) => {
+  if (!req.user || !req.user.sub || !req.user.empresa) {
+    return res.status(401).json({ message: 'No autorizado', data: undefined });
+  }
+  try {
+    await withPool(async (pool) => {
+      await refreshTokenService.revocarOtrasSesionesDispositivos(
+        pool,
+        req.user.sub,
+        req.user.empresa,
+        req.cookies && req.cookies.refreshToken
+      );
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: req.user.empresa,
+        idUsuario: req.user.sub,
+        tipo: 'SESIONES_OTRAS_REVOCADAS',
+        detalle: null,
+        ipCliente: obtenerIpCliente(req)
+      });
+      res.status(200).json({ message: 'Otras sesiones cerradas', data: { success: true } });
+    });
+  } catch (error) {
+    if (error.message === 'REFRESH_NO_EN_COOKIES') {
+      return res.status(400).json({
+        message: 'No hay cookie de sesión en este navegador; no se pudo conservar la sesión actual.',
+        data: undefined
+      });
+    }
+    console.error('revocarOtrasSesionesDispositivos:', error.message);
+    return next(error);
+  }
+};
+
 const restablecerPassword = async (req, res, next) => {
   const { token, newPassword } = req.body || {};
   if (!token || !newPassword) {
@@ -463,8 +569,16 @@ const restablecerPassword = async (req, res, next) => {
       res.status(200).send({ message: result.message, data: undefined });
     });
   } catch (error) {
-    if (error.message === 'jwt expired' || error.message === 'Token inválido') {
-      return res.status(400).send({ message: 'El enlace ha expirado. Solicite uno nuevo.', data: undefined });
+    if (
+      error.name === 'TokenExpiredError' ||
+      error.message === 'jwt expired' ||
+      error.message === 'Token inválido' ||
+      error.name === 'JsonWebTokenError'
+    ) {
+      return res.status(400).send({
+        message: 'El enlace no es válido o ha expirado. Solicite uno nuevo desde la pantalla de recuperación.',
+        data: undefined
+      });
     }
     if (error.message === 'La contraseña debe tener al menos 6 caracteres') {
       return res.status(400).send({ message: error.message, data: undefined });
@@ -686,5 +800,8 @@ module.exports = {
     obtener_datos_colaborador_admin,
     logout,
     recuperarPassword,
-    restablecerPassword
+    restablecerPassword,
+    listarSesionesDispositivos,
+    revocarSesionDispositivo,
+    revocarOtrasSesionesDispositivos
 };

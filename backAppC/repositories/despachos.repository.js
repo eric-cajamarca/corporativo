@@ -301,12 +301,143 @@ exports.actualizarCantidadDespachadaRepo = async (pool, user, datos) => {
     `);
   }
 
+  let todosDetallesDespachados = false;
+  if (idDespacho) {
+    const chk = await pool
+      .request()
+      .input("idDespacho", sql.UniqueIdentifier, idDespacho)
+      .query(`
+        SELECT COUNT(*) AS n
+        FROM DetalleDespachos
+        WHERE idDespacho = @idDespacho AND estado <> N'DESPACHADO'
+      `);
+    todosDetallesDespachados = Number(chk.recordset[0]?.n) === 0;
+  }
+
   return {
     idDetalleDespacho: datos.idDetalleDespacho,
     estado,
     cantidadDespachada: datos.cantidadDespachada,
-    idDespacho
+    idDespacho,
+    todosDetallesDespachados
   };
+};
+
+/**
+ * Registra cantidades retiradas para varias líneas del mismo despacho (una transacción).
+ * items: [{ idDetalleDespacho, cantidadDespachada, ubicacionOrigen?, ubicacionDestino? }]
+ */
+exports.actualizarCantidadesDespachoBatchRepo = async (pool, _user, idDespacho, items) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("ITEMS_VACIOS");
+  }
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+
+  try {
+    const rqEmp = transaction.request().input("idDespacho", sql.UniqueIdentifier, idDespacho);
+    const empRes = await rqEmp.query(`SELECT idEmpresa FROM Despachos WHERE idDespacho = @idDespacho`);
+    const idEmpresaDesp = empRes.recordset[0]?.idEmpresa;
+    if (!idEmpresaDesp) {
+      throw new Error("DESPACHO_NO_ENCONTRADO");
+    }
+
+    const idDetallesVentaSync = new Set();
+
+    for (const it of items) {
+      const idDd = it.idDetalleDespacho;
+      if (!idDd) {
+        throw new Error("DETALLE_NO_ENCONTRADO");
+      }
+      const detalleRow = await transaction
+        .request()
+        .input("idDetalleDespacho", sql.UniqueIdentifier, idDd)
+        .input("idDespacho", sql.UniqueIdentifier, idDespacho)
+        .query(`
+          SELECT dd.cantidadSolicitada, dd.idDetalleVenta, dd.idDespacho
+          FROM DetalleDespachos dd
+          WHERE dd.idDetalleDespacho = @idDetalleDespacho AND dd.idDespacho = @idDespacho
+        `);
+      const row = detalleRow.recordset[0];
+      if (!row) {
+        throw new Error("DETALLE_NO_ENCONTRADO");
+      }
+      const cant = Number(it.cantidadDespachada) || 0;
+      if (cant < 0 || cant > Number(row.cantidadSolicitada)) {
+        throw new Error("CANTIDAD_INVALIDA");
+      }
+      const estado = cant >= Number(row.cantidadSolicitada) ? "DESPACHADO" : "PENDIENTE";
+      idDetallesVentaSync.add(row.idDetalleVenta);
+
+      await transaction
+        .request()
+        .input("idDetalleDespacho", sql.UniqueIdentifier, idDd)
+        .input("cantidadDespachada", sql.Decimal(18, 3), cant)
+        .input("ubicacionOrigen", sql.VarChar, it.ubicacionOrigen || null)
+        .input("ubicacionDestino", sql.VarChar, it.ubicacionDestino || null)
+        .input("estado", sql.VarChar, estado)
+        .query(`
+          UPDATE DetalleDespachos
+          SET cantidadDespachada = @cantidadDespachada,
+              ubicacionOrigen = @ubicacionOrigen,
+              ubicacionDestino = @ubicacionDestino,
+              estado = @estado,
+              fechaDespacho = CASE WHEN @estado = 'DESPACHADO' THEN GETDATE() ELSE fechaDespacho END
+          WHERE idDetalleDespacho = @idDetalleDespacho
+        `);
+    }
+
+    for (const idDv of idDetallesVentaSync) {
+      await transaction
+        .request()
+        .input("idDetalleVenta", sql.Int, idDv)
+        .query(`
+          UPDATE DetalleVenta SET cantEntregada = (
+            SELECT ISNULL(SUM(dd.cantidadDespachada), 0)
+            FROM DetalleDespachos dd
+            WHERE dd.idDetalleVenta = @idDetalleVenta
+          )
+          WHERE idDetalle = @idDetalleVenta
+        `);
+    }
+
+    await transaction
+      .request()
+      .input("idDespacho", sql.UniqueIdentifier, idDespacho)
+      .query(`
+        UPDATE Despachos
+        SET estado = CASE
+          WHEN NOT EXISTS (
+            SELECT 1 FROM DetalleDespachos x
+            WHERE x.idDespacho = @idDespacho AND x.estado <> N'DESPACHADO'
+          ) THEN N'COMPLETADO'
+          WHEN EXISTS (
+            SELECT 1 FROM DetalleDespachos x
+            WHERE x.idDespacho = @idDespacho AND x.estado = N'DESPACHADO'
+          ) THEN N'EN_PROCESO'
+          ELSE N'PENDIENTE'
+        END
+        WHERE idDespacho = @idDespacho
+      `);
+
+    await transaction.commit();
+  } catch (e) {
+    await transaction.rollback();
+    throw e;
+  }
+
+  const chk = await pool
+    .request()
+    .input("idDespacho", sql.UniqueIdentifier, idDespacho)
+    .query(`
+      SELECT COUNT(*) AS n
+      FROM DetalleDespachos
+      WHERE idDespacho = @idDespacho AND estado <> N'DESPACHADO'
+    `);
+  const todosDetallesDespachados = Number(chk.recordset[0]?.n) === 0;
+
+  return { idDespacho, todosDetallesDespachados };
 };
 
 function sincronizarCantEntregadaDetalleVenta(pool, idDetalleVenta) {
@@ -521,6 +652,7 @@ exports.buscarVentaDespachosRepo = async (pool, idEmpresa, filtros) => {
 
   const ventaResult = await req.query(`
     SELECT TOP 1
+      v.idEmpresa,
       v.idVenta,
       v.compVenta,
       v.serie,

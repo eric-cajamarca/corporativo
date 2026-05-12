@@ -1,0 +1,26 @@
+.main-content {
+  margin-left: 260px;
+  padding: 1rem 1.25rem;
+  min-height: 100vh;
+  transition: margin-left 0.2s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 72px;
+}
+
+.content-header {
+  margin-bottom: 1.25rem;
+}
+
+.content-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+  .main-content,
+  .main-content.sidebar-collapsed {
+    margin-left: 0;
+  }
+}

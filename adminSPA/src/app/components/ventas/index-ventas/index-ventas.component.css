@@ -345,6 +345,28 @@
   padding: 0.5rem 0;
 }
 
+/* Totales SUNAT debajo de la paginación, centrados */
+.ventas-sunat-resumen-below-pag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.ventas-resumen-sunat-card {
+  width: 100%;
+  max-width: 22rem;
+  border-radius: 0.65rem;
+  border: 1px solid #dee2e6;
+}
+
+.ventas-resumen-sunat-card .card-body {
+  font-size: 0.9rem;
+}
+
 /* ===== MODAL ===== */
 .modal-content {
   border-radius: var(--border-radius);

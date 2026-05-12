@@ -2,7 +2,11 @@ var express = require('express');
 var api = express.Router();
 var adminController = require('../controllers/adminController');
 var auth  = require('../middlewares/autenticate');
-const { adminLoginRateLimiter } = require('../middlewares/loginRateLimit');
+const {
+  adminLoginRateLimiter,
+  recuperarPasswordRateLimiter,
+  restablecerPasswordRateLimiter
+} = require('../middlewares/loginRateLimit');
 
 // Rutas para el CRUD de ventas
 api.get('/admin',auth.auth, adminController.getAdmin);
@@ -13,8 +17,15 @@ api.post('/admin_2fa_setup_init', adminLoginRateLimiter, adminController.admin_2
 api.post('/admin_2fa_setup_confirm', adminLoginRateLimiter, adminController.admin_2fa_setup_confirm);
 api.post('/admin_2fa_verify', adminLoginRateLimiter, adminController.admin_2fa_verify);
 api.post('/refresh_session', adminController.refresh_session);
-api.post('/recuperar-password', adminController.recuperarPassword);
-api.post('/restablecer-password', adminController.restablecerPassword);
+api.get('/sesiones_dispositivos', auth.auth, adminController.listarSesionesDispositivos);
+api.delete('/sesiones_dispositivos/:idRefresh', auth.auth, adminController.revocarSesionDispositivo);
+api.post('/sesiones_dispositivos/revocar_otras', auth.auth, adminController.revocarOtrasSesionesDispositivos);
+api.post('/recuperar-password', recuperarPasswordRateLimiter, adminController.recuperarPassword);
+api.post(
+  '/restablecer-password',
+  restablecerPasswordRateLimiter,
+  adminController.restablecerPassword
+);
 api.post('/admin',auth.auth, adminController.createAdmin);
 api.put('/admin/:id',auth.auth, adminController.updateAdmin);
 api.put('/cambiar_estado_colaborador_admin/:id',auth.auth ,adminController.cambiar_estado_colaborador_admin);

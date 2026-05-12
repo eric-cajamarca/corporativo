@@ -1,0 +1,77 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h1 class="content-title mb-1">Sesiones y dispositivos</h1>
+        <p class="content-subtitle text-muted mb-0">
+          Vea dónde tiene la sesión abierta y cierre accesos que no reconozca.
+        </p>
+      </div>
+      <div class="d-flex gap-2">
+        <a routerLink="/configuracion" class="btn btn-outline-secondary">Volver a configuración</a>
+        <button type="button" class="btn btn-outline-primary" (click)="cargar()" [disabled]="cargando">
+          Actualizar
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-danger"
+          (click)="revocarOtras()"
+          [disabled]="cargando || sesiones.length <= 1"
+        >
+          Cerrar las demás sesiones
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      @if (cargando) {
+        <div class="p-4 text-center text-muted">Cargando…</div>
+      } @else if (sesiones.length === 0) {
+        <div class="p-4 text-center text-muted">No hay sesiones activas registradas.</div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Dispositivo / navegador</th>
+                <th>IP</th>
+                <th>Inicio</th>
+                <th>Expira</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of sesiones; track s.idRefresh) {
+                <tr>
+                  <td>
+                    <span class="text-break d-block" style="max-width: 28rem">
+                      {{ s.userAgentCrear || '—' }}
+                    </span>
+                    @if (s.esDispositivoActual) {
+                      <span class="badge bg-success ms-1">Este dispositivo</span>
+                    }
+                  </td>
+                  <td>{{ s.ipCrear || '—' }}</td>
+                  <td class="text-nowrap">{{ s.creado }}</td>
+                  <td class="text-nowrap">{{ s.expira }}</td>
+                  <td class="text-end">
+                    @if (!s.esDispositivoActual) {
+                      <button type="button" class="btn btn-sm btn-outline-danger" (click)="revocarSesion(s)">
+                        Cerrar sesión
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</main>

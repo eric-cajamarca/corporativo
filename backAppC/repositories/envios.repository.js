@@ -48,6 +48,7 @@ exports.obtenerEnviosProgramadosRepo = async (pool, idEmpresa, filtros = {}) => 
   const query = `
     SELECT
       e.idEnvio,
+      e.idEmpresa,
       e.idEstadoEnvio,
       e.idChofer,
       e.idTransportista,
@@ -107,6 +108,7 @@ exports.obtenerEnviosProgramadosMultiEmpresaRepo = async (pool, idsEmpresa, filt
   const query = `
     SELECT
       e.idEnvio,
+      e.idEmpresa,
       e.idEstadoEnvio,
       e.idChofer,
       e.idTransportista,
@@ -717,14 +719,19 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
         WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
       `);
 
-      // Sincronizar estado en ProgramacionPedidos (legacy) para que se refleje en la vista de programaciones
-      await request.query(`
-        UPDATE pp
-        SET pp.idEstado = @idEstadoPedidoNuevo
-        FROM ProgramacionPedidos pp
-        INNER JOIN Ventas v ON v.compVenta = pp.CompVentas AND v.idEmpresa = @idEmpresa
-        WHERE v.idVenta = @idVenta
+      // Sincronizar ProgramacionPedidos solo si la tabla existe (BD sin módulo legacy).
+      const legacyProg = await request.query(`
+        SELECT CASE WHEN OBJECT_ID(N'dbo.ProgramacionPedidos', N'U') IS NOT NULL THEN 1 ELSE 0 END AS existe
       `);
+      if (legacyProg.recordset?.[0]?.existe === 1) {
+        await request.query(`
+          UPDATE pp
+          SET pp.idEstado = @idEstadoPedidoNuevo
+          FROM ProgramacionPedidos pp
+          INNER JOIN Ventas v ON v.compVenta = pp.CompVentas AND v.idEmpresa = @idEmpresa
+          WHERE v.idVenta = @idVenta
+        `);
+      }
     }
 
     await transaction.commit();

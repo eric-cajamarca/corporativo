@@ -23,6 +23,7 @@ router.get('/:idDespacho/devoluciones', devolucionesDespachoController.listarDev
 router.post('/', despachosController.crearDespacho);
 router.post('/:idDespacho/devoluciones', devolucionesDespachoController.crearDevolucionDespacho);
 router.put('/detalle/:idDetalleDespacho/cantidad', despachosController.actualizarCantidadDespachada);
+router.put('/:idDespacho/registrar-cantidades', despachosController.registrarCantidadesDespachoBatch);
 router.put('/:idDespacho/finalizar', despachosController.finalizarDespacho);
 router.get('/devoluciones/:idDevolucionDespacho/detalle', devolucionesDespachoController.obtenerDetalleDevolucion);
 

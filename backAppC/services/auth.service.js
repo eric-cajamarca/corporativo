@@ -418,10 +418,13 @@ exports.updateAdministrador = async (pool, id, datos, usuarioAutenticado) => {
   } else {
     // CON password
     const hashedPassword = await bcrypt.hash(datos.password, 8);
-    return await usuarioRepository.updateUsuarioConPassword(pool, id, {
+    const rowsAffected = await usuarioRepository.updateUsuarioConPassword(pool, id, {
       ...datosActualizacion,
       password: hashedPassword
     });
+    const refreshTokenService = require('./refreshToken.service');
+    await refreshTokenService.revocarTodosUsuarioEmpresa(pool, id, usuarioAutenticado.empresa);
+    return rowsAffected;
   }
 }
 
@@ -479,12 +482,16 @@ exports.restablecerPassword = async (pool, token, newPassword) => {
   if (decoded.tipo === 'empresa') {
     const rows = await empresaRepository.actualizarPassword(pool, decoded.idEmpresa, hashedPassword);
     if (rows === 0) throw new Error('No se pudo actualizar la contraseña');
+    const refreshTokenService = require('./refreshToken.service');
+    await refreshTokenService.revocarTodosPorEmpresa(pool, decoded.idEmpresa);
     return { message: 'Contraseña de empresa actualizada correctamente' };
   }
 
   if (decoded.tipo === 'colaborador') {
     const rows = await usuarioRepository.actualizarSoloPassword(pool, decoded.idUsuario, hashedPassword);
     if (!rows || rows === 0) throw new Error('No se pudo actualizar la contraseña');
+    const refreshTokenService = require('./refreshToken.service');
+    await refreshTokenService.revocarTodosUsuarioEmpresa(pool, decoded.idUsuario, decoded.idEmpresa);
     return { message: 'Contraseña de colaborador actualizada correctamente' };
   }
 

@@ -58,6 +58,7 @@ exports.emitirSesion = async (pool, datosUsuario, res, req) => {
 
 /**
  * Rota refresh: revoca el actual y emite nuevas cookies.
+ * Si llega un hash ya revocado (token reutilizado), se revocan todas las sesiones del usuario/empresa (FASE D).
  */
 exports.rotarSesion = async (pool, rawRefresh, res, req) => {
   if (!rawRefresh || String(rawRefresh).length < 32) {
@@ -66,6 +67,29 @@ exports.rotarSesion = async (pool, rawRefresh, res, req) => {
   const h = hashToken(rawRefresh);
   const row = await sesionRefreshTokenRepository.buscarActivoPorHash(pool, h);
   if (!row) {
+    const revocado = await sesionRefreshTokenRepository.buscarRevocadoPorHash(pool, h);
+    if (revocado) {
+      await sesionRefreshTokenRepository.revocarTodosUsuarioEmpresa(
+        pool,
+        revocado.idUsuario,
+        revocado.idEmpresa
+      );
+      const seguridadAuditoriaService = require('./seguridadAuditoria.service');
+      await seguridadAuditoriaService.registrar(pool, req, {
+        idEmpresa: revocado.idEmpresa,
+        idUsuario: revocado.idUsuario,
+        tipo: 'REFRESH_REPLAY',
+        detalle: 'Reintento de refresh token ya revocado; sesiones revocadas',
+        ipCliente: obtenerIpCliente(req)
+      });
+      const seguridadAlertasService = require('./seguridadAlertas.service');
+      void seguridadAlertasService.notificarRefreshTokenReplay(pool, {
+        idEmpresa: revocado.idEmpresa,
+        idUsuario: revocado.idUsuario,
+        ipCliente: obtenerIpCliente(req)
+      });
+      throw new Error('REFRESH_REPLAY');
+    }
     throw new Error('REFRESH_INVALIDO');
   }
 
@@ -97,6 +121,63 @@ exports.revocarPorTokenRaw = async (pool, rawRefresh) => {
 
 exports.revocarTodosUsuarioEmpresa = async (pool, idUsuario, idEmpresa) => {
   await sesionRefreshTokenRepository.revocarTodosUsuarioEmpresa(pool, idUsuario, idEmpresa);
+};
+
+exports.revocarTodosPorEmpresa = async (pool, idEmpresa) => {
+  await sesionRefreshTokenRepository.revocarTodosPorEmpresa(pool, idEmpresa);
+};
+
+/**
+ * Lista sesiones activas (sin exponer tokenHash); marca la de la cookie actual.
+ */
+exports.listarSesionesDispositivos = async (pool, idUsuario, idEmpresa, rawRefreshActual) => {
+  const rows = await sesionRefreshTokenRepository.listarActivosPorUsuarioEmpresa(pool, idUsuario, idEmpresa);
+  const hashActual =
+    rawRefreshActual && String(rawRefreshActual).length >= 32 ? hashToken(String(rawRefreshActual)) : null;
+  return rows.map((r) => ({
+    idRefresh: r.idRefresh,
+    expira: r.expira,
+    creado: r.creado,
+    ipCrear: r.ipCrear,
+    userAgentCrear: r.userAgentCrear,
+    esDispositivoActual: Boolean(hashActual && r.tokenHash === hashActual)
+  }));
+};
+
+exports.revocarSesionDispositivo = async (pool, idRefresh, idUsuario, idEmpresa) => {
+  const n = await sesionRefreshTokenRepository.revocarPorIdRefreshSiPertenece(pool, idRefresh, idUsuario, idEmpresa);
+  if (!n) {
+    throw new Error('SESION_NO_ENCONTRADA');
+  }
+};
+
+/**
+ * Revoca una sesión; si era la de la cookie actual, limpia cookies HTTP.
+ * @returns {{ cerroCookies: boolean }}
+ */
+exports.revocarSesionDispositivoYcookiesSiActual = async (pool, idRefresh, idUsuario, idEmpresa, rawRefreshActual, res) => {
+  const prev = await sesionRefreshTokenRepository.obtenerActivoPorIdRefreshUsuario(
+    pool,
+    idRefresh,
+    idUsuario,
+    idEmpresa
+  );
+  const esCookieActual =
+    Boolean(prev && rawRefreshActual && String(rawRefreshActual).length >= 32) &&
+    hashToken(String(rawRefreshActual)) === prev.tokenHash;
+  await exports.revocarSesionDispositivo(pool, idRefresh, idUsuario, idEmpresa);
+  if (esCookieActual && res) {
+    exports.limpiarCookies(res);
+  }
+  return { cerroCookies: Boolean(esCookieActual) };
+};
+
+exports.revocarOtrasSesionesDispositivos = async (pool, idUsuario, idEmpresa, rawRefreshActual) => {
+  if (!rawRefreshActual || String(rawRefreshActual).length < 32) {
+    throw new Error('REFRESH_NO_EN_COOKIES');
+  }
+  const h = hashToken(String(rawRefreshActual));
+  await sesionRefreshTokenRepository.revocarActivosExceptoHash(pool, idUsuario, idEmpresa, h);
 };
 
 exports.limpiarCookies = (res) => {

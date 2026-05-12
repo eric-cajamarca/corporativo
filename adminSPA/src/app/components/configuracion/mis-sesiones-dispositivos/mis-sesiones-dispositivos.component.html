@@ -1,0 +1,93 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h1 class="content-title mb-1">Sesiones y dispositivos</h1>
+        <p class="content-subtitle text-muted mb-0">
+          Vea dónde tiene la sesión abierta y cierre accesos que no reconozca.
+        </p>
+      </div>
+      <a routerLink="/configuracion" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Volver a configuración
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="mb-0 fw-semibold">Sesiones activas</span>
+      <div class="d-flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-danger"
+          [disabled]="cargando() || !hayOtrasActivas() || accionId() !== null"
+          (click)="revocarOtras()"
+        >
+          @if (accionId() === '__otras__') {
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+          }
+          Cerrar las demás sesiones
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="cargando()" (click)="cargar()">
+          Actualizar
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      @if (cargando()) {
+        <div class="p-4 text-center text-muted">
+          <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+          Cargando…
+        </div>
+      } @else if (sesiones().length === 0) {
+        <div class="p-4 text-muted text-center">No hay sesiones activas registradas.</div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Dispositivo / navegador</th>
+                <th>IP</th>
+                <th>Inicio</th>
+                <th>Expira</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of sesiones(); track s.idRefresh) {
+                <tr [class.table-primary]="s.esDispositivoActual">
+                  <td>
+                    <span class="small text-break d-block">{{ s.userAgentCrear || '—' }}</span>
+                    @if (s.esDispositivoActual) {
+                      <span class="badge bg-primary mt-1">Este navegador</span>
+                    }
+                  </td>
+                  <td class="small">{{ s.ipCrear || '—' }}</td>
+                  <td class="small text-nowrap">{{ s.creado }}</td>
+                  <td class="small text-nowrap">{{ s.expira }}</td>
+                  <td class="text-end">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      [disabled]="accionId() !== null"
+                      (click)="revocar(s)"
+                    >
+                      @if (accionId() === s.idRefresh) {
+                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                      } @else {
+                        Cerrar
+                      }
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</main>

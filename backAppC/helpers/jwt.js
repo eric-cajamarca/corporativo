@@ -4,7 +4,7 @@ const moment = require('moment');
 const { getJwtSecret } = require('../config/jwt.config');
 
 const ACCESS_EXPIRES_MINUTES = Math.min(
-  Math.max(parseInt(process.env.JWT_ACCESS_EXPIRES_MINUTES, 10) || 15, 5),
+  Math.max(parseInt(process.env.JWT_ACCESS_EXPIRES_MINUTES, 10) || 240, 5),
   24 * 60
 );
 

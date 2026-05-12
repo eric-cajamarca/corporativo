@@ -1,6 +1,16 @@
 const sql = require('mssql');
 
+async function programacionPedidosExiste(pool) {
+  const r = await pool.request().query(`
+    SELECT CASE WHEN OBJECT_ID(N'dbo.ProgramacionPedidos', N'U') IS NOT NULL THEN 1 ELSE 0 END AS existe
+  `);
+  return r.recordset?.[0]?.existe === 1;
+}
+
 async function listarProgramacion(pool, whereSql, parameters) {
+  if (!(await programacionPedidosExiste(pool))) {
+    return [];
+  }
   const request = pool.request();
   (parameters || []).forEach((param) => {
     request.input(param.name, param.type, param.value);
@@ -16,6 +26,9 @@ async function listarProgramacion(pool, whereSql, parameters) {
 }
 
 async function listarProgramacionAdmin(pool) {
+  if (!(await programacionPedidosExiste(pool))) {
+    return [];
+  }
   const r = await pool.request().query(`
     SELECT pp.*, ep.descripcion AS estadoDescripcion, ep.color AS estadoColor
     FROM ProgramacionPedidos pp
@@ -25,6 +38,9 @@ async function listarProgramacionAdmin(pool) {
 }
 
 async function listarProgramacionConductor(pool, idConductor) {
+  if (!(await programacionPedidosExiste(pool))) {
+    return [];
+  }
   const r = await pool
     .request()
     .input('idConductor', sql.Int, idConductor)
