@@ -1554,7 +1554,11 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
       return;
     }
     
-    const cantidadTotal = detalle.cantidad || detalle.cantidadDisponible || 0;
+    /** Preferir stock actual del lote; `detalle.cantidad` es la de la línea de compra y puede quedar desactualizada tras más ingresos. */
+    const cantidadTotal =
+      detalle.cantidadDisponible != null && detalle.cantidadDisponible !== ''
+        ? Number(detalle.cantidadDisponible)
+        : Number(detalle.cantidad) || 0;
     this.inventarioModal.abrirAsignarUbicaciones(detalle.idLote, cantidadTotal).then(result => {
       if (result?.success) {
         // Actualizar vista si es necesario

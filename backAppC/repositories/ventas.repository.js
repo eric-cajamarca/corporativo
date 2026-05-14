@@ -1,6 +1,6 @@
 // repositories/ventas.repository.js
 const sql = require('mssql');
-const { getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const { parseFEmisionCabeceraSQL, mergeFEmisionNvCtSiMedianocheInnecessario } = require('../utils/fechaHoraLocal.util');
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 
 /** IN (@p0,@p1,...) para UUIDs en requests de consulta PDF / multiempresa */
@@ -602,6 +602,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ISNULL(v.gratuito, 0) AS gratuito,
           ISNULL(v.otrosCargos, 0) AS otrosCargos,
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          v.idMediosPago,
+          v.idEstadoPago,
           ISNULL(v.eliminado, 0) AS eliminado,
           v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
@@ -634,6 +636,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ISNULL(v.gratuito, 0) AS gratuito,
           ISNULL(v.otrosCargos, 0) AS otrosCargos,
           ISNULL(v.descuentos, 0) AS descuentos, v.total,
+          v.idMediosPago,
+          v.idEstadoPago,
           ISNULL(v.eliminado, 0) AS eliminado,
           v.compRelacionado, v.observaciones, v.tipoComprobanteRef, v.codigoMotivoNotaCredito,
           c.nombre AS nombreComprobante, c.codigo AS codigoComprobante,
@@ -950,6 +954,25 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     tieneNotasCreditoDebitoPdf = false;
   }
 
+  let detallePagoPdf = [];
+  try {
+    const dpv = await pool
+      .request()
+      .input('idVenta', sql.Int, idVenta)
+      .query(`
+        SELECT idMediosPago, monto
+        FROM DetallePagoVenta
+        WHERE idVenta = @idVenta
+        ORDER BY idMediosPago
+      `);
+    detallePagoPdf = (dpv.recordset || []).map((r) => ({
+      idMediosPago: r.idMediosPago != null ? Number(r.idMediosPago) : null,
+      monto: r.monto != null ? Number(r.monto) : 0
+    })).filter((x) => x.idMediosPago != null && !Number.isNaN(x.idMediosPago));
+  } catch (_) {
+    detallePagoPdf = [];
+  }
+
   return {
     venta: {
       idVenta: cab.idVenta,
@@ -982,7 +1005,14 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       codigoMotivoNotaCredito: cab.codigoMotivoNotaCredito != null ? String(cab.codigoMotivoNotaCredito).trim() : '',
       eliminado: !!cab.eliminado,
       tieneDespachos: tieneDespachosPdf,
-      tieneNotasCreditoDebito: tieneNotasCreditoDebitoPdf
+      tieneNotasCreditoDebito: tieneNotasCreditoDebitoPdf,
+      idMediosPago:
+        cab.idMediosPago != null && cab.idMediosPago !== ''
+          ? typeof cab.idMediosPago === 'number'
+            ? cab.idMediosPago
+            : String(cab.idMediosPago).trim()
+          : null,
+      idEstadoPago: cab.idEstadoPago != null ? Number(cab.idEstadoPago) : null
     },
     empresa: empresaPayload,
     cliente: {
@@ -1009,7 +1039,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : '',
       marca: d.marca != null ? String(d.marca).trim() : ''
     })),
-    impuestos
+    impuestos,
+    detallePago: detallePagoPdf
   };
 };
 
@@ -1052,10 +1083,10 @@ exports.ventaTieneNotasCreditoDebito = async (pool, idEmpresa, compVenta) => {
 
 /** Actualiza cabecera y detalle de una venta. Solo permitir cuando idEstadoSunat no sea Aceptado (1,2,3). Cotización (CT): solo dentro de 24 h de emisión.
  * Si hay despachos registrados, no se edita (falla antes o aquí). Con despachos = 0, sincroniza stock ante cambios de cantidad/producto.
- * @param {{ idUsuarioEjecutor?: string|null }} [opciones]
+ * @param {{ idUsuarioEjecutor?: string|null, detallePago?: Array<{ idMediosPago?: number, monto?: number }> }} [opciones]
  */
 exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, detalles, opciones = {}) => {
-  const { idUsuarioEjecutor = null } = opciones || {};
+  const { idUsuarioEjecutor = null, detallePago: detallePagoOpcional = null } = opciones || {};
   const stockRepository = require('./stock.repository');
   const inventarioRepository = require('./inventario.repository');
   const stockService = require('../services/stock.service');
@@ -1143,7 +1174,10 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     }
 
     const fEmisionRaw = cabecera.fEmision || null;
-    const fEmision = fEmisionRaw != null ? (getFechaSoloSQLString(fEmisionRaw) || String(fEmisionRaw).trim().slice(0, 19).replace('T', ' ') + (String(fEmisionRaw).length <= 10 ? ' 00:00:00.000' : '.000')) : null;
+    let fEmision = parseFEmisionCabeceraSQL(fEmisionRaw);
+    if (fEmision && (codComp === 'NV' || codComp === 'CT') && rowChk.fEmision != null) {
+      fEmision = mergeFEmisionNvCtSiMedianocheInnecessario(fEmision, rowChk.fEmision);
+    }
     const idCliente = cabecera.idCliente != null ? Number(cabecera.idCliente) : null;
     const subtotal = Number(cabecera.subtotal) || 0;
     const igv = Number(cabecera.igv) || 0;
@@ -1728,6 +1762,105 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
             LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = ve.idEmpresa
             WHERE ve.idVentaAgrupada = @idVA AND ISNULL(ve.eliminado, 0) = 0
           `);
+      }
+    }
+
+    if (Array.isArray(detallePagoOpcional) && detallePagoOpcional.length > 0) {
+      const { normalizarDetallePagoIdMediosPago } = require('../utils/detallePagoNormalizar.util');
+      const detalleNorm = await normalizarDetallePagoIdMediosPago(transaction, detallePagoOpcional);
+      const sumPago = detalleNorm.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+      if (sumPago <= 0.009) {
+        await transaction.rollback();
+        return { ok: false, error: 'El detalle de pago debe tener montos mayores a cero.' };
+      }
+      await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .query('DELETE FROM DetallePagoVenta WHERE idVenta = @idVenta');
+      await exports.insertarDetallePagoVenta(transaction, idVenta, detalleNorm);
+      const idMediosPrimero =
+        detalleNorm[0] && detalleNorm[0].idMediosPago != null ? String(detalleNorm[0].idMediosPago) : null;
+      let idEstadoPagoNuevo = sumPago + 0.02 >= newTotalFinal ? 2 : 1;
+      try {
+        const ventaCreditoPostVentaService = require('../services/ventaCreditoPostVenta.service');
+        const idsCred = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
+        if (detalleNorm.some((p) => idsCred.has(Number(p.idMediosPago)))) {
+          idEstadoPagoNuevo = 2;
+        }
+      } catch (e) {
+        console.error('contexto: ids crédito al actualizar detalle pago venta:', e.message);
+      }
+      const idMpCab =
+        idMediosPrimero != null && String(idMediosPrimero).trim() !== '' ? String(idMediosPrimero).trim() : '1';
+      await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idMediosPago', sql.VarChar(20), idMpCab)
+        .input('idEstadoPago', sql.Int, idEstadoPagoNuevo)
+        .query(`
+          UPDATE Ventas
+          SET idMediosPago = @idMediosPago, idEstadoPago = @idEstadoPago
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+        `);
+
+      /** Arqueo: MovimientosCaja (VENTA_CONTADO) deben coincidir con el desglose al contado; cotización (CT) no usa caja. */
+      if (codComp !== 'CT') {
+        const CajaRepository = require('../repositories/caja.repository');
+        const ventaCreditoPostVentaService = require('../services/ventaCreditoPostVenta.service');
+        let idsCredMc;
+        try {
+          idsCredMc = await ventaCreditoPostVentaService.idsMediosPagoCredito(transaction);
+        } catch (e) {
+          console.error('contexto: ids crédito al sincronizar caja tras edición de pago:', e.message);
+          idsCredMc = new Set();
+        }
+        const detalleCajaSync = detalleNorm.filter((p) => !idsCredMc.has(Number(p.idMediosPago)));
+        const idUsuarioCajaRaw = idUsuarioMov || idUsuarioEjecutor || rowChk.idUsuario;
+        const sumCaja = detalleCajaSync.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+        if (sumCaja > 0.009) {
+          if (!idUsuarioCajaRaw) {
+            await transaction.rollback();
+            return {
+              ok: false,
+              error:
+                'No se pudo reflejar el pago en caja: falta usuario de la operación (token o venta). Vuelva a iniciar sesión e intente de nuevo.'
+            };
+          }
+          let apRow = await CajaRepository.obtenerAperturaAbiertaPorSucursalRepo(pool, idEmpresa, idSucursal);
+          let idAperturaCaja = apRow && apRow.idApertura ? apRow.idApertura : null;
+          let idSucursalCaja = (apRow && apRow.idSucursal) || idSucursal;
+          if (!idAperturaCaja) {
+            const cualq = await CajaRepository.obtenerCualquierAperturaAbiertaRepo(pool, idEmpresa);
+            if (cualq && cualq.idApertura) {
+              idAperturaCaja = cualq.idApertura;
+              idSucursalCaja = cualq.idSucursal || idSucursal;
+            }
+          }
+          if (!idAperturaCaja) {
+            await transaction.rollback();
+            return {
+              ok: false,
+              error:
+                'No hay caja abierta para registrar el cambio de formas de pago al contado. Abra caja en la sucursal e intente guardar de nuevo.'
+            };
+          }
+          await CajaRepository.registrarMovimientosVentaContadoRepo(transaction, {
+            idApertura: idAperturaCaja,
+            idEmpresa,
+            idSucursal: idSucursalCaja,
+            idUsuario: idUsuarioCajaRaw,
+            idVenta,
+            compVenta: compVenta || 'S/N',
+            detallePago: detalleCajaSync
+          });
+        } else {
+          await transaction
+            .request()
+            .input('idVenta', sql.Int, idVenta)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .query('DELETE FROM MovimientosCaja WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa');
+        }
       }
     }
 

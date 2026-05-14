@@ -3,6 +3,8 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { UbicacionPrioridadService } from '../../../services/ubicacion-prioridad.service';
 import { LotesUbicacionService } from '../../../services/lotes-ubicacion.service';
 import { LotesService } from '../../../services/lotes.service';
+import { ProductoService } from '../../../services/producto.service';
+import { StockUbicacionProductoFila } from '../../../models/producto.models';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -30,7 +32,11 @@ export class AsignarStockUbicacionComponent {
   
   // Cantidad restante por asignar
   cantidadRestante = 0;
-  
+
+  /** Stock del producto en la sucursal (todos los lotes); solo informativo */
+  stockResumenProducto: StockUbicacionProductoFila[] = [];
+  cargandoStockResumen = false;
+
   // Estados de carga
   cargandoLote = true;
   cargandoUbicaciones = false;
@@ -44,7 +50,8 @@ export class AsignarStockUbicacionComponent {
     public activeModal: NgbActiveModal,
     private ubicacionService: UbicacionPrioridadService,
     private loteUbicacionService: LotesUbicacionService,
-    private loteService: LotesService
+    private loteService: LotesService,
+    private productoService: ProductoService
   ) {}
 
   ngOnInit(): void {
@@ -61,6 +68,26 @@ export class AsignarStockUbicacionComponent {
       next: (response: any) => {
         this.infoLote = response.data || response;
         this.idSucursal = (this.infoLote?.idSucursal ?? this.infoLote?.IdSucursal) ?? '';
+        const loteQty = Number(this.infoLote?.cantidadDisponible ?? this.infoLote?.CantidadDisponible);
+        if (Number.isFinite(loteQty) && loteQty >= 0) {
+          this.cantidadTotal = loteQty;
+        }
+        const idProd = this.infoLote?.idProducto ?? this.infoLote?.IdProducto;
+        if (idProd && this.idSucursal) {
+          this.cargandoStockResumen = true;
+          this.productoService.obtenerStockUbicacionesProducto(String(idProd), String(this.idSucursal)).subscribe({
+            next: (r) => {
+              this.stockResumenProducto = Array.isArray(r?.data) ? r.data : [];
+              this.cargandoStockResumen = false;
+            },
+            error: () => {
+              this.stockResumenProducto = [];
+              this.cargandoStockResumen = false;
+            }
+          });
+        } else {
+          this.stockResumenProducto = [];
+        }
         this.cargandoLote = false;
         this.cargarUbicaciones();
       },

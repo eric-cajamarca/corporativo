@@ -141,8 +141,15 @@ export class VentasService {
     );
   }
 
-  /** Actualiza cabecera y detalle de una venta (solo si no está aceptada en SUNAT). */
-  actualizarVenta(idVenta: number, payload: { venta: VentaEdicionPayload; detalles: DetalleVentaEdicionPayload[] }): Observable<{ message?: string }> {
+  /** Actualiza cabecera y detalle de una venta (solo si no está aceptada en SUNAT). Opcional: nuevo desglose de pago. */
+  actualizarVenta(
+    idVenta: number,
+    payload: {
+      venta: VentaEdicionPayload;
+      detalles: DetalleVentaEdicionPayload[];
+      detallePago?: Array<{ idMediosPago: number; monto: number }>;
+    }
+  ): Observable<{ message?: string }> {
     return this._http.put<{ message?: string }>(
       this.url + 'ventas/editar/' + idVenta,
       payload,
@@ -338,6 +345,8 @@ export interface ComprobantePdfData {
     total: number;
     resumenHash?: string;
     eliminado?: boolean;
+    idMediosPago?: string | number | null;
+    idEstadoPago?: number | null;
     /** Si true, el backend no permite editar el comprobante (hay despachos). */
     tieneDespachos?: boolean;
     /** Si true, el backend no permite editar (hay NC/ND vinculadas). */
@@ -379,6 +388,8 @@ export interface ComprobantePdfData {
     pIncluyeIGV?: boolean;
     estado?: boolean;
   }>;
+  /** Líneas de DetallePagoVenta (misma forma que al registrar venta). */
+  detallePago?: Array<{ idMediosPago: number | null; monto: number }>;
 }
 
 export interface VentaAgrupadaListado {

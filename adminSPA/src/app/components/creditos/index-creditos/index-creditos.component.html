@@ -316,7 +316,7 @@
     <div class="modal-content">
       <div class="modal-header bg-info text-white">
         <h5 class="modal-title">
-          <i class="fas fa-list me-2"></i>
+          <i class="bi bi-list me-2"></i>
           Cuotas - {{ creditoSeleccionado ? getClienteNombre(creditoSeleccionado.idCliente) : '' }}
         </h5>
         <button type="button" class="btn-close btn-close-white" (click)="cerrarModalVerCuotas()"></button>
@@ -348,7 +348,7 @@
                 <td>
                   <button class="btn btn-sm btn-success" *ngIf="cuota.estado !== 'PAGADO'"
                           (click)="abrirModalPagarCuota(cuota)" title="Pagar Cuota">
-                    <i class="fas fa-money-bill-wave"></i>
+                    <i class="bi bi-money-bill-wave"></i>
                   </button>
                 </td>
               </tr>
@@ -373,7 +373,7 @@
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
         <h5 class="modal-title">
-          <i class="fas fa-money-bill-wave me-2"></i>
+          <i class="bi bi-money-bill-wave me-2"></i>
           Pagar Cuota
         </h5>
         <button type="button" class="btn-close btn-close-white" (click)="cerrarModales()"></button>
@@ -433,7 +433,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" (click)="cerrarModales()">Cancelar</button>
         <button type="button" class="btn btn-success" (click)="pagarCuota()" [disabled]="loading">
-          <i class="fas fa-money-bill-wave me-1"></i>
+          <i class="bi bi-money-bill-wave me-1"></i>
           {{ loading ? 'Procesando...' : 'Registrar Pago' }}
         </button>
       </div>

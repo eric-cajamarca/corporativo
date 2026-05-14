@@ -1099,9 +1099,9 @@
                                     <div class="mb-2">
                                         <label class="form-check">
                                             <input type="checkbox" class="form-check-input" [(ngModel)]="asignarUbicacionPorDefecto" name="asignarUbicacionPorDefecto">
-                                            <span class="form-check-label small">Asignar stock a ubicación por defecto</span>
+                                            <span class="form-check-label small">Asignar ingreso a ubicación de prioridad 1</span>
                                         </label>
-                                        <small class="text-muted d-block">Si desactiva, podrá asignar ubicaciones manualmente desde Inventario después.</small>
+                                        <small class="text-muted d-block">Si está activo, toda la cantidad del ítem se guarda en la ubicación con menor número de prioridad de la sucursal (no quita stock de otros lotes). Si lo desactiva, podrá repartir solo la cantidad de cada lote nuevo desde el modal o desde Inventario.</small>
                                     </div>
                                     <div>
                                         <button *ngIf="!loadButton" type="button" class="btn btn-success"

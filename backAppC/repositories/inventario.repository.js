@@ -108,13 +108,75 @@ exports.crearLoteSinCompra = async (transaction, datos) => {
   const idLote = result.recordset && result.recordset[0] ? result.recordset[0].idLote : null;
 
   if (idLote && idUbicacionDefault && cant > 0) {
-    await transaction.request()
+    await transaction
+      .request()
       .input('idLote', sql.UniqueIdentifier, idLote)
       .input('idUbicacion', sql.Int, idUbicacionDefault)
-      .input('cantidad', sql.Decimal(18, 2), Math.round(cant))
+      .input('cantidad', sql.Decimal(18, 3), cant)
       .query('INSERT INTO LotesUbicacion (idLote, idUbicacion, cantidad) VALUES (@idLote, @idUbicacion, @cantidad)');
   }
   return idLote;
+};
+
+/**
+ * Suma cantidad en un lote que ya tenga fila LotesUbicacion en la ubicación (evita crear un lote nuevo
+ * cuando el stock del producto ya existe en esa ubicación).
+ * @returns {{ actualizado: boolean, idLote: string|null }}
+ */
+exports.incrementarStockEnUbicacionExistente = async (transaction, datos) => {
+  const { idEmpresa, idSucursal, idProducto, idUbicacion, cantidad } = datos;
+  const cant = parseFloat(cantidad) || 0;
+  if (cant <= 0) {
+    return { actualizado: false, idLote: null };
+  }
+  const idUb = parseInt(String(idUbicacion), 10);
+  if (!Number.isFinite(idUb) || idUb < 1) {
+    return { actualizado: false, idLote: null };
+  }
+
+  const sel = await transaction
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idUbicacion', sql.Int, idUb)
+    .query(`
+      SELECT TOP 1 l.idLote
+      FROM Lotes l
+      INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.idUbicacion = @idUbicacion
+      WHERE l.idEmpresa = @idEmpresa
+        AND l.idSucursal = @idSucursal
+        AND l.idProducto = @idProducto
+        AND l.cantidadDisponible > 0
+      ORDER BY CAST(lu.cantidad AS DECIMAL(18, 3)) DESC, l.fechaIngreso DESC, l.idLote DESC
+    `);
+  const row = sel.recordset && sel.recordset[0];
+  if (!row || !row.idLote) {
+    return { actualizado: false, idLote: null };
+  }
+  const idLote = row.idLote;
+
+  await transaction
+    .request()
+    .input('idLote', sql.UniqueIdentifier, idLote)
+    .input('idUbicacion', sql.Int, idUb)
+    .input('cant', sql.Decimal(18, 3), cant)
+    .query(
+      'UPDATE LotesUbicacion SET cantidad = cantidad + @cant WHERE idLote = @idLote AND idUbicacion = @idUbicacion'
+    );
+
+  await transaction
+    .request()
+    .input('idLote', sql.UniqueIdentifier, idLote)
+    .input('cant', sql.Decimal(18, 2), cant)
+    .query(
+      `UPDATE Lotes
+       SET cantidadDisponible = cantidadDisponible + @cant,
+           cantidadIngresada = cantidadIngresada + @cant
+       WHERE idLote = @idLote`
+    );
+
+  return { actualizado: true, idLote };
 };
 
 /**
@@ -395,6 +457,7 @@ function construirInClauseUuid(request, ids, prefijo) {
  * @param {object} opts
  * @param {string[]} opts.idsEmpresa
  * @param {string|null} opts.idSucursal
+ * @param {number|null} [opts.idUbicacion] - si viene con idSucursal, stock = suma LotesUbicacion en esa ubicación
  * @param {string|null} opts.categoriaLike - fragmento LIKE
  * @param {string|null} opts.marcaLike
  * @param {string} opts.filtroStock - 'todos' | 'cero' | 'minimo'
@@ -421,6 +484,15 @@ exports.listarStockActual = async (pool, opts) => {
     request.input('idSucursal', sql.UniqueIdentifier, idSucursal);
   }
 
+  const idUbicacion =
+    opts.idUbicacion != null && Number.isFinite(Number(opts.idUbicacion)) && Number(opts.idUbicacion) > 0
+      ? Number(opts.idUbicacion)
+      : null;
+  const usarStockPorUbicacion = idUbicacion != null && idSucursal != null;
+  if (usarStockPorUbicacion) {
+    request.input('idUbicacion', sql.Int, idUbicacion);
+  }
+
   const cat = opts.categoriaLike && String(opts.categoriaLike).trim() ? `%${String(opts.categoriaLike).trim()}%` : null;
   const mar = opts.marcaLike && String(opts.marcaLike).trim() ? `%${String(opts.marcaLike).trim()}%` : null;
   const bus = opts.buscar && String(opts.buscar).trim() ? `%${String(opts.buscar).trim()}%` : null;
@@ -433,6 +505,30 @@ exports.listarStockActual = async (pool, opts) => {
   const whereCat = cat ? 'AND c.nombre LIKE @catLike' : '';
   const whereBus = bus ? 'AND (p.codigo LIKE @busLike OR p.descripcion LIKE @busLike)' : '';
   const whereMarFixed = mar ? 'AND ISNULL(m.nombre, \'\') LIKE @marLike' : '';
+
+  const stkJoin = usarStockPorUbicacion
+    ? `
+    LEFT JOIN (
+      SELECT l.idEmpresa, l.idProducto, CAST(COALESCE(SUM(lu.cantidad), 0) AS DECIMAL(18, 3)) AS stock
+      FROM LotesUbicacion lu
+      INNER JOIN Lotes l ON l.idLote = lu.idLote
+      WHERE l.idEmpresa IN (${inClause})
+        AND lu.idUbicacion = @idUbicacion
+        ${whereSucursal}
+        AND l.cantidadDisponible > 0
+        AND lu.cantidad > 0
+      GROUP BY l.idEmpresa, l.idProducto
+    ) stk ON stk.idProducto = p.idProducto AND stk.idEmpresa = p.idEmpresa
+  `
+    : `
+    LEFT JOIN (
+      SELECT l.idEmpresa, l.idProducto, SUM(l.cantidadDisponible) AS stock
+      FROM Lotes l
+      WHERE l.idEmpresa IN (${inClause})
+      ${whereSucursal}
+      GROUP BY l.idEmpresa, l.idProducto
+    ) stk ON stk.idProducto = p.idProducto AND stk.idEmpresa = p.idEmpresa
+  `;
 
   const result = await request.query(`
     SELECT
@@ -456,13 +552,7 @@ exports.listarStockActual = async (pool, opts) => {
     LEFT JOIN Marcas m ON p.idMarca = m.idMarca
     INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
     INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
-    LEFT JOIN (
-      SELECT l.idEmpresa, l.idProducto, SUM(l.cantidadDisponible) AS stock
-      FROM Lotes l
-      WHERE l.idEmpresa IN (${inClause})
-      ${whereSucursal}
-      GROUP BY l.idEmpresa, l.idProducto
-    ) stk ON stk.idProducto = p.idProducto AND stk.idEmpresa = p.idEmpresa
+    ${stkJoin}
     WHERE p.idEmpresa IN (${inClause})
       AND p.estado = 1
       ${whereCat}
@@ -488,6 +578,35 @@ exports.obtenerStockAgregadoProductoSucursal = async (conn, idEmpresa, idSucursa
       SELECT CAST(COALESCE(SUM(l.cantidadDisponible), 0) AS DECIMAL(18, 3)) AS stock
       FROM Lotes l
       WHERE l.idEmpresa = @idEmpresa AND l.idSucursal = @idSucursal AND l.idProducto = @idProducto
+    `);
+  const row = r.recordset && r.recordset[0];
+  return row ? Number(row.stock) || 0 : 0;
+};
+
+/**
+ * Stock en una ubicación concreta (suma LotesUbicacion.cantidad enlazada a lotes del producto en la sucursal).
+ */
+exports.obtenerStockAgregadoProductoSucursalUbicacion = async (conn, idEmpresa, idSucursal, idProducto, idUbicacion) => {
+  const idUb = parseInt(String(idUbicacion), 10);
+  if (!Number.isFinite(idUb) || idUb < 1) {
+    return 0;
+  }
+  const r = await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idUbicacion', sql.Int, idUb)
+    .query(`
+      SELECT CAST(COALESCE(SUM(lu.cantidad), 0) AS DECIMAL(18, 3)) AS stock
+      FROM LotesUbicacion lu
+      INNER JOIN Lotes l ON l.idLote = lu.idLote
+      WHERE l.idEmpresa = @idEmpresa
+        AND l.idSucursal = @idSucursal
+        AND l.idProducto = @idProducto
+        AND lu.idUbicacion = @idUbicacion
+        AND l.cantidadDisponible > 0
+        AND lu.cantidad > 0
     `);
   const row = r.recordset && r.recordset[0];
   return row ? Number(row.stock) || 0 : 0;

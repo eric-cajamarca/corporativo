@@ -38,6 +38,7 @@
           <th>Precio</th>
           <th>Sucursal</th>
           <th>Stock</th>
+                <th *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center" style="width:3rem" title="Stock por ubicación">Ubic.</th>
         </tr>
       </thead>
       <tbody>
@@ -55,6 +56,19 @@
           <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
           <td>{{ p.sucursal }}</td>
           <td>{{ p.stock }}</td>
+          <td *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-nowrap" (click)="$event.stopPropagation()">
+            <button
+              *ngIf="puedeVerStockUbicaciones(p)"
+              type="button"
+              class="btn btn-sm btn-outline-secondary py-0 px-2"
+              (click)="abrirStockUbicaciones(p, $event)"
+              title="Ver stock por ubicación"
+              aria-label="Ver stock por ubicación"
+            >
+              <i class="bi bi-eye"></i>
+            </button>
+            <span *ngIf="!puedeVerStockUbicaciones(p)" class="text-muted small">—</span>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -76,9 +90,17 @@
           </div>
           <div class="small mt-1">{{ p?.descripcion }}</div>
           <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumna(p) }} · {{ p?.codigoPresentacion }}</div>
-          <div class="small d-flex justify-content-between mt-2">
+          <div class="small d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
             <span class="text-truncate me-1">{{ p?.sucursal }}</span>
             <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>
+            <button
+              *ngIf="mostrarColumnaUbicacionesBuscador() && puedeVerStockUbicaciones(p)"
+              type="button"
+              class="btn btn-sm btn-outline-secondary py-0 px-2"
+              (click)="abrirStockUbicaciones(p, $event)"
+            >
+              Stock por ubicación
+            </button>
           </div>
         </div>
       </div>
@@ -99,5 +121,38 @@
     <img [src]="imagenesProductoActual[visorIndex].url" [alt]="'Imagen ' + (visorIndex + 1)" (click)="$event.stopPropagation()" />
     <button type="button" class="visor-btn-nav visor-btn-sig" (click)="siguienteImagen(); $event.stopPropagation()" aria-label="Siguiente">›</button>
     <span class="visor-contador">{{ visorIndex + 1 }} / {{ imagenesProductoActual.length }}</span>
+  </div>
+</div>
+
+<!-- Overlay: stock por ubicación -->
+<div class="visor-fullscreen-overlay" *ngIf="modalStockUbicacionesAbierto" (click)="cerrarStockUbicaciones()">
+  <div class="bg-white rounded shadow p-3 mx-2" style="max-width: 440px; width: 100%; max-height: 85vh; overflow: auto" (click)="$event.stopPropagation()">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+      <h6 class="mb-0">Stock por ubicación</h6>
+      <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarStockUbicaciones()"></button>
+    </div>
+    <p class="small text-muted mb-2">{{ stockUbProductoDesc }}</p>
+    <p class="small text-muted mb-0" *ngIf="stockUbCargando"><i class="bi bi-hourglass-split"></i> Cargando…</p>
+    <table class="table table-sm table-bordered mb-0" *ngIf="!stockUbCargando && stockUbFilas.length > 0">
+      <thead class="table-light">
+        <tr>
+          <th>Ubicación</th>
+          <th class="text-end">Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of stockUbFilas" [class.text-muted]="u.esSinUbicacion">
+          <td>{{ u.codigoUbicacion || ('#' + u.idUbicacion) }}</td>
+          <td class="text-end">{{ u.cantidad | number : '1.0-3' }}</td>
+        </tr>
+      </tbody>
+      <tfoot *ngIf="!stockUbCargando && stockUbFilas.length > 0" class="table-light">
+        <tr class="fw-semibold">
+          <td>Total (todas las filas)</td>
+          <td class="text-end">{{ stockUbTotalCantidad() | number : '1.0-3' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="small text-muted mb-0" *ngIf="!stockUbCargando && stockUbFilas.length === 0">Sin datos de ubicación.</p>
   </div>
 </div>

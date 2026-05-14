@@ -595,11 +595,44 @@ const obtener_productos_habitacion = async (req, res) => {
   }
 };
 
+const obtener_stock_ubicaciones_producto = async (req, res) => {
+  try {
+    const idProducto = req.params.id;
+    const idSucursal = req.query && req.query.idSucursal;
+    if (!idSucursal || String(idSucursal).trim() === '') {
+      return res.status(400).json({ message: 'idSucursal es obligatorio (query)', data: undefined });
+    }
+    const data = await withPool(async (pool) =>
+      ProductosServices.obtenerStockUbicacionesProductoSucursalService(pool, idProducto, idSucursal, req.user)
+    );
+    res.status(200).json({ data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).json({ message: 'No autorizado', data: undefined });
+    }
+    if (error.message === 'NO_PERMISSIONS') {
+      return res.status(403).json({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    if (error.message === 'PRODUCTO_NO_ENCONTRADO') {
+      return res.status(404).json({ message: 'Producto no encontrado', data: undefined });
+    }
+    if (error.message === 'ID_PRODUCTO_INVALIDO' || error.message === 'ID_SUCURSAL_INVALIDO') {
+      return res.status(400).json({ message: 'Identificador inválido', data: undefined });
+    }
+    if (error.message === 'SUCURSAL_INVALIDA') {
+      return res.status(400).json({ message: 'Sucursal no válida para la empresa', data: undefined });
+    }
+    console.error('obtener_stock_ubicaciones_producto:', error);
+    res.status(500).json({ message: 'Error al obtener stock por ubicación', data: undefined });
+  }
+};
+
 module.exports = {
   obtener_productos_todos,
   obtener_productos_compras,
   obtener_productos_habitacion,
   match_productos_descripcion,
+  obtener_stock_ubicaciones_producto,
   obtener_productos_id,
   crear_producto,
   gestionProductos_Compras,

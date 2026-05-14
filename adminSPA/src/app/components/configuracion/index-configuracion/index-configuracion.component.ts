@@ -105,7 +105,9 @@ export class IndexConfiguracionComponent implements OnInit {
     /** Si es false, no se acumula descuento en el POS y en PDF el monto de descuentos se muestra 0.00 */
     usarDescuentoEnTotal: true,
     /** Tras registrar venta en “Nueva venta”, mostrar modal para generar PDF / WhatsApp */
-    mostrarModalPdfTrasRegistrarVenta: true
+    mostrarModalPdfTrasRegistrarVenta: true,
+    /** Stock por ubicación en buscador de productos y conteo físico por ubicación */
+    mostrarStockUbicacionesEnBuscador: false
   };
   public ventasGuardando = false;
 
@@ -564,6 +566,10 @@ export class IndexConfiguracionComponent implements OnInit {
           getVal('VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR', 'true'),
           true
         );
+        this.ventas.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR', 'false'),
+          false
+        );
       },
       error: () => {}
     });
@@ -587,6 +593,13 @@ export class IndexConfiguracionComponent implements OnInit {
         clave: 'VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR',
         valor: this.ventas.mostrarModalPdfTrasRegistrarVenta ? 'true' : 'false',
         descripcion: 'Al registrar una venta en Nueva venta, mostrar modal para generar comprobante PDF o WhatsApp',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR',
+        valor: this.ventas.mostrarStockUbicacionesEnBuscador ? 'true' : 'false',
+        descripcion:
+          'Mostrar en el modal de búsqueda de productos la opción de ver stock por ubicación; habilita conteo físico por ubicación al crear sesión',
         tipoDato: 'BOOLEAN'
       }
     ];

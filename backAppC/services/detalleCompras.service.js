@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const detalleComprasRepository = require('../repositories/detalleCompras.repository');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
+const conteoFisicoRepository = require('../repositories/conteoFisico.repository');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function obtenerDetallePorCompra(pool, user, idCompra) {
@@ -30,8 +31,13 @@ async function crearDetalleCompraCompleto(pool, user, body) {
   const totalVal = parseFloat(total) || 0;
   const fechaVencimientoVal = fechaVencimiento || null;
   const asignarUbicacionDefecto = asignarPorDefecto !== false;
+  const rawUbDest = body.idUbicacionDestino ?? body.idUbicacionCompra;
+  const idUbExplicita =
+    rawUbDest != null && String(rawUbDest).trim() !== '' ? parseInt(String(rawUbDest), 10) : NaN;
+  const tieneUbicacionExplicita = Number.isFinite(idUbExplicita) && idUbExplicita > 0;
+
   let idUbicacionDefault = null;
-  if (asignarUbicacionDefecto) {
+  if (asignarUbicacionDefecto && !tieneUbicacionExplicita) {
     idUbicacionDefault = await ubicacionesPrioridadRepository.getOrCreateDefaultForSucursal(idSucursal);
   }
   const transaction = new sql.Transaction(pool);
@@ -72,16 +78,36 @@ async function crearDetalleCompraCompleto(pool, user, body) {
       fechaVencimiento: fechaVencimientoVal,
       numeroLote
     });
-    if (asignarUbicacionDefecto && idLote && idUbicacionDefault) {
+    let idUbParaLote = null;
+    if (tieneUbicacionExplicita) {
+      const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(
+        transaction,
+        idSucursal,
+        idUbExplicita
+      );
+      if (!okUb) {
+        throw new Error('La ubicación de ingreso no pertenece a la sucursal del detalle');
+      }
+      idUbParaLote = idUbExplicita;
+    } else if (asignarUbicacionDefecto && idUbicacionDefault) {
+      idUbParaLote = idUbicacionDefault;
+    }
+    if (idLote && idUbParaLote != null) {
       await detalleComprasRepository.insertarLoteUbicacion(
         transaction,
         idLote,
-        idUbicacionDefault,
+        idUbParaLote,
         Math.round(cantidadVal)
       );
     }
     await transaction.commit();
-    return { numeroLote, idLote, asignarUbicacionDefecto };
+    const viaPrioridad1 = asignarUbicacionDefecto && !tieneUbicacionExplicita && idUbParaLote != null;
+    return {
+      numeroLote,
+      idLote,
+      asignarUbicacionDefecto: viaPrioridad1,
+      ubicacionAsignada: idUbParaLote != null
+    };
   } catch (err) {
     await transaction.rollback();
     throw err;

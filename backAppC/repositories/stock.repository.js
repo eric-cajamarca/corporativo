@@ -50,7 +50,7 @@ exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSu
  * Query: filas para descontar por prioridad (Lotes + LotesUbicacion + UbicacionesPrioridad).
  * Filtra por idEmpresa (multiempresa), idSucursal opcional, idProducto. Orden: prioridad ASC.
  */
-const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucursalFiltro) => {
+const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucursalFiltro, idUbicacionFiltro) => {
   const req = transaction.request();
   req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
   req.input('idProducto', sql.UniqueIdentifier, idProducto);
@@ -59,6 +59,14 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
     : '';
   if (idSucursalFiltro != null && idSucursalFiltro !== '') {
     req.input('idSucursal', sql.UniqueIdentifier, idSucursalFiltro);
+  }
+  const idUbF =
+    idUbicacionFiltro != null && idUbicacionFiltro !== ''
+      ? parseInt(String(idUbicacionFiltro), 10)
+      : NaN;
+  const whereUb = Number.isFinite(idUbF) && idUbF > 0 ? ' AND lu.idUbicacion = @idUbicacionFiltro' : '';
+  if (whereUb) {
+    req.input('idUbicacionFiltro', sql.Int, idUbF);
   }
   const rs = await req.query(`
     SELECT
@@ -73,6 +81,7 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
       AND l.idProducto = @idProducto
       AND l.cantidadDisponible > 0
       ${whereSucursal}
+      ${whereUb}
     ORDER BY up.prioridad ASC, l.idLote
   `);
   return rs.recordset || [];
@@ -91,6 +100,15 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   if (!idEmpresa || !idProducto) return { consumosPorLote: [] };
 
   const controlUbicaciones = opciones.controlUbicaciones !== false;
+  const idUbicacionSoloRaw = opciones.idUbicacionSolo;
+  const idUbicacionSoloParsed =
+    idUbicacionSoloRaw != null && idUbicacionSoloRaw !== ''
+      ? parseInt(String(idUbicacionSoloRaw), 10)
+      : NaN;
+  const idUbicacionSolo =
+    controlUbicaciones && Number.isFinite(idUbicacionSoloParsed) && idUbicacionSoloParsed > 0
+      ? idUbicacionSoloParsed
+      : null;
   const conSucursal = idSucursal != null && idSucursal !== '';
   let restante = cant;
   const consumos = [];
@@ -128,10 +146,16 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
 
   if (controlUbicaciones) {
     if (conSucursal) {
-      const filasSuc = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, idSucursal);
+      const filasSuc = await queryFilasPorPrioridad(
+        transaction,
+        idEmpresa,
+        idProducto,
+        idSucursal,
+        idUbicacionSolo
+      );
       await descontarPorPrioridad(filasSuc);
     }
-    if (restante > 0) {
+    if (!idUbicacionSolo && restante > 0) {
       if (conSucursal) {
         const reqOtras = transaction.request();
         reqOtras.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
@@ -148,13 +172,17 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         `);
         await descontarPorPrioridad(rsOtras.recordset || []);
       } else {
-        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null);
+        const filasTodas = await queryFilasPorPrioridad(transaction, idEmpresa, idProducto, null, null);
         await descontarPorPrioridad(filasTodas);
       }
     }
   }
 
   if (restante <= 0) return { consumosPorLote: consumos };
+
+  if (idUbicacionSolo) {
+    throw new Error('Stock insuficiente en la ubicación seleccionada');
+  }
 
   const ejecutarDescuentoSoloLotes = async (filas) => {
     for (const row of filas) {

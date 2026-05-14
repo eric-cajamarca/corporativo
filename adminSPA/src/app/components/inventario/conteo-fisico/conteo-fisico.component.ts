@@ -13,8 +13,10 @@ import { SucursalService } from '../../../services/sucursal.service';
 import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
 import { PresentacionService } from '../../../services/presentacion.service';
-import { ConteoFisicoService, UpsertLineaConteoBody } from '../../../services/conteo-fisico.service';
+import { ConteoFisicoService, CrearSesionConteoBody, UpsertLineaConteoBody } from '../../../services/conteo-fisico.service';
 import { ProductoCrearModalService } from '../../../services/producto-crear-modal.service';
+import { GestoresService } from '../../../services/gestores.service';
+import { UbicacionPrioridadService } from '../../../services/ubicacion-prioridad.service';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
@@ -27,6 +29,7 @@ import {
   InventarioFisicoSesionDto,
   TipoConteoFisico
 } from '../../../models/conteo-fisico.model';
+import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void };
 
@@ -50,6 +53,8 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private conteoService = inject(ConteoFisicoService);
   private modalService = inject(NgbModal);
   private productoCrearModal = inject(ProductoCrearModalService);
+  private gestoresService = inject(GestoresService);
+  private ubicacionPrioridadService = inject(UbicacionPrioridadService);
   private excelService = inject(ExcelService);
   private pdfService = inject(PdfService);
   private route = inject(ActivatedRoute);
@@ -62,6 +67,10 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   idSucursalNuevaSesion = '';
   tipoConteoNueva: TipoConteoFisico = 'MENSUAL';
   observacionesNueva = '';
+  /** Selector de ubicación: visible si INVENTARIO_CONTROL_UBICACIONES está activo. */
+  mostrarOpcionUbicacionConteo = false;
+  ubicacionesSucursal: Array<{ idUbicacion: number; codigoUbicacion: string }> = [];
+  idUbicacionNuevaSesion: number | null = null;
 
   sesion: InventarioFisicoSesionDto | null = null;
   lineas: InventarioFisicoLineaDto[] = [];
@@ -72,7 +81,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   cargandoBusqueda = false;
   productoSeleccionado: StockActualItem | null = null;
   stockRealInput: number | null = null;
-  verificadoInput = false;
+  verificadoInput = true;
   notasInput = '';
 
   /** Catálogos para editar maestro del producto en el panel lateral */
@@ -101,6 +110,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       this.buscarCatalogo();
     });
     this.cargarSucursales();
+    this.cargarOpcionUbicacionConteo();
     const inicial = this.route.snapshot.queryParamMap.get('idSesion');
     if (inicial) {
       this.idSesionEnCurso = inicial;
@@ -296,6 +306,54 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Muestra selector de ubicación si el inventario usa stock por ubicación (INVENTARIO_CONTROL_UBICACIONES). */
+  private cargarOpcionUbicacionConteo(): void {
+    this.gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = Array.isArray(res?.data) ? res.data : [];
+        const norm = (c: { clave?: string; Clave?: string }) =>
+          String(c?.clave ?? c?.Clave ?? '')
+            .trim()
+            .toUpperCase();
+        const row = lista.find((c) => norm(c) === 'INVENTARIO_CONTROL_UBICACIONES');
+        const v =
+          row && (row as { valor?: string; Valor?: string }).valor !== undefined
+            ? (row as { valor?: string; Valor?: string }).valor
+            : (row as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarOpcionUbicacionConteo = interpretarBooleanoConfig(v, true);
+        if (this.mostrarOpcionUbicacionConteo && this.idSucursalNuevaSesion) {
+          this.onCambioSucursalNuevaSesion();
+        }
+      },
+      error: () => {
+        this.mostrarOpcionUbicacionConteo = false;
+      }
+    });
+  }
+
+  onCambioSucursalNuevaSesion(): void {
+    this.idUbicacionNuevaSesion = null;
+    this.ubicacionesSucursal = [];
+    if (!this.mostrarOpcionUbicacionConteo || !this.idSucursalNuevaSesion?.trim()) {
+      return;
+    }
+    this.ubicacionPrioridadService.obtener_ubicacionesPrioridad_sucursal(this.idSucursalNuevaSesion.trim()).subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.ubicacionesSucursal = arr
+          .map((u: { idUbicacion?: number; codigoUbicacion?: string }) => ({
+            idUbicacion: Number(u.idUbicacion),
+            codigoUbicacion: String(u.codigoUbicacion ?? '').trim()
+          }))
+          .filter((u) => Number.isFinite(u.idUbicacion) && u.idUbicacion > 0);
+      },
+      error: () => {
+        this.ubicacionesSucursal = [];
+      }
+    });
+  }
+
   onBuscarInput(): void {
     this.buscarSubject.next(this.buscar);
   }
@@ -305,13 +363,15 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       iziToast.error({ title: 'Validación', message: 'Seleccione sucursal', position: 'topRight' });
       return;
     }
-    this.conteoService
-      .crearSesion({
-        idSucursal: this.idSucursalNuevaSesion.trim(),
-        tipoConteo: this.tipoConteoNueva,
-        observaciones: this.observacionesNueva?.trim() || null
-      })
-      .subscribe({
+    const body: CrearSesionConteoBody = {
+      idSucursal: this.idSucursalNuevaSesion.trim(),
+      tipoConteo: this.tipoConteoNueva,
+      observaciones: this.observacionesNueva?.trim() || null
+    };
+    if (this.mostrarOpcionUbicacionConteo && this.idUbicacionNuevaSesion != null) {
+      body.idUbicacionInventario = this.idUbicacionNuevaSesion;
+    }
+    this.conteoService.crearSesion(body).subscribe({
         next: (r) => {
           iziToast.success({ title: 'Sesión', message: r.message || 'Creada', position: 'topRight' });
           this.router.navigate([], {
@@ -365,12 +425,14 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       return;
     }
     this.cargandoBusqueda = true;
-    this.inventarioApi
-      .obtenerStockActual({
-        idSucursal: this.sesion.idSucursal,
-        buscar: this.buscar?.trim() || null,
-        filtroStock: 'todos'
-      })
+    this.inventarioApi.obtenerStockActual({
+      idSucursal: this.sesion.idSucursal,
+      buscar: this.buscar?.trim() || null,
+      filtroStock: 'todos',
+      ...(this.sesionInventarioPorUbicacion() && this.sesion?.idUbicacionInventario != null
+        ? { idUbicacion: this.sesion.idUbicacionInventario }
+        : {})
+    })
       .subscribe({
         next: (res) => {
           this.resultados = res.items || [];
@@ -385,8 +447,23 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       });
   }
 
+  /** Sesión creada con ubicación: referencias y movimientos son por esa ubicación. */
+  sesionInventarioPorUbicacion(): boolean {
+    const u = this.sesion?.idUbicacionInventario;
+    const n = u != null ? Number(u) : NaN;
+    return Number.isFinite(n) && n > 0;
+  }
+
+  etiquetaUbicacionSesion(): string {
+    if (!this.sesionInventarioPorUbicacion() || !this.sesion) {
+      return '';
+    }
+    const c = String(this.sesion.codigoUbicacionInventario ?? '').trim();
+    return c || `#${this.sesion.idUbicacionInventario}`;
+  }
+
   elegirProducto(p: StockActualItem): void {
-    this.productoSeleccionado = p;
+    this.productoSeleccionado = { ...p };
     const existente = this.lineas.find((l) => this.mismoUuid(l.idProducto, p.idProducto));
     if (existente) {
       this.stockRealInput = existente.stockReal != null ? Number(existente.stockReal) : null;
@@ -394,6 +471,9 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     } else {
       this.stockRealInput = Number(p.stock) || 0;
       this.notasInput = '';
+    }
+    if (existente && this.sesionInventarioPorUbicacion()) {
+      this.productoSeleccionado = { ...p, stock: Number(existente.stockSistema) || 0 };
     }
     this.descripcionEdit = String(p.descripcion || '');
     const idCat = p.idCategoria != null && p.idCategoria !== undefined ? Number(p.idCategoria) : NaN;
@@ -408,7 +488,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       idMarca: this.idMarcaEdit ?? 0,
       idPresentacion: this.idPresentacionEdit ?? 0
     };
-    this.verificadoInput = existente ? !!existente.verificado : false;
+    this.verificadoInput = existente ? !!existente.verificado : true;
     setTimeout(() => {
       const el = this.detalleConteoRef()?.nativeElement;
       if (el) {
@@ -430,7 +510,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   limpiarSeleccionProducto(): void {
     this.productoSeleccionado = null;
     this.stockRealInput = null;
-    this.verificadoInput = false;
+    this.verificadoInput = true;
     this.notasInput = '';
     this.descripcionEdit = '';
     this.idCategoriaEdit = null;
@@ -465,6 +545,18 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       verificado: this.verificadoInput,
       notas: this.notasInput?.trim() || null
     };
+    const rawSr = this.stockRealInput;
+    const tieneStockRealCapturado =
+      rawSr != null && String(rawSr).trim() !== '' && Number.isFinite(Number(rawSr));
+    if (tieneStockRealCapturado && !this.verificadoInput) {
+      iziToast.error({
+        title: 'Verificación',
+        message:
+          'Si ingresó «Stock real», marque «Verificado» antes de guardar; sin eso la línea no se incluye al registrar movimientos.',
+        position: 'topRight'
+      });
+      return;
+    }
     if (this.maestroCatalogoCambio()) {
       const descTrim = String(this.descripcionEdit ?? '').trim();
       if (!descTrim) {
@@ -571,7 +663,9 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       .subscribe({
       next: (r) => {
         this.aplicando = false;
-        iziToast.success({ title: 'Listo', message: r.message || 'Aplicado', position: 'topRight' });
+        const n = r?.movimientosGenerados != null ? Number(r.movimientosGenerados) : 0;
+        const extra = Number.isFinite(n) && n >= 0 ? ` (${n} ítem${n === 1 ? '' : 's'} de ajuste).` : '';
+        iziToast.success({ title: 'Listo', message: (r.message || 'Aplicado') + extra, position: 'topRight' });
         this.cargarSesion(this.idSesionEnCurso!);
       },
       error: (err) => {

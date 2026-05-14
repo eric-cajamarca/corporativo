@@ -108,3 +108,129 @@
     </div>
   </div>
 </main>
+
+<!-- Modal forma de pago (misma idea que nueva venta) -->
+<div class="modal fade" id="modalPagoEdicion" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content shadow-xl rounded-10">
+      <div class="modal-header bg-gradient-info text-white">
+        <h5 class="modal-title fw-600">
+          <i class="bi bi-cash-coin me-2"></i>Forma de pago
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body p-4">
+        <div class="row g-3 justify-content-center mb-4">
+          <div class="col-md-3">
+            <label class="form-label fw-bold">
+              <i class="bi bi-currency-dollar me-1"></i>Deuda total
+            </label>
+            <input type="text" class="form-control text-center bg-light fw-bold" [value]="(total | number:'1.2-2') || '0.00'" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">
+              <i class="bi bi-wallet2 me-1"></i>Paga con
+            </label>
+            <input type="number" class="form-control text-center fw-bold" [(ngModel)]="pagaCon" (input)="calcularVuelto()" placeholder="0.00" step="0.01" min="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-bold">
+              <i class="bi bi-currency-exchange me-1"></i>Vuelto
+            </label>
+            <input type="text" class="form-control text-center fw-bold bg-light" [class.text-success]="vuelto >= 0" [class.text-danger]="vuelto < 0" [value]="vuelto | number:'1.2-2'" readonly>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h6 class="fw-bold text-primary mb-3">
+          <i class="bi bi-list-check me-2"></i>Detalle de pago
+        </h6>
+
+        <div class="row g-2 mb-4 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small">
+              <i class="bi bi-credit-card-2-front me-1"></i>Forma de pago
+            </label>
+            <select class="form-select form-select-sm" [(ngModel)]="formaPagoSeleccionada.idFormaPago">
+              <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">
+              <i class="bi bi-cash-stack me-1"></i>Monto
+            </label>
+            <input type="number" class="form-control form-control-sm" [(ngModel)]="detailForm.monto" [placeholder]="(total | number:'1.2-2') || '0.00'" step="0.01" min="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">
+              <i class="bi bi-upc-scan me-1"></i>Referencia
+            </label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="detailForm.referencia" placeholder="N° operación">
+          </div>
+          <div class="col-md-2 d-flex align-items-end pb-1">
+            <button type="button" class="btn btn-success btn-sm w-100" (click)="agregarDetallePago()" title="Agregar">
+              <i class="bi bi-plus-circle me-1"></i>Agregar
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-hover table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th class="text-center" style="width: 5%">#</th>
+                <th style="width: 25%">Forma de pago</th>
+                <th style="width: 20%">Monto</th>
+                <th style="width: 35%">Referencia</th>
+                <th class="text-center" style="width: 15%">Quitar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let detalle of detallePago; let i = index">
+                <td class="text-center">{{ detalle.item }}</td>
+                <td>{{ detalle.descripcion }}</td>
+                <td class="text-end align-middle p-1">
+                  <input type="number" class="form-control text-end modal-pago-monto-fila" [(ngModel)]="detalle.monto" (ngModelChange)="onMontoTablaDetallePagoChange()" (blur)="normalizarMontoDetallePago(detalle)" step="0.01" min="0" inputmode="decimal">
+                </td>
+                <td>{{ detalle.referencia }}</td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarFilaDetallePago(i)" title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="detallePago.length === 0">
+                <td colspan="5" class="text-center text-muted py-3">
+                  <i class="bi bi-inbox me-1"></i>No se han agregado formas de pago
+                </td>
+              </tr>
+            </tbody>
+            <tfoot class="table-info">
+              <tr>
+                <td colspan="2" class="fw-bold text-end">TOTAL</td>
+                <td class="fw-bold text-end">
+                  {{ calcularTotalTablaDetallePago() | number:'1.2-2' }}
+                </td>
+                <td colspan="2" class="fw-bold">
+                  Saldo: {{ (total - calcularTotalTablaDetallePago()) | number:'1.2-2' }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-2"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-primary" (click)="confirmarGuardarConPago()" [disabled]="saving">
+          <span *ngIf="saving"><i class="bi bi-hourglass-split"></i> Guardando...</span>
+          <span *ngIf="!saving"><i class="bi bi-check-circle me-2"></i>Guardar pago</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

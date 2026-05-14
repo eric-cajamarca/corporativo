@@ -16,7 +16,7 @@ const obtenerSucursalesUsuario = async (pool, idUsuario, idEmpresa) => {
                 us.esDefault,
                 us.estado,
                 CONVERT(VARCHAR(19), us.fAsignacion, 120) as fAsignacion,
-                s.codigo as codigoSucursal,
+                s.nombre as codigoSucursal,
                 s.direccion as direccionSucursal,
                 s.telefono as telefonoSucursal,
                 s.estado as estadoSucursal
@@ -24,7 +24,7 @@ const obtenerSucursalesUsuario = async (pool, idUsuario, idEmpresa) => {
             INNER JOIN Sucursal s ON us.idSucursal = s.idSucursal
             WHERE us.idUsuario = @idUsuario
             AND s.idEmpresa = @idEmpresa
-            ORDER BY us.esDefault DESC, s.codigo
+            ORDER BY us.esDefault DESC, s.nombre
         `);
     return result.recordset;
 };
@@ -41,7 +41,7 @@ const obtenerSucursalesActivasUsuario = async (pool, idUsuario, idEmpresa) => {
                 us.idUsuarioSucursal,
                 us.idSucursal,
                 us.esDefault,
-                s.codigo as codigoSucursal,
+                s.nombre as codigoSucursal,
                 s.direccion as direccionSucursal,
                 s.telefono as telefonoSucursal
             FROM UsuarioSucursal us
@@ -50,7 +50,7 @@ const obtenerSucursalesActivasUsuario = async (pool, idUsuario, idEmpresa) => {
             AND s.idEmpresa = @idEmpresa
             AND ISNULL(us.estado, 1) = 1
             AND ISNULL(s.estado, 1) = 1
-            ORDER BY us.esDefault DESC, s.codigo
+            ORDER BY us.esDefault DESC, s.nombre
         `);
     return result.recordset;
 };
@@ -186,7 +186,7 @@ const obtenerSucursalDefault = async (pool, idUsuario, idEmpresa) => {
         .query(`
             SELECT TOP 1
                 us.idSucursal,
-                s.codigo,
+                s.nombre AS codigo,
                 s.direccion
             FROM UsuarioSucursal us
             INNER JOIN Sucursal s ON us.idSucursal = s.idSucursal

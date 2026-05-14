@@ -7,7 +7,8 @@ import {
   ProductoCreate,
   ProductoResponse,
   ImportacionProductosValidarData,
-  ImportacionProductosEjecutarData
+  ImportacionProductosEjecutarData,
+  StockUbicacionProductoFila
 } from '../models/producto.models';
 import { environment } from '../../environments/environment';
 
@@ -76,6 +77,19 @@ export class ProductoService {
     return this._http.get<ProductoResponse>(this.url + 'productos/' + id, {
       withCredentials: true
     });
+  }
+
+  /** Stock desglosado por ubicación (sucursal del query; empresa del JWT). */
+  obtenerStockUbicacionesProducto(
+    idProducto: string,
+    idSucursal: string
+  ): Observable<{ data: StockUbicacionProductoFila[] }> {
+    const pid = encodeURIComponent(idProducto);
+    const sid = encodeURIComponent(idSucursal);
+    return this._http.get<{ data: StockUbicacionProductoFila[] }>(
+      `${this.url}productos/${pid}/stock-ubicaciones?idSucursal=${sid}`,
+      { withCredentials: true }
+    );
   }
 
   crearProducto(producto: ProductoCreate): Observable<ProductoResponse> {

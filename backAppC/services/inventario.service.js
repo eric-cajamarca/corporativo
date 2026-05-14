@@ -11,6 +11,7 @@ const permisosService = require('./permisos.service');
 const stockService = require('./stock.service');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
+const conteoFisicoRepository = require('../repositories/conteoFisico.repository');
 
 /** Mapeo tipo frontend -> { tipoBD: 'EN'|'SA'|'AJ', esEntrada: boolean } */
 const TIPOS_MOVIMIENTO = {
@@ -303,12 +304,27 @@ exports.procesarMovimiento = async (idEmpresa, idUsuario, body) => {
  * @returns {{ primerIdMovimiento: number|null, comprobanteActual: object|null }}
  */
 async function ejecutarProcesarMovimientoNoTransferencia(transaction, idEmpresa, idUsuario, body, opts) {
-  const { mapa, controlUbicaciones } = opts;
+  const { mapa, controlUbicaciones, idUbicacionMovimiento } = opts;
   const { tipoMovimiento, idSucursal, fechaMovimiento, docRelacionado, observaciones, items, idComprobante } = body;
+
+  const idUbParsed =
+    idUbicacionMovimiento != null && idUbicacionMovimiento !== ''
+      ? parseInt(String(idUbicacionMovimiento), 10)
+      : NaN;
+  const idUbicacionExplicita =
+    Number.isFinite(idUbParsed) && idUbParsed > 0 ? idUbParsed : null;
+
+  /** Descuentos por ubicación solo si el inventario usa LotesUbicacion. */
+  const idUbicacionMovSalida =
+    controlUbicaciones && idUbicacionExplicita != null ? idUbicacionExplicita : null;
 
   let idUbicacionDefault = null;
   if (mapa.esEntrada) {
-    idUbicacionDefault = await ubicacionesPrioridadRepository.getOrCreateDefaultForSucursal(idSucursal);
+    if (idUbicacionExplicita != null) {
+      idUbicacionDefault = idUbicacionExplicita;
+    } else if (controlUbicaciones) {
+      idUbicacionDefault = await ubicacionesPrioridadRepository.getOrCreateDefaultForSucursal(idSucursal);
+    }
   }
 
   let docRelacionadoFinal = docRelacionado || null;
@@ -349,28 +365,58 @@ async function ejecutarProcesarMovimientoNoTransferencia(transaction, idEmpresa,
     let idLote = null;
     if (mapa.esEntrada) {
       const costoUnitario = parseFloat(item.costoUnitario) || 0;
-      const numeroLote = item.numeroLote != null && item.numeroLote !== '' ? String(item.numeroLote) : String(siguienteNumLote++);
-      idLote = await inventarioRepository.crearLoteSinCompra(transaction, {
-        idEmpresa,
-        idProducto: item.idProducto,
-        idSucursal,
-        costoUnitario,
-        cantidad,
-        fechaVencimiento: item.fechaVencimiento || null,
-        numeroLote,
-        idUbicacionDefault
-      });
+      if (idUbicacionDefault) {
+        const incRes = await inventarioRepository.incrementarStockEnUbicacionExistente(transaction, {
+          idEmpresa,
+          idSucursal,
+          idProducto: item.idProducto,
+          idUbicacion: idUbicacionDefault,
+          cantidad
+        });
+        if (incRes && incRes.actualizado) {
+          idLote = incRes.idLote;
+        }
+      }
+      if (!idLote) {
+        const numeroLote =
+          item.numeroLote != null && item.numeroLote !== ''
+            ? String(item.numeroLote)
+            : String(siguienteNumLote++);
+        idLote = await inventarioRepository.crearLoteSinCompra(transaction, {
+          idEmpresa,
+          idProducto: item.idProducto,
+          idSucursal,
+          costoUnitario,
+          cantidad,
+          fechaVencimiento: item.fechaVencimiento || null,
+          numeroLote,
+          idUbicacionDefault
+        });
+      }
     } else {
-      const disponible = await stockService.obtenerStockDisponible(transaction, idEmpresa, item.idProducto, idSucursal);
+      const disponible =
+        idUbicacionMovSalida != null
+          ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
+              transaction,
+              idEmpresa,
+              idSucursal,
+              item.idProducto,
+              idUbicacionMovSalida
+            )
+          : await stockService.obtenerStockDisponible(transaction, idEmpresa, item.idProducto, idSucursal);
       if (disponible < cantidad) {
         throw new Error(`Stock insuficiente para producto. Solicitado: ${cantidad}, disponible: ${disponible}`);
       }
-      const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
-        idEmpresa,
-        idSucursal,
-        idProducto: item.idProducto,
-        cantidad
-      }, { controlUbicaciones });
+      const resultadoDescuento = await stockService.descontarDesdeLotes(
+        transaction,
+        {
+          idEmpresa,
+          idSucursal,
+          idProducto: item.idProducto,
+          cantidad
+        },
+        { controlUbicaciones, idUbicacionSolo: idUbicacionMovSalida }
+      );
       const consumos = resultadoDescuento?.consumosPorLote || [];
       if (consumos.length > 0) {
         for (const c of consumos) {
@@ -491,7 +537,8 @@ exports.obtenerTiposMovimiento = () => {
 
 /**
  * Stock actual por producto (Lotes agregados). Requiere VER_INVENTARIO o Administrador.
- * Query: idSucursal?, categoria?, marca?, filtroStock=todos|cero|minimo, buscar?
+ * Query: idSucursal?, idUbicacion? (stock en esa ubicación; requiere INVENTARIO_CONTROL_UBICACIONES y idSucursal),
+ * categoria?, marca?, filtroStock=todos|cero|minimo, buscar?
  */
 exports.obtenerStockActual = async (user, query) => {
   if (!user || !user.empresa) {
@@ -518,9 +565,35 @@ exports.obtenerStockActual = async (user, query) => {
         idSucursal = null;
       }
     }
+    const rawUb = query.idUbicacion != null && String(query.idUbicacion).trim() !== '' ? String(query.idUbicacion).trim() : '';
+    let idUbicacion = null;
+    if (rawUb !== '') {
+      const n = parseInt(rawUb, 10);
+      if (Number.isFinite(n) && n > 0) {
+        idUbicacion = n;
+      }
+    }
+    if (idUbicacion != null) {
+      if (!idSucursal) {
+        throw new Error('idUbicacion requiere idSucursal');
+      }
+      const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa).catch(() => []);
+      const controlUb =
+        String(getConfig(configRows, 'INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+      if (!controlUb) {
+        throw new Error(
+          'El listado por ubicación requiere activar «Gestionar stock por ubicación» (INVENTARIO_CONTROL_UBICACIONES) en configuración de inventario.'
+        );
+      }
+      const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(pool, idSucursal, idUbicacion);
+      if (!okUb) {
+        throw new Error('La ubicación no pertenece a la sucursal indicada');
+      }
+    }
     const items = await inventarioRepository.listarStockActual(pool, {
       idsEmpresa,
       idSucursal,
+      idUbicacion,
       categoriaLike: query.categoria || null,
       marcaLike: query.marca || null,
       filtroStock,

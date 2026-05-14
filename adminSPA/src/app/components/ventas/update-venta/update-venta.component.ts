@@ -7,7 +7,14 @@ import { catchError } from 'rxjs/operators';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
-import { VentasService, ComprobantePdfData, DetalleVentaEdicionPayload, VentaEdicionPayload } from '../../../services/ventas.service';
+import {
+  VentasService,
+  ComprobantePdfData,
+  DetalleVentaEdicionPayload,
+  VentaEdicionPayload
+} from '../../../services/ventas.service';
+import { DocumentoService } from '../../../services/documento.service';
+import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
@@ -21,6 +28,15 @@ export interface ClienteOption {
 }
 
 declare var iziToast: any;
+declare var bootstrap: { Modal: { getOrCreateInstance: (el: HTMLElement) => { show: () => void; hide: () => void }; getInstance: (el: HTMLElement | null) => { hide: () => void } | null } };
+
+interface DetallePagoEdicionUi {
+  item: number;
+  idFormaPago: number;
+  descripcion: string;
+  monto: number;
+  referencia: string;
+}
 
 interface DetalleEdicion {
   idDetalle?: number;
@@ -51,6 +67,8 @@ export class UpdateVentaComponent implements OnInit {
   mensajeNoEditable = '';
   compVenta = '';
   fEmision = '';
+  /** Fecha/hora de emisión tal cual vino del API (para no perder la hora al guardar con solo `<input type="date">`). */
+  fEmisionOriginalCompleta = '';
   idCliente: number | null = null;
   clienteRazonSocial = '';
   clienteRuc = '';
@@ -67,10 +85,34 @@ export class UpdateVentaComponent implements OnInit {
   /** Impuestos activos de la empresa (misma fuente que nueva venta). */
   impuestosActivosEmpresa: Impuesto[] = [];
 
+  formasPago: FormaPago[] = [];
+  formaPagoSeleccionada: FormaPago = {
+    idFormaPago: 0,
+    descripcion: '',
+    tipo: 0,
+    requiereReferencia: 0,
+    activo: 0,
+    recibido: 0,
+    vuelto: 0,
+    referencia: ''
+  };
+  detallePago: DetallePagoEdicionUi[] = [];
+  detailForm = { monto: 0, referencia: '' };
+  pagaCon = 0;
+  vuelto = 0;
+  /** Estado de pago al cargar (1 = pendiente; no se exige coincidencia exacta con el total). */
+  idEstadoPagoCargado = 2;
+  codigoComprobanteEdicion = '';
+  private payloadEdicionPendiente: {
+    venta: VentaEdicionPayload;
+    detalles: DetalleVentaEdicionPayload[];
+  } | null = null;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private ventasService: VentasService,
+    private documentoService: DocumentoService,
     private buscadorProductosModal: BuscadorProductosModalService,
     private clienteService: ClienteService,
     private impuestoService: ImpuestoService,
@@ -87,11 +129,13 @@ export class UpdateVentaComponent implements OnInit {
 
     forkJoin({
       comp: this.ventasService.getComprobanteParaPdf(this.idVenta),
-      imp: this.impuestoService.obtenerTodos().pipe(catchError(() => of({ data: [] as Impuesto[] })))
+      imp: this.impuestoService.obtenerTodos().pipe(catchError(() => of({ data: [] as Impuesto[] }))),
+      formas: this.documentoService.getFormasPago().pipe(catchError(() => of({ data: [] as FormaPago[] })))
     }).subscribe({
-      next: ({ comp, imp }) => {
+      next: ({ comp, imp, formas }) => {
         const list: Impuesto[] = imp?.data || [];
         this.impuestosActivosEmpresa = list.filter((i) => this.impuestoEstaActivo(i));
+        this.formasPago = Array.isArray(formas?.data) ? formas.data : [];
 
         const data: ComprobantePdfData | null = comp?.data ?? null;
         if (!data) {
@@ -132,7 +176,8 @@ export class UpdateVentaComponent implements OnInit {
           this.noEditable = false;
         }
         this.compVenta = v.compVenta || '';
-        this.fEmision = (v.fEmision || '').toString().slice(0, 10);
+        this.fEmisionOriginalCompleta = (v.fEmision ?? '').toString().trim();
+        this.fEmision = this.fEmisionOriginalCompleta.slice(0, 10);
         this.idCliente = v.idCliente != null ? Number(v.idCliente) : null;
         this.clienteRazonSocial = (data.cliente?.razonSocial || data.cliente?.rSocial || '').toString();
         this.clienteRuc = (data.cliente?.ruc || '').toString();
@@ -155,6 +200,10 @@ export class UpdateVentaComponent implements OnInit {
           };
         });
         this.recalcularTotal();
+        this.codigoComprobanteEdicion = (v.codigoComprobante || '').trim().toUpperCase();
+        this.idEstadoPagoCargado =
+          v.idEstadoPago != null && !Number.isNaN(Number(v.idEstadoPago)) ? Number(v.idEstadoPago) : 2;
+        this.initDetallePagoDesdeComprobante(data);
         this.loading = false;
       },
       error: () => {
@@ -304,6 +353,203 @@ export class UpdateVentaComponent implements OnInit {
     return 'S/ ' + Number(value).toFixed(2);
   }
 
+  private initDetallePagoDesdeComprobante(data: ComprobantePdfData): void {
+    this.detallePago = [];
+    const rows = data.detallePago || [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const idMp = Number(r.idMediosPago);
+      if (!Number.isFinite(idMp) || idMp <= 0) continue;
+      const fp = this.formasPago.find((f) => Number(f.idFormaPago) === idMp);
+      this.detallePago.push({
+        item: this.detallePago.length + 1,
+        idFormaPago: idMp,
+        descripcion: fp?.descripcion || `Medio ${idMp}`,
+        monto: this.redondear2(Number(r.monto) || 0),
+        referencia: 'N/A'
+      });
+    }
+    this.detallePago.forEach((row, idx) => {
+      row.item = idx + 1;
+    });
+    const tot = this.redondear2(Number(this.total) || 0);
+    if (this.detallePago.length === 0 && tot > 0) {
+      const eff = this.formasPago.find((f) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO');
+      if (eff?.idFormaPago != null) {
+        this.detallePago.push({
+          item: 1,
+          idFormaPago: Number(eff.idFormaPago),
+          descripcion: eff.descripcion || 'EFECTIVO',
+          monto: tot,
+          referencia: 'N/A'
+        });
+      }
+    }
+  }
+
+  calcularVuelto(): void {
+    this.vuelto = this.redondear2((Number(this.pagaCon) || 0) - (Number(this.total) || 0));
+  }
+
+  calcularTotalTablaDetallePago(): number {
+    return this.redondear2(
+      this.detallePago.reduce((sum, item) => sum + (Number(item.monto) || 0), 0)
+    );
+  }
+
+  agregarDetallePago(): void {
+    const monto = this.redondear2(Number(this.detailForm.monto) || 0);
+    const idForma =
+      this.formaPagoSeleccionada?.idFormaPago != null ? Number(this.formaPagoSeleccionada.idFormaPago) : 0;
+    if (monto <= 0 || !idForma) return;
+
+    const desc =
+      this.formasPago.find((f) => Number(f.idFormaPago) === idForma)?.descripcion || 'Pago';
+    const ref = (this.detailForm.referencia || '').trim() || 'N/A';
+
+    const existente = this.detallePago.find((d) => Number(d.idFormaPago) === idForma);
+    if (existente) {
+      existente.monto = this.redondear2((Number(existente.monto) || 0) + monto);
+    } else {
+      this.detallePago.push({
+        item: this.detallePago.length + 1,
+        idFormaPago: idForma,
+        descripcion: desc,
+        monto,
+        referencia: ref
+      });
+      this.detallePago.forEach((item, idx) => {
+        item.item = idx + 1;
+      });
+    }
+
+    this.detailForm.referencia = '';
+    this.actualizarMontoSaldo();
+  }
+
+  eliminarFilaDetallePago(index: number): void {
+    if (index < 0 || index >= this.detallePago.length) return;
+    this.detallePago.splice(index, 1);
+    this.detallePago.forEach((item, idx) => {
+      item.item = idx + 1;
+    });
+    this.actualizarMontoSaldo();
+  }
+
+  normalizarMontoDetallePago(detalle: DetallePagoEdicionUi): void {
+    const n = this.redondear2(Number(detalle.monto) || 0);
+    detalle.monto = n < 0 ? 0 : n;
+    this.actualizarMontoSaldo();
+  }
+
+  onMontoTablaDetallePagoChange(): void {
+    this.actualizarMontoSaldo();
+  }
+
+  getSaldoPendientePago(): number {
+    const total = Number(this.total) || 0;
+    const pendiente = Math.max(0, total - this.calcularTotalTablaDetallePago());
+    return this.redondear2(pendiente);
+  }
+
+  actualizarMontoSaldo(): void {
+    this.detailForm.monto = this.getSaldoPendientePago();
+  }
+
+  private aplicarDetallePagoEfectivoPorDefectoSiVacio(): void {
+    if (this.detallePago.length > 0) return;
+    const total = this.redondear2(Number(this.total) || 0);
+    if (total <= 0) return;
+    const efectivo = this.formasPago.find(
+      (f) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
+    );
+    if (!efectivo?.idFormaPago) return;
+    const idForma = Number(efectivo.idFormaPago);
+    this.detallePago.push({
+      item: 1,
+      idFormaPago: idForma,
+      descripcion: efectivo.descripcion || 'EFECTIVO',
+      monto: total,
+      referencia: 'N/A'
+    });
+  }
+
+  private abrirModalPagoEdicion(): void {
+    const efectivo = this.formasPago.find(
+      (f) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
+    );
+    if (efectivo) {
+      this.formaPagoSeleccionada = { ...efectivo };
+    }
+    this.aplicarDetallePagoEfectivoPorDefectoSiVacio();
+    this.actualizarMontoSaldo();
+    const total = Number(this.total) || 0;
+    this.pagaCon = total;
+    this.calcularVuelto();
+    const modalEl = document.getElementById('modalPagoEdicion');
+    if (!modalEl) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl as HTMLElement);
+    modal.show();
+  }
+
+  private esCotizacionEdicion(): boolean {
+    return this.codigoComprobanteEdicion.trim().toUpperCase() === 'CT';
+  }
+
+  confirmarGuardarConPago(): void {
+    if (!this.payloadEdicionPendiente || this.idVenta == null) return;
+
+    const totalVenta = this.redondear2(Number(this.total) || 0);
+    const totalPago = this.calcularTotalTablaDetallePago();
+    const esPagoPendiente = this.idEstadoPagoCargado === 1;
+    if (!this.esCotizacionEdicion() && !esPagoPendiente && totalPago > 0 && Math.abs(totalPago - totalVenta) > 0.01) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'El total del detalle de pago no coincide con el total del comprobante.'
+      });
+      return;
+    }
+
+    const detallePagoApi = this.detallePago
+      .map((d) => ({
+        idMediosPago: Number(d.idFormaPago),
+        monto: this.redondear2(Number(d.monto) || 0)
+      }))
+      .filter((x) => x.idMediosPago > 0 && x.monto > 0);
+
+    if (detallePagoApi.length === 0) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'Agregue al menos una forma de pago con monto mayor a cero.'
+      });
+      return;
+    }
+
+    const modalEl = document.getElementById('modalPagoEdicion');
+    const inst = bootstrap.Modal.getInstance(modalEl);
+    inst?.hide();
+
+    this.saving = true;
+    this.ventasService
+      .actualizarVenta(this.idVenta, {
+        ...this.payloadEdicionPendiente,
+        detallePago: detallePagoApi
+      })
+      .subscribe({
+        next: () => {
+          this.saving = false;
+          this.payloadEdicionPendiente = null;
+          iziToast.success({ title: 'Éxito', message: 'Venta actualizada.' });
+          this.router.navigate(['/ventas']);
+        },
+        error: (err) => {
+          this.saving = false;
+          const msg = err?.error?.error || err?.message || 'Error al actualizar.';
+          iziToast.error({ title: 'Error', message: msg });
+        }
+      });
+  }
+
   eliminarDetalle(index: number): void {
     if (index >= 0 && index < this.detalles.length) {
       this.detalles.splice(index, 1);
@@ -343,6 +589,36 @@ export class UpdateVentaComponent implements OnInit {
 
   volver(): void {
     this.router.navigate(['/ventas']);
+  }
+
+  /** Extrae HH:mm:ss de un string de fecha/hora del backend. */
+  private extraerHoraFEmisionDesdeTexto(s: string): string {
+    if (!s) return '00:00:00';
+    const t = s.replace('T', ' ');
+    const m = t.match(/(\d{2}:\d{2}:\d{2})/);
+    return m ? m[1] : '00:00:00';
+  }
+
+  /**
+   * Combina la fecha del formulario con la hora original de emisión (misma lógica que debe aplicar el backend para NV/CT).
+   */
+  private fEmisionParaGuardarVenta(): string {
+    const fechaForm = (this.fEmision || '').trim().slice(0, 10);
+    const orig = (this.fEmisionOriginalCompleta || '').trim();
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const ahoraIso = (): string => {
+      const n = new Date();
+      return `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}T${pad2(n.getHours())}:${pad2(n.getMinutes())}:${pad2(n.getSeconds())}`;
+    };
+    if (!fechaForm) {
+      if (orig) {
+        const n = orig.replace(' ', 'T');
+        return n.length >= 19 ? n.slice(0, 19) : ahoraIso();
+      }
+      return ahoraIso();
+    }
+    const hora = this.extraerHoraFEmisionDesdeTexto(orig);
+    return `${fechaForm}T${hora}`;
   }
 
   /**
@@ -440,15 +716,7 @@ export class UpdateVentaComponent implements OnInit {
       const totalComprobante = this.redondear2(neto + sumIgvLines + otrosSinIgv);
 
       const venta: VentaEdicionPayload = {
-        fEmision: this.fEmision
-          ? this.fEmision + 'T00:00:00'
-          : (() => {
-              const n = new Date();
-              const y = n.getFullYear(),
-                m = String(n.getMonth() + 1).padStart(2, '0'),
-                d = String(n.getDate()).padStart(2, '0');
-              return `${y}-${m}-${d}T00:00:00`;
-            })(),
+        fEmision: this.fEmisionParaGuardarVenta(),
         idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
         subtotal: neto,
         igv: sumIgvLines,
@@ -482,15 +750,7 @@ export class UpdateVentaComponent implements OnInit {
     const totalComprobante = this.redondear2(neto + totalImpuestosASumar);
 
     const venta: VentaEdicionPayload = {
-      fEmision: this.fEmision
-        ? this.fEmision + 'T00:00:00'
-        : (() => {
-            const n = new Date();
-            const y = n.getFullYear(),
-              m = String(n.getMonth() + 1).padStart(2, '0'),
-              d = String(n.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}T00:00:00`;
-          })(),
+      fEmision: this.fEmisionParaGuardarVenta(),
       idCliente: this.idCliente != null && this.idCliente > 0 ? this.idCliente : undefined,
       subtotal: subTotal,
       igv: igvMonto,
@@ -510,19 +770,14 @@ export class UpdateVentaComponent implements OnInit {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un ítem.' });
       return;
     }
-    this.saving = true;
-    const { venta: ventaPayload, detalles: detallesPayload } = this.construirPayloadGuardado();
-    this.ventasService.actualizarVenta(this.idVenta, { venta: ventaPayload, detalles: detallesPayload }).subscribe({
-      next: () => {
-        this.saving = false;
-        iziToast.success({ title: 'Éxito', message: 'Venta actualizada.' });
-        this.router.navigate(['/ventas']);
-      },
-      error: (err) => {
-        this.saving = false;
-        const msg = err?.error?.error || err?.message || 'Error al actualizar.';
-        iziToast.error({ title: 'Error', message: msg });
-      }
-    });
+    if (this.formasPago.length === 0) {
+      iziToast.warning({
+        title: 'Advertencia',
+        message: 'No se pudieron cargar las formas de pago. Intente de nuevo.'
+      });
+      return;
+    }
+    this.payloadEdicionPendiente = this.construirPayloadGuardado();
+    this.abrirModalPagoEdicion();
   }
 }

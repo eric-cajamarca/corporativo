@@ -94,3 +94,13 @@ export interface ImportacionProductosEjecutarData {
     total: number;
   } | null;
 }
+
+/** Fila de GET /productos/:id/stock-ubicaciones */
+export interface StockUbicacionProductoFila {
+  idUbicacion: number;
+  codigoUbicacion: string;
+  prioridad: number;
+  cantidad: number;
+  /** Fila sintética: stock en Lotes sin reflejo completo en LotesUbicacion */
+  esSinUbicacion?: boolean;
+}

@@ -369,13 +369,15 @@ const actualizarVentaEdicion = async (req, res) => {
   if (Number.isNaN(idVenta) || idVenta < 1) {
     return res.status(400).json({ error: 'idVenta inválido' });
   }
-  const { venta: cabecera, detalles } = req.body || {};
+  const { venta: cabecera, detalles, detallePago } = req.body || {};
   if (!cabecera || !Array.isArray(detalles)) {
     return res.status(400).json({ error: 'Se requieren venta y detalles' });
   }
   try {
     const out = await withPool((pool) =>
-      ventasOrquestacion.actualizarVentaEdicion(pool, idEmpresa, idVenta, cabecera, detalles, req.user)
+      ventasOrquestacion.actualizarVentaEdicion(pool, idEmpresa, idVenta, cabecera, detalles, req.user, {
+        detallePago
+      })
     );
     if (!out.ok) {
       return res.status(out.status).json({ error: out.error });

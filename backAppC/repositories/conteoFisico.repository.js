@@ -7,18 +7,26 @@ exports.insertarSesion = async (transaction, datos) => {
     idSucursal,
     tipoConteo,
     observaciones,
-    idUsuarioCreacion
+    idUsuarioCreacion,
+    idUbicacionInventario
   } = datos;
-  await transaction.request()
+  const idUb =
+    idUbicacionInventario != null && idUbicacionInventario !== ''
+      ? parseInt(String(idUbicacionInventario), 10)
+      : null;
+  const idUbSql = Number.isFinite(idUb) && idUb > 0 ? idUb : null;
+  await transaction
+    .request()
     .input('idSesion', sql.UniqueIdentifier, idSesion)
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
     .input('tipoConteo', sql.VarChar(20), tipoConteo)
     .input('observaciones', sql.NVarChar(500), observaciones || null)
     .input('idUsuarioCreacion', sql.UniqueIdentifier, idUsuarioCreacion || null)
+    .input('idUbicacionInventario', sql.Int, idUbSql)
     .query(`
-      INSERT INTO InventarioFisicoSesion (idSesion, idEmpresa, idSucursal, tipoConteo, estado, observaciones, idUsuarioCreacion)
-      VALUES (@idSesion, @idEmpresa, @idSucursal, @tipoConteo, 'BORRADOR', @observaciones, @idUsuarioCreacion)
+      INSERT INTO InventarioFisicoSesion (idSesion, idEmpresa, idSucursal, tipoConteo, estado, observaciones, idUsuarioCreacion, idUbicacionInventario)
+      VALUES (@idSesion, @idEmpresa, @idSucursal, @tipoConteo, 'BORRADOR', @observaciones, @idUsuarioCreacion, @idUbicacionInventario)
     `);
 };
 
@@ -29,9 +37,12 @@ exports.obtenerSesionPorId = async (conn, idEmpresa, idSesion) => {
     .query(`
       SELECT s.idSesion, s.idEmpresa, s.idSucursal, sc.nombre AS nombreSucursal,
              s.tipoConteo, s.estado, s.observaciones,
-             CONVERT(VARCHAR(19), s.fCreacion, 120) AS fCreacion
+             CONVERT(VARCHAR(19), s.fCreacion, 120) AS fCreacion,
+             s.idUbicacionInventario,
+             RTRIM(LTRIM(ISNULL(up.codigoUbicacion, ''))) AS codigoUbicacionInventario
       FROM InventarioFisicoSesion s
       INNER JOIN Sucursal sc ON sc.idSucursal = s.idSucursal AND sc.idEmpresa = s.idEmpresa
+      LEFT JOIN UbicacionesPrioridad up ON up.idUbicacion = s.idUbicacionInventario AND up.idSucursal = s.idSucursal
       WHERE s.idEmpresa = @idEmpresa AND s.idSesion = @idSesion
     `);
   return r.recordset && r.recordset[0] ? r.recordset[0] : null;
@@ -61,6 +72,19 @@ exports.validarSucursalPerteneceEmpresa = async (conn, idEmpresa, idSucursal) =>
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
     .query(`SELECT 1 AS ok FROM Sucursal WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal`);
+  return !!(r.recordset && r.recordset[0]);
+};
+
+exports.validarUbicacionPerteneceSucursal = async (conn, idSucursal, idUbicacion) => {
+  const idUb = parseInt(String(idUbicacion), 10);
+  if (!Number.isFinite(idUb) || idUb < 1) return false;
+  const r = await conn
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idUbicacion', sql.Int, idUb)
+    .query(
+      'SELECT 1 AS ok FROM UbicacionesPrioridad WHERE idSucursal = @idSucursal AND idUbicacion = @idUbicacion'
+    );
   return !!(r.recordset && r.recordset[0]);
 };
 

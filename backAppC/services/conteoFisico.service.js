@@ -15,6 +15,21 @@ function controlUbicacionesDesdeConfig(configRows) {
   return String(row?.valor ?? 'true').toLowerCase() !== 'false';
 }
 
+/** Sesión con ubicación fijada requiere inventario por ubicaciones activo. */
+function assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones) {
+  const idUbSes =
+    sesion && sesion.idUbicacionInventario != null
+      ? parseInt(String(sesion.idUbicacionInventario), 10)
+      : NaN;
+  if (Number.isFinite(idUbSes) && idUbSes > 0 && !controlUbicaciones) {
+    throw new Error(
+      'La sesión tiene ubicación de conteo fijada, pero «Gestionar stock por ubicación» (INVENTARIO_CONTROL_UBICACIONES) está desactivado. Active esa opción en Configuración → Inventario o cree una sesión sin ubicación.'
+    );
+  }
+}
+
+const DELTA_CONTEO_EPS = 1e-6;
+
 const TIPOS_CONTEO = new Set(['INICIAL', 'MENSUAL']);
 
 function normTipoConteo(v) {
@@ -46,6 +61,28 @@ exports.crearSesion = async (idEmpresa, idUsuario, body) => {
     throw new Error('tipoConteo debe ser INICIAL o MENSUAL');
   }
   return withPool(async (pool) => {
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
+    const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
+
+    const rawUb = body && body.idUbicacionInventario;
+    let idUbicacionInventario = null;
+    if (rawUb != null && rawUb !== '') {
+      const n = parseInt(String(rawUb), 10);
+      if (!Number.isFinite(n) || n < 1) {
+        throw new Error('Ubicación de inventario inválida');
+      }
+      if (!controlUbicaciones) {
+        throw new Error(
+          'Active «Gestionar stock por ubicación» en configuración de inventario para fijar ubicación en el conteo físico'
+        );
+      }
+      const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(pool, idSucursal, n);
+      if (!okUb) {
+        throw new Error('La ubicación no pertenece a la sucursal seleccionada');
+      }
+      idUbicacionInventario = n;
+    }
+
     const ok = await conteoFisicoRepository.validarSucursalPerteneceEmpresa(pool, idEmpresa, idSucursal);
     if (!ok) {
       throw new Error('La sucursal no existe o no pertenece a la empresa');
@@ -60,7 +97,8 @@ exports.crearSesion = async (idEmpresa, idUsuario, body) => {
         idSucursal,
         tipoConteo: tipo,
         observaciones: observaciones != null ? String(observaciones).substring(0, 500) : null,
-        idUsuarioCreacion: idUsuario || null
+        idUsuarioCreacion: idUsuario || null,
+        idUbicacionInventario
       });
       await transaction.commit();
       return { idSesion, message: 'Sesión de conteo creada' };
@@ -93,14 +131,29 @@ exports.previsualizarAplicacion = async (idEmpresa, idSesion) => {
     if (sesion.estado !== 'BORRADOR') {
       throw new Error('Solo se puede previsualizar una sesión en borrador');
     }
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
+    const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
+    assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones);
+    const idUbSes =
+      sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
+    const usarStockUb =
+      controlUbicaciones && Number.isFinite(idUbSes) && idUbSes > 0;
     const preview = [];
     for (const l of lineas) {
-      const stockActual = await inventarioRepository.obtenerStockAgregadoProductoSucursal(
-        pool,
-        idEmpresa,
-        sesion.idSucursal,
-        l.idProducto
-      );
+      const stockActual = usarStockUb
+        ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
+            pool,
+            idEmpresa,
+            sesion.idSucursal,
+            l.idProducto,
+            idUbSes
+          )
+        : await inventarioRepository.obtenerStockAgregadoProductoSucursal(
+            pool,
+            idEmpresa,
+            sesion.idSucursal,
+            l.idProducto
+          );
       const stockReal = l.stockReal != null ? Number(l.stockReal) : null;
       const aplicable = !!l.verificado && stockReal != null && !Number.isNaN(stockReal);
       const delta = aplicable ? stockReal - stockActual : null;
@@ -115,7 +168,8 @@ exports.previsualizarAplicacion = async (idEmpresa, idSesion) => {
         stockReal: aplicable ? stockReal : l.stockReal,
         verificado: !!l.verificado,
         delta,
-        seAplicaraMovimiento: aplicable && delta !== 0
+        seAplicaraMovimiento:
+          aplicable && delta != null && Math.abs(delta) > DELTA_CONTEO_EPS
       });
     }
     return { sesion, preview };
@@ -191,12 +245,28 @@ exports.upsertLinea = async (user, idSesion, body) => {
       await assertAlgunoPermiso(pool, user, 'EDITAR_PRODUCTOS', 'CREAR_PRODUCTOS');
     }
 
-    const stockSistema = await inventarioRepository.obtenerStockAgregadoProductoSucursal(
-      pool,
-      idEmpresa,
-      sesion.idSucursal,
-      idProducto
-    );
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
+    const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
+    assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones);
+    const idUbSes =
+      sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
+    const usarStockUb =
+      controlUbicaciones && Number.isFinite(idUbSes) && idUbSes > 0;
+
+    const stockSistema = usarStockUb
+      ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
+          pool,
+          idEmpresa,
+          sesion.idSucursal,
+          idProducto,
+          idUbSes
+        )
+      : await inventarioRepository.obtenerStockAgregadoProductoSucursal(
+          pool,
+          idEmpresa,
+          sesion.idSucursal,
+          idProducto
+        );
     const transaction = new sql.Transaction(pool);
     try {
       await transaction.begin();
@@ -285,6 +355,11 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
 
       const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
       const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
+      assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones);
+      const idUbSes =
+        sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
+      const idUbMov =
+        controlUbicaciones && Number.isFinite(idUbSes) && idUbSes > 0 ? idUbSes : null;
 
       const detalle = [];
       const itemsPositivos = [];
@@ -299,12 +374,20 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
           continue;
         }
 
-        const stockActual = await inventarioRepository.obtenerStockAgregadoProductoSucursal(
-          transaction,
-          idEmpresa,
-          sesion.idSucursal,
-          l.idProducto
-        );
+        const stockActual = idUbMov
+          ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
+              transaction,
+              idEmpresa,
+              sesion.idSucursal,
+              l.idProducto,
+              idUbMov
+            )
+          : await inventarioRepository.obtenerStockAgregadoProductoSucursal(
+              transaction,
+              idEmpresa,
+              sesion.idSucursal,
+              l.idProducto
+            );
         const delta = stockReal - stockActual;
         detalle.push({
           idProducto: l.idProducto,
@@ -314,11 +397,11 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
           delta
         });
 
-        if (delta === 0) {
+        if (Math.abs(delta) < DELTA_CONTEO_EPS) {
           continue;
         }
 
-        if (delta > 0) {
+        if (delta > DELTA_CONTEO_EPS) {
           const costoUnitario = await inventarioRepository.obtenerCostoUnitarioProducto(
             transaction,
             idEmpresa,
@@ -344,6 +427,46 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
 
       const fechaMovimientoAplicacion = fechaMovimientoDesdeBodyAplicar(body);
 
+      const lineasConStockRealSinVerificar = lineas.filter((l) => {
+        if (l.verificado) return false;
+        const sr = l.stockReal != null ? Number(l.stockReal) : null;
+        return sr != null && !Number.isNaN(sr);
+      }).length;
+
+      if (itemsPositivos.length === 0 && itemsNegativos.length === 0) {
+        if (detalle.length === 0) {
+          // #region agent log
+          fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4c834d' },
+            body: JSON.stringify({
+              sessionId: '4c834d',
+              hypothesisId: 'H1',
+              location: 'conteoFisico.service.js:aplicarMovimientos',
+              message: 'sin items aplicables',
+              data: {
+                lineasTotal: lineas.length,
+                detalleLen: detalle.length,
+                lineasConStockRealSinVerificar
+              },
+              timestamp: Date.now()
+            })
+          }).catch(() => {});
+          // #endregion
+          if (lineasConStockRealSinVerificar > 0) {
+            throw new Error(
+              `Hay ${lineasConStockRealSinVerificar} línea(s) con «Stock real» guardado pero sin «Verificado». Abra cada producto en el panel lateral, marque «Verificado», pulse «Guardar línea» y vuelva a aplicar.`
+            );
+          }
+          throw new Error(
+            'No hay líneas para aplicar: marque «Verificado», indique «Stock real» y guarde cada línea antes de aplicar.'
+          );
+        }
+        throw new Error(
+          'No se registró ningún movimiento: en todas las líneas incluidas el stock real coincide con el stock del sistema (delta cero). Revise la previsualización o la sucursal/ubicación de la sesión.'
+        );
+      }
+
       if (itemsPositivos.length > 0) {
         const compIngreso = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
           transaction,
@@ -368,7 +491,7 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
           idEmpresa,
           idUsuario,
           movIngresoBody,
-          { mapa: mapaIngreso, controlUbicaciones }
+          { mapa: mapaIngreso, controlUbicaciones, idUbicacionMovimiento: idUbMov }
         );
         const numeroDocIngreso = parseInt(String(compIngreso.numero || '0'), 10) || 0;
         documentos.ingreso = {
@@ -404,7 +527,7 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
           idEmpresa,
           idUsuario,
           movSalidaBody,
-          { mapa: mapaSalida, controlUbicaciones }
+          { mapa: mapaSalida, controlUbicaciones, idUbicacionMovimiento: idUbMov }
         );
         const numeroDocSalida = parseInt(String(compSalida.numero || '0'), 10) || 0;
         documentos.salida = {

@@ -18,10 +18,10 @@
   <div *ngIf="!cargandoLote">
     <!-- Información del lote -->
     <div class="alert alert-info mb-3" *ngIf="infoLote">
-      <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-          <strong>Lote:</strong> {{ infoLote.idLote | slice:0:8 }}... | 
-          <strong>Total a asignar:</strong> <span class="badge bg-primary">{{ cantidadTotal }}</span> unidades
+          <strong>Lote:</strong> {{ infoLote.idLote | slice:0:8 }}... |
+          <strong>Total a asignar (este lote):</strong> <span class="badge bg-primary">{{ cantidadTotal }}</span> unidades
         </div>
         <button 
           class="btn btn-sm btn-outline-primary" 
@@ -29,6 +29,26 @@
           [disabled]="cantidadRestante === 0 || ubicaciones.length === 0">
           <i class="bi bi-magic me-1"></i>Distribuir Automático
         </button>
+      </div>
+      <p class="small mb-0 mt-2 text-muted">
+        Este reparto aplica <strong>solo</strong> a la cantidad de <strong>este ingreso (lote)</strong>. No borra ni sustituye el stock en ubicaciones de otros lotes del mismo producto en la sucursal.
+      </p>
+    </div>
+
+    <div class="alert alert-light border small mb-3" *ngIf="!cargandoLote && (cargandoStockResumen || stockResumenProducto.length > 0)">
+      <div class="fw-semibold mb-1">Referencia: stock del producto en la sucursal (todos los lotes)</div>
+      <div *ngIf="cargandoStockResumen" class="text-muted">Cargando…</div>
+      <div *ngIf="!cargandoStockResumen && stockResumenProducto.length === 0" class="text-muted">Sin desglose por ubicación o sin stock en ubicaciones.</div>
+      <div class="table-responsive" *ngIf="!cargandoStockResumen && stockResumenProducto.length > 0">
+        <table class="table table-sm table-bordered mb-0">
+          <thead><tr><th>Ubicación</th><th class="text-end">Cantidad</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let s of stockResumenProducto">
+              <td>{{ s.codigoUbicacion }} <span *ngIf="s.esSinUbicacion" class="badge bg-secondary">Sin ubic.</span></td>
+              <td class="text-end">{{ s.cantidad | number:'1.0-3' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 

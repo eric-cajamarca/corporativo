@@ -44,6 +44,7 @@ import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
+import { StockUbicacionProductoFila } from '../../../models/producto.models';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
@@ -192,6 +193,12 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Galería en modal Buscar productos: solo si está habilitado en Config > Inventario. */
   productosConImagenes = false;
+  /** Config ventas: botón ojo / stock por ubicación en modal Buscar productos */
+  mostrarStockUbicacionesEnBuscador = false;
+  modalStockUbAbierto = false;
+  stockUbCargando = false;
+  stockUbFilas: StockUbicacionProductoFila[] = [];
+  stockUbTitulo = '';
   imagenesProductoActual: ImagenProducto[] = [];
   visorAbierto = false;
   visorIndex = 0;
@@ -274,7 +281,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   private buscadorModalEl: HTMLElement | null = null;
   /** Handler estable para removeEventListener en ngOnDestroy. */
   private readonly onBuscadorModalShownBound = (): void => {
-    this.enfocarInputBuscadorModalVentas();
+    this.ngZone.run(() => {
+      this.enfocarInputBuscadorModalVentas();
+      this.refrescarFlagStockUbicacionesBuscador();
+    });
   };
 
   private pdfPostVentaModalEl: HTMLElement | null = null;
@@ -325,33 +335,66 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     setTimeout(intentar, 200);
   }
 
+  /**
+   * Vuelve a leer Gestores al abrir el modal de productos (evita SPA obsoleto si se guardó config en otra pestaña
+   * y acepta valor true/1/yes además de la cadena "true").
+   */
+  private refrescarFlagStockUbicacionesBuscador(): void {
+    this.gestoresService.obtenerConfiguracion().subscribe({
+      next: (res) => {
+        const lista = Array.isArray(res?.data) ? res.data : [];
+        const normClave = (c: { clave?: string; Clave?: string }) =>
+          String(c?.clave ?? c?.Clave ?? '')
+            .trim()
+            .toUpperCase();
+        const itemStockUb = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR'
+        );
+        const vStockUb =
+          itemStockUb && (itemStockUb as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemStockUb as { valor?: string; Valor?: string }).valor
+            : (itemStockUb as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(vStockUb, false);
+      },
+      error: () => {}
+    });
+  }
+
   ngOnInit(): void {
     this.gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
-        const item = lista.find((c: { clave?: string; Clave?: string }) =>
-          (c.clave || c.Clave || '') === 'PRODUCTOS_CON_IMAGENES'
-        );
+        const normClave = (c: { clave?: string; Clave?: string }) =>
+          String(c?.clave ?? c?.Clave ?? '')
+            .trim()
+            .toUpperCase();
+        const item = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'PRODUCTOS_CON_IMAGENES');
         const valor = item && (item as { valor?: string; Valor?: string }).valor !== undefined
           ? (item as { valor?: string; Valor?: string }).valor
           : (item as { valor?: string; Valor?: string }).Valor;
-        this.productosConImagenes = valor ? String(valor).toLowerCase() === 'true' : false;
-        const itemDesc = lista.find((c: { clave?: string; Clave?: string }) =>
-          (c.clave || c.Clave || '') === 'VENTAS_USAR_DESCUENTO_EN_TOTAL'
-        );
+        this.productosConImagenes = interpretarBooleanoConfig(valor, false);
+        const itemDesc = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_USAR_DESCUENTO_EN_TOTAL');
         const vDesc =
           itemDesc && (itemDesc as { valor?: string; Valor?: string }).valor !== undefined
             ? (itemDesc as { valor?: string; Valor?: string }).valor
             : (itemDesc as { valor?: string; Valor?: string })?.Valor;
         this.usarDescuentoEnTotal = interpretarBooleanoConfig(vDesc, true);
         const itemPdfModal = lista.find((c: { clave?: string; Clave?: string }) =>
-          (c.clave || c.Clave || '') === 'VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR'
+          normClave(c) === 'VENTAS_MOSTRAR_MODAL_PDF_TRAS_REGISTRAR'
         );
         const vPdfModal =
           itemPdfModal && (itemPdfModal as { valor?: string; Valor?: string }).valor !== undefined
             ? (itemPdfModal as { valor?: string; Valor?: string }).valor
             : (itemPdfModal as { valor?: string; Valor?: string })?.Valor;
         this.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(vPdfModal, true);
+        const itemStockUb = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR'
+        );
+        const vStockUb =
+          itemStockUb && (itemStockUb as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemStockUb as { valor?: string; Valor?: string }).valor
+            : (itemStockUb as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(vStockUb, false);
         this.descuentoEnTotalConfigListo = true;
         this.actualizaTotales();
       },
@@ -400,11 +443,13 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.esGestora = !!estado?.esGestora;
         this.esEmpresaGestionada = !!(estado as { esEmpresaGestionada?: boolean })?.esEmpresaGestionada;
         this.cargarPermitirVentaMultiSucursal();
+        this.buscarProductos();
       },
       error: () => {
         this.esGestora = false;
         this.esEmpresaGestionada = false;
         this.cargarPermitirVentaMultiSucursal();
+        this.buscarProductos();
       }
     });
     this.cargarSucursalesUsuario();
@@ -1046,7 +1091,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       productoActivoParaVenta(item as Record<string, unknown>)
     );
     const idsAsignadas = this.idsSucursalesAsignadasActivas();
-    if (idsAsignadas.size > 0) {
+    // En gestora el catálogo incluye sucursales de empresas gestionadas; no filtrar por asignaciones del usuario (token = gestora).
+    if (idsAsignadas.size > 0 && !this.esGestora) {
       activos = activos.filter((item: any) =>
         idsAsignadas.has(String(item?.idSucursal || '').toLowerCase())
       );
@@ -1075,18 +1121,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       return activos;
     }
-    const sucursalFijaPorEmpresa = new Map<string, string>();
-    return activos.filter((item: any) => {
-      const idEmpresa = String(item?.idEmpresa || '').trim();
-      const idSucursal = String(item?.idSucursal || '').trim();
-      if (!idEmpresa || !idSucursal) return false;
-      const fijada = sucursalFijaPorEmpresa.get(idEmpresa);
-      if (!fijada) {
-        sucursalFijaPorEmpresa.set(idEmpresa, idSucursal);
-        return true;
-      }
-      return fijada === idSucursal;
-    });
+    // Empresa gestora: catálogo multiempresa; cada fila es producto + sucursal real de stock. No recortar a una sucursal por empresa.
+    return activos;
   }
 
   private resolverSucursalesPermitidasVenta(): void {
@@ -1346,6 +1382,65 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   siguienteImagenVisor(): void {
     if (this.imagenesProductoActual.length === 0) return;
     this.visorIndex = (this.visorIndex + 1) % this.imagenesProductoActual.length;
+  }
+
+  /** idSucursal del ítem o el de la venta en curso (para API stock por ubicación). */
+  idSucursalParaStockUbVentas(p: { idSucursal?: string | number } | null | undefined): string {
+    const fromProd = p?.idSucursal != null ? String(p.idSucursal).trim() : '';
+    if (fromProd) {
+      return fromProd;
+    }
+    return String(this.ventas?.idSucursal ?? '').trim();
+  }
+
+  /** Columna y acciones «Ubic.»: config ventas o empresa gestora (venta corporativa). */
+  mostrarColumnaUbicacionesBuscadorVentas(): boolean {
+    return this.mostrarStockUbicacionesEnBuscador || this.esGestora;
+  }
+
+  puedeVerStockUbVentas(p: { idSucursal?: string | number } | null | undefined): boolean {
+    if (!this.mostrarColumnaUbicacionesBuscadorVentas()) {
+      return false;
+    }
+    return this.idSucursalParaStockUbVentas(p).length > 0;
+  }
+
+  abrirStockUbicacionesVentas(p: { idProducto?: string; codigo?: string; descripcion?: string; idSucursal?: string | number }, ev: Event): void {
+    ev.stopPropagation();
+    const id = p?.idProducto;
+    const sid = this.idSucursalParaStockUbVentas(p);
+    if (!id || !sid) {
+      return;
+    }
+    this.stockUbTitulo = `${p.codigo ?? ''} — ${p.descripcion ?? ''}`.replace(/^[\s—]+|[\s—]+$/g, '').trim() || String(id);
+    this.modalStockUbAbierto = true;
+    this.stockUbCargando = true;
+    this.stockUbFilas = [];
+    this._productoService.obtenerStockUbicacionesProducto(String(id), sid).subscribe({
+      next: (res) => {
+        this.stockUbFilas = Array.isArray(res?.data) ? res.data : [];
+        this.stockUbCargando = false;
+      },
+      error: () => {
+        this.stockUbFilas = [];
+        this.stockUbCargando = false;
+      }
+    });
+  }
+
+  cerrarStockUbVentas(): void {
+    this.modalStockUbAbierto = false;
+    this.stockUbFilas = [];
+    this.stockUbCargando = false;
+    this.stockUbTitulo = '';
+  }
+
+  /** Suma cantidades del modal (incluye fila «sin ubicación» si viene del API). */
+  stockUbTotalCantidad(): number {
+    if (!this.stockUbFilas?.length) {
+      return 0;
+    }
+    return this.stockUbFilas.reduce((s, u) => s + (Number(u.cantidad) || 0), 0);
   }
 
   agregarAlCarrito(producto: any): void {

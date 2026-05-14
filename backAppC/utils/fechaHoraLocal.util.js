@@ -94,11 +94,81 @@ function getFechaHoyLocal() {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Convierte fEmision ya guardada (Date de mssql o string) a "YYYY-MM-DD HH:mm:ss" (19 chars, hora local).
+ * @param {string|Date} valor
+ * @returns {string}
+ */
+function fEmisionRowALocalYmdHms(valor) {
+  if (valor == null) return '';
+  if (valor instanceof Date && !isNaN(valor.getTime())) {
+    const y = valor.getFullYear();
+    const mo = String(valor.getMonth() + 1).padStart(2, '0');
+    const d = String(valor.getDate()).padStart(2, '0');
+    const h = String(valor.getHours()).padStart(2, '0');
+    const mi = String(valor.getMinutes()).padStart(2, '0');
+    const s = String(valor.getSeconds()).padStart(2, '0');
+    return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+  }
+  const str = String(valor).trim().replace('T', ' ');
+  const m = str.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+  if (m) return `${m[1]} ${m[2]}`;
+  const solo = str.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(solo)) return `${solo} 00:00:00`;
+  return '';
+}
+
+/**
+ * Normaliza cabecera.fEmision a VARCHAR(23) "YYYY-MM-DD HH:mm:ss.000".
+ * Si viene solo fecha (sin reloj), medianoche. Si viene con hora (T o espacio), la conserva.
+ * Importante: no usar solo getFechaSoloSQLString cuando hay hora, porque anula la hora real.
+ * @param {string|Date|null|undefined} valor
+ * @returns {string|null}
+ */
+function parseFEmisionCabeceraSQL(valor) {
+  if (valor == null) return null;
+  const raw = String(valor).trim();
+  if (!raw) return null;
+  const conHora = /[T ]\d{2}:\d{2}:\d{2}/.test(raw);
+  if (!conHora) {
+    return getFechaSoloSQLString(raw);
+  }
+  const norm = raw.replace('T', ' ').replace(/\.\d{3}Z?$/, '');
+  const m = norm.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
+  if (m) {
+    return `${m[1]} ${m[2]}.000`;
+  }
+  return getFechaSoloSQLString(raw);
+}
+
+/**
+ * NV/CT: si la edición envía la misma fecha con 00:00:00 y en BD había otra hora, conservar la hora de BD.
+ * @param {string|null} fEmisionSql23
+ * @param {string|Date|null|undefined} fEmisionExistente
+ * @returns {string|null}
+ */
+function mergeFEmisionNvCtSiMedianocheInnecessario(fEmisionSql23, fEmisionExistente) {
+  if (!fEmisionSql23 || fEmisionExistente == null) return fEmisionSql23;
+  const exStr = fEmisionRowALocalYmdHms(fEmisionExistente);
+  if (exStr.length < 19) return fEmisionSql23;
+  const exDate = exStr.slice(0, 10);
+  const exTime = exStr.slice(11, 19);
+  const nuDate = fEmisionSql23.slice(0, 10);
+  const nuTime = fEmisionSql23.length >= 19 ? fEmisionSql23.slice(11, 19) : '00:00:00';
+  if (nuDate === exDate && nuTime === '00:00:00' && exTime !== '00:00:00') {
+    return `${nuDate} ${exTime}.000`;
+  }
+  return fEmisionSql23;
+}
+
 module.exports = {
   getNowLocal,
   getNowLocalISOString,
   getNowLocalSQLString,
   getFechaEmisionSQLString,
   getFechaSoloSQLString,
-  getFechaHoyLocal
+  getFechaHoyLocal,
+  fEmisionRowALocalYmdHms,
+  parseFEmisionCabeceraSQL,
+  mergeFEmisionNvCtSiMedianocheInnecessario
 };

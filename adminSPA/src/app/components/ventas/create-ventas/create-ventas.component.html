@@ -303,6 +303,7 @@
                 <th>Precio</th>
                 <th>Sucursal</th>
                 <th>Stock</th>
+                <th *ngIf="mostrarColumnaUbicacionesBuscadorVentas()" class="text-center text-nowrap" style="width:3rem" title="Stock por ubicación">Ubic.</th>
               </tr>
             </thead>
             <tbody>
@@ -325,6 +326,19 @@
                 <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                 <td>{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</td>
                 <td>{{ p.stock }}</td>
+                <td *ngIf="mostrarColumnaUbicacionesBuscadorVentas()" class="text-center align-middle" (click)="$event.stopPropagation()">
+                  <button
+                    *ngIf="puedeVerStockUbVentas(p)"
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    (click)="abrirStockUbicacionesVentas(p, $event)"
+                    title="Ver stock por ubicación"
+                    aria-label="Ver stock por ubicación"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  <span *ngIf="!puedeVerStockUbVentas(p)" class="text-white-50 small">—</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -348,9 +362,17 @@
                 <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorVentas()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
                 <div class="small mt-1">{{ p?.descripcion }}</div>
                 <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaVentas(p) }} · {{ p?.codigoPresentacion }}</div>
-                <div class="small d-flex justify-content-between mt-2">
+                <div class="small d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
                   <span class="text-truncate me-1">{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</span>
                   <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>
+                  <button
+                    *ngIf="mostrarColumnaUbicacionesBuscadorVentas() && puedeVerStockUbVentas(p)"
+                    type="button"
+                    class="btn btn-sm btn-outline-primary py-0 px-2"
+                    (click)="abrirStockUbicacionesVentas(p, $event)"
+                  >
+                    <i class="bi bi-eye me-1"></i>Ubicaciones
+                  </button>
                 </div>
               </div>
             </div>
@@ -372,6 +394,39 @@
     <img [src]="imagenesProductoActual[visorIndex].url" [alt]="'Imagen ' + (visorIndex + 1)" (click)="$event.stopPropagation()" />
     <button type="button" class="visor-btn-nav visor-btn-sig" (click)="siguienteImagenVisor(); $event.stopPropagation()" aria-label="Siguiente">›</button>
     <span class="visor-contador">{{ visorIndex + 1 }} / {{ imagenesProductoActual.length }}</span>
+  </div>
+</div>
+
+<!-- Stock por ubicación (modal Buscar productos, Nueva venta) -->
+<div class="visor-fullscreen-overlay" *ngIf="modalStockUbAbierto" (click)="cerrarStockUbVentas()">
+  <div class="bg-white rounded shadow p-3 mx-2" style="max-width: 440px; width: 100%; max-height: 85vh; overflow: auto" (click)="$event.stopPropagation()">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+      <h6 class="mb-0">Stock por ubicación</h6>
+      <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarStockUbVentas()"></button>
+    </div>
+    <p class="small text-muted mb-2">{{ stockUbTitulo }}</p>
+    <p class="small text-muted mb-0" *ngIf="stockUbCargando"><i class="bi bi-hourglass-split"></i> Cargando…</p>
+    <table class="table table-sm table-bordered mb-0" *ngIf="!stockUbCargando && stockUbFilas.length > 0">
+      <thead class="table-light">
+        <tr>
+          <th>Ubicación</th>
+          <th class="text-end">Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of stockUbFilas" [class.text-muted]="u.esSinUbicacion">
+          <td>{{ u.codigoUbicacion || ('#' + u.idUbicacion) }}</td>
+          <td class="text-end">{{ u.cantidad | number : '1.0-3' }}</td>
+        </tr>
+      </tbody>
+      <tfoot *ngIf="!stockUbCargando && stockUbFilas.length > 0" class="table-light">
+        <tr class="fw-semibold">
+          <td>Total (todas las filas)</td>
+          <td class="text-end">{{ stockUbTotalCantidad() | number : '1.0-3' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="small text-muted mb-0" *ngIf="!stockUbCargando && stockUbFilas.length === 0">Sin datos de ubicación.</p>
   </div>
 </div>
 

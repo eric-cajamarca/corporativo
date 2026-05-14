@@ -520,6 +520,14 @@
                       </label>
                     </div>
                   </div>
+                  <div class="col-12 d-flex align-items-center">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="mostrarStockUbicacionesEnBuscador" [(ngModel)]="ventas.mostrarStockUbicacionesEnBuscador" name="mostrarStockUbicacionesEnBuscador">
+                      <label class="form-check-label" for="mostrarStockUbicacionesEnBuscador">
+                        En el modal de <strong>búsqueda de productos</strong>, mostrar la opción de ver <strong>stock por ubicación</strong> (y permitir en conteo físico elegir la ubicación de la sesión).
+                      </label>
+                    </div>
+                  </div>
                   <div class="col-md-6">
                     <label for="diasCreditoMaximo" class="form-label">Días de crédito máximo</label>
                     <input type="number" class="form-control" id="diasCreditoMaximo" [(ngModel)]="ventas.diasCreditoMaximo" name="diasCreditoMaximo">

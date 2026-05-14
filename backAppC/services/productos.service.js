@@ -1,6 +1,7 @@
 // src/services/productos.service.js
 const ProductosRepository = require('../repositories/productos.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
+const sucursalRepository = require('../repositories/sucursal.repository');
 const permisosService = require('./permisos.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const { idsSucursalesFiltroCatalogo } = require('../utils/sucursalUsuarioScope.util');
@@ -94,4 +95,52 @@ exports.matchProductosPorDescripcionService = async (pool, user, descripciones) 
     if (d && !mapDesc[d]) mapDesc[d] = p.idProducto;
   });
   return list.map(desc => ({ descripcion: desc, idProducto: mapDesc[desc] || null }));
+};
+
+exports.obtenerStockUbicacionesProductoSucursalService = async (pool, idProducto, idSucursal, user) => {
+  if (!user || !user.empresa) {
+    throw new Error('NO_ACCESS');
+  }
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(idProducto)) {
+    throw new Error('ID_PRODUCTO_INVALIDO');
+  }
+  if (!uuidRegex.test(idSucursal)) {
+    throw new Error('ID_SUCURSAL_INVALIDO');
+  }
+  await assertAlgunoPermiso(
+    pool,
+    user,
+    'VER_PRODUCTOS',
+    'CREAR_VENTAS',
+    'EDITAR_VENTAS',
+    'CREAR_COMPRAS',
+    'EDITAR_COMPRAS'
+  );
+  const idEmpresaProducto = await ProductosRepository.obtenerIdEmpresaProductoPorId(pool, idProducto);
+  if (!idEmpresaProducto) {
+    throw new Error('PRODUCTO_NO_ENCONTRADO');
+  }
+  const empresaDelToken = String(user.empresa).toLowerCase();
+  const empresaProducto = String(idEmpresaProducto).toLowerCase();
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  if (esGestora) {
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
+    const permitidas = new Set([
+      empresaDelToken,
+      ...(Array.isArray(gestionadas) ? gestionadas : [])
+        .map((e) => String(e.idEmpresa || '').toLowerCase())
+        .filter(Boolean)
+    ]);
+    if (!permitidas.has(empresaProducto)) {
+      throw new Error('PRODUCTO_NO_ENCONTRADO');
+    }
+  } else if (empresaProducto !== empresaDelToken) {
+    throw new Error('PRODUCTO_NO_ENCONTRADO');
+  }
+  const ex = await sucursalRepository.existeSucursalEnEmpresa(pool, idSucursal, idEmpresaProducto);
+  if (!ex) {
+    throw new Error('SUCURSAL_INVALIDA');
+  }
+  return ProductosRepository.listarStockUbicacionesProductoSucursal(pool, idEmpresaProducto, idSucursal, idProducto);
 };

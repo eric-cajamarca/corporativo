@@ -27,11 +27,16 @@ const crear_detalle_compras_idcompra = async function (req, res) {
   }
   try {
     const result = await withPool((pool) => detalleComprasService.crearDetalleCompraCompleto(pool, req.user, req.body));
+    const ubicacionAsignada = result.ubicacionAsignada === true;
+    const msgDefault = result.asignarUbicacionDefecto === true;
+    const message = !ubicacionAsignada
+      ? 'Detalle de compra registrado. Lote creado. Asigne ubicaciones desde Inventario.'
+      : msgDefault
+        ? 'Detalle de compra registrado. Lote creado; cantidad asignada a la ubicación de prioridad 1.'
+        : 'Detalle de compra registrado. Lote creado; cantidad asignada a la ubicación indicada.';
     res.status(200).send({
       data: 1,
-      message: result.asignarUbicacionDefecto
-        ? 'Detalle de compra registrado. Lote y ubicación por defecto creados.'
-        : 'Detalle de compra registrado. Lote creado. Asigne ubicaciones desde Inventario.',
+      message,
       numeroLote: result.numeroLote,
       idLote: result.idLote
     });

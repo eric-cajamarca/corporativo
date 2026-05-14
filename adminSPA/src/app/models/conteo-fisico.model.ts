@@ -10,6 +10,9 @@ export interface InventarioFisicoSesionDto {
   estado: EstadoSesionConteo;
   observaciones: string | null;
   fCreacion: string;
+  /** Si la sesión se creó con inventario por ubicación, los movimientos aplican a esa ubicación. */
+  idUbicacionInventario?: number | null;
+  codigoUbicacionInventario?: string | null;
 }
 
 export interface InventarioFisicoLineaDto {

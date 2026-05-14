@@ -26,13 +26,28 @@
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <label class="form-label small fw-semibold">Sucursal</label>
-              <select class="form-select form-select-sm" [(ngModel)]="idSucursalNuevaSesion">
+              <select class="form-select form-select-sm" [(ngModel)]="idSucursalNuevaSesion" (ngModelChange)="onCambioSucursalNuevaSesion()">
                 <option value="">Seleccione…</option>
                 @for (s of sucursales; track s.idSucursal) {
                   <option [ngValue]="s.idSucursal">{{ s.nombre }}</option>
                 }
               </select>
             </div>
+            @if (mostrarOpcionUbicacionConteo) {
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold">Ubicación de inventario (opcional)</label>
+                <select class="form-select form-select-sm" [(ngModel)]="idUbicacionNuevaSesion">
+                  <option [ngValue]="null">Toda la sucursal (stock agregado)</option>
+                  @for (u of ubicacionesSucursal; track u.idUbicacion) {
+                    <option [ngValue]="u.idUbicacion">{{ u.codigoUbicacion || ('#' + u.idUbicacion) }}</option>
+                  }
+                </select>
+                <div class="form-text">
+                  La sesión guarda el id de la ubicación elegida (p. ej. Tnda 2piso). Al aplicar el conteo, los reajustes
+                  <strong>solo</strong> suman o restan stock en esa ubicación (requiere «Gestionar stock por ubicación» en inventario).
+                </div>
+              </div>
+            }
             <div class="col-12 col-md-4">
               <label class="form-label small fw-semibold">Tipo</label>
               <select class="form-select form-select-sm" [(ngModel)]="tipoConteoNueva">
@@ -66,6 +81,11 @@
                 @if (sesion.observaciones) {
                   <span> · {{ sesion.observaciones }}</span>
                 }
+                @if (sesionInventarioPorUbicacion()) {
+                  <span class="ms-1 badge bg-info text-dark">
+                    Ubicación: {{ etiquetaUbicacionSesion() }}
+                  </span>
+                }
               </div>
             </div>
             <div class="col-12 col-md-4 text-md-end">
@@ -85,7 +105,15 @@
         <div class="col-12 col-lg-7">
           <div class="card shadow-sm mb-3">
             <div class="card-header fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <span>Búsqueda (stock actual de la sucursal)</span>
+              <span>
+                Búsqueda (stock
+                @if (sesionInventarioPorUbicacion()) {
+                  en la ubicación de la sesión
+                } @else {
+                  actual de la sucursal (agregado)
+                }
+                )
+              </span>
               <div class="d-flex align-items-center gap-2">
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalCrearProducto()">
                   <i class="bi bi-plus-lg me-1"></i>Crear producto
@@ -110,7 +138,13 @@
                     <tr>
                       <th class="conteo-col-codigo">Código</th>
                       <th class="conteo-col-producto">Producto</th>
-                      <th class="text-end conteo-col-stock">Stock sist.</th>
+                      <th class="text-end conteo-col-stock">
+                        @if (sesionInventarioPorUbicacion()) {
+                          Stock ubic.
+                        } @else {
+                          Stock sist.
+                        }
+                      </th>
                       <th class="text-end conteo-col-stock">Stock real</th>
                       <th class="text-end conteo-col-accion"></th>
                     </tr>
@@ -277,6 +311,11 @@
           <p class="small text-muted mb-2">
             El <strong>delta</strong> es <code>stock real</code> menos el <strong>stock actual del sistema en este momento</strong> (no el valor guardado como referencia).
           </p>
+          @if (sesionInventarioPorUbicacion()) {
+            <p class="small alert alert-info py-2 mb-2">
+              Esta sesión ajusta solo la ubicación <strong>{{ etiquetaUbicacionSesion() }}</strong>; el stock «actual» y el delta son respecto a esa ubicación.
+            </p>
+          }
           <div class="d-flex flex-wrap gap-2 mb-3">
             <button type="button" class="btn btn-outline-primary btn-sm" (click)="cargarPrevisualizacion()" [disabled]="cargandoPreview">
               @if (cargandoPreview) {
@@ -310,7 +349,16 @@
                       <td>{{ r.productoDescripcion }}</td>
                       <td class="text-end">{{ r.stockSistemaAlGuardar | number : '1.0-3' }}</td>
                       <td class="text-end">{{ r.stockActual | number : '1.0-3' }}</td>
-                      <td class="text-end">{{ r.stockReal != null ? (r.stockReal | number : '1.0-3') : '—' }}</td>
+                      <td class="text-end">
+                        @if (r.verificado && r.stockReal != null) {
+                          {{ r.stockReal | number : '1.0-3' }}
+                        } @else if (!r.verificado && r.stockReal != null) {
+                          <span class="text-muted" title="Valor guardado sin verificar: no cuenta al aplicar. Marque Verificado y guarde la línea.">—</span>
+                          <span class="small text-muted d-block">({{ r.stockReal | number : '1.0-3' }} borrador)</span>
+                        } @else {
+                          —
+                        }
+                      </td>
                       <td class="text-end fw-semibold" [ngClass]="{ 'text-success': (r.delta || 0) > 0, 'text-danger': (r.delta || 0) < 0 }">
                         {{ r.delta != null ? (r.delta | number : '1.0-3') : '—' }}
                       </td>

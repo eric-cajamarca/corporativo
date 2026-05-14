@@ -196,6 +196,8 @@ export class MovimientoInventarioService {
   /** Stock actual agregado por producto (filtros en query). */
   obtenerStockActual(params: {
     idSucursal?: string | null;
+    /** Stock en esa ubicación (requiere idSucursal y control de ubicaciones en servidor). */
+    idUbicacion?: string | number | null;
     categoria?: string | null;
     marca?: string | null;
     filtroStock?: 'todos' | 'cero' | 'minimo';
@@ -203,6 +205,9 @@ export class MovimientoInventarioService {
   }): Observable<StockActualResponse> {
     let hp = new HttpParams();
     if (params.idSucursal) hp = hp.set('idSucursal', params.idSucursal);
+    if (params.idUbicacion != null && String(params.idUbicacion).trim() !== '') {
+      hp = hp.set('idUbicacion', String(params.idUbicacion).trim());
+    }
     if (params.categoria?.trim()) hp = hp.set('categoria', params.categoria.trim());
     if (params.marca?.trim()) hp = hp.set('marca', params.marca.trim());
     if (params.filtroStock) hp = hp.set('filtroStock', params.filtroStock);

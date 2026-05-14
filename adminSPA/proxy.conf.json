@@ -1,5 +1,5 @@
 {
-  "/api/reports": {"target":"http://localhost:3002","secure":false,"changeOrigin":true,"logLevel":"debug"},
-  "/api/**": {"target":"http://localhost:3000","secure":false,"changeOrigin":true,"logLevel":"debug"},
-  "/productos-img/**": {"target":"http://localhost:3000","secure":false,"changeOrigin":true}
+  "/api/reports": {"target":"http://127.0.0.1:3002","secure":false,"changeOrigin":true,"logLevel":"silent"},
+  "/api/**": {"target":"http://127.0.0.1:3000","secure":false,"changeOrigin":true,"logLevel":"silent"},
+  "/productos-img/**": {"target":"http://127.0.0.1:3000","secure":false,"changeOrigin":true}
 }

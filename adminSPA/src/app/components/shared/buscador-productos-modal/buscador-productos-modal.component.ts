@@ -4,8 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
 import { GestoresService } from '../../../services/gestores.service';
+import { EmpresaService } from '../../../services/empresa.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
+import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
+import { StockUbicacionProductoFila } from '../../../models/producto.models';
 
 export interface ProductoSeleccionado {
   idProducto: string;
@@ -41,6 +44,14 @@ export class BuscadorProductosModalComponent implements OnInit {
 
   /** Galería: solo si está habilitado en configuración de inventario */
   productosConImagenes = false;
+  /** Opción en Ventas: ver stock por ubicación en este modal */
+  mostrarStockUbicacionesEnBuscador = false;
+  /** Desde estado configuración: empresa gestora → mostrar columna Ubic. aunque la config ventas esté en false */
+  esEmpresaGestoraPorEstado = false;
+  modalStockUbicacionesAbierto = false;
+  stockUbCargando = false;
+  stockUbFilas: StockUbicacionProductoFila[] = [];
+  stockUbProductoDesc = '';
   /** Imágenes del producto cuya galería se está viendo */
   imagenesProductoActual: ImagenProducto[] = [];
   visorAbierto = false;
@@ -58,6 +69,7 @@ export class BuscadorProductosModalComponent implements OnInit {
     public activeModal: NgbActiveModal,
     private productoService: ProductoService,
     private gestoresService: GestoresService,
+    private empresaService: EmpresaService,
     private productosImagenService: ProductosImagenService,
     private cdr: ChangeDetectorRef
   ) {}
@@ -65,16 +77,33 @@ export class BuscadorProductosModalComponent implements OnInit {
   ngOnInit(): void {
     // Cargar productos de inmediato para que el modal muestre datos aunque la config tarde o falle
     this.cargarProductos();
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        this.esEmpresaGestoraPorEstado = !!(res?.data?.esGestora);
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
     this.gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
-        const item = lista.find((c: { clave?: string; Clave?: string }) =>
-          (c.clave || c.Clave || '') === 'PRODUCTOS_CON_IMAGENES'
-        );
+        const normClave = (c: { clave?: string; Clave?: string }) =>
+          String(c?.clave ?? c?.Clave ?? '')
+            .trim()
+            .toUpperCase();
+        const item = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'PRODUCTOS_CON_IMAGENES');
         const valor = item && (item as { valor?: string; Valor?: string }).valor !== undefined
           ? (item as { valor?: string; Valor?: string }).valor
           : (item as { valor?: string; Valor?: string }).Valor;
-        this.productosConImagenes = valor ? String(valor).toLowerCase() === 'true' : false;
+        this.productosConImagenes = interpretarBooleanoConfig(valor, false);
+        const itemUb = lista.find(
+          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR'
+        );
+        const valUb =
+          itemUb && (itemUb as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemUb as { valor?: string; Valor?: string }).valor
+            : (itemUb as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(valUb, false);
         this.cdr.detectChanges();
         if (this.productosConImagenes && this.productosFiltrados.length > 0) {
           this.productosFiltrados.forEach((p) => this.cargarPrimeraImagenSiNecesario(p));
@@ -268,5 +297,62 @@ export class BuscadorProductosModalComponent implements OnInit {
   siguienteImagen(): void {
     if (this.imagenesProductoActual.length === 0) return;
     this.visorIndex = (this.visorIndex + 1) % this.imagenesProductoActual.length;
+  }
+
+  puedeVerStockUbicaciones(p: ProductoSeleccionado): boolean {
+    if (!this.mostrarColumnaUbicacionesBuscador()) {
+      return false;
+    }
+    const sid = this.idSucursal ?? p.idSucursal;
+    return sid != null && String(sid).trim() !== '';
+  }
+
+  /** Columna Ubic.: config VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR o empresa gestora. */
+  mostrarColumnaUbicacionesBuscador(): boolean {
+    return this.mostrarStockUbicacionesEnBuscador || this.esEmpresaGestoraPorEstado;
+  }
+
+  abrirStockUbicaciones(p: ProductoSeleccionado, ev: Event): void {
+    ev.stopPropagation();
+    const id = p?.idProducto;
+    if (!id) {
+      return;
+    }
+    const sidRaw = this.idSucursal ?? p.idSucursal;
+    const idSucursal = sidRaw != null ? String(sidRaw).trim() : '';
+    if (!idSucursal) {
+      return;
+    }
+    this.stockUbProductoDesc = `${p.codigo} — ${p.descripcion}`;
+    this.modalStockUbicacionesAbierto = true;
+    this.stockUbCargando = true;
+    this.stockUbFilas = [];
+    this.cdr.detectChanges();
+    this.productoService.obtenerStockUbicacionesProducto(id, idSucursal).subscribe({
+      next: (res) => {
+        this.stockUbFilas = Array.isArray(res?.data) ? res.data : [];
+        this.stockUbCargando = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.stockUbFilas = [];
+        this.stockUbCargando = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  cerrarStockUbicaciones(): void {
+    this.modalStockUbicacionesAbierto = false;
+    this.stockUbFilas = [];
+    this.stockUbCargando = false;
+  }
+
+  /** Suma cantidades del modal (incluye fila «sin ubicación» si viene del API). */
+  stockUbTotalCantidad(): number {
+    if (!this.stockUbFilas?.length) {
+      return 0;
+    }
+    return this.stockUbFilas.reduce((s, u) => s + (Number(u.cantidad) || 0), 0);
   }
 }

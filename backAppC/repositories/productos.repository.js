@@ -532,6 +532,19 @@ exports.obtenerProductoPorIdRepo = async (pool, idProducto, idEmpresa) => {
   }
 };
 
+/** idEmpresa dueña del registro de producto (clave idProducto). */
+exports.obtenerIdEmpresaProductoPorId = async (pool, idProducto) => {
+  try {
+    const result = await pool
+      .request()
+      .input('idProducto', sql.UniqueIdentifier, idProducto)
+      .query('SELECT idEmpresa FROM Productos WHERE idProducto = @idProducto');
+    return result.recordset?.[0]?.idEmpresa ?? null;
+  } catch (error) {
+    throw new Error(`Repository Error: ${error.message}`);
+  }
+};
+
 /**
  * Obtiene idProducto por cada descripción que coincida exactamente (trim, misma empresa).
  * Retorna array { descripcion, idProducto } para usar en compras al cargar XML.
@@ -891,4 +904,72 @@ exports.actualizarProductoFlexible = async (pool, detalle) => {
   }
   updateSql += ' WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa';
   return request.query(updateSql);
+};
+
+/**
+ * Stock por ubicación (LotesUbicacion) de un producto en sucursal. Lista todas las ubicaciones de la sucursal con cantidad (0 si no hay lote).
+ */
+exports.listarStockUbicacionesProductoSucursal = async (pool, idEmpresa, idSucursal, idProducto) => {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT
+        up.idUbicacion,
+        RTRIM(LTRIM(ISNULL(up.codigoUbicacion, ''))) AS codigoUbicacion,
+        up.prioridad,
+        CAST(ISNULL(SUM(lu.cantidad), 0) AS DECIMAL(18, 3)) AS cantidad
+      FROM UbicacionesPrioridad up
+      LEFT JOIN Lotes l ON l.idSucursal = up.idSucursal
+        AND l.idEmpresa = @idEmpresa
+        AND l.idProducto = @idProducto
+        AND l.cantidadDisponible > 0
+      LEFT JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.idUbicacion = up.idUbicacion AND lu.cantidad > 0
+      WHERE up.idSucursal = @idSucursal
+      GROUP BY up.idUbicacion, up.codigoUbicacion, up.prioridad
+      ORDER BY up.prioridad ASC, up.idUbicacion
+    `);
+  const rows = (r.recordset || []).map((row) => ({
+    idUbicacion: row.idUbicacion != null ? Number(row.idUbicacion) : null,
+    codigoUbicacion: row.codigoUbicacion != null ? String(row.codigoUbicacion).trim() : '',
+    prioridad: row.prioridad != null ? Number(row.prioridad) : 0,
+    cantidad: row.cantidad != null ? Number(row.cantidad) : 0
+  }));
+
+  const rTot = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT CAST(COALESCE(SUM(l.cantidadDisponible), 0) AS DECIMAL(18, 3)) AS totalLotes
+      FROM Lotes l
+      WHERE l.idEmpresa = @idEmpresa AND l.idSucursal = @idSucursal AND l.idProducto = @idProducto
+    `);
+  const rLu = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT CAST(COALESCE(SUM(lu.cantidad), 0) AS DECIMAL(18, 3)) AS totalLu
+      FROM LotesUbicacion lu
+      INNER JOIN Lotes l ON l.idLote = lu.idLote
+      WHERE l.idEmpresa = @idEmpresa AND l.idSucursal = @idSucursal AND l.idProducto = @idProducto
+    `);
+  const totalLotes = rTot.recordset && rTot.recordset[0] ? Number(rTot.recordset[0].totalLotes) || 0 : 0;
+  const totalLu = rLu.recordset && rLu.recordset[0] ? Number(rLu.recordset[0].totalLu) || 0 : 0;
+  const diff = totalLotes - totalLu;
+  if (diff > 0.0005) {
+    rows.push({
+      idUbicacion: -1,
+      codigoUbicacion: 'Sin ubicación asignada (solo en lotes)',
+      prioridad: 999999,
+      cantidad: diff,
+      esSinUbicacion: true
+    });
+  }
+  return rows;
 };

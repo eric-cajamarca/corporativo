@@ -95,7 +95,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idEmpresa, idVenta, baseUrl) =>
 exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresa, idVentaAgrupada, baseUrl) =>
   ventasRepository.obtenerComprobanteVAParaPdf(pool, idEmpresa, idVentaAgrupada, baseUrl);
 
-exports.actualizarVentaEdicion = async (pool, idEmpresa, idVenta, cabecera, detalles, user) => {
+exports.actualizarVentaEdicion = async (pool, idEmpresa, idVenta, cabecera, detalles, user, opciones = {}) => {
+  const { detallePago } = opciones || {};
   const idsEmpresa = await idsEmpresaParaComprobanteVenta(pool, idEmpresa);
   const data = await ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, idsEmpresa);
   if (!data || !data.venta) {
@@ -147,7 +148,7 @@ exports.actualizarVentaEdicion = async (pool, idEmpresa, idVenta, cabecera, deta
         idEstadoSunat
       },
       detalles,
-      { idUsuarioEjecutor }
+      { idUsuarioEjecutor, detallePago }
     );
   } catch (err) {
     const msg = err && err.message ? String(err.message) : '';

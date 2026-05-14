@@ -32,3 +32,41 @@
     margin-left: 0;
   }
 }
+
+/* Modal forma de pago (alineado con create-ventas #modalPago) */
+#modalPagoEdicion .modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+#modalPagoEdicion .modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+#modalPagoEdicion .modal-footer {
+  display: flex !important;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #dee2e6;
+  background: #fff;
+}
+#modalPagoEdicion .modal-footer .btn {
+  min-width: 7rem;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+#modalPagoEdicion .form-control,
+#modalPagoEdicion .form-select {
+  font-size: 1.0625rem;
+}
+#modalPagoEdicion .form-label {
+  font-size: 0.9375rem;
+}
+#modalPagoEdicion .modal-pago-monto-fila {
+  min-width: 5.5rem;
+  max-width: 9rem;
+  margin-left: auto;
+}

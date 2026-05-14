@@ -14,6 +14,8 @@ export interface CrearSesionConteoBody {
   idSucursal: string;
   tipoConteo: string;
   observaciones?: string | null;
+  /** Opcional: sesión fijada a una ubicación; al aplicar, entradas/salidas solo afectan esa ubicación (requiere stock por ubicación en inventario). */
+  idUbicacionInventario?: number | null;
 }
 
 export interface UpsertLineaConteoBody {
