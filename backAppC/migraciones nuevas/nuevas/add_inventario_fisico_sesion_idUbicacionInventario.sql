@@ -16,3 +16,9 @@ BEGIN
     FOREIGN KEY (idUbicacionInventario) REFERENCES dbo.UbicacionesPrioridad(idUbicacion);
 END
 GO
+
+
+
+CREATE UNIQUE INDEX UX_Clientes_Empresa_RucNorm
+ON Clientes (idEmpresa, ruc)
+WHERE ruc IS NOT NULL AND ruc <> '';

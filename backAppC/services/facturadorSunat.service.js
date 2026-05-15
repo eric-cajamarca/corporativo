@@ -10,6 +10,12 @@ const axios = require("axios");
 const JSZip = require("jszip");
 const { getRutaRptaFacturador } = require("../utils/facturadorSunat.util");
 const debugSunatLog = require("../utils/debugSunatLog.util");
+const {
+  esFalloInfraestructuraSunat,
+  MAX_REINTENTOS,
+  delay,
+  DELAYS_MS
+} = require("../utils/sunatEnvioReintentos.util");
 
 const URL_FACTURADOR_DEFAULT = "http://localhost:9000";
 
@@ -294,8 +300,9 @@ async function leerYDevolverCDR(rutaCarpetaFacturadorSunat, base) {
     };
   }
   const idEstadoSunat = responseCodeToIdEstadoSunat(cdr.codigo);
+  const aceptado = idEstadoSunat === 1 || idEstadoSunat === 3;
   return {
-    ok: true,
+    ok: aceptado,
     idEstadoSunat,
     codigoRespuesta: cdr.codigo,
     descripcionRespuesta: cdr.descripcion,
@@ -319,30 +326,42 @@ async function enviarComprobanteAlFacturador(opts) {
   }
 
   const flujo = xmlYaEnFirma ? ejecutarFlujoSoloEnvio : ejecutarFlujoEnvio;
-  try {
-    return await flujo(baseUrl, rutaCarpetaFacturadorSunat, ruc, tipoComprobante, serie, numero);
-  } catch (err) {
-    if (esErrorConexionFacturador(err) && rutaCarpetaFacturadorSunat) {
-      const lanzado = await ejecutarFacturadorBat(rutaCarpetaFacturadorSunat);
-      if (lanzado) {
-        await new Promise((r) => setTimeout(r, SEGUNDOS_ESPERA_DESPUES_BAT * 1000));
-        try {
-          return await flujo(baseUrl, rutaCarpetaFacturadorSunat, ruc, tipoComprobante, serie, numero);
-        } catch (retryErr) {
-          const msg = retryErr.response?.data?.message || retryErr.message || "Error de conexión con el Facturador";
-          console.error("facturadorSunat.service: envío fallido tras iniciar Facturador:", msg);
-          return { ok: false, error: msg, idEstadoSunat: 6 };
+
+  async function intentarUnaVez() {
+    try {
+      return await flujo(baseUrl, rutaCarpetaFacturadorSunat, ruc, tipoComprobante, serie, numero);
+    } catch (err) {
+      if (esErrorConexionFacturador(err) && rutaCarpetaFacturadorSunat) {
+        const lanzado = await ejecutarFacturadorBat(rutaCarpetaFacturadorSunat);
+        if (lanzado) {
+          await new Promise((r) => setTimeout(r, SEGUNDOS_ESPERA_DESPUES_BAT * 1000));
+          try {
+            return await flujo(baseUrl, rutaCarpetaFacturadorSunat, ruc, tipoComprobante, serie, numero);
+          } catch (retryErr) {
+            const msg = retryErr.response?.data?.message || retryErr.message || "Error de conexión con el Facturador";
+            console.error("facturadorSunat.service: envío fallido tras iniciar Facturador:", msg);
+            return { ok: false, error: msg, idEstadoSunat: 6 };
+          }
         }
       }
+      const msg = err.response?.data?.message || err.message || "Error de conexión con el Facturador";
+      console.error("facturadorSunat.service: envío fallido:", msg);
+      return {
+        ok: false,
+        error: msg,
+        idEstadoSunat: 6
+      };
     }
-    const msg = err.response?.data?.message || err.message || "Error de conexión con el Facturador";
-    console.error("facturadorSunat.service: envío fallido:", msg);
-    return {
-      ok: false,
-      error: msg,
-      idEstadoSunat: 6
-    };
   }
+
+  let ultimo = await intentarUnaVez();
+  for (let i = 1; i < MAX_REINTENTOS && ultimo && !ultimo.ok && esFalloInfraestructuraSunat(ultimo, null); i++) {
+    const ms = DELAYS_MS[i - 1] != null ? DELAYS_MS[i - 1] : DELAYS_MS[DELAYS_MS.length - 1];
+    console.error("facturadorSunat.service: reintento infraestructura", i + 1, "/", MAX_REINTENTOS, "espera", ms, "ms");
+    await delay(ms);
+    ultimo = await intentarUnaVez();
+  }
+  return ultimo;
 }
 
 module.exports = {

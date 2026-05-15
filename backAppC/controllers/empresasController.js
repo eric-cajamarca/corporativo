@@ -154,7 +154,15 @@ const createEmpresa = async function (req, res, next) {
                     razon_Social,
                     correo,
                     celular,
-                    direccion: req.body.direccion || 'Sin dirección'
+                    direccion: req.body.direccion || 'Sin dirección',
+                    ubigeo: req.body.ubigeo,
+                    codPais: req.body.codPais,
+                    codpais: req.body.codpais,
+                    region: req.body.region,
+                    provincia: req.body.provincia,
+                    distrito: req.body.distrito,
+                    urbanizacion: req.body.urbanizacion,
+                    codLocal: req.body.codLocal
                 };
                 const resultadoInicializacion = await empresaService.inicializarDatosEmpresa(pool, idEmpresa, datosEmpresa);
 

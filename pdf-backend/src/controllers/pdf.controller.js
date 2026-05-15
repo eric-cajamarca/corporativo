@@ -39,6 +39,8 @@ async function generatePdf(req, res) {
             </table>
           </div>`
           : '';
+
+        console.log('datos.comprobante', datos);
         const bloqueComprobante = datos.comprobante
           ? `
           <div class="bloque-datos bloque-comprobante">
@@ -96,7 +98,7 @@ async function generatePdf(req, res) {
           tablaHtml: htmlBuilder.construirTablaHtml(datos.columnas || [], datos.filas || [])
         });
         break;
-
+      
       case 'comprobante-venta': {
         // Asegurar objetos para evitar "Cannot read properties of undefined (reading 'attrs')" u otros en librerías
         const empresa = datos.empresa && typeof datos.empresa === 'object' ? datos.empresa : {};
@@ -114,6 +116,7 @@ async function generatePdf(req, res) {
         });
         break;
       }
+      
 
       case 'arqueo-caja': {
         const fc = (n) => (n ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

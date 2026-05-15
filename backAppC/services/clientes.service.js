@@ -7,17 +7,27 @@ async function idsEmpresaConGestionadas(pool, idEmpresaRaiz) {
   return [idEmpresaRaiz, ...(gestionadas || []).map((g) => g.idEmpresa).filter(Boolean)];
 }
 
+/** Normaliza RUC/DNI: solo dígitos (igual que el repo). */
+function normalizarRucDni(valor) {
+  if (valor == null) return '';
+  return String(valor).replace(/\D/g, '');
+}
+
 async function crearCliente(pool, user, body) {
   if (!user) throw new Error('NO_AUTH');
   await assertAlgunoPermiso(pool, user, 'CREAR_CLIENTES');
   const idEmpresa = user.empresa;
   if (!idEmpresa) throw new Error('NO_EMPRESA');
   const { idDocumento, ruc, rSocial, correo, celular, condicion, sujetoCredito, lineaCredito } = body;
-  const existentes = await clientesRepository.buscarPorRuc(pool, idEmpresa, ruc);
-  if (existentes.length > 0) {
-    const err = new Error('RUC_DUPLICADO');
-    err.code = 'RUC_DUPLICADO';
+  const rucNorm = normalizarRucDni(ruc);
+  if (!rucNorm) {
+    const err = new Error('RUC_REQUERIDO');
+    err.code = 'RUC_REQUERIDO';
     throw err;
+  }
+  const existente = await clientesRepository.obtenerPorRuc(pool, idEmpresa, rucNorm);
+  if (existente) {
+    return { ...existente, existente: true };
   }
   const esSujetoCredito =
     sujetoCredito === true || sujetoCredito === 1 || String(sujetoCredito).toLowerCase() === 'true';
@@ -25,7 +35,7 @@ async function crearCliente(pool, user, body) {
   await clientesRepository.insertar(pool, {
     idEmpresa,
     idDocumento,
-    ruc,
+    ruc: rucNorm,
     rSocial,
     correo: correo || null,
     celular: celular || null,
@@ -33,7 +43,7 @@ async function crearCliente(pool, user, body) {
     sujetoCredito: esSujetoCredito,
     lineaCredito: linea
   });
-  return clientesRepository.obtenerPorRuc(pool, idEmpresa, ruc);
+  return clientesRepository.obtenerPorRuc(pool, idEmpresa, rucNorm);
 }
 
 async function listarClientes(pool, user) {

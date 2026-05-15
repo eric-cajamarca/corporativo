@@ -1,5 +1,14 @@
 const sql = require('mssql');
 
+/** Solo dígitos (cruzar RUC/DNI ignorando guiones, puntos o espacios). */
+function normalizarDocumento(valor) {
+  if (valor == null) return '';
+  return String(valor).replace(/\D/g, '');
+}
+
+/** SQL inline para normalizar columna RUC (mismas reglas que normalizarDocumento). */
+const SQL_RUC_NORM = "REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(ruc,''))), '-', ''), ' ', ''), '.', '')";
+
 function buildInParams(request, ids, paramPrefix) {
   const parts = [];
   (ids || []).forEach((id, i) => {
@@ -11,20 +20,23 @@ function buildInParams(request, ids, paramPrefix) {
 }
 
 async function buscarPorRuc(pool, idEmpresa, ruc) {
+  const rucNorm = normalizarDocumento(ruc);
+  if (!rucNorm) return [];
   const r = await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('ruc', sql.VarChar, ruc)
-    .query('SELECT * FROM Clientes WHERE idEmpresa = @idEmpresa AND ruc = @ruc');
+    .input('rucNorm', sql.VarChar(32), rucNorm)
+    .query(`SELECT * FROM Clientes WHERE idEmpresa = @idEmpresa AND ${SQL_RUC_NORM} = @rucNorm`);
   return r.recordset;
 }
 
 async function insertar(pool, row) {
+  const rucNorm = normalizarDocumento(row.ruc);
   await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, row.idEmpresa)
     .input('idDocumento', sql.VarChar, row.idDocumento)
-    .input('ruc', sql.VarChar, row.ruc)
+    .input('ruc', sql.VarChar, rucNorm)
     .input('rSocial', sql.VarChar, row.rSocial)
     .input('correo', sql.VarChar, row.correo)
     .input('celular', sql.VarChar, row.celular)
@@ -37,12 +49,16 @@ async function insertar(pool, row) {
 }
 
 async function obtenerPorRuc(pool, idEmpresa, ruc) {
+  const rucNorm = normalizarDocumento(ruc);
+  if (!rucNorm) return null;
   const r = await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('ruc', sql.VarChar, ruc)
+    .input('rucNorm', sql.VarChar(32), rucNorm)
     .query(
-      'SELECT idCliente, idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion, estado, sujetoCredito, lineaCredito FROM Clientes WHERE idEmpresa = @idEmpresa AND ruc = @ruc'
+      `SELECT idCliente, idEmpresa, idDocumento, ruc, rSocial, correo, celular, condicion, estado, sujetoCredito, lineaCredito
+       FROM Clientes
+       WHERE idEmpresa = @idEmpresa AND ${SQL_RUC_NORM} = @rucNorm`
     );
   return r.recordset[0] || null;
 }
@@ -56,9 +72,13 @@ async function listarPorEmpresa(pool, idEmpresa) {
 }
 
 async function listarPorRucEmpresas(pool, idEmpresas, ruc) {
-  const request = pool.request().input('ruc', sql.VarChar, ruc);
+  const rucNorm = normalizarDocumento(ruc);
+  if (!rucNorm) return [];
+  const request = pool.request().input('rucNorm', sql.VarChar(32), rucNorm);
   const inSql = buildInParams(request, idEmpresas, 'e');
-  const r = await request.query(`SELECT * FROM Clientes WHERE ruc = @ruc AND idEmpresa IN (${inSql})`);
+  const r = await request.query(
+    `SELECT * FROM Clientes WHERE ${SQL_RUC_NORM} = @rucNorm AND idEmpresa IN (${inSql})`
+  );
   return r.recordset;
 }
 

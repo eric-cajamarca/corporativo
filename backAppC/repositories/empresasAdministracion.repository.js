@@ -216,7 +216,9 @@ async function insertarDireccionEmpresa(pool, row) {
     .input('codLocal', sql.VarChar, row.codLocal)
     .input('principal', sql.Bit, row.principal ? 1 : 0)
     .query(
-      'INSERT INTO DireccionEmpresa (idEmpresa,ubigeo,codPais,region,provincia,distrito,urbanizacion,direccion,codLocal, principal) VALUES (@idEmpresa,@ubigeo,@codPais,@region,@provincia,@distrito,@urbanizacion,@direccion,@codLocal,@principal)'
+      'INSERT INTO DireccionEmpresa (idEmpresa,ubigeo,codPais,region,provincia,distrito,urbanizacion,direccion,codLocal, principal) ' +
+        'OUTPUT INSERTED.idDireccionEmpresa AS idDireccionEmpresa ' +
+        'VALUES (@idEmpresa,@ubigeo,@codPais,@region,@provincia,@distrito,@urbanizacion,@direccion,@codLocal,@principal)'
     );
 }
 

@@ -487,7 +487,12 @@ export class CreateEmpresaComponent implements OnInit {
     this.registrando.set(true);
 
     const formData = this.empresaForm.value;
-    
+
+    const ubigeoSoloDigitos = String(formData.ubigeo ?? '').replace(/\D/g, '');
+    const distritoSoloDigitos = String(formData.distrito ?? '').replace(/\D/g, '');
+    const ubigeoFinal =
+      ubigeoSoloDigitos.length === 6 ? ubigeoSoloDigitos : distritoSoloDigitos.length === 6 ? distritoSoloDigitos : '';
+
     const empresaData: Record<string, unknown> = {
       idDocumento: '6',
       ruc: formData.ruc,
@@ -499,6 +504,11 @@ export class CreateEmpresaComponent implements OnInit {
       condicion: formData.condicion || '',
       estSunat: formData.estado || '',
       direccion: (formData.direccion || '').trim(),
+      ubigeo: ubigeoFinal,
+      codpais: 'PEN',
+      region: formData.region ?? '',
+      provincia: formData.provincia ?? '',
+      distrito: formData.distrito ?? '',
       solicitudDemo: !!formData.solicitudDemo,
       checkoutOrderNumber: this.checkoutOrderNumber || undefined
     };
@@ -507,45 +517,21 @@ export class CreateEmpresaComponent implements OnInit {
       next: (response) => {
         if (response.data) {
           this.idEmpresaCreada.set(response.data);
-          // Crear dirección
-          const direccionData = {
-            idEmpresa: response.data,
-            ubigeo: formData.ubigeo || '',
-            codpais: 'PEN',
-            region: formData.region || '',
-            provincia: formData.provincia || '',
-            distrito: formData.distrito || '',
-            direccion: formData.direccion || '',
-            principal: true,
-            codLocal: '0000',
-            crearSucursal: false
-          };
-
-          this.empresaService.createDireccionEmpresa(direccionData).subscribe({
-            next: () => {
-              this.registrando.set(false);
-              this.loadCreate.set(true);
-              try {
-                localStorage.removeItem(LS_CHECKOUT_PENDIENTE);
-              } catch {
-                /* ignore */
-              }
-              const msg = (response as any).mensaje || (response as any).message;
-              iziToast.show({
-                title: 'Empresa creada',
-                titleColor: '#28a745',
-                color: '#FFF',
-                class: 'text-success',
-                position: 'topRight',
-                message: msg || 'Revisa tu WhatsApp: te enviamos un código para activar tu cuenta. Luego inicia sesión.'
-              });
-            },
-            error: (error) => {
-              console.error('Error creando dirección:', error);
-              this.registrando.set(false);
-              // La empresa se creó pero falló la dirección
-              this.loadCreate.set(true);
-            }
+          this.registrando.set(false);
+          this.loadCreate.set(true);
+          try {
+            localStorage.removeItem(LS_CHECKOUT_PENDIENTE);
+          } catch {
+            /* ignore */
+          }
+          const msg = (response as any).mensaje || (response as any).message;
+          iziToast.show({
+            title: 'Empresa creada',
+            titleColor: '#28a745',
+            color: '#FFF',
+            class: 'text-success',
+            position: 'topRight',
+            message: msg || 'Revisa tu WhatsApp: te enviamos un código para activar tu cuenta. Luego inicia sesión.'
           });
         } else {
           this.registrando.set(false);

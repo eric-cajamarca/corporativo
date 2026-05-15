@@ -22,6 +22,7 @@ const notaCreditoSunatStockService = require("../services/notaCreditoSunatStock.
 const bajaSunatStockService = require("../services/bajaSunatStock.service");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 const saasContadorComprobantesSunatService = require("../services/saasContadorComprobantesSunat.service");
+const { esFalloInfraestructuraSunat } = require("../utils/sunatEnvioReintentos.util");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -1747,7 +1748,7 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     const claveSunatDec = config.claveSunat ? cifradoClaveCertificado.descifrar(config.claveSunat) : null;
     let resultado;
     try {
-      resultado = await envioDirectoSunat.enviarComprobanteDirectoSunat(
+      resultado = await envioDirectoSunat.enviarComprobanteDirectoSunatConReintentos(
         xml,
         nombreBase,
         usuarioSOAP,
@@ -1757,25 +1758,44 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
       console.error("[SUNAT] Respuesta SUNAT:", JSON.stringify(resultado));
     } catch (err) {
       console.error("[SUNAT] Error en envío a SUNAT:", err);
+      const infraCatch = esFalloInfraestructuraSunat(null, err);
+      if (infraCatch) {
+        return {
+          ok: false,
+          mensaje: err.message || "Error de conexión con SUNAT",
+          quedarPendiente: true
+        };
+      }
       return {
         ok: false,
         mensaje: err.message || "Error al enviar comprobante a SUNAT"
       };
     }
-    await exports.actualizarResultadoEnvioRepo(
-      pool,
-      idComprobanteElectronico,
-      {
-        codigoRespuesta: resultado.codigoRespuesta,
-        descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
-        cdr: resultado.cdr,
-        idEstadoSunat: resultado.idEstadoSunat ?? 6
-      },
-      idUsuarioDesdePayloadUser(user)
-    );
+    const infraDir = !resultado.ok && esFalloInfraestructuraSunat(resultado, null);
+    if (!infraDir) {
+      await exports.actualizarResultadoEnvioRepo(
+        pool,
+        idComprobanteElectronico,
+        {
+          codigoRespuesta: resultado.codigoRespuesta,
+          descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
+          cdr: resultado.cdr,
+          idEstadoSunat: resultado.idEstadoSunat ?? 6
+        },
+        idUsuarioDesdePayloadUser(user)
+      );
+    }
     const resDir = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
     console.error("[SUNAT] enviarComprobanteSunatRepo: resultado envío directo", resDir);
     debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoDirecto", message: "resultado", data: resDir });
+    if (infraDir) {
+      return {
+        ok: false,
+        mensaje: resultado.error || resultado.descripcionRespuesta || "SUNAT no disponible; se reintentará automáticamente.",
+        quedarPendiente: true,
+        idEstadoSunat: 7
+      };
+    }
     return {
       ok: resultado.ok,
       mensaje: resultado.ok ? "Comprobante enviado a SUNAT (directo)" : (resultado.error || "Error en envío directo"),
@@ -1865,23 +1885,34 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     xmlYaEnFirma: usarXmlUbl
   });
 
-  await exports.actualizarResultadoEnvioRepo(
-    pool,
-    idComprobanteElectronico,
-    {
-      codigoRespuesta: resultado.codigoRespuesta,
-      descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
-      cdr: resultado.cdr,
-      idEstadoSunat: resultado.idEstadoSunat ?? 6
-    },
-    idUsuarioDesdePayloadUser(user)
-  );
+  const infraFac = !resultado.ok && esFalloInfraestructuraSunat(resultado, null);
+  if (!infraFac) {
+    await exports.actualizarResultadoEnvioRepo(
+      pool,
+      idComprobanteElectronico,
+      {
+        codigoRespuesta: resultado.codigoRespuesta,
+        descripcionRespuesta: resultado.descripcionRespuesta || resultado.error,
+        cdr: resultado.cdr,
+        idEstadoSunat: resultado.idEstadoSunat ?? 6
+      },
+      idUsuarioDesdePayloadUser(user)
+    );
+  }
 
   // #region agent log
   const resFac = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
   console.error("[SUNAT] enviarComprobanteSunatRepo: resultado Facturador", resFac);
   debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoFacturador", message: "resultado", data: resFac });
   // #endregion
+  if (infraFac) {
+    return {
+      ok: false,
+      mensaje: resultado.error || resultado.descripcionRespuesta || "Facturador/SUNAT no disponible; se reintentará automáticamente.",
+      quedarPendiente: true,
+      idEstadoSunat: 7
+    };
+  }
   return {
     ok: resultado.ok,
     mensaje: resultado.ok ? "Comprobante enviado a SUNAT" : (resultado.error || "Error en envío"),

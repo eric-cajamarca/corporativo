@@ -207,6 +207,18 @@ const enviarComprobanteSunat = async (req, res, next) => {
     debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:result", message: "result", data: resultData });
     // #endregion
     if (result && !result.ok) {
+      if (result.quedarPendiente) {
+        return res.status(503).json({
+          message:
+            result.mensaje ||
+            "SUNAT o el servicio de envío no respondió. El comprobante sigue pendiente y se reintentará automáticamente.",
+          data: {
+            ok: false,
+            quedarPendiente: true,
+            idEstadoSunat: result.idEstadoSunat
+          }
+        });
+      }
       const rawMsg = result.mensaje || "Error al enviar a SUNAT";
       const message = typeof rawMsg === "string" && (rawMsg.includes("<") || rawMsg.length > 500)
         ? "SUNAT rechazó el envío. El sistema no puede responder su solicitud. Intente nuevamente o comuníquese con su Administrador."

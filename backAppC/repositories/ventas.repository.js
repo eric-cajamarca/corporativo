@@ -2,6 +2,103 @@
 const sql = require('mssql');
 const { parseFEmisionCabeceraSQL, mergeFEmisionNvCtSiMedianocheInnecessario } = require('../utils/fechaHoraLocal.util');
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
+const { appendAgentDebugNdjson } = require('../utils/debugAgentLog.util');
+const { extraerDireccionClienteDesdeXmlUbl } = require('../utils/extraerDireccionClienteXmlUbl.util');
+const { ventasTieneColumnaIdDireccionClientes } = require('../utils/ventasColumnaDireccion.util');
+const gestoresRepository = require('./gestores.repository');
+
+/** Normaliza RUC/DNI a solo dígitos para cruzar con Clientes. No registrar el valor en logs. */
+function documentoSoloDigitosPdf(valor) {
+  if (valor == null) return '';
+  return String(valor).replace(/\D/g, '');
+}
+
+/** Línea legible desde `DireccionClientes` con alias `dc` (CONCAT tolera NULL; compatible SQL Server 2012+). */
+const SQL_DC_LINEA_DIRECCION_READABLE = `LTRIM(RTRIM(CONCAT(
+  RTRIM(LTRIM(ISNULL(dc.direccion, ''))), ' ',
+  RTRIM(LTRIM(ISNULL(dc.urbanizacion, ''))), ' ',
+  RTRIM(LTRIM(ISNULL(dc.distrito, ''))), ' ',
+  RTRIM(LTRIM(ISNULL(dc.provincia, ''))), ' ',
+  RTRIM(LTRIM(ISNULL(dc.region, '')))
+)))`;
+
+/**
+ * Dirección en PDF de venta (solo `DireccionClientes`).
+ * `empresasInList` es la lista SQL ya enlazada, p. ej. `@pdfEmp0,@pdfEmp1` (gestora + gestionadas).
+ * Requiere alias `v` y `cl` en el SELECT exterior.
+ */
+function buildSqlExprClienteDireccionPdfVenta(tieneColVentas, empresasInList) {
+  const empIn = `IN (${empresasInList})`;
+  if (tieneColVentas) {
+    return `COALESCE(
+  NULLIF(LTRIM(RTRIM((
+    SELECT TOP 1 ${SQL_DC_LINEA_DIRECCION_READABLE}
+    FROM DireccionClientes dc
+    WHERE v.idDireccionClientes IS NOT NULL
+      AND dc.idDireccionClientes = v.idDireccionClientes
+      AND dc.idEmpresa ${empIn}
+      AND dc.idCliente = v.idCliente
+      AND NULLIF(${SQL_DC_LINEA_DIRECCION_READABLE}, '') IS NOT NULL
+  ))), ''),
+  ISNULL((
+    SELECT TOP 1 ${SQL_DC_LINEA_DIRECCION_READABLE}
+    FROM DireccionClientes dc
+    INNER JOIN Clientes cl2 ON cl2.idCliente = dc.idCliente
+    WHERE cl2.idEmpresa ${empIn}
+      AND NULLIF(${SQL_DC_LINEA_DIRECCION_READABLE}, '') IS NOT NULL
+      AND (
+        dc.idCliente = cl.idCliente
+        OR (
+          LEN(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '')) >= 8
+          AND REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl2.ruc,''))), '-', ''), ' ', ''), '.', '')
+              = REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '')
+        )
+      )
+    ORDER BY
+      CASE WHEN dc.idCliente = cl.idCliente THEN 0 ELSE 1 END,
+      CASE WHEN ISNULL(dc.principal, 0) = 1 THEN 0 ELSE 1 END,
+      dc.idDireccionClientes ASC
+  ), ''),
+  ''
+)`;
+  }
+  return `ISNULL((
+    SELECT TOP 1 ${SQL_DC_LINEA_DIRECCION_READABLE}
+    FROM DireccionClientes dc
+    INNER JOIN Clientes cl2 ON cl2.idCliente = dc.idCliente
+    WHERE cl2.idEmpresa ${empIn}
+      AND NULLIF(${SQL_DC_LINEA_DIRECCION_READABLE}, '') IS NOT NULL
+      AND (
+        dc.idCliente = cl.idCliente
+        OR (
+          LEN(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '')) >= 8
+          AND REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl2.ruc,''))), '-', ''), ' ', ''), '.', '')
+              = REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '')
+        )
+      )
+    ORDER BY
+      CASE WHEN dc.idCliente = cl.idCliente THEN 0 ELSE 1 END,
+      CASE WHEN ISNULL(dc.principal, 0) = 1 THEN 0 ELSE 1 END,
+      dc.idDireccionClientes ASC
+  ), '')`;
+}
+
+function sqlSelectIdDireccionClientesVenta(tieneColVentas) {
+  return tieneColVentas
+    ? 'v.idDireccionClientes AS idDireccionClientesVenta'
+    : 'CAST(NULL AS INT) AS idDireccionClientesVenta';
+}
+
+/** Dirección al enriquecer NC/ND desde comprobante origen (empresas del mismo alcance JWT). */
+function buildSqlExprClienteDireccionNotaOrigen(empresasInList) {
+  return `ISNULL((
+    SELECT TOP 1 ${SQL_DC_LINEA_DIRECCION_READABLE}
+    FROM DireccionClientes dc
+    WHERE dc.idCliente = cl.idCliente AND dc.idEmpresa IN (${empresasInList})
+      AND NULLIF(${SQL_DC_LINEA_DIRECCION_READABLE}, '') IS NOT NULL
+    ORDER BY CASE WHEN ISNULL(dc.principal, 0) = 1 THEN 0 ELSE 1 END, dc.idDireccionClientes
+), '')`;
+}
 
 /** IN (@p0,@p1,...) para UUIDs en requests de consulta PDF / multiempresa */
 const bindUniqueIdentifiersIn = (request, idsEmpresa, prefix) => {
@@ -30,7 +127,7 @@ const CODIGOS_VENTA_NOTA_CREDITO_DEBITO = new Set(["B7", "F7", "B8", "F8"]);
  * Copia cliente desde la factura/boleta indicada en compRelacionado cuando la NC/ND no tiene receptor válido.
  * Evita enviar 00000000 si la boleta original sí tenía cliente en BD.
  */
-async function enriquecerClienteDesdeVentaOrigenSiNota(pool, cab) {
+async function enriquecerClienteDesdeVentaOrigenSiNota(pool, cab, idsEmpresaPermitidas) {
   if (!cab || !cab.idEmpresa) return;
   const cod = String(cab.codigoComprobante || "").trim().toUpperCase();
   if (!CODIGOS_VENTA_NOTA_CREDITO_DEBITO.has(cod)) return;
@@ -46,24 +143,25 @@ async function enriquecerClienteDesdeVentaOrigenSiNota(pool, cab) {
   const sinClienteValido = cab.idCliente == null || !rucN || rucN === "00000000";
   if (!sinClienteValido) return;
   try {
-    const q = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, cab.idEmpresa)
-      .input("serie", sql.VarChar(20), serieOrigen.slice(0, 20))
-      .input("numero", sql.Int, numInt)
-      .query(`
+    const idsPerm =
+      (Array.isArray(idsEmpresaPermitidas) ? idsEmpresaPermitidas : [idsEmpresaPermitidas]).filter(Boolean);
+    const ids = idsPerm.length > 0 ? idsPerm : [cab.idEmpresa];
+    const reqNota = pool.request();
+    const inList = bindUniqueIdentifiersIn(reqNota, ids, "notaOrigenEmp");
+    const exprDirNota = buildSqlExprClienteDireccionNotaOrigen(inList);
+    reqNota.input("serie", sql.VarChar(20), serieOrigen.slice(0, 20));
+    reqNota.input("numero", sql.Int, numInt);
+    const q = await reqNota.query(`
         SELECT TOP 1
           cl.idCliente,
           cl.rSocial AS clienteRazonSocial,
           cl.ruc AS clienteRuc,
           cl.idDocumento AS clienteTipoDoc,
-          (SELECT TOP 1 ISNULL(dc.direccion, '') FROM DireccionClientes dc
-           WHERE dc.idCliente = cl.idCliente AND dc.idEmpresa = v.idEmpresa
-           ORDER BY dc.idDireccionClientes) AS clienteDireccion
+          ${exprDirNota} AS clienteDireccion
         FROM Ventas v
         INNER JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
-        WHERE v.idEmpresa = @idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList})
+        WHERE v.idEmpresa IN (${inList})
           AND LTRIM(RTRIM(v.serie)) = LTRIM(RTRIM(@serie))
           AND v.numero = @numero
           AND c.codigo IN (N'01', N'03')
@@ -111,6 +209,11 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     idVentaAgrupada
   } = datosVenta;
 
+  const idDireccionClientesVal =
+    datosVenta.idDireccionClientes != null && Number(datosVenta.idDireccionClientes) > 0
+      ? Number(datosVenta.idDireccionClientes)
+      : null;
+
   const compRelacionadoVal = (compRelacionado == null)
     ? ''
     : String(compRelacionado).trim().slice(0, 30);
@@ -121,6 +224,8 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
   const fVencimientoVal = fVencimiento != null ? fVencimiento : fEmision;
   const idEstadoPedidoVal = idEstadoPedido != null ? parseInt(idEstadoPedido, 10) : 1;
   const idEstadoPagoVal = idEstadoPago != null ? parseInt(idEstadoPago, 10) : 1;
+
+  const tieneDirVentas = await ventasTieneColumnaIdDireccionClientes(transaction);
 
   const req = transaction
     .request()
@@ -150,8 +255,22 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     .input('observaciones', sql.VarChar(500), observacionesVal)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario);
 
+  if (tieneDirVentas) {
+    req.input('idDireccionClientes', sql.Int, idDireccionClientesVal);
+  }
+
   if (idVentaAgrupada) {
     req.input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada);
+    if (tieneDirVentas) {
+      return await req.query(`
+      DECLARE @ins TABLE (idVenta INT);
+      INSERT INTO Ventas
+      (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, idVentaAgrupada, idDireccionClientes)
+      OUTPUT INSERTED.idVenta INTO @ins
+      VALUES
+      (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario, @idVentaAgrupada, @idDireccionClientes);
+      SELECT idVenta FROM @ins;`);
+    }
     return await req.query(`
       DECLARE @ins TABLE (idVenta INT);
       INSERT INTO Ventas
@@ -162,6 +281,17 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
       SELECT idVenta FROM @ins;`);
   }
 
+  if (tieneDirVentas) {
+    return await req.query(`
+    DECLARE @ins TABLE (idVenta INT);
+    INSERT INTO Ventas
+    (idEmpresa, idSucursal, serie, numero, compVenta, idComprobante, fEmision, fVencimiento, idCliente, idMoneda, tCambio, subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, idDireccionClientes)
+    OUTPUT INSERTED.idVenta INTO @ins
+    VALUES
+    (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario, @idDireccionClientes);
+    SELECT idVenta FROM @ins;`);
+  }
+
   return await req.query(`
     DECLARE @ins TABLE (idVenta INT);
     INSERT INTO Ventas
@@ -170,6 +300,49 @@ exports.insertar = async (transaction, datosVenta, idEmpresa, idUsuario) => {
     VALUES
     (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fVencimiento, @idCliente, @idMoneda, @tCambio, @subtotal, @igv, @exonerado, @gratuito, @otrosCargos, @descuentos, @total, @idMediosPago, @idEstadoPedido, @idEstadoPago, @idEstadoSunat, @compRelacionado, @observaciones, @idUsuario);
     SELECT idVenta FROM @ins;`);
+};
+
+/**
+ * Primera dirección del cliente con texto (principal primero). Para `Ventas.idDireccionClientes` cuando el front no envía id.
+ * @param {import('mssql').Transaction} transaction
+ * @param {string|string[]} idsEmpresa - Empresa de la venta o lista (gestora + gestionadas): `DireccionClientes.idEmpresa` debe estar en el conjunto.
+ * @param {number} idCliente
+ * @param {string|null} [idEmpresaPreferente] - Prioriza dirección registrada en esta empresa (p. ej. `Ventas.idEmpresa`).
+ */
+exports.obtenerIdDireccionClientePreferidoParaVenta = async (
+  transaction,
+  idsEmpresa,
+  idCliente,
+  idEmpresaPreferente = null
+) => {
+  if (idCliente == null || Number(idCliente) <= 0) return undefined;
+  let ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0 && idEmpresaPreferente) ids = [idEmpresaPreferente];
+  if (ids.length === 0) return undefined;
+
+  const req = transaction.request().input('idCliente', sql.Int, Number(idCliente));
+  const inList = bindUniqueIdentifiersIn(req, ids, 'dirPrefEmp');
+  let orderPref = '';
+  if (idEmpresaPreferente) {
+    req.input('idEmpresaPrefDir', sql.UniqueIdentifier, idEmpresaPreferente);
+    orderPref = 'CASE WHEN idEmpresa = @idEmpresaPrefDir THEN 0 ELSE 1 END, ';
+  }
+  const r = await req.query(`
+      SELECT TOP 1 idDireccionClientes
+      FROM DireccionClientes
+      WHERE idEmpresa IN (${inList})
+        AND idCliente = @idCliente
+        AND NULLIF(LTRIM(RTRIM(CONCAT(
+          RTRIM(LTRIM(ISNULL(direccion, ''))), ' ',
+          RTRIM(LTRIM(ISNULL(urbanizacion, ''))), ' ',
+          RTRIM(LTRIM(ISNULL(distrito, ''))), ' ',
+          RTRIM(LTRIM(ISNULL(provincia, ''))), ' ',
+          RTRIM(LTRIM(ISNULL(region, '')))
+        ))), '') IS NOT NULL
+      ORDER BY ${orderPref}CASE WHEN ISNULL(principal, 0) = 1 THEN 0 ELSE 1 END, idDireccionClientes ASC
+    `);
+  const id = r.recordset[0]?.idDireccionClientes;
+  return id != null && Number(id) > 0 ? Number(id) : undefined;
 };
 
 /** Actualiza el número correlativo del comprobante usado en la venta (incrementa en BD para la siguiente). */
@@ -586,15 +759,20 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
 
   const inEmp = (req) => bindUniqueIdentifiersIn(req, idsPermitidos, 'pdfEmp');
 
+  const tieneDirVentas = await ventasTieneColumnaIdDireccionClientes(pool);
+  const selIdDirVenta = sqlSelectIdDireccionClientesVenta(tieneDirVentas);
+
   let cabecera;
   try {
     const reqCab = pool.request().input('idVenta', sql.Int, idVenta);
     const inList = inEmp(reqCab);
+    const exprDirPdf = buildSqlExprClienteDireccionPdfVenta(tieneDirVentas, inList);
     cabecera = await reqCab.query(`
         SELECT
           v.idEmpresa,
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           v.idVentaAgrupada,
+          ${selIdDirVenta},
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           CONVERT(VARCHAR(10), v.fVencimiento, 120) AS fVencimiento,
           v.subtotal, v.igv,
@@ -612,23 +790,25 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
-          (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
+          ${exprDirPdf} AS clienteDireccion
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
-        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList})
         WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList})
       `);
   } catch (err) {
     if (err.message && (err.message.includes('MediosPago') || err.message.includes('Invalid object'))) {
       const reqCab2 = pool.request().input('idVenta', sql.Int, idVenta);
       const inList2 = inEmp(reqCab2);
+      const exprDirPdf2 = buildSqlExprClienteDireccionPdfVenta(tieneDirVentas, inList2);
       cabecera = await reqCab2.query(`
         SELECT
           v.idEmpresa,
           v.idVenta, v.compVenta, v.serie, v.numero, v.idEstadoSunat, v.idSucursal, v.idComprobante,
           v.idVentaAgrupada,
+          ${selIdDirVenta},
           CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           CONVERT(VARCHAR(10), v.fVencimiento, 120) AS fVencimiento,
           v.subtotal, v.igv,
@@ -646,10 +826,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
-          (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
+          ${exprDirPdf2} AS clienteDireccion
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
-        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+        LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList2})
         WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList2})
       `);
     } else {
@@ -659,7 +839,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
 
   const cab = cabecera.recordset && cabecera.recordset[0] ? cabecera.recordset[0] : null;
   if (!cab || !cab.idEmpresa) return null;
-  await enriquecerClienteDesdeVentaOrigenSiNota(pool, cab);
+  await enriquecerClienteDesdeVentaOrigenSiNota(pool, cab, idsPermitidos);
   const idEmpresaVenta = cab.idEmpresa;
 
   let empresaResult;
@@ -855,17 +1035,288 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
 
   let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '') ? String(cab.clienteDireccion).trim() : '';
+  const dirLenCabecera = clienteDireccion.length;
+
+  // #region agent log
+  try {
+    appendAgentDebugNdjson({
+      hypothesisId: 'A',
+      runId: 'trace',
+      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso1-cabecera',
+      message: 'PDF direccion cliente: paso 1 (cabecera SQL)',
+      data: {
+        idVenta,
+        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
+        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
+        cabClienteDireccion: cab.clienteDireccion != null ? String(cab.clienteDireccion) : null,
+        cabClienteRazonSocial: cab.clienteRazonSocial != null ? String(cab.clienteRazonSocial) : null,
+        cabClienteRuc: cab.clienteRuc != null ? String(cab.clienteRuc) : null,
+        clienteDireccionTrasCabecera: clienteDireccion
+      }
+    });
+  } catch (_) {}
+  // #endregion
+
+  let dirLenPorIdCliente = 0;
+  let filasDireccionClientesIdCliente = [];
   if (!clienteDireccion && cab.idCliente != null) {
     try {
       const dirClienteResult = await pool
         .request()
         .input('idCliente', sql.Int, cab.idCliente)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
-        .query(`SELECT TOP 1 ISNULL(direccion, '') AS direccion FROM DireccionClientes WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa ORDER BY idDireccionClientes`);
-      const dirRow = dirClienteResult.recordset && dirClienteResult.recordset[0];
-      if (dirRow && dirRow.direccion) clienteDireccion = String(dirRow.direccion).trim();
-    } catch (_) {}
+        .query(`
+          SELECT idDireccionClientes, ISNULL(principal,0) AS principal,
+            LTRIM(RTRIM(CONCAT(
+              RTRIM(LTRIM(ISNULL(direccion, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(urbanizacion, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(distrito, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(provincia, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(region, '')))
+            ))) AS direccion
+          FROM DireccionClientes
+          WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa
+          ORDER BY ISNULL(principal,0) DESC, idDireccionClientes`);
+      filasDireccionClientesIdCliente = (dirClienteResult.recordset || []).map((r) => ({
+        idDireccionClientes: r.idDireccionClientes,
+        principal: r.principal === 1 || r.principal === true,
+        direccion: r.direccion != null ? String(r.direccion) : ''
+      }));
+      const elegida = filasDireccionClientesIdCliente.find((r) => r.direccion && r.direccion.trim() !== '');
+      if (elegida) {
+        clienteDireccion = elegida.direccion.trim();
+        dirLenPorIdCliente = clienteDireccion.length;
+      }
+    } catch (err) {
+      console.error('obtenerComprobanteParaPdf direccion por idCliente:', err);
+    }
   }
+
+  // #region agent log
+  try {
+    appendAgentDebugNdjson({
+      hypothesisId: 'A',
+      runId: 'trace',
+      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso2-direccionClientes-idCliente',
+      message: 'PDF direccion cliente: paso 2 (DireccionClientes por idCliente)',
+      data: {
+        idVenta,
+        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
+        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
+        filasEncontradas: filasDireccionClientesIdCliente.length,
+        filas: filasDireccionClientesIdCliente,
+        clienteDireccionTrasPaso2: clienteDireccion
+      }
+    });
+  } catch (_) {}
+  // #endregion
+
+  // Fallback: si aún no hay direccion y el cab trae RUC/DNI con >=8 digitos, buscar dirección de cualquier
+  // cliente con el mismo RUC normalizado dentro de la misma empresa (caso clientes duplicados por RUC).
+  const docDigitsCab = documentoSoloDigitosPdf(cab.clienteRuc);
+  let dirLenPorRucEmpresa = 0;
+  let clientesMismaEmpRucCount = -1;
+  let dirsClientesMismaEmpRucCount = -1;
+  let filasDireccionClientesPorRuc = [];
+  let clientesMismaEmpRucDetalle = [];
+  if (!clienteDireccion && docDigitsCab.length >= 8 && idEmpresaVenta) {
+    try {
+      const detCli = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+        .input('rucNorm', sql.VarChar(32), docDigitsCab)
+        .query(`
+          SELECT cl.idCliente, ISNULL(cl.rSocial, '') AS rSocial, ISNULL(cl.ruc, '') AS ruc
+          FROM Clientes cl
+          WHERE cl.idEmpresa = @idEmpresa
+            AND REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '') = @rucNorm
+        `);
+      clientesMismaEmpRucDetalle = (detCli.recordset || []).map((r) => ({
+        idCliente: r.idCliente,
+        rSocial: r.rSocial != null ? String(r.rSocial) : '',
+        ruc: r.ruc != null ? String(r.ruc) : ''
+      }));
+      clientesMismaEmpRucCount = clientesMismaEmpRucDetalle.length;
+
+      const detDir = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+        .input('rucNorm', sql.VarChar(32), docDigitsCab)
+        .query(`
+          SELECT dc.idDireccionClientes, dc.idCliente, ISNULL(dc.principal, 0) AS principal,
+            LTRIM(RTRIM(CONCAT(
+              RTRIM(LTRIM(ISNULL(dc.direccion, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(dc.urbanizacion, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(dc.distrito, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(dc.provincia, ''))), ' ',
+              RTRIM(LTRIM(ISNULL(dc.region, '')))
+            ))) AS direccion
+          FROM DireccionClientes dc
+          INNER JOIN Clientes cl ON cl.idCliente = dc.idCliente
+          WHERE cl.idEmpresa = @idEmpresa
+            AND REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '') = @rucNorm
+        `);
+      filasDireccionClientesPorRuc = (detDir.recordset || []).map((r) => ({
+        idDireccionClientes: r.idDireccionClientes,
+        idCliente: r.idCliente,
+        principal: r.principal === 1 || r.principal === true,
+        direccion: r.direccion != null ? String(r.direccion) : ''
+      }));
+      dirsClientesMismaEmpRucCount = filasDireccionClientesPorRuc.filter((r) => r.direccion && r.direccion.trim() !== '').length;
+
+      if (dirsClientesMismaEmpRucCount > 0) {
+        const idClienteVenta = cab.idCliente != null && Number.isFinite(Number(cab.idCliente)) ? Number(cab.idCliente) : -1;
+        const elegida = [...filasDireccionClientesPorRuc]
+          .filter((r) => r.direccion && r.direccion.trim() !== '')
+          .sort((a, b) => {
+            const aMatch = idClienteVenta > 0 && a.idCliente === idClienteVenta ? 0 : 1;
+            const bMatch = idClienteVenta > 0 && b.idCliente === idClienteVenta ? 0 : 1;
+            if (aMatch !== bMatch) return aMatch - bMatch;
+            const aPri = a.principal ? 0 : 1;
+            const bPri = b.principal ? 0 : 1;
+            if (aPri !== bPri) return aPri - bPri;
+            return (a.idDireccionClientes || 0) - (b.idDireccionClientes || 0);
+          })[0];
+        if (elegida) {
+          clienteDireccion = elegida.direccion.trim();
+          dirLenPorRucEmpresa = clienteDireccion.length;
+        }
+      }
+    } catch (err) {
+      console.error('obtenerComprobanteParaPdf direccion por RUC fallback:', err);
+    }
+  }
+
+  // #region agent log
+  try {
+    appendAgentDebugNdjson({
+      hypothesisId: 'A',
+      runId: 'trace',
+      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso3-rucNormalizado',
+      message: 'PDF direccion cliente: paso 3 (RUC normalizado en misma empresa)',
+      data: {
+        idVenta,
+        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
+        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
+        docDigitsLen: docDigitsCab.length,
+        rucLast4: docDigitsCab.length >= 4 ? docDigitsCab.slice(-4) : '',
+        clientesMismaEmpRucCount,
+        clientesMismaEmpRucDetalle,
+        dirsClientesMismaEmpRucCount,
+        filasDireccionClientesPorRuc,
+        clienteDireccionTrasPaso3: clienteDireccion
+      }
+    });
+  } catch (_) {}
+  // #endregion
+
+  // Último fallback: si tras Cabecera + idCliente + RUC sigue sin dirección, extraerla del XML
+  // enviado a SUNAT (ComprobantesElectronicos.xmlEnviado) y persistirla en DireccionClientes
+  // para que no haya que volver a parsearla y queden corregidos los datos del cliente.
+  let dirLenDesdeXml = 0;
+  let xmlEncontrado = false;
+  let dirPersistidaDesdeXml = false;
+  let dirXmlExtraida = '';
+  let xmlLen = 0;
+  if (!clienteDireccion && cab.idCliente != null && idEmpresaVenta) {
+    try {
+      const xr = await pool
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+        .query(`
+          SELECT TOP 1 CAST(ISNULL(ce.xmlEnviado, '') AS NVARCHAR(MAX)) AS xmlEnviado
+          FROM ComprobantesElectronicos ce
+          WHERE ce.idVenta = @idVenta AND ce.idEmpresa = @idEmpresa
+            AND NULLIF(LTRIM(RTRIM(CAST(ce.xmlEnviado AS NVARCHAR(MAX)))), '') <> ''
+          ORDER BY ce.fechaEmision DESC
+        `);
+      const xmlRow = xr.recordset && xr.recordset[0];
+      const rawXml = xmlRow ? xmlRow.xmlEnviado ?? xmlRow.XMLENVIADO : null;
+      if (rawXml != null && String(rawXml).trim() !== '') {
+        xmlEncontrado = true;
+        xmlLen = String(rawXml).length;
+        const dirXml = extraerDireccionClienteDesdeXmlUbl(String(rawXml));
+        dirXmlExtraida = dirXml;
+        if (dirXml) {
+          clienteDireccion = dirXml;
+          dirLenDesdeXml = dirXml.length;
+          try {
+            await pool
+              .request()
+              .input('idCliente', sql.Int, Number(cab.idCliente))
+              .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
+              .input('direccion', sql.VarChar(255), dirXml.slice(0, 255))
+              .query(`
+                IF NOT EXISTS (
+                  SELECT 1 FROM DireccionClientes WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa
+                )
+                BEGIN
+                  INSERT INTO DireccionClientes
+                    (idEmpresa, idCliente, ubigeo, codPais, region, provincia, distrito, urbanizacion, direccion, referencia, codLocal, principal)
+                  VALUES
+                    (@idEmpresa, @idCliente, '', 'PE', '', '', '', '', @direccion, '', '', 1)
+                END
+              `);
+            dirPersistidaDesdeXml = true;
+          } catch (errPersist) {
+            console.error('obtenerComprobanteParaPdf persistir direccion XML:', errPersist);
+          }
+        }
+      }
+    } catch (errXml) {
+      console.error('obtenerComprobanteParaPdf direccion desde XML:', errXml);
+    }
+  }
+
+  // #region agent log
+  try {
+    appendAgentDebugNdjson({
+      hypothesisId: 'A',
+      runId: 'trace',
+      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso4-xmlEnviado',
+      message: 'PDF direccion cliente: paso 4 (XML enviado a SUNAT)',
+      data: {
+        idVenta,
+        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
+        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
+        xmlEncontrado,
+        xmlLen,
+        dirXmlExtraida,
+        dirLenDesdeXml,
+        dirPersistidaDesdeXml,
+        clienteDireccionTrasPaso4: clienteDireccion
+      }
+    });
+  } catch (_) {}
+  // #endregion
+
+  // #region agent log
+  try {
+    appendAgentDebugNdjson({
+      hypothesisId: 'A',
+      runId: 'post-fix',
+      location: 'ventas.repository.js:obtenerComprobanteParaPdf',
+      message: 'PDF cliente direccion (repo)',
+      data: {
+        idVenta,
+        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
+        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
+        docDigitsLen: docDigitsCab.length,
+        rucLast4: docDigitsCab.length >= 4 ? docDigitsCab.slice(-4) : '',
+        dirLenCabecera,
+        dirLenPorIdCliente,
+        dirLenPorRucEmpresa,
+        clientesMismaEmpRucCount,
+        dirsClientesMismaEmpRucCount,
+        xmlEncontrado,
+        dirLenDesdeXml,
+        dirPersistidaDesdeXml,
+        dirFinalLen: clienteDireccion.length
+      }
+    });
+  } catch (_) { /* logging best effort */ }
+  // #endregion
 
   const base = (baseUrl || '').replace(/\/$/, '');
   const logoFileName = emp && (
@@ -1095,6 +1546,8 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
+    const tieneDirVentasCol = await ventasTieneColumnaIdDireccionClientes(transaction);
+
     const chk = await transaction.request()
       .input('idVenta', sql.Int, idVenta)
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -1186,40 +1639,48 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     const otrosCargos = Number(cabecera.otrosCargos) || 0;
     const descuentos = Number(cabecera.descuentos) || 0;
     const total = Number(cabecera.total) || 0;
+
+    const reqUp = transaction
+      .request()
+      .input('idVenta', sql.Int, idVenta)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('fEmision', sql.VarChar(23), fEmision)
+      .input('subtotal', sql.Decimal(18, 2), subtotal)
+      .input('igv', sql.Decimal(18, 2), igv)
+      .input('exonerado', sql.Decimal(18, 2), exonerado)
+      .input('gratuito', sql.Decimal(18, 2), gratuito)
+      .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
+      .input('descuentos', sql.Decimal(18, 2), descuentos)
+      .input('total', sql.Decimal(18, 2), total);
+
+    const setParts = [
+      'fEmision = @fEmision',
+      'subtotal = @subtotal',
+      'igv = @igv',
+      'exonerado = @exonerado',
+      'gratuito = @gratuito',
+      'otrosCargos = @otrosCargos',
+      'descuentos = @descuentos',
+      'total = @total'
+    ];
     if (idCliente != null && idCliente > 0) {
-      await transaction.request()
-        .input('idVenta', sql.Int, idVenta)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('fEmision', sql.VarChar(23), fEmision)
-        .input('idCliente', sql.Int, idCliente)
-        .input('subtotal', sql.Decimal(18, 2), subtotal)
-        .input('igv', sql.Decimal(18, 2), igv)
-        .input('exonerado', sql.Decimal(18, 2), exonerado)
-        .input('gratuito', sql.Decimal(18, 2), gratuito)
-        .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
-        .input('descuentos', sql.Decimal(18, 2), descuentos)
-        .input('total', sql.Decimal(18, 2), total)
-        .query(`
-          UPDATE Ventas SET fEmision = @fEmision, idCliente = @idCliente, subtotal = @subtotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total
-          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
-        `);
-    } else {
-      await transaction.request()
-        .input('idVenta', sql.Int, idVenta)
-        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('fEmision', sql.VarChar(23), fEmision)
-        .input('subtotal', sql.Decimal(18, 2), subtotal)
-        .input('igv', sql.Decimal(18, 2), igv)
-        .input('exonerado', sql.Decimal(18, 2), exonerado)
-        .input('gratuito', sql.Decimal(18, 2), gratuito)
-        .input('otrosCargos', sql.Decimal(18, 2), otrosCargos)
-        .input('descuentos', sql.Decimal(18, 2), descuentos)
-        .input('total', sql.Decimal(18, 2), total)
-        .query(`
-          UPDATE Ventas SET fEmision = @fEmision, subtotal = @subtotal, igv = @igv, exonerado = @exonerado, gratuito = @gratuito, otrosCargos = @otrosCargos, descuentos = @descuentos, total = @total
-          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
-        `);
+      reqUp.input('idCliente', sql.Int, idCliente);
+      setParts.splice(1, 0, 'idCliente = @idCliente');
     }
+    if (tieneDirVentasCol && Object.prototype.hasOwnProperty.call(cabecera, 'idDireccionClientes')) {
+      const idDirV =
+        cabecera.idDireccionClientes != null &&
+        cabecera.idDireccionClientes !== '' &&
+        Number(cabecera.idDireccionClientes) > 0
+          ? Number(cabecera.idDireccionClientes)
+          : null;
+      reqUp.input('idDireccionClientes', sql.Int, idDirV);
+      setParts.push('idDireccionClientes = @idDireccionClientes');
+    }
+
+    await reqUp.query(
+      `UPDATE Ventas SET ${setParts.join(', ')} WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa`
+    );
 
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
     const getConfig = (clave, def) => (configRows.find((c) => c.clave === clave)?.valor ?? def);
@@ -2296,25 +2757,43 @@ exports.obtenerClientePorIdEnEmpresas = async (transaction, idCliente, idsEmpres
   return result.recordset && result.recordset[0];
 };
 
-/** Busca cliente por documento (RUC/DNI) en una empresa. */
+/** Busca cliente por documento (RUC/DNI) en una empresa. Compara RUC normalizado (solo dígitos).
+ *  Prioriza el cliente que ya tenga al menos una dirección registrada (evita reusar duplicados sin dirección). */
 exports.buscarClientePorDocumento = async (transaction, idEmpresa, ruc) => {
+  const rucNorm = documentoSoloDigitosPdf(ruc);
+  if (!rucNorm) return null;
   const result = await transaction.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('ruc', sql.VarChar(11), ruc)
+    .input('rucNorm', sql.VarChar(32), rucNorm)
     .query(`
-      SELECT TOP 1 idCliente, idDocumento, ruc, rSocial, correo, celular, condicion
-      FROM Clientes
-      WHERE idEmpresa = @idEmpresa AND ruc = @ruc
+      SELECT TOP 1 cl.idCliente, cl.idDocumento, cl.ruc, cl.rSocial, cl.correo, cl.celular, cl.condicion
+      FROM Clientes cl
+      WHERE cl.idEmpresa = @idEmpresa
+        AND REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(cl.ruc,''))), '-', ''), ' ', ''), '.', '') = @rucNorm
+      ORDER BY
+        CASE WHEN EXISTS (
+          SELECT 1 FROM DireccionClientes dc
+          WHERE dc.idCliente = cl.idCliente
+            AND dc.idEmpresa = cl.idEmpresa
+            AND NULLIF(LTRIM(RTRIM(ISNULL(dc.direccion,''))), '') IS NOT NULL
+        ) THEN 0 ELSE 1 END,
+        cl.idCliente ASC
     `);
   return result.recordset && result.recordset[0];
 };
 
-/** Inserta cliente en empresa destino replicando datos básicos. */
+/** Inserta cliente en empresa destino replicando datos básicos. Idempotente: si ya existe el RUC normalizado,
+ *  devuelve el cliente existente sin volver a insertar. */
 exports.crearClienteEnEmpresa = async (transaction, idEmpresa, clienteBase) => {
+  const existente = await exports.buscarClientePorDocumento(transaction, idEmpresa, clienteBase.ruc);
+  if (existente && existente.idCliente) {
+    return { idCliente: existente.idCliente, existente: true };
+  }
+  const rucNorm = documentoSoloDigitosPdf(clienteBase.ruc);
   const result = await transaction.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idDocumento', sql.VarChar(1), clienteBase.idDocumento)
-    .input('ruc', sql.VarChar(11), clienteBase.ruc)
+    .input('ruc', sql.VarChar(11), rucNorm)
     .input('rSocial', sql.VarChar(200), clienteBase.rSocial)
     .input('correo', sql.VarChar(100), clienteBase.correo || null)
     .input('celular', sql.VarChar(50), clienteBase.celular || null)
@@ -2487,10 +2966,24 @@ exports.listarVentasEmpresa = async (pool, idEmpresa) => {
 
 /** Datos del comprobante VA para generar PDF (cabecera, empresa gestora, cliente, items con alias empresa). */
 exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAgrupada, baseUrl = 'http://localhost:3000') => {
-  const cabResult = await pool.request()
+  const idsSet = new Set();
+  if (idEmpresaCobradora) idsSet.add(String(idEmpresaCobradora));
+  try {
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaCobradora);
+    for (const g of gestionadas || []) {
+      if (g.idEmpresa) idsSet.add(String(g.idEmpresa));
+    }
+  } catch (_) {
+    /* solo cobradora */
+  }
+  const idsArr = Array.from(idsSet);
+  const reqVaCab = pool
+    .request()
     .input('idVentaAgrupada', sql.UniqueIdentifier, idVentaAgrupada)
-    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
-    .query(`
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora);
+  const inListVa = bindUniqueIdentifiersIn(reqVaCab, idsArr, 'vaPdfEmp');
+
+  const cabResult = await reqVaCab.query(`
       SELECT
         va.idVentaAgrupada, va.compVenta, va.serie, va.numero,
         CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
@@ -2502,10 +2995,16 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
         ISNULL(cl.ruc, '') AS clienteRuc,
         ISNULL(cl.idDocumento, '1') AS clienteTipoDoc,
         ISNULL(cl.celular, '') AS clienteCelular,
-        (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion
+        (SELECT TOP 1 ${SQL_DC_LINEA_DIRECCION_READABLE}
+         FROM DireccionClientes dc
+         WHERE dc.idCliente = va.idCliente AND dc.idEmpresa IN (${inListVa})
+           AND NULLIF(${SQL_DC_LINEA_DIRECCION_READABLE}, '') IS NOT NULL
+         ORDER BY
+           CASE WHEN dc.idEmpresa = va.idEmpresaCobradora THEN 0 ELSE 1 END,
+           CASE WHEN ISNULL(dc.principal, 0) = 1 THEN 0 ELSE 1 END, dc.idDireccionClientes) AS clienteDireccion
       FROM VentaAgrupada va
       LEFT JOIN Sucursal s ON s.idSucursal = va.idSucursal
-      LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
+      LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa IN (${inListVa})
       WHERE va.idVentaAgrupada = @idVentaAgrupada AND va.idEmpresaCobradora = @idEmpresaCobradora
     `);
   const cab = cabResult.recordset && cabResult.recordset[0];

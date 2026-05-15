@@ -8,6 +8,12 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const JSZip = require("jszip");
+const {
+  esFalloInfraestructuraSunat,
+  MAX_REINTENTOS,
+  delay,
+  DELAYS_MS
+} = require("../utils/sunatEnvioReintentos.util");
 
 /** Carpeta donde se guardan el ZIP y la respuesta SOAP de SUNAT para depuración. */
 const CARPETA_RESPUESTAS_SUNAT = path.join(process.cwd(), "sunat_respuestas");
@@ -495,9 +501,30 @@ async function enviarComprobanteDirectoSunat(xmlFirmado, nombreBase, usuarioSOAP
 }
 
 /**
- * Intenta extraer CDR (código + descripción + XML) desde el content base64 de getStatus (ZIP).
- * Sirve para statusCode 0 (aceptado) y 99 (rechazo con ZIP de error).
+ * Envío sendBill con reintentos ante fallos de red o SUNAT transitorios.
  */
+async function enviarComprobanteDirectoSunatConReintentos(xmlFirmado, nombreBase, usuarioSOAP, claveSOAP, urlBillService) {
+  let ultimo = null;
+  for (let i = 0; i < MAX_REINTENTOS; i++) {
+    try {
+      ultimo = await enviarComprobanteDirectoSunat(xmlFirmado, nombreBase, usuarioSOAP, claveSOAP, urlBillService);
+    } catch (err) {
+      console.error("envioDirectoSunat: intento", i + 1, "excepción:", err.message);
+      ultimo = { ok: false, error: err.message || "Error al enviar comprobante a SUNAT", idEstadoSunat: 6 };
+    }
+    if (ultimo.ok || (ultimo && ultimo.idEstadoSunat === 4) || !esFalloInfraestructuraSunat(ultimo, null)) {
+      return ultimo;
+    }
+    if (i < MAX_REINTENTOS - 1) {
+      const ms = DELAYS_MS[i] != null ? DELAYS_MS[i] : DELAYS_MS[DELAYS_MS.length - 1];
+      console.error("envioDirectoSunat: reintento por infraestructura, espera", ms, "ms (intento", i + 1, ")");
+      await delay(ms);
+    }
+  }
+  return ultimo;
+}
+
+/** Extrae CDR desde content base64 de getStatus (ZIP). */
 async function extraerCdrDesdeContentBase64(contentBase64) {
   if (!contentBase64 || typeof contentBase64 !== "string") return null;
   try {
@@ -511,6 +538,7 @@ async function extraerCdrDesdeContentBase64(contentBase64) {
 
 module.exports = {
   enviarComprobanteDirectoSunat,
+  enviarComprobanteDirectoSunatConReintentos,
   enviarResumenDirectoSunat,
   consultarEstadoResumenSunat,
   extraerCdrDeZipBuffer,

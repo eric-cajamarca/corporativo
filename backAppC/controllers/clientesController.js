@@ -7,10 +7,15 @@ const crearCliente = async function (req, res) {
   }
   try {
     const cliente = await withPool((pool) => clientesService.crearCliente(pool, req.user, req.body));
-    res.status(200).send({ message: 'Cliente creado', data: cliente });
+    const existente = cliente && cliente.existente === true;
+    res.status(200).send({
+      message: existente ? 'Cliente ya existía, se reutiliza el registro' : 'Cliente creado',
+      data: cliente,
+      existente
+    });
   } catch (err) {
-    if (err.code === 'RUC_DUPLICADO') {
-      return res.status(200).send({ message: 'El ruc ya existe', data: undefined });
+    if (err.code === 'RUC_REQUERIDO') {
+      return res.status(400).send({ message: 'Debe ingresar un RUC/DNI válido', data: undefined });
     }
     if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS')) {
       return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });

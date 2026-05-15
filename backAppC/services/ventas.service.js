@@ -18,6 +18,31 @@ const comprobantesRepository = require('../repositories/comprobantes.repository'
 const usuarioSucursalRepository = require('../repositories/usuarioSucursal.repository');
 const { idUsuarioDesdePayloadUser } = require('../utils/idUsuarioSesion.util');
 
+/**
+ * idDireccionClientes del body para persistir en Ventas (DireccionClientes del mismo contexto).
+ * Si no viene o es inválido, undefined (el repositorio inserta NULL).
+ */
+function idDireccionClientesDesdeBody(body) {
+  if (!body || body.idDireccionClientes == null || body.idDireccionClientes === '') return undefined;
+  const n = Number(body.idDireccionClientes);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** Empresa del token + gestionadas activas (mismo alcance que comprobante PDF / listados gestora). */
+async function idsEmpresaJwtYGestionadas(pool, idEmpresaUsuario) {
+  const ids = new Set();
+  if (idEmpresaUsuario) ids.add(String(idEmpresaUsuario));
+  try {
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaUsuario);
+    for (const g of gestionadas || []) {
+      if (g.idEmpresa) ids.add(String(g.idEmpresa));
+    }
+  } catch (_) {
+    /* solo JWT */
+  }
+  return Array.from(ids);
+}
+
 /** Inserta cabecera de venta dentro de una transacción ya iniciada. */
 exports.insertarVentaCabecera = async (transaction, datosVenta, idEmpresa, idUsuario) => {
   return await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
@@ -479,10 +504,12 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       });
     }
 
+    const idsCirculoCliente = await idsEmpresaJwtYGestionadas(pool, user.empresa);
+
     const clienteSeleccionado = await ventasRepository.obtenerClientePorIdEnEmpresas(
       transaction,
       venta.idCliente,
-      [user.empresa]
+      idsCirculoCliente
     );
     if (!clienteSeleccionado) {
       throw new Error('Cliente no encontrado.');
@@ -545,6 +572,16 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       descuentosCabeceraFinal = Math.round(descuentosCliente * 100) / 100;
     }
 
+    let idDirInsert = idDireccionClientesDesdeBody(venta);
+    if (idDirInsert === undefined && idClienteEmpresa) {
+      idDirInsert = await ventasRepository.obtenerIdDireccionClientePreferidoParaVenta(
+        transaction,
+        idsCirculoCliente,
+        idClienteEmpresa,
+        user.empresa
+      );
+    }
+
     const ventaDatos = {
       idSucursal: idSucursalLinea,
       serie,
@@ -568,7 +605,8 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       idEstadoPago,
       idEstadoSunat: esNotaVenta ? 0 : (venta.idEstadoSunat || 0),
       compRelacionado: venta.compRelacionado || null,
-      observaciones: venta.observaciones || null
+      observaciones: venta.observaciones || null,
+      idDireccionClientes: idDirInsert
     };
 
     const ventaResult = await ventasRepository.insertar(transaction, ventaDatos, user.empresa, idUsuarioEmpresa);
@@ -967,6 +1005,16 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         descuentosHija = Math.round(descuentosClienteAgr * prop * 100) / 100;
       }
 
+      let idDirHija = idDireccionClientesDesdeBody(venta);
+      if (idDirHija === undefined && idClienteEmpresa) {
+        idDirHija = await ventasRepository.obtenerIdDireccionClientePreferidoParaVenta(
+          transaction,
+          Array.from(empresasPermitidas),
+          idClienteEmpresa,
+          idEmpresaProducto
+        );
+      }
+
       const ventaDatos = {
         idSucursal: idSucursalEmpresa,
         serie, numero, compVenta,
@@ -989,7 +1037,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         idEstadoSunat: esNotaVenta ? 0 : (venta.idEstadoSunat || 0),
         compRelacionado: venta.compRelacionado || null,
         observaciones: venta.observaciones || null,
-        idVentaAgrupada
+        idVentaAgrupada,
+        idDireccionClientes: idDirHija
       };
 
       const ventaResult = await ventasRepository.insertar(transaction, ventaDatos, idEmpresaProducto, idUsuarioEmpresa);

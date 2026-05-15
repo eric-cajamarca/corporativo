@@ -1787,10 +1787,7 @@ abrirModalPrecios(item: any) {
           };
                     this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
             next: (dirRes) => {
-              if (dirRes.data && dirRes.data[0]) {
-                this.direccionCliente = dirRes.data[0];
-                this.cliente.direccion = this.direccionCliente.direccion ?? '';
-              }
+              this.aplicarPrimeraDireccionClienteAlContexto(dirRes);
               this.clienteBuscando = false;
             },
             error: () => { this.clienteBuscando = false; }
@@ -1859,10 +1856,7 @@ abrirModalPrecios(item: any) {
     if (this.cliente.idCliente != null && this.cliente.idCliente !== '' && this.cliente.idCliente !== 0) {
       this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
         next: (dirRes) => {
-          if (dirRes?.data && dirRes.data.length > 0) {
-            this.direccionCliente = dirRes.data[0];
-            this.cliente.direccion = (this.direccionCliente.direccion ?? '').toString();
-          }
+          this.aplicarPrimeraDireccionClienteAlContexto(dirRes);
         },
         error: () => {}
       });
@@ -1929,10 +1923,7 @@ abrirModalPrecios(item: any) {
     };
     this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
       next: (dirRes) => {
-        if (dirRes?.data && dirRes.data.length > 0) {
-          this.direccionCliente = dirRes.data[0];
-          this.cliente.direccion = (this.direccionCliente?.direccion ?? this.cliente.direccion ?? '').toString();
-        }
+        this.aplicarPrimeraDireccionClienteAlContexto(dirRes);
       },
       error: () => {}
     });
@@ -2754,6 +2745,54 @@ abrirModalPrecios(item: any) {
     detallePago.push({ idMediosPago: Number(medioCred.idMediosPago), monto: totalVenta });
   }
 
+  /** Lista de filas DireccionClientes desde la respuesta HTTP (varios formatos de envoltorio). */
+  private extraerFilasDireccionesClienteDesdeRespuestaHttp(dirRes: unknown): unknown[] {
+    if (!dirRes) return [];
+    if (Array.isArray(dirRes)) return dirRes;
+    const dr = dirRes as Record<string, unknown>;
+    const d = dr['data'];
+    if (Array.isArray(d)) return d;
+    if (d != null && typeof d === 'object' && Array.isArray((d as Record<string, unknown>)['data'])) {
+      return (d as Record<string, unknown>)['data'] as unknown[];
+    }
+    return [];
+  }
+
+  /** Asigna `direccionCliente` y texto en `cliente.direccion` desde la primera fila devuelta por el API. */
+  private aplicarPrimeraDireccionClienteAlContexto(dirRes: unknown): void {
+    const filas = this.extraerFilasDireccionesClienteDesdeRespuestaHttp(dirRes);
+    const primera = filas[0] as Record<string, unknown> | undefined;
+    if (!primera) {
+      return;
+    }
+    const rawId =
+      primera['idDireccionClientes'] ?? primera['idDireccionCliente'] ?? primera['IdDireccionClientes'];
+    const idNum = Number(rawId);
+    this.direccionCliente = { ...primera };
+    if (Number.isFinite(idNum) && idNum > 0) {
+      (this.direccionCliente as Record<string, unknown>)['idDireccionClientes'] = idNum;
+    }
+    const partes = [
+      primera['direccion'],
+      primera['urbanizacion'],
+      primera['distrito'],
+      primera['provincia'],
+      primera['region']
+    ]
+      .map((x) => (x ?? '').toString().trim())
+      .filter((s) => s.length > 0);
+    this.cliente.direccion = (partes.join(', ') || (primera['direccion'] ?? '')).toString();
+  }
+
+  /** Id de dirección a persistir en Ventas (misma empresa / POS). */
+  private obtenerIdDireccionClienteSeleccionadaParaVenta(): number | undefined {
+    const dc = this.direccionCliente as Record<string, unknown> | undefined;
+    if (!dc || typeof dc !== 'object') return undefined;
+    const raw = dc['idDireccionClientes'] ?? dc['idDireccionCliente'] ?? dc['IdDireccionClientes'];
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }
+
   private enviarVentaConCliente(idCliente: number): void {
     const totalVenta = Number(this.ventas.total) || 0;
     const totalPago = this.calcularTotalTabla();
@@ -2795,6 +2834,11 @@ abrirModalPrecios(item: any) {
       compRelacionado: null,
       observaciones: this.ventas.observacion || null
     };
+
+    const idDirUi = this.obtenerIdDireccionClienteSeleccionadaParaVenta();
+    if (idDirUi != null) {
+      ventaPayload.idDireccionClientes = idDirUi;
+    }
 
     if (this.esGestora) {
       ventaPayload.tipoComprobanteDestino = this.tipoComprobanteDestino;
@@ -3124,10 +3168,7 @@ abrirModalPrecios(item: any) {
         }
         this._clienteService.obtener_direccionesCliente_idCliente(id).subscribe({
           next: (dirRes) => {
-            if (dirRes?.data && dirRes.data.length > 0) {
-              this.direccionCliente = dirRes.data[0];
-              this.cliente.direccion = (this.direccionCliente.direccion ?? '').toString();
-            }
+            this.aplicarPrimeraDireccionClienteAlContexto(dirRes);
           },
           error: () => {}
         });

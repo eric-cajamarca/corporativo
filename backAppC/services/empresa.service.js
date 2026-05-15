@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
+const empresasAdministracionRepository = require('../repositories/empresasAdministracion.repository');
 
 /** Catálogo inicial de comprobantes por sucursal (alta empresa o al pasar a series propias). */
 const COMPROBANTES_PREDETERMINADOS = [
@@ -178,6 +179,45 @@ exports.asegurarComprobantesPredeterminadosPorSucursal = async (pool, idEmpresa,
 };
 
 /**
+ * Ubigeo INEI 6 dígitos y códigos de catálogo (región 2, provincia 4, distrito 6) desde el alta de empresa.
+ */
+function normalizarUbicacionDireccionEmpresaNueva(datosEmpresa) {
+  let ubigeo = datosEmpresa.ubigeo != null ? String(datosEmpresa.ubigeo).replace(/\D/g, '') : '';
+  let region = datosEmpresa.region != null ? String(datosEmpresa.region).trim() : '';
+  let provincia = datosEmpresa.provincia != null ? String(datosEmpresa.provincia).trim() : '';
+  let distrito = datosEmpresa.distrito != null ? String(datosEmpresa.distrito).replace(/\D/g, '') : '';
+
+  if (ubigeo.length !== 6 && distrito.length === 6) {
+    ubigeo = distrito;
+  }
+  if (ubigeo.length === 6 && distrito.length !== 6) {
+    distrito = ubigeo;
+  }
+  if (ubigeo.length >= 2 && !region) {
+    region = ubigeo.slice(0, 2);
+  }
+  if (ubigeo.length >= 4 && !provincia) {
+    provincia = ubigeo.slice(0, 4);
+  }
+
+  const codPaisRaw =
+    datosEmpresa.codPais != null && String(datosEmpresa.codPais).trim() !== ''
+      ? String(datosEmpresa.codPais).trim()
+      : datosEmpresa.codpais != null && String(datosEmpresa.codpais).trim() !== ''
+        ? String(datosEmpresa.codpais).trim()
+        : 'PEN';
+
+  return {
+    ubigeo: ubigeo.length === 6 ? ubigeo : '',
+    region,
+    provincia,
+    distrito: distrito.length === 6 ? distrito : ubigeo.length === 6 ? ubigeo : '',
+    codPais: codPaisRaw || 'PEN',
+    urbanizacion: datosEmpresa.urbanizacion != null ? String(datosEmpresa.urbanizacion).trim() : ''
+  };
+}
+
+/**
  * Crea la sucursal principal para una nueva empresa
  * @param {Object} pool - Conexión a la base de datos
  * @param {String} idEmpresa - ID de la empresa
@@ -185,28 +225,67 @@ exports.asegurarComprobantesPredeterminadosPorSucursal = async (pool, idEmpresa,
  * @returns {Object} Sucursal creada
  */
 exports.crearSucursalPrincipal = async (pool, idEmpresa, datosEmpresa) => {
-        const direccionSucursal = datosEmpresa.direccion || 'Sin dirección';
-    const idSucursal = uuidv4();
+  const direccionSucursal =
+    datosEmpresa.direccion != null && String(datosEmpresa.direccion).trim() !== ''
+      ? String(datosEmpresa.direccion).trim()
+      : 'Sin dirección';
+  const ubi = normalizarUbicacionDireccionEmpresaNueva(datosEmpresa);
+  const idSucursal = uuidv4();
 
-    try {
-        await pool.request()
-            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('nombre', sql.VarChar(50), 'Sucursal Principal')
-            .input('direccion', sql.VarChar(200), direccionSucursal)
-            .input('telefono', sql.VarChar(20), datosEmpresa.celular || '')
-            .input('estado', sql.Bit, 1)
-            .query(`
+  try {
+    await pool
+      .request()
+      .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('nombre', sql.VarChar(50), 'Sucursal Principal')
+      .input('direccion', sql.VarChar(200), direccionSucursal)
+      .input('telefono', sql.VarChar(20), datosEmpresa.celular || '')
+      .input('estado', sql.Bit, 1)
+      .query(`
                 INSERT INTO Sucursal (idSucursal, idEmpresa, nombre, direccion, telefono, estado, fRegistro, esPrincipal)
                 VALUES (@idSucursal, @idEmpresa, @nombre, @direccion, @telefono, @estado, GETDATE(), 1)
             `);
 
-                return { idSucursal, nombre: 'Sucursal Principal' };
-
-    } catch (error) {
-        console.error('Error creando sucursal principal:', error);
-        throw new Error('Error al crear sucursal principal: ' + error.message);
+    const codLocalFiscal =
+      datosEmpresa.codLocal != null && String(datosEmpresa.codLocal).trim() !== ''
+        ? String(datosEmpresa.codLocal).trim().slice(0, 4)
+        : '0000';
+    const insDir = await empresasAdministracionRepository.insertarDireccionEmpresa(pool, {
+      idEmpresa,
+      ubigeo: ubi.ubigeo,
+      codPais: ubi.codPais,
+      region: ubi.region,
+      provincia: ubi.provincia,
+      distrito: ubi.distrito,
+      urbanizacion: ubi.urbanizacion,
+      direccion: direccionSucursal,
+      codLocal: codLocalFiscal,
+      principal: true
+    });
+    const idDireccionEmpresa = insDir.recordset && insDir.recordset[0] ? insDir.recordset[0].idDireccionEmpresa : null;
+    if (idDireccionEmpresa != null) {
+      try {
+        await pool
+          .request()
+          .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+          .input('idDireccionEmpresa', sql.Int, idDireccionEmpresa)
+          .query(
+            'UPDATE Sucursal SET idDireccionEmpresa = @idDireccionEmpresa WHERE idSucursal = @idSucursal'
+          );
+      } catch (errVinc) {
+        if (errVinc.message && String(errVinc.message).includes('idDireccionEmpresa')) {
+          console.error('contexto: Sucursal sin columna idDireccionEmpresa o error al vincular dirección fiscal:', errVinc);
+        } else {
+          throw errVinc;
+        }
+      }
     }
+
+    return { idSucursal, nombre: 'Sucursal Principal', idDireccionEmpresa };
+  } catch (error) {
+    console.error('Error creando sucursal principal:', error);
+    throw new Error('Error al crear sucursal principal: ' + error.message);
+  }
 };
 
 /**

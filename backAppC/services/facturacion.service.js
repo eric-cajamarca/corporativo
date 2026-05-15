@@ -290,7 +290,7 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
   // #endregion
   const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
   if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
-    return { enviados: 0, errores: 0, mensaje: "Configure envío directo SUNAT o ruta del Facturador" };
+    return { enviados: 0, errores: 0, reintentosProgramados: 0, total: 0, mensaje: "Configure envío directo SUNAT o ruta del Facturador" };
   }
 
   const excluirBoletas = config?.useResumenDiarioBoletas === true;
@@ -305,6 +305,7 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
   // #endregion
   let enviados = 0;
   let errores = 0;
+  let reintentosProgramados = 0;
 
   for (const ce of pendientes) {
     try {
@@ -322,10 +323,17 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
           claveSunat: config.claveSunat
         }
       );
-      if (result?.ok) enviados++;
-      else {
+      if (result?.ok) {
+        enviados++;
+      } else if (result?.quedarPendiente) {
+        reintentosProgramados++;
+        try {
+          await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, ce.idComprobanteElectronico, idEmpresa);
+        } catch (_) {
+          /* ignore */
+        }
+      } else {
         errores++;
-        await FacturacionRepository.registrarFalloIntentoEnvioRepo(pool, ce.idComprobanteElectronico, idEmpresa);
       }
     } catch (err) {
       console.error("facturacion.service: error enviando comprobante", ce.idComprobanteElectronico, err.message);
@@ -339,11 +347,11 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
   }
 
   // #region agent log
-  const resData = { enviados, errores, total: pendientes.length, idEmpresa };
+  const resData = { enviados, errores, reintentosProgramados, total: pendientes.length, idEmpresa };
   console.error("[SUNAT] enviarLotePendientesService: result", resData);
   debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:result", message: "result", data: resData });
   // #endregion
-  return { enviados, errores, total: pendientes.length };
+  return { enviados, errores, reintentosProgramados, total: pendientes.length };
 };
 
 /**
