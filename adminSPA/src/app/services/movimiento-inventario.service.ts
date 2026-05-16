@@ -202,6 +202,8 @@ export class MovimientoInventarioService {
     marca?: string | null;
     filtroStock?: 'todos' | 'cero' | 'minimo';
     buscar?: string | null;
+    /** Catálogo conteo físico: incluye productos inactivos (mismo permiso que stock actual). */
+    catalogoConteoFisico?: boolean;
   }): Observable<StockActualResponse> {
     let hp = new HttpParams();
     if (params.idSucursal) hp = hp.set('idSucursal', params.idSucursal);
@@ -212,6 +214,7 @@ export class MovimientoInventarioService {
     if (params.marca?.trim()) hp = hp.set('marca', params.marca.trim());
     if (params.filtroStock) hp = hp.set('filtroStock', params.filtroStock);
     if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
+    if (params.catalogoConteoFisico) hp = hp.set('catalogoConteoFisico', '1');
     return this.http.get<StockActualResponse>(this.baseUrl + 'stock-actual', {
       params: hp,
       withCredentials: true

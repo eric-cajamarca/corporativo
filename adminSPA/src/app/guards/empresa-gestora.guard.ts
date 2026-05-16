@@ -23,6 +23,8 @@ function esRutaPermitidaGestora(path: string): boolean {
   }
   if (path.startsWith('despachos')) return true;
   if (path.startsWith('envios')) return true;
+  /** Inventario (stock, conteo físico, kardex, movimientos, etc.) */
+  if (path.startsWith('inventario')) return true;
   /** Colaboradores y roles de la propia empresa gestora (JWT = idEmpresa gestora). */
   if (path.startsWith('colaborador')) return true;
   if (path.startsWith('rol')) return true;

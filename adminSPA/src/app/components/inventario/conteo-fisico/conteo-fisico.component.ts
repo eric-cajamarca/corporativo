@@ -429,6 +429,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       idSucursal: this.sesion.idSucursal,
       buscar: this.buscar?.trim() || null,
       filtroStock: 'todos',
+      catalogoConteoFisico: true,
       ...(this.sesionInventarioPorUbicacion() && this.sesion?.idUbicacionInventario != null
         ? { idUbicacion: this.sesion.idUbicacionInventario }
         : {})
@@ -460,6 +461,14 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     }
     const c = String(this.sesion.codigoUbicacionInventario ?? '').trim();
     return c || `#${this.sesion.idUbicacionInventario}`;
+  }
+
+  /** En catálogo de conteo (incluye inactivos) el API envía estado 0. */
+  productoCatalogoInactivo(p: StockActualItem): boolean {
+    if (p.estado == null) {
+      return false;
+    }
+    return Number(p.estado) === 0;
   }
 
   elegirProducto(p: StockActualItem): void {

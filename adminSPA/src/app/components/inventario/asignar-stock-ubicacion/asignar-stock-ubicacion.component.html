@@ -1,9 +1,17 @@
-<div class="modal-header bg-primary text-white">
-  <h5 class="modal-title">
+<div class="modal-header bg-primary text-white d-flex align-items-center gap-2 flex-wrap">
+  <h5 class="modal-title flex-grow-1 mb-0">
     <i class="bi bi-map me-2"></i>
     Asignar Stock a Ubicaciones
   </h5>
-  <button type="button" class="btn-close btn-close-white" (click)="cancelar()"></button>
+  <button
+    type="button"
+    class="btn btn-sm btn-outline-light"
+    (click)="actualizarDesdeServidor()"
+    [disabled]="cargandoLote || cargandoUbicaciones || guardando"
+    title="Recargar lote, ubicaciones y cantidades asignadas">
+    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+  </button>
+  <button type="button" class="btn-close btn-close-white" (click)="cancelar()" aria-label="Cerrar"></button>
 </div>
 
 <div class="modal-body">

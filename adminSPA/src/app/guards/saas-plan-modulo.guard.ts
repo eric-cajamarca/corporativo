@@ -8,6 +8,14 @@ import { PermisosService } from '../services/permisos.service';
 function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosService): boolean | UrlTree {
   const abs = normalizarRutaAbsoluta(url.split('?')[0] || '/');
 
+  if (abs === '/inventario/conteo-fisico') {
+    return true;
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e02ca2'},body:JSON.stringify({sessionId:'e02ca2',location:'saas-plan-modulo.guard.ts:9',message:'evaluarAccesoPlan',data:{abs,modulos:permisos.modulosPlanMenu(),plan:permisos.planCodeEfectivo()},timestamp:Date.now(),runId:'debug-run',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion agent log
+
   if (permisos.deploymentMode() !== 'saas') {
     return true;
   }

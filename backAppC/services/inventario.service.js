@@ -538,7 +538,8 @@ exports.obtenerTiposMovimiento = () => {
 /**
  * Stock actual por producto (Lotes agregados). Requiere VER_INVENTARIO o Administrador.
  * Query: idSucursal?, idUbicacion? (stock en esa ubicación; requiere INVENTARIO_CONTROL_UBICACIONES y idSucursal),
- * categoria?, marca?, filtroStock=todos|cero|minimo, buscar?
+ * categoria?, marca?, filtroStock=todos|cero|minimo, buscar?,
+ * catalogoConteoFisico=1|true|si — incluye productos inactivos (solo catálogo conteo físico; mismo permiso VER_INVENTARIO).
  */
 exports.obtenerStockActual = async (user, query) => {
   if (!user || !user.empresa) {
@@ -558,6 +559,9 @@ exports.obtenerStockActual = async (user, query) => {
     ];
     const filtroStockRaw = (query.filtroStock || 'todos').toString().toLowerCase();
     const filtroStock = ['todos', 'cero', 'minimo'].includes(filtroStockRaw) ? filtroStockRaw : 'todos';
+    const rawCatConteo = query.catalogoConteoFisico != null ? String(query.catalogoConteoFisico).trim().toLowerCase() : '';
+    const incluirInactivos =
+      rawCatConteo === '1' || rawCatConteo === 'true' || rawCatConteo === 'si' || rawCatConteo === 'yes';
     let idSucursal = query.idSucursal && String(query.idSucursal).trim() ? String(query.idSucursal).trim() : null;
     if (idSucursal) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -597,7 +601,8 @@ exports.obtenerStockActual = async (user, query) => {
       categoriaLike: query.categoria || null,
       marcaLike: query.marca || null,
       filtroStock,
-      buscar: query.buscar || null
+      buscar: query.buscar || null,
+      incluirInactivos
     });
     const totalValorizado = items.reduce((s, r) => s + (Number(r.valorizado) || 0), 0);
     return {

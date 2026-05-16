@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, signal, effect, Output, EventEmitter, Input } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 import { PermisosService } from '../../services/permisos.service';
 import { AuthService } from '../../services/auth.service';
 import { EmpresaService } from '../../services/empresa.service';
@@ -71,6 +72,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private routerEventsSubscription: ReturnType<Router['events']['subscribe']> | null = null;
+  private mobileTopnavSub: Subscription | null = null;
 
   ngOnInit(): void {
     this.cargarEstadoConfiguracion();
@@ -86,10 +88,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
     // Sincronizar estado visual con el servicio (ya inicializado desde localStorage)
     this.isCollapsed.set(this.sidebarState.sidebarCollapsed());
+
+    this.mobileTopnavSub = this.sidebarState.mobileSidebarToggleRequest.subscribe(() => {
+      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 991.98px)').matches) {
+        this.toggleMobileSidebar();
+      }
+    });
   }
 
   ngOnDestroy(): void {
     this.routerEventsSubscription?.unsubscribe();
+    this.mobileTopnavSub?.unsubscribe();
   }
 
   /**
@@ -428,6 +437,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
    */
   navigateTo(ruta: string | null): void {
     if (ruta) {
+      // #region agent log
+      fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e02ca2'},body:JSON.stringify({sessionId:'e02ca2',location:'sidebar.component.ts:439',message:'navigateTo',data:{ruta,routeset:this.menuItems()},timestamp:Date.now(),runId:'debug-run',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion agent log
       const target = this.normalizarRuta(ruta);
       if (target === '/ventas/create') {
         const segments = target.split('/').filter(Boolean);
@@ -435,13 +447,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
         window.open(url, '_blank');
         this.closeMobileSidebar();
       } else {
-        // En móviles, cerrar el sidebar ANTES puede interrumpir el click/navegación.
-        // Primero navegamos, luego cerramos el panel.
+        // Navegación + cierre drawer: en WebKit móvil cerrar en el mismo tick que el click a veces anula la ruta.
         this.router.navigateByUrl(target).then((ok) => {
           if (!ok) {
             console.error('No se pudo navegar a ruta de sidebar:', target);
           }
-          this.closeMobileSidebar();
+          setTimeout(() => this.closeMobileSidebar(), 0);
         });
       }
     }

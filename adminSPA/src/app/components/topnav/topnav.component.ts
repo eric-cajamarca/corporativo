@@ -19,6 +19,7 @@ import {
 import { AppBannerRibbonComponent } from '../app-banner-ribbon/app-banner-ribbon.component';
 import { AppBannerService } from '../../services/app-banner.service';
 import { ConsultarPlacaModalOpenerService } from '../../services/consultar-placa-modal-opener.service';
+import { SidebarStateService } from '../../services/sidebar-state.service';
 
 declare const iziToast: any;
 
@@ -91,7 +92,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
     private deploymentContext: DeploymentContextService,
     private saasSubscription: SaasSubscriptionService,
     private appBanner: AppBannerService,
-    private consultarPlacaOpener: ConsultarPlacaModalOpenerService
+    private consultarPlacaOpener: ConsultarPlacaModalOpenerService,
+    private sidebarState: SidebarStateService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -242,6 +244,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
    * Emite evento para toggle del sidebar
    */
   onToggleSidebar(): void {
+    this.sidebarState.requestMobileSidebarToggle();
     this.toggleSidebar.emit();
   }
 

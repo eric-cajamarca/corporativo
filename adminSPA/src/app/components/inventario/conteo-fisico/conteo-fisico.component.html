@@ -156,6 +156,9 @@
                         <td class="text-nowrap align-middle conteo-col-codigo">{{ p.codigo }}</td>
                         <td class="align-middle conteo-col-producto">
                           <div class="product-desc-clip" [title]="p.descripcion">{{ p.descripcion }}</div>
+                          @if (productoCatalogoInactivo(p)) {
+                            <span class="badge bg-secondary ms-1 align-middle">Inactivo</span>
+                          }
                         </td>
                         <td class="text-end align-middle conteo-col-stock">{{ p.stock | number : '1.0-3' }}</td>
                         <td class="text-end text-nowrap align-middle conteo-col-stock">

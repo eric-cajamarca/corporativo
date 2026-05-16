@@ -15,6 +15,8 @@ export interface StockActualItem {
   alertaMinimo: number | null;
   aliasEmpresa: string;
   valorizado: number;
+  /** 1 activo, 0 inactivo (cuando el listado incluye inactivos, p. ej. conteo físico). */
+  estado?: number;
 }
 
 export interface StockActualResponse {

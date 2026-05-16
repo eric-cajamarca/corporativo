@@ -1,6 +1,6 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { LotesService } from '../../../services/lotes.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -26,7 +26,8 @@ export class PrincipalInventarioComponent implements OnInit {
   constructor(
     public inventarioModal: InventarioModalService,
     private loteService: LotesService,
-    public sidebarState: SidebarStateService
+    public sidebarState: SidebarStateService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -56,6 +57,16 @@ export class PrincipalInventarioComponent implements OnInit {
   /** Quita el foco del botón al abrir modal para evitar aviso aria-hidden */
   private blurTrigger(event?: Event): void {
     (event?.target as HTMLElement)?.blur();
+  }
+
+  /** Navegación explícita: en algunos móviles los enlaces tipo botón con routerLink no disparan bien el toque. */
+  irConteoFisico(event?: Event): void {
+    this.blurTrigger(event);
+    void this.router.navigateByUrl('/inventario/conteo-fisico').then((ok) => {
+      if (!ok) {
+        console.error('No se pudo navegar a conteo físico');
+      }
+    });
   }
 
   /**

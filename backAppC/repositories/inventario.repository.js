@@ -462,10 +462,14 @@ function construirInClauseUuid(request, ids, prefijo) {
  * @param {string|null} opts.marcaLike
  * @param {string} opts.filtroStock - 'todos' | 'cero' | 'minimo'
  * @param {string|null} opts.buscar - código o descripción
+ * @param {boolean} [opts.incluirInactivos] - si true, incluye productos con estado = 0 (catálogo conteo físico)
  */
 exports.listarStockActual = async (pool, opts) => {
   const ids = (opts.idsEmpresa || []).filter(Boolean);
   if (ids.length === 0) return [];
+
+  const incluirInactivos = !!opts.incluirInactivos;
+  const whereEstado = incluirInactivos ? '1=1' : 'p.estado = 1';
 
   const filtroStock = String(opts.filtroStock || 'todos').toLowerCase();
   let stockClause = '1=1';
@@ -546,7 +550,8 @@ exports.listarStockActual = async (pool, opts) => {
       CAST(p.cUnitario AS DECIMAL(18, 6)) AS cUnitario,
       CAST(p.alertaMinimo AS DECIMAL(18, 2)) AS alertaMinimo,
       ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa,
-      CAST(COALESCE(stk.stock, 0) * p.cUnitario AS DECIMAL(18, 6)) AS valorizado
+      CAST(COALESCE(stk.stock, 0) * p.cUnitario AS DECIMAL(18, 6)) AS valorizado,
+      p.estado AS estado
     FROM Productos p
     INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
     LEFT JOIN Marcas m ON p.idMarca = m.idMarca
@@ -554,7 +559,7 @@ exports.listarStockActual = async (pool, opts) => {
     INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
     ${stkJoin}
     WHERE p.idEmpresa IN (${inClause})
-      AND p.estado = 1
+      AND (${whereEstado})
       ${whereCat}
       ${whereMarFixed}
       ${whereBus}

@@ -104,6 +104,8 @@
   align-items: center;
   justify-content: center;
   min-height: 150px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .quick-action-btn:hover {

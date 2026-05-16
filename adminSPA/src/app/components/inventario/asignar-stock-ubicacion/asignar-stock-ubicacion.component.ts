@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { UbicacionPrioridadService } from '../../../services/ubicacion-prioridad.service';
 import { LotesUbicacionService } from '../../../services/lotes-ubicacion.service';
@@ -18,7 +18,7 @@ declare var iziToast: any;
   templateUrl: './asignar-stock-ubicacion.component.html',
   styleUrl: './asignar-stock-ubicacion.component.css'
 })
-export class AsignarStockUbicacionComponent {
+export class AsignarStockUbicacionComponent implements OnInit {
 
   // Entradas del modal
   @Input() idLote!: string;
@@ -340,5 +340,13 @@ export class AsignarStockUbicacionComponent {
    */
   cancelar(): void {
     this.activeModal.dismiss();
+  }
+
+  /** Recarga lote, ubicaciones y asignaciones sin cerrar el modal (p. ej. tras crear ubicaciones en otra pantalla). */
+  actualizarDesdeServidor(): void {
+    if (this.guardando) {
+      return;
+    }
+    this.cargarDatosLote();
   }
 }

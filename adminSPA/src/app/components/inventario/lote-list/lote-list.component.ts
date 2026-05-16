@@ -197,6 +197,17 @@ export class LoteListComponent implements OnInit {
   }
 
   /**
+   * Recarga la lista desde el servidor (sin cerrar el modal).
+   */
+  actualizarLista(): void {
+    if (this.isLoading) {
+      return;
+    }
+    this.errorMessage = '';
+    this.cargarLotes();
+  }
+
+  /**
    * Cierra el modal
    */
   cerrar(): void {
