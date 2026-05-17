@@ -11,6 +11,7 @@ var auth  = require('../middlewares/autenticate');
 
 // Rutas para el CRUD de marca
 api.get('/marcas',auth.auth, marcaController.obtenerMarcas);
+api.get('/marcasempresa/:idEmpresa',auth.auth, marcaController.obtenerMarcasPorEmpresa);
 api.get('/marcas/:id',auth.auth, marcaController.obtenerMarcaPorId);
 api.post('/marcas', auth.auth, marcaController.crearMarca);
 api.put('/marcas/:id',auth.auth, marcaController.editarMarca);

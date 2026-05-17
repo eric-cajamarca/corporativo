@@ -7,8 +7,11 @@ const inventarioService = require('./inventario.service');
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const productosRepository = require('../repositories/productos.repository');
+const cotizacionesRepository = require('../repositories/cotizaciones.repository');
+const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
+const { esEmpresaGestora, assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 
 function controlUbicacionesDesdeConfig(configRows) {
   const row = configRows && configRows.find((c) => c.clave === 'INVENTARIO_CONTROL_UBICACIONES');
@@ -36,6 +39,126 @@ function normTipoConteo(v) {
   return String(v || '').trim().toUpperCase();
 }
 
+/**
+ * Resuelve empresa, sucursal y ubicación para stock/movimientos de una línea (gestora multiempresa).
+ */
+async function resolverContextoLineaStock(pool, sesion, idProducto, idEmpresaJwt) {
+  const empresaProducto = await productosRepository.obtenerIdEmpresaProductoPorId(pool, idProducto);
+  if (!empresaProducto) {
+    throw new Error('Producto no encontrado');
+  }
+  await assertEmpresaAutorizada(pool, idEmpresaJwt, empresaProducto);
+
+  const gestora = await esEmpresaGestora(pool, idEmpresaJwt);
+  let idSucursal = sesion.idSucursal;
+
+  if (gestora || String(empresaProducto).toLowerCase() !== String(idEmpresaJwt).toLowerCase()) {
+    const sucConStock = await inventarioRepository.obtenerSucursalConStockProducto(
+      pool,
+      empresaProducto,
+      idProducto
+    );
+    idSucursal =
+      sucConStock ||
+      (await cotizacionesRepository.obtenerPrimeraSucursalPorEmpresa(pool, empresaProducto));
+    if (!idSucursal) {
+      throw new Error('No hay sucursal configurada para la empresa del producto');
+    }
+  }
+
+  const configRows = await gestoresRepository
+    .obtenerConfiguracionEmpresa(pool, empresaProducto)
+    .catch(() => []);
+  const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
+
+  let idUbMov = null;
+  if (controlUbicaciones) {
+    const codigoSes = String(sesion.codigoUbicacionInventario || '').trim();
+    if (codigoSes) {
+      idUbMov = await conteoFisicoRepository.obtenerIdUbicacionPorCodigo(
+        pool,
+        empresaProducto,
+        idSucursal,
+        codigoSes
+      );
+    } else if (!gestora) {
+      const idUbSes =
+        sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
+      if (Number.isFinite(idUbSes) && idUbSes > 0) {
+        const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(pool, idSucursal, idUbSes);
+        if (okUb) {
+          idUbMov = idUbSes;
+        }
+      }
+    }
+  }
+
+  return {
+    idEmpresa: empresaProducto,
+    idSucursal,
+    controlUbicaciones,
+    idUbMov,
+    codigoUbicacion: String(sesion.codigoUbicacionInventario || '').trim() || null,
+    gestora
+  };
+}
+
+async function obtenerStockLinea(conn, ctx, idProducto) {
+  if (ctx.idUbMov) {
+    return inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
+      conn,
+      ctx.idEmpresa,
+      ctx.idSucursal,
+      idProducto,
+      ctx.idUbMov
+    );
+  }
+  if (ctx.gestora) {
+    return inventarioRepository.obtenerStockAgregadoProductoEmpresa(conn, ctx.idEmpresa, idProducto);
+  }
+  return inventarioRepository.obtenerStockAgregadoProductoSucursal(
+    conn,
+    ctx.idEmpresa,
+    ctx.idSucursal,
+    idProducto
+  );
+}
+
+function claveGrupoMovimiento(ctx) {
+  const ub = ctx.idUbMov != null && ctx.idUbMov > 0 ? String(ctx.idUbMov) : '0';
+  return `${String(ctx.idEmpresa).toLowerCase()}|${String(ctx.idSucursal).toLowerCase()}|${ub}`;
+}
+
+async function obtenerComprobanteIngresoInventario(conn, idEmpresa, idSucursal) {
+  for (const cod of ['IN', 'II', 'IV']) {
+    const comp = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+      conn,
+      idEmpresa,
+      cod,
+      idSucursal
+    );
+    if (comp && comp.idComprobante) {
+      return comp;
+    }
+  }
+  return null;
+}
+
+async function obtenerComprobanteSalidaInventario(conn, idEmpresa, idSucursal) {
+  for (const cod of ['SA']) {
+    const comp = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+      conn,
+      idEmpresa,
+      cod,
+      idSucursal
+    );
+    if (comp && comp.idComprobante) {
+      return comp;
+    }
+  }
+  return null;
+}
+
 /** Fecha/hora civil enviada por el cliente (navegador) o null para GETDATE() en SQL. */
 function fechaMovimientoDesdeBodyAplicar(body) {
   if (body && body.fechaMovimiento != null && String(body.fechaMovimiento).trim() !== '') {
@@ -61,12 +184,49 @@ exports.crearSesion = async (idEmpresa, idUsuario, body) => {
     throw new Error('tipoConteo debe ser INICIAL o MENSUAL');
   }
   return withPool(async (pool) => {
+    const gestora = await esEmpresaGestora(pool, idEmpresa);
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
     const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
 
     const rawUb = body && body.idUbicacionInventario;
+    const rawCodigoUb =
+      body && body.codigoUbicacionInventario != null ? String(body.codigoUbicacionInventario).trim() : '';
     let idUbicacionInventario = null;
-    if (rawUb != null && rawUb !== '') {
+    let codigoUbicacionInventario = null;
+
+    if (rawCodigoUb) {
+      if (!controlUbicaciones) {
+        throw new Error(
+          'Active «Gestionar stock por ubicación» en configuración de inventario para fijar ubicación en el conteo físico'
+        );
+      }
+      codigoUbicacionInventario = rawCodigoUb.substring(0, 20);
+      if (gestora) {
+        const { idsEmpresaGestoraConsolidados } = require('../utils/empresaGestora.util');
+        const ids = await idsEmpresaGestoraConsolidados(pool, idEmpresa);
+        const codigos = await ubicacionesPrioridadRepository.listarCodigosConsolidados(pool, ids);
+        const okCod = (codigos || []).some(
+          (c) =>
+            String(c.codigoUbicacion || '')
+              .trim()
+              .toUpperCase() === codigoUbicacionInventario.toUpperCase()
+        );
+        if (!okCod) {
+          throw new Error(`El código de ubicación «${codigoUbicacionInventario}» no existe en las empresas gestionadas`);
+        }
+      } else {
+        const idUb = await conteoFisicoRepository.obtenerIdUbicacionPorCodigo(
+          pool,
+          idEmpresa,
+          idSucursal,
+          codigoUbicacionInventario
+        );
+        if (!idUb) {
+          throw new Error('La ubicación no pertenece a la sucursal seleccionada');
+        }
+        idUbicacionInventario = idUb;
+      }
+    } else if (rawUb != null && rawUb !== '') {
       const n = parseInt(String(rawUb), 10);
       if (!Number.isFinite(n) || n < 1) {
         throw new Error('Ubicación de inventario inválida');
@@ -98,7 +258,8 @@ exports.crearSesion = async (idEmpresa, idUsuario, body) => {
         tipoConteo: tipo,
         observaciones: observaciones != null ? String(observaciones).substring(0, 500) : null,
         idUsuarioCreacion: idUsuario || null,
-        idUbicacionInventario
+        idUbicacionInventario,
+        codigoUbicacionInventario
       });
       await transaction.commit();
       return { idSesion, message: 'Sesión de conteo creada' };
@@ -131,29 +292,10 @@ exports.previsualizarAplicacion = async (idEmpresa, idSesion) => {
     if (sesion.estado !== 'BORRADOR') {
       throw new Error('Solo se puede previsualizar una sesión en borrador');
     }
-    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
-    const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
-    assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones);
-    const idUbSes =
-      sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
-    const usarStockUb =
-      controlUbicaciones && Number.isFinite(idUbSes) && idUbSes > 0;
     const preview = [];
     for (const l of lineas) {
-      const stockActual = usarStockUb
-        ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
-            pool,
-            idEmpresa,
-            sesion.idSucursal,
-            l.idProducto,
-            idUbSes
-          )
-        : await inventarioRepository.obtenerStockAgregadoProductoSucursal(
-            pool,
-            idEmpresa,
-            sesion.idSucursal,
-            l.idProducto
-          );
+      const ctx = await resolverContextoLineaStock(pool, sesion, l.idProducto, idEmpresa);
+      const stockActual = await obtenerStockLinea(pool, ctx, l.idProducto);
       const stockReal = l.stockReal != null ? Number(l.stockReal) : null;
       const aplicable = !!l.verificado && stockReal != null && !Number.isNaN(stockReal);
       const delta = aplicable ? stockReal - stockActual : null;
@@ -221,6 +363,8 @@ exports.upsertLinea = async (user, idSesion, body) => {
     throw new Error('NO_ACCESS');
   }
   const idEmpresa = user.empresa;
+  const rawEmpresaProducto = body?.idEmpresaProducto ? String(body.idEmpresaProducto).trim() : null;
+  const idEmpresaProducto = rawEmpresaProducto || null;
   const { idProducto, stockReal, verificado, notas } = body || {};
   if (!idProducto) {
     throw new Error('idProducto es obligatorio');
@@ -233,6 +377,12 @@ exports.upsertLinea = async (user, idSesion, body) => {
   const quiereMaestro = tieneDescripcion || tieneCategoria || tienePresentacion || tieneMarca;
 
   return withPool(async (pool) => {
+    const empresaProductoRegistrado = await productosRepository.obtenerIdEmpresaProductoPorId(pool, idProducto);
+    if (!empresaProductoRegistrado) {
+      throw new Error('Producto no encontrado');
+    }
+    const empresaDestino = idEmpresaProducto || empresaProductoRegistrado;
+    await assertEmpresaAutorizada(pool, idEmpresa, empresaDestino);
     const sesion = await conteoFisicoRepository.obtenerSesionPorId(pool, idEmpresa, idSesion);
     if (!sesion) {
       throw new Error('Sesión no encontrada');
@@ -245,72 +395,52 @@ exports.upsertLinea = async (user, idSesion, body) => {
       await assertAlgunoPermiso(pool, user, 'EDITAR_PRODUCTOS', 'CREAR_PRODUCTOS');
     }
 
-    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
-    const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
-    assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones);
-    const idUbSes =
-      sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
-    const usarStockUb =
-      controlUbicaciones && Number.isFinite(idUbSes) && idUbSes > 0;
-
-    const stockSistema = usarStockUb
-      ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
-          pool,
-          idEmpresa,
-          sesion.idSucursal,
-          idProducto,
-          idUbSes
-        )
-      : await inventarioRepository.obtenerStockAgregadoProductoSucursal(
-          pool,
-          idEmpresa,
-          sesion.idSucursal,
-          idProducto
-        );
+    const ctx = await resolverContextoLineaStock(pool, sesion, idProducto, idEmpresa);
+    const stockSistema = await obtenerStockLinea(pool, ctx, idProducto);
     const transaction = new sql.Transaction(pool);
     try {
       await transaction.begin();
 
       if (quiereMaestro) {
-        const prod = await productosRepository.obtenerProductoPorIdRepo(transaction, idProducto, idEmpresa);
-        if (!prod) {
-          throw new Error('Producto no encontrado');
-        }
-        const nuevaDesc = tieneDescripcion ? String(body.descripcion ?? '').trim() : String(prod.descripcion || '').trim();
-        const nuevaCat = tieneCategoria ? Number(body.idCategoria) : Number(prod.idCategoria);
-        const nuevaPres = tienePresentacion ? Number(body.idPresentacion) : Number(prod.idPresentacion);
-        const nuevaMar = tieneMarca ? Number(body.idMarca) : Number(prod.idMarca);
-        if (!nuevaDesc) {
-          throw new Error('La descripción no puede quedar vacía');
-        }
-        if (!Number.isInteger(nuevaCat) || nuevaCat < 1) {
-          throw new Error('idCategoria inválido');
-        }
-        if (!Number.isInteger(nuevaPres) || nuevaPres < 1) {
-          throw new Error('idPresentacion inválido');
-        }
-        if (!Number.isInteger(nuevaMar) || nuevaMar < 1) {
-          throw new Error('idMarca inválido');
-        }
-        await validarCategoriaEmpresa(transaction, idEmpresa, nuevaCat);
-        await validarPresentacionExiste(transaction, nuevaPres);
-        await validarMarcaEmpresa(transaction, idEmpresa, nuevaMar);
-        const cambia =
-          nuevaDesc !== String(prod.descripcion || '').trim() ||
-          nuevaCat !== Number(prod.idCategoria) ||
-          nuevaPres !== Number(prod.idPresentacion) ||
-          nuevaMar !== Number(prod.idMarca);
-        if (cambia) {
-          await productosRepository.actualizarMaestroConteoFisico(transaction, {
-            idEmpresa,
-            idProducto,
-            descripcion: nuevaDesc,
-            idCategoria: nuevaCat,
-            idPresentacion: nuevaPres,
-            idMarca: nuevaMar
-          });
-        }
+      const prod = await productosRepository.obtenerProductoPorIdRepo(transaction, idProducto, empresaDestino);
+      if (!prod) {
+        throw new Error('Producto no encontrado');
       }
+      const nuevaDesc = tieneDescripcion ? String(body.descripcion ?? '').trim() : String(prod.descripcion || '').trim();
+      const nuevaCat = tieneCategoria ? Number(body.idCategoria) : Number(prod.idCategoria);
+      const nuevaPres = tienePresentacion ? Number(body.idPresentacion) : Number(prod.idPresentacion);
+      const nuevaMar = tieneMarca ? Number(body.idMarca) : Number(prod.idMarca);
+      if (!nuevaDesc) {
+        throw new Error('La descripción no puede quedar vacía');
+      }
+      if (!Number.isInteger(nuevaCat) || nuevaCat < 1) {
+        throw new Error('idCategoria inválido');
+      }
+      if (!Number.isInteger(nuevaPres) || nuevaPres < 1) {
+        throw new Error('idPresentacion inválido');
+      }
+      if (!Number.isInteger(nuevaMar) || nuevaMar < 1) {
+        throw new Error('idMarca inválido');
+      }
+      await validarCategoriaEmpresa(transaction, empresaDestino, nuevaCat);
+      await validarPresentacionExiste(transaction, nuevaPres);
+      await validarMarcaEmpresa(transaction, empresaDestino, nuevaMar);
+      const cambia =
+        nuevaDesc !== String(prod.descripcion || '').trim() ||
+        nuevaCat !== Number(prod.idCategoria) ||
+        nuevaPres !== Number(prod.idPresentacion) ||
+        nuevaMar !== Number(prod.idMarca);
+      if (cambia) {
+        await productosRepository.actualizarMaestroConteoFisico(transaction, {
+          idEmpresa: empresaDestino,
+          idProducto,
+          descripcion: nuevaDesc,
+          idCategoria: nuevaCat,
+          idPresentacion: nuevaPres,
+          idMarca: nuevaMar
+        });
+      }
+    }
 
       await conteoFisicoRepository.upsertLinea(transaction, {
         idSesion,
@@ -353,17 +483,11 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
     try {
       await transaction.begin();
 
-      const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa).catch(() => []);
-      const controlUbicaciones = controlUbicacionesDesdeConfig(configRows);
-      assertSesionUbicacionCompatibleConControl(sesion, controlUbicaciones);
-      const idUbSes =
-        sesion.idUbicacionInventario != null ? parseInt(String(sesion.idUbicacionInventario), 10) : NaN;
-      const idUbMov =
-        controlUbicaciones && Number.isFinite(idUbSes) && idUbSes > 0 ? idUbSes : null;
-
       const detalle = [];
-      const itemsPositivos = [];
-      const itemsNegativos = [];
+      /** @type {Map<string, { ctx: object, items: object[] }>} */
+      const gruposPositivos = new Map();
+      /** @type {Map<string, { ctx: object, items: object[] }>} */
+      const gruposNegativos = new Map();
 
       for (const l of lineas) {
         if (!l.verificado) {
@@ -374,23 +498,13 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
           continue;
         }
 
-        const stockActual = idUbMov
-          ? await inventarioRepository.obtenerStockAgregadoProductoSucursalUbicacion(
-              transaction,
-              idEmpresa,
-              sesion.idSucursal,
-              l.idProducto,
-              idUbMov
-            )
-          : await inventarioRepository.obtenerStockAgregadoProductoSucursal(
-              transaction,
-              idEmpresa,
-              sesion.idSucursal,
-              l.idProducto
-            );
+        const ctx = await resolverContextoLineaStock(transaction, sesion, l.idProducto, idEmpresa);
+        const stockActual = await obtenerStockLinea(transaction, ctx, l.idProducto);
         const delta = stockReal - stockActual;
         detalle.push({
           idProducto: l.idProducto,
+          idEmpresaDestino: ctx.idEmpresa,
+          idSucursalDestino: ctx.idSucursal,
           productoCodigo: l.productoCodigo,
           stockActual,
           stockReal,
@@ -401,22 +515,44 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
           continue;
         }
 
+        if (ctx.codigoUbicacion && ctx.controlUbicaciones && !ctx.idUbMov) {
+          throw new Error(
+            `No existe la ubicación «${ctx.codigoUbicacion}» en la sucursal del producto (${l.productoDescripcion || l.productoCodigo}).`
+          );
+        }
+
+        const keyGrupo = claveGrupoMovimiento(ctx);
         if (delta > DELTA_CONTEO_EPS) {
           const costoUnitario = await inventarioRepository.obtenerCostoUnitarioProducto(
             transaction,
-            idEmpresa,
+            ctx.idEmpresa,
             l.idProducto
           );
-          itemsPositivos.push({
+          if (!gruposPositivos.has(keyGrupo)) {
+            gruposPositivos.set(keyGrupo, { ctx, items: [] });
+          }
+          gruposPositivos.get(keyGrupo).items.push({
             idProducto: l.idProducto,
             cantidad: delta,
             costoUnitario: costoUnitario > 0 ? costoUnitario : 0
           });
         } else {
           const cantidad = Math.abs(delta);
-          itemsNegativos.push({ idProducto: l.idProducto, cantidad });
+          if (!gruposNegativos.has(keyGrupo)) {
+            gruposNegativos.set(keyGrupo, { ctx, items: [] });
+          }
+          gruposNegativos.get(keyGrupo).items.push({ idProducto: l.idProducto, cantidad });
         }
       }
+
+      let totalItemsPositivos = 0;
+      let totalItemsNegativos = 0;
+      gruposPositivos.forEach((g) => {
+        totalItemsPositivos += g.items.length;
+      });
+      gruposNegativos.forEach((g) => {
+        totalItemsNegativos += g.items.length;
+      });
 
       const obsBase = `Conteo físico sesión ${idSesion}`;
       const obs = [obsBase, observacionesExtra].filter(Boolean).join('. ');
@@ -433,26 +569,8 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
         return sr != null && !Number.isNaN(sr);
       }).length;
 
-      if (itemsPositivos.length === 0 && itemsNegativos.length === 0) {
+      if (totalItemsPositivos === 0 && totalItemsNegativos === 0) {
         if (detalle.length === 0) {
-          // #region agent log
-          fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '4c834d' },
-            body: JSON.stringify({
-              sessionId: '4c834d',
-              hypothesisId: 'H1',
-              location: 'conteoFisico.service.js:aplicarMovimientos',
-              message: 'sin items aplicables',
-              data: {
-                lineasTotal: lineas.length,
-                detalleLen: detalle.length,
-                lineasConStockRealSinVerificar
-              },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
           if (lineasConStockRealSinVerificar > 0) {
             throw new Error(
               `Hay ${lineasConStockRealSinVerificar} línea(s) con «Stock real» guardado pero sin «Verificado». Abra cada producto en el panel lateral, marque «Verificado», pulse «Guardar línea» y vuelva a aplicar.`
@@ -467,85 +585,108 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
         );
       }
 
-      if (itemsPositivos.length > 0) {
-        const compIngreso = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+      const empresasAfectadas = new Set();
+
+      for (const [, grupo] of gruposPositivos) {
+        const { ctx, items } = grupo;
+        empresasAfectadas.add(String(ctx.idEmpresa).toLowerCase());
+        const compIngreso = await obtenerComprobanteIngresoInventario(
           transaction,
-          idEmpresa,
-          'IN'
+          ctx.idEmpresa,
+          ctx.idSucursal
         );
         if (!compIngreso || !compIngreso.idComprobante) {
-          throw new Error('No existe comprobante IN para registrar reajuste positivo');
+          throw new Error(
+            'No existe comprobante de ingreso (IN, II o IV) en la sucursal del producto para registrar el reajuste positivo'
+          );
         }
         const movIngresoBody = {
           tipoMovimiento: 'REAJUSTE_POSITIVO',
-          idSucursal: sesion.idSucursal,
+          idSucursal: ctx.idSucursal,
           fechaMovimiento: fechaMovimientoAplicacion,
           docRelacionado: null,
           observaciones: obs,
           idComprobante: compIngreso.idComprobante,
-          items: itemsPositivos
+          items
         };
         const mapaIngreso = { tipoBD: 'AJ', esEntrada: true };
         await inventarioService.ejecutarProcesarMovimientoNoTransferencia(
           transaction,
-          idEmpresa,
+          ctx.idEmpresa,
           idUsuario,
           movIngresoBody,
-          { mapa: mapaIngreso, controlUbicaciones, idUbicacionMovimiento: idUbMov }
+          {
+            mapa: mapaIngreso,
+            controlUbicaciones: ctx.controlUbicaciones,
+            idUbicacionMovimiento: ctx.idUbMov
+          }
         );
-        const numeroDocIngreso = parseInt(String(compIngreso.numero || '0'), 10) || 0;
-        documentos.ingreso = {
-          idComprobante: compIngreso.idComprobante,
-          codigo: compIngreso.codigo,
-          serie: compIngreso.serie || null,
-          numero: numeroDocIngreso,
-          serieNumero: `${compIngreso.serie || ''}-${numeroDocIngreso}`.replace(/^-/, '')
-        };
+        if (!documentos.ingreso) {
+          const numeroDocIngreso = parseInt(String(compIngreso.numero || '0'), 10) || 0;
+          documentos.ingreso = {
+            idComprobante: compIngreso.idComprobante,
+            codigo: compIngreso.codigo,
+            serie: compIngreso.serie || null,
+            numero: numeroDocIngreso,
+            serieNumero: `${compIngreso.serie || ''}-${numeroDocIngreso}`.replace(/^-/, '')
+          };
+        }
       }
 
-      if (itemsNegativos.length > 0) {
-        const compSalida = await comprobantesRepository.obtenerComprobantePorCodigoRepo(
+      for (const [, grupo] of gruposNegativos) {
+        const { ctx, items } = grupo;
+        empresasAfectadas.add(String(ctx.idEmpresa).toLowerCase());
+        const compSalida = await obtenerComprobanteSalidaInventario(
           transaction,
-          idEmpresa,
-          'SA'
+          ctx.idEmpresa,
+          ctx.idSucursal
         );
         if (!compSalida || !compSalida.idComprobante) {
-          throw new Error('No existe comprobante SA para registrar reajuste negativo');
+          throw new Error(
+            'No existe comprobante SA en la sucursal del producto para registrar el reajuste negativo'
+          );
         }
         const movSalidaBody = {
           tipoMovimiento: 'REAJUSTE_NEGATIVO',
-          idSucursal: sesion.idSucursal,
+          idSucursal: ctx.idSucursal,
           fechaMovimiento: fechaMovimientoAplicacion,
           docRelacionado: null,
           observaciones: obs,
           idComprobante: compSalida.idComprobante,
-          items: itemsNegativos
+          items
         };
         const mapaSalida = { tipoBD: 'AJ', esEntrada: false };
         await inventarioService.ejecutarProcesarMovimientoNoTransferencia(
           transaction,
-          idEmpresa,
+          ctx.idEmpresa,
           idUsuario,
           movSalidaBody,
-          { mapa: mapaSalida, controlUbicaciones, idUbicacionMovimiento: idUbMov }
+          {
+            mapa: mapaSalida,
+            controlUbicaciones: ctx.controlUbicaciones,
+            idUbicacionMovimiento: ctx.idUbMov
+          }
         );
-        const numeroDocSalida = parseInt(String(compSalida.numero || '0'), 10) || 0;
-        documentos.salida = {
-          idComprobante: compSalida.idComprobante,
-          codigo: compSalida.codigo,
-          serie: compSalida.serie || null,
-          numero: numeroDocSalida,
-          serieNumero: `${compSalida.serie || ''}-${numeroDocSalida}`.replace(/^-/, '')
-        };
+        if (!documentos.salida) {
+          const numeroDocSalida = parseInt(String(compSalida.numero || '0'), 10) || 0;
+          documentos.salida = {
+            idComprobante: compSalida.idComprobante,
+            codigo: compSalida.codigo,
+            serie: compSalida.serie || null,
+            numero: numeroDocSalida,
+            serieNumero: `${compSalida.serie || ''}-${numeroDocSalida}`.replace(/^-/, '')
+          };
+        }
       }
 
       await conteoFisicoRepository.marcarSesionCerrada(transaction, idEmpresa, idSesion);
       await transaction.commit();
-      const movimientosGenerados = itemsPositivos.length + itemsNegativos.length;
+      const movimientosGenerados = totalItemsPositivos + totalItemsNegativos;
       return {
         message: 'Movimientos aplicados y sesión cerrada',
         movimientosGenerados,
         lineasProcesadas: detalle.length,
+        empresasAfectadas: Array.from(empresasAfectadas),
         detalle,
         documentos
       };

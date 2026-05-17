@@ -38,13 +38,30 @@ const getBySucursal = async function (req, res) {
     }
     try {
         const { idSucursal } = req.params;
-        const ubicaciones = await ubicacionesPrioridadService.getBySucursal(idSucursal, idEmpresa);
+        const ubicaciones = await ubicacionesPrioridadService.getBySucursalAutorizado(idSucursal, idEmpresa);
         const data = Array.isArray(ubicaciones) ? ubicaciones.map(normalizarUbicacion) : [];
         res.status(200).send({ success: true, data });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 }
+
+const listarCodigosConsolidados = async function (req, res) {
+    if (!req.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const idEmpresa = req.user.empresa || req.user.idEmpresa;
+    if (!idEmpresa) {
+        return res.status(403).json({ success: false, error: 'No autorizado: falta empresa en token' });
+    }
+    try {
+        const rows = await ubicacionesPrioridadService.listarCodigosConsolidados(idEmpresa, req.query || {});
+        const data = (rows || []).map((r) => String(r.codigoUbicacion || '').trim()).filter(Boolean);
+        res.status(200).send({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
 
 const create = async function (req, res) {
     if (!req.user) {
@@ -102,6 +119,7 @@ const deleted = async function (req, res) {
 module.exports = {
     getAll,
     getBySucursal,
+    listarCodigosConsolidados,
     create,
     update,
     deleted

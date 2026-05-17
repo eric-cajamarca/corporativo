@@ -160,7 +160,7 @@ export class AsignarStockUbicacionComponent implements OnInit {
         const existentes = Array.isArray(raw) ? raw : [];
         this.inicializarAsignaciones(existentes);
         this.cargandoUbicaciones = false;
-        if (this.ubicaciones.length === 0) {
+        if (this.ubicaciones.length === 0 && this.asignaciones.length === 0) {
           iziToast.show({
             title: 'Advertencia',
             titleColor: '#ffc107',

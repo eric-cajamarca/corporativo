@@ -5,8 +5,12 @@ const getAll = async function (req, res) {
         return res.status(401).send({ success: false, error: 'Unauthorized' });
     }else{
                 try {
-            const idEmpresa  = req.user.empresa; // Asumiendo middleware JWT
-            const lotes = await lotesService.getAll(idEmpresa);
+            const idEmpresa = req.user.empresa;
+            const alcance = req.query && req.query.alcance ? String(req.query.alcance).trim().toLowerCase() : '';
+            const lotes =
+              alcance === 'gestora'
+                ? await lotesService.getAllConsolidadoGestora(idEmpresa)
+                : await lotesService.getAll(idEmpresa);
             res.status(200).send({ success: true, data: lotes });
         } catch (error) {
             res.status(500).send({ success: false, data: undefined });

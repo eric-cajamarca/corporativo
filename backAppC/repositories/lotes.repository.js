@@ -1,6 +1,20 @@
 const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 
+function construirInClauseUuid(request, ids, prefix) {
+  const valid = (ids || []).filter((id) => id && String(id).trim());
+  if (!valid.length) {
+    return null;
+  }
+  return valid
+    .map((id, i) => {
+      const key = `${prefix}${i}`;
+      request.input(key, sql.UniqueIdentifier, String(id).trim());
+      return `@${key}`;
+    })
+    .join(', ');
+}
+
 async function getAll(idEmpresa) {
   return withPool(async (pool) => {
     const result = await pool.request()
@@ -17,12 +31,46 @@ async function getAll(idEmpresa) {
                 l.cantidadDisponible,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
                 p.descripcion AS nombreProducto,
-                s.nombre AS nombreSucursal
+                s.nombre AS nombreSucursal,
+                ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa
             FROM Lotes l
             LEFT JOIN Productos p ON l.idProducto = p.idProducto
             LEFT JOIN Sucursal s ON l.idSucursal = s.idSucursal
+            LEFT JOIN Empresas e ON e.idEmpresa = l.idEmpresa
             WHERE l.idEmpresa = @idEmpresa 
             ORDER BY l.fechaIngreso DESC
+        `);
+    return result.recordset;
+  });
+}
+
+async function getAllPorEmpresas(idsEmpresa) {
+  return withPool(async (pool) => {
+    const request = pool.request();
+    const inClause = construirInClauseUuid(request, idsEmpresa, 'idEmpresaLote');
+    if (!inClause) {
+      return [];
+    }
+    const result = await request.query(`
+            SELECT 
+                l.idLote, 
+                l.idEmpresa, 
+                l.idProducto, 
+                l.idSucursal, 
+                l.numeroLote,
+                l.costoUnitario, 
+                l.cantidadIngresada, 
+                l.cantidadDisponible,
+                CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
+                p.descripcion AS nombreProducto,
+                s.nombre AS nombreSucursal,
+                ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa
+            FROM Lotes l
+            LEFT JOIN Productos p ON l.idProducto = p.idProducto AND p.idEmpresa = l.idEmpresa
+            LEFT JOIN Sucursal s ON l.idSucursal = s.idSucursal
+            LEFT JOIN Empresas e ON e.idEmpresa = l.idEmpresa
+            WHERE l.idEmpresa IN (${inClause})
+            ORDER BY e.alias, l.fechaIngreso DESC
         `);
     return result.recordset;
   });
@@ -124,6 +172,7 @@ async function actualizarCantidadDisponible(idLote, nuevaCantidad) {
 
 module.exports = {
   getAll,
+  getAllPorEmpresas,
   getById,
   getBySucursal,
   create,

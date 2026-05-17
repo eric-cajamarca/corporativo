@@ -1,4 +1,5 @@
 const categoriaRepository = require('../repositories/categoria.repository');
+const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 
 function asegurarUsuario(user) {
   if (!user || !user.empresa) {
@@ -9,6 +10,16 @@ function asegurarUsuario(user) {
 async function obtenerCategorias(pool, user) {
   asegurarUsuario(user);
   return categoriaRepository.listarPorEmpresa(pool, user.empresa);
+}
+
+async function obtenerCategoriasPorEmpresa(pool, user, idEmpresaDestino) {
+  asegurarUsuario(user);
+  const idDest = String(idEmpresaDestino || '').trim();
+  if (!idDest) {
+    throw new Error('idEmpresa inválido');
+  }
+  await assertEmpresaAutorizada(pool, user.empresa, idDest);
+  return categoriaRepository.listarPorEmpresa(pool, idDest);
 }
 
 async function obtenerCategoriaPorId(pool, user, idCategoria) {
@@ -71,6 +82,7 @@ async function eliminarCategoria(pool, user, idCategoria) {
 
 module.exports = {
   obtenerCategorias,
+  obtenerCategoriasPorEmpresa,
   obtenerCategoriaPorId,
   crearCategoria,
   editarCategoria,

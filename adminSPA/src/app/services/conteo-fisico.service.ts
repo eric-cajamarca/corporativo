@@ -16,6 +16,8 @@ export interface CrearSesionConteoBody {
   observaciones?: string | null;
   /** Opcional: sesión fijada a una ubicación; al aplicar, entradas/salidas solo afectan esa ubicación (requiere stock por ubicación en inventario). */
   idUbicacionInventario?: number | null;
+  /** Gestora: código común (ej. TNDA_2PISO) resuelto por empresa del producto al aplicar. */
+  codigoUbicacionInventario?: string | null;
 }
 
 export interface UpsertLineaConteoBody {
@@ -27,6 +29,8 @@ export interface UpsertLineaConteoBody {
   idCategoria?: number;
   idPresentacion?: number;
   idMarca?: number;
+  /** Empresa dueña del producto (gestora + empresas gestionadas). */
+  idEmpresaProducto?: string | null;
 }
 
 export interface AplicarConteoBody {

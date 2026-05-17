@@ -2,6 +2,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { LotesService } from '../../../services/lotes.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
+import { GestoresService } from '../../../services/gestores.service';
 import { Lote } from '../../../models/inventario.model';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -26,6 +27,7 @@ export class LoteListComponent implements OnInit {
   filtroSucursal = '';
   filtroFechaDesde = '';
   filtroFechaHasta = '';
+  esModoGestora = false;
   
   // Bandera para mostrar/ocultar spinner de carga
   isLoading = true;
@@ -36,11 +38,22 @@ export class LoteListComponent implements OnInit {
   constructor(
     public activeModal: NgbActiveModal,
     private loteService: LotesService,
-    private inventarioModal: InventarioModalService
+    private inventarioModal: InventarioModalService,
+    private gestoresService: GestoresService
   ) {}
 
   ngOnInit(): void {
-    this.cargarLotes();
+    this.gestoresService.obtenerEmpresasGestionadas().subscribe({
+      next: (res) => {
+        const arr = Array.isArray(res?.data) ? res.data : [];
+        this.esModoGestora = arr.length > 0;
+        this.cargarLotes();
+      },
+      error: () => {
+        this.esModoGestora = false;
+        this.cargarLotes();
+      }
+    });
   }
 
   /**
@@ -48,7 +61,7 @@ export class LoteListComponent implements OnInit {
    */
   cargarLotes(): void {
     this.isLoading = true;
-    this.loteService.obtener_lotes_todos().subscribe({
+    this.loteService.obtener_lotes_todos({ alcanceGestora: this.esModoGestora }).subscribe({
       next: (response: any) => {
         this.lotes = response.data || [];
         this.aplicarFiltros();
@@ -79,6 +92,27 @@ export class LoteListComponent implements OnInit {
     if (Array.isArray(idLotesFiltro) && idLotesFiltro.length > 0) {
       const setIds = new Set(idLotesFiltro);
       filtrados = filtrados.filter(l => l.idLote && setIds.has(l.idLote));
+    }
+
+    const productoFiltro = this.filtrosIniciales?.producto;
+    if (productoFiltro) {
+      const term = new RegExp(productoFiltro, 'i');
+      filtrados = filtrados.filter(
+        l =>
+          term.test(l.nombreProducto || '') ||
+          term.test(l.idProducto || '') ||
+          term.test(l.numeroLote || '')
+      );
+    }
+
+    const empresaFiltro = this.filtrosIniciales?.empresa;
+    if (empresaFiltro) {
+      const term = new RegExp(empresaFiltro, 'i');
+      filtrados = filtrados.filter(
+        l =>
+          term.test(l.aliasEmpresa || '') ||
+          term.test(l.idEmpresa || '')
+      );
     }
 
     if (this.filtroProducto) {

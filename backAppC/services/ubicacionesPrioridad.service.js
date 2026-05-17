@@ -1,4 +1,8 @@
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
+const gestoresRepository = require('../repositories/gestores.repository');
+const sucursalRepository = require('../repositories/sucursal.repository');
+const { withPool } = require('../utils/dbPool.util');
+const { assertEmpresaAutorizada, idsEmpresaGestoraConsolidados } = require('../utils/empresaGestora.util');
 
 async function getAll(idEmpresa) {
     return await ubicacionesPrioridadRepository.getAll(idEmpresa);
@@ -6,6 +10,41 @@ async function getAll(idEmpresa) {
 
 async function getBySucursal(idSucursal, idEmpresa) {
     return await ubicacionesPrioridadRepository.getBySucursal(idSucursal, idEmpresa);
+}
+
+async function getBySucursalAutorizado(idSucursal, idEmpresaJwt) {
+  return withPool(async (pool) => {
+    const idEmpresaSucursal = await sucursalRepository.obtenerEmpresaPorSucursal(pool, idSucursal);
+    if (!idEmpresaSucursal) {
+      throw new Error('Sucursal no encontrada');
+    }
+    await assertEmpresaAutorizada(pool, idEmpresaJwt, idEmpresaSucursal);
+    return ubicacionesPrioridadRepository.getBySucursal(idSucursal, idEmpresaSucursal);
+  });
+}
+
+async function listarCodigosConsolidados(idEmpresaJwt, query = {}) {
+  return withPool(async (pool) => {
+    const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaJwt);
+    const idsGestionadas = (gestionadas || []).map((e) => e.idEmpresa).filter(Boolean);
+    const rawEmpresa =
+      query && query.idEmpresa != null && String(query.idEmpresa).trim() !== ''
+        ? String(query.idEmpresa).trim()
+        : '';
+    const modo = query && query.modo ? String(query.modo).trim().toLowerCase() : '';
+
+    if (rawEmpresa) {
+      await assertEmpresaAutorizada(pool, idEmpresaJwt, rawEmpresa);
+      return ubicacionesPrioridadRepository.listarCodigosConsolidados(pool, [rawEmpresa]);
+    }
+
+    if (idsGestionadas.length > 0 && (modo === 'interseccion' || modo === '')) {
+      return ubicacionesPrioridadRepository.listarCodigosInterseccion(pool, idsGestionadas);
+    }
+
+    const ids = await idsEmpresaGestoraConsolidados(pool, idEmpresaJwt);
+    return ubicacionesPrioridadRepository.listarCodigosConsolidados(pool, ids);
+  });
 }
 
 async function create(ubicacionData, idEmpresa) {
@@ -41,6 +80,8 @@ async function deleted(idUbicacion, idEmpresa) {
 module.exports = {
     getAll,
     getBySucursal,
+    getBySucursalAutorizado,
+    listarCodigosConsolidados,
     create,
     update,
     deleted

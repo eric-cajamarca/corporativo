@@ -1,4 +1,5 @@
 const marcaRepository = require('../repositories/marca.repository');
+const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 
 function asegurarUsuario(user) {
   if (!user || !user.empresa) {
@@ -9,6 +10,16 @@ function asegurarUsuario(user) {
 async function obtenerMarcas(pool, user) {
   asegurarUsuario(user);
   return marcaRepository.listarPorEmpresa(pool, user.empresa);
+}
+
+async function obtenerMarcasPorEmpresa(pool, user, idEmpresaDestino) {
+  asegurarUsuario(user);
+  const idDest = String(idEmpresaDestino || '').trim();
+  if (!idDest) {
+    throw new Error('idEmpresa inválido');
+  }
+  await assertEmpresaAutorizada(pool, user.empresa, idDest);
+  return marcaRepository.listarPorEmpresa(pool, idDest);
 }
 
 async function obtenerMarcaPorId(pool, user, idMarca) {
@@ -65,6 +76,7 @@ async function editarEstadoMarca(pool, user, idMarca, body) {
 
 module.exports = {
   obtenerMarcas,
+  obtenerMarcasPorEmpresa,
   obtenerMarcaPorId,
   crearMarca,
   editarMarca,

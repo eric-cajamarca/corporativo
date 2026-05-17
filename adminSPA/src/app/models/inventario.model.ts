@@ -3,6 +3,7 @@ export interface Lote {
   idEmpresa: string;
   idProducto: string;
   idSucursal: string;
+  numeroLote?: string;
   costoUnitario: number;
   cantidadIngresada: number;
   cantidadDisponible: number;
@@ -10,6 +11,7 @@ export interface Lote {
   // Propiedades extendidas para UI
   nombreProducto?: string;
   nombreSucursal?: string;
+  aliasEmpresa?: string;
   ubicaciones?: any[];
 }
 

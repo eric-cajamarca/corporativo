@@ -54,7 +54,7 @@ exports.listarMovimientosResumen = async (req, res) => {
     if (!req.user || !req.user.empresa) {
       return res.status(401).json({ message: 'No autorizado' });
     }
-    const lista = await inventarioService.listarMovimientosResumen(req.user.empresa, req.query);
+    const lista = await inventarioService.listarMovimientosResumen(req.user, req.query);
     return res.status(200).json(lista);
   } catch (error) {
     console.error('inventarioController listarMovimientosResumen:', error);

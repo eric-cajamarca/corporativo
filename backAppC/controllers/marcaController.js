@@ -1,6 +1,24 @@
 const marcaService = require('../services/marca.service');
 const { withPool } = require('../utils/dbPool.util');
 
+const obtenerMarcasPorEmpresa = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).send({ message: 'No Access', data: undefined });
+  }
+  try {
+    const data = await withPool((pool) =>
+      marcaService.obtenerMarcasPorEmpresa(pool, req.user, req.params.idEmpresa)
+    );
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS' || error.message === 'Empresa no autorizada') {
+      return res.status(401).send({ message: 'No Access', data: undefined });
+    }
+    console.error('Error al obtener marcas por empresa:', error);
+    res.status(500).send({ data: undefined });
+  }
+};
+
 const obtenerMarcas = async (req, res) => {
   if (!req.user) {
     return res.status(401).send({ message: 'No Access', data: undefined });
@@ -85,6 +103,7 @@ const editarEstadoMarca = async (req, res) => {
 
 module.exports = {
   obtenerMarcas,
+  obtenerMarcasPorEmpresa,
   obtenerMarcaPorId,
   crearMarca,
   editarMarca,

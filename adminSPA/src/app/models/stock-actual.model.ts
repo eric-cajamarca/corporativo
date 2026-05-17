@@ -17,6 +17,8 @@ export interface StockActualItem {
   valorizado: number;
   /** 1 activo, 0 inactivo (cuando el listado incluye inactivos, p. ej. conteo físico). */
   estado?: number;
+  /** Stock total sin ubicaciones asignadas (solo para vista general). */
+  stockSinUbicacion?: number;
 }
 
 export interface StockActualResponse {

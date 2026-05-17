@@ -92,6 +92,29 @@ function construirNavegacionEmpresaGestora(esAdmin, permisos, tieneVerEnviosChof
 
     items.push({ tipo: 'separador' });
 
+    const tieneInventario = can('VER_INVENTARIO');
+    if (tieneInventario) {
+        items.push({
+            modulo: 'INVENTARIO',
+            nombre: 'Inventario',
+            icono: 'bi bi-boxes',
+            ruta: null,
+            permiso: 'VER_INVENTARIO',
+            visible: true,
+            submenu: [
+                { nombre: 'Stock General', ruta: '/inventario', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Stock Actual', ruta: '/inventario/stock-actual', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Conteo físico', ruta: '/inventario/conteo-fisico', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Kardex', ruta: '/inventario/kardex', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Movimientos', ruta: '/inventario/movimientos', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Ingresos y salidas', ruta: '/inventario/ingreso-salida', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Productos vendidos', ruta: '/inventario/productos-vendidos', permiso: 'VER_INVENTARIO', visible: true },
+                { nombre: 'Productos comprados', ruta: '/inventario/productos-comprados', permiso: 'VER_INVENTARIO', visible: true }
+            ]
+        });
+        items.push({ tipo: 'separador' });
+    }
+
     const subDespachos = [
         {
             nombre: 'Despachos',

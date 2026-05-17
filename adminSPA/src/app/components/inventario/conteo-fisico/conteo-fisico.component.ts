@@ -1,10 +1,10 @@
-import { Component, ElementRef, OnDestroy, OnInit, inject, viewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, TemplateRef, inject, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { takeUntil } from 'rxjs/operators';
+import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -29,6 +29,7 @@ import {
   InventarioFisicoSesionDto,
   TipoConteoFisico
 } from '../../../models/conteo-fisico.model';
+import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void };
@@ -41,8 +42,7 @@ declare const iziToast: { success: (o: object) => void; error: (o: object) => vo
   styleUrl: './conteo-fisico.component.css'
 })
 export class ConteoFisicoComponent implements OnInit, OnDestroy {
-  /** Card «Detalle del conteo» para hacer scroll al pulsar Elegir */
-  private readonly detalleConteoRef = viewChild<ElementRef<HTMLElement>>('detalleConteoCard');
+  private readonly detalleModalTpl = viewChild<TemplateRef<unknown>>('detalleConteoModal');
 
   sidebarState = inject(SidebarStateService);
   private inventarioApi = inject(MovimientoInventarioService);
@@ -51,6 +51,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private marcaService = inject(MarcaService);
   private presentacionService = inject(PresentacionService);
   private conteoService = inject(ConteoFisicoService);
+  private inventarioModal = inject(InventarioModalService);
   private modalService = inject(NgbModal);
   private productoCrearModal = inject(ProductoCrearModalService);
   private gestoresService = inject(GestoresService);
@@ -61,7 +62,8 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   private router = inject(Router);
 
   private destroy$ = new Subject<void>();
-  private buscarSubject = new Subject<string>();
+  private detalleModalRef: NgbModalRef | null = null;
+  private idEmpresaCatalogoActual: string | null = null;
 
   sucursales: Sucursal[] = [];
   idSucursalNuevaSesion = '';
@@ -71,6 +73,10 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   mostrarOpcionUbicacionConteo = false;
   ubicacionesSucursal: Array<{ idUbicacion: number; codigoUbicacion: string }> = [];
   idUbicacionNuevaSesion: number | null = null;
+  codigoUbicacionNuevaSesion: string | null = null;
+  /** Empresa de referencia para listar códigos de ubicación al crear sesión (gestora). */
+  empresaUbicacionNuevaSesion = '';
+  codigosUbicacionGestora: string[] = [];
 
   sesion: InventarioFisicoSesionDto | null = null;
   lineas: InventarioFisicoLineaDto[] = [];
@@ -83,6 +89,8 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   stockRealInput: number | null = null;
   verificadoInput = true;
   notasInput = '';
+  empresasGestionadas: Array<{ idEmpresa: string; nombre: string }> = [];
+  empresaFiltroSeleccionada = 'todas';
 
   /** Catálogos para editar maestro del producto en el panel lateral */
   categoriasSelect: Array<{ idCategoria: number; nombre: string }> = [];
@@ -106,11 +114,9 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit(): void {
-    this.buscarSubject.pipe(debounceTime(400), distinctUntilChanged(), takeUntil(this.destroy$)).subscribe(() => {
-      this.buscarCatalogo();
-    });
     this.cargarSucursales();
     this.cargarOpcionUbicacionConteo();
+    this.cargarEmpresasGestionadas();
     const inicial = this.route.snapshot.queryParamMap.get('idSesion');
     if (inicial) {
       this.idSesionEnCurso = inicial;
@@ -137,12 +143,23 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  private cargarCatalogosMaestro(): void {
-    if (!this.sesion?.idEmpresa) {
+  get esModoGestora(): boolean {
+    return this.empresasGestionadas.length > 0;
+  }
+
+  private cargarCatalogosMaestro(idEmpresaProducto?: string | null): void {
+    const idEmpresa = idEmpresaProducto?.trim() || this.productoSeleccionado?.idEmpresa?.trim() || null;
+    if (!idEmpresa) {
       return;
     }
-    /* GET /categorias ya filtra por empresa del JWT; la ruta categoriasempresa/:id no está montada en backAppC. */
-    this.categoriaService.obtener_categorias().subscribe({
+    const empresaCambio = this.idEmpresaCatalogoActual !== idEmpresa;
+    this.idEmpresaCatalogoActual = idEmpresa;
+    if (!empresaCambio && this.categoriasSelect.length > 0 && this.marcasSelect.length > 0) {
+      return;
+    }
+    this.categoriasSelect = [];
+    this.marcasSelect = [];
+    this.categoriaService.obtener_categorias_idEmpresa(idEmpresa).subscribe({
       next: (res) => {
         const raw = res?.data ?? res;
         const arr = Array.isArray(raw) ? raw : [];
@@ -177,7 +194,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
         this.presentacionesSelect = [];
       }
     });
-    this.marcaService.obtener_marcas().subscribe({
+    this.marcaService.obtener_marcas_idEmpresa(idEmpresa).subscribe({
       next: (res) => {
         const raw = res?.data ?? res;
         const arr = Array.isArray(raw) ? raw : [];
@@ -250,7 +267,11 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   }
 
   private recargarSoloMarcasYSeleccionar(idMarca: number): void {
-    this.marcaService.obtener_marcas().subscribe({
+    const idEmpresa = this.productoSeleccionado?.idEmpresa || this.idEmpresaCatalogoActual;
+    if (!idEmpresa) {
+      return;
+    }
+    this.marcaService.obtener_marcas_idEmpresa(idEmpresa).subscribe({
       next: (res) => {
         const raw = res?.data ?? res;
         const arr = Array.isArray(raw) ? raw : [];
@@ -268,7 +289,11 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   }
 
   private recargarSoloCategoriasYSeleccionar(idCategoria: number): void {
-    this.categoriaService.obtener_categorias().subscribe({
+    const idEmpresa = this.productoSeleccionado?.idEmpresa || this.idEmpresaCatalogoActual;
+    if (!idEmpresa) {
+      return;
+    }
+    this.categoriaService.obtener_categorias_idEmpresa(idEmpresa).subscribe({
       next: (res) => {
         const raw = res?.data ?? res;
         const arr = Array.isArray(raw) ? raw : [];
@@ -321,8 +346,11 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
             ? (row as { valor?: string; Valor?: string }).valor
             : (row as { valor?: string; Valor?: string })?.Valor;
         this.mostrarOpcionUbicacionConteo = interpretarBooleanoConfig(v, true);
-        if (this.mostrarOpcionUbicacionConteo && this.idSucursalNuevaSesion) {
-          this.onCambioSucursalNuevaSesion();
+        if (this.mostrarOpcionUbicacionConteo) {
+          this.intentarCargarCodigosUbicacionSesion();
+          if (this.idSucursalNuevaSesion && !this.esModoGestora) {
+            this.onCambioSucursalNuevaSesion();
+          }
         }
       },
       error: () => {
@@ -331,10 +359,76 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
+  private cargarEmpresasGestionadas(): void {
+    this.gestoresService.obtenerEmpresasGestionadas().subscribe({
+      next: (res) => {
+        const arr = Array.isArray(res?.data) ? res.data : [];
+        const dedupe = new Map<string, { idEmpresa: string; nombre: string }>();
+        arr.forEach((e) => {
+          const id = String(e?.idEmpresa || '').trim();
+          if (!id) return;
+          const nombre = String(e?.nombreComercial || e?.razon_Social || e?.ruc || '').trim() || 'Empresa';
+          const key = `${id.toLowerCase()}|${nombre.toLowerCase()}`;
+          if (!dedupe.has(key)) {
+            dedupe.set(key, { idEmpresa: id, nombre });
+          }
+        });
+        this.empresasGestionadas = Array.from(dedupe.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+        if (this.esModoGestora && !this.empresaUbicacionNuevaSesion && this.empresasGestionadas.length === 1) {
+          this.empresaUbicacionNuevaSesion = this.empresasGestionadas[0].idEmpresa;
+        }
+        this.intentarCargarCodigosUbicacionSesion();
+      },
+      error: () => {
+        this.empresasGestionadas = [];
+        this.codigosUbicacionGestora = [];
+      }
+    });
+  }
+
+  /** Requiere modo gestora y opción de ubicación activa (evita carrera al iniciar). */
+  private intentarCargarCodigosUbicacionSesion(): void {
+    if (!this.mostrarOpcionUbicacionConteo || !this.esModoGestora) {
+      if (!this.esModoGestora) {
+        this.codigosUbicacionGestora = [];
+      }
+      return;
+    }
+    this.cargarCodigosUbicacionSesion();
+  }
+
+  onEmpresaUbicacionNuevaSesionChange(): void {
+    this.codigoUbicacionNuevaSesion = null;
+    this.intentarCargarCodigosUbicacionSesion();
+  }
+
+  private cargarCodigosUbicacionSesion(): void {
+    const idEmpresaRef = this.empresaUbicacionNuevaSesion?.trim() || null;
+    this.ubicacionPrioridadService
+      .obtener_codigos_ubicacion_consolidados({
+        idEmpresa: idEmpresaRef,
+        modo: idEmpresaRef ? undefined : 'interseccion'
+      })
+      .subscribe({
+      next: (res) => {
+        const raw = res?.data ?? res;
+        const arr = Array.isArray(raw) ? raw : [];
+        this.codigosUbicacionGestora = arr
+          .map((c) => String(c || '').trim())
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+      },
+      error: () => {
+        this.codigosUbicacionGestora = [];
+      }
+    });
+  }
+
   onCambioSucursalNuevaSesion(): void {
     this.idUbicacionNuevaSesion = null;
+    this.codigoUbicacionNuevaSesion = null;
     this.ubicacionesSucursal = [];
-    if (!this.mostrarOpcionUbicacionConteo || !this.idSucursalNuevaSesion?.trim()) {
+    if (!this.mostrarOpcionUbicacionConteo || !this.idSucursalNuevaSesion?.trim() || this.esModoGestora) {
       return;
     }
     this.ubicacionPrioridadService.obtener_ubicacionesPrioridad_sucursal(this.idSucursalNuevaSesion.trim()).subscribe({
@@ -354,10 +448,6 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
-  onBuscarInput(): void {
-    this.buscarSubject.next(this.buscar);
-  }
-
   crearSesion(): void {
     if (!this.idSucursalNuevaSesion?.trim()) {
       iziToast.error({ title: 'Validación', message: 'Seleccione sucursal', position: 'topRight' });
@@ -368,8 +458,12 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       tipoConteo: this.tipoConteoNueva,
       observaciones: this.observacionesNueva?.trim() || null
     };
-    if (this.mostrarOpcionUbicacionConteo && this.idUbicacionNuevaSesion != null) {
-      body.idUbicacionInventario = this.idUbicacionNuevaSesion;
+    if (this.mostrarOpcionUbicacionConteo) {
+      if (this.esModoGestora && this.codigoUbicacionNuevaSesion?.trim()) {
+        body.codigoUbicacionInventario = this.codigoUbicacionNuevaSesion.trim();
+      } else if (!this.esModoGestora && this.idUbicacionNuevaSesion != null) {
+        body.idUbicacionInventario = this.idUbicacionNuevaSesion;
+      }
     }
     this.conteoService.crearSesion(body).subscribe({
         next: (r) => {
@@ -395,8 +489,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
         this.previewCargado = false;
         this.previewFilas = [];
         if (this.sesion?.estado === 'BORRADOR') {
-          this.cargarCatalogosMaestro();
-          this.buscarCatalogo();
+          this.resultados = [];
         } else {
           this.categoriasSelect = [];
           this.marcasSelect = [];
@@ -425,15 +518,29 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       return;
     }
     this.cargandoBusqueda = true;
-    this.inventarioApi.obtenerStockActual({
-      idSucursal: this.sesion.idSucursal,
+    const params: {
+      idSucursal?: string;
+      buscar: string | null;
+      filtroStock: 'todos' | 'cero' | 'minimo';
+      catalogoConteoFisico: boolean;
+      idUbicacion?: number;
+      idEmpresa?: string;
+    } = {
       buscar: this.buscar?.trim() || null,
       filtroStock: 'todos',
-      catalogoConteoFisico: true,
-      ...(this.sesionInventarioPorUbicacion() && this.sesion?.idUbicacionInventario != null
-        ? { idUbicacion: this.sesion.idUbicacionInventario }
-        : {})
-    })
+      catalogoConteoFisico: true
+    };
+    if (!this.esModoGestora) {
+      params.idSucursal = this.sesion.idSucursal;
+      if (this.sesionInventarioPorUbicacion() && this.sesion?.idUbicacionInventario != null) {
+        params.idUbicacion = this.sesion.idUbicacionInventario;
+      }
+    }
+    const idEmpresaFiltro = this.obtenerIdEmpresaFiltro();
+    if (idEmpresaFiltro) {
+      params.idEmpresa = idEmpresaFiltro;
+    }
+    this.inventarioApi.obtenerStockActual(params)
       .subscribe({
         next: (res) => {
           this.resultados = res.items || [];
@@ -450,9 +557,38 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
 
   /** Sesión creada con ubicación: referencias y movimientos son por esa ubicación. */
   sesionInventarioPorUbicacion(): boolean {
+    const cod = String(this.sesion?.codigoUbicacionInventario ?? '').trim();
+    if (cod) {
+      return true;
+    }
     const u = this.sesion?.idUbicacionInventario;
     const n = u != null ? Number(u) : NaN;
     return Number.isFinite(n) && n > 0;
+  }
+
+  onEmpresaFiltroChange(): void {
+    this.resultados = [];
+  }
+
+  private obtenerIdEmpresaFiltro(): string | null {
+    if (!this.empresasGestionadas.length) {
+      return null;
+    }
+    if (!this.empresaFiltroSeleccionada || this.empresaFiltroSeleccionada === 'todas') {
+      return null;
+    }
+    return this.empresaFiltroSeleccionada;
+  }
+
+  get descripcionEmpresaFiltro(): string {
+    if (!this.empresasGestionadas.length) {
+      return 'Empresa actual';
+    }
+    if (!this.empresaFiltroSeleccionada || this.empresaFiltroSeleccionada === 'todas') {
+      return 'Consolidado (gestora + empresas gestionadas)';
+    }
+    const match = this.empresasGestionadas.find((e) => e.idEmpresa === this.empresaFiltroSeleccionada);
+    return match?.nombre || 'Empresa seleccionada';
   }
 
   etiquetaUbicacionSesion(): string {
@@ -498,12 +634,23 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       idPresentacion: this.idPresentacionEdit ?? 0
     };
     this.verificadoInput = existente ? !!existente.verificado : true;
-    setTimeout(() => {
-      const el = this.detalleConteoRef()?.nativeElement;
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    }, 0);
+    this.cargarCatalogosMaestro(p.idEmpresa);
+    const tpl = this.detalleModalTpl();
+    if (tpl) {
+      this.detalleModalRef?.close();
+      this.detalleModalRef = this.modalService.open(tpl, {
+        size: 'lg',
+        centered: true,
+        backdrop: 'static',
+        scrollable: true
+      });
+    }
+  }
+
+  cerrarDetalleModal(): void {
+    this.detalleModalRef?.close();
+    this.detalleModalRef = null;
+    this.limpiarSeleccionProducto();
   }
 
   /** Stock real ya guardado en la sesión para este producto (tabla búsqueda), o null si no hay línea / valor. */
@@ -585,8 +732,12 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       body.idMarca = Number(this.idMarcaEdit);
       body.idPresentacion = Number(this.idPresentacionEdit);
     }
+    const empresaProducto = this.productoSeleccionado?.idEmpresa || null;
     this.conteoService
-      .upsertLinea(this.idSesionEnCurso, this.productoSeleccionado.idProducto, body)
+      .upsertLinea(this.idSesionEnCurso, this.productoSeleccionado.idProducto, {
+        ...body,
+        idEmpresaProducto: empresaProducto
+      })
       .subscribe({
         next: (r) => {
           this.lineas = r.lineas || [];
@@ -614,6 +765,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
           iziToast.success({ title: 'Línea', message: 'Guardada', position: 'topRight' });
           this.previewCargado = false;
           this.buscarCatalogo();
+          this.cerrarDetalleModal();
         },
         error: (err) => {
           const msg = err?.error?.message || 'No se pudo guardar';
@@ -648,6 +800,14 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
 
+  tieneStockSinUbicacion(p: StockActualItem): boolean {
+    if (p.stockSinUbicacion == null) {
+      return false;
+    }
+    const n = Number(p.stockSinUbicacion);
+    return Number.isFinite(n) && n > 0;
+  }
+
   aplicarMovimientos(): void {
     if (!this.idSesionEnCurso) {
       return;
@@ -674,7 +834,20 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
         this.aplicando = false;
         const n = r?.movimientosGenerados != null ? Number(r.movimientosGenerados) : 0;
         const extra = Number.isFinite(n) && n >= 0 ? ` (${n} ítem${n === 1 ? '' : 's'} de ajuste).` : '';
-        iziToast.success({ title: 'Listo', message: (r.message || 'Aplicado') + extra, position: 'topRight' });
+        const idsEmp = r?.empresasAfectadas || [];
+        const nombresEmp = idsEmp
+          .map((id) => this.empresasGestionadas.find((e) => this.mismoUuid(e.idEmpresa, id))?.nombre)
+          .filter(Boolean);
+        const empMsg =
+          nombresEmp.length > 0
+            ? ` Movimientos en: ${nombresEmp.join(', ')} (véalo en Inventario → Movimientos de esa empresa).`
+            : '';
+        iziToast.success({
+          title: 'Listo',
+          message: (r.message || 'Aplicado') + extra + empMsg,
+          position: 'topRight',
+          timeout: 8000
+        });
         this.cargarSesion(this.idSesionEnCurso!);
       },
       error: (err) => {
@@ -683,6 +856,12 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
         iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
       }
     });
+  }
+
+  abrirAsignarSinUbicar(p: StockActualItem): void {
+    this.inventarioModal
+      .abrirLoteList({ producto: p.idProducto, empresa: p.idEmpresa })
+      .catch(() => {});
   }
 
   exportarExcel(): void {

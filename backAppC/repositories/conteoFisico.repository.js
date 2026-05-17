@@ -8,13 +8,18 @@ exports.insertarSesion = async (transaction, datos) => {
     tipoConteo,
     observaciones,
     idUsuarioCreacion,
-    idUbicacionInventario
+    idUbicacionInventario,
+    codigoUbicacionInventario
   } = datos;
   const idUb =
     idUbicacionInventario != null && idUbicacionInventario !== ''
       ? parseInt(String(idUbicacionInventario), 10)
       : null;
   const idUbSql = Number.isFinite(idUb) && idUb > 0 ? idUb : null;
+  const codigoUb =
+    codigoUbicacionInventario != null && String(codigoUbicacionInventario).trim() !== ''
+      ? String(codigoUbicacionInventario).trim().substring(0, 20)
+      : null;
   await transaction
     .request()
     .input('idSesion', sql.UniqueIdentifier, idSesion)
@@ -24,9 +29,10 @@ exports.insertarSesion = async (transaction, datos) => {
     .input('observaciones', sql.NVarChar(500), observaciones || null)
     .input('idUsuarioCreacion', sql.UniqueIdentifier, idUsuarioCreacion || null)
     .input('idUbicacionInventario', sql.Int, idUbSql)
+    .input('codigoUbicacionInventario', sql.VarChar(20), codigoUb)
     .query(`
-      INSERT INTO InventarioFisicoSesion (idSesion, idEmpresa, idSucursal, tipoConteo, estado, observaciones, idUsuarioCreacion, idUbicacionInventario)
-      VALUES (@idSesion, @idEmpresa, @idSucursal, @tipoConteo, 'BORRADOR', @observaciones, @idUsuarioCreacion, @idUbicacionInventario)
+      INSERT INTO InventarioFisicoSesion (idSesion, idEmpresa, idSucursal, tipoConteo, estado, observaciones, idUsuarioCreacion, idUbicacionInventario, codigoUbicacionInventario)
+      VALUES (@idSesion, @idEmpresa, @idSucursal, @tipoConteo, 'BORRADOR', @observaciones, @idUsuarioCreacion, @idUbicacionInventario, @codigoUbicacionInventario)
     `);
 };
 
@@ -39,7 +45,7 @@ exports.obtenerSesionPorId = async (conn, idEmpresa, idSesion) => {
              s.tipoConteo, s.estado, s.observaciones,
              CONVERT(VARCHAR(19), s.fCreacion, 120) AS fCreacion,
              s.idUbicacionInventario,
-             RTRIM(LTRIM(ISNULL(up.codigoUbicacion, ''))) AS codigoUbicacionInventario
+             RTRIM(LTRIM(COALESCE(NULLIF(s.codigoUbicacionInventario, ''), up.codigoUbicacion, ''))) AS codigoUbicacionInventario
       FROM InventarioFisicoSesion s
       INNER JOIN Sucursal sc ON sc.idSucursal = s.idSucursal AND sc.idEmpresa = s.idEmpresa
       LEFT JOIN UbicacionesPrioridad up ON up.idUbicacion = s.idUbicacionInventario AND up.idSucursal = s.idSucursal
@@ -59,8 +65,8 @@ exports.listarLineasPorSesion = async (conn, idEmpresa, idSesion) => {
              ISNULL(m.nombre, '') AS marca
       FROM InventarioFisicoLinea l
       INNER JOIN InventarioFisicoSesion s ON s.idSesion = l.idSesion AND s.idEmpresa = @idEmpresa
-      INNER JOIN Productos p ON p.idProducto = l.idProducto AND p.idEmpresa = s.idEmpresa
-      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
+      INNER JOIN Productos p ON p.idProducto = l.idProducto
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca AND m.idEmpresa = p.idEmpresa
       WHERE l.idSesion = @idSesion
       ORDER BY p.descripcion
     `);
@@ -73,6 +79,29 @@ exports.validarSucursalPerteneceEmpresa = async (conn, idEmpresa, idSucursal) =>
     .input('idSucursal', sql.UniqueIdentifier, idSucursal)
     .query(`SELECT 1 AS ok FROM Sucursal WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal`);
   return !!(r.recordset && r.recordset[0]);
+};
+
+/** Resuelve idUbicacion por código en la sucursal de la empresa del producto. */
+exports.obtenerIdUbicacionPorCodigo = async (conn, idEmpresa, idSucursal, codigoUbicacion) => {
+  const cod = String(codigoUbicacion || '').trim();
+  if (!cod) {
+    return null;
+  }
+  const r = await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .input('codigo', sql.VarChar(20), cod)
+    .query(`
+      SELECT TOP 1 up.idUbicacion
+      FROM UbicacionesPrioridad up
+      INNER JOIN Sucursal s ON s.idSucursal = up.idSucursal AND s.idEmpresa = @idEmpresa
+      WHERE up.idSucursal = @idSucursal
+        AND RTRIM(LTRIM(up.codigoUbicacion)) = RTRIM(LTRIM(@codigo))
+    `);
+  const row = r.recordset && r.recordset[0];
+  const id = row && row.idUbicacion != null ? parseInt(String(row.idUbicacion), 10) : NaN;
+  return Number.isFinite(id) && id > 0 ? id : null;
 };
 
 exports.validarUbicacionPerteneceSucursal = async (conn, idSucursal, idUbicacion) => {

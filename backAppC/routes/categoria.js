@@ -13,9 +13,8 @@ var auth  = require('../middlewares/autenticate');
     // eliminar_Categoria  
 // Rutas para el CRUD de categoria
 api.get('/categorias',auth.auth, categoriaController.obtener_Categorias);
-//api.get('/categoriasempresa',auth.auth, categoriaController.obtener_Categorias_idEmpresa);
+api.get('/categoriasempresa/:idEmpresa',auth.auth, categoriaController.obtener_Categorias_idEmpresa);
 api.get('/categorias/:id',auth.auth, categoriaController.obtener_Categoria_id);
-//api.get('/categoriasempresa/:id',auth.auth, categoriaController.obtener_Categoria_id_idempresa);
 api.post('/categorias', auth.auth, categoriaController.crear_Categoria);
 api.put('/categorias/:id',auth.auth, categoriaController.editar_Categoria);
 api.delete('/categorias/:id',auth.auth, categoriaController.eliminar_Categoria);

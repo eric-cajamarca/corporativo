@@ -12,6 +12,7 @@ const stockService = require('./stock.service');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const conteoFisicoRepository = require('../repositories/conteoFisico.repository');
+const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 
 /** Mapeo tipo frontend -> { tipoBD: 'EN'|'SA'|'AJ', esEntrada: boolean } */
 const TIPOS_MOVIMIENTO = {
@@ -483,8 +484,20 @@ exports.listarMovimientos = async (idEmpresa, filtros) => {
 /**
  * Cabeceras agrupadas para pantalla Movimientos (ingresos/salidas).
  */
-exports.listarMovimientosResumen = async (idEmpresa, query) => {
+exports.listarMovimientosResumen = async (user, query) => {
+  if (!user || !user.empresa) {
+    throw new Error('NO_AUTH');
+  }
   return withPool(async (pool) => {
+    let idEmpresa = user.empresa;
+    const rawEmpresaFiltro =
+      query && query.idEmpresa != null && String(query.idEmpresa).trim() !== ''
+        ? String(query.idEmpresa).trim()
+        : '';
+    if (rawEmpresaFiltro) {
+      await assertEmpresaAutorizada(pool, user.empresa, rawEmpresaFiltro);
+      idEmpresa = rawEmpresaFiltro;
+    }
     const fechaInicio = query.fechaInicio || query.fechaDesde || null;
     const fechaFinRaw = query.fechaFin || query.fechaHasta || null;
     const toYmd = (v) => (v ? String(v).trim().substring(0, 10) : null);
@@ -553,7 +566,7 @@ exports.obtenerStockActual = async (user, query) => {
       throw new Error('NO_PERMISO_STOCK_ACTUAL');
     }
     const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
-    const idsEmpresa = [
+    let idsEmpresa = [
       user.empresa,
       ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)
     ];
@@ -593,6 +606,18 @@ exports.obtenerStockActual = async (user, query) => {
       if (!okUb) {
         throw new Error('La ubicación no pertenece a la sucursal indicada');
       }
+    }
+    const rawEmpresaFiltro =
+      query.idEmpresa != null && String(query.idEmpresa).trim() !== ''
+        ? String(query.idEmpresa).trim()
+        : '';
+    if (rawEmpresaFiltro) {
+      const normalized = rawEmpresaFiltro.toLowerCase();
+      const encontrado = idsEmpresa.find((id) => String(id || '').toLowerCase() === normalized);
+      if (!encontrado) {
+        throw new Error('Empresa no autorizada');
+      }
+      idsEmpresa = [encontrado];
     }
     const items = await inventarioRepository.listarStockActual(pool, {
       idsEmpresa,

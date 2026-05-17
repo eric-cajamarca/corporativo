@@ -25,10 +25,15 @@ public url: any;
   // api.delete('/lote/:idLote',auth.auth, lotesController.deleted);
   // api.put('/lote/:idLote/disponible',auth.auth, lotesController.actualizarCantidadDisponible);
   
-  obtener_lotes_todos():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'lote',{
-      headers:headers,
+  obtener_lotes_todos(opciones?: { alcanceGestora?: boolean }): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    const params: Record<string, string> = {};
+    if (opciones?.alcanceGestora) {
+      params['alcance'] = 'gestora';
+    }
+    return this._http.get(this.url + 'lote', {
+      headers,
+      params,
       withCredentials: true
     });
   }

@@ -29,6 +29,63 @@ async function getBySucursal(idSucursal, idEmpresa) {
   });
 }
 
+/** Códigos de ubicación distintos en empresas autorizadas (gestora + gestionadas). */
+async function listarCodigosConsolidados(pool, idsEmpresa) {
+  const valid = (idsEmpresa || []).filter((id) => id && String(id).trim());
+  if (!valid.length) {
+    return [];
+  }
+  const request = pool.request();
+  const ph = valid
+    .map((id, i) => {
+      const p = `idEmp${i}`;
+      request.input(p, sql.UniqueIdentifier, String(id).trim());
+      return `@${p}`;
+    })
+    .join(', ');
+  const result = await request.query(`
+      SELECT DISTINCT RTRIM(LTRIM(up.codigoUbicacion)) AS codigoUbicacion
+      FROM UbicacionesPrioridad up
+      INNER JOIN Sucursal s ON s.idSucursal = up.idSucursal
+      WHERE s.idEmpresa IN (${ph})
+        AND RTRIM(LTRIM(ISNULL(up.codigoUbicacion, ''))) <> ''
+      ORDER BY codigoUbicacion
+    `);
+  return result.recordset || [];
+}
+
+/** Códigos que existen en todas las empresas indicadas (misma convención de nombres entre gestionadas). */
+async function listarCodigosInterseccion(pool, idsEmpresa) {
+  const valid = (idsEmpresa || []).filter((id) => id && String(id).trim());
+  const n = valid.length;
+  if (n === 0) {
+    return [];
+  }
+  const request = pool.request();
+  request.input('numEmpresas', sql.Int, n);
+  const ph = valid
+    .map((id, i) => {
+      const p = `idEmpInt${i}`;
+      request.input(p, sql.UniqueIdentifier, String(id).trim());
+      return `@${p}`;
+    })
+    .join(', ');
+  const result = await request.query(`
+      SELECT RTRIM(LTRIM(x.codigoUbicacion)) AS codigoUbicacion
+      FROM (
+        SELECT RTRIM(LTRIM(up.codigoUbicacion)) AS codigoUbicacion, s.idEmpresa
+        FROM UbicacionesPrioridad up
+        INNER JOIN Sucursal s ON s.idSucursal = up.idSucursal
+        WHERE s.idEmpresa IN (${ph})
+          AND RTRIM(LTRIM(ISNULL(up.codigoUbicacion, ''))) <> ''
+      ) x
+      GROUP BY RTRIM(LTRIM(x.codigoUbicacion))
+      HAVING COUNT(DISTINCT x.idEmpresa) = @numEmpresas
+      ORDER BY codigoUbicacion
+    `);
+  return result.recordset || [];
+}
+
 /**
  * Obtiene la primera ubicación de la sucursal o crea una por defecto (codigo DEF-xxx, prioridad 1).
  * Idempotente ante llamadas paralelas: si otro request ya insertó la misma ubicación, se obtiene por SELECT.
@@ -144,6 +201,8 @@ async function getByIdConEmpresa(idUbicacion) {
 module.exports = {
     getAll,
     getBySucursal,
+    listarCodigosConsolidados,
+    listarCodigosInterseccion,
     getOrCreateDefaultForSucursal,
     create,
     update,

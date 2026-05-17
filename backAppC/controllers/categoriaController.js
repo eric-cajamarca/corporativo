@@ -1,6 +1,24 @@
 const categoriaService = require('../services/categoria.service');
 const { withPool } = require('../utils/dbPool.util');
 
+const obtener_Categorias_idEmpresa = async (req, res) => {
+  if (!req.user) {
+    return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+  }
+  try {
+    const data = await withPool((pool) =>
+      categoriaService.obtenerCategoriasPorEmpresa(pool, req.user, req.params.idEmpresa)
+    );
+    res.status(200).send({ data });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS' || error.message === 'Empresa no autorizada') {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    console.error('categoria.obtener_Categorias_idEmpresa:', error);
+    res.status(500).send({ message: error.message, data: undefined });
+  }
+};
+
 const obtener_Categorias = async (req, res) => {
   if (!req.user) {
     return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
@@ -103,6 +121,7 @@ const eliminar_Categoria = async (req, res) => {
 
 module.exports = {
   obtener_Categorias,
+  obtener_Categorias_idEmpresa,
   obtener_Categoria_id,
   crear_Categoria,
   editar_Categoria,

@@ -67,8 +67,11 @@ export interface ConteoFisicoAplicarResponse {
   message: string;
   movimientosGenerados: number;
   lineasProcesadas: number;
+  empresasAfectadas?: string[];
   detalle: Array<{
     idProducto: string;
+    idEmpresaDestino?: string;
+    idSucursalDestino?: string;
     productoCodigo: string;
     stockActual: number;
     stockReal: number;

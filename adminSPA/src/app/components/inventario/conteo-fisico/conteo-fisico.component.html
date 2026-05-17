@@ -33,7 +33,33 @@
                 }
               </select>
             </div>
-            @if (mostrarOpcionUbicacionConteo) {
+            @if (mostrarOpcionUbicacionConteo && esModoGestora) {
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold">Empresa (ubicaciones)</label>
+                <select
+                  class="form-select form-select-sm"
+                  [(ngModel)]="empresaUbicacionNuevaSesion"
+                  (ngModelChange)="onEmpresaUbicacionNuevaSesionChange()">
+                  <option value="">Comunes a todas las gestionadas</option>
+                  @for (empresa of empresasGestionadas; track empresa.idEmpresa) {
+                    <option [value]="empresa.idEmpresa">{{ empresa.nombre }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold">Ubicación de conteo (por código)</label>
+                <select class="form-select form-select-sm" [(ngModel)]="codigoUbicacionNuevaSesion">
+                  <option [ngValue]="null">Toda la sucursal (stock agregado)</option>
+                  @for (cod of codigosUbicacionGestora; track cod) {
+                    <option [ngValue]="cod">{{ cod }}</option>
+                  }
+                </select>
+                <div class="form-text">
+                  Lista según la empresa elegida (solo sus ubicaciones) o códigos comunes a todas.
+                </div>
+              </div>
+            }
+            @if (mostrarOpcionUbicacionConteo && !esModoGestora) {
               <div class="col-12 col-md-4">
                 <label class="form-label small fw-semibold">Ubicación de inventario (opcional)</label>
                 <select class="form-select form-select-sm" [(ngModel)]="idUbicacionNuevaSesion">
@@ -102,12 +128,14 @@
 
     @if (sesion && esBorrador()) {
       <div class="row g-3">
-        <div class="col-12 col-lg-7">
+        <div class="col-12">
           <div class="card shadow-sm mb-3">
             <div class="card-header fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
               <span>
                 Búsqueda (stock
-                @if (sesionInventarioPorUbicacion()) {
+                @if (esModoGestora) {
+                  consolidado por empresa gestionada
+                } @else if (sesionInventarioPorUbicacion()) {
                   en la ubicación de la sesión
                 } @else {
                   actual de la sucursal (agregado)
@@ -122,22 +150,46 @@
                   <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
                 }
               </div>
+              @if (empresasGestionadas.length > 0) {
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <label class="form-label small mb-0">Empresa</label>
+                  <select
+                    class="form-select form-select-sm"
+                    [(ngModel)]="empresaFiltroSeleccionada"
+                    (ngModelChange)="onEmpresaFiltroChange()"
+                    style="width: 220px;">
+                    <option value="todas">Consolidado (gestora y empresas gestionadas)</option>
+                    @for (empresa of empresasGestionadas; track empresa.idEmpresa) {
+                      <option [value]="empresa.idEmpresa">{{ empresa.nombre }}</option>
+                    }
+                  </select>
+                  <span class="small text-muted mb-0">{{ descripcionEmpresaFiltro }}</span>
+                </div>
+              }
             </div>
             <div class="card-body">
               <label class="form-label small">Buscar producto</label>
-              <input
-                type="text"
-                class="form-control form-control-sm mb-2"
-                [(ngModel)]="buscar"
-                (input)="onBuscarInput()"
-                placeholder="Código, descripción, marca…"
-              />
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                <input
+                  type="text"
+                  class="form-control form-control-sm flex-grow-1"
+                  [(ngModel)]="buscar"
+                  (keyup.enter)="buscarCatalogo()"
+                  placeholder="Código, descripción, marca…"
+                />
+                <button type="button" class="btn btn-primary btn-sm" (click)="buscarCatalogo()" [disabled]="cargandoBusqueda">
+                  <i class="bi bi-search me-1"></i>Buscar
+                </button>
+              </div>
               <div class="table-responsive conteo-table-wrap">
                 <table class="table table-sm table-hover align-middle mb-0 conteo-stock-table">
                   <thead class="table-light">
                     <tr>
                       <th class="conteo-col-codigo">Código</th>
                       <th class="conteo-col-producto">Producto</th>
+                      @if (empresasGestionadas.length > 0) {
+                        <th class="text-start conteo-col-empresa">Empresa</th>
+                      }
                       <th class="text-end conteo-col-stock">
                         @if (sesionInventarioPorUbicacion()) {
                           Stock ubic.
@@ -145,6 +197,7 @@
                           Stock sist.
                         }
                       </th>
+                      <th class="text-end">Sin ubic.</th>
                       <th class="text-end conteo-col-stock">Stock real</th>
                       <th class="text-end conteo-col-accion"></th>
                     </tr>
@@ -160,7 +213,26 @@
                             <span class="badge bg-secondary ms-1 align-middle">Inactivo</span>
                           }
                         </td>
+                        @if (empresasGestionadas.length > 0) {
+                          <td class="align-middle conteo-col-empresa text-start">
+                            <span class="d-block text-truncate" [title]="p.aliasEmpresa || p.idEmpresa">
+                              {{ p.aliasEmpresa || '—' }}
+                            </span>
+                          </td>
+                        }
                         <td class="text-end align-middle conteo-col-stock">{{ p.stock | number : '1.0-3' }}</td>
+                        <td class="text-end align-middle conteo-col-stock">
+                          @if (tieneStockSinUbicacion(p)) {
+                            <div class="d-flex flex-column align-items-end gap-1">
+                              <span class="text-danger">{{ p.stockSinUbicacion | number : '1.0-3' }}</span>
+                              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirAsignarSinUbicar(p)">
+                                <i class="bi bi-geo"></i> Asignar
+                              </button>
+                            </div>
+                          } @else {
+                            <span class="text-muted small">—</span>
+                          }
+                        </td>
                         <td class="text-end text-nowrap align-middle conteo-col-stock">
                           @if (srLinea != null) {
                             {{ srLinea | number : '1.0-3' }}
@@ -174,7 +246,7 @@
                       </tr>
                     } @empty {
                       <tr>
-                        <td colspan="5" class="text-muted text-center py-3">Sin resultados. Escriba para buscar.</td>
+                        <td [attr.colspan]="empresasGestionadas.length > 0 ? 7 : 6" class="text-muted text-center py-3">Sin resultados. Pulse Buscar.</td>
                       </tr>
                     }
                   </tbody>
@@ -184,90 +256,6 @@
           </div>
         </div>
 
-        <div class="col-12 col-lg-5">
-          <div #detalleConteoCard id="detalleConteoCard" class="card shadow-sm border-primary mb-3 conteo-detalle-card">
-            <div class="card-header fw-semibold">Detalle del conteo</div>
-            <div class="card-body">
-              @if (!productoSeleccionado) {
-                <p class="text-muted small mb-0">Elija un producto de la tabla para registrar stock real y verificado.</p>
-              } @else {
-                <div class="mb-2">
-                  <div class="fw-semibold">{{ productoSeleccionado.descripcion }}</div>
-                  <div class="small text-muted">{{ productoSeleccionado.codigo }} · Stock en sistema: {{ productoSeleccionado.stock | number : '1.0-3' }}</div>
-                </div>
-                <div class="border rounded px-2 py-2 mb-3 bg-light">
-                  <div class="small fw-semibold text-muted mb-2">Datos del producto (opcional)</div>
-                  <div class="mb-2">
-                    <label class="form-label small mb-0">Descripción</label>
-                    <input type="text" class="form-control form-control-sm" [(ngModel)]="descripcionEdit" maxlength="200" />
-                  </div>
-                  <div class="mb-2">
-                    <div class="d-flex justify-content-between align-items-center mb-0">
-                      <label class="form-label small mb-0">Marca</label>
-                      <button type="button" class="btn btn-link btn-sm py-0 px-0 small" (click)="abrirModalCrearMarca()">
-                        Crear marca
-                      </button>
-                    </div>
-                    <select class="form-select form-select-sm" [(ngModel)]="idMarcaEdit">
-                      <option [ngValue]="null">Seleccione…</option>
-                      @for (m of marcasSelect; track m.idMarca) {
-                        <option [ngValue]="m.idMarca">{{ m.nombre }}</option>
-                      }
-                    </select>
-                  </div>
-                  <div class="row g-2">
-                    <div class="col-12 col-sm-6">
-                      <div class="d-flex justify-content-between align-items-center mb-0">
-                        <label class="form-label small mb-0">Categoría</label>
-                        <button type="button" class="btn btn-link btn-sm py-0 px-0 small" (click)="abrirModalCrearCategoria()">
-                          Crear categoría
-                        </button>
-                      </div>
-                      <select class="form-select form-select-sm" [(ngModel)]="idCategoriaEdit">
-                        <option [ngValue]="null">Seleccione…</option>
-                        @for (c of categoriasSelect; track c.idCategoria) {
-                          <option [ngValue]="c.idCategoria">{{ c.nombre }}</option>
-                        }
-                      </select>
-                    </div>
-                    <div class="col-12 col-sm-6">
-                      <label class="form-label small mb-0">Presentación</label>
-                      <select class="form-select form-select-sm" [(ngModel)]="idPresentacionEdit">
-                        <option [ngValue]="null">Seleccione…</option>
-                        @for (pr of presentacionesSelect; track pr.idPresentacion) {
-                          <option [ngValue]="pr.idPresentacion">{{ pr.label }}</option>
-                        }
-                      </select>
-                    </div>
-                  </div>
-                  <p class="small text-muted mb-0 mt-2">
-                    Si modifica descripción, marca, categoría o presentación y guarda, se actualiza el maestro del producto (requiere permiso de editar/crear productos).
-                  </p>
-                </div>
-                <div class="mb-2">
-                  <label class="form-label small mb-0">Stock real (físico)</label>
-                  <input type="number" class="form-control form-control-sm" [(ngModel)]="stockRealInput" step="0.001" />
-                </div>
-                <div class="form-check mb-1">
-                  <input class="form-check-input" type="checkbox" id="chkVerif" [(ngModel)]="verificadoInput" />
-                  <label class="form-check-label small" for="chkVerif">Verificado</label>
-                </div>
-                <p class="small text-muted mb-2">
-                  Marque <strong>Verificado</strong> cuando haya revisado físicamente el ítem. Si el stock real coincide con el del sistema, en la previsualización verá «Sin ajuste» (no se genera movimiento), pero la línea queda registrada en la sesión.
-                  Las líneas <strong>sin</strong> verificar no se incluyen al aplicar movimientos.
-                </p>
-                <div class="mb-3">
-                  <label class="form-label small mb-0">Notas</label>
-                  <input type="text" class="form-control form-control-sm" [(ngModel)]="notasInput" maxlength="500" />
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <button type="button" class="btn btn-primary btn-sm" (click)="guardarLinea()">Guardar línea</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="limpiarSeleccionProducto()">Cerrar</button>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="card shadow-sm mb-3">
@@ -403,5 +391,80 @@
         </div>
       </div>
     }
+    <ng-template #detalleConteoModal let-modal>
+      <div class="modal-header">
+        <h5 class="modal-title">Detalle del conteo</h5>
+        <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarDetalleModal()"></button>
+      </div>
+      <div class="modal-body">
+        @if (productoSeleccionado) {
+          <div class="mb-2">
+            <div class="fw-semibold">{{ productoSeleccionado.descripcion }}</div>
+            <div class="small text-muted">
+              {{ productoSeleccionado.codigo }} · {{ productoSeleccionado.aliasEmpresa || 'Empresa' }} · Stock sistema:
+              {{ productoSeleccionado.stock | number : '1.0-3' }}
+            </div>
+          </div>
+          <div class="border rounded px-2 py-2 mb-3 bg-light">
+            <div class="small fw-semibold text-muted mb-2">Datos del producto (opcional)</div>
+            <div class="mb-2">
+              <label class="form-label small mb-0">Descripción</label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="descripcionEdit" maxlength="200" />
+            </div>
+            <div class="mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-0">
+                <label class="form-label small mb-0">Marca</label>
+                <button type="button" class="btn btn-link btn-sm py-0 px-0 small" (click)="abrirModalCrearMarca()">Crear marca</button>
+              </div>
+              <select class="form-select form-select-sm" [(ngModel)]="idMarcaEdit">
+                <option [ngValue]="null">Seleccione…</option>
+                @for (m of marcasSelect; track m.idMarca) {
+                  <option [ngValue]="m.idMarca">{{ m.nombre }}</option>
+                }
+              </select>
+            </div>
+            <div class="row g-2">
+              <div class="col-12 col-sm-6">
+                <div class="d-flex justify-content-between align-items-center mb-0">
+                  <label class="form-label small mb-0">Categoría</label>
+                  <button type="button" class="btn btn-link btn-sm py-0 px-0 small" (click)="abrirModalCrearCategoria()">Crear categoría</button>
+                </div>
+                <select class="form-select form-select-sm" [(ngModel)]="idCategoriaEdit">
+                  <option [ngValue]="null">Seleccione…</option>
+                  @for (c of categoriasSelect; track c.idCategoria) {
+                    <option [ngValue]="c.idCategoria">{{ c.nombre }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-12 col-sm-6">
+                <label class="form-label small mb-0">Presentación</label>
+                <select class="form-select form-select-sm" [(ngModel)]="idPresentacionEdit">
+                  <option [ngValue]="null">Seleccione…</option>
+                  @for (pr of presentacionesSelect; track pr.idPresentacion) {
+                    <option [ngValue]="pr.idPresentacion">{{ pr.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-0">Stock real (físico)</label>
+            <input type="number" class="form-control form-control-sm" [(ngModel)]="stockRealInput" step="0.001" />
+          </div>
+          <div class="form-check mb-1">
+            <input class="form-check-input" type="checkbox" id="chkVerifModal" [(ngModel)]="verificadoInput" />
+            <label class="form-check-label small" for="chkVerifModal">Verificado</label>
+          </div>
+          <div class="mb-0">
+            <label class="form-label small mb-0">Notas</label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="notasInput" maxlength="500" />
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cerrarDetalleModal()">Cerrar</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="guardarLinea()" [disabled]="!productoSeleccionado">Guardar línea</button>
+      </div>
+    </ng-template>
   </div>
 </main>

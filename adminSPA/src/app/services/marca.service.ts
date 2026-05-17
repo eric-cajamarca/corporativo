@@ -28,5 +28,17 @@ export class MarcaService {
       withCredentials: true
     });
   }
+
+  obtener_marcas_idEmpresa(idEmpresa: string): Observable<any> {
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': ''
+    });
+
+    return this._http.get(this.url + 'marcasempresa/' + encodeURIComponent(idEmpresa), {
+      headers,
+      withCredentials: true
+    });
+  }
 }
 

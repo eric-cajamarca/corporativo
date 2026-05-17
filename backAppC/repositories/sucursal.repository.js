@@ -23,6 +23,15 @@ async function listarResumenPorEmpresa(pool, idEmpresa, soloActivas = true, idsS
   return result.recordset;
 }
 
+async function obtenerEmpresaPorSucursal(pool, idSucursal) {
+  const result = await pool
+    .request()
+    .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+    .query('SELECT TOP 1 idEmpresa FROM Sucursal WHERE idSucursal = @idSucursal');
+  const row = result.recordset && result.recordset[0];
+  return row && row.idEmpresa != null ? row.idEmpresa : null;
+}
+
 async function obtenerSucursalPorId(pool, idEmpresa, idSucursal) {
   const result = await pool
     .request()
@@ -240,6 +249,7 @@ module.exports = {
   obtenerSucursalDefectoComprobantes,
   obtenerIdSucursalDeLote,
   obtenerSucursalPorId,
+  obtenerEmpresaPorSucursal,
   existeSucursalEnEmpresa,
   quitarPrincipalTodas,
   marcarSucursalPrincipal,

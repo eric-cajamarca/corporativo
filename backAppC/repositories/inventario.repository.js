@@ -534,6 +534,23 @@ exports.listarStockActual = async (pool, opts) => {
     ) stk ON stk.idProducto = p.idProducto AND stk.idEmpresa = p.idEmpresa
   `;
 
+  const assignedJoin = `
+    LEFT JOIN (
+      SELECT l.idEmpresa, l.idProducto, CAST(COALESCE(SUM(lu.cantidad), 0) AS DECIMAL(18, 3)) AS asignado
+      FROM LotesUbicacion lu
+      INNER JOIN Lotes l ON l.idLote = lu.idLote
+      WHERE l.idEmpresa IN (${inClause})
+        ${whereSucursal}
+      GROUP BY l.idEmpresa, l.idProducto
+    ) asg ON asg.idProducto = p.idProducto AND asg.idEmpresa = p.idEmpresa
+  `;
+
+  const stockSinUbicacionExpr = usarStockPorUbicacion
+    ? 'CAST(0 AS DECIMAL(18, 3))'
+    : `CAST(CASE WHEN COALESCE(stk.stock, 0) - COALESCE(asg.asignado, 0) > 0
+                 THEN COALESCE(stk.stock, 0) - COALESCE(asg.asignado, 0)
+                 ELSE 0 END AS DECIMAL(18, 3))`;
+
   const result = await request.query(`
     SELECT
       p.idProducto,
@@ -551,13 +568,15 @@ exports.listarStockActual = async (pool, opts) => {
       CAST(p.alertaMinimo AS DECIMAL(18, 2)) AS alertaMinimo,
       ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa,
       CAST(COALESCE(stk.stock, 0) * p.cUnitario AS DECIMAL(18, 6)) AS valorizado,
+      ${stockSinUbicacionExpr} AS stockSinUbicacion,
       p.estado AS estado
     FROM Productos p
-    INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
-    LEFT JOIN Marcas m ON p.idMarca = m.idMarca
+    INNER JOIN Categorias c ON p.idCategoria = c.idCategoria AND c.idEmpresa = p.idEmpresa
+    LEFT JOIN Marcas m ON m.idMarca = p.idMarca AND m.idEmpresa = p.idEmpresa
     INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
     INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
     ${stkJoin}
+    ${assignedJoin}
     WHERE p.idEmpresa IN (${inClause})
       AND (${whereEstado})
       ${whereCat}
@@ -586,6 +605,39 @@ exports.obtenerStockAgregadoProductoSucursal = async (conn, idEmpresa, idSucursa
     `);
   const row = r.recordset && r.recordset[0];
   return row ? Number(row.stock) || 0 : 0;
+};
+
+/** Stock total del producto en todas las sucursales de la empresa (conteo gestora sin sucursal fija). */
+exports.obtenerStockAgregadoProductoEmpresa = async (conn, idEmpresa, idProducto) => {
+  const r = await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT CAST(COALESCE(SUM(l.cantidadDisponible), 0) AS DECIMAL(18, 3)) AS stock
+      FROM Lotes l
+      WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto
+    `);
+  const row = r.recordset && r.recordset[0];
+  return row ? Number(row.stock) || 0 : 0;
+};
+
+/** Sucursal con stock del producto (para conteo gestora multiempresa). */
+exports.obtenerSucursalConStockProducto = async (conn, idEmpresa, idProducto) => {
+  const r = await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT TOP 1 l.idSucursal
+      FROM Lotes l
+      WHERE l.idEmpresa = @idEmpresa
+        AND l.idProducto = @idProducto
+        AND l.cantidadDisponible > 0
+      ORDER BY l.fechaIngreso DESC
+    `);
+  const row = r.recordset && r.recordset[0];
+  return row && row.idSucursal != null ? row.idSucursal : null;
 };
 
 /**

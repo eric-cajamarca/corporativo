@@ -107,6 +107,8 @@ export class MovimientoInventarioService {
     fechaDesde?: string | null;
     fechaHasta?: string | null;
     idSucursal?: string | null;
+    /** Empresa gestionada (gestora): movimientos se registran en la empresa del producto. */
+    idEmpresa?: string | null;
     codigoTipo?: string | null;
     buscar?: string | null;
     page?: number;
@@ -116,6 +118,7 @@ export class MovimientoInventarioService {
     if (filtros.fechaDesde) params = params.set('fechaDesde', filtros.fechaDesde);
     if (filtros.fechaHasta) params = params.set('fechaHasta', filtros.fechaHasta);
     if (filtros.idSucursal) params = params.set('idSucursal', filtros.idSucursal);
+    if (filtros.idEmpresa?.trim()) params = params.set('idEmpresa', filtros.idEmpresa.trim());
     if (filtros.codigoTipo?.trim()) params = params.set('codigoTipo', filtros.codigoTipo.trim());
     if (filtros.buscar?.trim()) params = params.set('buscar', filtros.buscar.trim());
     if (filtros.page != null) params = params.set('page', String(filtros.page));
@@ -204,6 +207,8 @@ export class MovimientoInventarioService {
     buscar?: string | null;
     /** Catálogo conteo físico: incluye productos inactivos (mismo permiso que stock actual). */
     catalogoConteoFisico?: boolean;
+    /** Empresa específica (gestora con empresas gestionadas). */
+    idEmpresa?: string | null;
   }): Observable<StockActualResponse> {
     let hp = new HttpParams();
     if (params.idSucursal) hp = hp.set('idSucursal', params.idSucursal);
@@ -215,6 +220,7 @@ export class MovimientoInventarioService {
     if (params.filtroStock) hp = hp.set('filtroStock', params.filtroStock);
     if (params.buscar?.trim()) hp = hp.set('buscar', params.buscar.trim());
     if (params.catalogoConteoFisico) hp = hp.set('catalogoConteoFisico', '1');
+    if (params.idEmpresa?.trim()) hp = hp.set('idEmpresa', params.idEmpresa.trim());
     return this.http.get<StockActualResponse>(this.baseUrl + 'stock-actual', {
       params: hp,
       withCredentials: true

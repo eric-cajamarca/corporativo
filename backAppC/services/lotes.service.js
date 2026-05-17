@@ -1,7 +1,16 @@
 const lotesRepository = require('../repositories/lotes.repository');
+const { withPool } = require('../utils/dbPool.util');
+const { idsEmpresaGestoraConsolidados } = require('../utils/empresaGestora.util');
 
 async function getAll(idEmpresa) {
-        return await lotesRepository.getAll(idEmpresa);
+  return await lotesRepository.getAll(idEmpresa);
+}
+
+async function getAllConsolidadoGestora(idEmpresaJwt) {
+  return withPool(async (pool) => {
+    const ids = await idsEmpresaGestoraConsolidados(pool, idEmpresaJwt);
+    return lotesRepository.getAllPorEmpresas(ids);
+  });
 }
 
 async function getById(idLote) {
@@ -40,6 +49,7 @@ async function actualizarCantidadDisponible(idLote, cantidad, tipo) {
 
 module.exports = {
     getAll,
+    getAllConsolidadoGestora,
     getById,
     getBySucursal,
     create,

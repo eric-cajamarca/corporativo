@@ -39,6 +39,24 @@ export class UbicacionPrioridadService {
     });
   }
 
+  obtener_codigos_ubicacion_consolidados(opciones?: {
+    idEmpresa?: string | null;
+    modo?: 'interseccion' | 'union';
+  }): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    const params: Record<string, string> = {};
+    if (opciones?.idEmpresa?.trim()) {
+      params['idEmpresa'] = opciones.idEmpresa.trim();
+    } else if (opciones?.modo === 'union') {
+      params['modo'] = 'union';
+    }
+    return this._http.get(this.url + 'ubicaciones-prioridad/codigos-consolidados', {
+      headers,
+      params,
+      withCredentials: true
+    });
+  }
+
   crear_ubicacionPrioridad(ubicacionPrioridadData:any):Observable<any>{
     let params = JSON.stringify(ubicacionPrioridadData);
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
