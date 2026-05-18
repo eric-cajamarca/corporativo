@@ -27,6 +27,7 @@ import {
   ConteoFisicoPreviewFila,
   InventarioFisicoLineaDto,
   InventarioFisicoSesionDto,
+  InventarioFisicoSesionResumenDto,
   TipoConteoFisico
 } from '../../../models/conteo-fisico.model';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
@@ -108,6 +109,10 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   cargandoPreview = false;
   aplicando = false;
 
+  /** Borradores con líneas guardadas (movimientos aún no aplicados). */
+  sesionesPendientes: InventarioFisicoSesionResumenDto[] = [];
+  cargandoSesionesPendientes = false;
+
   tiposConteo: { id: TipoConteoFisico; label: string }[] = [
     { id: 'INICIAL', label: 'Inventario inicial' },
     { id: 'MENSUAL', label: 'Inventario mensual' }
@@ -117,6 +122,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     this.cargarSucursales();
     this.cargarOpcionUbicacionConteo();
     this.cargarEmpresasGestionadas();
+    this.cargarSesionesPendientes();
     const inicial = this.route.snapshot.queryParamMap.get('idSesion');
     if (inicial) {
       this.idSesionEnCurso = inicial;
@@ -134,8 +140,55 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
         this.limpiarSeleccionProducto();
         this.previewCargado = false;
         this.previewFilas = [];
+        this.cargarSesionesPendientes();
       }
     });
+  }
+
+  cargarSesionesPendientes(): void {
+    this.cargandoSesionesPendientes = true;
+    this.conteoService.listarSesionesPendientes(true).subscribe({
+      next: (res) => {
+        const lista = Array.isArray(res?.sesiones) ? res.sesiones : [];
+        const actual = this.idSesionEnCurso?.trim().toLowerCase();
+        this.sesionesPendientes = actual
+          ? lista.filter((s) => String(s.idSesion).toLowerCase() !== actual)
+          : lista;
+        this.cargandoSesionesPendientes = false;
+      },
+      error: () => {
+        this.sesionesPendientes = [];
+        this.cargandoSesionesPendientes = false;
+      }
+    });
+  }
+
+  continuarSesionPendiente(idSesion: string): void {
+    if (!idSesion?.trim()) {
+      return;
+    }
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { idSesion: idSesion.trim() },
+      replaceUrl: true
+    });
+  }
+
+  etiquetaTipoConteo(tipo: string): string {
+    const t = String(tipo || '').toUpperCase();
+    return this.tiposConteo.find((x) => x.id === t)?.label || t;
+  }
+
+  etiquetaUbicacionResumen(s: InventarioFisicoSesionResumenDto): string | null {
+    const cod = String(s.codigoUbicacionInventario ?? '').trim();
+    if (cod) {
+      return cod;
+    }
+    const u = s.idUbicacionInventario;
+    if (u != null && Number(u) > 0) {
+      return `#${u}`;
+    }
+    return null;
   }
 
   ngOnDestroy(): void {
@@ -506,6 +559,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
 
   nuevaSesionDesdeCabecera(): void {
     this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    this.cargarSesionesPendientes();
   }
 
   esBorrador(): boolean {
@@ -849,6 +903,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
           timeout: 8000
         });
         this.cargarSesion(this.idSesionEnCurso!);
+        this.cargarSesionesPendientes();
       },
       error: (err) => {
         this.aplicando = false;

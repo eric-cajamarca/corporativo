@@ -19,6 +19,63 @@
       </div>
     </div>
 
+    @if (!idSesionEnCurso && (cargandoSesionesPendientes || sesionesPendientes.length > 0)) {
+      <div class="card shadow-sm mb-3 border-warning">
+        <div class="card-header fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span><i class="bi bi-arrow-counterclockwise me-1"></i> Recuperar conteo pendiente</span>
+          @if (cargandoSesionesPendientes) {
+            <span class="spinner-border spinner-border-sm text-warning" role="status"></span>
+          }
+        </div>
+        <div class="card-body p-0">
+          <p class="small text-muted px-3 pt-3 mb-2">
+            Sesiones en borrador con líneas guardadas y <strong>movimientos aún no aplicados</strong>. Continúe el conteo,
+            revise la previsualización y pulse «Registrar movimientos y cerrar».
+          </p>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Sucursal</th>
+                  <th>Tipo</th>
+                  <th>Creada</th>
+                  <th class="text-center">Líneas</th>
+                  <th class="text-center">Verif.</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (sp of sesionesPendientes; track sp.idSesion) {
+                  <tr>
+                    <td>
+                      <div class="fw-semibold small">{{ sp.nombreSucursal }}</div>
+                      @if (etiquetaUbicacionResumen(sp)) {
+                        <div class="text-muted" style="font-size: 0.75rem;">Ubic.: {{ etiquetaUbicacionResumen(sp) }}</div>
+                      }
+                      @if (sp.observaciones) {
+                        <div class="text-muted text-truncate" style="font-size: 0.75rem; max-width: 14rem;" [title]="sp.observaciones">
+                          {{ sp.observaciones }}
+                        </div>
+                      }
+                    </td>
+                    <td class="small">{{ etiquetaTipoConteo(sp.tipoConteo) }}</td>
+                    <td class="small text-nowrap">{{ sp.fCreacion }}</td>
+                    <td class="text-center">{{ sp.cantidadLineas }}</td>
+                    <td class="text-center">{{ sp.lineasVerificadas }}</td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-warning" (click)="continuarSesionPendiente(sp.idSesion)">
+                        Continuar
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
     @if (!idSesionEnCurso) {
       <div class="card shadow-sm mb-3">
         <div class="card-header fw-semibold">Nueva sesión de conteo</div>
@@ -182,7 +239,7 @@
                 </button>
               </div>
               <div class="table-responsive conteo-table-wrap">
-                <table class="table table-sm table-hover align-middle mb-0 conteo-stock-table">
+                <table class="table table-sm table-hover align-middle mb-0 conteo-stock-table conteo-stock-table-mobile">
                   <thead class="table-light">
                     <tr>
                       <th class="conteo-col-codigo">Código</th>
@@ -206,24 +263,26 @@
                     @for (p of resultados; track trackProducto($index, p)) {
                       @let srLinea = stockRealLineaEnBusqueda(p);
                       <tr [class.table-active]="productoSeleccionado?.idProducto === p.idProducto">
-                        <td class="text-nowrap align-middle conteo-col-codigo">{{ p.codigo }}</td>
-                        <td class="align-middle conteo-col-producto">
+                        <td class="text-nowrap align-middle conteo-col-codigo" data-label="Código">{{ p.codigo }}</td>
+                        <td class="align-middle conteo-col-producto" data-label="Producto">
                           <div class="product-desc-clip" [title]="p.descripcion">{{ p.descripcion }}</div>
                           @if (productoCatalogoInactivo(p)) {
-                            <span class="badge bg-secondary ms-1 align-middle">Inactivo</span>
+                            <span class="badge bg-secondary mt-1 align-middle">Inactivo</span>
                           }
                         </td>
                         @if (empresasGestionadas.length > 0) {
-                          <td class="align-middle conteo-col-empresa text-start">
-                            <span class="d-block text-truncate" [title]="p.aliasEmpresa || p.idEmpresa">
+                          <td class="align-middle conteo-col-empresa text-start" data-label="Empresa">
+                            <span class="conteo-empresa-valor" [title]="p.aliasEmpresa || p.idEmpresa">
                               {{ p.aliasEmpresa || '—' }}
                             </span>
                           </td>
                         }
-                        <td class="text-end align-middle conteo-col-stock">{{ p.stock | number : '1.0-3' }}</td>
-                        <td class="text-end align-middle conteo-col-stock">
+                        <td class="text-end align-middle conteo-col-stock" [attr.data-label]="sesionInventarioPorUbicacion() ? 'Stock ubic.' : 'Stock sist.'">
+                          {{ p.stock | number : '1.0-3' }}
+                        </td>
+                        <td class="text-end align-middle conteo-col-sin-ubic" data-label="Sin ubic.">
                           @if (tieneStockSinUbicacion(p)) {
-                            <div class="d-flex flex-column align-items-end gap-1">
+                            <div class="conteo-sin-ubic-valor d-flex flex-column align-items-end gap-1 ms-auto">
                               <span class="text-danger">{{ p.stockSinUbicacion | number : '1.0-3' }}</span>
                               <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirAsignarSinUbicar(p)">
                                 <i class="bi bi-geo"></i> Asignar
@@ -233,20 +292,20 @@
                             <span class="text-muted small">—</span>
                           }
                         </td>
-                        <td class="text-end text-nowrap align-middle conteo-col-stock">
+                        <td class="text-end text-nowrap align-middle conteo-col-stock" data-label="Stock real">
                           @if (srLinea != null) {
                             {{ srLinea | number : '1.0-3' }}
                           } @else {
                             <span class="text-muted small">—</span>
                           }
                         </td>
-                        <td class="text-end align-middle conteo-col-accion">
-                          <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirProducto(p)">Elegir</button>
+                        <td class="text-end align-middle conteo-col-accion" data-label="">
+                          <button type="button" class="btn btn-sm btn-outline-primary w-100" (click)="elegirProducto(p)">Elegir</button>
                         </td>
                       </tr>
                     } @empty {
                       <tr>
-                        <td [attr.colspan]="empresasGestionadas.length > 0 ? 7 : 6" class="text-muted text-center py-3">Sin resultados. Pulse Buscar.</td>
+                        <td [attr.colspan]="empresasGestionadas.length > 0 ? 7 : 6" class="text-muted text-center py-3 conteo-busqueda-empty">Sin resultados. Pulse Buscar.</td>
                       </tr>
                     }
                   </tbody>

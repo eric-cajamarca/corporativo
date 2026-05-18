@@ -247,10 +247,23 @@ const eliminar_borrador_compras_empresa = async (req, res, next) => {
 
 // --- Correlativos ---
 
+const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
+const { withPool } = require('../utils/dbPool.util');
+
 const obtener_correlativos_empresa = async (req, res, next) => {
-    const idEmpresa = req.user?.empresa;
-    if (!idEmpresa) {
+    const idEmpresaJwt = req.user?.empresa;
+    if (!idEmpresaJwt) {
         return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    let idEmpresa = idEmpresaJwt;
+    const dest = req.query?.idEmpresaDestino != null ? String(req.query.idEmpresaDestino).trim() : '';
+    if (dest) {
+        try {
+            await withPool((pool) => assertEmpresaAutorizada(pool, idEmpresaJwt, dest));
+            idEmpresa = dest;
+        } catch (e) {
+            return res.status(403).send({ message: 'Empresa no autorizada', data: undefined });
+        }
     }
     try {
         const data = await comprasService.listarCorrelativos(idEmpresa);

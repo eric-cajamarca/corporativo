@@ -33,11 +33,17 @@ async function obtenerMarcaPorId(pool, user, idMarca) {
 
 async function crearMarca(pool, user, body) {
   asegurarUsuario(user);
-  const { nombre, descripcion, contacto, paginaWeb } = body || {};
+  const { nombre, descripcion, contacto, paginaWeb, idEmpresaDestino } = body || {};
   if (!nombre || String(nombre).trim() === '') {
     throw new Error('nombre es requerido');
   }
-  return marcaRepository.insertar(pool, user.empresa, {
+  let idEmpresa = user.empresa;
+  const dest = idEmpresaDestino != null ? String(idEmpresaDestino).trim() : '';
+  if (dest) {
+    await assertEmpresaAutorizada(pool, user.empresa, dest);
+    idEmpresa = dest;
+  }
+  return marcaRepository.insertar(pool, idEmpresa, {
     nombre: String(nombre).trim(),
     descripcion: descripcion != null ? String(descripcion) : '',
     contacto: contacto != null ? String(contacto) : '',

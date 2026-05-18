@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs';
@@ -36,9 +36,13 @@ export class PreciosService {
   }
 
   //api.get('/lista_precios_empresa',auth.auth, preciosVController.obtener_listas_precio_empresa);
-  listar_listas_precios_empresa():Observable<any>{
+  listar_listas_precios_empresa(idEmpresaDestino?: string): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'lista_precios_empresa',{withCredentials:true,headers:headers});
+    let params = new HttpParams();
+    if (idEmpresaDestino?.trim()) {
+      params = params.set('idEmpresaDestino', idEmpresaDestino.trim());
+    }
+    return this._http.get(this.url + 'lista_precios_empresa', { withCredentials: true, headers, params });
   }
 
   listar_precios_producto(productoId:any):Observable<any>{

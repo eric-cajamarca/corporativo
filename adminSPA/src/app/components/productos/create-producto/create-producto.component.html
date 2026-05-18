@@ -53,6 +53,24 @@
     } @else {
     <form [formGroup]="productoForm">
       @if (activeTab() === 'basico') {
+        @if (esModoGestora) {
+          <div class="mb-3 pb-2 border-bottom">
+            <label class="form-label fw-semibold small mb-1">Empresa <span class="text-danger">*</span></label>
+            <select
+              class="form-select form-select-sm"
+              [(ngModel)]="idEmpresaSeleccionada"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="onEmpresaSeleccionadaChange()">
+              <option value="">Seleccione empresa…</option>
+              @for (emp of empresasGestionadas; track emp.idEmpresa) {
+                <option [value]="emp.idEmpresa">{{ emp.nombre }}</option>
+              }
+            </select>
+            <div class="form-text small text-muted mb-0">
+              Categorías, marcas y el producto nuevo se registrarán en la empresa elegida.
+            </div>
+          </div>
+        }
         <div class="mb-3">
           <label class="form-label text-muted small mb-1">
             <i class="fas fa-copy me-1"></i> Copiar datos de producto existente (opcional)
@@ -62,6 +80,7 @@
               <span class="input-group-text"><i class="bi bi-search"></i></span>
               <input type="text" class="form-control" [(ngModel)]="textoBusqueda" [ngModelOptions]="{standalone: true}"
                 placeholder="Buscar producto por descripción, código, categoría o marca..."
+                [disabled]="esModoGestora && !idEmpresaSeleccionada"
                 (input)="buscarProductoBase()" (blur)="cerrarResultadosBusqueda()">
               @if (buscandoProducto) {
                 <span class="input-group-text"><span class="spinner-border spinner-border-sm"></span></span>

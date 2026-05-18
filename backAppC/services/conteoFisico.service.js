@@ -284,6 +284,19 @@ exports.obtenerSesion = async (idEmpresa, idSesion) => {
 };
 
 /**
+ * Sesiones en borrador recuperables (con líneas guardadas y movimientos aún no aplicados).
+ */
+exports.listarSesionesPendientes = async (idEmpresa, opciones = {}) => {
+  if (!idEmpresa) {
+    throw new Error('Empresa no identificada');
+  }
+  const soloConLineas = opciones.soloConLineas !== false;
+  return withPool((pool) =>
+    conteoFisicoRepository.listarSesionesBorrador(pool, idEmpresa, { soloConLineas })
+  );
+};
+
+/**
  * Previsualización: stock al instante y delta que se aplicaría (solo líneas verificadas con stockReal).
  */
 exports.previsualizarAplicacion = async (idEmpresa, idSesion) => {

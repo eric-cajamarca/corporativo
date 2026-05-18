@@ -36,6 +36,38 @@ exports.insertarSesion = async (transaction, datos) => {
     `);
 };
 
+/**
+ * Sesiones en borrador (p. ej. sin aplicar movimientos), con conteo de líneas.
+ * @param {{ soloConLineas?: boolean }} opciones — si true (default), solo sesiones con al menos una línea.
+ */
+exports.listarSesionesBorrador = async (conn, idEmpresa, opciones = {}) => {
+  const soloConLineas = opciones.soloConLineas !== false;
+  const havingSql = soloConLineas ? 'HAVING COUNT(l.idLinea) > 0' : '';
+  const r = await conn.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
+      SELECT s.idSesion, s.idEmpresa, s.idSucursal, sc.nombre AS nombreSucursal,
+             s.tipoConteo, s.estado, s.observaciones,
+             CONVERT(VARCHAR(19), s.fCreacion, 120) AS fCreacion,
+             s.idUbicacionInventario,
+             RTRIM(LTRIM(COALESCE(NULLIF(s.codigoUbicacionInventario, ''), up.codigoUbicacion, ''))) AS codigoUbicacionInventario,
+             COUNT(l.idLinea) AS cantidadLineas,
+             SUM(CASE WHEN l.verificado = 1 AND l.stockReal IS NOT NULL THEN 1 ELSE 0 END) AS lineasVerificadas
+      FROM InventarioFisicoSesion s
+      INNER JOIN Sucursal sc ON sc.idSucursal = s.idSucursal AND sc.idEmpresa = s.idEmpresa
+      LEFT JOIN UbicacionesPrioridad up ON up.idUbicacion = s.idUbicacionInventario AND up.idSucursal = s.idSucursal
+      LEFT JOIN InventarioFisicoLinea l ON l.idSesion = s.idSesion
+      WHERE s.idEmpresa = @idEmpresa AND s.estado = 'BORRADOR'
+      GROUP BY s.idSesion, s.idEmpresa, s.idSucursal, sc.nombre, s.tipoConteo, s.estado, s.observaciones,
+               s.fCreacion, s.idUbicacionInventario, s.codigoUbicacionInventario, up.codigoUbicacion
+      ${havingSql}
+      ORDER BY s.fCreacion DESC
+    `);
+  return (r.recordset || []).map((row) => ({
+    ...row,
+    cantidadLineas: Number(row.cantidadLineas) || 0,
+    lineasVerificadas: Number(row.lineasVerificadas) || 0
+  }));
+};
+
 exports.obtenerSesionPorId = async (conn, idEmpresa, idSesion) => {
   const r = await conn.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)

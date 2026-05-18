@@ -56,6 +56,19 @@ export class SucursalService {
     });
   }
 
+  /** Empresa gestora: sucursales de la empresa gestionada indicada. */
+  obtener_sucursales_por_empresa(idEmpresa: string, incluirInactivas = false): Observable<ApiResponse<Sucursal[]>> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let params = new HttpParams();
+    if (incluirInactivas) {
+      params = params.set('incluirInactivas', 'true');
+    }
+    return this._http.get<ApiResponse<Sucursal[]>>(
+      this.url + 'sucursalempresa/' + encodeURIComponent(idEmpresa),
+      { headers, params, withCredentials: true }
+    );
+  }
+
   obtener_sucursal_idempresa1(incluirInactivas = false): Observable<ApiResponse<Sucursal[]>> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
     let params = new HttpParams();

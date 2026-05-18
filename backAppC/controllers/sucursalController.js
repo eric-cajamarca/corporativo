@@ -31,6 +31,29 @@ const obtener_sucursal_idempresa = async (req, res) => {
   }
 };
 
+const obtener_sucursal_por_empresa_destino = async (req, res) => {
+  try {
+    const data = await withPool((pool) =>
+      sucursalService.obtenerSucursalesPorEmpresaDestino(
+        pool,
+        req.user,
+        req.params.idEmpresa,
+        { incluirInactivas: incluirInactivasDesdeQuery(req) }
+      )
+    );
+    res.status(200).send({ data });
+  } catch (error) {
+    if (sinPermisoSucursal(error.message)) {
+      return res.status(200).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    if (error.message === E.NO_ACCESS || error.message === E.FALTA_EMPRESA || error.message === 'Empresa no autorizada') {
+      return res.status(403).send({ message: 'No autorizado', data: undefined });
+    }
+    console.error('obtener_sucursal_por_empresa_destino:', error);
+    res.status(500).send({ message: 'Error al obtener las sucursales', data: undefined });
+  }
+};
+
 const obtener_sucursal_todos = async (req, res) => {
   try {
     const data = await withPool((pool) =>
@@ -262,6 +285,7 @@ const eliminar_stock_sucursal = async (req, res) => {
 
 module.exports = {
   obtener_sucursal_idempresa,
+  obtener_sucursal_por_empresa_destino,
   obtener_sucursal_todos,
   establecer_sucursal_principal,
   editar_sucursal_idEmpresa,

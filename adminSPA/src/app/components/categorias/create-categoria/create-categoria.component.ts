@@ -22,7 +22,8 @@ export class CreateCategoriaComponent {
   
   public btn_registrar = false;
   esModal = false;
-
+  /** Empresa gestora: crear categoría en empresa gestionada. */
+  idEmpresaDestino = '';
 
   constructor(
     private _categoriaService: CategoriaService,
@@ -37,7 +38,11 @@ export class CreateCategoriaComponent {
   }
 
   registrar(_registroForm: unknown): void {
-    this._categoriaService.crear_categoria(this.categorias).subscribe({
+    const payload = { ...this.categorias };
+    if (this.idEmpresaDestino?.trim()) {
+      payload.idEmpresaDestino = this.idEmpresaDestino.trim();
+    }
+    this._categoriaService.crear_categoria(payload).subscribe({
       next: (response: { data?: { idCategoria?: number; IdCategoria?: number } }) => {
         const raw = response?.data ?? response;
         const idCategoria =

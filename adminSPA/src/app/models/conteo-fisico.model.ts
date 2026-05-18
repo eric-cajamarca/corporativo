@@ -1,6 +1,25 @@
 export type EstadoSesionConteo = 'BORRADOR' | 'CERRADO';
 export type TipoConteoFisico = 'INICIAL' | 'MENSUAL';
 
+/** Resumen para listar sesiones en borrador (recuperar conteo sin aplicar). */
+export interface InventarioFisicoSesionResumenDto {
+  idSesion: string;
+  idSucursal: string;
+  nombreSucursal: string;
+  tipoConteo: TipoConteoFisico;
+  estado: EstadoSesionConteo;
+  observaciones: string | null;
+  fCreacion: string;
+  idUbicacionInventario?: number | null;
+  codigoUbicacionInventario?: string | null;
+  cantidadLineas: number;
+  lineasVerificadas: number;
+}
+
+export interface ConteoFisicoListarSesionesResponse {
+  sesiones: InventarioFisicoSesionResumenDto[];
+}
+
 export interface InventarioFisicoSesionDto {
   idSesion: string;
   idEmpresa: string;

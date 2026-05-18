@@ -107,6 +107,10 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   /** true cuando se abre como modal (desde ProductoCrearModalService) */
   esModal = false;
 
+  /** Empresa gestora: empresas gestionadas para selector y catálogos por empresa. */
+  empresasGestionadas: Array<{ idEmpresa: string; nombre: string }> = [];
+  idEmpresaSeleccionada = '';
+
   /** Galería: activa si la empresa tiene productos con imágenes */
   productosConImagenes = false;
   /** Tras crear producto, id para subir imágenes */
@@ -141,9 +145,13 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     }
   }
 
+  get esModoGestora(): boolean {
+    return this.empresasGestionadas.length > 0;
+  }
+
   ngOnInit(): void {
     this.initForm();
-    this.cargarDatos();
+    this.cargarEmpresasGestionadas();
     this.productoForm.get('useCorrelativo')?.valueChanges.subscribe(() => {
       this.onCheckboxChangeCorrelativo();
     });
@@ -184,10 +192,67 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     });
   }
 
+  private cargarEmpresasGestionadas(): void {
+    this.gestoresService.obtenerEmpresasGestionadas().subscribe({
+      next: (res) => {
+        const arr = Array.isArray(res?.data) ? res.data : [];
+        const dedupe = new Map<string, { idEmpresa: string; nombre: string }>();
+        arr.forEach((e: { idEmpresa?: string; nombreComercial?: string; razon_Social?: string; ruc?: string }) => {
+          const id = String(e?.idEmpresa || '').trim();
+          if (!id) return;
+          const nombre = String(e?.nombreComercial || e?.razon_Social || e?.ruc || '').trim() || 'Empresa';
+          const key = id.toLowerCase();
+          if (!dedupe.has(key)) {
+            dedupe.set(key, { idEmpresa: id, nombre });
+          }
+        });
+        this.empresasGestionadas = Array.from(dedupe.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+        if (this.esModoGestora) {
+          this.idEmpresaSeleccionada = this.empresasGestionadas[0]?.idEmpresa || '';
+        }
+        this.cargarDatos();
+      },
+      error: () => {
+        this.empresasGestionadas = [];
+        this.cargarDatos();
+      }
+    });
+  }
+
+  onEmpresaSeleccionadaChange(): void {
+    if (!this.esModoGestora) return;
+    this.textoBusqueda = '';
+    this.resultadosBusqueda = [];
+    this.mostrarResultados = false;
+    this.productoForm.patchValue({
+      idCategoria: '',
+      idMarca: ''
+    });
+    this.cargarDatos();
+  }
+
+  private idEmpresaCatalogoActual(): string | undefined {
+    if (this.esModoGestora) {
+      const id = String(this.idEmpresaSeleccionada || '').trim();
+      return id || undefined;
+    }
+    return undefined;
+  }
+
   private cargarDatos(): void {
+    if (this.esModoGestora && !this.idEmpresaSeleccionada) {
+      this.categorias = [];
+      this.marcas = [];
+      this.sucursales = [];
+      this.listasPrecio = [];
+      this.cargandoDatos.set(false);
+      return;
+    }
+
     this.cargandoDatos.set(true);
     let completados = 0;
     const total = 6;
+    const idEmpresa = this.idEmpresaCatalogoActual();
 
     const verificarCompletado = () => {
       completados++;
@@ -196,8 +261,10 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       }
     };
 
-    // Cargar categorías
-    this.categoriaService.obtener_categorias().subscribe({
+    const obsCategorias = idEmpresa
+      ? this.categoriaService.obtener_categorias_idEmpresa(idEmpresa)
+      : this.categoriaService.obtener_categorias();
+    obsCategorias.subscribe({
       next: (response) => {
         this.categorias = response.data || [];
         verificarCompletado();
@@ -205,8 +272,10 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       error: () => verificarCompletado()
     });
 
-    // Cargar marcas
-    this.marcaService.obtener_marcas().subscribe({
+    const obsMarcas = idEmpresa
+      ? this.marcaService.obtener_marcas_idEmpresa(idEmpresa)
+      : this.marcaService.obtener_marcas();
+    obsMarcas.subscribe({
       next: (response) => {
         this.marcas = response.data || [];
         verificarCompletado();
@@ -245,8 +314,10 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       error: () => verificarCompletado()
     });
 
-    // Cargar sucursales
-    this.sucursalService.obtener_sucursal_todos().subscribe({
+    const obsSucursales = idEmpresa
+      ? this.sucursalService.obtener_sucursales_por_empresa(idEmpresa)
+      : this.sucursalService.obtener_sucursal_todos();
+    obsSucursales.subscribe({
       next: (response: { data?: Sucursal[] }) => {
         this.sucursales = response.data || [];
         if (this.sucursales.length > 0) {
@@ -257,8 +328,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       error: () => verificarCompletado()
     });
 
-    // Cargar listas de precios
-    this.preciosService.listar_listas_precios_empresa().subscribe({
+    this.preciosService.listar_listas_precios_empresa(idEmpresa).subscribe({
       next: (response) => {
         this.listasPrecio = response?.data || [];
         const principal = this.listasPrecio.find((l: any) => l.principal === true || l.principal === 1);
@@ -271,8 +341,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       error: () => verificarCompletado()
     });
 
-    // Cargar correlativo de productos
-    this.comprasService.obtener_correlativo_empresa().subscribe({
+    this.comprasService.obtener_correlativo_empresa(idEmpresa).subscribe({
       next: (res) => {
         const data = res?.data;
         this.correlativo = data && typeof data === 'object' ? data : this.correlativo;
@@ -295,6 +364,15 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   irSiguienteTabCreacion(): void {
     const tab = this.activeTab();
     if (tab === 'basico') {
+      if (this.esModoGestora && !this.idEmpresaSeleccionada) {
+        iziToast.show({
+          title: 'Advertencia',
+          titleColor: '#ffc107',
+          message: 'Seleccione la empresa donde se registrará el producto',
+          position: 'topRight'
+        });
+        return;
+      }
       const useCorr = !!this.productoForm.get('useCorrelativo')?.value;
       const codVal = String(this.productoForm.get('codigo')?.value || '').trim();
       const codigoOk = useCorr || codVal.length >= 2;
@@ -334,6 +412,15 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   }
 
   guardarProducto(): void {
+    if (this.esModoGestora && !this.idEmpresaSeleccionada) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        message: 'Seleccione la empresa donde se registrará el producto',
+        position: 'topRight'
+      });
+      return;
+    }
     if (this.productoForm.invalid) {
       this.marcarCamposComoTocados();
       iziToast.show({
@@ -383,7 +470,10 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
           ? Number(v.idListaPrecio)
           : null,
       preciosPorLista: Array.isArray(preciosPorLista) ? preciosPorLista : undefined,
-      permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta
+      permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta,
+      ...(this.esModoGestora && this.idEmpresaSeleccionada
+        ? { idEmpresaDestino: this.idEmpresaSeleccionada }
+        : {})
     };
 
     this.productoService.crearProducto(producto).subscribe({
@@ -490,7 +580,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   private actualizarCorrelativoSiAplica(): void {
     const useCorrelativo = !!this.productoForm.get('useCorrelativo')?.value;
     if (!useCorrelativo) return;
-    this.comprasService.obtener_correlativo_empresa().subscribe({
+    this.comprasService.obtener_correlativo_empresa(this.idEmpresaCatalogoActual()).subscribe({
       next: (res) => {
         const data = res?.data;
         this.correlativo = data && typeof data === 'object' ? data : this.correlativo;
@@ -503,7 +593,11 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   }
 
   recargarCategorias(onDone?: () => void): void {
-    this.categoriaService.obtener_categorias().subscribe({
+    const idEmpresa = this.idEmpresaCatalogoActual();
+    const obs = idEmpresa
+      ? this.categoriaService.obtener_categorias_idEmpresa(idEmpresa)
+      : this.categoriaService.obtener_categorias();
+    obs.subscribe({
       next: (response) => {
         this.categorias = response.data || [];
         onDone?.();
@@ -513,7 +607,11 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   }
 
   recargarMarcas(onDone?: () => void): void {
-    this.marcaService.obtener_marcas().subscribe({
+    const idEmpresa = this.idEmpresaCatalogoActual();
+    const obs = idEmpresa
+      ? this.marcaService.obtener_marcas_idEmpresa(idEmpresa)
+      : this.marcaService.obtener_marcas();
+    obs.subscribe({
       next: (response) => {
         this.marcas = response.data || [];
         onDone?.();
@@ -599,14 +697,20 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   }
 
   private filtrarListaProductos(lista: any[], texto: string): any[] {
+    const idEmpresa = this.idEmpresaCatalogoActual();
     return lista
-      .filter(
-        (p: any) =>
+      .filter((p: any) => {
+        if (idEmpresa) {
+          const pe = String(p.idEmpresa || p.IdEmpresa || '').trim().toLowerCase();
+          if (pe !== idEmpresa.toLowerCase()) return false;
+        }
+        return (
           (p.descripcion || '').toLowerCase().includes(texto) ||
           (p.codigo || '').toLowerCase().includes(texto) ||
           (p.categoria || '').toLowerCase().includes(texto) ||
           (p.marca || '').toLowerCase().includes(texto)
-      )
+        );
+      })
       .slice(0, 10);
   }
 
@@ -642,12 +746,24 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   }
 
   abrirNuevaCategoria(): void {
+    if (this.esModoGestora && !this.idEmpresaSeleccionada) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        message: 'Seleccione la empresa antes de crear una categoría',
+        position: 'topRight'
+      });
+      return;
+    }
     const modalRef = this.modalService.open(CreateCategoriaComponent, {
       centered: true,
       backdrop: 'static',
       keyboard: false,
       size: 'lg'
     });
+    if (this.esModoGestora) {
+      modalRef.componentInstance.idEmpresaDestino = this.idEmpresaSeleccionada;
+    }
     modalRef.result
       .then((res: unknown) => {
         const id = this.parseIdCategoriaModal(res);
@@ -661,12 +777,24 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   }
 
   abrirNuevaMarca(): void {
+    if (this.esModoGestora && !this.idEmpresaSeleccionada) {
+      iziToast.show({
+        title: 'Advertencia',
+        titleColor: '#ffc107',
+        message: 'Seleccione la empresa antes de crear una marca',
+        position: 'topRight'
+      });
+      return;
+    }
     const modalRef = this.modalService.open(CreateMarcaComponent, {
       centered: true,
       backdrop: 'static',
       keyboard: false,
       size: 'lg'
     });
+    if (this.esModoGestora) {
+      modalRef.componentInstance.idEmpresaDestino = this.idEmpresaSeleccionada;
+    }
     modalRef.result
       .then((res: unknown) => {
         const id = this.parseIdMarcaModal(res);

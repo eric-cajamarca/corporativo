@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { withPool } = require('../utils/dbPool.util');
+const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 const ProductosServices = require('../services/productos.service');
 const ProductosRepository = require('../repositories/productos.repository');
 const productosMutacionesService = require('../services/productosMutaciones.service');
@@ -212,11 +213,23 @@ const crear_producto = async (req, res) => {
     useCorrelativo,
     permiteDescripcionEnVenta,
     preciosPorLista,
+    idEmpresaDestino,
   } = req.body;
 
-  const idEmpresa = req.user.empresa;
-  if (!idEmpresa) {
+  const idEmpresaJwt = req.user.empresa;
+  if (!idEmpresaJwt) {
     return res.status(401).send({ message: "Empresa no identificada", data: undefined });
+  }
+
+  let idEmpresa = idEmpresaJwt;
+  const destRaw = idEmpresaDestino != null ? String(idEmpresaDestino).trim() : '';
+  if (destRaw) {
+    try {
+      await withPool((pool) => assertEmpresaAutorizada(pool, idEmpresaJwt, destRaw));
+      idEmpresa = destRaw;
+    } catch (e) {
+      return res.status(403).send({ message: 'Empresa destino no autorizada', data: undefined });
+    }
   }
 
   const cUnitarioNum = parseFloat(cUnitario);

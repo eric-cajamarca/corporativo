@@ -20,7 +20,8 @@ export class CreateMarcaComponent {
   
   public btn_registrar = false;
   esModal = false;
-
+  /** Empresa gestora: crear marca en empresa gestionada. */
+  idEmpresaDestino = '';
 
   constructor(
     private _marcaService: variosService,
@@ -35,7 +36,11 @@ export class CreateMarcaComponent {
   }
 
   registrar(_registroForm: unknown): void {
-    this._marcaService.crearMarca(this.marca).subscribe({
+    const payload = { ...this.marca };
+    if (this.idEmpresaDestino?.trim()) {
+      payload.idEmpresaDestino = this.idEmpresaDestino.trim();
+    }
+    this._marcaService.crearMarca(payload).subscribe({
       next: (response: { data?: { idMarca?: number; IdMarca?: number } }) => {
         const raw = response?.data ?? response;
         const idMarca = raw != null && typeof raw === 'object' ? Number((raw as { idMarca?: number }).idMarca) : NaN;

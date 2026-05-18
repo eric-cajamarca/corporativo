@@ -55,6 +55,8 @@ export interface ProductoCreate {
   lote?: LoteInicialCreate | null;
   precioVenta?: number;
   permiteDescripcionEnVenta?: boolean;
+  /** Empresa gestora: crear el producto en esta empresa gestionada. */
+  idEmpresaDestino?: string;
 }
 
 export interface ProductoResponse {

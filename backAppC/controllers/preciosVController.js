@@ -339,7 +339,13 @@ const obtener_listas_precio_empresa = async function (req, res) {
             });
         }
 
-        const listas = await withPool((pool) => precioProductoService.obtenerListasPrecioEmpresa(pool, req.user));
+        const idEmpresaDestino = req.query?.idEmpresaDestino != null
+            ? String(req.query.idEmpresaDestino).trim()
+            : null;
+
+        const listas = await withPool((pool) =>
+            precioProductoService.obtenerListasPrecioEmpresa(pool, req.user, idEmpresaDestino || null)
+        );
         
         res.status(200).send({ data: listas });
 

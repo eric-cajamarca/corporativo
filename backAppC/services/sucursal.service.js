@@ -78,6 +78,25 @@ async function obtenerSucursalTodos(pool, user, opciones = {}) {
   return normalizarFechaRegistro(rows);
 }
 
+/** Empresa gestora: sucursales de una empresa gestionada (o la propia). */
+async function obtenerSucursalesPorEmpresaDestino(pool, user, idEmpresaDestino, opciones = {}) {
+  if (!user) throw new Error(E.NO_ACCESS);
+  const dest = String(idEmpresaDestino || '').trim();
+  if (!dest) throw new Error(E.FALTA_EMPRESA);
+  const idEmpresaJwt = idEmpresaDesdeUser(user);
+  if (!idEmpresaJwt) throw new Error(E.FALTA_EMPRESA);
+  const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
+  await assertEmpresaAutorizada(pool, idEmpresaJwt, dest);
+  await assertAlgunoPermiso(pool, user, ...PERMISOS_LISTAR_SUCURSALES_OPERATIVO);
+  const incluirInactivas = !!opciones.incluirInactivas;
+  const rol = (user.rol || '').toString();
+  const sinFiltroUsuarioSucursal =
+    rol === 'Administrador' || rol === 'superAdmin' || incluirInactivas;
+  const idsUsuario = sinFiltroUsuarioSucursal ? null : await idsSucursalesFiltroCatalogo(pool, user);
+  const rows = await sucursalRepository.listarTodosPorEmpresa(pool, dest, !incluirInactivas, idsUsuario);
+  return normalizarFechaRegistro(rows);
+}
+
 async function establecerPrincipal(pool, user, idSucursal) {
   if (!user) throw new Error(E.NO_ACCESS);
   const idEmpresa = idEmpresaDesdeUser(user);
@@ -249,6 +268,7 @@ async function eliminarStockLote(pool, user, idLote) {
 module.exports = {
   obtenerSucursalResumen,
   obtenerSucursalTodos,
+  obtenerSucursalesPorEmpresaDestino,
   establecerPrincipal,
   editarSucursal,
   editarEstadoSucursal,

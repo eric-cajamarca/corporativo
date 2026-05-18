@@ -172,10 +172,15 @@ export class ComprasService {
   // api.get('/correlativos',auth.auth, comprasController.obtener_correlativos_empresa);
   // api.put('/correlativos/:id',auth.auth, comprasController.editar_correlativos_empresa);
 
-  obtener_correlativo_empresa(): Observable<any> {
+  obtener_correlativo_empresa(idEmpresaDestino?: string): Observable<any> {
     let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    let params = new HttpParams();
+    if (idEmpresaDestino?.trim()) {
+      params = params.set('idEmpresaDestino', idEmpresaDestino.trim());
+    }
     return this._http.get(this.url + 'correlativos', { 
       headers:headers,
+      params,
       withCredentials: true
     });
   }

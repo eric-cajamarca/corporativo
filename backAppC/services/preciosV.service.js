@@ -535,7 +535,7 @@ exports.obtenerListasPrecioPorProducto = async (pool, idProducto, usuarioAutenti
     }
 };
 
-exports.obtenerListasPrecioEmpresa = async (pool, usuarioAutenticado) => {
+exports.obtenerListasPrecioEmpresa = async (pool, usuarioAutenticado, idEmpresaDestino = null) => {
     try {
         if (!usuarioAutenticado) {
             throw new Error('NO_ACCESO');
@@ -545,9 +545,17 @@ exports.obtenerListasPrecioEmpresa = async (pool, usuarioAutenticado) => {
             throw new Error('EMPRESA_NO_ASIGNADA');
         }
 
+        let idEmpresa = usuarioAutenticado.empresa;
+        const dest = idEmpresaDestino != null ? String(idEmpresaDestino).trim() : '';
+        if (dest) {
+            const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
+            await assertEmpresaAutorizada(pool, usuarioAutenticado.empresa, dest);
+            idEmpresa = dest;
+        }
+
         const listas = await precioProductoRepository.obtenerListasPrecioEmpresa(
             pool,
-            usuarioAutenticado.empresa
+            idEmpresa
         );
 
         return listas;

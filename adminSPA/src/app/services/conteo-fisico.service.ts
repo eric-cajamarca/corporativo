@@ -5,6 +5,7 @@ import { environment } from '../../environments/environment';
 import {
   ConteoFisicoAplicarResponse,
   ConteoFisicoCrearSesionResponse,
+  ConteoFisicoListarSesionesResponse,
   ConteoFisicoPrevisualizarResponse,
   ConteoFisicoSesionResponse,
   ConteoFisicoUpsertLineaResponse
@@ -51,6 +52,14 @@ export class ConteoFisicoService {
 
   crearSesion(body: CrearSesionConteoBody): Observable<ConteoFisicoCrearSesionResponse> {
     return this.http.post<ConteoFisicoCrearSesionResponse>(this.baseUrl + 'sesiones', body, {
+      withCredentials: true
+    });
+  }
+
+  /** Borradores con líneas guardadas y movimientos aún no aplicados. */
+  listarSesionesPendientes(soloConLineas = true): Observable<ConteoFisicoListarSesionesResponse> {
+    const params = soloConLineas ? '?soloConLineas=true' : '?soloConLineas=false';
+    return this.http.get<ConteoFisicoListarSesionesResponse>(this.baseUrl + 'sesiones' + params, {
       withCredentials: true
     });
   }

@@ -211,6 +211,24 @@ exports.productosComprados = async (req, res) => {
   }
 };
 
+/** GET /api/inventario/conteo-fisico/sesiones?soloConLineas=true */
+exports.conteoFisicoListarSesiones = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const q = req.query?.soloConLineas;
+    const soloConLineas = q === undefined || q === 'true' || q === '1';
+    const sesiones = await conteoFisicoService.listarSesionesPendientes(req.user.empresa, {
+      soloConLineas
+    });
+    return res.status(200).json({ sesiones });
+  } catch (error) {
+    console.error('inventarioController conteoFisicoListarSesiones:', error);
+    return res.status(500).json({ message: error.message || 'Error al listar sesiones de conteo' });
+  }
+};
+
 /** POST /api/inventario/conteo-fisico/sesiones */
 exports.conteoFisicoCrearSesion = async (req, res) => {
   try {

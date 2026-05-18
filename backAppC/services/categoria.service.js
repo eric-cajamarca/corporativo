@@ -33,11 +33,17 @@ async function obtenerCategoriaPorId(pool, user, idCategoria) {
 
 async function crearCategoria(pool, user, body) {
   asegurarUsuario(user);
-  const { descripcion, nombre } = body || {};
+  const { descripcion, nombre, idEmpresaDestino } = body || {};
   if (!nombre || descripcion === undefined || descripcion === null) {
     throw new Error('nombre y descripcion son requeridos');
   }
-  return categoriaRepository.insertar(pool, user.empresa, {
+  let idEmpresa = user.empresa;
+  const dest = idEmpresaDestino != null ? String(idEmpresaDestino).trim() : '';
+  if (dest) {
+    await assertEmpresaAutorizada(pool, user.empresa, dest);
+    idEmpresa = dest;
+  }
+  return categoriaRepository.insertar(pool, idEmpresa, {
     nombre: String(nombre).trim(),
     descripcion: String(descripcion).trim(),
     estado: 1

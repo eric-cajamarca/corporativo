@@ -6,6 +6,7 @@ const inventarioController = require('../controllers/inventarioController');
 router.use(auth.auth);
 
 router.post('/conteo-fisico/sesiones', inventarioController.conteoFisicoCrearSesion);
+router.get('/conteo-fisico/sesiones', inventarioController.conteoFisicoListarSesiones);
 router.get('/conteo-fisico/sesiones/:idSesion/previsualizar', inventarioController.conteoFisicoPrevisualizar);
 router.post('/conteo-fisico/sesiones/:idSesion/aplicar-movimientos', inventarioController.conteoFisicoAplicarMovimientos);
 router.get('/conteo-fisico/sesiones/:idSesion/export', inventarioController.conteoFisicoExportData);
