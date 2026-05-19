@@ -126,6 +126,7 @@ export class IndexConfiguracionComponent implements OnInit {
     exportarConciliacionCulqi: true
   };
   public sistemaGuardando = false;
+  public backupEjecutando = false;
   public puedeEditarSistemaOperativo = false;
   /** Pestaña Sistema: visible solo si empresa principal o usuario superAdmin. */
   public mostrarTabSistema = false;
@@ -614,6 +615,60 @@ export class IndexConfiguracionComponent implements OnInit {
         this.ventasGuardando = false;
         if (typeof iziToast !== 'undefined') {
           iziToast.error({ title: 'Error', message: 'No se pudo guardar la configuración de ventas.', position: 'topRight' });
+        }
+      }
+    });
+  }
+
+  ejecutarBackupAhora(): void {
+    if (!this.puedeEditarSistemaOperativo) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'Permisos',
+          message: 'Solo superAdmin de la empresa principal puede ejecutar backups.',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
+    const ruta = String(this.sistema.rutaBackupLocal || '').trim();
+    if (!ruta) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'Ruta requerida',
+          message: 'Indique la ruta local del respaldo antes de ejecutar el backup.',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
+    const ok = window.confirm(
+      'Se ejecutará un backup completo de la base de datos en el servidor SQL.\n\n' +
+        'Puede tardar varios minutos según el tamaño de los datos.\n\n¿Continuar?'
+    );
+    if (!ok) {
+      return;
+    }
+    this.backupEjecutando = true;
+    this._gestoresService
+      .ejecutarBackupAhora({
+        rutaBackupLocal: ruta,
+        rutaBackupSecundaria: String(this.sistema.rutaBackupSecundaria || '').trim(),
+        googleDriveRemote: String(this.sistema.googleDriveRemote || '').trim()
+      })
+      .subscribe({
+      next: (res) => {
+        this.backupEjecutando = false;
+        const msg = res?.message || res?.data?.mensaje || 'Backup completado.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({ title: 'Backup', message: msg, position: 'topRight', timeout: 10000 });
+        }
+      },
+      error: (err) => {
+        this.backupEjecutando = false;
+        const msg = err?.error?.message || 'No se pudo ejecutar el backup.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight', timeout: 12000 });
         }
       }
     });

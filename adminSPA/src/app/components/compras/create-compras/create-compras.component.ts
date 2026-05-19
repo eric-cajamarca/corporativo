@@ -22,6 +22,7 @@ import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { ConsultaXMLService } from '../../../services/consulta-xml.service';
 import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
+import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 import { saveAs } from 'file-saver';
 import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
@@ -1944,6 +1945,10 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  uMedidaColumnaCompras(p: any): string {
+    return descripcionUnidadMedidaProducto(p);
   }
 
   marcaColumnaCompras(p: any): string {

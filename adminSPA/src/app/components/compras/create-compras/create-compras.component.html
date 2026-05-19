@@ -806,7 +806,7 @@
                                                     <td class="efaf-buscador-col-cat" [title]="p.categoria">{{ p.categoria }}</td>
                                                     <td class="efaf-buscador-col-marca" [title]="marcaColumnaCompras(p)">{{ marcaColumnaCompras(p) }}</td>
                                                     <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
-                                                    <td>{{ p.codigoPresentacion }}</td>
+                                                    <td>{{ uMedidaColumnaCompras(p) }}</td>
                                                     <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                                                     <td>{{ p.sucursal }}</td>
                                                     <td>{{ p.stock }}</td>
@@ -824,7 +824,7 @@
                                             </div>
                                             <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorCompras()">{{ p.aliasEmpresa || p.razonSocialEmpresa || '—' }}</div>
                                             <div class="small mt-1">{{ p.descripcion }}</div>
-                                            <div class="small text-muted mt-1">{{ p.categoria }} · {{ marcaColumnaCompras(p) }} · {{ p.codigoPresentacion }}</div>
+                                            <div class="small text-muted mt-1">{{ p.categoria }} · {{ marcaColumnaCompras(p) }} · {{ uMedidaColumnaCompras(p) }}</div>
                                             <div class="small d-flex justify-content-between mt-2">
                                                 <span>{{ p.sucursal }}</span>
                                                 <span>Stock: {{ p.stock }}</span>

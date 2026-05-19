@@ -405,6 +405,55 @@ const guardar_configuracion = async function (req, res) {
     }
 };
 
+const ejecutar_backup_ahora = async function (req, res) {
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+        const overrides = req.body && typeof req.body === 'object' ? req.body : {};
+        const resultado = await withPool(async (pool) =>
+            gestoresService.ejecutarBackupAhora(pool, req.user, overrides)
+        );
+        res.status(200).json({
+            message: resultado.mensaje || 'Backup ejecutado correctamente',
+            data: resultado
+        });
+    } catch (error) {
+        console.error('Error en ejecutar_backup_ahora:', error.message);
+        if (error.message === 'NO_AUTORIZADO_CONFIG_SISTEMA') {
+            return res.status(403).json({
+                message: 'Solo superAdmin de la empresa principal puede ejecutar backups.',
+                data: undefined
+            });
+        }
+        if (error.message === 'BACKUP_SOLO_WINDOWS') {
+            return res.status(400).json({
+                message: 'El backup manual solo puede ejecutarse en el servidor Windows donde corre SQL Server.',
+                data: undefined
+            });
+        }
+        if (error.message === 'BACKUP_RUTA_LOCAL_REQUERIDA') {
+            return res.status(400).json({
+                message: 'Configure la ruta local del respaldo antes de ejecutar el backup.',
+                data: undefined
+            });
+        }
+        if (error.message === 'BACKUP_TIMEOUT') {
+            return res.status(504).json({
+                message: 'El backup excedió el tiempo máximo de espera. Revise el servidor SQL.',
+                data: undefined
+            });
+        }
+        const detail = String(error.message || '').trim();
+        res.status(500).json({
+            message: detail
+                ? `Error al ejecutar backup: ${detail.slice(0, 500)}`
+                : 'Error al ejecutar backup',
+            data: undefined
+        });
+    }
+};
+
 module.exports = {
     obtener_empresas_gestionadas,
     obtener_todos_gestores,
@@ -415,5 +464,6 @@ module.exports = {
     eliminar_empresa_gestionada,
     obtener_configuracion,
     obtener_permisos_configuracion_sistema,
-    guardar_configuracion
+    guardar_configuracion,
+    ejecutar_backup_ahora
 };

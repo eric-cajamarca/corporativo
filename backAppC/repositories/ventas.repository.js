@@ -4,6 +4,7 @@ const { parseFEmisionCabeceraSQL, mergeFEmisionNvCtSiMedianocheInnecessario } = 
 const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
 const { appendAgentDebugNdjson } = require('../utils/debugAgentLog.util');
 const { extraerDireccionClienteDesdeXmlUbl } = require('../utils/extraerDireccionClienteXmlUbl.util');
+const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
 const { ventasTieneColumnaIdDireccionClientes } = require('../utils/ventasColumnaDireccion.util');
 const gestoresRepository = require('./gestores.repository');
 
@@ -13,14 +14,10 @@ function documentoSoloDigitosPdf(valor) {
   return String(valor).replace(/\D/g, '');
 }
 
-/** Línea legible desde `DireccionClientes` con alias `dc` (CONCAT tolera NULL; compatible SQL Server 2012+). */
-const SQL_DC_LINEA_DIRECCION_READABLE = `LTRIM(RTRIM(CONCAT(
-  RTRIM(LTRIM(ISNULL(dc.direccion, ''))), ' ',
-  RTRIM(LTRIM(ISNULL(dc.urbanizacion, ''))), ' ',
-  RTRIM(LTRIM(ISNULL(dc.distrito, ''))), ' ',
-  RTRIM(LTRIM(ISNULL(dc.provincia, ''))), ' ',
-  RTRIM(LTRIM(ISNULL(dc.region, '')))
-)))`;
+/**
+ * PDF comprobante: solo calle (dc.direccion). distrito/provincia/region en BD suelen ser IDs/ubigeo, no nombres.
+ */
+const SQL_DC_LINEA_DIRECCION_READABLE = `LTRIM(RTRIM(ISNULL(dc.direccion, '')))`;
 
 /**
  * Dirección en PDF de venta (solo `DireccionClientes`).
@@ -174,7 +171,7 @@ async function enriquecerClienteDesdeVentaOrigenSiNota(pool, cab, idsEmpresaPerm
     cab.clienteRuc = row.clienteRuc || cab.clienteRuc;
     cab.clienteTipoDoc = row.clienteTipoDoc != null ? String(row.clienteTipoDoc).trim() : cab.clienteTipoDoc;
     if (row.clienteDireccion != null && String(row.clienteDireccion).trim() !== "") {
-      cab.clienteDireccion = String(row.clienteDireccion).trim();
+      cab.clienteDireccion = direccionClienteLegiblePdf(String(row.clienteDireccion).trim());
     }
   } catch (err) {
     console.error("enriquecerClienteDesdeVentaOrigenSiNota:", err);
@@ -332,13 +329,7 @@ exports.obtenerIdDireccionClientePreferidoParaVenta = async (
       FROM DireccionClientes
       WHERE idEmpresa IN (${inList})
         AND idCliente = @idCliente
-        AND NULLIF(LTRIM(RTRIM(CONCAT(
-          RTRIM(LTRIM(ISNULL(direccion, ''))), ' ',
-          RTRIM(LTRIM(ISNULL(urbanizacion, ''))), ' ',
-          RTRIM(LTRIM(ISNULL(distrito, ''))), ' ',
-          RTRIM(LTRIM(ISNULL(provincia, ''))), ' ',
-          RTRIM(LTRIM(ISNULL(region, '')))
-        ))), '') IS NOT NULL
+        AND NULLIF(LTRIM(RTRIM(ISNULL(direccion, ''))), '') IS NOT NULL
       ORDER BY ${orderPref}CASE WHEN ISNULL(principal, 0) = 1 THEN 0 ELSE 1 END, idDireccionClientes ASC
     `);
   const id = r.recordset[0]?.idDireccionClientes;
@@ -1034,7 +1025,9 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   const hashRow = hashResult.recordset && hashResult.recordset[0] ? hashResult.recordset[0] : null;
   const resumenHash = hashRow && (hashRow.resumenHash || hashRow.resumenhash) ? String(hashRow.resumenHash || hashRow.resumenhash).trim() : '';
 
-  let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '') ? String(cab.clienteDireccion).trim() : '';
+  let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '')
+    ? direccionClienteLegiblePdf(String(cab.clienteDireccion).trim())
+    : '';
   const dirLenCabecera = clienteDireccion.length;
 
   // #region agent log
@@ -1067,13 +1060,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
         .query(`
           SELECT idDireccionClientes, ISNULL(principal,0) AS principal,
-            LTRIM(RTRIM(CONCAT(
-              RTRIM(LTRIM(ISNULL(direccion, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(urbanizacion, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(distrito, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(provincia, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(region, '')))
-            ))) AS direccion
+            LTRIM(RTRIM(ISNULL(direccion, ''))) AS direccion
           FROM DireccionClientes
           WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa
           ORDER BY ISNULL(principal,0) DESC, idDireccionClientes`);
@@ -1084,7 +1071,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       }));
       const elegida = filasDireccionClientesIdCliente.find((r) => r.direccion && r.direccion.trim() !== '');
       if (elegida) {
-        clienteDireccion = elegida.direccion.trim();
+        clienteDireccion = direccionClienteLegiblePdf(elegida.direccion.trim());
         dirLenPorIdCliente = clienteDireccion.length;
       }
     } catch (err) {
@@ -1144,13 +1131,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         .input('rucNorm', sql.VarChar(32), docDigitsCab)
         .query(`
           SELECT dc.idDireccionClientes, dc.idCliente, ISNULL(dc.principal, 0) AS principal,
-            LTRIM(RTRIM(CONCAT(
-              RTRIM(LTRIM(ISNULL(dc.direccion, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(dc.urbanizacion, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(dc.distrito, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(dc.provincia, ''))), ' ',
-              RTRIM(LTRIM(ISNULL(dc.region, '')))
-            ))) AS direccion
+            LTRIM(RTRIM(ISNULL(dc.direccion, ''))) AS direccion
           FROM DireccionClientes dc
           INNER JOIN Clientes cl ON cl.idCliente = dc.idCliente
           WHERE cl.idEmpresa = @idEmpresa
@@ -1178,7 +1159,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
             return (a.idDireccionClientes || 0) - (b.idDireccionClientes || 0);
           })[0];
         if (elegida) {
-          clienteDireccion = elegida.direccion.trim();
+          clienteDireccion = direccionClienteLegiblePdf(elegida.direccion.trim());
           dirLenPorRucEmpresa = clienteDireccion.length;
         }
       }
@@ -1239,8 +1220,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         const dirXml = extraerDireccionClienteDesdeXmlUbl(String(rawXml));
         dirXmlExtraida = dirXml;
         if (dirXml) {
-          clienteDireccion = dirXml;
-          dirLenDesdeXml = dirXml.length;
+          clienteDireccion = direccionClienteLegiblePdf(dirXml);
+          dirLenDesdeXml = clienteDireccion.length;
           try {
             await pool
               .request()
@@ -1471,7 +1452,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
       celular: (cab.clienteCelular != null && String(cab.clienteCelular).trim() !== '') ? String(cab.clienteCelular).trim() : '',
-      direccion: clienteDireccion,
+      direccion: direccionClienteLegiblePdf(clienteDireccion),
       tipoDocSunat: tipoDocSunat
     },
     items: detalle.map(d => ({
@@ -3128,7 +3109,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
       celular: (cab.clienteCelular || '').trim(),
-      direccion: (cab.clienteDireccion || '').trim(),
+      direccion: direccionClienteLegiblePdf((cab.clienteDireccion || '').trim()),
       tipoDocSunat: (cab.clienteTipoDoc === '6' || (cab.clienteRuc && String(cab.clienteRuc).length === 11)) ? '6' : '1'
     },
     items: (itemsResult.recordset || []).map(d => ({

@@ -322,7 +322,7 @@
                 <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
                 <td class="efaf-buscador-col-marca" [title]="marcaColumnaVentas(p)">{{ marcaColumnaVentas(p) }}</td>
                 <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
-                <td>{{ p.codigoPresentacion }}</td>
+                <td>{{ uMedidaColumnaVentas(p) }}</td>
                 <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
                 <td>{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</td>
                 <td>{{ p.stock }}</td>
@@ -361,7 +361,7 @@
                 </div>
                 <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorVentas()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
                 <div class="small mt-1">{{ p?.descripcion }}</div>
-                <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaVentas(p) }} · {{ p?.codigoPresentacion }}</div>
+                <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaVentas(p) }} · {{ uMedidaColumnaVentas(p) }}</div>
                 <div class="small d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
                   <span class="text-truncate me-1">{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</span>
                   <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>

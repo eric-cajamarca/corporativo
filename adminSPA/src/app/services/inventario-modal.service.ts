@@ -87,13 +87,13 @@ export class InventarioModalService {
   abrirMovimientoUbicacion(idLote?: string): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(MovimientoUbicacionComponent, {
       ...this.modalInventarioBase,
-      size: 'lg'
+      size: 'xl',
+      scrollable: true
     });
 
     const component = modalRef.componentInstance as MovimientoUbicacionComponent;
     if (idLote) {
-      component.movimientoForm.patchValue({ idLote });
-      component.onLoteSeleccionado();
+      component.idLote = idLote;
     }
 
     return modalRef.result;

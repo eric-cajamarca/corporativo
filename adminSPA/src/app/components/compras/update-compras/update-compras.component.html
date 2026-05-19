@@ -462,7 +462,7 @@
                                             <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p?.categoria }}</td>
                                             <td class="efaf-buscador-col-marca" [title]="marcaColumnaUpdateCompras(p)">{{ marcaColumnaUpdateCompras(p) }}</td>
                                             <td class="efaf-buscador-col-desc">{{ p?.descripcion }}</td>
-                                            <td>{{ p?.codigoPresentacion || p?.descripcionPres || '-' }}</td>
+                                            <td>{{ uMedidaColumnaUpdateCompras(p) }}</td>
                                             <td>{{ (p?.cUnitario ?? p?.pUnitario) | number:'1.2-2' }}</td>
                                             <td>{{ p?.sucursal }}</td>
                                             <td>{{ p?.stock ?? '-' }}</td>
@@ -479,7 +479,7 @@
                                     </div>
                                     <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorCompras()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
                                     <div class="small mt-1">{{ p?.descripcion }}</div>
-                                    <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaUpdateCompras(p) }} · {{ p?.codigoPresentacion || p?.descripcionPres || '-' }}</div>
+                                    <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaUpdateCompras(p) }} · {{ uMedidaColumnaUpdateCompras(p) }}</div>
                                     <div class="small d-flex justify-content-between mt-2">
                                         <span>{{ p?.sucursal }}</span>
                                         <span>Stock: {{ p?.stock ?? '—' }}</span>

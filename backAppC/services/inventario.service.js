@@ -590,9 +590,9 @@ exports.obtenerStockActual = async (user, query) => {
         idUbicacion = n;
       }
     }
-    if (idUbicacion != null) {
+    const validarUbicacionEnSucursal = async (idUb, etiqueta) => {
       if (!idSucursal) {
-        throw new Error('idUbicacion requiere idSucursal');
+        throw new Error(`${etiqueta} requiere idSucursal`);
       }
       const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa).catch(() => []);
       const controlUb =
@@ -602,10 +602,34 @@ exports.obtenerStockActual = async (user, query) => {
           'El listado por ubicación requiere activar «Gestionar stock por ubicación» (INVENTARIO_CONTROL_UBICACIONES) en configuración de inventario.'
         );
       }
-      const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(pool, idSucursal, idUbicacion);
+      const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(pool, idSucursal, idUb);
       if (!okUb) {
         throw new Error('La ubicación no pertenece a la sucursal indicada');
       }
+    };
+    if (idUbicacion != null) {
+      await validarUbicacionEnSucursal(idUbicacion, 'idUbicacion');
+    }
+    const rawUbConteo =
+      query.idUbicacionConteo != null && String(query.idUbicacionConteo).trim() !== ''
+        ? String(query.idUbicacionConteo).trim()
+        : '';
+    let idUbicacionConteo = null;
+    if (rawUbConteo !== '') {
+      const n = parseInt(rawUbConteo, 10);
+      if (Number.isFinite(n) && n > 0) {
+        idUbicacionConteo = n;
+      }
+    }
+    const codigoUbicacionConteo =
+      query.codigoUbicacionConteo != null && String(query.codigoUbicacionConteo).trim()
+        ? String(query.codigoUbicacionConteo).trim().substring(0, 20)
+        : null;
+    if (idUbicacionConteo != null) {
+      await validarUbicacionEnSucursal(idUbicacionConteo, 'idUbicacionConteo');
+    }
+    if (idUbicacionConteo != null && !idSucursal) {
+      throw new Error('idUbicacionConteo requiere idSucursal');
     }
     const rawEmpresaFiltro =
       query.idEmpresa != null && String(query.idEmpresa).trim() !== ''
@@ -623,6 +647,8 @@ exports.obtenerStockActual = async (user, query) => {
       idsEmpresa,
       idSucursal,
       idUbicacion,
+      idUbicacionConteo,
+      codigoUbicacionConteo,
       categoriaLike: query.categoria || null,
       marcaLike: query.marca || null,
       filtroStock,

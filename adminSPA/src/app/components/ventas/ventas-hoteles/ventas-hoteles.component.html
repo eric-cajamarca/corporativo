@@ -338,7 +338,7 @@
               @if (productoSeleccionadoConsumo) {
                 <span class="text-muted small">
                   Seleccionado: <strong>{{ productoSeleccionadoConsumo.descripcion }}</strong>
-                  {{ productoSeleccionadoConsumo.codigoPresentacion ? '(' + productoSeleccionadoConsumo.codigoPresentacion + ')' : '' }}
+                  {{ uMedidaColumnaConsumo(productoSeleccionadoConsumo) !== '—' ? '(' + uMedidaColumnaConsumo(productoSeleccionadoConsumo) + ')' : '' }}
                   — S/ {{ (productoSeleccionadoConsumo.pVenta ?? 0) | number:'1.2-2' }}
                 </span>
               }
@@ -405,7 +405,7 @@
                     <td>{{ p.codigo }}</td>
                     <td>{{ p.categoria }}</td>
                     <td>{{ p.descripcion }}</td>
-                    <td>{{ p.codigoPresentacion }}</td>
+                    <td>{{ uMedidaColumnaConsumo(p) }}</td>
                     <td>S/ {{ (p.pVenta ?? 0) | number:'1.2-2' }}</td>
                     <td>{{ p.sucursal }}</td>
                     <td>{{ p.stock }}</td>

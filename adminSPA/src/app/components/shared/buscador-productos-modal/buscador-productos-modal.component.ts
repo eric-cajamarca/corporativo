@@ -7,6 +7,7 @@ import { GestoresService } from '../../../services/gestores.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
+import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 import { StockUbicacionProductoFila } from '../../../models/producto.models';
 
@@ -18,6 +19,7 @@ export interface ProductoSeleccionado {
   nombreMarca?: string;
   idPresentacion?: number;
   codigoPresentacion?: string;
+  descripcionPres?: string;
   pVenta: number;
   categoria?: string;
   sucursal?: string;
@@ -188,6 +190,10 @@ export class BuscadorProductosModalComponent implements OnInit {
   }
 
   /** Texto de marca para columna (API: marca / nombreMarca). */
+  uMedidaColumna(p: ProductoSeleccionado): string {
+    return descripcionUnidadMedidaProducto(p as Record<string, unknown>);
+  }
+
   marcaColumna(p: ProductoSeleccionado): string {
     const t = marcaProductoEnLista(p as Record<string, unknown>);
     return t || '—';

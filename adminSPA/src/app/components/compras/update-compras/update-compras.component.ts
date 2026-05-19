@@ -19,6 +19,7 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
+import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -438,6 +439,10 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
         console.error('Error al cargar productos:', error);
       }
     );
+  }
+
+  uMedidaColumnaUpdateCompras(p: any): string {
+    return descripcionUnidadMedidaProducto(p);
   }
 
   marcaColumnaUpdateCompras(p: any): string {

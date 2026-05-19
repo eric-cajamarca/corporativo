@@ -459,6 +459,8 @@ function construirInClauseUuid(request, ids, prefijo) {
  * @param {string[]} opts.idsEmpresa
  * @param {string|null} opts.idSucursal
  * @param {number|null} [opts.idUbicacion] - si viene con idSucursal, stock = suma LotesUbicacion en esa ubicación
+ * @param {number|null} [opts.idUbicacionConteo] - columna stockUbicacionConteo (no altera stock principal)
+ * @param {string|null} [opts.codigoUbicacionConteo] - columna stockUbicacionConteo por código (gestora / multi-empresa)
  * @param {string|null} opts.categoriaLike - fragmento LIKE
  * @param {string|null} opts.marcaLike
  * @param {string} opts.filtroStock - 'todos' | 'cero' | 'minimo'
@@ -496,6 +498,27 @@ exports.listarStockActual = async (pool, opts) => {
   const usarStockPorUbicacion = idUbicacion != null && idSucursal != null;
   if (usarStockPorUbicacion) {
     request.input('idUbicacion', sql.Int, idUbicacion);
+  }
+
+  const idUbicacionConteo =
+    opts.idUbicacionConteo != null &&
+    Number.isFinite(Number(opts.idUbicacionConteo)) &&
+    Number(opts.idUbicacionConteo) > 0
+      ? Number(opts.idUbicacionConteo)
+      : null;
+  const codigoUbicacionConteo =
+    opts.codigoUbicacionConteo != null && String(opts.codigoUbicacionConteo).trim()
+      ? String(opts.codigoUbicacionConteo).trim().substring(0, 20)
+      : null;
+  const usarStockUbicacionConteo =
+    idUbicacionConteo != null
+      ? idSucursal != null
+      : !!codigoUbicacionConteo;
+  if (usarStockUbicacionConteo && idUbicacionConteo != null) {
+    request.input('idUbicacionConteo', sql.Int, idUbicacionConteo);
+  }
+  if (usarStockUbicacionConteo && codigoUbicacionConteo) {
+    request.input('codigoUbicacionConteo', sql.VarChar(20), codigoUbicacionConteo);
   }
 
   const cat = opts.categoriaLike && String(opts.categoriaLike).trim() ? `%${String(opts.categoriaLike).trim()}%` : null;
@@ -552,6 +575,32 @@ exports.listarStockActual = async (pool, opts) => {
                  THEN COALESCE(stk.stock, 0) - COALESCE(asg.asignado, 0)
                  ELSE 0 END AS DECIMAL(18, 3))`;
 
+  const whereUbConteoCodigo = codigoUbicacionConteo
+    ? 'AND UPPER(RTRIM(LTRIM(up.codigoUbicacion))) = UPPER(RTRIM(LTRIM(@codigoUbicacionConteo)))'
+    : '';
+  const whereUbConteoId = idUbicacionConteo != null ? 'AND lu.idUbicacion = @idUbicacionConteo' : '';
+  const stkUbConteoJoin = usarStockUbicacionConteo
+    ? `
+    LEFT JOIN (
+      SELECT l.idEmpresa, l.idProducto,
+             CAST(COALESCE(SUM(lu.cantidad), 0) AS DECIMAL(18, 3)) AS stockUbicacionConteo
+      FROM LotesUbicacion lu
+      INNER JOIN Lotes l ON l.idLote = lu.idLote
+      INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion AND up.idSucursal = l.idSucursal
+      WHERE l.idEmpresa IN (${inClause})
+        ${whereSucursal}
+        AND l.cantidadDisponible > 0
+        AND lu.cantidad > 0
+        ${whereUbConteoId}
+        ${whereUbConteoCodigo}
+      GROUP BY l.idEmpresa, l.idProducto
+    ) stkUbConteo ON stkUbConteo.idProducto = p.idProducto AND stkUbConteo.idEmpresa = p.idEmpresa
+  `
+    : '';
+  const stockUbicacionConteoExpr = usarStockUbicacionConteo
+    ? 'CAST(COALESCE(stkUbConteo.stockUbicacionConteo, 0) AS DECIMAL(18, 3)) AS stockUbicacionConteo,'
+    : '';
+
   const result = await request.query(`
     SELECT
       p.idProducto,
@@ -570,6 +619,7 @@ exports.listarStockActual = async (pool, opts) => {
       ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa,
       CAST(COALESCE(stk.stock, 0) * p.cUnitario AS DECIMAL(18, 6)) AS valorizado,
       ${stockSinUbicacionExpr} AS stockSinUbicacion,
+      ${stockUbicacionConteoExpr}
       p.estado AS estado
     FROM Productos p
     INNER JOIN Categorias c ON p.idCategoria = c.idCategoria AND c.idEmpresa = p.idEmpresa
@@ -578,6 +628,7 @@ exports.listarStockActual = async (pool, opts) => {
     INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
     ${stkJoin}
     ${assignedJoin}
+    ${stkUbConteoJoin}
     WHERE p.idEmpresa IN (${inClause})
       AND (${whereEstado})
       ${whereCat}

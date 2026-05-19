@@ -192,8 +192,6 @@
                 Búsqueda (stock
                 @if (esModoGestora) {
                   consolidado por empresa gestionada
-                } @else if (sesionInventarioPorUbicacion()) {
-                  en la ubicación de la sesión
                 } @else {
                   actual de la sucursal (agregado)
                 }
@@ -247,13 +245,12 @@
                       @if (empresasGestionadas.length > 0) {
                         <th class="text-start conteo-col-empresa">Empresa</th>
                       }
-                      <th class="text-end conteo-col-stock">
-                        @if (sesionInventarioPorUbicacion()) {
-                          Stock ubic.
-                        } @else {
-                          Stock sist.
-                        }
-                      </th>
+                      <th class="text-end conteo-col-stock">Stock sist.</th>
+                      @if (sesionInventarioPorUbicacion()) {
+                        <th class="text-end conteo-col-stock" [title]="'Stock en ubicación de conteo ' + etiquetaUbicacionSesion()">
+                          Ubic. {{ etiquetaUbicacionSesion() }}
+                        </th>
+                      }
                       <th class="text-end">Sin ubic.</th>
                       <th class="text-end conteo-col-stock">Stock real</th>
                       <th class="text-end conteo-col-accion"></th>
@@ -277,9 +274,14 @@
                             </span>
                           </td>
                         }
-                        <td class="text-end align-middle conteo-col-stock" [attr.data-label]="sesionInventarioPorUbicacion() ? 'Stock ubic.' : 'Stock sist.'">
+                        <td class="text-end align-middle conteo-col-stock" data-label="Stock sist.">
                           {{ p.stock | number : '1.0-3' }}
                         </td>
+                        @if (sesionInventarioPorUbicacion()) {
+                          <td class="text-end align-middle conteo-col-stock" [attr.data-label]="'Ubic. ' + etiquetaUbicacionSesion()">
+                            {{ stockUbicacionConteoProducto(p) | number : '1.0-3' }}
+                          </td>
+                        }
                         <td class="text-end align-middle conteo-col-sin-ubic" data-label="Sin ubic.">
                           <div class="conteo-sin-ubic-valor d-flex flex-column align-items-end gap-1 ms-auto">
                             @if (tieneStockSinUbicacion(p)) {
@@ -305,7 +307,7 @@
                       </tr>
                     } @empty {
                       <tr>
-                        <td [attr.colspan]="empresasGestionadas.length > 0 ? 7 : 6" class="text-muted text-center py-3 conteo-busqueda-empty">Sin resultados. Pulse Buscar.</td>
+                        <td [attr.colspan]="columnasTablaBusqueda()" class="text-muted text-center py-3 conteo-busqueda-empty">Sin resultados. Pulse Buscar.</td>
                       </tr>
                     }
                   </tbody>
@@ -460,8 +462,12 @@
           <div class="mb-2">
             <div class="fw-semibold">{{ productoSeleccionado.descripcion }}</div>
             <div class="small text-muted">
-              {{ productoSeleccionado.codigo }} · {{ productoSeleccionado.aliasEmpresa || 'Empresa' }} · Stock sistema:
-              {{ productoSeleccionado.stock | number : '1.0-3' }}
+              {{ productoSeleccionado.codigo }} · {{ productoSeleccionado.aliasEmpresa || 'Empresa' }}
+              · Stock sistema: {{ productoSeleccionado.stock | number : '1.0-3' }}
+              @if (sesionInventarioPorUbicacion()) {
+                · Ubic. {{ etiquetaUbicacionSesion() }}:
+                {{ stockUbicacionConteoProducto(productoSeleccionado) | number : '1.0-3' }}
+              }
             </div>
           </div>
           <div class="border rounded px-2 py-2 mb-3 bg-light">

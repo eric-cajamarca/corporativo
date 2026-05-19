@@ -668,11 +668,24 @@
                       <label class="form-check-label" for="backupAutomatico">Backup automático habilitado</label>
                     </div>
                     <label for="frecuenciaBackup" class="form-label">Frecuencia</label>
-                    <select class="form-select" id="frecuenciaBackup" [(ngModel)]="sistema.frecuenciaBackup" name="frecuenciaBackup" [disabled]="!puedeEditarSistemaOperativo">
+                    <select class="form-select mb-3" id="frecuenciaBackup" [(ngModel)]="sistema.frecuenciaBackup" name="frecuenciaBackup" [disabled]="!puedeEditarSistemaOperativo">
                       <option value="diario">Diario</option>
                       <option value="semanal">Semanal</option>
                       <option value="mensual">Mensual</option>
                     </select>
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary w-100"
+                      (click)="ejecutarBackupAhora()"
+                      [disabled]="backupEjecutando || !puedeEditarSistemaOperativo">
+                      @if (backupEjecutando) {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Ejecutando backup…
+                      } @else {
+                        <i class="fas fa-database me-2"></i>Realizar backup ahora
+                      }
+                    </button>
+                    <p class="form-text small mb-0 mt-2">Genera un <code>.bak</code> en la ruta local usando la misma conexión SQL que la aplicación (no requiere <code>sqlcmd</code>). Opcional: copia secundaria y Google Drive.</p>
                   </div>
                 </div>
               </div>

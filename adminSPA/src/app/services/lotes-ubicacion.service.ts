@@ -1,7 +1,28 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs/internal/Observable';
 import { global } from './global';
+
+export interface ProductoTrasladoUbicacion {
+  idProducto: string;
+  idEmpresa: string;
+  codigoProducto: string;
+  nombreProducto: string;
+  marca?: string;
+  categoria?: string;
+  stockEnUbicaciones: number;
+  aliasEmpresa?: string;
+}
+
+export interface LoteTrasladable {
+  idLote: string;
+  idProducto: string;
+  idSucursal: string;
+  numeroLote?: string;
+  cantidadDisponible: number;
+  nombreSucursal?: string;
+  stockEnUbicaciones: number;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -54,6 +75,58 @@ public url: any;
       headers:headers,
       withCredentials: true
     });
+  }
+
+  buscarProductosTraslado(params: {
+    buscar?: string | null;
+    idSucursal?: string | null;
+    restringirSucursal?: boolean;
+  }): Observable<{ success: boolean; items: ProductoTrasladoUbicacion[]; alcanceGestora?: boolean }> {
+    let hp = new HttpParams();
+    if (params.buscar?.trim()) {
+      hp = hp.set('buscar', params.buscar.trim());
+    }
+    if (params.idSucursal?.trim()) {
+      hp = hp.set('idSucursal', params.idSucursal.trim());
+    }
+    if (params.restringirSucursal === false) {
+      hp = hp.set('restringirSucursal', 'false');
+    }
+    return this._http.get<{ success: boolean; items: ProductoTrasladoUbicacion[] }>(
+      this.url + 'lote-ubicacion/buscar-productos',
+      { params: hp, withCredentials: true }
+    );
+  }
+
+  listarLotesTrasladables(
+    idProducto: string,
+    idSucursal?: string | null,
+    restringirSucursal = true
+  ): Observable<{ success: boolean; lotes: LoteTrasladable[]; idEmpresa: string }> {
+    let hp = new HttpParams();
+    if (idSucursal?.trim()) {
+      hp = hp.set('idSucursal', idSucursal.trim());
+    }
+    if (!restringirSucursal) {
+      hp = hp.set('restringirSucursal', 'false');
+    }
+    return this._http.get<{ success: boolean; lotes: LoteTrasladable[]; idEmpresa: string }>(
+      this.url + 'lote-ubicacion/producto/' + idProducto + '/lotes',
+      { params: hp, withCredentials: true }
+    );
+  }
+
+  trasladoEntreUbicaciones(body: {
+    idLote: string;
+    idUbicacionOrigen: number;
+    idUbicacionDestino: number;
+    cantidad: number;
+  }): Observable<{ success: boolean; message: string }> {
+    return this._http.post<{ success: boolean; message: string }>(
+      this.url + 'lote-ubicacion/trasladar',
+      body,
+      { withCredentials: true }
+    );
   }
 
   eliminar_loteUbicacion(idLote:any, idUbicacion:any):Observable<any>{

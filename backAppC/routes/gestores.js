@@ -21,5 +21,6 @@ api.delete('/:idGestor', gestoresController.eliminar_empresa_gestionada);
 api.get('/configuracion', gestoresController.obtener_configuracion);
 api.get('/configuracion/sistema-permisos', gestoresController.obtener_permisos_configuracion_sistema);
 api.post('/configuracion', gestoresController.guardar_configuracion);
+api.post('/backup/ejecutar', gestoresController.ejecutar_backup_ahora);
 
 module.exports = api;

@@ -5,6 +5,7 @@ const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
+const sistemaBackupService = require('./sistemaBackup.service');
 
 const CLAVES_CONFIG_SISTEMA_OPERATIVO = new Set([
     'SISTEMA_BACKUP_AUTOMATICO',
@@ -262,6 +263,9 @@ const guardarConfiguracion = async (pool, configuraciones, user) => {
     return { success: true, count: configuraciones.length };
 };
 
+const ejecutarBackupAhora = async (pool, user, overrides) =>
+    sistemaBackupService.ejecutarBackupAhora(pool, user, overrides);
+
 module.exports = {
     obtenerEmpresasGestionadas,
     obtenerTodosGestores,
@@ -272,5 +276,6 @@ module.exports = {
     eliminarEmpresaGestionada,
     obtenerConfiguracion,
     obtenerPermisosConfiguracionSistema,
-    guardarConfiguracion
+    guardarConfiguracion,
+    ejecutarBackupAhora
 };

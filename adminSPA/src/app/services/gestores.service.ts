@@ -70,6 +70,13 @@ export interface PermisosConfiguracionSistema {
     esSuperAdmin?: boolean;
 }
 
+export interface EjecutarBackupAhoraResult {
+    success: boolean;
+    archivo?: string | null;
+    rutaLocal?: string;
+    mensaje?: string;
+}
+
 @Injectable({
     providedIn: 'root'
 })
@@ -177,6 +184,19 @@ export class GestoresService {
     obtenerPermisosConfiguracionSistema(): Observable<ApiResponse<PermisosConfiguracionSistema>> {
         return this.http.get<ApiResponse<PermisosConfiguracionSistema>>(
             `${this.url}gestores/configuracion/sistema-permisos`,
+            { withCredentials: true }
+        );
+    }
+
+    /** Ejecuta backup_sqlserver.ps1 en el servidor (Windows + sqlcmd). */
+    ejecutarBackupAhora(opciones?: {
+        rutaBackupLocal?: string;
+        rutaBackupSecundaria?: string;
+        googleDriveRemote?: string;
+    }): Observable<ApiResponse<EjecutarBackupAhoraResult>> {
+        return this.http.post<ApiResponse<EjecutarBackupAhoraResult>>(
+            `${this.url}gestores/backup/ejecutar`,
+            opciones || {},
             { withCredentials: true }
         );
     }

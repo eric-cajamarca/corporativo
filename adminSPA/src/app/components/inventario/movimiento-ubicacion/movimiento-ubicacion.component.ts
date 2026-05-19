@@ -1,191 +1,332 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { LotesService } from '../../../services/lotes.service';
-import { LotesUbicacionService } from '../../../services/lotes-ubicacion.service';
-import { UbicacionPrioridadService } from '../../../services/ubicacion-prioridad.service';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import {
+  LotesUbicacionService,
+  LoteTrasladable,
+  ProductoTrasladoUbicacion
+} from '../../../services/lotes-ubicacion.service';
+import { LotesService } from '../../../services/lotes.service';
+import { SucursalService } from '../../../services/sucursal.service';
+import { GestoresService } from '../../../services/gestores.service';
+import { Sucursal } from '../../../interfaces/sucursal-interface';
+import { UbicacionPrioridadService } from '../../../services/ubicacion-prioridad.service';
+import { marcaProductoEnLista } from '../../../utils/producto-busqueda.util';
 
-declare var iziToast: any;
+declare const iziToast: { success: (o: object) => void; error: (o: object) => void; show: (o: object) => void };
+
+interface UbicacionLoteRow {
+  idUbicacion: number;
+  codigoUbicacion: string;
+  prioridad?: number;
+  cantidad: number;
+}
 
 @Component({
   selector: 'app-movimiento-ubicacion',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './movimiento-ubicacion.component.html',
   styleUrl: './movimiento-ubicacion.component.css'
 })
 export class MovimientoUbicacionComponent implements OnInit {
-
-  // Formulario para el traslado
-  movimientoForm: FormGroup;
-  
-  // Input opcional para pre-seleccionar lote
   @Input() idLote: string | null = null;
-  
-  // Lista de lotes disponibles
-  lotes: any[] = [];
-  
-  // Ubicaciones origen y destino
-  ubicacionesOrigen: any[] = [];
-  ubicacionesDestino: any[] = [];
-  
-  // Estados
-  cargandoLotes = true;
+
+  movimientoForm: FormGroup;
+
+  sucursales: Sucursal[] = [];
+  idSucursalSeleccionada = '';
+  esModoGestora = false;
+
+  buscarProducto = '';
+  productosResultado: ProductoTrasladoUbicacion[] = [];
+  productoSeleccionado: ProductoTrasladoUbicacion | null = null;
+  lotesProducto: LoteTrasladable[] = [];
+  loteSeleccionado: LoteTrasladable | null = null;
+
+  ubicacionesOrigen: UbicacionLoteRow[] = [];
+  ubicacionesDestino: UbicacionLoteRow[] = [];
+
+  cargandoSucursales = true;
+  cargandoBusqueda = false;
+  cargandoLotes = false;
   cargandoUbicaciones = false;
   ejecutando = false;
-  
-  // Stock disponible en ubicación origen seleccionada
+
   stockDisponibleOrigen = 0;
+  paso: 'producto' | 'lote' | 'traslado' = 'producto';
 
   constructor(
     public activeModal: NgbActiveModal,
     private fb: FormBuilder,
     private loteService: LotesService,
     private loteUbicacionService: LotesUbicacionService,
-    private ubicacionService: UbicacionPrioridadService
+    private sucursalService: SucursalService,
+    private gestoresService: GestoresService,
+    private ubicacionPrioridadService: UbicacionPrioridadService
   ) {
     this.movimientoForm = this.fb.group({
-      idLote: ['', Validators.required],
       idUbicacionOrigen: ['', Validators.required],
       idUbicacionDestino: ['', Validators.required],
-      cantidad: [0, [Validators.required, Validators.min(1)]]
+      cantidad: [null, [Validators.required, Validators.min(0.001)]]
     });
   }
 
   ngOnInit(): void {
-    this.cargarLotes();
-    this.actualizarEstadoControles();
-    // Si hay idLote pre-seleccionado, aplicarlo
+    this.cargarSucursales();
     if (this.idLote) {
-      this.movimientoForm.patchValue({ idLote: this.idLote });
-      setTimeout(() => this.onLoteSeleccionado(), 100);
+      this.cargarDesdeLotePrecargado(this.idLote);
     }
   }
 
-  /**
-   * Carga todos los lotes de la empresa
-   */
-  cargarLotes(): void {
-    this.cargandoLotes = true;
-    this.loteService.obtener_lotes_todos().subscribe({
-      next: (response: any) => {
-        this.lotes = response.data || [];
-        this.cargandoLotes = false;
+  private cargarSucursales(): void {
+    this.cargandoSucursales = true;
+    this.gestoresService.obtenerEmpresasGestionadas().subscribe({
+      next: (res) => {
+        const arr = Array.isArray(res?.data) ? res.data : [];
+        this.esModoGestora = arr.length > 0;
+        this.sucursalService.obtener_sucursal_todos().subscribe({
+          next: (sucRes) => {
+            const raw = sucRes?.data ?? sucRes;
+            this.sucursales = Array.isArray(raw) ? raw : [];
+            this.aplicarSucursalPorDefecto();
+            this.cargandoSucursales = false;
+          },
+          error: () => {
+            this.cargandoSucursales = false;
+          }
+        });
       },
-      error: (error) => {
-        console.error('Error cargando lotes', error);
-        this.cargandoLotes = false;
-        iziToast.show({
-          title: 'Error',
-          titleColor: '#dc3545',
-          message: 'Error al cargar los lotes',
-          position: 'topRight'
+      error: () => {
+        this.esModoGestora = false;
+        this.sucursalService.obtener_sucursal_todos().subscribe({
+          next: (sucRes) => {
+            const raw = sucRes?.data ?? sucRes;
+            this.sucursales = Array.isArray(raw) ? raw : [];
+            this.aplicarSucursalPorDefecto();
+            this.cargandoSucursales = false;
+          },
+          error: () => {
+            this.cargandoSucursales = false;
+          }
         });
       }
     });
   }
 
-  /**
-   * Cuando seleccionan un lote, carga sus ubicaciones actuales
-   */
+  private cargarDesdeLotePrecargado(idLote: string): void {
+    this.loteService.obtener_lote_id(idLote).subscribe({
+      next: (res) => {
+        const lote = res?.data ?? res;
+        if (!lote?.idLote) {
+          return;
+        }
+        if (lote.idSucursal) {
+          this.idSucursalSeleccionada = String(lote.idSucursal);
+        }
+        this.loteSeleccionado = {
+          idLote: lote.idLote,
+          idProducto: lote.idProducto,
+          idSucursal: lote.idSucursal,
+          numeroLote: lote.numeroLote,
+          cantidadDisponible: Number(lote.cantidadDisponible) || 0,
+          stockEnUbicaciones: 0
+        };
+        this.productoSeleccionado = {
+          idProducto: lote.idProducto,
+          idEmpresa: lote.idEmpresa,
+          codigoProducto: '',
+          nombreProducto: 'Lote seleccionado',
+          stockEnUbicaciones: 0
+        };
+        this.paso = 'traslado';
+        this.onLoteSeleccionado();
+      },
+      error: () => {
+        iziToast.error({ title: 'Error', message: 'No se pudo cargar el lote', position: 'topRight' });
+      }
+    });
+  }
+
+  private aplicarSucursalPorDefecto(): void {
+    if (this.esModoGestora) {
+      this.idSucursalSeleccionada = '';
+      return;
+    }
+    if (this.sucursales.length > 0 && !this.idSucursalSeleccionada) {
+      this.idSucursalSeleccionada = String(this.sucursales[0].idSucursal || '');
+    }
+  }
+
+  buscarProductos(): void {
+    if (!this.esModoGestora && !this.idSucursalSeleccionada?.trim()) {
+      iziToast.error({ title: 'Validación', message: 'Seleccione una sucursal', position: 'topRight' });
+      return;
+    }
+    this.cargandoBusqueda = true;
+    this.productoSeleccionado = null;
+    this.lotesProducto = [];
+    this.loteSeleccionado = null;
+    this.paso = 'producto';
+    this.loteUbicacionService
+      .buscarProductosTraslado({
+        buscar: this.buscarProducto?.trim() || null,
+        idSucursal: this.idSucursalSeleccionada || null,
+        restringirSucursal: !this.esModoGestora
+      })
+      .subscribe({
+        next: (res) => {
+          this.productosResultado = res.items || [];
+          this.cargandoBusqueda = false;
+        },
+        error: (err) => {
+          this.cargandoBusqueda = false;
+          this.productosResultado = [];
+          iziToast.error({
+            title: 'Error',
+            message: err?.error?.message || 'Error al buscar productos',
+            position: 'topRight'
+          });
+        }
+      });
+  }
+
+  elegirProducto(p: ProductoTrasladoUbicacion): void {
+    this.productoSeleccionado = p;
+    this.loteSeleccionado = null;
+    this.paso = 'lote';
+    this.cargarLotesProducto();
+  }
+
+  private cargarLotesProducto(): void {
+    if (!this.productoSeleccionado) {
+      return;
+    }
+    this.cargandoLotes = true;
+    this.lotesProducto = [];
+    this.loteUbicacionService
+      .listarLotesTrasladables(
+        this.productoSeleccionado.idProducto,
+        this.idSucursalSeleccionada || null,
+        !this.esModoGestora
+      )
+      .subscribe({
+        next: (res) => {
+          this.lotesProducto = res.lotes || [];
+          this.cargandoLotes = false;
+          if (this.lotesProducto.length === 1) {
+            this.elegirLote(this.lotesProducto[0]);
+          }
+        },
+        error: (err) => {
+          this.cargandoLotes = false;
+          iziToast.error({
+            title: 'Error',
+            message: err?.error?.message || 'No se pudieron cargar los lotes',
+            position: 'topRight'
+          });
+        }
+      });
+  }
+
+  elegirLote(lote: LoteTrasladable): void {
+    this.loteSeleccionado = lote;
+    this.paso = 'traslado';
+    this.movimientoForm.reset({ idUbicacionOrigen: '', idUbicacionDestino: '', cantidad: null });
+    this.onLoteSeleccionado();
+  }
+
+  volverABuscarProducto(): void {
+    this.paso = 'producto';
+    this.productoSeleccionado = null;
+    this.lotesProducto = [];
+    this.loteSeleccionado = null;
+    this.ubicacionesOrigen = [];
+    this.ubicacionesDestino = [];
+    this.stockDisponibleOrigen = 0;
+  }
+
+  volverALotes(): void {
+    this.paso = 'lote';
+    this.loteSeleccionado = null;
+    this.ubicacionesOrigen = [];
+    this.ubicacionesDestino = [];
+    this.stockDisponibleOrigen = 0;
+    this.movimientoForm.reset({ idUbicacionOrigen: '', idUbicacionDestino: '', cantidad: null });
+  }
+
   onLoteSeleccionado(): void {
-    const idLote = this.movimientoForm.get('idLote')?.value;
+    const idLote = this.loteSeleccionado?.idLote;
     if (!idLote) {
       this.ubicacionesOrigen = [];
       this.ubicacionesDestino = [];
-      this.actualizarEstadoControles();
       return;
     }
 
     this.cargandoUbicaciones = true;
-    this.movimientoForm.patchValue({ idUbicacionOrigen: '', idUbicacionDestino: '', cantidad: 0 });
+    this.movimientoForm.patchValue({ idUbicacionOrigen: '', idUbicacionDestino: '', cantidad: null });
     this.stockDisponibleOrigen = 0;
 
-    // Cargar ubicaciones del lote
     this.loteUbicacionService.obtener_ubicacionLote_idLote(idLote).subscribe({
-      next: (response: any) => {
-        const data = response.data || response;
-        this.ubicacionesOrigen = Array.isArray(data) ? data : [];
-        
-        // Para destino, carga todas las ubicaciones de la sucursal del lote
-        const loteSeleccionado = this.lotes.find(l => l.idLote === idLote);
-        const idSucursal = loteSeleccionado?.idSucursal;
-        
-        if (idSucursal) {
-          this.ubicacionService.obtener_ubicacionesPrioridad_sucursal(idSucursal).subscribe({
-            next: (ubicaciones: any) => {
-              const ubicacionesData = Array.isArray(ubicaciones) ? ubicaciones : (ubicaciones.data || []);
-              // Excluir la ubicación origen de las opciones de destino
-              this.ubicacionesDestino = ubicacionesData.filter((u: any) => 
-                u.idUbicacion !== this.movimientoForm.get('idUbicacionOrigen')?.value
-              );
-              this.cargandoUbicaciones = false;
-              this.actualizarEstadoControles();
-            },
-            error: () => {
-              this.cargandoUbicaciones = false;
-              this.actualizarEstadoControles();
-            }
-          });
-        } else {
-          this.cargandoUbicaciones = false;
-          this.actualizarEstadoControles();
-        }
-      },
-      error: (error) => {
-        console.error('Error cargando ubicaciones', error);
+      next: (response: { data?: UbicacionLoteRow[] }) => {
+        const data = response.data ?? (response as unknown as UbicacionLoteRow[]);
+        const filas = (Array.isArray(data) ? data : []).filter((u) => Number(u.cantidad) > 0);
+        this.ubicacionesOrigen = filas;
+        this.ubicacionesDestino = [];
         this.cargandoUbicaciones = false;
         this.actualizarEstadoControles();
-        iziToast.show({
+      },
+      error: () => {
+        this.cargandoUbicaciones = false;
+        iziToast.error({
           title: 'Error',
-          titleColor: '#dc3545',
-          message: 'Error al cargar las ubicaciones del lote',
+          message: 'Error al cargar ubicaciones del lote',
           position: 'topRight'
         });
       }
     });
   }
 
-  /**
-   * Cuando seleccionan ubicación origen, actualiza stock disponible
-   */
   onUbicacionOrigenSeleccionada(): void {
-    const idUbicacionOrigen = this.movimientoForm.get('idUbicacionOrigen')?.value;
+    const idUbicacionOrigen = Number(this.movimientoForm.get('idUbicacionOrigen')?.value);
     if (!idUbicacionOrigen) {
       this.stockDisponibleOrigen = 0;
+      this.ubicacionesDestino = [];
       this.actualizarEstadoControles();
       return;
     }
-
-    const ubicacion = this.ubicacionesOrigen.find(u => u.idUbicacion === idUbicacionOrigen);
-    this.stockDisponibleOrigen = ubicacion?.cantidad || 0;
-    this.actualizarEstadoControles();
-    // Resetear cantidad si excede el disponible
-    const cantidadActual = this.movimientoForm.get('cantidad')?.value || 0;
+    const ubicacion = this.ubicacionesOrigen.find((u) => u.idUbicacion === idUbicacionOrigen);
+    this.stockDisponibleOrigen = Number(ubicacion?.cantidad) || 0;
+    this.cargarDestinosExcluyendoOrigen(idUbicacionOrigen);
+    const cantidadActual = Number(this.movimientoForm.get('cantidad')?.value) || 0;
     if (cantidadActual > this.stockDisponibleOrigen) {
       this.movimientoForm.patchValue({ cantidad: this.stockDisponibleOrigen });
     }
-    // Filtrar destino para excluir origen
-    const idSucursal = this.lotes.find(l => l.idLote === this.movimientoForm.get('idLote')?.value)?.idSucursal;
-    if (idSucursal) {
-      this.ubicacionService.obtener_ubicacionesPrioridad_sucursal(idSucursal).subscribe({
-        next: (ubicaciones: any) => {
-          const ubicacionesData = Array.isArray(ubicaciones) ? ubicaciones : (ubicaciones.data || []);
-          this.ubicacionesDestino = ubicacionesData.filter((u: any) => u.idUbicacion !== idUbicacionOrigen);
-          this.actualizarEstadoControles();
-        }
-      });
-    } else {
-      this.actualizarEstadoControles();
-    }
+    this.actualizarEstadoControles();
   }
 
-  /**
-   * Valida que la cantidad no exceda el stock disponible
-   */
+  private cargarDestinosExcluyendoOrigen(idUbicacionOrigen: number): void {
+    const idSucursal = this.loteSeleccionado?.idSucursal;
+    if (!idSucursal) {
+      return;
+    }
+    this.ubicacionPrioridadService.obtener_ubicacionesPrioridad_sucursal(idSucursal).subscribe({
+      next: (ubicaciones: { data?: UbicacionLoteRow[] } | UbicacionLoteRow[]) => {
+        const ubicacionesData = Array.isArray(ubicaciones)
+          ? ubicaciones
+          : Array.isArray(ubicaciones?.data)
+            ? ubicaciones.data
+            : [];
+        this.ubicacionesDestino = ubicacionesData.filter((u) => u.idUbicacion !== idUbicacionOrigen);
+        this.actualizarEstadoControles();
+      }
+    });
+  }
+
   validarCantidad(): void {
-    const cantidad = this.movimientoForm.get('cantidad')?.value || 0;
+    const cantidad = Number(this.movimientoForm.get('cantidad')?.value) || 0;
     if (cantidad > this.stockDisponibleOrigen) {
       this.movimientoForm.patchValue({ cantidad: this.stockDisponibleOrigen });
       iziToast.show({
@@ -197,11 +338,8 @@ export class MovimientoUbicacionComponent implements OnInit {
     }
   }
 
-  /**
-   * Ejecuta el traslado de stock entre ubicaciones
-   */
   ejecutarMovimiento(): void {
-    if (this.movimientoForm.invalid) {
+    if (!this.loteSeleccionado || this.movimientoForm.invalid) {
       this.marcarCamposComoTocados();
       iziToast.show({
         title: 'Validación',
@@ -212,9 +350,11 @@ export class MovimientoUbicacionComponent implements OnInit {
       return;
     }
 
-    const { idLote, idUbicacionOrigen, idUbicacionDestino, cantidad } = this.movimientoForm.getRawValue();
+    const idLote = this.loteSeleccionado.idLote;
+    const idUbicacionOrigen = Number(this.movimientoForm.get('idUbicacionOrigen')?.value);
+    const idUbicacionDestino = Number(this.movimientoForm.get('idUbicacionDestino')?.value);
+    const cantidad = Number(this.movimientoForm.get('cantidad')?.value);
 
-    // Validar que origen y destino sean diferentes
     if (idUbicacionOrigen === idUbicacionDestino) {
       iziToast.show({
         title: 'Validación',
@@ -225,7 +365,6 @@ export class MovimientoUbicacionComponent implements OnInit {
       return;
     }
 
-    // Validar stock disponible
     if (cantidad > this.stockDisponibleOrigen) {
       iziToast.show({
         title: 'Validación',
@@ -239,129 +378,87 @@ export class MovimientoUbicacionComponent implements OnInit {
     this.ejecutando = true;
     this.actualizarEstadoControles();
 
-    // 1. Restar de origen
-    const datosOrigen = {
-      idLote,
-      idUbicacion: idUbicacionOrigen,
-      cantidad: -cantidad // Negativo para restar
-    };
-
-    this.loteUbicacionService.actualizar_cantidad_loteUbicacion(datosOrigen).subscribe({
-      next: () => {
-        // 2. Sumar a destino (crear si no existe)
-        this.loteUbicacionService.crear_loteUbicacion({
-          idLote,
-          idUbicacion: idUbicacionDestino,
-          cantidad
-        }).subscribe({
-          next: () => {
-            this.ejecutando = false;
-            iziToast.show({
-              title: 'Éxito',
-              titleColor: '#28a745',
-              message: `Movimiento de ${cantidad} unidades ejecutado correctamente`,
-              position: 'topRight'
-            });
-            this.activeModal.close({ success: true, cantidad, idLote });
-          },
-          error: (error) => {
-            this.ejecutando = false;
-            this.actualizarEstadoControles();
-            console.error('Error en destino:', error);
-            // Intentar revertir el movimiento en origen
-            this.loteUbicacionService.actualizar_cantidad_loteUbicacion({
-              idLote,
-              idUbicacion: idUbicacionOrigen,
-              cantidad: cantidad // Positivo para sumar de vuelta
-            }).subscribe();
-            
-            iziToast.show({
-              title: 'Error',
-              titleColor: '#dc3545',
-              message: error.error?.message || 'Error al mover stock a destino',
-              position: 'topRight'
-            });
-          }
-        });
-      },
-      error: (error) => {
-        this.ejecutando = false;
-        this.actualizarEstadoControles();
-        console.error('Error en origen:', error);
-        iziToast.show({
-          title: 'Error',
-          titleColor: '#dc3545',
-          message: error.error?.message || 'Error al restar stock del origen',
-          position: 'topRight'
-        });
-      }
-    });
+    this.loteUbicacionService
+      .trasladoEntreUbicaciones({
+        idLote,
+        idUbicacionOrigen,
+        idUbicacionDestino,
+        cantidad
+      })
+      .subscribe({
+        next: (res) => {
+          this.ejecutando = false;
+          iziToast.success({
+            title: 'Éxito',
+            message: res.message || `Traslado de ${cantidad} unidades ejecutado`,
+            position: 'topRight'
+          });
+          this.activeModal.close({ success: true, cantidad, idLote });
+        },
+        error: (err) => {
+          this.ejecutando = false;
+          this.actualizarEstadoControles();
+          iziToast.error({
+            title: 'Error',
+            message: err?.error?.message || 'Error al ejecutar el traslado',
+            position: 'topRight'
+          });
+        }
+      });
   }
 
-  /**
-   * Marca todos los campos como tocados
-   */
+  marcaColumna(p: ProductoTrasladoUbicacion): string {
+    return marcaProductoEnLista(p as unknown as Record<string, unknown>);
+  }
+
   private marcarCamposComoTocados(): void {
-    Object.keys(this.movimientoForm.controls).forEach(key => {
+    Object.keys(this.movimientoForm.controls).forEach((key) => {
       this.movimientoForm.get(key)?.markAsTouched();
     });
   }
 
-  /**
-   * Verifica si un campo tiene error
-   */
   hasError(field: string): boolean {
     const control = this.movimientoForm.get(field);
     return !!(control?.invalid && control?.touched);
   }
 
-  /**
-   * Actualiza el estado disabled de los controles según el estado del formulario
-   * (evita usar [disabled] en template con reactive forms)
-   */
   actualizarEstadoControles(): void {
     const idOrigen = this.movimientoForm.get('idUbicacionOrigen')?.value;
-    const cIdLote = this.movimientoForm.get('idLote');
     const cOrigen = this.movimientoForm.get('idUbicacionOrigen');
     const cDestino = this.movimientoForm.get('idUbicacionDestino');
     const cCantidad = this.movimientoForm.get('cantidad');
     if (this.ejecutando) {
-      cIdLote?.disable();
       cOrigen?.disable();
       cDestino?.disable();
       cCantidad?.disable();
     } else {
-      cIdLote?.enable();
       cOrigen?.enable();
       cDestino?.enable();
       cCantidad?.enable();
-      if (this.ubicacionesOrigen.length === 0) cOrigen?.disable();
-      if (this.ubicacionesDestino.length === 0 || !idOrigen) cDestino?.disable();
-      if (this.stockDisponibleOrigen === 0) cCantidad?.disable();
+      if (this.ubicacionesOrigen.length === 0) {
+        cOrigen?.disable();
+      }
+      if (this.ubicacionesDestino.length === 0 || !idOrigen) {
+        cDestino?.disable();
+      }
+      if (this.stockDisponibleOrigen === 0) {
+        cCantidad?.disable();
+      }
     }
   }
 
-  /**
-   * Código de la ubicación origen seleccionada (para el resumen en template)
-   */
   get codigoUbicacionOrigen(): string {
-    const id = this.movimientoForm.get('idUbicacionOrigen')?.value;
-    const u = this.ubicacionesOrigen.find((u: any) => u.idUbicacion === id);
+    const id = Number(this.movimientoForm.get('idUbicacionOrigen')?.value);
+    const u = this.ubicacionesOrigen.find((x) => x.idUbicacion === id);
     return u?.codigoUbicacion ?? '';
   }
 
-  /**
-   * Código de la ubicación destino seleccionada (para el resumen en template)
-   */
   get codigoUbicacionDestino(): string {
-    const id = this.movimientoForm.get('idUbicacionDestino')?.value;
-    const u = this.ubicacionesDestino.find((u: any) => u.idUbicacion === id);
+    const id = Number(this.movimientoForm.get('idUbicacionDestino')?.value);
+    const u = this.ubicacionesDestino.find((x) => x.idUbicacion === id);
     return u?.codigoUbicacion ?? '';
   }
 
-  /**
-   * Cierra el modal
-   */
   cancelar(): void {
     this.activeModal.dismiss();
   }

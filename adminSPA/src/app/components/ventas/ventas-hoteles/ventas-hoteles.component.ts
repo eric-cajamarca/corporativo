@@ -12,6 +12,7 @@ import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.
 import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
 import { productoActivoParaVenta } from '../../../utils/producto-busqueda.util';
+import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 
 type EstadoReserva = 'vigente' | 'sin_efecto';
 
@@ -21,6 +22,7 @@ export interface ProductoParaConsumo {
   descripcion: string;
   pVenta?: number;
   codigoPresentacion?: string;
+  descripcionPres?: string;
   categoria?: string;
   sucursal?: string;
   stock?: number;
@@ -194,6 +196,7 @@ export class VentasHotelesComponent implements OnInit {
       descripcion: (x['descripcion'] ?? '') as string,
       pVenta: (x['pVenta'] != null ? Number(x['pVenta']) : 0),
       codigoPresentacion: (x['codigoPresentacion'] ?? '') as string,
+      descripcionPres: (x['descripcionPres'] ?? '') as string,
       categoria: (x['categoria'] ?? '') as string,
       sucursal: (x['sucursal'] ?? '') as string,
       stock: (x['stock'] != null ? Number(x['stock']) : undefined)
@@ -214,6 +217,10 @@ export class VentasHotelesComponent implements OnInit {
 
   cerrarModalBuscarProductoConsumo(): void {
     this.showModalBuscarProducto.set(false);
+  }
+
+  uMedidaColumnaConsumo(p: ProductoParaConsumo): string {
+    return descripcionUnidadMedidaProducto(p as unknown as Record<string, unknown>);
   }
 
   buscarProductosConsumo(): void {

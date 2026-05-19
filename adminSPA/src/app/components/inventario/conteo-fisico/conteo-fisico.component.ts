@@ -577,7 +577,8 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       buscar: string | null;
       filtroStock: 'todos' | 'cero' | 'minimo';
       catalogoConteoFisico: boolean;
-      idUbicacion?: number;
+      idUbicacionConteo?: number;
+      codigoUbicacionConteo?: string;
       idEmpresa?: string;
     } = {
       buscar: this.buscar?.trim() || null,
@@ -586,8 +587,19 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     };
     if (!this.esModoGestora) {
       params.idSucursal = this.sesion.idSucursal;
-      if (this.sesionInventarioPorUbicacion() && this.sesion?.idUbicacionInventario != null) {
-        params.idUbicacion = this.sesion.idUbicacionInventario;
+    }
+    if (this.sesionInventarioPorUbicacion()) {
+      const codUb = String(this.sesion?.codigoUbicacionInventario ?? '').trim();
+      if (codUb) {
+        params.codigoUbicacionConteo = codUb;
+        if (!this.esModoGestora) {
+          params.idSucursal = this.sesion.idSucursal;
+        }
+      } else if (this.sesion?.idUbicacionInventario != null) {
+        params.idUbicacionConteo = Number(this.sesion.idUbicacionInventario);
+        if (!this.esModoGestora) {
+          params.idSucursal = this.sesion.idSucursal;
+        }
       }
     }
     const idEmpresaFiltro = this.obtenerIdEmpresaFiltro();
@@ -653,6 +665,22 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     return c || `#${this.sesion.idUbicacionInventario}`;
   }
 
+  stockUbicacionConteoProducto(p: StockActualItem): number {
+    const n = p.stockUbicacionConteo != null ? Number(p.stockUbicacionConteo) : NaN;
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  columnasTablaBusqueda(): number {
+    let n = 6;
+    if (this.empresasGestionadas.length > 0) {
+      n += 1;
+    }
+    if (this.sesionInventarioPorUbicacion()) {
+      n += 1;
+    }
+    return n;
+  }
+
   /** En catálogo de conteo (incluye inactivos) el API envía estado 0. */
   productoCatalogoInactivo(p: StockActualItem): boolean {
     if (p.estado == null) {
@@ -668,11 +696,17 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
       this.stockRealInput = existente.stockReal != null ? Number(existente.stockReal) : null;
       this.notasInput = existente.notas || '';
     } else {
-      this.stockRealInput = Number(p.stock) || 0;
+      this.stockRealInput = this.sesionInventarioPorUbicacion()
+        ? this.stockUbicacionConteoProducto(p)
+        : Number(p.stock) || 0;
       this.notasInput = '';
     }
     if (existente && this.sesionInventarioPorUbicacion()) {
-      this.productoSeleccionado = { ...p, stock: Number(existente.stockSistema) || 0 };
+      this.productoSeleccionado = {
+        ...p,
+        stock: Number(existente.stockSistema) || 0,
+        stockUbicacionConteo: Number(existente.stockSistema) || 0
+      };
     }
     this.descripcionEdit = String(p.descripcion || '');
     const idCat = p.idCategoria != null && p.idCategoria !== undefined ? Number(p.idCategoria) : NaN;

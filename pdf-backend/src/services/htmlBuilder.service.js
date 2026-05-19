@@ -16,6 +16,21 @@ class HtmlBuilderService {
       .replace(/'/g, '&#39;');
   }
 
+  /** PDF ventas: solo calle; sin ubigeo/códigos SUNAT al final. */
+  _direccionClienteLegible(texto) {
+    let s = String(texto ?? '').trim();
+    if (!s) return '';
+    let prev;
+    do {
+      prev = s;
+      s = s
+        .replace(/\s+\d{6}(?:\s+\d{1,4}){0,2}(?:\s+\d{1,2})?\s*$/g, '')
+        .replace(/\s+(?:PEN|PE)\s*$/gi, '')
+        .trim();
+    } while (s !== prev);
+    return s;
+  }
+
   /** Texto de ítem para PDF: descripción + marca si existe (sin HTML). */
   _descripcionProductoPdfLinea(it) {
     const item = it && typeof it === 'object' ? it : {};
@@ -888,7 +903,7 @@ class HtmlBuilderService {
       ).join('');
 
     const razonSocial = cliente.rSocial || cliente.razonSocial || '';
-    const dirCliente = cliente.direccion || '';
+    const dirCliente = this._direccionClienteLegible(cliente.direccion || '');
     const condicionPago = this._normalizarCondicionPago(venta);
     const fVencimiento = venta.fVencimiento ? String(venta.fVencimiento).trim() : '';
     const cuentasBancarias = this._parseCuentasBancarias(empresa.cuentasBancarias);
@@ -1094,7 +1109,7 @@ class HtmlBuilderService {
   </div>
   <table class="detalle">
     <thead><tr>${incluirUnidadMedida
-    ? '<th class="text-center" style="width:8%;">Cant.</th><th class="text-center" style="width:12%;">U. MEDIDA</th><th style="width:36%;">Descripción</th><th class="text-end" style="width:16%;">P. Unit. (S/)</th><th class="text-end" style="width:16%;">Importe (S/)</th>'
+    ? '<th class="text-center" style="width:8%;">Cant.</th><th class="text-center" style="width:12%;">U. Medida</th><th style="width:36%;">Descripción</th><th class="text-end" style="width:16%;">P. Unit. (S/)</th><th class="text-end" style="width:16%;">Importe (S/)</th>'
     : '<th class="text-center" style="width:10%;">Cant.</th><th style="width:44%;">Descripción</th><th class="text-end" style="width:18%;">P. Unit. (S/)</th><th class="text-end" style="width:18%;">Importe (S/)</th>'}</tr></thead>
     <tbody>${filas}</tbody>
   </table>

@@ -3,7 +3,12 @@
 }
 
 .modal-body {
-  max-height: 70vh;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.mov-ubic-table-wrap {
+  max-height: 280px;
   overflow-y: auto;
 }
 

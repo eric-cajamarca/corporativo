@@ -19,6 +19,8 @@ export interface StockActualItem {
   estado?: number;
   /** Stock total sin ubicaciones asignadas (solo para vista general). */
   stockSinUbicacion?: number;
+  /** Stock en la ubicación de conteo de la sesión (conteo físico). */
+  stockUbicacionConteo?: number;
 }
 
 export interface StockActualResponse {

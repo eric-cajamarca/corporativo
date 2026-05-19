@@ -29,6 +29,7 @@ import {
   productoCoincideBusquedaMultipalabra,
   productoSinStockEnBusqueda
 } from '../../../utils/producto-busqueda.util';
+import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 import {
   CotizacionesService,
   CotizacionListado,
@@ -945,6 +946,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Recarga catálogo desde BD y mantiene el texto del input (solo filtra de nuevo). */
   recargarCatalogoProductosModal(): void {
     this.cargarProductos({ evitarCache: true });
+  }
+
+  uMedidaColumnaVentas(p: any): string {
+    return descripcionUnidadMedidaProducto(p);
   }
 
   marcaColumnaVentas(p: any): string {

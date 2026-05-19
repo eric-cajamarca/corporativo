@@ -7,150 +7,262 @@
 </div>
 
 <div class="modal-body">
-  <form [formGroup]="movimientoForm" (ngSubmit)="ejecutarMovimiento()">
-    <!-- Selección de Lote -->
-    <div class="mb-3">
-      <label for="lote" class="form-label">Lote *</label>
-      @if (cargandoLotes) {
-        <div class="text-center py-2">
-          <div class="spinner-border spinner-border-sm text-primary"></div>
-        </div>
+  <div class="mb-3">
+    <label class="form-label">
+      @if (esModoGestora) {
+        Sucursal de referencia (opcional)
       } @else {
-        <select 
-          id="lote" 
-          formControlName="idLote" 
-          class="form-select"
-          [class.is-invalid]="hasError('idLote')"
-          (change)="onLoteSeleccionado()">
-          <option value="">Seleccione un lote</option>
-          @for (lote of lotes; track lote.idLote) {
-            <option [value]="lote.idLote">
-              {{ lote.nombreProducto || 'Lote' }} - {{ lote.idLote | slice:0:8 }}... 
-              ({{ lote.cantidadDisponible }} unid.)
-            </option>
-          }
-        </select>
-        @if (hasError('idLote')) {
-          <div class="invalid-feedback">Seleccione un lote</div>
-        }
+        Sucursal *
       }
-    </div>
-
-    <!-- Ubicación Origen -->
-    <div class="mb-3">
-      <label for="origen" class="form-label">Desde Ubicación *</label>
-      @if (cargandoUbicaciones) {
-        <div class="text-center py-2">
-          <div class="spinner-border spinner-border-sm text-primary"></div>
-        </div>
-      } @else {
-        <select 
-          id="origen" 
-          formControlName="idUbicacionOrigen" 
-          class="form-select"
-          [class.is-invalid]="hasError('idUbicacionOrigen')"
-          (change)="onUbicacionOrigenSeleccionada()">
-          <option value="">Seleccione origen</option>
-          @for (u of ubicacionesOrigen; track u.idUbicacion) {
-            <option [value]="u.idUbicacion">
-              {{ u.codigoUbicacion }} ({{ u.cantidad }} unid.)
-            </option>
-          }
-        </select>
-        @if (hasError('idUbicacionOrigen')) {
-          <div class="invalid-feedback">Seleccione una ubicación origen</div>
+    </label>
+    @if (cargandoSucursales) {
+      <div class="spinner-border spinner-border-sm text-primary"></div>
+    } @else {
+      <select class="form-select" [(ngModel)]="idSucursalSeleccionada" [ngModelOptions]="{ standalone: true }" [disabled]="ejecutando || !!idLote">
+        @if (esModoGestora) {
+          <option value="">Todas las sucursales (empresas gestionadas)</option>
         }
-        @if (ubicacionesOrigen.length === 0 && movimientoForm.get('idLote')?.value) {
-          <small class="text-muted">Este lote no tiene ubicaciones asignadas</small>
-        }
-      }
-    </div>
-
-    <!-- Stock disponible en origen -->
-    @if (stockDisponibleOrigen > 0) {
-      <div class="alert alert-info mb-3">
-        <i class="bi bi-info-circle me-2"></i>
-        <strong>Stock disponible en origen:</strong> {{ stockDisponibleOrigen }} unidades
-      </div>
-    }
-
-    <!-- Ubicación Destino -->
-    <div class="mb-3">
-      <label for="destino" class="form-label">Hacia Ubicación *</label>
-      <select 
-        id="destino" 
-        formControlName="idUbicacionDestino" 
-        class="form-select"
-        [class.is-invalid]="hasError('idUbicacionDestino')"
-        [disabled]="ejecutando || ubicacionesDestino.length === 0 || !movimientoForm.get('idUbicacionOrigen')?.value">
-        <option value="">Seleccione destino</option>
-        @for (u of ubicacionesDestino; track u.idUbicacion) {
-          <option [value]="u.idUbicacion">
-            {{ u.codigoUbicacion }} (Prioridad: {{ u.prioridad }})
-          </option>
+        @for (s of sucursales; track s.idSucursal) {
+          <option [value]="s.idSucursal">{{ s.nombre }}</option>
         }
       </select>
-      @if (hasError('idUbicacionDestino')) {
-        <div class="invalid-feedback">Seleccione una ubicación destino</div>
+      @if (esModoGestora) {
+        <small class="text-muted d-block mt-1">
+          La búsqueda incluye productos con stock en ubicación en cualquier sucursal de las empresas gestionadas.
+        </small>
       }
-      @if (ubicacionesDestino.length === 0 && movimientoForm.get('idUbicacionOrigen')?.value) {
-        <small class="text-muted">No hay otras ubicaciones disponibles</small>
-      }
-    </div>
+    }
+  </div>
 
-    <!-- Cantidad -->
+  @if (paso === 'producto' && !idLote) {
     <div class="mb-3">
-      <label for="cantidad" class="form-label">Cantidad a Mover *</label>
-      <input 
-        type="number" 
-        id="cantidad" 
-        formControlName="cantidad" 
-        class="form-control"
-        [class.is-invalid]="hasError('cantidad')"
-        (blur)="validarCantidad()"
-        [max]="stockDisponibleOrigen"
-        min="1">
-      @if (hasError('cantidad')) {
-        <div class="invalid-feedback">Ingrese una cantidad válida</div>
-      }
-      @if (stockDisponibleOrigen > 0) {
-        <small class="text-muted">Máximo: {{ stockDisponibleOrigen }} unidades</small>
+      <label class="form-label">Buscar producto</label>
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <input
+          type="search"
+          class="form-control flex-grow-1"
+          placeholder="Código, descripción, marca, categoría…"
+          [(ngModel)]="buscarProducto"
+          [ngModelOptions]="{ standalone: true }"
+          (keyup.enter)="buscarProductos()"
+          [disabled]="ejecutando"
+        />
+        <button type="button" class="btn btn-primary" (click)="buscarProductos()" [disabled]="cargandoBusqueda || ejecutando">
+          <i class="bi bi-search me-1"></i>Buscar
+        </button>
+      </div>
+      @if (cargandoBusqueda) {
+        <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></div>
+      } @else {
+        <div class="table-responsive mov-ubic-table-wrap">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Código</th>
+                <th>Producto</th>
+                @if (esModoGestora) {
+                  <th>Empresa</th>
+                }
+                <th>Marca</th>
+                <th class="text-end">Stock ubic.</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of productosResultado; track p.idProducto) {
+                <tr>
+                  <td class="text-nowrap">{{ p.codigoProducto }}</td>
+                  <td>{{ p.nombreProducto }}</td>
+                  @if (esModoGestora) {
+                    <td class="small">{{ p.aliasEmpresa || '—' }}</td>
+                  }
+                  <td class="small">{{ marcaColumna(p) }}</td>
+                  <td class="text-end">{{ p.stockEnUbicaciones | number : '1.0-3' }}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirProducto(p)">Elegir</button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="esModoGestora ? 6 : 5" class="text-center text-muted py-3">
+                    Busque productos con stock en ubicaciones.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
     </div>
+  }
 
-    <!-- Resumen del movimiento -->
-    @if (movimientoForm.get('cantidad')?.value > 0 && movimientoForm.get('idUbicacionOrigen')?.value && movimientoForm.get('idUbicacionDestino')?.value) {
-      <div class="alert alert-success">
-        <i class="bi bi-check-circle me-2"></i>
-        <strong>Resumen:</strong> Mover 
-        <strong>{{ movimientoForm.get('cantidad')?.value }}</strong> unidades desde 
-        <strong>{{ codigoUbicacionOrigen }}</strong> 
-        hacia 
-        <strong>{{ codigoUbicacionDestino }}</strong>
+  @if (paso === 'lote' && productoSeleccionado) {
+    <div class="mb-2 d-flex justify-content-between align-items-start gap-2">
+      <div>
+        <div class="fw-semibold">{{ productoSeleccionado.nombreProducto }}</div>
+        <div class="small text-muted">{{ productoSeleccionado.codigoProducto }}</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="volverABuscarProducto()">Cambiar producto</button>
+    </div>
+    <label class="form-label">Seleccione lote</label>
+    @if (cargandoLotes) {
+      <div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div></div>
+    } @else {
+      <div class="table-responsive mov-ubic-table-wrap">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Lote</th>
+              <th>Sucursal</th>
+              <th class="text-end">Disp. lote</th>
+              <th class="text-end">En ubic.</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (l of lotesProducto; track l.idLote) {
+              <tr>
+                <td>{{ l.numeroLote || (l.idLote | slice : 0 : 8) }}</td>
+                <td>{{ l.nombreSucursal }}</td>
+                <td class="text-end">{{ l.cantidadDisponible | number : '1.0-3' }}</td>
+                <td class="text-end">{{ l.stockEnUbicaciones | number : '1.0-3' }}</td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirLote(l)">Elegir</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">Sin lotes con stock en ubicaciones.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
       </div>
     }
-  </form>
+  }
+
+  @if (paso === 'traslado' && loteSeleccionado) {
+    <div class="mb-3 d-flex justify-content-between align-items-start gap-2 flex-wrap">
+      <div>
+        <div class="fw-semibold">{{ productoSeleccionado?.nombreProducto || 'Producto' }}</div>
+        <div class="small text-muted">
+          Lote: {{ loteSeleccionado.numeroLote || (loteSeleccionado.idLote | slice : 0 : 8) }}
+          · {{ loteSeleccionado.nombreSucursal }}
+        </div>
+      </div>
+      @if (!idLote) {
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="volverALotes()">Cambiar lote</button>
+      }
+    </div>
+
+    <form [formGroup]="movimientoForm" (ngSubmit)="ejecutarMovimiento()">
+      <div class="mb-3">
+        <label for="origen" class="form-label">Desde Ubicación *</label>
+        @if (cargandoUbicaciones) {
+          <div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div></div>
+        } @else {
+          <select
+            id="origen"
+            formControlName="idUbicacionOrigen"
+            class="form-select"
+            [class.is-invalid]="hasError('idUbicacionOrigen')"
+            (change)="onUbicacionOrigenSeleccionada()"
+          >
+            <option value="">Seleccione origen</option>
+            @for (u of ubicacionesOrigen; track u.idUbicacion) {
+              <option [ngValue]="u.idUbicacion">{{ u.codigoUbicacion }} ({{ u.cantidad | number : '1.0-3' }} unid.)</option>
+            }
+          </select>
+          @if (hasError('idUbicacionOrigen')) {
+            <div class="invalid-feedback">Seleccione una ubicación origen</div>
+          }
+          @if (ubicacionesOrigen.length === 0) {
+            <small class="text-muted">Este lote no tiene stock en ubicaciones. Asigne stock desde Gestión de lotes.</small>
+          }
+        }
+      </div>
+
+      @if (stockDisponibleOrigen > 0) {
+        <div class="alert alert-info mb-3 py-2">
+          <i class="bi bi-info-circle me-2"></i>
+          <strong>Stock disponible en origen:</strong> {{ stockDisponibleOrigen | number : '1.0-3' }} unidades
+        </div>
+      }
+
+      <div class="mb-3">
+        <label for="destino" class="form-label">Hacia Ubicación *</label>
+        <select
+          id="destino"
+          formControlName="idUbicacionDestino"
+          class="form-select"
+          [class.is-invalid]="hasError('idUbicacionDestino')"
+        >
+          <option value="">Seleccione destino</option>
+          @for (u of ubicacionesDestino; track u.idUbicacion) {
+            <option [ngValue]="u.idUbicacion">
+              {{ u.codigoUbicacion }}@if (u.prioridad != null) { (P: {{ u.prioridad }}) }
+            </option>
+          }
+        </select>
+        @if (hasError('idUbicacionDestino')) {
+          <div class="invalid-feedback">Seleccione una ubicación destino</div>
+        }
+      </div>
+
+      <div class="mb-3">
+        <label for="cantidad" class="form-label">Cantidad a Mover *</label>
+        <input
+          type="number"
+          id="cantidad"
+          formControlName="cantidad"
+          class="form-control"
+          [class.is-invalid]="hasError('cantidad')"
+          (blur)="validarCantidad()"
+          [max]="stockDisponibleOrigen"
+          min="0.001"
+          step="0.001"
+        />
+        @if (hasError('cantidad')) {
+          <div class="invalid-feedback">Ingrese una cantidad válida</div>
+        }
+        @if (stockDisponibleOrigen > 0) {
+          <small class="text-muted">Máximo: {{ stockDisponibleOrigen | number : '1.0-3' }} unidades</small>
+        }
+      </div>
+
+      @if (
+        (movimientoForm.get('cantidad')?.value ?? 0) > 0 &&
+        movimientoForm.get('idUbicacionOrigen')?.value &&
+        movimientoForm.get('idUbicacionDestino')?.value
+      ) {
+        <div class="alert alert-success py-2">
+          <i class="bi bi-check-circle me-2"></i>
+          <strong>Resumen:</strong> Mover
+          <strong>{{ movimientoForm.get('cantidad')?.value | number : '1.0-3' }}</strong> unidades desde
+          <strong>{{ codigoUbicacionOrigen }}</strong> hacia <strong>{{ codigoUbicacionDestino }}</strong>
+        </div>
+      }
+    </form>
+  }
 </div>
 
 <div class="modal-footer">
-  <button 
-    type="button" 
-    class="btn btn-secondary" 
-    (click)="cancelar()"
-    [disabled]="ejecutando">
-    <i class="bi bi-x-times me-1"></i>Cancelar
-  </button>
-  <button 
-    type="button" 
-    class="btn btn-warning" 
-    (click)="ejecutarMovimiento()" 
-    [disabled]="movimientoForm.invalid || ejecutando || stockDisponibleOrigen === 0">
-    @if (ejecutando) {
-      <span class="spinner-border spinner-border-sm me-1"></span>
-      Ejecutando...
-    } @else {
-      <i class="bi bi-arrow-repeat me-1"></i>
-      Ejecutar Movimiento
-    }
-  </button>
+  <button type="button" class="btn btn-secondary" (click)="cancelar()" [disabled]="ejecutando">Cancelar</button>
+  @if (paso === 'traslado') {
+    <button
+      type="button"
+      class="btn btn-warning"
+      (click)="ejecutarMovimiento()"
+      [disabled]="movimientoForm.invalid || ejecutando || stockDisponibleOrigen === 0"
+    >
+      @if (ejecutando) {
+        <span class="spinner-border spinner-border-sm me-1"></span>
+        Ejecutando...
+      } @else {
+        <i class="bi bi-arrow-repeat me-1"></i>
+        Ejecutar Movimiento
+      }
+    </button>
+  }
 </div>
+
