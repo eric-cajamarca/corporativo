@@ -390,6 +390,7 @@
 .visor-fullscreen-overlay {
   position: fixed;
   inset: 0;
+  /* Por debajo de modales inventario (1090) y encima del modal Bootstrap buscador (~1055) */
   z-index: 1060;
   background: rgba(0, 0, 0, 0.9);
   display: flex;

@@ -23,7 +23,12 @@ import { ModalPreciosComponent } from '../../modal-precios/modal-precios.compone
 import { ModalService } from '../../../services/modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
-import { marcaProductoEnLista, productoActivoParaVenta, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
+import {
+  marcaProductoEnLista,
+  productoActivoParaVenta,
+  productoCoincideBusquedaMultipalabra,
+  productoSinStockEnBusqueda
+} from '../../../utils/producto-busqueda.util';
 import {
   CotizacionesService,
   CotizacionListado,
@@ -1213,27 +1218,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   buscarProductos(): void {
-    const term = this.searchTerm.toLowerCase().trim();
+    const term = this.searchTerm.trim();
     const activos = this.obtenerCatalogoProductosOperativo();
     if (term === '') {
       this.productos_filtrados = activos;
     } else {
-      this.productos_filtrados = activos.filter((item: any) => {
-        const descripcion = (item.descripcion ?? '').toString().toLowerCase();
-        const codigo = (item.codigo ?? '').toString().toLowerCase();
-        const marcaCol = marcaProductoEnLista(item as Record<string, unknown>).toLowerCase();
-        const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
-        const alias = (item.aliasEmpresa ?? '').toString().toLowerCase();
-        const sucursal = (item.sucursal ?? '').toString().toLowerCase();
-        return (
-          descripcion.includes(term) ||
-          codigo.includes(term) ||
-          marcaCol.includes(term) ||
-          marcaLegacy.includes(term) ||
-          alias.includes(term) ||
-          sucursal.includes(term)
-        );
-      });
+      this.productos_filtrados = activos.filter((item: any) =>
+        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term)
+      );
     }
   }
 

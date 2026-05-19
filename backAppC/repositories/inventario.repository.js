@@ -1,6 +1,7 @@
 // repositories/inventario.repository.js
 const sql = require('mssql');
 const { normalizarFechaMovimientoParaSql } = require('../utils/fechaMovimientoInventario.util');
+const { clausulaBusquedaProductoMultiPalabra } = require('../utils/productoBusqueda.util');
 
 /**
  * Inserta una fila en MovimientosInventario (esquema con idProducto y cantidad NOT NULL).
@@ -499,15 +500,15 @@ exports.listarStockActual = async (pool, opts) => {
 
   const cat = opts.categoriaLike && String(opts.categoriaLike).trim() ? `%${String(opts.categoriaLike).trim()}%` : null;
   const mar = opts.marcaLike && String(opts.marcaLike).trim() ? `%${String(opts.marcaLike).trim()}%` : null;
-  const bus = opts.buscar && String(opts.buscar).trim() ? `%${String(opts.buscar).trim()}%` : null;
 
   if (cat) request.input('catLike', sql.NVarChar(200), cat);
   if (mar) request.input('marLike', sql.NVarChar(200), mar);
-  if (bus) request.input('busLike', sql.NVarChar(500), bus);
+
+  const busquedaMulti = clausulaBusquedaProductoMultiPalabra(request, opts.buscar, 'busStock');
 
   const whereSucursal = idSucursal ? 'AND l.idSucursal = @idSucursal' : '';
   const whereCat = cat ? 'AND c.nombre LIKE @catLike' : '';
-  const whereBus = bus ? 'AND (p.codigo LIKE @busLike OR p.descripcion LIKE @busLike)' : '';
+  const whereBus = busquedaMulti.clause;
   const whereMarFixed = mar ? 'AND ISNULL(m.nombre, \'\') LIKE @marLike' : '';
 
   const stkJoin = usarStockPorUbicacion

@@ -1,3 +1,51 @@
+/** Palabras del término de búsqueda (separadas por espacios). */
+export function tokenizarTerminoBusquedaProducto(termino: string): string[] {
+  const t = String(termino ?? '').trim().toLowerCase();
+  if (!t) {
+    return [];
+  }
+  return t.split(/\s+/).filter(Boolean);
+}
+
+/** Campos usados en el modal de búsqueda de productos (ventas, conteo físico en cliente). */
+export function camposBusquedaProducto(item: Record<string, unknown> | null | undefined): {
+  codigo: string;
+  descripcion: string;
+  marca: string;
+  categoria: string;
+} {
+  if (!item) {
+    return { codigo: '', descripcion: '', marca: '', categoria: '' };
+  }
+  return {
+    codigo: String(item['codigo'] ?? '').toLowerCase(),
+    descripcion: String(item['descripcion'] ?? '').toLowerCase(),
+    marca: marcaProductoEnLista(item).toLowerCase(),
+    categoria: String(item['categoria'] ?? '').toLowerCase()
+  };
+}
+
+/**
+ * Cada palabra del término debe aparecer en al menos uno de: código, descripción, marca o categoría.
+ */
+export function productoCoincideBusquedaMultipalabra(
+  item: Record<string, unknown> | null | undefined,
+  termino: string
+): boolean {
+  const tokens = tokenizarTerminoBusquedaProducto(termino);
+  if (!tokens.length) {
+    return true;
+  }
+  const campos = camposBusquedaProducto(item);
+  return tokens.every(
+    (tok) =>
+      campos.codigo.includes(tok) ||
+      campos.descripcion.includes(tok) ||
+      campos.marca.includes(tok) ||
+      campos.categoria.includes(tok)
+  );
+}
+
 /** Texto de marca para listados / modales (API puede enviar marca, nombreMarca o nombre). */
 export function marcaProductoEnLista(item: Record<string, unknown> | null | undefined): string {
   if (!item) return '';

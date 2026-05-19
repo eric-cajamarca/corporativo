@@ -100,6 +100,7 @@ export class LoteListComponent implements OnInit {
       filtrados = filtrados.filter(
         l =>
           term.test(l.nombreProducto || '') ||
+          term.test(l.codigoProducto || '') ||
           term.test(l.idProducto || '') ||
           term.test(l.numeroLote || '')
       );
@@ -117,9 +118,11 @@ export class LoteListComponent implements OnInit {
 
     if (this.filtroProducto) {
       const term = new RegExp(this.filtroProducto, 'i');
-      filtrados = filtrados.filter(l => 
-        term.test(l.nombreProducto || '') || 
-        term.test(l.idProducto || '')
+      filtrados = filtrados.filter(l =>
+        term.test(l.nombreProducto || '') ||
+        term.test(l.codigoProducto || '') ||
+        term.test(l.idProducto || '') ||
+        term.test(l.numeroLote || '')
       );
     }
 

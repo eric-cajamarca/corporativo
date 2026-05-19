@@ -10,6 +10,7 @@ export interface Lote {
   fechaIngreso?: Date;
   // Propiedades extendidas para UI
   nombreProducto?: string;
+  codigoProducto?: string;
   nombreSucursal?: string;
   aliasEmpresa?: string;
   ubicaciones?: any[];

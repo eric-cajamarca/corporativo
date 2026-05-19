@@ -16,6 +16,23 @@
   z-index: 1075 !important;
 }
 
+/**
+ * NgbModal inventario (lotes, asignar ubicaciones) sobre Bootstrap modal (ventas/compras)
+ * y sobre overlays custom (stock por ubicación, visor).
+ */
+body > .modal.modal-inventario-ngb-layer {
+  z-index: 1090 !important;
+}
+body > .modal-backdrop.modal-inventario-ngb-backdrop {
+  z-index: 1085 !important;
+}
+body > .modal.modal-inventario-ngb-layer ~ .modal.modal-inventario-ngb-layer {
+  z-index: 1100 !important;
+}
+body > .modal-backdrop.modal-inventario-ngb-backdrop ~ .modal-backdrop.modal-inventario-ngb-backdrop {
+  z-index: 1095 !important;
+}
+
 /* Inventario: modales adaptativos (escritorio lg centrado; viewport menor que sm = pantalla completa) */
 .modal-inventario-dialog.modal-fullscreen-sm-down {
   margin: 0;

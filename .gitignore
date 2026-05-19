@@ -21,6 +21,8 @@ documentacion/
 ops/
 otros/
 respaldo/
+CRM/
+
 
 # Caché / pruebas (por si se generan fuera de adminSPA/.gitignore)
 **/.angular/cache/

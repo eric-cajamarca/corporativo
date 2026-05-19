@@ -232,7 +232,7 @@
                   class="form-control form-control-sm flex-grow-1"
                   [(ngModel)]="buscar"
                   (keyup.enter)="buscarCatalogo()"
-                  placeholder="Código, descripción, marca…"
+                  placeholder="Código, descripción, marca, categoría…"
                 />
                 <button type="button" class="btn btn-primary btn-sm" (click)="buscarCatalogo()" [disabled]="cargandoBusqueda">
                   <i class="bi bi-search me-1"></i>Buscar
@@ -281,16 +281,16 @@
                           {{ p.stock | number : '1.0-3' }}
                         </td>
                         <td class="text-end align-middle conteo-col-sin-ubic" data-label="Sin ubic.">
-                          @if (tieneStockSinUbicacion(p)) {
-                            <div class="conteo-sin-ubic-valor d-flex flex-column align-items-end gap-1 ms-auto">
+                          <div class="conteo-sin-ubic-valor d-flex flex-column align-items-end gap-1 ms-auto">
+                            @if (tieneStockSinUbicacion(p)) {
                               <span class="text-danger">{{ p.stockSinUbicacion | number : '1.0-3' }}</span>
-                              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirAsignarSinUbicar(p)">
-                                <i class="bi bi-geo"></i> Asignar
-                              </button>
-                            </div>
-                          } @else {
-                            <span class="text-muted small">—</span>
-                          }
+                            } @else {
+                              <span class="text-muted small">—</span>
+                            }
+                            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirAsignarSinUbicar(p)">
+                              <i class="bi bi-geo"></i> Asignar
+                            </button>
+                          </div>
                         </td>
                         <td class="text-end text-nowrap align-middle conteo-col-stock" data-label="Stock real">
                           @if (srLinea != null) {

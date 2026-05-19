@@ -9,6 +9,7 @@ const { connectDB } = require('./dbConnection');
 const xss = require('xss'); // Solo si vas a usarlo
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const auth = require('./middlewares/autenticate');
 const { requestContextMiddleware } = require('./middlewares/requestContext.middleware');
 const { querySafeMiddleware } = require('./middlewares/tenant-query');
@@ -249,6 +250,23 @@ app.use('/api', webhooksRoutes);
 app.use('/api', suscripcionRoutes);
 const grifoRoutes = require('./routes/grifo');
 app.use('/api', grifoRoutes);
+
+// Modo una sola máquina (sin Nginx): sirve el build Angular desde SERVE_SPA_ROOT (p. ej. C:\EFAF\app\www)
+if (process.env.SERVE_SPA_ROOT) {
+  const spaRoot = path.resolve(process.env.SERVE_SPA_ROOT);
+  if (fs.existsSync(spaRoot)) {
+    app.use(express.static(spaRoot, { index: false }));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path === '/health') {
+        return next();
+      }
+      res.sendFile(path.join(spaRoot, 'index.html'), (err) => (err ? next(err) : undefined));
+    });
+    console.error('context:', JSON.stringify({ level: 'info', message: 'desktop_spa_enabled', spaRoot }));
+  } else {
+    console.error('context:', JSON.stringify({ level: 'error', message: 'SERVE_SPA_ROOT_missing', spaRoot }));
+  }
+}
 
 // Errores: 5xx → WhatsApp al desarrollador (throttle en seguridadAlertas); 4xx sin alerta
 const errorHandler = require('./middlewares/errorHandler');

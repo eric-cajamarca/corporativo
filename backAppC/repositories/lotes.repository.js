@@ -31,10 +31,11 @@ async function getAll(idEmpresa) {
                 l.cantidadDisponible,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
                 p.descripcion AS nombreProducto,
+                p.codigo AS codigoProducto,
                 s.nombre AS nombreSucursal,
                 ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa
             FROM Lotes l
-            LEFT JOIN Productos p ON l.idProducto = p.idProducto
+            LEFT JOIN Productos p ON l.idProducto = p.idProducto AND p.idEmpresa = l.idEmpresa
             LEFT JOIN Sucursal s ON l.idSucursal = s.idSucursal
             LEFT JOIN Empresas e ON e.idEmpresa = l.idEmpresa
             WHERE l.idEmpresa = @idEmpresa 
@@ -63,6 +64,7 @@ async function getAllPorEmpresas(idsEmpresa) {
                 l.cantidadDisponible,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
                 p.descripcion AS nombreProducto,
+                p.codigo AS codigoProducto,
                 s.nombre AS nombreSucursal,
                 ISNULL(e.alias, ISNULL(e.nombreComercial, e.razon_Social)) AS aliasEmpresa
             FROM Lotes l

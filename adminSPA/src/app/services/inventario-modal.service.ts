@@ -12,6 +12,15 @@ import { VentaPorPrioridadComponent } from '../components/inventario/venta-por-p
 })
 export class InventarioModalService {
 
+  /** Por encima de Bootstrap modal (~1055) y overlays de stock/visor (~1060). */
+  private readonly modalInventarioBase = {
+    centered: true,
+    backdrop: 'static' as const,
+    container: 'body',
+    windowClass: 'modal-inventario-ngb-layer',
+    backdropClass: 'modal-inventario-ngb-backdrop'
+  };
+
   constructor(private modalService: NgbModal) {}
 
   /**
@@ -19,9 +28,8 @@ export class InventarioModalService {
    */
   abrirAsignarUbicaciones(idLote: string, cantidadTotal: number): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(AsignarStockUbicacionComponent, {
-      size: 'lg',
-      centered: true,
-      backdrop: 'static'
+      ...this.modalInventarioBase,
+      size: 'lg'
     });
 
     const component = modalRef.componentInstance as AsignarStockUbicacionComponent;
@@ -36,9 +44,8 @@ export class InventarioModalService {
    */
   abrirLoteForm(idLote?: string, idProducto?: string, idSucursal?: string): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(LoteFormComponent, {
-      size: 'lg',
-      centered: true,
-      backdrop: 'static'
+      ...this.modalInventarioBase,
+      size: 'lg'
     });
 
     const component = modalRef.componentInstance as LoteFormComponent;
@@ -61,9 +68,8 @@ export class InventarioModalService {
    */
   abrirLoteList(filtros?: any): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(LoteListComponent, {
+      ...this.modalInventarioBase,
       size: 'xl',
-      centered: true,
-      backdrop: 'static',
       scrollable: true
     });
 
@@ -80,9 +86,8 @@ export class InventarioModalService {
    */
   abrirMovimientoUbicacion(idLote?: string): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(MovimientoUbicacionComponent, {
-      size: 'lg',
-      centered: true,
-      backdrop: 'static'
+      ...this.modalInventarioBase,
+      size: 'lg'
     });
 
     const component = modalRef.componentInstance as MovimientoUbicacionComponent;
@@ -99,9 +104,8 @@ export class InventarioModalService {
    */
   abrirUbicacionesPrioridad(idSucursal?: string): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(UbicacionPrioridadListComponent, {
+      ...this.modalInventarioBase,
       size: 'xl',
-      centered: true,
-      backdrop: 'static',
       scrollable: true
     });
 
@@ -118,9 +122,8 @@ export class InventarioModalService {
    */
   abrirVentaPorPrioridad(idSucursal?: string): Promise<any> {
     const modalRef: NgbModalRef = this.modalService.open(VentaPorPrioridadComponent, {
-      size: 'lg',
-      centered: true,
-      backdrop: 'static'
+      ...this.modalInventarioBase,
+      size: 'lg'
     });
 
     const component = modalRef.componentInstance as VentaPorPrioridadComponent;
