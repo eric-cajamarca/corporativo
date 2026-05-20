@@ -32,6 +32,44 @@ const obtener_productos_todos = async (req, res) => {
   }
 };
 
+const buscar_productos_venta = async (req, res) => {
+  try {
+    const q = req.query && req.query.q != null ? String(req.query.q).trim() : '';
+    const limit = req.query && req.query.limit != null ? req.query.limit : 80;
+    const idSucursal = req.query && req.query.idSucursal != null ? String(req.query.idSucursal).trim() : null;
+
+    const productos = await withPool(async (pool) =>
+      ProductosServices.buscarProductosVentaService(pool, req.user, q, limit, idSucursal)
+    );
+
+    res.status(200).send({ data: productos });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(500).send({ message: 'No Access', data: undefined });
+    }
+    if (error.message === 'NO_PERMISSIONS') {
+      return res.status(200).send({
+        message: 'No tiene permisos para realizar esta acción',
+        data: undefined
+      });
+    }
+    if (error.message === 'TERMINO_CORTO') {
+      return res.status(400).send({
+        message: 'Ingrese al menos 2 caracteres para buscar',
+        data: []
+      });
+    }
+    if (error.message === 'ID_SUCURSAL_INVALIDO') {
+      return res.status(400).send({ message: 'Sucursal inválida', data: undefined });
+    }
+    console.error('buscar_productos_venta:', error);
+    res.status(500).send({
+      message: 'Error al buscar productos',
+      data: undefined
+    });
+  }
+};
+
 const obtener_productos_compras = async (req, res) => {
   try {
 
@@ -642,6 +680,7 @@ const obtener_stock_ubicaciones_producto = async (req, res) => {
 
 module.exports = {
   obtener_productos_todos,
+  buscar_productos_venta,
   obtener_productos_compras,
   obtener_productos_habitacion,
   match_productos_descripcion,

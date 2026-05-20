@@ -49,9 +49,6 @@ export class UtilidadesService {
   /** Detalle por línea de venta (producto, fecha, comprobante, precio, costo, utilidad, idVenta). */
   getUtilidadesDetalle(fechaInicio: string, fechaFin: string): Observable<{ message: string; data: FilaUtilidadDetalle[] }> {
     const requestUrl = this.url + '/detalle';
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '486b2c' }, body: JSON.stringify({ sessionId: '486b2c', location: 'utilidades.service.ts:getUtilidadesDetalle', message: 'request URL', data: { requestUrl, baseUrl: this.url }, timestamp: Date.now(), hypothesisId: 'H3' }) }).catch(() => {});
-    // #endregion
     return this.http.get<{ message: string; data: FilaUtilidadDetalle[] }>(requestUrl, {
       params: { fechaInicio, fechaFin },
       withCredentials: true,

@@ -142,15 +142,8 @@ async function obtenerUtilidadesDetalle(pool, idEmpresa, fechaInicio, fechaFin) 
       ORDER BY v.fEmision, v.idVenta
     `);
   } catch (repoErr) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '486b2c' }, body: JSON.stringify({ sessionId: '486b2c', location: 'utilidades.repository.js:obtenerUtilidadesDetalle:catch', message: 'repo error', data: { errorMessage: repoErr?.message }, timestamp: Date.now(), hypothesisId: 'H4' }) }).catch(() => {});
-    // #endregion
     throw repoErr;
   }
-  // #region agent log
-  const recordsetLength = (rs.recordset || []).length;
-  fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '486b2c' }, body: JSON.stringify({ sessionId: '486b2c', location: 'utilidades.repository.js:obtenerUtilidadesDetalle', message: 'query result', data: { recordsetLength, fechaInicio, fechaFin }, timestamp: Date.now(), hypothesisId: 'H2' }) }).catch(() => {});
-  // #endregion
   const rows = (rs.recordset || []).map((r) => ({
     idVenta: r.idVenta,
     comprobante: String(r.comprobante || ''),

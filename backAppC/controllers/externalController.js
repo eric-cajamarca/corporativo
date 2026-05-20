@@ -158,10 +158,6 @@ async function getDni(req, res) {
 }
 
 async function getRuc(req, res) {
-  // #region agent log
-  const isPublicRoute = req.originalUrl && req.originalUrl.includes('ruc-publico');
-  fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'externalController.js:getRuc',message:'getRuc called',data:{hasUser:!!req.user,isPublicRoute,ruc:req.params?.ruc},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
   if (!idEmpresa) {
     return res.status(403).json({ error: 'No autorizado' });
@@ -199,10 +195,6 @@ async function getRuc(req, res) {
  */
 async function getRucPublico(req, res) {
   const ruc = (req.params.ruc || '').trim();
-  // #region agent log
-  const logIngest = (message, data) => { fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'externalController.js:getRucPublico',message,data:{ruc,...data},timestamp:Date.now()})}).catch(()=>{}); };
-  logIngest('getRucPublico entry', {});
-  // #endregion
   if (!ruc) {
     return res.status(400).json({ error: 'RUC requerido' });
   }
@@ -219,21 +211,12 @@ async function getRucPublico(req, res) {
     });
     hasConfig = db.hasConfig;
     token = db.token;
-    // #region agent log
-    logIngest('getRucPublico after DB', { hasConfig, hasToken: !!token });
-    // #endregion
   } catch (err) {
     console.error('externalController getRucPublico DB:', err.message);
-    // #region agent log
-    logIngest('getRucPublico DB error', { errMessage: err.message });
-    // #endregion
     token = process.env.FACTILIZA_TOKEN || null;
   }
 
   if (!token) {
-    // #region agent log
-    logIngest('getRucPublico no token', {});
-    // #endregion
     return res.status(503).json({
       _source: 'factiliza',
       error: 'Servicio de validación RUC no configurado. Configure Factiliza SUNAT en la base de datos o FACTILIZA_TOKEN.'
@@ -241,15 +224,6 @@ async function getRucPublico(req, res) {
   }
 
   const factilizaResult = await tryFactilizaWithToken(`/ruc/info/${ruc}`, token);
-  // #region agent log
-  logIngest('getRucPublico Factiliza result', {
-    ok: factilizaResult.ok,
-    status: factilizaResult.status,
-    reason: factilizaResult.reason,
-    rawMessage: factilizaResult.raw && factilizaResult.raw.message,
-    hasInner: !!factilizaResult.inner
-  });
-  // #endregion
   if (factilizaResult.ok && factilizaResult.inner) {
     const data = normalizeRuc(factilizaResult.raw);
     return res.status(200).json({ _source: 'factiliza', data });

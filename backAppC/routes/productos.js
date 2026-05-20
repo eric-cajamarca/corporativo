@@ -23,6 +23,7 @@ api.post(
 
 // Rutas CRUD productos (habitaciones antes de :id)
 api.get('/productos', auth.auth, productosController.obtener_productos_todos);
+api.get('/productos/buscar-venta', auth.auth, productosController.buscar_productos_venta);
 api.get('/productos/compras', auth.auth, productosController.obtener_productos_compras);
 api.get('/productos/habitaciones', auth.auth, productosController.obtener_productos_habitacion);
 api.post('/productos/match-descripcion', auth.auth, productosController.match_productos_descripcion);

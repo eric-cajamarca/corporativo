@@ -36,9 +36,14 @@ class HtmlBuilderService {
     const item = it && typeof it === 'object' ? it : {};
     const base = String(item.descripcion ?? item.desc ?? item.productoDescripcion ?? '').trim();
     const marca = String(item.marca ?? item.nombreMarca ?? item.productoMarca ?? '').trim();
-    if (marca && base) return `${base} - ${marca}`;
-    if (marca) return marca;
-    return base;
+    if (!marca) return base;
+    if (!base) return marca;
+    const baseLow = base.toLowerCase();
+    const marcaLow = marca.toLowerCase();
+    if (baseLow.endsWith(` - ${marcaLow}`) || baseLow.endsWith(`-${marcaLow}`)) {
+      return base;
+    }
+    return `${base} - ${marca}`;
   }
 
   _normalizarCondicionPago(venta = {}) {

@@ -280,16 +280,21 @@
         <div class="row g-2 mb-3">
           <div class="col-12 col-lg-8">
             <input id="create-ventas-buscador-modal-search" type="search" class="form-control" placeholder="Código, descripción, marca, categoría…" [(ngModel)]="searchTerm"
-              (input)="buscarProductos()">
+              (input)="onBusquedaProductoInput()" autocomplete="off">
           </div>
           <div class="col-12 col-lg-4">
-            <button type="button" class="btn btn-outline-light w-100" (click)="recargarCatalogoProductosModal()">
+            <button type="button" class="btn btn-outline-light w-100" (click)="recargarCatalogoProductosModal()" [disabled]="buscadorCargando">
               <i class="bi bi-search"></i> Buscar
             </button>
           </div>
         </div>
+        <p *ngIf="buscadorMensaje" class="small text-white-50 mb-2">{{ buscadorMensaje }}</p>
+        <div *ngIf="buscadorCargando" class="text-center py-2">
+          <span class="spinner-border spinner-border-sm text-light" role="status" aria-hidden="true"></span>
+          <span class="ms-2 small text-white-50">Buscando…</span>
+        </div>
 
-        <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap">
+        <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap" *ngIf="productos_filtrados.length > 0">
           <table class="table table-hover align-middle mb-0">
             <thead class="buscador-compra-thead">
               <tr>
@@ -307,7 +312,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover" [class.efaf-buscador-row-sin-stock]="productoBusquedaSinStockSuficiente(p)" (click)="seleccionaProducto(p)">
+              <tr *ngFor="let p of productos_filtrados; trackBy: trackByProductoBuscador" role="button" class="table-row-hover" [class.efaf-buscador-row-sin-stock]="productoBusquedaSinStockSuficiente(p)" (click)="seleccionaProducto(p)">
                 <td *ngIf="productosConImagenes" class="align-middle" (click)="$event.stopPropagation()">
                   <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
                     (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
@@ -344,8 +349,8 @@
           </table>
         </div>
 
-        <div class="d-lg-none buscador-compra-cards">
-          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados" [class.efaf-buscador-card-sin-stock]="productoBusquedaSinStockSuficiente(p)">
+        <div class="d-lg-none buscador-compra-cards" *ngIf="productos_filtrados.length > 0">
+          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados; trackBy: trackByProductoBuscador" [class.efaf-buscador-card-sin-stock]="productoBusquedaSinStockSuficiente(p)">
             <div class="d-flex gap-2 align-items-start">
               <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
                 <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"

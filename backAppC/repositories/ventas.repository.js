@@ -1,7 +1,11 @@
 // repositories/ventas.repository.js
 const sql = require('mssql');
 const { parseFEmisionCabeceraSQL, mergeFEmisionNvCtSiMedianocheInnecessario } = require('../utils/fechaHoraLocal.util');
-const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
+const {
+  interpretarBooleanoConfig,
+  leerPermitirVentasNegativas,
+  crearLectorConfiguracionEmpresa
+} = require('../utils/configBoolean.util');
 const { appendAgentDebugNdjson } = require('../utils/debugAgentLog.util');
 const { extraerDireccionClienteDesdeXmlUbl } = require('../utils/extraerDireccionClienteXmlUbl.util');
 const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
@@ -1030,25 +1034,6 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     : '';
   const dirLenCabecera = clienteDireccion.length;
 
-  // #region agent log
-  try {
-    appendAgentDebugNdjson({
-      hypothesisId: 'A',
-      runId: 'trace',
-      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso1-cabecera',
-      message: 'PDF direccion cliente: paso 1 (cabecera SQL)',
-      data: {
-        idVenta,
-        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
-        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
-        cabClienteDireccion: cab.clienteDireccion != null ? String(cab.clienteDireccion) : null,
-        cabClienteRazonSocial: cab.clienteRazonSocial != null ? String(cab.clienteRazonSocial) : null,
-        cabClienteRuc: cab.clienteRuc != null ? String(cab.clienteRuc) : null,
-        clienteDireccionTrasCabecera: clienteDireccion
-      }
-    });
-  } catch (_) {}
-  // #endregion
 
   let dirLenPorIdCliente = 0;
   let filasDireccionClientesIdCliente = [];
@@ -1079,24 +1064,6 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     }
   }
 
-  // #region agent log
-  try {
-    appendAgentDebugNdjson({
-      hypothesisId: 'A',
-      runId: 'trace',
-      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso2-direccionClientes-idCliente',
-      message: 'PDF direccion cliente: paso 2 (DireccionClientes por idCliente)',
-      data: {
-        idVenta,
-        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
-        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
-        filasEncontradas: filasDireccionClientesIdCliente.length,
-        filas: filasDireccionClientesIdCliente,
-        clienteDireccionTrasPaso2: clienteDireccion
-      }
-    });
-  } catch (_) {}
-  // #endregion
 
   // Fallback: si aún no hay direccion y el cab trae RUC/DNI con >=8 digitos, buscar dirección de cualquier
   // cliente con el mismo RUC normalizado dentro de la misma empresa (caso clientes duplicados por RUC).
@@ -1168,28 +1135,6 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     }
   }
 
-  // #region agent log
-  try {
-    appendAgentDebugNdjson({
-      hypothesisId: 'A',
-      runId: 'trace',
-      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso3-rucNormalizado',
-      message: 'PDF direccion cliente: paso 3 (RUC normalizado en misma empresa)',
-      data: {
-        idVenta,
-        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
-        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
-        docDigitsLen: docDigitsCab.length,
-        rucLast4: docDigitsCab.length >= 4 ? docDigitsCab.slice(-4) : '',
-        clientesMismaEmpRucCount,
-        clientesMismaEmpRucDetalle,
-        dirsClientesMismaEmpRucCount,
-        filasDireccionClientesPorRuc,
-        clienteDireccionTrasPaso3: clienteDireccion
-      }
-    });
-  } catch (_) {}
-  // #endregion
 
   // Último fallback: si tras Cabecera + idCliente + RUC sigue sin dirección, extraerla del XML
   // enviado a SUNAT (ComprobantesElectronicos.xmlEnviado) y persistirla en DireccionClientes
@@ -1250,54 +1195,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     }
   }
 
-  // #region agent log
-  try {
-    appendAgentDebugNdjson({
-      hypothesisId: 'A',
-      runId: 'trace',
-      location: 'ventas.repository.js:obtenerComprobanteParaPdf paso4-xmlEnviado',
-      message: 'PDF direccion cliente: paso 4 (XML enviado a SUNAT)',
-      data: {
-        idVenta,
-        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
-        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
-        xmlEncontrado,
-        xmlLen,
-        dirXmlExtraida,
-        dirLenDesdeXml,
-        dirPersistidaDesdeXml,
-        clienteDireccionTrasPaso4: clienteDireccion
-      }
-    });
-  } catch (_) {}
-  // #endregion
 
-  // #region agent log
-  try {
-    appendAgentDebugNdjson({
-      hypothesisId: 'A',
-      runId: 'post-fix',
-      location: 'ventas.repository.js:obtenerComprobanteParaPdf',
-      message: 'PDF cliente direccion (repo)',
-      data: {
-        idVenta,
-        idEmpresaVenta: idEmpresaVenta != null ? String(idEmpresaVenta) : null,
-        idCliente: cab.idCliente != null ? Number(cab.idCliente) : null,
-        docDigitsLen: docDigitsCab.length,
-        rucLast4: docDigitsCab.length >= 4 ? docDigitsCab.slice(-4) : '',
-        dirLenCabecera,
-        dirLenPorIdCliente,
-        dirLenPorRucEmpresa,
-        clientesMismaEmpRucCount,
-        dirsClientesMismaEmpRucCount,
-        xmlEncontrado,
-        dirLenDesdeXml,
-        dirPersistidaDesdeXml,
-        dirFinalLen: clienteDireccion.length
-      }
-    });
-  } catch (_) { /* logging best effort */ }
-  // #endregion
 
   const base = (baseUrl || '').replace(/\/$/, '');
   const logoFileName = emp && (
@@ -1664,10 +1562,9 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     );
 
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
-    const getConfig = (clave, def) => (configRows.find((c) => c.clave === clave)?.valor ?? def);
-    const permitirVentasNegativas =
-      String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
-    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+    const getConfig = crearLectorConfiguracionEmpresa(configRows);
+    const permitirVentasNegativas = leerPermitirVentasNegativas(getConfig);
+    const controlUbicaciones = interpretarBooleanoConfig(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true'), true);
 
     const EPS_Q = 0.0001;
 
@@ -1714,7 +1611,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
           `Stock insuficiente al guardar la edición. Disponible: ${stockDisponible}, solicitado: ${cantPed}.`
         );
       }
-      const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPed, stockDisponible) : cantPed;
+      const cantidadADescontar = cantPed;
       if (cantidadADescontar <= 0) return descuentoVacioRet(costoFallback);
       const resultadoDescuento = await stockService.descontarDesdeLotes(
         transaction,
@@ -1724,7 +1621,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
           idProducto: idProductoDesc,
           cantidad: cantidadADescontar
         },
-        { controlUbicaciones }
+        { controlUbicaciones, permitirVentasNegativas }
       );
       const consumosPorLote = resultadoDescuento?.consumosPorLote || [];
       const costoTotalLinea = Array.isArray(consumosPorLote)

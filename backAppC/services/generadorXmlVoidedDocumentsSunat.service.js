@@ -43,9 +43,6 @@ function generarXmlVoidedDocuments(datos, lineas) {
   // IssueDate: fecha de la comunicación de baja (hoy)
   const issueDate = fechaCom.slice(0, 4) + "-" + fechaCom.slice(4, 6) + "-" + fechaCom.slice(6, 8);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'generadorXmlVoidedDocuments.js:31',message:'Generando XML VoidedDocuments',data:{ruc,razon:razon.substring(0,50),fechaCom,fechaRef,correlativo,idDoc,referenceDate,issueDate,lineasCount:lineas?.length||0,lineas:lineas?.slice(0,3)},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
   const lineasXml = [];
   let idx = 1;
@@ -106,9 +103,6 @@ function generarXmlVoidedDocuments(datos, lineas) {
   ${lineasXml.join("")}
 </VoidedDocuments>`;
 
-  // #region agent log
-  fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c9704a'},body:JSON.stringify({sessionId:'c9704a',location:'generadorXmlVoidedDocuments.js:95',message:'XML VoidedDocuments generado',data:{xmlLength:result?.length||0,xmlFirst500:result?.substring(0,500)||'',xmlContainsVoidedDocuments:result?.includes('<VoidedDocuments'),xmlContainsSac:result?.includes('xmlns:sac=')},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
 
   return result;
 }

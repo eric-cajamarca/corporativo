@@ -459,17 +459,26 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
 
   const items = await pool.request()
     .input('idCotizacion', sql.Int, idCotizacion)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query(`
       SELECT
         d.cantidad,
         d.pVenta,
         d.total,
-        d.descripcion,
         d.codigo,
+        CASE
+          WHEN NULLIF(LTRIM(RTRIM(ISNULL(d.descripcion, ''))), '') IS NOT NULL
+          THEN LTRIM(RTRIM(d.descripcion))
+          ELSE LTRIM(RTRIM(ISNULL(COALESCE(pPorId.descripcion, pPorCodigo.descripcion), '')))
+        END AS descripcion,
+        LTRIM(RTRIM(ISNULL(COALESCE(pPorId.descripcion, pPorCodigo.descripcion), ''))) AS descripcionProducto,
         LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca
       FROM DetalleCotizacion d
-      LEFT JOIN Productos p ON p.idProducto = d.idProducto AND p.idEmpresa = d.idEmpresa
-      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
+      LEFT JOIN Productos pPorId ON pPorId.idProducto = d.idProducto
+      LEFT JOIN Productos pPorCodigo ON d.idProducto IS NULL
+        AND pPorCodigo.idEmpresa = COALESCE(d.idEmpresaProducto, d.idEmpresa)
+        AND RTRIM(LTRIM(ISNULL(pPorCodigo.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
+      LEFT JOIN Marcas m ON m.idMarca = COALESCE(pPorId.idMarca, pPorCodigo.idMarca)
       WHERE d.idCotizacion = @idCotizacion
       ORDER BY d.idDetalleCotizacion
     `);
@@ -509,7 +518,8 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
   } : { nombre: '', ruc: '', direccion: '', telefono: '', rubro: '', correo: '', logo: `${base}/assets/img/01.jpg` };
 
   const detalle = (items.recordset || []).map((d) => ({
-    descripcion: d.descripcion,
+    descripcion: d.descripcion != null ? String(d.descripcion).trim() : '',
+    descripcionProducto: d.descripcionProducto != null ? String(d.descripcionProducto).trim() : '',
     codigo: d.codigo != null ? String(d.codigo).trim() : '',
     marca: d.marca != null ? String(d.marca).trim() : '',
     cantidad: d.cantidad,

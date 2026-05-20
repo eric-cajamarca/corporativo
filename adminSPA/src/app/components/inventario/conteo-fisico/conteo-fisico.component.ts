@@ -265,42 +265,71 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Empresa dueña del producto en conteo (gestora: no usar token = empresa gestora). */
+  private idEmpresaDelProductoSeleccionado(): string | null {
+    const id =
+      this.productoSeleccionado?.idEmpresa?.trim() ||
+      this.idEmpresaCatalogoActual?.trim() ||
+      null;
+    return id || null;
+  }
+
   abrirModalCrearMarca(): void {
+    const idEmpresa = this.idEmpresaDelProductoSeleccionado();
+    if (!idEmpresa) {
+      iziToast.error({
+        title: 'Aviso',
+        message: 'No se identificó la empresa del producto. Cierre y vuelva a abrir el detalle.',
+        position: 'topRight'
+      });
+      return;
+    }
     const ref = this.modalService.open(CreateMarcaComponent, {
       centered: true,
       backdrop: 'static',
       keyboard: false,
       size: 'lg'
     });
+    ref.componentInstance.idEmpresaDestino = idEmpresa;
     ref.result
       .then((res: unknown) => {
         const id = this.parseIdMarcaCreada(res);
         if (id != null) {
           this.recargarSoloMarcasYSeleccionar(id);
         } else {
-          this.cargarCatalogosMaestro();
+          this.cargarCatalogosMaestro(idEmpresa);
         }
       })
-      .catch(() => this.cargarCatalogosMaestro());
+      .catch(() => this.cargarCatalogosMaestro(idEmpresa));
   }
 
   abrirModalCrearCategoria(): void {
+    const idEmpresa = this.idEmpresaDelProductoSeleccionado();
+    if (!idEmpresa) {
+      iziToast.error({
+        title: 'Aviso',
+        message: 'No se identificó la empresa del producto. Cierre y vuelva a abrir el detalle.',
+        position: 'topRight'
+      });
+      return;
+    }
     const ref = this.modalService.open(CreateCategoriaComponent, {
       centered: true,
       backdrop: 'static',
       keyboard: false,
       size: 'lg'
     });
+    ref.componentInstance.idEmpresaDestino = idEmpresa;
     ref.result
       .then((res: unknown) => {
         const id = this.parseIdCategoriaCreada(res);
         if (id != null) {
           this.recargarSoloCategoriasYSeleccionar(id);
         } else {
-          this.cargarCatalogosMaestro();
+          this.cargarCatalogosMaestro(idEmpresa);
         }
       })
-      .catch(() => this.cargarCatalogosMaestro());
+      .catch(() => this.cargarCatalogosMaestro(idEmpresa));
   }
 
   private parseIdMarcaCreada(res: unknown): number | null {

@@ -1,7 +1,8 @@
 -- Conteo físico: ubicación de trabajo (reajustes aplican stock en esa ubicación con INVENTARIO_CONTROL_UBICACIONES activo).IF NOT EXISTS (
+  IF NOT EXISTS (
   SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
   WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'InventarioFisicoSesion' AND COLUMN_NAME = 'idUbicacionInventario'
-)
+  )
 BEGIN
   ALTER TABLE dbo.InventarioFisicoSesion ADD idUbicacionInventario INT NULL;
 END

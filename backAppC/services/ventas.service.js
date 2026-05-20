@@ -10,7 +10,11 @@ const gestoresRepository = require('../repositories/gestores.repository');
 const stockService = require('./stock.service');
 const inventarioRepository = require('../repositories/inventario.repository');
 const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
-const { interpretarBooleanoConfig } = require('../utils/configBoolean.util');
+const {
+  interpretarBooleanoConfig,
+  leerPermitirVentasNegativas,
+  crearLectorConfiguracionEmpresa
+} = require('../utils/configBoolean.util');
 const sunatPostPagoService = require('./sunatPostPago.service');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
 const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
@@ -26,6 +30,41 @@ function idDireccionClientesDesdeBody(body) {
   if (!body || body.idDireccionClientes == null || body.idDireccionClientes === '') return undefined;
   const n = Number(body.idDireccionClientes);
   return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+const FLAGS_INVENTARIO_DEFECTO = Object.freeze({
+  permitirVentasNegativas: false,
+  controlUbicaciones: true
+});
+
+/** Flags de inventario por empresa (ConfiguracionEmpresa), clave = idEmpresa en minúsculas. */
+async function cargarFlagsInventarioPorEmpresas(pool, idsEmpresa) {
+  const cache = new Map();
+  const unicos = [...new Set((idsEmpresa || []).filter(Boolean).map(String))];
+  for (const idEmpresa of unicos) {
+    const key = idEmpresa.toLowerCase();
+    if (cache.has(key)) continue;
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+    const getConfig = crearLectorConfiguracionEmpresa(configRows);
+    cache.set(key, {
+      permitirVentasNegativas: leerPermitirVentasNegativas(getConfig),
+      controlUbicaciones: interpretarBooleanoConfig(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true'), true)
+    });
+  }
+  return cache;
+}
+
+function flagsInventarioEmpresa(cache, idEmpresa) {
+  if (idEmpresa == null || String(idEmpresa).trim() === '') return FLAGS_INVENTARIO_DEFECTO;
+  return cache.get(String(idEmpresa).toLowerCase()) || FLAGS_INVENTARIO_DEFECTO;
+}
+
+/** True si la gestora o la empresa del producto tienen activado INVENTARIO_PERMITIR_VENTAS_NEGATIVAS. */
+function permitirVentasNegativasEfectivo(cache, ...idsEmpresa) {
+  for (const id of idsEmpresa) {
+    if (flagsInventarioEmpresa(cache, id).permitirVentasNegativas) return true;
+  }
+  return false;
 }
 
 /** Empresa del token + gestionadas activas (mismo alcance que comprobante PDF / listados gestora). */
@@ -444,9 +483,9 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
   await transaction.begin();
   try {
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
-    const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
-    const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
-    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
+    const getConfig = crearLectorConfiguracionEmpresa(configRows);
+    const permitirVentasNegativas = leerPermitirVentasNegativas(getConfig);
+    const controlUbicaciones = interpretarBooleanoConfig(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true'), true);
     const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
 
     let idSucursalEmpresa = venta.idSucursal || null;
@@ -626,7 +665,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
       }
 
-      const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPedida, stockDisponible) : cantPedida;
+      const cantidadADescontar = cantPedida;
       let consumosPorLote = [];
       if (cantidadADescontar > 0) {
         const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
@@ -634,7 +673,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
           idSucursal: idSucursalLinea,
           idProducto: det.idProducto,
           cantidad: cantidadADescontar
-        }, { controlUbicaciones });
+        }, { controlUbicaciones, permitirVentasNegativas });
         consumosPorLote = resultadoDescuento?.consumosPorLote || [];
       }
 
@@ -750,7 +789,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       compVentaVA: null,
       ventasEmpresa,
       avisoStockInsuficiente: avisoStockInsuficiente.length > 0
-        ? 'Stock insuficiente para uno o más productos. Se descontó solo el disponible.'
+        ? 'Stock insuficiente para uno o más productos. La venta se registró y el inventario puede quedar en negativo según configuración.'
         : null
     };
   } catch (error) {
@@ -781,11 +820,9 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
-    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
-    const getConfig = (clave, def) => (configRows.find(c => c.clave === clave)?.valor ?? def);
-    const permitirVentasNegativas = String(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
-    const controlUbicaciones = String(getConfig('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() !== 'false';
-    const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
+    const configRowsGestora = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
+    const getConfigGestora = crearLectorConfiguracionEmpresa(configRowsGestora);
+    const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfigGestora('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
 
     let idSucursalCobradora = venta.idSucursal || null;
     if (!idSucursalCobradora) {
@@ -845,6 +882,11 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       arr.push({ ...det, idEmpresaProducto, idSucursalEmpresa });
       detallesPorEmpresa.set(String(idEmpresaProducto), arr);
     }
+
+    const flagsInventarioCache = await cargarFlagsInventarioPorEmpresas(pool, [
+      user.empresa,
+      ...Array.from(detallesPorEmpresa.keys())
+    ]);
 
     const clienteSeleccionado = await ventasRepository.obtenerClientePorIdEnEmpresas(
       transaction,
@@ -1048,15 +1090,22 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         const cantPedida = parseFloat(det.cantidad) || 0;
         const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
 
+        const flagsInvProducto = flagsInventarioEmpresa(flagsInventarioCache, idEmpresaProducto);
+        const permitirNegativoLinea = permitirVentasNegativasEfectivo(
+          flagsInventarioCache,
+          user.empresa,
+          idEmpresaProducto
+        );
+
         const stockDisponible = await stockService.obtenerStockDisponible(transaction, idEmpresaProducto, det.idProducto, idSucursalEmpresa);
         if (stockDisponible < cantPedida) {
-          if (!permitirVentasNegativas) {
+          if (!permitirNegativoLinea) {
             throw new Error(`Stock insuficiente para "${det.descripcion || det.idProducto}" en empresa ${det.aliasEmpresa || idEmpresaProducto}. Disponible: ${stockDisponible}, solicitado: ${cantPedida}.`);
           }
           avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
         }
 
-        const cantidadADescontar = permitirVentasNegativas ? Math.min(cantPedida, stockDisponible) : cantPedida;
+        const cantidadADescontar = cantPedida;
         let consumosPorLote = [];
         if (cantidadADescontar > 0) {
           const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
@@ -1064,7 +1113,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
             idSucursal: idSucursalEmpresa,
             idProducto: det.idProducto,
             cantidad: cantidadADescontar
-          }, { controlUbicaciones });
+          }, {
+            controlUbicaciones: flagsInvProducto.controlUbicaciones,
+            permitirVentasNegativas: permitirNegativoLinea
+          });
           consumosPorLote = resultadoDescuento?.consumosPorLote || [];
         }
 
@@ -1247,7 +1299,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       compVentaVA,
       ventasEmpresa,
       avisoStockInsuficiente: avisoStockInsuficiente.length > 0
-        ? 'Stock insuficiente para uno o más productos. Se descontó solo el disponible.'
+        ? 'Stock insuficiente para uno o más productos. La venta se registró y el inventario puede quedar en negativo según configuración.'
         : null
     };
   } catch (error) {

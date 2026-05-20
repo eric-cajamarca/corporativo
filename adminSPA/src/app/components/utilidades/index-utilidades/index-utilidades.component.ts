@@ -108,18 +108,11 @@ export class IndexUtilidadesComponent implements OnInit {
       .getUtilidadesDetalle(this.fechaInicio, this.fechaFin)
       .subscribe({
         next: (res) => {
-          // #region agent log
-          const dataLen = res?.data ? (Array.isArray(res.data) ? res.data.length : -1) : -2;
-          fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '486b2c' }, body: JSON.stringify({ sessionId: '486b2c', location: 'index-utilidades.component.ts:cargar:next', message: 'utilidades next', data: { dataLength: dataLen, hasData: !!res?.data }, timestamp: Date.now(), hypothesisId: 'H1' }) }).catch(() => {});
-          // #endregion
           this.datos = res.data || [];
           this.recalcularTotales();
           this.cargando = false;
         },
         error: (err) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '486b2c' }, body: JSON.stringify({ sessionId: '486b2c', location: 'index-utilidades.component.ts:cargar:error', message: 'utilidades error', data: { status: err?.status, statusText: err?.statusText, errorMessage: err?.error?.message }, timestamp: Date.now(), hypothesisId: 'H1_H3_H4' }) }).catch(() => {});
-          // #endregion
           this.error = err?.error?.message || err?.message || 'Error al cargar utilidades';
           this.datos = [];
           this.recalcularTotales();

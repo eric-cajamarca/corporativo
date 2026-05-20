@@ -324,10 +324,6 @@ export class CreateEmpresaComponent implements OnInit {
       error: (error) => {
         this.buscando.set(false);
         console.error('Error buscando RUC:', error);
-        // #region agent log
-        const errBody = error?.error && typeof error.error === 'object' ? (error.error as Record<string, unknown>) : (error?.error ?? null);
-        fetch('http://127.0.0.1:7243/ingest/4cdb12f7-f0e0-45f1-8edf-c7587f720407',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e8165b'},body:JSON.stringify({sessionId:'e8165b',location:'create-empresa.component.ts:buscarRuc',message:'getRucInfoPublic error',data:{status:error?.status,statusText:error?.statusText,url:error?.url,errorMsg:error?.message,bodyError:errBody?.error ?? errBody},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',

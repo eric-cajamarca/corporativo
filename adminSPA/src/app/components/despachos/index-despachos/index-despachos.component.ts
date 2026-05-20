@@ -17,6 +17,7 @@ import {
   DevolucionDespachoDetalle,
   DevolucionDespachoResumen
 } from '../../../models/devolucion-despacho.model';
+import { descripcionProductoConMarca } from '../../../utils/producto-presentacion.util';
 
 declare const iziToast: any;
 
@@ -938,10 +939,41 @@ export class IndexDespachosComponent implements OnInit {
     });
   }
 
+  private itemPdfDespacho(lin: {
+    productoCodigo?: string;
+    productoDescripcion?: string;
+    productoMarca?: string | null;
+    marca?: string | null;
+    cantidadDespachada?: number;
+    cantidad?: number;
+    cantPendiente?: number;
+    ubicacionOrigen?: string | null;
+    ubicacionDestino?: string | null;
+    ubicaciones?: string;
+  }): {
+    productoCodigo: string;
+    productoDescripcion: string;
+    marca: string;
+    cantidadDespachada?: number;
+    cantidad?: number;
+    ubicaciones: string;
+  } {
+    const marca = String(lin.productoMarca ?? lin.marca ?? '').trim();
+    return {
+      productoCodigo: String(lin.productoCodigo ?? ''),
+      productoDescripcion: descripcionProductoConMarca(lin.productoDescripcion, marca),
+      marca,
+      cantidadDespachada: lin.cantidadDespachada,
+      cantidad: lin.cantidad ?? lin.cantPendiente,
+      ubicaciones: lin.ubicaciones || lin.ubicacionOrigen || lin.ubicacionDestino || '—'
+    };
+  }
+
   private emitirPdfTicketDespacho(
     lineas: Array<{
       productoCodigo: string;
       productoDescripcion: string;
+      productoMarca?: string | null;
       cantidadDespachada: number;
       ubicacionOrigen?: string | null;
       ubicacionDestino?: string | null;
@@ -967,12 +999,7 @@ export class IndexDespachosComponent implements OnInit {
         };
         const venta = { ...r.venta };
         const cliente = { razonSocial: r.venta.clienteRazonSocial || '', ruc: r.venta.clienteRuc || '' };
-        const items = lineas.map((lin) => ({
-          productoCodigo: lin.productoCodigo,
-          productoDescripcion: lin.productoDescripcion,
-          cantidadDespachada: lin.cantidadDespachada,
-          ubicaciones: lin.ubicacionOrigen || lin.ubicacionDestino || '—'
-        }));
+        const items = lineas.map((lin) => this.itemPdfDespacho(lin));
         const despacho = {
           tipoDespacho: cab.tipoDespacho,
           fechaDespacho: cab.fechaDespacho,
@@ -1021,13 +1048,7 @@ export class IndexDespachosComponent implements OnInit {
         };
         const venta = { ...r.venta };
         const cliente = { razonSocial: r.venta.clienteRazonSocial || '', ruc: r.venta.clienteRuc || '' };
-        const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => ({
-          productoCodigo: dv.productoCodigo,
-          productoDescripcion: dv.productoDescripcion,
-          marca: dv.productoMarca,
-          cantidad: dv.cantPendiente ?? dv.cantidad,
-          ubicaciones: dv.ubicaciones || ''
-        }));
+        const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => this.itemPdfDespacho(dv));
         const datos = { empresa, venta, cliente, items, titulo: 'Comprobante de despacho' };
         const nombreArchivo = `despacho-${(r.venta.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
         this.pdfService.generarPdfComprobanteDespacho(datos, formato, nombreArchivo).subscribe({
@@ -1079,13 +1100,7 @@ export class IndexDespachosComponent implements OnInit {
         };
         const venta = { ...r.venta };
         const cliente = { razonSocial: r.venta.clienteRazonSocial || '', ruc: r.venta.clienteRuc || '' };
-        const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => ({
-          productoCodigo: dv.productoCodigo,
-          productoDescripcion: dv.productoDescripcion,
-          marca: dv.productoMarca,
-          cantidad: dv.cantPendiente ?? dv.cantidad,
-          ubicaciones: dv.ubicaciones || ''
-        }));
+        const items = (r.detalleVenta || []).map((dv: DetalleVentaLinea) => this.itemPdfDespacho(dv));
         const datos = { empresa, venta, cliente, items, titulo: 'Comprobante de despacho' };
         const nombreArchivo = `despacho-${(r.venta.compVenta || 'venta').replace(/-/g, '_')}.pdf`;
         this.pdfService.generarPdfComprobanteDespacho(datos, this.whatsappFormato, nombreArchivo).subscribe({

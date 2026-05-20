@@ -193,19 +193,9 @@ const generarComprobanteElectronico = async (req, res, next) => {
 const enviarComprobanteSunat = async (req, res, next) => {
   const { idComprobanteElectronico } = req.params;
   const opciones = { usarXmlUbl: req.body?.usarXmlUbl === true };
-  // #region agent log
-  const entryData = { idComprobanteElectronico, opciones, idEmpresa: req.user?.empresa };
-  console.error("[SUNAT] enviarComprobanteSunat: entry", entryData);
-  debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:entry", message: "entry", data: entryData });
-  // #endregion
   try {
     const result = await withPool(async (pool) => FacturacionServices.enviarComprobanteSunatService(pool, req.user, idComprobanteElectronico, opciones));
 
-    // #region agent log
-    const resultData = { ok: result?.ok, idEstadoSunat: result?.idEstadoSunat, mensaje: result?.mensaje };
-    console.error("[SUNAT] enviarComprobanteSunat: result", resultData);
-    debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:result", message: "result", data: resultData });
-    // #endregion
     if (result && !result.ok) {
       if (result.quedarPendiente) {
         return res.status(503).json({
@@ -251,10 +241,6 @@ const enviarComprobanteSunat = async (req, res, next) => {
     if (error.message === "CDR_NO_ENCONTRADO" || error.message === "XML no encontrado") {
       return res.status(404).json({ message: error.message, data: undefined });
     }
-    // #region agent log
-    console.error("[SUNAT] enviarComprobanteSunat: error", error.message);
-    debugSunatLog.write({ location: "facturacionController.enviarComprobanteSunat:error", message: "error", data: { error: error.message } });
-    // #endregion
     console.error("Error enviar comprobante SUNAT:", error);
     return next(error);
   }
@@ -360,27 +346,13 @@ const validarCredencialesSol = async (req, res, next) => {
 
 // Envío por lotes (manual): envía todos los comprobantes pendientes de la empresa del usuario
 const enviarLoteSunat = async (req, res, next) => {
-  // #region agent log
-  const loteEntry = { idEmpresa: req.user?.empresa };
-  console.error("[SUNAT] enviarLoteSunat: entry", loteEntry);
-  debugSunatLog.write({ location: "facturacionController.enviarLoteSunat:entry", message: "entry", data: loteEntry });
-  // #endregion
   try {
     const result = await withPool(async (pool) => FacturacionServices.enviarLotePendientesService(pool, req.user.empresa, { manual: true }));
-    // #region agent log
-    const loteResult = { enviados: result?.enviados, errores: result?.errores, total: result?.total, mensaje: result?.mensaje };
-    console.error("[SUNAT] enviarLoteSunat: result", loteResult);
-    debugSunatLog.write({ location: "facturacionController.enviarLoteSunat:result", message: "result", data: loteResult });
-  // #endregion
     res.status(200).send({
       message: `Envío por lotes: ${result.enviados} enviados, ${result.errores} errores`,
       data: result
     });
   } catch (error) {
-    // #region agent log
-    console.error("[SUNAT] enviarLoteSunat: error", error.message);
-    debugSunatLog.write({ location: "facturacionController.enviarLoteSunat:error", message: "error", data: { error: error.message } });
-    // #endregion
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }

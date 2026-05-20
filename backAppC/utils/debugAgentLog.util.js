@@ -1,20 +1,23 @@
 /**
- * Logger de depuración para sesión de debug del agente.
- * Append NDJSON al archivo en raíz del workspace: <repo>/debug-4547ec.log
- * No registra PII (RUC completo, direcciones, etc.).
+ * Logger de depuración del agente.
+ *
+ * Por defecto NO escribe a disco (no-op) para evitar I/O innecesario en
+ * caliente (5+ escrituras por PDF generado).
+ *
+ * Para reactivar en desarrollo: DEBUG_AGENT_LOG=1 en .env.
+ * Cuando se activa, escribe asíncronamente en <repo>/debug-agent.log.
  */
 const fs = require('fs');
 const path = require('path');
 
-const SESSION_ID = '4547ec';
-const LOG_FILENAME = `debug-${SESSION_ID}.log`;
-const REPO_ROOT = path.resolve(__dirname, '..', '..');
-const LOG_PATH = path.join(REPO_ROOT, LOG_FILENAME);
+const ENABLED = process.env.DEBUG_AGENT_LOG === '1';
+const LOG_PATH = path.join(__dirname, '..', '..', 'debug-agent.log');
 
 function appendAgentDebugNdjson({ hypothesisId, runId, location, message, data }) {
+  if (!ENABLED) return;
   try {
     const line = JSON.stringify({
-      sessionId: SESSION_ID,
+      sessionId: 'agent',
       timestamp: Date.now(),
       hypothesisId: hypothesisId || null,
       runId: runId || null,
@@ -23,7 +26,8 @@ function appendAgentDebugNdjson({ hypothesisId, runId, location, message, data }
       data: data || {}
     });
     fs.appendFile(LOG_PATH, line + '\n', () => {});
-  } catch (_) { /* nunca afectar flujo de negocio */ }
+  } catch (_) {
+  }
 }
 
 module.exports = { appendAgentDebugNdjson };

@@ -101,11 +101,6 @@ exports.enviarComprobanteSunatService = async (pool, user, idComprobanteElectron
 
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, user.empresa);
   const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
-  // #region agent log
-  const configData = { usaDirecto: !!usaDirecto, tieneRutaFacturador: !!config?.rutaCarpetaFacturadorSunat, urlFacturadorSunat: config?.urlFacturadorSunat || "(default)", urlEnvio: config?.urlEnvio ? "(definida)" : "(no)", idEmpresa: user.empresa };
-  console.error("[SUNAT] enviarComprobanteSunatService: config", configData);
-  debugSunatLog.write({ location: "facturacion.service.enviarComprobanteSunatService:config", message: "config", data: configData });
-  // #endregion
   if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
     throw new Error("CONFIG_FACTURADOR_INCOMPLETA");
   }
@@ -277,17 +272,6 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
   const manual = opts.manual === true;
   const filtroProgramacion = manual ? null : opts.filtroProgramacion || null;
   const config = await FacturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idEmpresa);
-  // #region agent log
-  const entryData = {
-    idEmpresa,
-    manual,
-    filtroProgramacion,
-    tieneRutaFacturador: !!config?.rutaCarpetaFacturadorSunat,
-    envioDirectoSunat: !!config?.envioDirectoSunat
-  };
-  console.error("[SUNAT] enviarLotePendientesService: entry", entryData);
-  debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:entry", message: "entry", data: entryData });
-  // #endregion
   const usaDirecto = config?.envioDirectoSunat && config?.urlEnvio && config?.usuarioSunat && config?.claveSunat;
   if (!usaDirecto && !config?.rutaCarpetaFacturadorSunat) {
     return { enviados: 0, errores: 0, reintentosProgramados: 0, total: 0, mensaje: "Configure envío directo SUNAT o ruta del Facturador" };
@@ -298,11 +282,6 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
     excluirBoletas,
     filtroProgramacion
   });
-  // #region agent log
-  const pendData = { count: pendientes.length, idEmpresa };
-  console.error("[SUNAT] enviarLotePendientesService: pendientes", pendData);
-  debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:pendientes", message: "pendientes", data: pendData });
-  // #endregion
   let enviados = 0;
   let errores = 0;
   let reintentosProgramados = 0;
@@ -346,11 +325,6 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
     }
   }
 
-  // #region agent log
-  const resData = { enviados, errores, reintentosProgramados, total: pendientes.length, idEmpresa };
-  console.error("[SUNAT] enviarLotePendientesService: result", resData);
-  debugSunatLog.write({ location: "facturacion.service.enviarLotePendientesService:result", message: "result", data: resData });
-  // #endregion
   return { enviados, errores, reintentosProgramados, total: pendientes.length };
 };
 
@@ -360,11 +334,6 @@ exports.enviarLotePendientesService = async (pool, idEmpresa, opts = {}) => {
  */
 exports.ejecutarEnvioAutomaticoService = async (pool) => {
   const empresas = await FacturacionRepository.listarEmpresasConEnvioAutomaticoRepo(pool);
-  // #region agent log
-  const empData = { count: empresas.length, ids: empresas.map((e) => e.idEmpresa) };
-  console.error("[SUNAT] ejecutarEnvioAutomaticoService: empresas con envío automático", empData);
-  debugSunatLog.write({ location: "facturacion.service.ejecutarEnvioAutomaticoService:empresas", message: "empresas", data: empData });
-  // #endregion
   const resultados = [];
   const hoyLima = ymdLima(new Date());
   const ahoraMin = minutosDesdeMedianocheLima(new Date());
@@ -406,10 +375,6 @@ exports.ejecutarEnvioAutomaticoService = async (pool) => {
       resultados.push({ idEmpresa: emp.idEmpresa, enviados: 0, errores: 0, mensaje: err.message });
     }
   }
-  // #region agent log
-  console.error("[SUNAT] ejecutarEnvioAutomaticoService: resultados", resultados);
-  debugSunatLog.write({ location: "facturacion.service.ejecutarEnvioAutomaticoService:resultados", message: "resultados", data: resultados });
-  // #endregion
   return resultados;
 };
 

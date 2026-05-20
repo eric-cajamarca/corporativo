@@ -16,4 +16,22 @@ function interpretarBooleanoConfig(valor, predeterminado) {
   return predeterminado;
 }
 
-module.exports = { interpretarBooleanoConfig };
+/** Lee INVENTARIO_PERMITIR_VENTAS_NEGATIVAS desde getConfig(clave, def). */
+function leerPermitirVentasNegativas(getConfig) {
+  return interpretarBooleanoConfig(getConfig('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false'), false);
+}
+
+/** getConfig(clave, def) a partir de filas ConfiguracionEmpresa. */
+function crearLectorConfiguracionEmpresa(configRows) {
+  const rows = Array.isArray(configRows) ? configRows : [];
+  return (clave, def) => {
+    const row = rows.find((c) => String(c.clave || '').trim() === String(clave).trim());
+    return row != null && row.valor !== undefined && row.valor !== null ? row.valor : def;
+  };
+}
+
+module.exports = {
+  interpretarBooleanoConfig,
+  leerPermitirVentasNegativas,
+  crearLectorConfiguracionEmpresa
+};

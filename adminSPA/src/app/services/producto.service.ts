@@ -3,6 +3,17 @@ import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import {
+  productoActivoParaVenta,
+  productoCoincideBusquedaMultipalabra
+} from '../utils/producto-busqueda.util';
+
+export interface BuscarProductosVentaOpciones {
+  q: string;
+  limit?: number;
+  idSucursal?: string;
+  evitarCache?: boolean;
+}
+import {
   Producto,
   ProductoCreate,
   ProductoResponse,
@@ -11,6 +22,7 @@ import {
   StockUbicacionProductoFila
 } from '../models/producto.models';
 import { environment } from '../../environments/environment';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -21,16 +33,108 @@ export class ProductoService {
   public idUser:any;
   /** Copia en memoria del último GET /productos (misma sesión SPA). Evita repetir HTTP al abrir el modal si ya se cargó al iniciar venta u otra pantalla. */
   private listaProductosMemoria: ProductoResponse | null = null;
+  /** Empresa del JWT cuando se guardó listaProductosMemoria (evita mezclar catálogo al cambiar de empresa sin recargar). */
+  private catalogoMemoriaIdEmpresa: string | null = null;
+  /** Caché corta de búsquedas en modal de ventas (misma sesión). */
+  private readonly cacheBusquedaVenta = new Map<string, { ts: number; data: ProductoResponse }>();
+  private readonly ttlBusquedaVentaMs = 60_000;
 
   constructor(
     private _http: HttpClient,
+    private auth: AuthService
   ) {
     this.url = environment.API_URL;
   }
 
-  /** Llamar al entrar a «Nueva venta» para forzar un GET fresco y actualizar la copia en memoria. */
+  private idEmpresaJwtCacheKey(): string {
+    return String(this.auth.userData()?.idEmpresa || '').trim().toLowerCase();
+  }
+
+  /** Si cambió la empresa del token, invalida catálogo en memoria (login en otra empresa sin F5). */
+  invalidarCacheSiEmpresaDistinta(): void {
+    const actual = this.idEmpresaJwtCacheKey();
+    if (!actual) {
+      this.limpiarCacheListaProductos();
+      return;
+    }
+    if (this.catalogoMemoriaIdEmpresa && this.catalogoMemoriaIdEmpresa !== actual) {
+      this.limpiarCacheListaProductos();
+    }
+  }
+
+  /** Invalida la copia en memoria del listado completo (p. ej. tras crear/editar producto). */
   limpiarCacheListaProductos(): void {
     this.listaProductosMemoria = null;
+    this.catalogoMemoriaIdEmpresa = null;
+    this.cacheBusquedaVenta.clear();
+  }
+
+  tieneCatalogoEnMemoria(): boolean {
+    const emp = this.idEmpresaJwtCacheKey();
+    if (!emp || this.catalogoMemoriaIdEmpresa !== emp) {
+      return false;
+    }
+    return Array.isArray(this.listaProductosMemoria?.data) && this.listaProductosMemoria!.data!.length > 0;
+  }
+
+  /**
+   * Filtra el catálogo ya cargado en memoria (instantáneo si existe).
+   */
+  filtrarListaMemoriaVenta(termino: string, limite = 80): any[] | null {
+    const raw = this.listaProductosMemoria?.data;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return null;
+    }
+    const term = String(termino || '').trim();
+    if (term.length < 2) {
+      return [];
+    }
+    const filtrados = raw
+      .filter((item) => productoActivoParaVenta(item as unknown as Record<string, unknown>))
+      .filter((item) =>
+        productoCoincideBusquedaMultipalabra(item as unknown as Record<string, unknown>, term)
+      );
+    return filtrados.slice(0, Math.min(100, Math.max(1, limite)));
+  }
+
+  /**
+   * Búsqueda server-side para modal de ventas (no descarga el catálogo completo).
+   */
+  buscarProductosVenta(opciones: BuscarProductosVentaOpciones): Observable<ProductoResponse> {
+    this.invalidarCacheSiEmpresaDistinta();
+    const qRaw = String(opciones.q || '').trim();
+    const limit = opciones.limit != null ? Math.min(100, Math.max(1, opciones.limit)) : 80;
+    const cacheKey = `${this.idEmpresaJwtCacheKey()}|${qRaw.toLowerCase()}|${limit}|${opciones.idSucursal || ''}`;
+    if (!opciones?.evitarCache) {
+      const hit = this.cacheBusquedaVenta.get(cacheKey);
+      if (hit && Date.now() - hit.ts < this.ttlBusquedaVentaMs) {
+        const d = hit.data.data;
+        const dataCopy = Array.isArray(d) ? [...d] : d;
+        return of({ ...hit.data, data: dataCopy } as ProductoResponse);
+      }
+    }
+    const q = encodeURIComponent(qRaw);
+    let url = `${this.url}productos/buscar-venta?q=${q}&limit=${limit}`;
+    if (opciones.idSucursal) {
+      url += `&idSucursal=${encodeURIComponent(opciones.idSucursal)}`;
+    }
+    if (opciones.evitarCache) {
+      url += `&_=${encodeURIComponent(String(Date.now()))}`;
+    }
+    return this._http.get<ProductoResponse>(url, { withCredentials: true }).pipe(
+      tap((res) => {
+        if (res?.data != null) {
+          const d = res.data;
+          this.cacheBusquedaVenta.set(cacheKey, {
+            ts: Date.now(),
+            data: {
+              ...res,
+              data: Array.isArray(d) ? [...d] : d
+            } as ProductoResponse
+          });
+        }
+      })
+    );
   }
 
   /**
@@ -38,7 +142,14 @@ export class ProductoService {
    * @param opciones.evitarCache Fuerza petición HTTP (query anti-caché) y actualiza memoria.
    */
   obtenerProductosTodos(opciones?: { evitarCache?: boolean }): Observable<ProductoResponse> {
-    if (!opciones?.evitarCache && this.listaProductosMemoria?.data != null) {
+    this.invalidarCacheSiEmpresaDistinta();
+    const empKey = this.idEmpresaJwtCacheKey();
+    if (
+      !opciones?.evitarCache &&
+      empKey &&
+      this.catalogoMemoriaIdEmpresa === empKey &&
+      this.listaProductosMemoria?.data != null
+    ) {
       const d = this.listaProductosMemoria.data;
       const dataCopy = Array.isArray(d) ? [...d] : d;
       return of({ ...this.listaProductosMemoria, data: dataCopy } as ProductoResponse);
@@ -53,6 +164,7 @@ export class ProductoService {
       tap((res) => {
         if (res?.data != null) {
           const d = res.data;
+          this.catalogoMemoriaIdEmpresa = empKey || null;
           this.listaProductosMemoria = {
             ...res,
             data: Array.isArray(d) ? [...d] : d

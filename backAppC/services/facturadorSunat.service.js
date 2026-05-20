@@ -285,13 +285,6 @@ async function leerYDevolverCDR(rutaCarpetaFacturadorSunat, base) {
       contenidoRpta = ["(carpeta RPTA no existe)"];
     }
     console.error("facturadorSunat.service: CDR no encontrado. Ruta esperada:", zipPath, "| Contenido RPTA:", contenidoRpta.slice(0, 20));
-    // #region agent log
-    debugSunatLog.write({
-      location: "facturadorSunat.service.leerYDevolverCDR",
-      message: "CDR no encontrado",
-      data: { zipPath, rptaDir, contenidoRpta: contenidoRpta.slice(0, 30), base }
-    });
-    // #endregion
     const errorDetalle = `No se encontró CDR después del envío. Ruta esperada: ${zipPath}. Carpeta RPTA: ${(contenidoRpta.length > 0 ? contenidoRpta.slice(0, 10).join(", ") : "vacía o inaccesible")}.`;
     return {
       ok: false,

@@ -1,7 +1,8 @@
 // SIEMPRE usa environment para URLs (regla 2.2)
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { finalize, shareReplay, tap } from 'rxjs/operators';
 import { global } from './global';
 
 export interface EmpresaGestionada {
@@ -82,9 +83,18 @@ export interface EjecutarBackupAhoraResult {
 })
 export class GestoresService {
     private url: string;
+    /** Configuración de empresa en memoria (una petición por sesión hasta guardar o invalidar). */
+    private configuracionMemoria: ApiResponse<ConfiguracionEmpresa[]> | null = null;
+    private configuracionEnVuelo: Observable<ApiResponse<ConfiguracionEmpresa[]>> | null = null;
 
     constructor(private http: HttpClient) {
         this.url = global.url;
+    }
+
+    /** Tras guardar configuración en BD, forzar próximo GET. */
+    invalidarCacheConfiguracion(): void {
+        this.configuracionMemoria = null;
+        this.configuracionEnVuelo = null;
     }
 
     /**
@@ -161,13 +171,40 @@ export class GestoresService {
     }
 
     /**
-     * Obtiene la configuración de la empresa
+     * Obtiene la configuración de la empresa (caché en memoria por sesión).
      */
-    obtenerConfiguracion(): Observable<ApiResponse<ConfiguracionEmpresa[]>> {
-        return this.http.get<ApiResponse<ConfiguracionEmpresa[]>>(
-            `${this.url}gestores/configuracion`,
-            { withCredentials: true }
-        );
+    obtenerConfiguracion(opciones?: { evitarCache?: boolean }): Observable<ApiResponse<ConfiguracionEmpresa[]>> {
+        if (!opciones?.evitarCache && this.configuracionMemoria?.data != null) {
+            const data = Array.isArray(this.configuracionMemoria.data)
+                ? [...this.configuracionMemoria.data]
+                : this.configuracionMemoria.data;
+            return of({ ...this.configuracionMemoria, data } as ApiResponse<ConfiguracionEmpresa[]>);
+        }
+        if (!opciones?.evitarCache && this.configuracionEnVuelo) {
+            return this.configuracionEnVuelo;
+        }
+        const peticion = this.http
+            .get<ApiResponse<ConfiguracionEmpresa[]>>(
+                `${this.url}gestores/configuracion`,
+                { withCredentials: true }
+            )
+            .pipe(
+                tap((res) => {
+                    if (res?.data != null) {
+                        const d = res.data;
+                        this.configuracionMemoria = {
+                            ...res,
+                            data: Array.isArray(d) ? [...d] : d
+                        } as ApiResponse<ConfiguracionEmpresa[]>;
+                    }
+                }),
+                shareReplay(1),
+                finalize(() => {
+                    this.configuracionEnVuelo = null;
+                })
+            );
+        this.configuracionEnVuelo = peticion;
+        return peticion;
     }
 
     /**
@@ -178,6 +215,8 @@ export class GestoresService {
             `${this.url}gestores/configuracion`,
             { configuraciones },
             { withCredentials: true }
+        ).pipe(
+            tap(() => this.invalidarCacheConfiguracion())
         );
     }
 

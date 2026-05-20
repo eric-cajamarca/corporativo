@@ -49,6 +49,107 @@ const construirInClause = (request, ids, prefijo) => {
   return params.length > 0 ? params.join(', ') : null;
 };
 
+/** Filtro multipalabra (cada token en código, descripción, marca o categoría). */
+const construirFiltroTokensBusqueda = (request, tokens, aliasMarca, aliasCategoria, paramBase = 'busq') => {
+  if (!tokens || tokens.length === 0) {
+    return '';
+  }
+  const conds = [];
+  tokens.forEach((tok, i) => {
+    const p = `${paramBase}${i}`;
+    request.input(p, sql.NVarChar(120), `%${String(tok).replace(/[%_[\]]/g, '')}%`);
+    conds.push(`(
+      p.codigo LIKE @${p} OR
+      p.descripcion LIKE @${p} OR
+      ${aliasMarca}.nombre LIKE @${p} OR
+      ${aliasCategoria}.nombre LIKE @${p}
+    )`);
+  });
+  return ` AND (${conds.join(' AND ')}) `;
+};
+
+const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProductoFiltro = null) => {
+  const ids = (idsEmpresa || []).filter(Boolean);
+  if (!recordset || recordset.length === 0) {
+    return [];
+  }
+  const idsProdUnicos =
+    idsProductoFiltro && idsProductoFiltro.length
+      ? [...new Set(idsProductoFiltro.filter(Boolean))]
+      : [...new Set(recordset.map((r) => r.idProducto).filter(Boolean))];
+
+  const preciosRequest = pool.request();
+  const inClausePrecios = construirInClause(preciosRequest, ids, 'idEmpresaPrecio');
+  const inClauseProd =
+    idsProdUnicos.length > 0 ? construirInClause(preciosRequest, idsProdUnicos, 'idProdPrecio') : null;
+  const filtroProdSql = inClauseProd ? ` AND pp.idProducto IN (${inClauseProd}) ` : '';
+
+  const preciosResult = await preciosRequest.query(`
+        SELECT 
+            pp.idProducto,
+            pp.idLista,
+            pp.precio,
+            pp.idPrecio,
+            pp.fActualizacion,
+            lp.nombre as nombreLista,
+            lp.principal,
+            m.simbolo as simboloMoneda
+        FROM PreciosProducto pp
+        INNER JOIN ListasPrecio lp ON pp.idLista = lp.idLista
+        INNER JOIN Moneda m ON lp.idMoneda = m.idMoneda
+        INNER JOIN Productos p ON pp.idProducto = p.idProducto
+        WHERE p.idEmpresa IN (${inClausePrecios})
+        ${filtroProdSql}
+        AND lp.activo = 1
+      `);
+
+  const preciosMap = {};
+  preciosResult.recordset.forEach((precio) => {
+    if (!preciosMap[precio.idProducto]) {
+      preciosMap[precio.idProducto] = {};
+    }
+    preciosMap[precio.idProducto][precio.idLista] = {
+      precio: precio.precio,
+      idPrecio: precio.idPrecio,
+      nombreLista: precio.nombreLista,
+      principal: precio.principal,
+      simboloMoneda: precio.simboloMoneda,
+      fActualizacion: precio.fActualizacion
+    };
+  });
+
+  return (recordset || []).map((producto) => {
+    const preciosProducto = preciosMap[producto.idProducto] || {};
+    const precioPrincipal = Object.values(preciosProducto).find((p) => p.principal === true);
+    return {
+      idProducto: producto.idProducto,
+      idEmpresa: producto.idEmpresa,
+      codigo: producto.codigo,
+      idCategoria: producto.idCategoria,
+      categoria: producto.categoria,
+      descripcion: producto.descripcion,
+      permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1),
+      idMarca: producto.idMarca,
+      marca: producto.marca,
+      idPresentacion: producto.idPresentacion,
+      codigoPresentacion: producto.codigoPresentacion,
+      descripcionPres: producto.descripcionPres,
+      idSucursal: producto.idSucursal,
+      sucursal: producto.sucursal,
+      cUnitario: producto.cUnitario,
+      pVenta: precioPrincipal ? precioPrincipal.precio : 0,
+      stock: producto.stock,
+      tipoProducto: producto.tipoProducto,
+      fProduccion: producto.fProduccion,
+      fVencimiento: producto.fVencimiento,
+      estado: !!(producto.estado === true || producto.estado === 1),
+      precios: preciosProducto,
+      aliasEmpresa: producto.aliasEmpresa || '',
+      razonSocialEmpresa: producto.razonSocialEmpresa || ''
+    };
+  });
+};
+
 exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucursalesFiltro = null) => {
   try {
     const ids = (idsEmpresa || []).filter(Boolean);
@@ -165,106 +266,200 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
         )
       `);
 
-    // Obtener precios por separado
-    const preciosRequest = pool.request();
-    const inClausePrecios = construirInClause(preciosRequest, ids, 'idEmpresaPrecio');
-    const preciosResult = await preciosRequest.query(`
-        SELECT 
-            pp.idProducto,
-            pp.idLista,
-            pp.precio,
-            pp.idPrecio,
-            pp.fActualizacion,
-            lp.nombre as nombreLista,
-            lp.principal,
-            m.simbolo as simboloMoneda
-            
-        FROM PreciosProducto pp
-        INNER JOIN ListasPrecio lp ON pp.idLista = lp.idLista
-        INNER JOIN Moneda m ON lp.idMoneda = m.idMoneda
-        INNER JOIN Productos p ON pp.idProducto = p.idProducto
-        WHERE p.idEmpresa IN (${inClausePrecios})
-        AND lp.activo = 1
+    const productos = await combinarRecordsetConPrecios(pool, ids, result.recordset);
+    return productos;
+  } catch (error) {
+    throw new Error(`Repository Error: ${error.message}`);
+  }
+};
+
+/**
+ * Búsqueda rápida para ventas: primero filtra productos (TOP), luego stock solo de esos IDs.
+ */
+exports.buscarProductosVentaRepo = async (
+  pool,
+  idsEmpresa,
+  idsSucursalesFiltro = null,
+  tokensBusqueda = [],
+  limite = 80,
+  idSucursalVenta = null
+) => {
+  try {
+    const ids = (idsEmpresa || []).filter(Boolean);
+    if (ids.length === 0) return [];
+    const tokens = (tokensBusqueda || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 4);
+    if (tokens.length === 0) return [];
+
+    const top = Math.min(100, Math.max(1, parseInt(limite, 10) || 80));
+    const topCandidatos = Math.min(150, top * 2);
+
+    const reqProd = pool.request();
+    reqProd.input('limite', sql.Int, topCandidatos);
+    const inClauseEmp = construirInClause(reqProd, ids, 'idEmpresa');
+    const filtroBusq = construirFiltroTokensBusqueda(reqProd, tokens, 'm', 'c', 'bv');
+
+    const candidatosRes = await reqProd.query(`
+      SELECT TOP (@limite)
+        p.idProducto,
+        p.idEmpresa,
+        p.codigo,
+        p.idCategoria,
+        c.nombre AS categoria,
+        p.descripcion,
+        ISNULL(p.permiteDescripcionEnVenta, 0) AS permiteDescripcionEnVenta,
+        p.idMarca,
+        m.nombre AS marca,
+        p.idPresentacion,
+        pr.codigo AS codigoPresentacion,
+        pr.descripcion AS descripcionPres,
+        p.cUnitario,
+        p.tipoProducto,
+        p.fProduccion,
+        p.fVencimiento,
+        p.estado,
+        ISNULL(e.alias, e.nombreComercial) AS aliasEmpresa,
+        e.razon_Social AS razonSocialEmpresa
+      FROM Productos p
+      INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
+      INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+      INNER JOIN Marcas m ON p.idMarca = m.idMarca
+      INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
+      WHERE p.idEmpresa IN (${inClauseEmp})
+        AND ISNULL(p.estado, 1) = 1
+        ${filtroBusq}
+      ORDER BY p.descripcion, p.codigo
+    `);
+
+    const candidatos = candidatosRes.recordset || [];
+    if (candidatos.length === 0) {
+      return [];
+    }
+
+    const idsProducto = [...new Set(candidatos.map((r) => r.idProducto).filter(Boolean))];
+    const mapCandidato = new Map();
+    for (const c of candidatos) {
+      mapCandidato.set(`${c.idProducto}|${c.idEmpresa}`, c);
+    }
+
+    const sucFilt = (idsSucursalesFiltro || []).filter(Boolean);
+    const reqStock = pool.request();
+    reqStock.input('limiteFilas', sql.Int, top);
+    const inClauseEmp2 = construirInClause(reqStock, ids, 'idEmp2');
+    const inClauseProd = construirInClause(reqStock, idsProducto, 'idProd');
+    const inSucClause = sucFilt.length > 0 ? construirInClause(reqStock, sucFilt, 'idSuc') : null;
+    let filtroSucLotes = inSucClause ? ` AND l.idSucursal IN (${inSucClause}) ` : '';
+    if (idSucursalVenta) {
+      reqStock.input('idSucursalVenta', sql.UniqueIdentifier, idSucursalVenta);
+      filtroSucLotes += ' AND l.idSucursal = @idSucursalVenta ';
+    }
+
+    const stockRes = await reqStock.query(`
+      SELECT TOP (@limiteFilas)
+        l.idProducto,
+        l.idEmpresa,
+        l.idSucursal,
+        s.nombre AS sucursal,
+        SUM(l.cantidadDisponible) AS stock
+      FROM Lotes l
+      INNER JOIN Sucursal s ON l.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
+      WHERE l.idEmpresa IN (${inClauseEmp2})
+        AND l.idProducto IN (${inClauseProd})
+        ${filtroSucLotes}
+      GROUP BY l.idProducto, l.idEmpresa, l.idSucursal, s.nombre
+      ORDER BY s.nombre
+    `);
+
+    const filas = [];
+    const conStock = new Set();
+
+    for (const row of stockRes.recordset || []) {
+      const key = `${row.idProducto}|${row.idEmpresa}`;
+      const base = mapCandidato.get(key);
+      if (!base) continue;
+      conStock.add(key);
+      filas.push({
+        ...base,
+        idSucursal: row.idSucursal,
+        sucursal: row.sucursal,
+        stock: row.stock
+      });
+      if (filas.length >= top) break;
+    }
+
+    if (filas.length < top) {
+      const reqSinLote = pool.request();
+      reqSinLote.input('limiteFilas', sql.Int, top - filas.length);
+      const inClauseEmp3 = construirInClause(reqSinLote, ids, 'idEmp3');
+      const inClauseProd3 = construirInClause(reqSinLote, idsProducto, 'idProd3');
+      const inSucClause3 = sucFilt.length > 0 ? construirInClause(reqSinLote, sucFilt, 'idSuc3') : null;
+
+      const applySucursalSinLotes = inSucClause3
+        ? `OUTER APPLY (
+            SELECT TOP 1 su.idSucursal AS idSucursal
+            FROM Sucursal su
+            WHERE su.idEmpresa = p.idEmpresa
+              AND ISNULL(su.estado, 1) = 1
+              AND su.idSucursal IN (${inSucClause3})
+            ORDER BY su.nombre
+          ) defFilt
+          OUTER APPLY (
+            SELECT TOP 1 su.idSucursal AS idSucursal
+            FROM Sucursal su
+            WHERE su.idEmpresa = p.idEmpresa
+              AND ISNULL(su.estado, 1) = 1
+            ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+          ) defFb`
+        : `CROSS APPLY (
+            SELECT TOP 1 su.idSucursal AS idSucursal
+            FROM Sucursal su
+            WHERE su.idEmpresa = p.idEmpresa
+              AND ISNULL(su.estado, 1) = 1
+            ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+          ) defFb`;
+      const idSucExpr = inSucClause3 ? 'COALESCE(defFilt.idSucursal, defFb.idSucursal)' : 'defFb.idSucursal';
+      let filtroSucVenta2 = '';
+      if (idSucursalVenta) {
+        reqSinLote.input('idSucursalVenta2', sql.UniqueIdentifier, idSucursalVenta);
+        filtroSucVenta2 = ` AND ${idSucExpr} = @idSucursalVenta2 `;
+      }
+
+      const sinLoteRes = await reqSinLote.query(`
+        SELECT TOP (@limiteFilas)
+          p.idProducto,
+          p.idEmpresa,
+          ${idSucExpr} AS idSucursal,
+          s2.nombre AS sucursal,
+          CAST(0 AS DECIMAL(18, 3)) AS stock
+        FROM Productos p
+        ${applySucursalSinLotes}
+        INNER JOIN Sucursal s2 ON s2.idSucursal = ${idSucExpr} AND ISNULL(s2.estado, 1) = 1
+        WHERE p.idEmpresa IN (${inClauseEmp3})
+          AND p.idProducto IN (${inClauseProd3})
+          AND ISNULL(p.estado, 1) = 1
+          ${filtroSucVenta2}
+          AND NOT EXISTS (
+            SELECT 1 FROM Lotes l
+            WHERE l.idProducto = p.idProducto AND l.idEmpresa = p.idEmpresa
+          )
+        ORDER BY p.descripcion
       `);
 
-    // Crear mapa de precios
-    const preciosMap = {};
-    preciosResult.recordset.forEach(precio => {
-      if (!preciosMap[precio.idProducto]) {
-        preciosMap[precio.idProducto] = {};
+      for (const row of sinLoteRes.recordset || []) {
+        const key = `${row.idProducto}|${row.idEmpresa}`;
+        if (conStock.has(key)) continue;
+        const base = mapCandidato.get(key);
+        if (!base) continue;
+        filas.push({
+          ...base,
+          idSucursal: row.idSucursal,
+          sucursal: row.sucursal,
+          stock: row.stock
+        });
+        if (filas.length >= top) break;
       }
-      preciosMap[precio.idProducto][precio.idLista] = {
-        precio: precio.precio,
-        idPrecio: precio.idPrecio,
-        nombreLista: precio.nombreLista,
-        principal: precio.principal,
-        simboloMoneda: precio.simboloMoneda,
-        fActualizacion: precio.fActualizacion
+    }
 
-      };
-      
-    });
-
-     // Combinar productos con precios
-    const productos = result.recordset.map((producto) => {
-      // Obtener precios del producto actual
-      const preciosProducto = preciosMap[producto.idProducto] || {};
-      
-      // Buscar el precio principal (donde principal = true)
-      const precioPrincipal = Object.values(preciosProducto).find(
-        (p) => p.principal === true
-      );
-
-      return {
-        idProducto: producto.idProducto,
-        idEmpresa: producto.idEmpresa,
-        codigo: producto.codigo,
-        idCategoria: producto.idCategoria,
-        categoria: producto.categoria,
-        descripcion: producto.descripcion,
-        permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1),
-        idMarca: producto.idMarca,
-        marca: producto.marca,
-        idPresentacion: producto.idPresentacion,
-        codigoPresentacion: producto.codigoPresentacion,
-        descripcionPres: producto.descripcionPres,
-        idSucursal: producto.idSucursal,
-        sucursal: producto.sucursal,
-        cUnitario: producto.cUnitario,
-        pVenta: precioPrincipal ? precioPrincipal.precio:0,
-        stock: producto.stock,
-        tipoProducto: producto.tipoProducto,
-        fProduccion: producto.fProduccion,
-        fVencimiento: producto.fVencimiento,
-        estado: !!(producto.estado === true || producto.estado === 1),
-        precios: preciosProducto,
-        aliasEmpresa: producto.aliasEmpresa || '',
-        razonSocialEmpresa: producto.razonSocialEmpresa || '',
-      };
-    });   // Encontrar el precio principal (normal)
-   
-
-    // Combinar productos con precios
-    // const productos = result.recordset.map((producto) => ({
-    //   idProducto: producto.idProducto,
-    //   codigo: producto.codigo,
-    //   categoria: producto.categoria,
-    //   descripcion: producto.descripcion,
-    //   marca: producto.marca,
-    //   codigoPresentacion: producto.codigoPresentacion,
-    //   descripcionPres: producto.descripcionPres,
-    //   idSucursal: producto.idSucursal,
-    //   sucursal: producto.sucursal,
-    //   cUnitario: producto.cUnitario,
-    //   pVenta: precioNormal ? precioNormal.precio : null,
-    //   stock: producto.stock,
-    //   tipoProducto: producto.tipoProducto,
-    //   fProduccion: producto.fProduccion,
-    //   fVencimiento: producto.fVencimiento,
-    //   precios: preciosMap[producto.idProducto] || {}
-    // }));
-
-    return productos;
+    return await combinarRecordsetConPrecios(pool, ids, filas, idsProducto);
   } catch (error) {
     throw new Error(`Repository Error: ${error.message}`);
   }
@@ -354,9 +549,6 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
 
 exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = null) => {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productos.repository.js:obtenerProductosCompras:entry',message:'pool at entry',data:{poolConnected:pool?.connected},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     // Primero, obtener productos básicos (obtenerProductosCompras)
     const reqCompras = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
     let filtroSucCompras = '';
@@ -396,9 +588,6 @@ exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = 
         WHERE ss.idEmpresa = @idEmpresa ${filtroSucCompras}
       `);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/c3150317-d333-42b3-b498-118180355ae2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'08e109'},body:JSON.stringify({sessionId:'08e109',location:'productos.repository.js:obtenerProductosCompras:beforeSecondRequest',message:'pool before second request',data:{poolConnected:pool?.connected},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     // Obtener precios por separado
     const preciosResult = await pool
       .request()

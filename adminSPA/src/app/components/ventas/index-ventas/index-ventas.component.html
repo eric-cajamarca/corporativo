@@ -150,7 +150,6 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="Ticket VA — imprimir" (click)="imprimirVA(v.idVentaAgrupada)" [disabled]="imprimiendoVAId === v.idVentaAgrupada">
                       <span *ngIf="imprimiendoVAId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
                       <span *ngIf="imprimiendoVAId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
-                      Imprimir VA
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#comprobantesModal" (click)="abrirModalComprobantes(v)">
                       <i class="bi bi-receipt"></i> Ver

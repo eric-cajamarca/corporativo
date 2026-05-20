@@ -1,5 +1,90 @@
 // repositories/stock.repository.js
 const sql = require('mssql');
+const inventarioRepository = require('./inventario.repository');
+
+async function obtenerCostoUnitarioProducto(transaction, idEmpresa, idProducto) {
+  const rs = await transaction
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT ISNULL(cUnitario, 0) AS cUnitario
+      FROM Productos
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto
+    `);
+  const v = rs.recordset && rs.recordset[0] ? rs.recordset[0].cUnitario : 0;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Descuenta cantidad dejando cantidadDisponible negativa en un lote (venta sin stock).
+ * Crea lote en 0 si el producto no tiene ninguno en la sucursal.
+ */
+async function aplicarSaldoNegativoEnLote(transaction, { idEmpresa, idSucursal, idProducto, cantidad, consumos }) {
+  const cant = parseFloat(cantidad) || 0;
+  if (cant <= 0 || !idEmpresa || !idProducto) return;
+  const conSucursal = idSucursal != null && idSucursal !== '';
+  const req = transaction.request();
+  req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  req.input('idProducto', sql.UniqueIdentifier, idProducto);
+  const whereSuc = conSucursal ? ' AND idSucursal = @idSucursal' : '';
+  if (conSucursal) req.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+
+  const rs = await req.query(`
+    SELECT TOP 1 idLote, ISNULL(costoUnitario, 0) AS costoUnitario,
+      CONVERT(DECIMAL(18, 2), cantidadDisponible) AS cantidadDisponible
+    FROM Lotes
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto${whereSuc}
+    ORDER BY fechaIngreso DESC, idLote DESC
+  `);
+
+  let idLote = rs.recordset && rs.recordset[0] ? rs.recordset[0].idLote : null;
+  let costoUnitario =
+    rs.recordset && rs.recordset[0] && rs.recordset[0].costoUnitario != null
+      ? parseFloat(rs.recordset[0].costoUnitario)
+      : 0;
+  let disp =
+    rs.recordset && rs.recordset[0] && rs.recordset[0].cantidadDisponible != null
+      ? parseFloat(rs.recordset[0].cantidadDisponible)
+      : 0;
+
+  if (!idLote) {
+    if (!conSucursal) {
+      throw new Error('No se pudo determinar la sucursal para registrar stock negativo.');
+    }
+    costoUnitario = await obtenerCostoUnitarioProducto(transaction, idEmpresa, idProducto);
+    idLote = await inventarioRepository.crearLoteSinCompra(transaction, {
+      idEmpresa,
+      idProducto,
+      idSucursal,
+      costoUnitario,
+      cantidad: 0
+    });
+    disp = 0;
+  }
+
+  if (!idLote) {
+    throw new Error('No se pudo registrar el saldo negativo del producto.');
+  }
+
+  const nuevaCant = (Number.isFinite(disp) ? disp : 0) - cant;
+  await transaction
+    .request()
+    .input('idLote', sql.UniqueIdentifier, idLote)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('nuevaCantidad', sql.Decimal(18, 2), nuevaCant)
+    .query(`
+      UPDATE Lotes SET cantidadDisponible = @nuevaCantidad
+      WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+    `);
+
+  consumos.push({
+    idLote,
+    cantidadTomada: cant,
+    costoUnitario: Number.isFinite(costoUnitario) ? costoUnitario : 0
+  });
+}
 
 exports.ejecutarDescuento = async (transaction, stockData) => {
   const {
@@ -181,6 +266,16 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   if (restante <= 0) return { consumosPorLote: consumos };
 
   if (idUbicacionSolo) {
+    if (opciones.permitirVentasNegativas) {
+      await aplicarSaldoNegativoEnLote(transaction, {
+        idEmpresa,
+        idSucursal,
+        idProducto,
+        cantidad: restante,
+        consumos
+      });
+      return { consumosPorLote: consumos };
+    }
     throw new Error('Stock insuficiente en la ubicación seleccionada');
   }
 
@@ -238,6 +333,16 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   }
 
   if (restante > 0) {
+    if (opciones.permitirVentasNegativas) {
+      await aplicarSaldoNegativoEnLote(transaction, {
+        idEmpresa,
+        idSucursal,
+        idProducto,
+        cantidad: restante,
+        consumos
+      });
+      return { consumosPorLote: consumos };
+    }
     throw new Error('Stock insuficiente para el producto en la empresa');
   }
   return { consumosPorLote: consumos };

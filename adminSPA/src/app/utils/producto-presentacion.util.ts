@@ -27,3 +27,24 @@ export function descripcionUnidadMedidaProducto(
   const codigo = String(p['codigoPresentacion'] ?? '').trim();
   return codigo || '—';
 }
+
+/** Descripción de producto para PDF/listados: «descripción - marca» si hay marca. */
+export function descripcionProductoConMarca(
+  descripcion?: string | null,
+  marca?: string | null
+): string {
+  const base = String(descripcion ?? '').trim();
+  const m = String(marca ?? '').trim();
+  if (!m) {
+    return base;
+  }
+  if (!base) {
+    return m;
+  }
+  const baseLow = base.toLowerCase();
+  const mLow = m.toLowerCase();
+  if (baseLow.endsWith(` - ${mLow}`) || baseLow.endsWith(`-${mLow}`)) {
+    return base;
+  }
+  return `${base} - ${m}`;
+}

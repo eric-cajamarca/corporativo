@@ -79,18 +79,31 @@ if (process.env.TRUST_PROXY === '1') {
   app.set('trust proxy', 1);
 }
 
-// Seguridad: Implementar headers de seguridad con helmet
+// Seguridad: headers con helmet (CSP relajado en desktop: el build Angular usa onload en <link rel=stylesheet>)
+const isDesktopSpa = Boolean(process.env.SERVE_SPA_ROOT);
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-  crossOriginEmbedderPolicy: false
+  contentSecurityPolicy: isDesktopSpa
+    ? {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+          scriptSrc: ["'self'"],
+          // Sin esto, script-src-attr 'none' impide onload="this.media='all'" y no carga styles-*.css
+          scriptSrcAttr: ["'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https:"],
+        },
+      }
+    : {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+        },
+      },
+  crossOriginEmbedderPolicy: false,
 }));
 
 // Servir archivos est?ticos desde uploads

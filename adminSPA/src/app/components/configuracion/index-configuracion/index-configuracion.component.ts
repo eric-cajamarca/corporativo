@@ -514,7 +514,10 @@ export class IndexConfiguracionComponent implements OnInit {
         const getVal = (clave: string, def: string) => (lista.find((c: { clave: string; valor: string }) => c.clave === clave)?.valor ?? def);
         this.inventario.alertaStockMinimo = parseInt(getVal('INVENTARIO_ALERTA_STOCK_MINIMO', '10'), 10) || 10;
         this.inventario.alertaStockMaximo = parseInt(getVal('INVENTARIO_ALERTA_STOCK_MAXIMO', '1000'), 10) || 1000;
-        this.inventario.permitirVentasNegativas = String(getVal('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false')).toLowerCase() === 'true';
+        this.inventario.permitirVentasNegativas = interpretarBooleanoConfig(
+          getVal('INVENTARIO_PERMITIR_VENTAS_NEGATIVAS', 'false'),
+          false
+        );
         this.inventario.controlLotes = true;
         this.inventario.controlVencimiento = String(getVal('INVENTARIO_CONTROL_VENCIMIENTO', 'true')).toLowerCase() === 'true';
         this.inventario.ubicaciones = String(getVal('INVENTARIO_CONTROL_UBICACIONES', 'true')).toLowerCase() === 'true';

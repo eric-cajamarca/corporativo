@@ -1688,11 +1688,6 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
 exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico, facturadorSunatService, config, opciones = {}) => {
   const comp = await exports.obtenerComprobanteParaEnvioRepo(pool, idComprobanteElectronico, user.empresa);
   if (!comp) return null;
-  // #region agent log
-  const compData = { idComprobanteElectronico, ruc: comp.rucEmpresa, tipo: comp.tipoComprobante, serie: comp.serie, numero: comp.numero };
-  console.error("[SUNAT] enviarComprobanteSunatRepo: comprobante", compData);
-  debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:comprobante", message: "comprobante", data: compData });
-  // #endregion
 
   const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, [user.empresa]);
   if (!payload) {
@@ -1812,11 +1807,6 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
       mensaje: "Configure la carpeta del Facturador SUNAT o active Envío directo con URL, usuario y clave SOL"
     };
   }
-  // #region agent log
-  const ramaData = { idComprobanteElectronico, usarXmlUbl, urlFacturador: config.urlFacturadorSunat || "(default)" };
-  console.error("[SUNAT] enviarComprobanteSunatRepo: rama FACTURADOR SFS", ramaData);
-  debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:rama", message: "rama FACTURADOR SFS", data: ramaData });
-  // #endregion
 
   if (usarXmlUbl) {
     const numeroComprobante = `${comp.serie}-${String(comp.numero).replace(/\D/g, "").padStart(8, "0")}`;
@@ -1900,11 +1890,6 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     );
   }
 
-  // #region agent log
-  const resFac = { ok: resultado.ok, idEstadoSunat: resultado.idEstadoSunat, codigoRespuesta: resultado.codigoRespuesta, error: resultado.error };
-  console.error("[SUNAT] enviarComprobanteSunatRepo: resultado Facturador", resFac);
-  debugSunatLog.write({ location: "facturacion.repository.enviarComprobanteSunatRepo:resultadoFacturador", message: "resultado", data: resFac });
-  // #endregion
   if (infraFac) {
     return {
       ok: false,

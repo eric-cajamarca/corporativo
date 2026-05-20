@@ -41,6 +41,69 @@ exports.obtenerProductosTodosService = async (pool, user) => {
   return productos;
 };
 
+/** Misma autorización y alcance multiempresa que el listado completo; búsqueda con límite para modal de ventas. */
+exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucursalVenta) => {
+  if (!user) {
+    throw new Error('NO_ACCESS');
+  }
+
+  const term = String(termino || '').trim();
+  if (term.length < 2) {
+    throw new Error('TERMINO_CORTO');
+  }
+
+  const esAdmin = user.rol === 'Administrador';
+  const puedeVerLista =
+    esAdmin ||
+    (await permisosService.verificarPermisoUsuario(pool, 'CREAR_VENTAS', user)) ||
+    (await permisosService.verificarPermisoUsuario(pool, 'VER_PRODUCTOS', user));
+
+  if (!puedeVerLista) {
+    throw new Error('NO_PERMISSIONS');
+  }
+
+  const tokens = term
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  let idsEmpresa;
+  if (esGestora) {
+    const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
+    idsEmpresa = [
+      user.empresa,
+      ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)
+    ];
+  } else {
+    idsEmpresa = [user.empresa];
+  }
+
+  const rol = (user.rol || '').toString();
+  const idsSucFiltro =
+    esAdmin || rol === 'superAdmin' ? null : await idsSucursalesFiltroCatalogo(pool, user);
+
+  let idSucursalFiltro = null;
+  if (idSucursalVenta && String(idSucursalVenta).trim()) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(String(idSucursalVenta).trim())) {
+      throw new Error('ID_SUCURSAL_INVALIDO');
+    }
+    idSucursalFiltro = String(idSucursalVenta).trim();
+  }
+
+  const lim = Math.min(100, Math.max(1, parseInt(limite, 10) || 80));
+  return ProductosRepository.buscarProductosVentaRepo(
+    pool,
+    idsEmpresa,
+    idsSucFiltro,
+    tokens,
+    lim,
+    idSucursalFiltro
+  );
+};
+
 exports.obtenerProductosComprasService = async (pool, user) => {
   if (!user) {
     throw new Error("NO_ACCESS");

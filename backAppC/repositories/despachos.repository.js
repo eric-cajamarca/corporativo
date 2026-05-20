@@ -724,6 +724,7 @@ exports.obtenerDetalleDespachoRepo = async (pool, idDespacho, idEmpresa) => {
         dd.idProducto,
         p.codigo AS productoCodigo,
         p.descripcion AS productoDescripcion,
+        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS productoMarca,
         dd.cantidadSolicitada,
         dd.cantidadDespachada,
         dd.ubicacionOrigen,
@@ -733,6 +734,7 @@ exports.obtenerDetalleDespachoRepo = async (pool, idDespacho, idEmpresa) => {
       FROM DetalleDespachos dd
       INNER JOIN Despachos d ON d.idDespacho = dd.idDespacho AND d.idEmpresa = @idEmpresa
       INNER JOIN Productos p ON p.idProducto = dd.idProducto
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
       WHERE dd.idDespacho = @idDespacho
       ORDER BY p.descripcion
     `);

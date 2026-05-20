@@ -437,9 +437,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
    */
   navigateTo(ruta: string | null): void {
     if (ruta) {
-      // #region agent log
-      fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e02ca2'},body:JSON.stringify({sessionId:'e02ca2',location:'sidebar.component.ts:439',message:'navigateTo',data:{ruta,routeset:this.menuItems()},timestamp:Date.now(),runId:'debug-run',hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion agent log
       const target = this.normalizarRuta(ruta);
       if (target === '/ventas/create') {
         const segments = target.split('/').filter(Boolean);
