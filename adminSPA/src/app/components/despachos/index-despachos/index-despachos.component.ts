@@ -21,6 +21,20 @@ import { descripcionProductoConMarca } from '../../../utils/producto-presentacio
 
 declare const iziToast: any;
 
+/** Línea de DetalleDespachos en el acordeón (API + marca para UI/PDF). */
+export interface LineaDetalleDespachoAcordeon {
+  idDetalleDespacho: string;
+  productoCodigo: string;
+  productoDescripcion: string;
+  productoMarca?: string | null;
+  cantidadSolicitada: number;
+  cantidadDespachada: number;
+  estado: string;
+  fechaDespacho: string | null;
+  ubicacionOrigen?: string | null;
+  ubicacionDestino?: string | null;
+}
+
 export interface DetalleVentaLinea {
   idDetalle: number;
   idProducto: string;
@@ -135,17 +149,7 @@ export class IndexDespachosComponent implements OnInit {
   errorMsg = '';
   resultado: VentaDespachosResult | null = null;
   /** Detalle cargado por idDespacho para el acordeón */
-  detallePorDespacho: Record<string, Array<{
-    idDetalleDespacho: string;
-    productoCodigo: string;
-    productoDescripcion: string;
-    cantidadSolicitada: number;
-    cantidadDespachada: number;
-    estado: string;
-    fechaDespacho: string | null;
-    ubicacionOrigen?: string | null;
-    ubicacionDestino?: string | null;
-  }>> = {};
+  detallePorDespacho: Record<string, LineaDetalleDespachoAcordeon[]> = {};
   loadingDetalle: Record<string, boolean> = {};
   /** Un solo guardado por despacho (todas las líneas pendientes). */
   guardandoCantidadesBatch: Record<string, boolean> = {};
@@ -216,6 +220,34 @@ export class IndexDespachosComponent implements OnInit {
   get esNotaVenta(): boolean {
     const cod = (this.resultado?.venta?.codigoComprobante || '').toUpperCase();
     return cod === 'NV';
+  }
+
+  /** Misma regla que el PDF: «descripción - marca». */
+  descripcionProductoDespacho(
+    descripcion?: string | null,
+    marca?: string | null
+  ): string {
+    return descripcionProductoConMarca(descripcion, marca);
+  }
+
+  private enriquecerLineaDescripcionProducto<T extends { productoDescripcion?: string; productoMarca?: string | null }>(
+    lin: T
+  ): T {
+    return {
+      ...lin,
+      productoDescripcion: descripcionProductoConMarca(lin.productoDescripcion, lin.productoMarca)
+    };
+  }
+
+  private normalizarDetalleVentaDespacho(lineas?: DetalleVentaLinea[]): DetalleVentaLinea[] {
+    return (lineas || []).map((dv) => this.enriquecerLineaDescripcionProducto(dv));
+  }
+
+  private normalizarResultadoDespachos(data: VentaDespachosResult): VentaDespachosResult {
+    return {
+      ...data,
+      detalleVenta: this.normalizarDetalleVentaDespacho(data.detalleVenta)
+    };
   }
 
   constructor(
@@ -357,7 +389,7 @@ export class IndexDespachosComponent implements OnInit {
         eliminado: false
       },
       despachos: (comp.despachos || []) as VentaDespachosResult['despachos'],
-      detalleVenta: comp.detalleVenta || [],
+      detalleVenta: this.normalizarDetalleVentaDespacho(comp.detalleVenta || []),
       entregadoMismoDia: false
     };
     this.detallePorDespacho = {};
@@ -372,7 +404,7 @@ export class IndexDespachosComponent implements OnInit {
         .buscarVentaDespachos({ idVenta: idV, idEmpresa: this.idEmpresaDespachoActiva })
         .subscribe({
           next: (res) => {
-            if (res?.data) this.resultado = res.data as VentaDespachosResult;
+            if (res?.data) this.resultado = this.normalizarResultadoDespachos(res.data as VentaDespachosResult);
           }
         });
       return;
@@ -383,7 +415,7 @@ export class IndexDespachosComponent implements OnInit {
       )
       .subscribe({
         next: (res) => {
-          if (res?.data) this.resultado = res.data as VentaDespachosResult;
+          if (res?.data) this.resultado = this.normalizarResultadoDespachos(res.data as VentaDespachosResult);
         }
       });
   }
@@ -430,7 +462,7 @@ export class IndexDespachosComponent implements OnInit {
           if (idEmpVenta) {
             this.idEmpresaDespachoActiva = String(idEmpVenta).trim();
           }
-          this.resultado = data;
+          this.resultado = this.normalizarResultadoDespachos(data);
           this.detallePorDespacho = {};
         } else {
           this.errorMsg = 'Venta no encontrada.';
@@ -452,7 +484,9 @@ export class IndexDespachosComponent implements OnInit {
     this.despachoService.obtenerDetalleDespacho(idDespacho).subscribe({
       next: (res) => {
         this.loadingDetalle[idDespacho] = false;
-        const list = (res && res.data) ? res.data : [];
+        const list = ((res && res.data) ? res.data : []).map((lin: LineaDetalleDespachoAcordeon) =>
+          this.enriquecerLineaDescripcionProducto(lin)
+        );
         this.detallePorDespacho[idDespacho] = list;
         list.forEach((lin: any) => {
           const pend = this.pendienteLinea(lin);
@@ -481,9 +515,9 @@ export class IndexDespachosComponent implements OnInit {
   }
 
   /** Líneas del despacho con cantidad pendiente de registrar en almacén. */
-  lineasConPendienteDespacho(idDespacho: string): any[] {
+  lineasConPendienteDespacho(idDespacho: string): LineaDetalleDespachoAcordeon[] {
     const list = this.detallePorDespacho[idDespacho] || [];
-    return list.filter((lin: any) => this.pendienteLinea(lin) > 0);
+    return list.filter((lin) => this.pendienteLinea(lin) > 0);
   }
 
   guardarTodasCantidadesDespacho(d: { idDespacho: string }): void {
@@ -597,7 +631,9 @@ export class IndexDespachosComponent implements OnInit {
     this.detalleDevolucionPorDespacho[idDespacho] = [];
     this.despachoService.obtenerDetalleDevolucion(idDevolucionDespacho).subscribe({
       next: (res) => {
-        this.detalleDevolucionPorDespacho[idDespacho] = res?.data ?? [];
+        this.detalleDevolucionPorDespacho[idDespacho] = (res?.data ?? []).map((det: DevolucionDespachoDetalle) =>
+          this.enriquecerLineaDescripcionProducto(det)
+        );
       }
     });
   }
@@ -883,7 +919,9 @@ export class IndexDespachosComponent implements OnInit {
           }
           return;
         }
-        this.detallePorDespacho[d.idDespacho] = list;
+        this.detallePorDespacho[d.idDespacho] = list.map((lin: LineaDetalleDespachoAcordeon) =>
+          this.enriquecerLineaDescripcionProducto(lin)
+        );
         list.forEach((lin: { idDetalleDespacho: string; cantidadDespachada: number }) => {
           this.cantADespacharEdicion[lin.idDetalleDespacho] = Number(lin.cantidadDespachada) || 0;
           this.devolucionCantidadPorDetalle[lin.idDetalleDespacho] = 0;

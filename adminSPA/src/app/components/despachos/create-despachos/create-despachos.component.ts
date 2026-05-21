@@ -18,6 +18,7 @@ import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { descripcionProductoConMarca } from '../../../utils/producto-presentacion.util';
 
 declare var iziToast: any;
 
@@ -163,12 +164,23 @@ export class CreateDespachosComponent {
     this.cargarDevolucionesDespacho(idDespacho);
   }
 
+  descripcionProductoDespacho(
+    descripcion?: string | null,
+    marca?: string | null
+  ): string {
+    return descripcionProductoConMarca(descripcion, marca);
+  }
+
   cargarDetalleDespacho(idDespacho: string): void {
     this.cargandoDetalleDespacho = true;
     this._despachoApi.obtenerDetalleDespacho(idDespacho).subscribe({
       next: (res) => {
         this.cargandoDetalleDespacho = false;
-        this.detalleDespachoSeleccionado = (res?.data ?? []) as DetalleDespachoLinea[];
+        const raw = (res?.data ?? []) as DetalleDespachoLinea[];
+        this.detalleDespachoSeleccionado = raw.map((d) => ({
+          ...d,
+          productoDescripcion: descripcionProductoConMarca(d.productoDescripcion, d.productoMarca)
+        }));
         this.devolucionItems = this.detalleDespachoSeleccionado.map((d) => ({
           idDetalleDespacho: d.idDetalleDespacho,
           cantidadDevuelta: 0,
@@ -230,7 +242,11 @@ export class CreateDespachosComponent {
     this.detalleDevolucionSeleccionada = [];
     this._despachoApi.obtenerDetalleDevolucion(idDevolucionDespacho).subscribe({
       next: (res) => {
-        this.detalleDevolucionSeleccionada = res?.data ?? [];
+        const raw = (res?.data ?? []) as DevolucionDespachoDetalle[];
+        this.detalleDevolucionSeleccionada = raw.map((dd) => ({
+          ...dd,
+          productoDescripcion: descripcionProductoConMarca(dd.productoDescripcion, dd.productoMarca)
+        }));
       }
     });
   }

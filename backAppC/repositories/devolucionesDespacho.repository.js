@@ -200,11 +200,13 @@ exports.obtenerDetalleDevolucionRepo = async (pool, idEmpresa, idDevolucionDespa
         dd.idProducto,
         p.codigo AS productoCodigo,
         p.descripcion AS productoDescripcion,
+        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS productoMarca,
         dd.cantidadDevuelta,
         dd.notas
       FROM DevolucionesDespachoDetalle dd
       INNER JOIN DevolucionesDespacho d ON d.idDevolucionDespacho = dd.idDevolucionDespacho
       INNER JOIN Productos p ON p.idProducto = dd.idProducto
+      LEFT JOIN Marcas m ON m.idMarca = p.idMarca
       WHERE d.idEmpresa = @idEmpresa AND d.idDevolucionDespacho = @idDevolucionDespacho
       ORDER BY p.descripcion
     `);

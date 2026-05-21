@@ -10,6 +10,7 @@ export interface DetalleDespachoLinea {
   idDetalleDespacho: string;
   idProducto: string;
   productoDescripcion: string;
+  productoMarca?: string | null;
   cantidadSolicitada: number;
   cantidadDespachada: number;
   ubicacionOrigen?: string;
@@ -42,6 +43,7 @@ export interface DevolucionDespachoDetalle {
   idDetalleVenta: number;
   idProducto: string;
   productoDescripcion: string;
+  productoMarca?: string | null;
   cantidadDevuelta: number;
   notas?: string;
 }

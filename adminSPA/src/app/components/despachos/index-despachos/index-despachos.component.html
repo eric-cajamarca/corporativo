@@ -227,7 +227,7 @@
                     <tbody>
                       <tr *ngFor="let dv of resultado.detalleVenta">
                         <td>{{ dv.productoCodigo }}</td>
-                        <td>{{ dv.productoDescripcion }}</td>
+                        <td>{{ descripcionProductoDespacho(dv.productoDescripcion, dv.productoMarca) }}</td>
                         <td>{{ dv.cantidad }}</td>
                         <td>{{ dv.cantEntregada }}</td>
                         <td>{{ dv.cantPendiente }}</td>
@@ -305,7 +305,7 @@
                             <tbody>
                               <tr *ngFor="let lin of detallePorDespacho[d.idDespacho]">
                                 <td>{{ lin.productoCodigo }}</td>
-                                <td>{{ lin.productoDescripcion }}</td>
+                                <td>{{ descripcionProductoDespacho(lin.productoDescripcion, lin.productoMarca) }}</td>
                                 <td>{{ lin.cantidadSolicitada }}</td>
                                 <td>{{ lin.cantidadDespachada }}</td>
                                 <td>{{ pendienteLinea(lin) }}</td>
@@ -355,7 +355,7 @@
                               </thead>
                               <tbody>
                                 <tr *ngFor="let lin of detallePorDespacho[d.idDespacho]">
-                                  <td>{{ lin.productoDescripcion }}</td>
+                                  <td>{{ descripcionProductoDespacho(lin.productoDescripcion, lin.productoMarca) }}</td>
                                   <td class="text-end">{{ lin.cantidadDespachada }}</td>
                                   <td style="width: 120px;">
                                     <input type="number" class="form-control form-control-sm text-end"
@@ -425,7 +425,7 @@
                               </thead>
                               <tbody>
                                 <tr *ngFor="let det of detalleDevolucionPorDespacho[d.idDespacho]">
-                                  <td>{{ det.productoDescripcion }}</td>
+                                  <td>{{ descripcionProductoDespacho(det.productoDescripcion, det.productoMarca) }}</td>
                                   <td class="text-end">{{ det.cantidadDevuelta }}</td>
                                   <td>{{ det.notas }}</td>
                                 </tr>
@@ -519,7 +519,7 @@
               <tbody>
                 <tr *ngFor="let dv of detalleConPendiente">
                   <td class="small">{{ dv.productoCodigo }}</td>
-                  <td class="small">{{ dv.productoDescripcion }}</td>
+                  <td class="small">{{ descripcionProductoDespacho(dv.productoDescripcion, dv.productoMarca) }}</td>
                   <td>{{ dv.cantPendiente }}</td>
                   <td class="small fw-semibold">{{ dv.ubicaciones || '—' }}</td>
                   <td>

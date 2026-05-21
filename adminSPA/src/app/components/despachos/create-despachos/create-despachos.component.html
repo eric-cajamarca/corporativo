@@ -71,7 +71,7 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let d of detalleDespachoSeleccionado; let i = index">
-                        <td>{{ d.productoDescripcion }}</td>
+                        <td>{{ descripcionProductoDespacho(d.productoDescripcion, d.productoMarca) }}</td>
                         <td class="text-end">{{ d.cantidadDespachada | number:'1.0-3' }}</td>
                         <td class="text-end" style="width: 140px;">
                           <input type="number"
@@ -146,7 +146,7 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let dd of detalleDevolucionSeleccionada">
-                        <td>{{ dd.productoDescripcion }}</td>
+                        <td>{{ descripcionProductoDespacho(dd.productoDescripcion, dd.productoMarca) }}</td>
                         <td class="text-end">{{ dd.cantidadDevuelta | number:'1.0-3' }}</td>
                         <td>{{ dd.notas }}</td>
                       </tr>
