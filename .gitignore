@@ -39,7 +39,10 @@ CRM/
 backAppC/.env
 pdf-backend/.env
 adminSPA/.env
-
+whatsapp-gateway/.env
+# Sesiones Baileys (credenciales WhatsApp por empresa — nunca versionar)
+whatsapp-gateway/sessions/
+whatsapp-gateway/sessions/**
 # Notas / scripts de prueba con datos sensibles (no subir)
 planes_comerciales_saas_fb6b3258.plan.md
 test_login.js

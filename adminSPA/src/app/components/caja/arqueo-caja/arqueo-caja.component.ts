@@ -604,7 +604,7 @@ export class ArqueoCajaComponent implements OnInit {
             },
             error: (err) => {
               this.enviandoWhatsapp = false;
-              this.whatsappMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+              this.whatsappMensaje = err?.message || err?.error?.message || 'Error al enviar por WhatsApp.';
             }
           });
         };

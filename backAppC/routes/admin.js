@@ -17,6 +17,7 @@ api.post('/admin_2fa_setup_init', adminLoginRateLimiter, adminController.admin_2
 api.post('/admin_2fa_setup_confirm', adminLoginRateLimiter, adminController.admin_2fa_setup_confirm);
 api.post('/admin_2fa_verify', adminLoginRateLimiter, adminController.admin_2fa_verify);
 api.post('/refresh_session', adminController.refresh_session);
+api.get('/session_alive', auth.auth, adminController.sessionAlive);
 api.get('/sesiones_dispositivos', auth.auth, adminController.listarSesionesDispositivos);
 api.delete('/sesiones_dispositivos/:idRefresh', auth.auth, adminController.revocarSesionDispositivo);
 api.post('/sesiones_dispositivos/revocar_otras', auth.auth, adminController.revocarOtrasSesionesDispositivos);

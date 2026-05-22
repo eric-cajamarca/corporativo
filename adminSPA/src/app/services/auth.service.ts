@@ -28,7 +28,8 @@ interface UserData {
 })
 export class AuthService {
   private _userData = signal<UserData | null>(null);
-  private verificationInterval = 10 * 60 * 1000; // Verificar cada 15 minutos
+  /** Comprueba si la sesión sigue activa en el servidor (p. ej. tras cerrarla en otro dispositivo). */
+  private verificationInterval = 60 * 1000;
 
   /** Una sola petición refresh en vuelo (evita tormenta si expiran muchas llamadas a la vez). */
   private refreshInFlight$: Observable<boolean> | null = null;
@@ -78,9 +79,23 @@ export class AuthService {
   }
 
   private setupTokenVerification() {
-    // setInterval(() => {
-    //   this.verifyToken().subscribe();
-    // }, this.verificationInterval);
+    setInterval(() => {
+      if (!this.isAuthenticated() || this.isPublicRoute()) return;
+      this.http
+        .get<{ message: string }>(this.url + 'session_alive', { withCredentials: true })
+        .pipe(
+          catchError((err) => {
+            const msg = err?.error?.message;
+            if (msg === 'SesionRevocada' || msg === 'TokenExpirado' || msg === 'InvalidToken') {
+              this.forceLogout();
+            } else {
+              this.handleAuthError();
+            }
+            return of(null);
+          })
+        )
+        .subscribe();
+    }, this.verificationInterval);
   }
 
   /**

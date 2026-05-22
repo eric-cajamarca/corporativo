@@ -1,0 +1,41 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h1 class="content-title mb-1">
+          <i class="bi bi-whatsapp text-success me-2"></i>Vincular WhatsApp
+        </h1>
+        <p class="content-subtitle text-muted mb-0">
+          Conecte el número de la empresa para enviar PDFs y mensajes desde el ERP (Baileys)
+        </p>
+      </div>
+      <a routerLink="/configuracion" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Volver a Configuración
+      </a>
+    </div>
+  </div>
+
+  <div class="config-container">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">Sesión WhatsApp por empresa</h5>
+      </div>
+      <div class="card-body">
+        <app-whatsapp-session-panel [compact]="false"></app-whatsapp-session-panel>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-body">
+        <h6 class="fw-semibold">¿Dónde se usa?</h6>
+        <ul class="small text-muted mb-0">
+          <li>Arqueo de caja — enviar PDF del arqueo</li>
+          <li>Ventas, cotizaciones, despachos y otros módulos con botón «Enviar por WhatsApp»</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</main>

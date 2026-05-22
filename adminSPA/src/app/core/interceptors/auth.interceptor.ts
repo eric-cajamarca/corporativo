@@ -19,6 +19,7 @@ export class AuthInterceptor implements HttpInterceptor {
     const url = req.url;
     const skipRefresh =
       url.includes('refresh_session') ||
+      url.includes('session_alive') ||
       url.includes('admin_login') ||
       url.includes('admin_2fa_') ||
       url.includes('logout') ||
@@ -29,6 +30,10 @@ export class AuthInterceptor implements HttpInterceptor {
       catchError((error: HttpErrorResponse) => {
         if (error instanceof HttpErrorResponse && error.status === 403 && !skipRefresh) {
           const msg = error.error?.message;
+          if (msg === 'SesionRevocada') {
+            this.authService.forceLogout();
+            return throwError(() => error);
+          }
           if (msg === 'TokenExpirado' || msg === 'InvalidToken' || msg === 'NoTokenError') {
             return this.authService.tryRefreshSession().pipe(
               switchMap(ok => {

@@ -1,0 +1,26 @@
+.whatsapp-panel {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: #fafafa;
+}
+
+.whatsapp-panel--compact {
+  padding: 0.75rem;
+  background: #fff;
+}
+
+.qr-wrap {
+  max-width: 280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.qr-image {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  border: 4px solid #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}

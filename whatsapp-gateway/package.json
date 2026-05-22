@@ -1,0 +1,20 @@
+﻿{
+  "name": "efaf-whatsapp-gateway",
+  "version": "1.0.0",
+  "description": "Microservicio WhatsApp multi-tenant con Baileys",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "engines": { "node": ">=20.0.0" },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.21",
+    "axios": "^1.13.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}

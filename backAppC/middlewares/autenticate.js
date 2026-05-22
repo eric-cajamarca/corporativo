@@ -1,54 +1,66 @@
-const jwt = require('jsonwebtoken'); // Cambiado a jsonwebtoken
+const jwt = require('jsonwebtoken');
 const moment = require('moment');
+const sql = require('mssql');
+const dbConfig = require('../dbconfig');
 const { getJwtSecret } = require('../config/jwt.config');
+const refreshTokenService = require('../services/refreshToken.service');
 
-exports.auth = function(req, res, next) {
-    // if (!req.headers) {
-    //     return res.status(403).send({ message: 'NoHeadersError' });
-    // }
+async function validarSesionEnBd(req) {
+  try {
+    const pool = await sql.connect(dbConfig);
+    return refreshTokenService.validarSesionRequest(pool, req);
+  } catch (e) {
+    console.error('auth validarSesionEnBd:', e.message);
+    return false;
+  }
+}
 
-    //const token = req.headers.authorization.replace(/['"]+/g, '');
-    const token = req.cookies.token; // Cambiado a cookies
-    if (!token) {
-        return res.status(403).send({ message: 'NoTokenError' });
+exports.auth = async function (req, res, next) {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(403).send({ message: 'NoTokenError' });
+  }
+
+  try {
+    const payload = jwt.verify(token, getJwtSecret());
+
+    if (payload.exp <= moment().unix()) {
+      return res.status(403).send({ message: 'TokenExpirado' });
     }
 
-    try {
-        // Verifica y decodifica el token con jsonwebtoken
-        const payload = jwt.verify(token, getJwtSecret());
+    req.user = payload;
 
-        // Verifica si el token ha expirado
-        if (payload.exp <= moment().unix()) {
-            return res.status(403).send({ message: 'TokenExpirado' });
-        }
-        
-        // Adjunta el payload decodificado a la solicitud (req.user)
-        req.user = payload;
-
-        next(); // Continúa al siguiente middleware/ruta
-    } catch (error) {
-        // Maneja errores (token inválido, expirado, etc.)
-        return res.status(403).send({ message: 'InvalidToken' });
+    const sesionOk = await validarSesionEnBd(req);
+    if (!sesionOk) {
+      return res.status(403).send({ message: 'SesionRevocada' });
     }
+
+    next();
+  } catch (error) {
+    return res.status(403).send({ message: 'InvalidToken' });
+  }
 };
 
 /**
  * Mismo flujo que auth pero sin devolver 403: si no hay token o es inválido, solo llama next().
- * Sirve para rutas que deben responder siempre 200 y decidir en el controller (ej. getEmpresa_login).
  */
-exports.optionalAuth = function (req, res, next) {
-    const token = req.cookies && req.cookies.token;
-    if (!token) {
-        return next();
+exports.optionalAuth = async function (req, res, next) {
+  const token = req.cookies && req.cookies.token;
+  if (!token) {
+    return next();
+  }
+  try {
+    const payload = jwt.verify(token, getJwtSecret());
+    if (payload.exp <= moment().unix()) {
+      return next();
     }
-    try {
-        const payload = jwt.verify(token, getJwtSecret());
-        if (payload.exp <= moment().unix()) {
-            return next();
-        }
-        req.user = payload;
-    } catch (error) {
-        // Token inválido o expirado; no asignar req.user, no 403
+    req.user = payload;
+    const sesionOk = await validarSesionEnBd(req);
+    if (!sesionOk) {
+      return next();
     }
-    next();
+  } catch (error) {
+    /* token inválido */
+  }
+  next();
 };

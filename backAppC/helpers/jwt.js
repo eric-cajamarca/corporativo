@@ -65,5 +65,8 @@ exports.createToken = function (user) {
     iat: moment().unix(),
     exp: moment().add(ACCESS_EXPIRES_MINUTES, 'minutes').unix()
   };
+  if (user.idRefresh) {
+    payload.sid = String(user.idRefresh);
+  }
   return jwt.sign(payload, getJwtSecret());
 };

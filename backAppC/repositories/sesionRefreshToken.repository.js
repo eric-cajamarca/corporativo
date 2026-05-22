@@ -61,8 +61,8 @@ exports.listarActivosPorUsuarioEmpresa = async (pool, idUsuario, idEmpresa) => {
       SELECT
         idRefresh,
         tokenHash,
-        CONVERT(VARCHAR(19), expira, 120) AS expira,
-        CONVERT(VARCHAR(19), creado, 120) AS creado,
+        expira,
+        creado,
         ipCrear,
         userAgentCrear
       FROM SesionRefreshToken
@@ -71,6 +71,22 @@ exports.listarActivosPorUsuarioEmpresa = async (pool, idUsuario, idEmpresa) => {
       ORDER BY creado DESC
     `);
   return r.recordset;
+};
+
+/** Sesión refresh aún válida (no revocada, no expirada). */
+exports.existeSesionActiva = async (pool, idRefresh, idUsuario, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input('idRefresh', sql.UniqueIdentifier, idRefresh)
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT TOP 1 1 AS ok
+      FROM SesionRefreshToken
+      WHERE idRefresh = @idRefresh AND idUsuario = @idUsuario AND idEmpresa = @idEmpresa
+        AND revocado = 0 AND expira > GETDATE()
+    `);
+  return r.recordset.length > 0;
 };
 
 exports.obtenerActivoPorIdRefreshUsuario = async (pool, idRefresh, idUsuario, idEmpresa) => {

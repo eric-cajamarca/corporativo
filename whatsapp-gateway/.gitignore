@@ -1,0 +1,6 @@
+﻿node_modules/
+# Credenciales de sesión WhatsApp (Baileys) — no subir a Git
+sessions/
+sessions/**
+.env
+*.log

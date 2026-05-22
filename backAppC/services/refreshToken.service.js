@@ -4,6 +4,7 @@ const moment = require('moment');
 const sesionRefreshTokenRepository = require('../repositories/sesionRefreshToken.repository');
 const jwtHelper = require('../helpers/jwt');
 const { obtenerIpCliente } = require('../utils/clientIp.util');
+const { formatearFechaHoraLima } = require('../utils/fechaDisplay.util');
 
 const REFRESH_DAYS = parseInt(process.env.JWT_REFRESH_EXPIRES_DAYS, 10) || 7;
 
@@ -58,7 +59,8 @@ exports.emitirSesion = async (pool, datosUsuario, res, req) => {
 
 /**
  * Rota refresh: revoca el actual y emite nuevas cookies.
- * Si llega un hash ya revocado (token reutilizado), se revocan todas las sesiones del usuario/empresa (FASE D).
+ * Si el refresh ya fue revocado (p. ej. cerrado desde "Sesiones y dispositivos"), solo falla
+ * ESE navegador — no se revocan las demás sesiones activas.
  */
 exports.rotarSesion = async (pool, rawRefresh, res, req) => {
   if (!rawRefresh || String(rawRefresh).length < 32) {
@@ -69,26 +71,15 @@ exports.rotarSesion = async (pool, rawRefresh, res, req) => {
   if (!row) {
     const revocado = await sesionRefreshTokenRepository.buscarRevocadoPorHash(pool, h);
     if (revocado) {
-      await sesionRefreshTokenRepository.revocarTodosUsuarioEmpresa(
-        pool,
-        revocado.idUsuario,
-        revocado.idEmpresa
-      );
       const seguridadAuditoriaService = require('./seguridadAuditoria.service');
       await seguridadAuditoriaService.registrar(pool, req, {
         idEmpresa: revocado.idEmpresa,
         idUsuario: revocado.idUsuario,
-        tipo: 'REFRESH_REPLAY',
-        detalle: 'Reintento de refresh token ya revocado; sesiones revocadas',
+        tipo: 'REFRESH_SESION_CERRADA',
+        detalle: 'Refresh en sesion ya revocada (cierre remoto o logout)',
         ipCliente: obtenerIpCliente(req)
       });
-      const seguridadAlertasService = require('./seguridadAlertas.service');
-      void seguridadAlertasService.notificarRefreshTokenReplay(pool, {
-        idEmpresa: revocado.idEmpresa,
-        idUsuario: revocado.idUsuario,
-        ipCliente: obtenerIpCliente(req)
-      });
-      throw new Error('REFRESH_REPLAY');
+      throw new Error('REFRESH_SESION_CERRADA');
     }
     throw new Error('REFRESH_INVALIDO');
   }
@@ -136,12 +127,34 @@ exports.listarSesionesDispositivos = async (pool, idUsuario, idEmpresa, rawRefre
     rawRefreshActual && String(rawRefreshActual).length >= 32 ? hashToken(String(rawRefreshActual)) : null;
   return rows.map((r) => ({
     idRefresh: r.idRefresh,
-    expira: r.expira,
-    creado: r.creado,
+    expira: formatearFechaHoraLima(r.expira),
+    creado: formatearFechaHoraLima(r.creado),
     ipCrear: r.ipCrear,
     userAgentCrear: r.userAgentCrear,
     esDispositivoActual: Boolean(hashActual && r.tokenHash === hashActual)
   }));
+};
+
+/**
+ * Valida que la sesión del JWT (sid) o la cookie refresh sigan activas en BD.
+ */
+exports.validarSesionRequest = async (pool, req) => {
+  const user = req.user;
+  if (!user || !user.sub || !user.empresa) return false;
+
+  if (user.sid) {
+    return sesionRefreshTokenRepository.existeSesionActiva(pool, user.sid, user.sub, user.empresa);
+  }
+
+  const raw = req.cookies && req.cookies.refreshToken;
+  if (!raw || String(raw).length < 32) return false;
+  const h = hashToken(String(raw));
+  const row = await sesionRefreshTokenRepository.buscarActivoPorHash(pool, h);
+  return Boolean(
+    row &&
+    String(row.idUsuario).toLowerCase() === String(user.sub).toLowerCase() &&
+    String(row.idEmpresa).toLowerCase() === String(user.empresa).toLowerCase()
+  );
 };
 
 exports.revocarSesionDispositivo = async (pool, idRefresh, idUsuario, idEmpresa) => {

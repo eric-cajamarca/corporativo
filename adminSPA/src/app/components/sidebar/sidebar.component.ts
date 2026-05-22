@@ -244,6 +244,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       { tipo: 'separador' },
       { nombre: 'Configuración', icono: 'bi bi-gear', ruta: '/configuracion', visible: true },
       { nombre: 'Integraciones / APIs de pago', icono: 'bi bi-credit-card', ruta: '/configuracion/integraciones', visible: true },
+      { nombre: 'Vincular WhatsApp', icono: 'bi bi-whatsapp', ruta: '/configuracion/whatsapp', visible: true },
     ];
 
     this.menuItems.set(navegacionCompleta);

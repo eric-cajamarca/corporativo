@@ -373,14 +373,14 @@
             <option value="A5">A5</option>
             <option value="A4">A4</option>
           </select>
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 flex-wrap">
             <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsapp" (click)="enviarPdfPorWhatsapp()">
               <span *ngIf="enviandoWhatsapp"><i class="bi bi-hourglass-split"></i> Enviando...</span>
               <span *ngIf="!enviandoWhatsapp"><i class="bi bi-send"></i> Enviar</span>
             </button>
             <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsapp" (click)="mostrarWhatsappForm = false">Cancelar</button>
           </div>
-          <p class="small mt-2 mb-0" [class.text-success]="whatsappMensaje && whatsappNumber && !enviandoWhatsapp" [class.text-danger]="whatsappMensaje && (enviandoWhatsapp || !whatsappNumber)">{{ whatsappMensaje }}</p>
+          <p class="small mt-2 mb-0" [class.text-success]="whatsappMensaje && !enviandoWhatsapp" [class.text-danger]="whatsappMensaje && enviandoWhatsapp">{{ whatsappMensaje }}</p>
         </div>
         <p class="text-muted small mt-2 mb-0" *ngIf="generandoPdf && !mostrarWhatsappForm"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
       </div>

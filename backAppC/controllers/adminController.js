@@ -468,6 +468,11 @@ const recuperarPassword = async (req, res, next) => {
  * POST /restablecer-password
  * Body: { token, newPassword }
  */
+/** GET ligero: confirma que la sesión (refresh) sigue activa; si fue revocada, auth devuelve 403. */
+const sessionAlive = async (req, res) => {
+  res.status(200).json({ message: 'OK', data: { active: true } });
+};
+
 const listarSesionesDispositivos = async (req, res, next) => {
   if (!req.user || !req.user.sub || !req.user.empresa) {
     return res.status(401).json({ message: 'No autorizado', data: undefined });
@@ -801,6 +806,7 @@ module.exports = {
     logout,
     recuperarPassword,
     restablecerPassword,
+    sessionAlive,
     listarSesionesDispositivos,
     revocarSesionDispositivo,
     revocarOtrasSesionesDispositivos
