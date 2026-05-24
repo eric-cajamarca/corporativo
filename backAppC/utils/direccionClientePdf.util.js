@@ -24,6 +24,7 @@ function limpiarCodigosSunatAlFinal(texto) {
   do {
     prev = s;
     s = s
+      .replace(/(?:,\s*)?\d{6}(?:\s*,\s*\d{1,6}){0,3}\s*$/g, '')
       .replace(/\s+\d{6}(?:\s+\d{1,4}){0,2}(?:\s+\d{1,2})?\s*$/g, '')
       .replace(/\s+(?:PEN|PE)\s*$/gi, '')
       .trim();

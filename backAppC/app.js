@@ -41,6 +41,7 @@ const proveedoresRoutes = require('./routes/proveedores');
 const factilizaRoutes = require('./routes/factiliza');
 const vehiculosRoutes = require('./routes/vehiculos');
 const whatsappRoutes = require('./routes/whatsapp');
+const whatsappBotRoutes = require('./routes/whatsappBot');
 const productoCompuestoRoutes = require('./routes/productoCompuesto');
 const productoVarianteRoutes = require('./routes/productoVariante');
 const tranferenciaRoutes = require('./routes/transferencia');
@@ -192,6 +193,10 @@ app.get('/database', async (req, res) => {
     res.status(500).send('?Error al conectar a la base de datos!');
   }
 });
+
+// Bot WhatsApp entrante (webhook gateway -> backend, sin JWT; antes de /api/whatsapp)
+app.use('/api/whatsapp-bot', whatsappBotRoutes);
+console.error('context:', JSON.stringify({ level: 'info', message: 'whatsapp_bot_inbound_ready', path: '/api/whatsapp-bot/inbound', port: process.env.PORT || 3000 }));
 
 app.use('/api', auth.optionalAuth);
 app.use('/api', querySafeMiddleware); // Agrega req.querySafe

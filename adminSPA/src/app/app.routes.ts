@@ -75,6 +75,7 @@ import { IndexConfiguracionComponent } from './components/configuracion/index-co
 import { IntegracionesComponent } from './components/configuracion/integraciones/integraciones.component';
 import { MisSesionesDispositivosComponent } from './components/configuracion/mis-sesiones-dispositivos/mis-sesiones-dispositivos.component';
 import { WhatsappVincularComponent } from './components/configuracion/whatsapp-vincular/whatsapp-vincular.component';
+import { WhatsappBotComponent } from './components/configuracion/whatsapp-bot/whatsapp-bot.component';
 import { IndexReportesComponent } from './components/reportes/index-reportes/index-reportes.component';
 import { IndexUtilidadesComponent } from './components/utilidades/index-utilidades/index-utilidades.component';
 import { PagoProveedoresComponent } from './components/caja/pago-proveedores/pago-proveedores.component';
@@ -295,6 +296,7 @@ export const routes: Routes = [
      { path: 'configuracion/integraciones', component: IntegracionesComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Integraciones y APIs de pago' },
      { path: 'configuracion/sesiones', component: MisSesionesDispositivosComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Sesiones y dispositivos' },
      { path: 'configuracion/whatsapp', component: WhatsappVincularComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Vincular WhatsApp' },
+     { path: 'configuracion/whatsapp-bot', component: WhatsappBotComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Bot WhatsApp' },
      { path: 'rubros', component: IndexRubrosComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Configuración por rubro' },
      { path: 'vales-despacho', component: IndexValesDespachoComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Vales de despacho' },
     { path: 'vales-despacho/nuevo', component: CreateValeDespachoComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Nuevo vale de despacho' },

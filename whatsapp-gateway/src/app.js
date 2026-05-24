@@ -4,6 +4,7 @@ const config = require('./config');
 const { requireApiKey } = require('./middlewares/auth.middleware');
 const sessionController = require('./controllers/session.controller');
 const messageController = require('./controllers/message.controller');
+const sessionManager = require('./services/sessionManager.service');
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -27,4 +28,7 @@ app.use((err, _req, res, _next) => {
 
 app.listen(config.port, () => {
   console.error(`whatsapp-gateway escuchando en puerto ${config.port}`);
+  sessionManager.preloadSessions().catch((err) => {
+    console.error('whatsapp-gateway preloadSessions:', err.message);
+  });
 });

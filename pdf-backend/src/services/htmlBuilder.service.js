@@ -867,7 +867,10 @@ class HtmlBuilderService {
       }
     }
 
-    const incluirUnidadMedida = !esCotizacion && this._esComprobanteConUnidadMedidaPdf(codigoComp);
+    const incluirUnidadMedida =
+      this._esComprobanteConUnidadMedidaPdf(codigoComp) ||
+      esCotizacion ||
+      String(codigoComp || '').trim().toUpperCase() === 'CT';
 
     const filasPlanas = (Array.isArray(items) ? items : []).map(it => {
       const desc = this._descripcionProductoPdfLinea(it);
@@ -893,12 +896,11 @@ class HtmlBuilderService {
 
     const filasTicket = incluirUnidadMedida
       ? filasPlanas.map(({ desc, cant, pUnit, importe, um, codPres }) => {
-        const descProducto = codPres
+        const lineaDesc = codPres
           ? `${this._escapeHtml(codPres)} | ${this._escapeHtml(desc)}`
-          : this._escapeHtml(desc);
-        const lineaDesc = um
-          ? `${this._escapeHtml(um)} · ${descProducto}`
-          : descProducto;
+          : um
+            ? `${this._escapeHtml(um)} | ${this._escapeHtml(desc)}`
+            : this._escapeHtml(desc);
         return `<tr><td colspan="3" class="ticket-item-desc">${lineaDesc}</td></tr>
 <tr class="ticket-item-nums"><td>${cant}</td><td class="num">${pUnit.toFixed(2)}</td><td class="num">${importe.toFixed(2)}</td></tr>`;
       }).join('')

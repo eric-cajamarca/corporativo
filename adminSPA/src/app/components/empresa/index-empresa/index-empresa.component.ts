@@ -467,6 +467,7 @@ export class IndexEmpresaComponent implements OnInit {
   etiquetaColumnaServicioApi(nombre: string): string {
     const n = (nombre || '').trim();
     if (!n) return nombre;
+    if (/WHATSAPP\s+BOT/i.test(n)) return 'WhatsApp-bot';
     return n.replace(/^Factiliza\s+/i, '').trim() || n;
   }
 

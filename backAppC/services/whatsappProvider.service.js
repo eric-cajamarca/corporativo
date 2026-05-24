@@ -1,6 +1,7 @@
 ﻿const { withPool } = require('../utils/dbPool.util');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const empresaWhatsAppRepository = require('../repositories/empresaWhatsApp.repository');
+const empresaRepository = require('../repositories/empresa.repository');
 const whatsappFactilizaService = require('./whatsappFactiliza.service');
 const whatsappGatewayClient = require('./whatsappGateway.client');
 
@@ -70,7 +71,10 @@ async function startSession(idEmpresa) {
     throw new Error('Gateway WhatsApp no configurado en el servidor');
   }
   await withPool((pool) => empresaWhatsAppRepository.setProveedor(pool, idEmpresa, 'baileys'));
-  const gw = await whatsappGatewayClient.startSession(idEmpresa);
+  const nombreDispositivo = await withPool((pool) =>
+    empresaRepository.obtenerNombreDispositivoWhatsApp(pool, idEmpresa)
+  );
+  const gw = await whatsappGatewayClient.startSession(idEmpresa, nombreDispositivo);
   const raw = gw.data || {};
   const data = {
     proveedor: 'baileys',

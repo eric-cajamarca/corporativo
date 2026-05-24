@@ -14,8 +14,9 @@ function validateTenantId(req, res) {
 async function startSession(req, res) {
   const idEmpresa = validateTenantId(req, res);
   if (!idEmpresa) return;
+  const nombreDispositivo = req.body?.nombreDispositivo;
   try {
-    const data = await sessionManager.startSession(idEmpresa);
+    const data = await sessionManager.startSession(idEmpresa, { nombreDispositivo });
     return res.status(200).json({ status: 200, success: true, data });
   } catch (err) {
     console.error('session.controller start:', err.message);

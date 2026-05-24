@@ -25,3 +25,16 @@ Puerto por defecto: **3010**.
 | POST | `/v1/tenants/:idEmpresa/messages/media` |
 
 Sesiones en carpeta `sessions/{idEmpresa}/`.
+
+## Bot entrante (Piloto A)
+
+Al conectar una sesión, el gateway escucha `messages.upsert` y reenvía al backend:
+
+- `BACKEND_WEBHOOK_URL` — ej. `http://127.0.0.1:3000/api/whatsapp-bot/inbound`
+- `WEBHOOK_SECRET` — misma clave que `WHATSAPP_BOT_WEBHOOK_SECRET` en backAppC
+- Header `X-Webhook-Secret` en cada POST
+- Reintento 2 veces si el backend no responde en `WEBHOOK_TIMEOUT_MS` (default 5s)
+
+Al arrancar, precarga sesiones existentes en `SESSIONS_DIR` (reconexión tras reinicio).
+
+Solo reenvía mensajes de texto de chats individuales (no grupos, no `fromMe`).

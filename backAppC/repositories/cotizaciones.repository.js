@@ -472,13 +472,22 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
           ELSE LTRIM(RTRIM(ISNULL(COALESCE(pPorId.descripcion, pPorCodigo.descripcion), '')))
         END AS descripcion,
         LTRIM(RTRIM(ISNULL(COALESCE(pPorId.descripcion, pPorCodigo.descripcion), ''))) AS descripcionProducto,
-        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca
+        LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca,
+        LTRIM(RTRIM(ISNULL(pr.descripcion, ''))) AS presentacion,
+        LTRIM(RTRIM(ISNULL(pr.codigo, ''))) AS presentacionCodigo
       FROM DetalleCotizacion d
       LEFT JOIN Productos pPorId ON pPorId.idProducto = d.idProducto
       LEFT JOIN Productos pPorCodigo ON d.idProducto IS NULL
         AND pPorCodigo.idEmpresa = COALESCE(d.idEmpresaProducto, d.idEmpresa)
         AND RTRIM(LTRIM(ISNULL(pPorCodigo.codigo, ''))) = RTRIM(LTRIM(ISNULL(d.codigo, '')))
       LEFT JOIN Marcas m ON m.idMarca = COALESCE(pPorId.idMarca, pPorCodigo.idMarca)
+      LEFT JOIN Presentacion pr ON pr.idPresentacion = COALESCE(
+        CASE WHEN ISNULL(d.idPresentacion, 0) > 1 THEN d.idPresentacion END,
+        pPorId.idPresentacion,
+        pPorCodigo.idPresentacion,
+        NULLIF(d.idPresentacion, 0),
+        1
+      )
       WHERE d.idCotizacion = @idCotizacion
       ORDER BY d.idDetalleCotizacion
     `);
@@ -522,6 +531,8 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
     descripcionProducto: d.descripcionProducto != null ? String(d.descripcionProducto).trim() : '',
     codigo: d.codigo != null ? String(d.codigo).trim() : '',
     marca: d.marca != null ? String(d.marca).trim() : '',
+    presentacion: d.presentacion != null ? String(d.presentacion).trim() : '',
+    presentacionCodigo: d.presentacionCodigo != null ? String(d.presentacionCodigo).trim() : '',
     cantidad: d.cantidad,
     pVenta: d.pVenta,
     subtotal: d.total,

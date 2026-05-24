@@ -9,6 +9,7 @@ function fullPath(req) {
 function isWhitelistedPublic(pathname, method) {
   if (pathname.startsWith('/api/public')) return true;
   if (pathname.startsWith('/api/webhooks')) return true;
+  if (pathname.startsWith('/api/whatsapp-bot/inbound')) return true;
   if (pathname.startsWith('/api/activacion')) return true;
   if (pathname.startsWith('/api/external')) return true;
   if (pathname === '/api/database') return true;

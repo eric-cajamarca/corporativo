@@ -15,11 +15,24 @@ exports.obtenerBasicaPorId = async (pool, idEmpresa) => {
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .query(`
-      SELECT idEmpresa, razon_Social, correo, estado, celular, ruc, adminRequiere2FA
+      SELECT idEmpresa, razon_Social, nombreComercial, correo, estado, celular, ruc, adminRequiere2FA
       FROM Empresas
       WHERE idEmpresa = @idEmpresa
     `);
   return result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
+exports.obtenerNombreDispositivoWhatsApp = async (pool, idEmpresa) => {
+  const result = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT ISNULL(NULLIF(LTRIM(RTRIM(nombreComercial)), ''), LTRIM(RTRIM(razon_Social))) AS nombreDispositivo
+      FROM Empresas
+      WHERE idEmpresa = @idEmpresa
+    `);
+  const row = result.recordset.length > 0 ? result.recordset[0] : null;
+  return row?.nombreDispositivo ? String(row.nombreDispositivo).trim() : null;
 };
 
 exports.buscarPorRuc = async (pool, ruc) => {

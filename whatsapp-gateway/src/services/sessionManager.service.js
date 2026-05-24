@@ -10,10 +10,12 @@ const {
   fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 const config = require('../config');
-const { toWhatsAppJid } = require('../utils/phone.util');
+const { toWhatsAppJid, jidToPhone, resolveInboundSender, isIndividualChatJid } = require('../utils/phone.util');
+const inboundWebhook = require('./inboundWebhook.service');
 
 const tenants = new Map();
 const QR_WAIT_MS = Number(process.env.QR_WAIT_MS) || 30000;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getTenantState(idEmpresa) {
   if (!tenants.has(idEmpresa)) {
@@ -25,7 +27,12 @@ function getTenantState(idEmpresa) {
       telefonoVinculado: null,
       lastSendAt: 0,
       starting: false,
-      lastError: null
+      lastError: null,
+      lidToPhone: new Map(),
+      lidToJid: new Map(),
+      nombreDispositivo: null,
+      suppressMessageIds: new Set(),
+      processedMessageIds: new Set()
     });
   }
   return tenants.get(idEmpresa);
@@ -33,6 +40,50 @@ function getTenantState(idEmpresa) {
 
 function sessionPath(idEmpresa) {
   return path.join(config.sessionsDir, String(idEmpresa));
+}
+
+function deviceMetaPath(idEmpresa) {
+  return path.join(sessionPath(idEmpresa), 'device-meta.json');
+}
+
+function sanitizeDeviceName(name) {
+  const cleaned = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  return cleaned || config.defaultDeviceName || 'EFAF ERP';
+}
+
+function buildBrowser(nombreDispositivo) {
+  return [sanitizeDeviceName(nombreDispositivo), 'Chrome', '1.0.0'];
+}
+
+async function saveDeviceMeta(idEmpresa, nombreDispositivo) {
+  const safeName = sanitizeDeviceName(nombreDispositivo);
+  await fs.promises.writeFile(
+    deviceMetaPath(idEmpresa),
+    JSON.stringify({ nombreDispositivo: safeName }),
+    'utf8'
+  );
+  return safeName;
+}
+
+async function loadDeviceMeta(idEmpresa) {
+  try {
+    const raw = await fs.promises.readFile(deviceMetaPath(idEmpresa), 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed?.nombreDispositivo ? sanitizeDeviceName(parsed.nombreDispositivo) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveDeviceName(idEmpresa, t, options = {}) {
+  if (options.nombreDispositivo) {
+    t.nombreDispositivo = await saveDeviceMeta(idEmpresa, options.nombreDispositivo);
+    return t.nombreDispositivo;
+  }
+  if (t.nombreDispositivo) return t.nombreDispositivo;
+  const cached = await loadDeviceMeta(idEmpresa);
+  t.nombreDispositivo = cached || config.defaultDeviceName || 'EFAF ERP';
+  return t.nombreDispositivo;
 }
 
 async function ensureSessionsDir() {
@@ -71,11 +122,142 @@ async function destroySocket(t) {
   try {
     t.sock.ev.removeAllListeners('connection.update');
     t.sock.ev.removeAllListeners('creds.update');
+    t.sock.ev.removeAllListeners('messages.upsert');
+    t.sock.ev.removeAllListeners('chats.phoneNumberShare');
+    t.sock.ev.removeAllListeners('contacts.upsert');
     t.sock.end(undefined);
   } catch (e) {
     console.error('sessionManager destroySocket:', e.message);
   }
   t.sock = null;
+}
+
+function extractMessageText(message) {
+  const content = message?.message;
+  if (!content) return null;
+  if (content.conversation) return content.conversation;
+  if (content.extendedTextMessage?.text) return content.extendedTextMessage.text;
+  return null;
+}
+
+function rememberOutboundMessage(t, sentMsg) {
+  const id = sentMsg?.key?.id;
+  if (!id || !t) return;
+  t.suppressMessageIds.add(id);
+  setTimeout(() => t.suppressMessageIds.delete(id), 60000);
+}
+
+function shouldForwardInbound(message, t) {
+  const key = message?.key;
+  if (!key) return false;
+
+  const remoteJid = String(key.remoteJid || '');
+  if (remoteJid.endsWith('@g.us') || remoteJid.includes('@broadcast')) return false;
+
+  if (key.fromMe) {
+    if (key.id && t?.suppressMessageIds?.has(key.id)) return false;
+    const chatOk = isIndividualChatJid(remoteJid) || Boolean(key.senderPn);
+    if (!chatOk) return false;
+  } else if (!isIndividualChatJid(remoteJid)) {
+    return false;
+  }
+
+  if (key.id && t?.processedMessageIds?.has(key.id)) return false;
+
+  const text = extractMessageText(message);
+  if (!text || !String(text).trim()) return false;
+  return true;
+}
+
+function rememberLidMapping(t, lid, jid) {
+  if (!lid || !jid) return;
+  t.lidToJid.set(lid, jid);
+  const phone = jidToPhone(jid);
+  if (phone) t.lidToPhone.set(lid, phone);
+}
+
+function bindLidMappingListener(t, sock) {
+  sock.ev.on('chats.phoneNumberShare', ({ lid, jid }) => {
+    rememberLidMapping(t, lid, jid);
+  });
+
+  sock.ev.on('contacts.upsert', (contacts) => {
+    for (const contact of contacts || []) {
+      if (contact.lid && contact.jid) {
+        rememberLidMapping(t, contact.lid, contact.jid);
+      }
+      if (contact.id && String(contact.id).endsWith('@lid') && contact.jid) {
+        rememberLidMapping(t, contact.id, contact.jid);
+      }
+    }
+  });
+}
+
+function bindInboundListener(idEmpresa, sock) {
+  const t = getTenantState(idEmpresa);
+  bindLidMappingListener(t, sock);
+
+  sock.ev.on('messages.upsert', async (event) => {
+    if (!event || event.type !== 'notify' || !Array.isArray(event.messages)) return;
+    if (!inboundWebhook.isConfigured()) return;
+
+    for (const message of event.messages) {
+      if (!shouldForwardInbound(message, t)) continue;
+
+      const resolved = resolveInboundSender(message, t, t.telefonoVinculado);
+      if (!resolved?.replyTo) continue;
+
+      const text = String(extractMessageText(message) || '').trim();
+      const messageId = message.key.id || null;
+      if (messageId) {
+        t.processedMessageIds.add(messageId);
+        if (t.processedMessageIds.size > 500) t.processedMessageIds.clear();
+      }
+      const timestamp = message.messageTimestamp
+        ? Number(message.messageTimestamp) * 1000
+        : Date.now();
+
+      console.error(`sessionManager inbound ${idEmpresa}: ${resolved.logId} -> "${text.slice(0, 40)}"`);
+
+      inboundWebhook.postInbound({
+        idEmpresa,
+        from: resolved.replyTo,
+        messageId,
+        text,
+        timestamp
+      }).catch((err) => {
+        console.error(`sessionManager inbound ${idEmpresa}:`, err.message);
+      });
+    }
+  });
+}
+
+async function preloadSessions() {
+  await ensureSessionsDir();
+  let entries = [];
+  try {
+    entries = await fs.promises.readdir(config.sessionsDir, { withFileTypes: true });
+  } catch (e) {
+    console.error('sessionManager preloadSessions readdir:', e.message);
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const idEmpresa = entry.name;
+    if (!UUID_REGEX.test(idEmpresa)) continue;
+
+    const credsPath = path.join(config.sessionsDir, idEmpresa, 'creds.json');
+    try {
+      await fs.promises.access(credsPath);
+    } catch {
+      continue;
+    }
+
+    connectTenant(idEmpresa).catch((err) => {
+      console.error(`sessionManager preload ${idEmpresa}:`, err.message);
+    });
+  }
 }
 
 async function connectTenant(idEmpresa, options = {}) {
@@ -112,19 +294,21 @@ async function connectTenant(idEmpresa, options = {}) {
     const { state, saveCreds } = await useMultiFileAuthState(dir);
     const { version } = await fetchLatestBaileysVersion();
     const logger = pino({ level: config.logLevel });
+    const nombreDispositivo = await resolveDeviceName(idEmpresa, t, options);
 
     const sock = makeWASocket({
       version,
       auth: state,
       logger,
       printQRInTerminal: false,
-      browser: ['EFAF ERP', 'Chrome', '1.0.0'],
+      browser: buildBrowser(nombreDispositivo),
       syncFullHistory: false,
       markOnlineOnConnect: false
     });
     t.sock = sock;
 
     sock.ev.on('creds.update', saveCreds);
+    bindInboundListener(idEmpresa, sock);
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr, isNewLogin } = update;
 
@@ -196,8 +380,8 @@ async function connectTenant(idEmpresa, options = {}) {
   return t;
 }
 
-async function startSession(idEmpresa) {
-  await connectTenant(idEmpresa, { forceNew: true });
+async function startSession(idEmpresa, options = {}) {
+  await connectTenant(idEmpresa, { forceNew: true, ...options });
   const t = await waitForSessionReady(idEmpresa);
   const status = getSessionStatus(idEmpresa);
   if (t.status === 'conectando' && !t.qrDataUrl) {
@@ -216,6 +400,7 @@ function getSessionStatus(idEmpresa) {
     telefonoVinculado: t.telefonoVinculado,
     qr: t.qr,
     qrDataUrl: t.qrDataUrl,
+    nombreDispositivo: t.nombreDispositivo || null,
     lastError: t.lastError || null
   };
 }
@@ -257,10 +442,12 @@ async function throttleSend(idEmpresa) {
 }
 
 async function sendText(idEmpresa, number, text) {
+  const t = getTenantState(idEmpresa);
   const sock = requireConnected(idEmpresa);
   await throttleSend(idEmpresa);
   const jid = toWhatsAppJid(number);
-  await sock.sendMessage(jid, { text: String(text).trim() });
+  const sent = await sock.sendMessage(jid, { text: String(text).trim() });
+  rememberOutboundMessage(t, sent);
   return { status: 200, success: true, message: 'Mensaje enviado' };
 }
 
@@ -310,5 +497,6 @@ module.exports = {
   getSessionStatus,
   logoutSession,
   sendText,
-  sendMedia
+  sendMedia,
+  preloadSessions
 };

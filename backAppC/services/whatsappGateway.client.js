@@ -13,8 +13,12 @@ function client() {
   return axios.create({ baseURL: BASE_URL, timeout: TIMEOUT_MS, validateStatus: () => true });
 }
 
-async function startSession(idEmpresa) {
-  const res = await client().post(`/v1/tenants/${idEmpresa}/session`, {}, { headers: headers() });
+async function startSession(idEmpresa, nombreDispositivo) {
+  const body = {};
+  if (nombreDispositivo != null && String(nombreDispositivo).trim() !== '') {
+    body.nombreDispositivo = String(nombreDispositivo).trim();
+  }
+  const res = await client().post(`/v1/tenants/${idEmpresa}/session`, body, { headers: headers() });
   return res.data;
 }
 
