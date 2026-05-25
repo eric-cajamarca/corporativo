@@ -770,6 +770,14 @@ export class UpdateVentaComponent implements OnInit {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un ítem.' });
       return;
     }
+
+    this.payloadEdicionPendiente = this.construirPayloadGuardado();
+
+    if (this.idEstadoPagoCargado === 1 || this.esCotizacionEdicion()) {
+      this.guardarSinFormaPago();
+      return;
+    }
+
     if (this.formasPago.length === 0) {
       iziToast.warning({
         title: 'Advertencia',
@@ -777,7 +785,27 @@ export class UpdateVentaComponent implements OnInit {
       });
       return;
     }
-    this.payloadEdicionPendiente = this.construirPayloadGuardado();
     this.abrirModalPagoEdicion();
+  }
+
+  private guardarSinFormaPago(): void {
+    if (!this.payloadEdicionPendiente || this.idVenta == null) return;
+
+    this.saving = true;
+    this.ventasService
+      .actualizarVenta(this.idVenta, { ...this.payloadEdicionPendiente })
+      .subscribe({
+        next: () => {
+          this.saving = false;
+          this.payloadEdicionPendiente = null;
+          iziToast.success({ title: 'Éxito', message: 'Venta actualizada.' });
+          this.router.navigate(['/ventas']);
+        },
+        error: (err) => {
+          this.saving = false;
+          const msg = err?.error?.error || err?.message || 'Error al actualizar.';
+          iziToast.error({ title: 'Error', message: msg });
+        }
+      });
   }
 }

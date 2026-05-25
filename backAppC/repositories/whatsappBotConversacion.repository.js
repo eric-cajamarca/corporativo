@@ -63,4 +63,20 @@ async function reiniciar(pool, idEmpresa, telefonoCliente) {
   await guardar(pool, idEmpresa, telefonoCliente, { estado: 'menu', slots: {}, candidatos: [] });
 }
 
-module.exports = { obtener, guardar, reiniciar };
+async function eliminar(pool, idEmpresa, telefonoCliente) {
+  try {
+    await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('telefonoCliente', sql.VarChar(20), telefonoCliente)
+      .query(`
+        DELETE FROM WhatsAppBotConversacion
+        WHERE idEmpresa = @idEmpresa AND telefonoCliente = @telefonoCliente
+      `);
+  } catch (e) {
+    if (e && e.number === 208) return;
+    throw e;
+  }
+}
+
+module.exports = { obtener, guardar, reiniciar, eliminar };

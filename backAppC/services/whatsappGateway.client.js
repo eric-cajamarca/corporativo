@@ -32,11 +32,18 @@ async function logoutSession(idEmpresa) {
   return res.data;
 }
 
-async function sendText(idEmpresa, number, text) {
+function authHeaders(options = {}) {
+  const h = headers();
+  if (options.skipThrottle) h['X-Bot-Reply'] = '1';
+  return h;
+}
+
+async function sendText(idEmpresa, number, text, options = {}) {
+  const body = { number, text, skipThrottle: !!options.skipThrottle };
   const res = await client().post(
     `/v1/tenants/${idEmpresa}/messages/text`,
-    { number, text },
-    { headers: headers() }
+    body,
+    { headers: authHeaders(options) }
   );
   const data = res.data || {};
   return {
@@ -46,11 +53,15 @@ async function sendText(idEmpresa, number, text) {
   };
 }
 
-async function sendMedia(idEmpresa, number, mediatype, media, filename, caption) {
-  const body = { number, mediatype, media };
+async function sendMedia(idEmpresa, number, mediatype, media, filename, caption, options = {}) {
+  const body = { number, mediatype, media, skipThrottle: !!options.skipThrottle };
   if (filename != null) body.filename = filename;
   if (caption != null) body.caption = caption;
-  const res = await client().post(`/v1/tenants/${idEmpresa}/messages/media`, body, { headers: headers() });
+  const res = await client().post(
+    `/v1/tenants/${idEmpresa}/messages/media`,
+    body,
+    { headers: authHeaders(options) }
+  );
   const data = res.data || {};
   return {
     status: data.status != null ? data.status : res.status,

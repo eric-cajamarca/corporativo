@@ -3,6 +3,8 @@ const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const clientesRepository = require('../repositories/clientes.repository');
+const whatsappBotConsultasRepository = require('../repositories/whatsappBotConsultas.repository');
+const { variantesBusquedaCelular } = require('../utils/telefonoWhatsApp.util');
 
 const NOMBRE_SERVICIO_SUNAT = 'Factiliza SUNAT';
 const FACTILIZA_BASE = 'https://api.factiliza.com/v1';
@@ -146,6 +148,24 @@ async function vincularCelularCliente(pool, idEmpresa, idCliente, celular) {
     `);
 }
 
+async function validarCelularUnicoDocumento(pool, idEmpresa, variantesCelular, docNumero, idClientePermitido = null) {
+  const rows = await whatsappBotConsultasRepository.buscarPorCelular(pool, idEmpresa, variantesCelular);
+  const docNorm = soloDigitos(docNumero);
+  for (const row of rows) {
+    if (idClientePermitido && row.idCliente === idClientePermitido) continue;
+    const rucNorm = soloDigitos(row.ruc);
+    if (rucNorm && rucNorm !== docNorm) {
+      return {
+        ok: false,
+        mensaje:
+          'Este numero de celular ya esta registrado como contacto de otro cliente. ' +
+          'Use el documento asociado a su numero o contacte a la empresa.'
+      };
+    }
+  }
+  return { ok: true };
+}
+
 async function registrarOActualizarPorDocumento(pool, idEmpresa, doc, datosSunat, celularWhatsApp) {
   const existente = await clientesRepository.obtenerPorRuc(pool, idEmpresa, doc.numero);
   if (existente) {
@@ -185,19 +205,29 @@ async function registrarOActualizarPorDocumento(pool, idEmpresa, doc, datosSunat
 /**
  * Valida DNI/RUC en Factiliza y crea o vincula cliente en la empresa.
  */
-async function registrarPorDocumento(idEmpresa, digitosCelular, textoDocumento) {
+async function registrarPorDocumento(idEmpresa, digitosCelular, textoDocumento, idClienteConocido = null) {
   const doc = parseDocumentoEntrada(textoDocumento);
   const fmt = validarFormatoDocumento(doc);
   if (!fmt.ok) return { ok: false, mensaje: fmt.mensaje };
 
+  const celular = soloDigitos(digitosCelular);
+  const celularFmt = celular.length === 9 && celular.startsWith('9') ? `51${celular}` : celular;
+  const variantes = variantesBusquedaCelular(celularFmt || digitosCelular);
+
   return withPool(async (pool) => {
+    const celularOk = await validarCelularUnicoDocumento(
+      pool,
+      idEmpresa,
+      variantes,
+      doc.numero,
+      idClienteConocido
+    );
+    if (!celularOk.ok) {
+      return { ok: false, mensaje: celularOk.mensaje };
+    }
+
     const consulta = await consultarDocumentoFactiliza(pool, idEmpresa, doc);
     if (!consulta.ok) return { ok: false, mensaje: consulta.mensaje };
-
-    const celular = soloDigitos(digitosCelular);
-    const celularFmt = celular.length === 9 && celular.startsWith('9')
-      ? `51${celular}`
-      : celular;
 
     const cliente = await registrarOActualizarPorDocumento(
       pool,

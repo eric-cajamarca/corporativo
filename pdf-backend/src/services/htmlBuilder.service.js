@@ -867,10 +867,12 @@ class HtmlBuilderService {
       }
     }
 
+    const codigoCompUpper = String(codigoComp || '').trim().toUpperCase();
     const incluirUnidadMedida =
       this._esComprobanteConUnidadMedidaPdf(codigoComp) ||
       esCotizacion ||
-      String(codigoComp || '').trim().toUpperCase() === 'CT';
+      codigoCompUpper === 'CT' ||
+      codigoCompUpper === 'NV';
 
     const filasPlanas = (Array.isArray(items) ? items : []).map(it => {
       const desc = this._descripcionProductoPdfLinea(it);

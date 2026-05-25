@@ -14,12 +14,14 @@ function validateTenantId(req, res) {
 async function sendText(req, res) {
   const idEmpresa = validateTenantId(req, res);
   if (!idEmpresa) return;
-  const { number, text } = req.body || {};
+  const { number, text, skipThrottle } = req.body || {};
   if (!number || !text) {
     return res.status(400).json({ status: 400, success: false, message: 'number y text son requeridos' });
   }
   try {
-    const resultado = await sessionManager.sendText(idEmpresa, number, text);
+    const resultado = await sessionManager.sendText(idEmpresa, number, text, {
+      skipThrottle: skipThrottle === true || req.get('X-Bot-Reply') === '1'
+    });
     return res.status(200).json(resultado);
   } catch (err) {
     console.error('message.controller sendText:', err.message);
@@ -30,12 +32,14 @@ async function sendText(req, res) {
 async function sendMedia(req, res) {
   const idEmpresa = validateTenantId(req, res);
   if (!idEmpresa) return;
-  const { number, mediatype, media, filename, caption } = req.body || {};
+  const { number, mediatype, media, filename, caption, skipThrottle } = req.body || {};
   if (!number || !media) {
     return res.status(400).json({ status: 400, success: false, message: 'number y media son requeridos' });
   }
   try {
-    const resultado = await sessionManager.sendMedia(idEmpresa, number, mediatype, media, filename, caption);
+    const resultado = await sessionManager.sendMedia(idEmpresa, number, mediatype, media, filename, caption, {
+      skipThrottle: skipThrottle === true || req.get('X-Bot-Reply') === '1'
+    });
     return res.status(200).json(resultado);
   } catch (err) {
     console.error('message.controller sendMedia:', err.message);

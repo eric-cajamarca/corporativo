@@ -1,16 +1,21 @@
 const { withPool } = require('../utils/dbPool.util');
-const whatsappProvider = require('./whatsappProvider.service');
-const empresaWhatsAppRepository = require('../repositories/empresaWhatsApp.repository');
+const whatsappGatewayClient = require('./whatsappGateway.client');
 const whatsappBotLogRepository = require('../repositories/whatsappBotLog.repository');
 const whatsappBotConfigRepository = require('../repositories/whatsappBotConfig.repository');
 const whatsappBotDialogo = require('./whatsappBotDialogo.service');
 const whatsappBotCatalogo = require('./whatsappBotCatalogo.service');
 const whatsappBotSinonimoRepository = require('../repositories/whatsappBotSinonimo.repository');
+const whatsappBotInboundContext = require('./whatsappBotInboundContext.service');
+const whatsappBotConversacionRepository = require('../repositories/whatsappBotConversacion.repository');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const NOMBRE_SERVICIO_WHATSAPP_BOT = 'Factiliza WHATSAPP BOT';
+const NOMBRE_SERVICIO_WHATSAPP_BOT = whatsappBotInboundContext.NOMBRE_SERVICIO_WHATSAPP_BOT;
+
+/** Evita reprocesar el mismo messageId si el gateway reintenta el webhook. */
+const mensajesProcesados = new Map();
+const DEDUP_TTL_MS = 10 * 60 * 1000;
 
 function validarUuid(idEmpresa) {
   if (!idEmpresa || !UUID_REGEX.test(String(idEmpresa).trim())) {
@@ -18,15 +23,29 @@ function validarUuid(idEmpresa) {
   }
 }
 
-async function assertEmpresaBaileysActiva(idEmpresa) {
-  const row = await withPool((pool) => empresaWhatsAppRepository.getByEmpresa(pool, idEmpresa));
-  if (!row || !row.activo) {
-    throw new Error('WhatsApp no activo para esta empresa');
+function esDuplicado(idEmpresa, messageId) {
+  if (!messageId) return false;
+  const key = `${String(idEmpresa).toLowerCase()}:${messageId}`;
+  const now = Date.now();
+  if (mensajesProcesados.has(key)) return true;
+  mensajesProcesados.set(key, now);
+  if (mensajesProcesados.size > 2000) {
+    for (const [k, t] of mensajesProcesados) {
+      if (now - t > DEDUP_TTL_MS) mensajesProcesados.delete(k);
+    }
   }
-  if (String(row.proveedor).toLowerCase() !== 'baileys') {
-    throw new Error('El bot entrante solo aplica con proveedor baileys');
-  }
-  return row;
+  return false;
+}
+
+function registrarLogAsync(idEmpresa, direccion, telefonoCliente, messageId, texto) {
+  withPool((pool) =>
+    whatsappBotLogRepository.insertar(pool, idEmpresa, {
+      direccion,
+      telefonoCliente,
+      messageId,
+      texto: String(texto || '').slice(0, 2000)
+    })
+  ).catch((err) => console.error('whatsappBot registrarLog:', err.message));
 }
 
 async function empresaPuedeUsarBot(idEmpresa) {
@@ -42,17 +61,6 @@ async function assertEmpresaPuedeUsarBot(idEmpresa) {
     err.code = 'FORBIDDEN';
     throw err;
   }
-}
-
-async function registrarLog(idEmpresa, direccion, telefonoCliente, messageId, texto) {
-  await withPool((pool) =>
-    whatsappBotLogRepository.insertar(pool, idEmpresa, {
-      direccion,
-      telefonoCliente,
-      messageId,
-      texto: String(texto || '').slice(0, 2000)
-    })
-  );
 }
 
 async function getConfig(idEmpresa) {
@@ -120,63 +128,112 @@ async function listarLogs(idEmpresa, limite) {
 }
 
 async function procesarInbound(payload) {
+  const t0 = Date.now();
   const { idEmpresa, from, messageId, text, timestamp } = payload || {};
   validarUuid(idEmpresa);
+
+  if (esDuplicado(idEmpresa, messageId)) {
+    return { ok: true, duplicate: true, idEmpresa, messageId: messageId || null };
+  }
+
   const tel = normalizarTelefonoWhatsApp(from);
   if (!tel.destino) throw new Error('Telefono de origen requerido');
 
   const textoEntrada = String(text || '').trim();
   if (!textoEntrada) throw new Error('Mensaje de texto vacio');
 
-  await assertEmpresaPuedeUsarBot(idEmpresa);
-  await assertEmpresaBaileysActiva(idEmpresa);
-  const config = await getConfig(idEmpresa);
-  if (!config.activoBot) {
+  const precarga = await whatsappBotInboundContext.precargar(idEmpresa, tel.logId, tel.digitos);
+
+  if (!precarga.autorizado) {
+    const err = new Error('Bot WhatsApp no autorizado para esta empresa');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+  const wa = precarga.waRow;
+  if (!wa || !wa.activo) {
+    throw new Error('WhatsApp no activo para esta empresa');
+  }
+  if (String(wa.proveedor).toLowerCase() !== 'baileys') {
+    throw new Error('El bot entrante solo aplica con proveedor baileys');
+  }
+  if (!precarga.config.activoBot) {
     throw new Error('Bot WhatsApp desactivado para esta empresa');
   }
 
-  await registrarLog(idEmpresa, 'in', tel.logId, messageId, textoEntrada);
-
-  const stats = await whatsappBotCatalogo.statusCatalogo(idEmpresa);
-  if (!stats.total || Number(stats.total) === 0) {
-    await syncCatalogo(idEmpresa).catch((err) => {
+  if (!precarga.catStats?.total || Number(precarga.catStats.total) === 0) {
+    syncCatalogo(idEmpresa).catch((err) => {
       console.error('whatsappBot auto-sync catalogo:', err.message);
     });
   }
 
-  const turno = await whatsappBotDialogo.procesarTurno({
-    idEmpresa,
-    telefonoLog: tel.logId,
-    digitosCelular: tel.digitos,
-    textoEntrada,
-    config
-  });
+  const turno = await whatsappBotDialogo.procesarTurno(
+    {
+      idEmpresa,
+      telefonoLog: tel.logId,
+      digitosCelular: tel.digitos,
+      textoEntrada,
+      config: precarga.config
+    },
+    precarga
+  );
+  const { respuesta, conv, adjunto, limpiarHistorial } = turno;
 
-  const { respuesta, conv, adjunto } = turno;
+  if (!limpiarHistorial) {
+    registrarLogAsync(idEmpresa, 'in', tel.logId, messageId, textoEntrada);
+  }
 
-  await whatsappBotDialogo.persistirConversacion(idEmpresa, tel.logId, conv);
-
-  const envio = await whatsappProvider.sendText(idEmpresa, tel.destino, respuesta);
+  const envio = await whatsappGatewayClient.sendText(idEmpresa, tel.destino, respuesta, { skipThrottle: true });
   if (!envio.success) {
     throw new Error(envio.message || 'No se pudo enviar la respuesta');
   }
 
-  await registrarLog(idEmpresa, 'out', tel.logId, null, respuesta);
+  if (limpiarHistorial) {
+    try {
+      await withPool(async (pool) => {
+        await whatsappBotLogRepository.eliminarPorTelefono(pool, idEmpresa, tel.logId);
+        await whatsappBotConversacionRepository.eliminar(pool, idEmpresa, tel.logId);
+      });
+    } catch (err) {
+      console.error('whatsappBot limpiar historial:', err.message);
+    }
+  } else {
+    registrarLogAsync(idEmpresa, 'out', tel.logId, null, respuesta);
+
+    withPool((pool) =>
+      whatsappBotInboundContext.persistirTurno(
+        pool,
+        idEmpresa,
+        tel.logId,
+        conv,
+        precarga.convNueva
+      )
+    ).catch((err) => console.error('whatsappBot persistir conversacion:', err.message));
+  }
 
   if (adjunto?.pdfBase64 && adjunto?.filename) {
-    const media = await whatsappProvider.sendMedia(
-      idEmpresa,
-      tel.destino,
-      'document',
-      adjunto.pdfBase64,
-      adjunto.filename,
-      adjunto.caption || 'Cotizacion'
-    );
-    if (!media.success) {
-      console.error('whatsappBot envio PDF:', media.message);
-    } else {
-      await registrarLog(idEmpresa, 'out', tel.logId, null, `[PDF] ${adjunto.filename}`);
-    }
+    whatsappGatewayClient
+      .sendMedia(
+        idEmpresa,
+        tel.destino,
+        'document',
+        adjunto.pdfBase64,
+        adjunto.filename,
+        adjunto.caption || 'Cotizacion',
+        { skipThrottle: true }
+      )
+      .then((media) => {
+        if (!media.success) {
+          console.error('whatsappBot envio PDF:', media.message);
+        } else {
+          registrarLogAsync(idEmpresa, 'out', tel.logId, null, `[PDF] ${adjunto.filename}`);
+        }
+      })
+      .catch((err) => console.error('whatsappBot envio PDF:', err.message));
+  }
+
+  const ms = Date.now() - t0;
+  if (ms > 3000) {
+    console.error(`whatsappBot inbound lento: ${ms}ms idEmpresa=${idEmpresa} texto="${textoEntrada.slice(0, 30)}"`);
   }
 
   return {
@@ -186,7 +243,8 @@ async function procesarInbound(payload) {
     messageId: messageId || null,
     timestamp: timestamp || null,
     respuesta,
-    pdfEnviado: Boolean(adjunto?.pdfBase64)
+    pdfEnviado: Boolean(adjunto?.pdfBase64),
+    elapsedMs: ms
   };
 }
 

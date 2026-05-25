@@ -17,7 +17,10 @@ const PATRONES = {
   productosDestacados: /\b(que productos vendes|que productos venden|productos mas vendidos|productos destacados|que venden ustedes|que venden ellos|lista de productos)\b/i,
   queVendes: /\b(que vendes|que venden|que comercializ|que ofrecen|que productos tienen|que lineas manejan|que categorias|que marcas)\b/i,
   ubicacion: /\b(direccion|donde estan|donde queda|donde quedan|ubicacion|ubicados|donde son|como llegar)\b/i,
-  contacto: /\b(telefono|celular|correo|email|e mail|como contact|datos de contacto|numero de contacto)\b/i
+  contacto: /\b(telefono|celular|correo|email|e mail|como contact|datos de contacto|numero de contacto)\b/i,
+  despedida: /\b(gracias|muchas gracias|mil gracias|te agradezco|ok gracias|listo gracias|hasta pronto|hasta luego|nos vemos|chau|chao|adios|bye|hasta manana|nada mas|eso es todo|fue un gusto)\b/i,
+  productosPedido: /\b(productos|producto|detalle|items|que trae|que incluye|lista|ver pedido)\b/i,
+  pdfPedido: /\b(pdf|comprobante|documento|recibo|boleta|factura)\b/i
 };
 
 function aplicarSinonimos(tokens, sinonimosMap) {
@@ -27,6 +30,10 @@ function aplicarSinonimos(tokens, sinonimosMap) {
 
 function esEstadoCotiz(estado) {
   return String(estado || '').startsWith('cotiz_');
+}
+
+function esEstadoPedido(estado) {
+  return String(estado || '').startsWith('pedido_');
 }
 
 function detectarIdentidad(textoNorm, t) {
@@ -51,6 +58,7 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
   const estado = contexto?.estado || 'menu';
   if (estado === 'registro_documento') {
     if (PATRONES.menu.test(textoNorm) || t.toUpperCase() === 'MENU') return 'menu';
+    if (PATRONES.despedida.test(textoNorm)) return 'despedida';
     if (PATRONES.cancelar.test(textoNorm) || t.toUpperCase() === 'CANCELAR') return 'cancelar_cotizacion';
     const doc = String(t).replace(/\D/g, '');
     if (/^\d{8}$/.test(doc) || /^\d{11}$/.test(doc)) return 'documento_identidad';
@@ -60,6 +68,7 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
   if (PATRONES.ping.test(textoNorm)) return 'ping';
   if (PATRONES.menu.test(textoNorm)) return 'menu';
   if (PATRONES.hola.test(textoNorm)) return 'hola';
+  if (PATRONES.despedida.test(textoNorm)) return 'despedida';
 
   const identidad = detectarIdentidad(textoNorm, t);
   if (identidad && !esEstadoCotiz(contexto.estado)) return identidad;
@@ -73,6 +82,7 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
   if (PATRONES.deuda.test(textoNorm)) return 'deuda';
   if (PATRONES.precio.test(textoNorm)) return 'precio';
   if (PATRONES.stock.test(textoNorm)) return 'stock';
+  if (esEstadoPedido(contexto.estado)) return 'pedido_opcion_invalida';
   if (esEstadoCotiz(contexto.estado)) return 'producto';
   return 'producto';
 }
@@ -85,6 +95,27 @@ function interpretar(mensaje, contexto = {}) {
   const sinonimosMap = contexto.sinonimosMap || new Map();
   const estado = contexto.estado || 'menu';
   const t = String(mensaje || '').trim();
+
+  if (/^\d+$/.test(t) && estado === 'pedido_eligiendo') {
+    return {
+      intencion: 'seleccion_numero',
+      terminosBusqueda: [],
+      entidades: { numero: Number(t) },
+      textoNorm
+    };
+  }
+
+  if (estado === 'pedido_opciones') {
+    if (PATRONES.menu.test(textoNorm) || t.toUpperCase() === 'MENU') {
+      return { intencion: 'menu', terminosBusqueda: [], entidades: {}, textoNorm };
+    }
+    if (PATRONES.pdfPedido.test(textoNorm) || t.toUpperCase() === 'PDF') {
+      return { intencion: 'pdf_pedido', terminosBusqueda: [], entidades: {}, textoNorm };
+    }
+    if (PATRONES.productosPedido.test(textoNorm) || t.toUpperCase() === 'PRODUCTOS') {
+      return { intencion: 'productos_pedido', terminosBusqueda: [], entidades: {}, textoNorm };
+    }
+  }
 
   if (/^\d+$/.test(t) && (estado === 'eligiendo_candidato' || estado === 'cotiz_eligiendo')) {
     return {
@@ -139,7 +170,8 @@ function interpretar(mensaje, contexto = {}) {
     'cotizar', 'confirmar_cotizacion', 'cancelar_cotizacion', 'carrito',
     'quitar_carrito', 'medio_pago', 'cantidad', 'menu_numero',
     'identidad', 'que_vendes', 'productos_destacados', 'ubicacion', 'contacto',
-    'documento_identidad', 'documento_invalido'
+    'documento_identidad', 'documento_invalido', 'despedida',
+    'productos_pedido', 'pdf_pedido', 'pedido_opcion_invalida'
   ];
 
   if (sinTerminos.includes(intencion)) {

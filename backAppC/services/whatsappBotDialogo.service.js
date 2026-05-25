@@ -6,6 +6,7 @@ const whatsappBotConversacionRepository = require('../repositories/whatsappBotCo
 const whatsappBotConsultasRepository = require('../repositories/whatsappBotConsultas.repository');
 const whatsappBotSinonimoRepository = require('../repositories/whatsappBotSinonimo.repository');
 const whatsappBotCotizacion = require('./whatsappBotCotizacion.service');
+const whatsappBotPedidos = require('./whatsappBotPedidos.service');
 const whatsappBotIdentidad = require('./whatsappBotIdentidad.service');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 
@@ -24,6 +25,12 @@ const TEXTO_MENU = [
 const TEXTO_PING = 'PONG - Bot activo.';
 const TEXTO_NO_ENTIENDO = 'No entendi su consulta. Escriba MENU o el nombre del producto.';
 const TEXTO_ACLARAR = 'Indique que producto busca, por ejemplo: pintura latex';
+const TEXTO_DESPEDIDA = [
+  'Gracias por escribirnos.',
+  'Hasta pronto.',
+  '',
+  'Cuando necesite algo, escriba *MENU*.'
+].join('\n');
 
 function formatearProducto(p, idx) {
   const n = idx != null ? `${idx}. ` : '';
@@ -41,38 +48,68 @@ function formatearDetalleProducto(p) {
   ].join('\n');
 }
 
-async function listarPedidos(idEmpresa, idCliente) {
-  const pedidos = await withPool((pool) =>
-    whatsappBotConsultasRepository.listarPedidosRecientes(pool, idEmpresa, idCliente, 5)
-  );
-  if (!pedidos.length) {
-    return 'No encontramos pedidos recientes a su nombre.';
-  }
-  const lineas = pedidos.map((p, i) => {
-    const comp = `${p.serie || ''}-${p.numero || ''}`.replace(/^-/, '');
-    return `${i + 1}. ${comp} | ${p.fEmision || ''} | ${formatearPrecio(p.total)} | ${p.estadoPedido || '—'}`;
-  });
-  return ['*Sus ultimos pedidos:*', ...lineas, '', 'Escriba MENU para volver.'].join('\n');
+function compVenta(v) {
+  return `${v.serie || ''}-${v.numero || ''}`.replace(/^-/, '');
 }
 
 async function resumenDeuda(idEmpresa, idCliente) {
-  const { creditos, saldoTotal } = await withPool((pool) =>
-    whatsappBotConsultasRepository.resumenDeudaCliente(pool, idEmpresa, idCliente)
+  const [{ creditos, saldoTotal }, ventasPendientes] = await withPool((pool) =>
+    Promise.all([
+      whatsappBotConsultasRepository.resumenDeudaCliente(pool, idEmpresa, idCliente),
+      whatsappBotConsultasRepository.listarVentasPendientesPago(pool, idEmpresa, idCliente)
+    ])
   );
-  if (!creditos.length) {
-    return 'No registra creditos activos.';
+
+  const totalVentas = ventasPendientes.reduce((s, v) => s + Number(v.total || 0), 0);
+  const totalCreditos = Number(saldoTotal || 0);
+  const totalGeneral = totalVentas + totalCreditos;
+
+  if (!ventasPendientes.length && !creditos.length) {
+    return [
+      '*Mi deuda*',
+      'No registra pedidos pendientes de pago ni creditos activos.',
+      '',
+      'Escriba MENU para volver.'
+    ].join('\n');
   }
-  const lineas = creditos.slice(0, 5).map((c, i) => {
-    const comp = c.comprobante || '—';
-    return `${i + 1}. ${comp} | Saldo: ${formatearPrecio(c.saldoPendiente)}`;
-  });
-  return [
-    '*Resumen de deuda:*',
-    `Total pendiente: ${formatearPrecio(saldoTotal)}`,
-    ...lineas,
-    '',
-    'Escriba MENU para volver.'
-  ].join('\n');
+
+  const bloques = ['*Mi deuda*', `Total general: ${formatearPrecio(totalGeneral)}`, ''];
+
+  if (ventasPendientes.length) {
+    bloques.push('*Pedidos pendientes de pago:*');
+    ventasPendientes.slice(0, 5).forEach((v, i) => {
+      const venc = v.fVencimiento ? ` | Vence: ${v.fVencimiento}` : '';
+      const etiqueta = v.idEstadoPago === 3 ? 'VENCIDO' : 'PENDIENTE';
+      bloques.push(`${i + 1}. ${compVenta(v)} | ${v.fEmision || ''} | ${formatearPrecio(v.total)} | _${etiqueta}_${venc}`);
+    });
+    if (ventasPendientes.length > 5) {
+      bloques.push(`...y ${ventasPendientes.length - 5} mas.`);
+    }
+    bloques.push(`Subtotal pedidos: ${formatearPrecio(totalVentas)}`);
+    bloques.push('');
+  } else {
+    bloques.push('_Sin pedidos pendientes de pago._');
+    bloques.push('');
+  }
+
+  if (creditos.length) {
+    bloques.push('*Creditos activos:*');
+    creditos.slice(0, 5).forEach((c, i) => {
+      const comp = c.comprobante || '—';
+      bloques.push(`${i + 1}. ${comp} | Saldo: ${formatearPrecio(c.saldoPendiente)}`);
+    });
+    if (creditos.length > 5) {
+      bloques.push(`...y ${creditos.length - 5} mas.`);
+    }
+    bloques.push(`Subtotal creditos: ${formatearPrecio(totalCreditos)}`);
+    bloques.push('');
+  } else {
+    bloques.push('_Sin creditos activos._');
+    bloques.push('');
+  }
+
+  bloques.push('Escriba *1* para ver sus pedidos o MENU para volver.');
+  return bloques.join('\n');
 }
 
 async function buscarYResponder(idEmpresa, terminos, intencion) {
@@ -100,16 +137,20 @@ async function requiereCliente(config, resCliente) {
   return config.mensajeNoRegistrado || 'No encontramos su numero registrado.';
 }
 
-async function procesarTurno(ctx) {
+async function procesarTurno(ctx, precarga = null) {
   const { idEmpresa, telefonoLog, textoEntrada, config } = ctx;
-  const sinonimosMap = await withPool((pool) => whatsappBotSinonimoRepository.mapaPorEmpresa(pool, idEmpresa));
+  const sinonimosMap =
+    precarga?.sinonimosMap ??
+    (await withPool((pool) => whatsappBotSinonimoRepository.mapaPorEmpresa(pool, idEmpresa)));
 
-  let conv = await withPool((pool) =>
-    whatsappBotConversacionRepository.obtener(pool, idEmpresa, telefonoLog)
-  );
+  let conv = precarga?.conv;
   if (!conv) {
-    await withPool((pool) => whatsappBotConversacionRepository.reiniciar(pool, idEmpresa, telefonoLog));
-    conv = { estado: 'menu', slots: {}, candidatos: [] };
+    conv = await withPool((pool) =>
+      whatsappBotConversacionRepository.obtener(pool, idEmpresa, telefonoLog)
+    );
+    if (!conv) {
+      conv = { estado: 'menu', slots: {}, candidatos: [] };
+    }
   }
 
   const nlu = whatsappBotNlu.interpretar(textoEntrada, {
@@ -117,7 +158,21 @@ async function procesarTurno(ctx) {
     sinonimosMap
   });
 
-  const resCliente = await whatsappBotCliente.resolverCliente(idEmpresa, ctx.digitosCelular);
+  const resCliente =
+    precarga?.resCliente ?? (await whatsappBotCliente.resolverCliente(idEmpresa, ctx.digitosCelular));
+
+  if (nlu.intencion === 'despedida') {
+    return {
+      respuesta: TEXTO_DESPEDIDA,
+      conv: { estado: 'menu', slots: {}, candidatos: [] },
+      limpiarHistorial: true
+    };
+  }
+
+  const pedidosTurno = await whatsappBotPedidos.intentarProcesar(ctx, conv, nlu, config, resCliente);
+  if (pedidosTurno) {
+    return pedidosTurno;
+  }
 
   const cotizacionTurno = await whatsappBotCotizacion.intentarProcesar(ctx, conv, nlu, config, resCliente);
   if (cotizacionTurno) {
@@ -149,13 +204,6 @@ async function procesarTurno(ctx) {
       };
     }
     return { respuesta: 'Opcion invalida. Responda un numero de la lista o escriba MENU.', conv };
-  }
-
-  if (nlu.intencion === 'pedido' || (conv.estado === 'menu' && nlu.intencion === 'pedido')) {
-    const msg = await requiereCliente(config, resCliente);
-    if (msg) return { respuesta: msg, conv: { estado: 'menu', slots: {}, candidatos: [] } };
-    const respuesta = await listarPedidos(idEmpresa, resCliente.cliente.idCliente);
-    return { respuesta, conv: { estado: 'menu', slots: {}, candidatos: [] } };
   }
 
   if (nlu.intencion === 'deuda') {

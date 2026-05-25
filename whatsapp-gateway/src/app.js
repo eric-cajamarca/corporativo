@@ -26,8 +26,8 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ status: 500, success: false, message: 'Error interno del gateway' });
 });
 
-app.listen(config.port, () => {
-  console.error(`whatsapp-gateway escuchando en puerto ${config.port}`);
+app.listen(config.port, config.host, () => {
+  console.error(`whatsapp-gateway escuchando en ${config.host}:${config.port}`);
   sessionManager.preloadSessions().catch((err) => {
     console.error('whatsapp-gateway preloadSessions:', err.message);
   });

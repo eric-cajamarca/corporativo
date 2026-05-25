@@ -433,7 +433,8 @@ function requireConnected(idEmpresa) {
   return t.sock;
 }
 
-async function throttleSend(idEmpresa) {
+async function throttleSend(idEmpresa, skip = false) {
+  if (skip) return;
   const t = getTenantState(idEmpresa);
   const now = Date.now();
   const wait = config.sendMinIntervalMs - (now - t.lastSendAt);
@@ -441,10 +442,10 @@ async function throttleSend(idEmpresa) {
   t.lastSendAt = Date.now();
 }
 
-async function sendText(idEmpresa, number, text) {
+async function sendText(idEmpresa, number, text, options = {}) {
   const t = getTenantState(idEmpresa);
   const sock = requireConnected(idEmpresa);
-  await throttleSend(idEmpresa);
+  await throttleSend(idEmpresa, options.skipThrottle === true);
   const jid = toWhatsAppJid(number);
   const sent = await sock.sendMessage(jid, { text: String(text).trim() });
   rememberOutboundMessage(t, sent);
@@ -462,9 +463,9 @@ async function resolveMediaBuffer(media) {
   return Buffer.from(b64, 'base64');
 }
 
-async function sendMedia(idEmpresa, number, mediatype, media, filename, caption) {
+async function sendMedia(idEmpresa, number, mediatype, media, filename, caption, options = {}) {
   const sock = requireConnected(idEmpresa);
-  await throttleSend(idEmpresa);
+  await throttleSend(idEmpresa, options.skipThrottle === true);
   const jid = toWhatsAppJid(number);
   const buffer = await resolveMediaBuffer(media);
   const mt = String(mediatype || 'document').toLowerCase();

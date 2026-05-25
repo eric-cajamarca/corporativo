@@ -37,4 +37,20 @@ async function listar(pool, idEmpresa, limite = 50) {
   }
 }
 
-module.exports = { insertar, listar };
+async function eliminarPorTelefono(pool, idEmpresa, telefonoCliente) {
+  try {
+    await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('telefonoCliente', sql.VarChar(20), telefonoCliente)
+      .query(`
+        DELETE FROM WhatsAppBotLog
+        WHERE idEmpresa = @idEmpresa AND telefonoCliente = @telefonoCliente
+      `);
+  } catch (e) {
+    if (e && e.number === 208) return;
+    throw e;
+  }
+}
+
+module.exports = { insertar, listar, eliminarPorTelefono };

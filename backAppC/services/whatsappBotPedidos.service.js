@@ -1,0 +1,331 @@
+const { withPool } = require('../utils/dbPool.util');
+const whatsappBotConsultasRepository = require('../repositories/whatsappBotConsultas.repository');
+const ventasRepository = require('../repositories/ventas.repository');
+const pdfBackendClient = require('./pdfBackend.client');
+const { numeroALetras } = require('../utils/numeroALetras.util');
+const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
+
+const PEDIDOS_TOP = 5;
+const PDF_MAX_DIA = parseInt(process.env.WHATSAPP_BOT_PEDIDO_PDF_MAX_DIA, 10) || 3;
+const pdfPedidosPorDia = new Map();
+
+function esEstadoPedido(estado) {
+  return String(estado || '').startsWith('pedido_');
+}
+
+function compPedido(p) {
+  return `${p.serie || ''}-${p.numero || ''}`.replace(/^-/, '');
+}
+
+function clavePdfDia(idEmpresa, telefonoLog) {
+  return `${String(idEmpresa).toLowerCase()}:${telefonoLog}:${new Date().toISOString().slice(0, 10)}`;
+}
+
+function puedeEnviarPdfPedido(idEmpresa, telefonoLog) {
+  const n = pdfPedidosPorDia.get(clavePdfDia(idEmpresa, telefonoLog)) || 0;
+  return n < PDF_MAX_DIA;
+}
+
+function registrarPdfPedido(idEmpresa, telefonoLog) {
+  const key = clavePdfDia(idEmpresa, telefonoLog);
+  pdfPedidosPorDia.set(key, (pdfPedidosPorDia.get(key) || 0) + 1);
+}
+
+function requiereCliente(config, resCliente) {
+  if (resCliente.encontrado) return null;
+  if (resCliente.ambiguo) {
+    return 'Encontramos mas de un cliente con su numero. Contacte a la empresa para actualizar sus datos.';
+  }
+  return config.mensajeNoRegistrado || 'No encontramos su numero registrado.';
+}
+
+function marcaPago(idEstadoPago) {
+  if (idEstadoPago === 1) return 'PENDIENTE PAGO';
+  if (idEstadoPago === 3) return 'VENCIDO';
+  if (idEstadoPago === 2) return 'PAGADO';
+  if (idEstadoPago === 4) return 'ANULADO';
+  return '—';
+}
+
+function formatearListaPedidos(pedidos) {
+  const lineas = pedidos.map((p, i) => {
+    const comp = compPedido(p);
+    const pago = marcaPago(p.idEstadoPago);
+    return `${i + 1}. ${comp} | ${p.fEmision || ''} | ${formatearPrecio(p.total)} | ${p.estadoPedido || '—'} | _${pago}_`;
+  });
+  const pendientes = pedidos.filter((p) => p.idEstadoPago === 1 || p.idEstadoPago === 3).length;
+  const aviso = pendientes > 0
+    ? `_Tiene ${pendientes} pedido(s) pendiente(s) de pago._`
+    : '_Todos sus pedidos estan pagados._';
+  return [
+    '*Sus ultimos pedidos:*',
+    ...lineas,
+    '',
+    aviso,
+    '',
+    'Responda el *numero* del pedido (1-5) para ver detalle.',
+    'Escriba MENU para volver.'
+  ].join('\n');
+}
+
+function formatearResumenPedido(pedido) {
+  const comp = compPedido(pedido);
+  const pago = marcaPago(pedido.idEstadoPago);
+  return [
+    `*Pedido ${comp}*`,
+    `Fecha: ${pedido.fEmision || '—'}`,
+    `Total: ${formatearPrecio(pedido.total)}`,
+    `Estado pedido: ${pedido.estadoPedido || '—'}`,
+    `Estado pago: ${pago}`,
+    '',
+    'Que desea?',
+    '*PRODUCTOS* - ver items del pedido',
+    '*PDF* - recibir comprobante PDF',
+    '',
+    'Escriba MENU para volver.'
+  ].join('\n');
+}
+
+function formatearProductosPedido(pedido, items) {
+  const comp = compPedido(pedido);
+  if (!items.length) {
+    return `El pedido ${comp} no tiene productos registrados.\n\nEscriba PDF o MENU.`;
+  }
+  const lineas = items.map((it, i) => {
+    const desc = String(it.descripcion || it.descripcionProducto || 'Producto').trim();
+    const cod = it.codigo ? ` (${it.codigo})` : '';
+    return `${i + 1}. ${desc}${cod} x${Number(it.cantidad || 0)} = ${formatearPrecio(it.total)}`;
+  });
+  return [
+    `*Productos del pedido ${comp}:*`,
+    ...lineas,
+    '',
+    `Total pedido: ${formatearPrecio(pedido.total)}`,
+    '',
+    'Escriba *PDF* para recibir el comprobante o *MENU* para volver.'
+  ].join('\n');
+}
+
+async function listarPedidos(idEmpresa, idCliente) {
+  return withPool((pool) =>
+    whatsappBotConsultasRepository.listarPedidosRecientes(pool, idEmpresa, idCliente, PEDIDOS_TOP)
+  );
+}
+
+async function obtenerPedidoSeleccionado(idEmpresa, idCliente, candidatos, idx) {
+  const pedido = candidatos[idx];
+  if (!pedido?.idVenta) return null;
+  return withPool((pool) =>
+    whatsappBotConsultasRepository.obtenerVentaDeCliente(
+      pool,
+      idEmpresa,
+      pedido.idVenta,
+      idCliente
+    )
+  );
+}
+
+async function generarPdfPedido(idEmpresa, idVenta, idCliente) {
+  if (!pdfBackendClient.isConfigured()) {
+    throw new Error('Servicio PDF no configurado (PDF_BACKEND_URL)');
+  }
+  const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+  const pdfData = await withPool(async (pool) => {
+    const venta = await whatsappBotConsultasRepository.obtenerVentaDeCliente(
+      pool,
+      idEmpresa,
+      idVenta,
+      idCliente
+    );
+    if (!venta) return null;
+    return ventasRepository.obtenerComprobanteParaPdf(pool, idVenta, [idEmpresa], baseUrl);
+  });
+  if (!pdfData) {
+    throw new Error('No se pudo obtener el comprobante del pedido.');
+  }
+  const total = Number(pdfData?.venta?.total ?? 0);
+  const comp = pdfData?.venta?.compVenta || `pedido-${idVenta}`;
+  const nombreArchivo = `pedido-${String(comp).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+  const buffer = await pdfBackendClient.generarPdfComprobanteVenta(
+    {
+      ...pdfData,
+      cantidadLetras: numeroALetras(total),
+      nombreArchivo,
+      esCotizacion: false
+    },
+    'A4'
+  );
+  return { pdfBase64: buffer.toString('base64'), filename: nombreArchivo, caption: `Pedido ${comp}` };
+}
+
+/**
+ * Flujo: listar pedidos -> elegir numero -> PRODUCTOS o PDF.
+ */
+async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
+  const { idEmpresa, telefonoLog } = ctx;
+  const estado = conv.estado || 'menu';
+  const slots = { ...(conv.slots || {}) };
+
+  if (nlu.intencion === 'pedido' && !esEstadoPedido(estado)) {
+    const msg = requiereCliente(config, resCliente);
+    if (msg) {
+      return { respuesta: msg, conv: { estado: 'menu', slots: {}, candidatos: [] } };
+    }
+    const pedidos = await listarPedidos(idEmpresa, resCliente.cliente.idCliente);
+    if (!pedidos.length) {
+      return {
+        respuesta: 'No encontramos pedidos recientes a su nombre.',
+        conv: { estado: 'menu', slots: {}, candidatos: [] }
+      };
+    }
+    return {
+      respuesta: formatearListaPedidos(pedidos),
+      conv: {
+        estado: 'pedido_eligiendo',
+        slots: { idCliente: resCliente.cliente.idCliente },
+        candidatos: pedidos
+      }
+    };
+  }
+
+  if (estado === 'pedido_eligiendo') {
+    if (nlu.intencion === 'menu') {
+      return { respuesta: 'Volviendo al menu.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
+    }
+    if (nlu.intencion === 'pedido') {
+      const pedidos = await listarPedidos(idEmpresa, slots.idCliente || resCliente.cliente?.idCliente);
+      if (!pedidos.length) {
+        return {
+          respuesta: 'No encontramos pedidos recientes a su nombre.',
+          conv: { estado: 'menu', slots: {}, candidatos: [] }
+        };
+      }
+      return {
+        respuesta: formatearListaPedidos(pedidos),
+        conv: {
+          estado: 'pedido_eligiendo',
+          slots: { idCliente: slots.idCliente || resCliente.cliente.idCliente },
+          candidatos: pedidos
+        }
+      };
+    }
+    if (nlu.intencion !== 'seleccion_numero') {
+      return {
+        respuesta: 'Responda el *numero* del pedido de la lista (1-5) o escriba MENU.',
+        conv
+      };
+    }
+    const idx = Number(nlu.entidades.numero) - 1;
+    const candidatos = conv.candidatos || [];
+    const idCliente = slots.idCliente || resCliente.cliente?.idCliente;
+    if (idx < 0 || idx >= candidatos.length || !idCliente) {
+      return {
+        respuesta: 'Opcion invalida. Responda un numero de la lista o escriba MENU.',
+        conv
+      };
+    }
+    const pedido = await obtenerPedidoSeleccionado(idEmpresa, idCliente, candidatos, idx);
+    if (!pedido) {
+      return {
+        respuesta: 'No pudimos acceder a ese pedido. Escriba MENU para volver.',
+        conv: { estado: 'menu', slots: {}, candidatos: [] }
+      };
+    }
+    return {
+      respuesta: formatearResumenPedido(pedido),
+      conv: {
+        estado: 'pedido_opciones',
+        slots: { idCliente, idVenta: pedido.idVenta, pedido },
+        candidatos: []
+      }
+    };
+  }
+
+  if (estado === 'pedido_opciones') {
+    if (nlu.intencion === 'menu') {
+      return { respuesta: 'Volviendo al menu.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
+    }
+    const idCliente = slots.idCliente || resCliente.cliente?.idCliente;
+    const idVenta = slots.idVenta;
+    const pedido = slots.pedido;
+    if (!idCliente || !idVenta || !pedido) {
+      return {
+        respuesta: 'Sesion de pedido expirada. Escriba *1* o *mis pedidos* para volver a consultar.',
+        conv: { estado: 'menu', slots: {}, candidatos: [] }
+      };
+    }
+
+    if (nlu.intencion === 'productos_pedido') {
+      const items = await withPool((pool) =>
+        whatsappBotConsultasRepository.listarDetallePedido(pool, idEmpresa, idVenta, idCliente)
+      );
+      return {
+        respuesta: formatearProductosPedido(pedido, items),
+        conv: {
+          estado: 'pedido_opciones',
+          slots: { idCliente, idVenta, pedido },
+          candidatos: []
+        }
+      };
+    }
+
+    if (nlu.intencion === 'pdf_pedido') {
+      if (!puedeEnviarPdfPedido(idEmpresa, telefonoLog)) {
+        return {
+          respuesta: `Solo puede solicitar ${PDF_MAX_DIA} PDF de pedidos por dia desde este numero.\n\nEscriba PRODUCTOS o MENU.`,
+          conv: {
+            estado: 'pedido_opciones',
+            slots: { idCliente, idVenta, pedido },
+            candidatos: []
+          }
+        };
+      }
+      try {
+        const adjunto = await generarPdfPedido(idEmpresa, idVenta, idCliente);
+        registrarPdfPedido(idEmpresa, telefonoLog);
+        return {
+          respuesta: `Enviando PDF del pedido ${compPedido(pedido)}...`,
+          conv: { estado: 'menu', slots: {}, candidatos: [] },
+          adjunto: {
+            pdfBase64: adjunto.pdfBase64,
+            filename: adjunto.filename,
+            caption: adjunto.caption
+          }
+        };
+      } catch (err) {
+        console.error('whatsappBotPedidos PDF:', err.message);
+        return {
+          respuesta: 'No pudimos generar el PDF en este momento. Intente mas tarde o escriba PRODUCTOS.',
+          conv: {
+            estado: 'pedido_opciones',
+            slots: { idCliente, idVenta, pedido },
+            candidatos: []
+          }
+        };
+      }
+    }
+
+    return {
+      respuesta: 'Escriba *PRODUCTOS* para ver items o *PDF* para recibir el comprobante.\n\nMENU para volver.',
+      conv: {
+        estado: 'pedido_opciones',
+        slots: { idCliente, idVenta, pedido },
+        candidatos: []
+      }
+    };
+  }
+
+  if (esEstadoPedido(estado)) {
+    return {
+      respuesta: 'Sesion de pedido expirada. Escriba *1* o *mis pedidos* para consultar de nuevo.',
+      conv: { estado: 'menu', slots: {}, candidatos: [] }
+    };
+  }
+
+  return null;
+}
+
+module.exports = {
+  intentarProcesar,
+  esEstadoPedido
+};

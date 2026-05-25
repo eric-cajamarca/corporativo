@@ -5,6 +5,7 @@ const cotizacionesRepository = require('../repositories/cotizaciones.repository'
 const whatsappBotCatalogo = require('./whatsappBotCatalogo.service');
 const whatsappBotCotizacionRepository = require('../repositories/whatsappBotCotizacion.repository');
 const whatsappBotRegistroCliente = require('./whatsappBotRegistroCliente.service');
+const whatsappBotLimites = require('./whatsappBotLimites.service');
 const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
@@ -297,7 +298,13 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
       };
     }
     if (nlu.intencion === 'documento_identidad') {
-      const registro = await whatsappBotRegistroCliente.registrarPorDocumento(idEmpresa, digitosCelular, texto);
+      const idClientePrevio = resolverIdCliente(slots, resCliente);
+      const registro = await whatsappBotRegistroCliente.registrarPorDocumento(
+        idEmpresa,
+        digitosCelular,
+        texto,
+        idClientePrevio
+      );
       if (!registro.ok) {
         return {
           respuesta: [
@@ -372,6 +379,14 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
       return solicitarRegistroOIniciarCotizacion(resCliente);
     }
     try {
+      try {
+        await whatsappBotLimites.assertLimiteCotizacionesDia(idEmpresa, digitosCelular, idClienteConfirm);
+      } catch (limErr) {
+        return {
+          respuesta: `${limErr.message} Escriba MENU para volver al inicio.`,
+          conv: { estado: 'menu', slots: {}, candidatos: [] }
+        };
+      }
       const { idCotizacion, pdfData, serieNumero } = await crearCotizacionDesdeCarrito(
         idEmpresa,
         idClienteConfirm,
