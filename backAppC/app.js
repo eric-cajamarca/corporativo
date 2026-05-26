@@ -183,17 +183,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Ruta de prueba para conexi?n a DB
-app.get('/database', async (req, res) => {
-  try {
-    await connectDB();
-    res.send('?Conexi?n exitosa a la base de datos!');
-  } catch (error) {
-    console.error('Error al conectar a la base de datos:', error);
-    res.status(500).send('?Error al conectar a la base de datos!');
-  }
-});
-
 // Bot WhatsApp entrante (webhook gateway -> backend, sin JWT; antes de /api/whatsapp)
 app.use('/api/whatsapp-bot', whatsappBotRoutes);
 console.error('context:', JSON.stringify({ level: 'info', message: 'whatsapp_bot_inbound_ready', path: '/api/whatsapp-bot/inbound', port: process.env.PORT || 3000 }));

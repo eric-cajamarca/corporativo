@@ -1,16 +1,45 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 const windowMs = parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
-const max = parseInt(process.env.LOGIN_RATE_LIMIT_MAX, 10) || 50;
+const max = parseInt(process.env.LOGIN_RATE_LIMIT_MAX, 10) || 5;
 
-/**
- * Límite por IP sobre POST /api/admin_login (complementa bloqueo por credencial en BD).
- */
+const mfaWindowMs = parseInt(process.env.MFA_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000;
+const mfaMax = parseInt(process.env.MFA_RATE_LIMIT_MAX, 10) || 10;
+
+function normalizarEmail(req) {
+  const email = req && req.body && req.body.email ? String(req.body.email).toLowerCase().trim() : '';
+  return email;
+}
+
+function keyLoginIpEmail(req, res) {
+  return `${ipKeyGenerator(req, res)}|${normalizarEmail(req)}`;
+}
+
+function keyMfaIpToken(req, res) {
+  const tok = req && req.cookies && req.cookies.pendingToken ? String(req.cookies.pendingToken).slice(-32) : '';
+  return `${ipKeyGenerator(req, res)}|${tok}`;
+}
+
 exports.adminLoginRateLimiter = rateLimit({
   windowMs,
   max,
+  keyGenerator: keyLoginIpEmail,
+  skipSuccessfulRequests: true,
   message: {
     message: 'Demasiados intentos desde esta red. Espere unos minutos e intente de nuevo.',
+    data: undefined
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+exports.adminMfaRateLimiter = rateLimit({
+  windowMs: mfaWindowMs,
+  max: mfaMax,
+  keyGenerator: keyMfaIpToken,
+  skipSuccessfulRequests: true,
+  message: {
+    message: 'Demasiados intentos. Espere unos minutos e intente de nuevo.',
     data: undefined
   },
   standardHeaders: true,

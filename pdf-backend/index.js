@@ -1,25 +1,25 @@
+require('dotenv').config();
 const { createApp } = require('./src/config/app.config');
 const reportRoutes = require('./src/routes/report.routes');
+const { requirePdfBackendToken } = require('./src/middleware/authToken.middleware');
 
 const app = createApp();
+app.set('trust proxy', String(process.env.TRUST_PROXY || '0') === '1');
 
-// Health para Kubernetes/Ambassador (sin auth)
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'pdf-backend' });
+  res.status(200).json({ status: 'ok' });
 });
 
-// Rutas
-app.use('/api/reports', reportRoutes);
+app.use('/api/reports', requirePdfBackendToken, reportRoutes);
 
-// Ruta de prueba
 app.get('/', (req, res) => {
-  res.send('Report Backend con PDF y Excel está funcionando ✅');
+  res.status(200).type('text/plain').send('OK');
 });
 
-// Iniciar servidor
 const PORT = process.env.PORT || 3002;
-const server = app.listen(PORT, () => {
-  console.error(`pdf-backend: escuchando en http://127.0.0.1:${PORT}`);
+const HOST = process.env.PDF_BACKEND_BIND_HOST || '127.0.0.1';
+const server = app.listen(PORT, HOST, () => {
+  console.error(`pdf-backend: escuchando en http://${HOST}:${PORT}`);
 });
 
 server.on('error', (err) => {

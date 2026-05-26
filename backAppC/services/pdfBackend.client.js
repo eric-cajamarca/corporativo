@@ -2,6 +2,13 @@ const axios = require('axios');
 
 const BASE_URL = (process.env.PDF_BACKEND_URL || 'http://127.0.0.1:3002').replace(/\/$/, '');
 const TIMEOUT_MS = Number(process.env.PDF_BACKEND_TIMEOUT_MS) || 90000;
+const PDF_BACKEND_TOKEN = process.env.PDF_BACKEND_TOKEN || '';
+
+function authHeaders(base) {
+  const headers = { ...(base || {}) };
+  if (PDF_BACKEND_TOKEN) headers['X-Pdf-Backend-Token'] = PDF_BACKEND_TOKEN;
+  return headers;
+}
 
 function pdfUrl() {
   return `${BASE_URL}/api/reports/generate-pdf`;
@@ -28,7 +35,7 @@ async function generarPdfComprobanteVenta(datos, formato = 'A4') {
       fontSize: 10,
       formato: formato === 'ticket' || formato === 'A5' ? formato : 'A4'
     },
-    { responseType: 'arraybuffer', timeout: TIMEOUT_MS, validateStatus: () => true }
+    { responseType: 'arraybuffer', timeout: TIMEOUT_MS, validateStatus: () => true, headers: authHeaders() }
   );
   if (res.status < 200 || res.status >= 300) {
     const errText = Buffer.isBuffer(res.data) ? res.data.toString('utf8').slice(0, 300) : String(res.data);
@@ -49,7 +56,7 @@ async function generarExcel(data) {
   const res = await axios.post(
     excelGenerateUrl(),
     { data },
-    { responseType: 'arraybuffer', timeout: TIMEOUT_MS, validateStatus: () => true }
+    { responseType: 'arraybuffer', timeout: TIMEOUT_MS, validateStatus: () => true, headers: authHeaders() }
   );
   if (res.status < 200 || res.status >= 300) {
     const errText = Buffer.isBuffer(res.data) ? res.data.toString('utf8').slice(0, 300) : String(res.data);
@@ -84,7 +91,7 @@ async function parsearExcel(buffer, opts = {}) {
   if (opts.maxFilas) form.append('maxFilas', String(opts.maxFilas));
 
   const res = await axios.post(excelParseUrl(), form, {
-    headers: form.getHeaders(),
+    headers: authHeaders(form.getHeaders()),
     timeout: TIMEOUT_MS,
     validateStatus: () => true,
     maxContentLength: Infinity,
