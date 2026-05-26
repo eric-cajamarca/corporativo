@@ -131,32 +131,82 @@
                   <td>{{ descripcionEstado(item) }}</td>
                   <td class="small cb-desc-preview">{{ previewDescripcion(item.descripcionRespuesta) }}</td>
                   <td (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
-                    <div class="d-flex flex-wrap gap-1">
-                      @if (tieneXmlEnviado(item)) {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="verXmlEnviado(item)"
-                                [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-xml'">
-                          @if (abriendoArchivoId === item.idComunicacionBaja + '-xml') { … } @else { Ver XML }
-                        </button>
-                      }
-                      @if (tieneCdr(item)) {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="verCdrSunat(item)"
-                                [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-cdr'">
-                          @if (abriendoArchivoId === item.idComunicacionBaja + '-cdr') { … } @else { Ver CDR }
-                        </button>
-                      }
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                      <button type="button" class="btn btn-sm btn-outline-danger" title="Generar PDF resumen"
+                              (click)="generarPdfResumenBaja(item)"
+                              [disabled]="generandoPdfBaja">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-success" title="Enviar por WhatsApp"
+                              (click)="abrirModalWhatsappBaja(item)">
+                        <i class="bi bi-whatsapp"></i>
+                      </button>
                       @if (item.idEstadoSunat == null || item.idEstadoSunat === 7) {
                         <button type="button" class="btn btn-sm btn-outline-primary" (click)="consultarEstado(item)"
                                 [disabled]="consultandoId === item.idComunicacionBaja">
                           @if (consultandoId === item.idComunicacionBaja) { Consultando... } @else { Consultar estado }
                         </button>
                       }
-                      @if (puedeMostrarBotonEliminar(item)) {
-                        <button type="button" class="btn btn-sm btn-outline-danger" title="Quitar del historial (no cambia el correlativo RA en catálogo)"
-                                (click)="eliminarDelHistorial(item, $event)"
-                                [disabled]="eliminandoId === item.idComunicacionBaja">
-                          @if (eliminandoId === item.idComunicacionBaja) { … } @else { Eliminar }
+                      <div class="dropdown">
+                        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                data-bs-toggle="dropdown" aria-expanded="false" title="Más opciones">
+                          <i class="bi bi-three-dots-vertical"></i>
                         </button>
-                      }
+                        <ul class="dropdown-menu dropdown-menu-end">
+                          @if (tieneXmlEnviado(item)) {
+                            <li>
+                              <button type="button" class="dropdown-item" (click)="verXmlEnviado(item)"
+                                      [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-xml'">
+                                <i class="bi bi-eye me-2 text-primary"></i> Ver XML
+                              </button>
+                            </li>
+                            <li>
+                              <button type="button" class="dropdown-item" (click)="descargarXmlEnviado(item)"
+                                      [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-xml-dl'">
+                                <i class="bi bi-download me-2 text-primary"></i> Descargar XML
+                              </button>
+                            </li>
+                          }
+                          @if (tieneCdr(item)) {
+                            <li>
+                              <button type="button" class="dropdown-item" (click)="verCdrSunat(item)"
+                                      [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-cdr'">
+                                <i class="bi bi-eye me-2 text-info"></i> Ver CDR
+                              </button>
+                            </li>
+                            <li>
+                              <button type="button" class="dropdown-item" (click)="descargarCdr(item)"
+                                      [disabled]="abriendoArchivoId === item.idComunicacionBaja + '-cdr-dl'">
+                                <i class="bi bi-download me-2 text-info"></i> Descargar CDR
+                              </button>
+                            </li>
+                          }
+                          @if (tieneXmlEnviado(item) || tieneCdr(item)) {
+                            <li><hr class="dropdown-divider"></li>
+                          }
+                          <li>
+                            <button type="button" class="dropdown-item" (click)="generarPdfResumenBaja(item)"
+                                    [disabled]="generandoPdfBaja">
+                              <i class="bi bi-file-earmark-pdf me-2 text-danger"></i> PDF resumen
+                            </button>
+                          </li>
+                          <li>
+                            <button type="button" class="dropdown-item" (click)="abrirModalWhatsappBaja(item)">
+                              <i class="bi bi-whatsapp me-2 text-success"></i> Enviar por WhatsApp
+                            </button>
+                          </li>
+                          @if (puedeMostrarBotonEliminar(item)) {
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                              <button type="button" class="dropdown-item text-danger"
+                                      (click)="eliminarDelHistorial(item, $event)"
+                                      [disabled]="eliminandoId === item.idComunicacionBaja">
+                                <i class="bi bi-trash me-2"></i> Eliminar del historial
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -202,6 +252,62 @@
       </div>
       <div class="modal-footer border-0 pt-0">
         <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Envío por WhatsApp de la comunicación de baja -->
+<div class="modal fade" id="whatsappBajaModal" tabindex="-1" aria-labelledby="whatsappBajaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="whatsappBajaModalLabel">
+          <i class="bi bi-whatsapp"></i> Enviar comunicación de baja por WhatsApp
+        </h5>
+        <button type="button" class="btn-close btn-close-white" aria-label="Cerrar"
+                (click)="cerrarModalWhatsappBaja()"></button>
+      </div>
+      <div class="modal-body">
+        @if (bajaSeleccionadaWa) {
+          <p class="small text-muted mb-2">
+            Correlativo: <strong>{{ bajaSeleccionadaWa.numeroCorrelativo || '—' }}</strong>
+            <span class="ms-2">Estado: {{ descripcionEstado(bajaSeleccionadaWa) }}</span>
+          </p>
+        }
+        <label class="form-label small">Tipo de archivo</label>
+        <select class="form-select form-select-sm mb-2" [(ngModel)]="whatsappBajaTipo">
+          <option value="pdf">PDF resumen</option>
+          @if (bajaSeleccionadaWa && tieneXmlEnviado(bajaSeleccionadaWa)) {
+            <option value="xml">XML enviado</option>
+          }
+          @if (bajaSeleccionadaWa && tieneCdr(bajaSeleccionadaWa)) {
+            <option value="cdr">CDR (respuesta SUNAT)</option>
+          }
+        </select>
+        <label class="form-label small">Número (código país + número, ej. 51999999999)</label>
+        <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappBajaNumber" placeholder="51999999999" />
+        <label class="form-label small">Mensaje opcional (caption)</label>
+        <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappBajaCaption" placeholder="Opcional" />
+        @if (whatsappBajaMensaje) {
+          <p class="small mb-0"
+             [class.text-success]="whatsappBajaMensaje && whatsappBajaNumber && !enviandoWhatsappBaja"
+             [class.text-danger]="whatsappBajaMensaje && (!whatsappBajaNumber || enviandoWhatsappBaja)">
+            {{ whatsappBajaMensaje }}
+          </p>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsappBaja"
+                (click)="cerrarModalWhatsappBaja()">Cancelar</button>
+        <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsappBaja"
+                (click)="enviarWhatsappBaja()">
+          @if (enviandoWhatsappBaja) {
+            <span><i class="bi bi-hourglass-split"></i> Enviando...</span>
+          } @else {
+            <span><i class="bi bi-send"></i> Enviar</span>
+          }
+        </button>
       </div>
     </div>
   </div>

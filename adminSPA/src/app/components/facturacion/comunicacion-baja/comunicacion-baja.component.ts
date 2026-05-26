@@ -6,6 +6,10 @@ import { FacturacionService, ComprobanteParaBaja, ComunicacionBajaHistorialItem,
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { PdfService } from '../../../services/pdf.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { Empresa as EmpresaModel } from '../../../models/empresa.model';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -43,13 +47,33 @@ export class ComunicacionBajaComponent implements OnInit {
   abriendoArchivoId: string | null = null;
   eliminandoId: string | null = null;
 
-  constructor(private _facturacionService: FacturacionService) {}
+  /** Empresa actual (para encabezado del PDF resumen). */
+  empresa: EmpresaModel | null = null;
+
+  /** Modal de envío WhatsApp para una comunicación de baja. */
+  bajaSeleccionadaWa: ComunicacionBajaHistorialItem | null = null;
+  whatsappBajaTipo: 'pdf' | 'xml' | 'cdr' = 'pdf';
+  whatsappBajaNumber = '';
+  whatsappBajaCaption = '';
+  enviandoWhatsappBaja = false;
+  whatsappBajaMensaje: string | null = null;
+  generandoPdfBaja = false;
+
+  constructor(
+    private _facturacionService: FacturacionService,
+    private _pdfService: PdfService,
+    private _whatsappService: WhatsappService,
+    private _empresaService: EmpresaService
+  ) {}
 
   ngOnInit(): void {
     this.establecerRangoMes();
     this.cargarComprobantes();
     this.cargarMotivos();
     this.cargarListado();
+    this._empresaService.getEmpresa$().subscribe((emp) => {
+      this.empresa = emp;
+    });
   }
 
   establecerRangoMes(): void {
@@ -320,6 +344,216 @@ export class ComunicacionBajaComponent implements OnInit {
 
   tieneCdr(item: any): boolean {
     return item?.tieneCdr === 1 || item?.tieneCdr === true;
+  }
+
+  /** Descarga el XML enviado a SUNAT como archivo. */
+  descargarXmlEnviado(item: ComunicacionBajaHistorialItem): void {
+    const id = item?.idComunicacionBaja;
+    if (!id) return;
+    this.abriendoArchivoId = id + '-xml-dl';
+    this._facturacionService.obtenerXmlComunicacionBaja(id).subscribe({
+      next: (res) => {
+        this.abriendoArchivoId = null;
+        const content = res?.data?.content ?? '';
+        if (!content) return;
+        this.descargarComoArchivo(content, `ra-${id}.xml`);
+      },
+      error: (err) => {
+        this.abriendoArchivoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo descargar el XML.';
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'XML', message: msg });
+      }
+    });
+  }
+
+  /** Descarga el CDR (respuesta SUNAT) como archivo. */
+  descargarCdr(item: ComunicacionBajaHistorialItem): void {
+    const id = item?.idComunicacionBaja;
+    if (!id) return;
+    this.abriendoArchivoId = id + '-cdr-dl';
+    this._facturacionService.obtenerCdrComunicacionBaja(id).subscribe({
+      next: (res) => {
+        this.abriendoArchivoId = null;
+        const content = res?.data?.content ?? '';
+        if (!content) return;
+        this.descargarComoArchivo(content, `cdr-ra-${id}.xml`);
+      },
+      error: (err) => {
+        this.abriendoArchivoId = null;
+        const msg = err?.error?.message || err?.message || 'No se pudo descargar el CDR.';
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'CDR', message: msg });
+      }
+    });
+  }
+
+  private descargarComoArchivo(content: string, nombreArchivo: string): void {
+    const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  /** Genera y previsualiza un PDF resumen de la comunicación de baja. */
+  generarPdfResumenBaja(item: ComunicacionBajaHistorialItem): void {
+    if (!item?.idComunicacionBaja) return;
+    this.generandoPdfBaja = true;
+    const datos = this.armarDatosPdfResumenBaja(item);
+    this._pdfService.generarPdfDinamico(datos, 'lista-ventas', 10).subscribe({
+      next: (blob) => {
+        this.generandoPdfBaja = false;
+        this._pdfService.previsualizar(blob);
+      },
+      error: () => {
+        this.generandoPdfBaja = false;
+        if (typeof iziToast !== 'undefined') iziToast.error({ title: 'Error', message: 'No se pudo generar el PDF resumen.' });
+      }
+    });
+  }
+
+  private armarDatosPdfResumenBaja(item: ComunicacionBajaHistorialItem) {
+    const emp = this.empresa;
+    const empresaPdf = {
+      logo: emp?.logo ?? '',
+      nombre: emp?.nombre ?? '',
+      ruc: emp?.ruc ?? '',
+      direccion: emp?.direccion ?? '',
+      telefono: emp?.telefono ?? ''
+    };
+    const fechaFmt = this.formatearFechaCorta(item.fechaComunicacion);
+    const filas = [
+      ['Correlativo RA', item.numeroCorrelativo || '—'],
+      ['Fecha', fechaFmt],
+      ['Ticket SUNAT', item.ticketSunat || '—'],
+      ['Estado SUNAT', this.descripcionEstado(item)],
+      ['Descripción', (item.descripcionRespuesta || '—').toString()]
+    ];
+    return {
+      empresa: empresaPdf,
+      titulo: 'Comunicación de baja (RA)',
+      columnas: ['Campo', 'Valor'],
+      filas
+    };
+  }
+
+  private formatearFechaCorta(f: string | undefined | null): string {
+    if (!f) return '—';
+    const s = String(f).trim().slice(0, 19).replace('T', ' ');
+    return s || '—';
+  }
+
+  /** Abre el modal de envío por WhatsApp con el archivo seleccionado (PDF, XML o CDR). */
+  abrirModalWhatsappBaja(item: ComunicacionBajaHistorialItem): void {
+    this.bajaSeleccionadaWa = item;
+    this.whatsappBajaTipo = 'pdf';
+    this.whatsappBajaNumber = '';
+    this.whatsappBajaCaption = `Comunicación de baja ${item.numeroCorrelativo || ''}`.trim();
+    this.whatsappBajaMensaje = null;
+    this.enviandoWhatsappBaja = false;
+    setTimeout(() => {
+      const el = document.getElementById('whatsappBajaModal');
+      if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  enviarWhatsappBaja(): void {
+    const item = this.bajaSeleccionadaWa;
+    if (!item) return;
+    if (!this.whatsappBajaNumber.trim()) {
+      this.whatsappBajaMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsappBaja = true;
+    this.whatsappBajaMensaje = null;
+    if (this.whatsappBajaTipo === 'pdf') {
+      this.enviarPdfBajaWhatsapp(item);
+    } else if (this.whatsappBajaTipo === 'xml') {
+      this.enviarArchivoBajaWhatsapp(item, 'xml');
+    } else {
+      this.enviarArchivoBajaWhatsapp(item, 'cdr');
+    }
+  }
+
+  private enviarPdfBajaWhatsapp(item: ComunicacionBajaHistorialItem): void {
+    const datos = this.armarDatosPdfResumenBaja(item);
+    const nombreArchivo = `comunicacion-baja-${item.numeroCorrelativo || item.idComunicacionBaja}.pdf`;
+    this._pdfService.generarPdfDinamico(datos, 'lista-ventas', 10).subscribe({
+      next: (blob) => {
+        this.enviarBlobPorWhatsapp(blob, nombreArchivo);
+      },
+      error: () => {
+        this.enviandoWhatsappBaja = false;
+        this.whatsappBajaMensaje = 'Error al generar el PDF.';
+      }
+    });
+  }
+
+  private enviarArchivoBajaWhatsapp(item: ComunicacionBajaHistorialItem, tipo: 'xml' | 'cdr'): void {
+    const id = item.idComunicacionBaja;
+    const obs = tipo === 'xml'
+      ? this._facturacionService.obtenerXmlComunicacionBaja(id)
+      : this._facturacionService.obtenerCdrComunicacionBaja(id);
+    obs.subscribe({
+      next: (res) => {
+        const content = res?.data?.content ?? '';
+        if (!content) {
+          this.enviandoWhatsappBaja = false;
+          this.whatsappBajaMensaje = `No hay contenido ${tipo.toUpperCase()} disponible.`;
+          return;
+        }
+        const nombreArchivo = tipo === 'xml'
+          ? `ra-${id}.xml`
+          : `cdr-ra-${id}.xml`;
+        const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+        this.enviarBlobPorWhatsapp(blob, nombreArchivo);
+      },
+      error: (err) => {
+        this.enviandoWhatsappBaja = false;
+        this.whatsappBajaMensaje = err?.error?.message || err?.message || `Error al obtener el ${tipo.toUpperCase()}.`;
+      }
+    });
+  }
+
+  private enviarBlobPorWhatsapp(blob: Blob, nombreArchivo: string): void {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+      this._whatsappService
+        .enviarArchivo(this.whatsappBajaNumber.trim(), base64, nombreArchivo, 'document', this.whatsappBajaCaption.trim() || undefined)
+        .subscribe({
+          next: (res) => {
+            this.enviandoWhatsappBaja = false;
+            this.whatsappBajaMensaje = res.message;
+            if (res.success) {
+              setTimeout(() => this.cerrarModalWhatsappBaja(), 2000);
+            }
+          },
+          error: (err) => {
+            this.enviandoWhatsappBaja = false;
+            this.whatsappBajaMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+          }
+        });
+    };
+    reader.readAsDataURL(blob);
+  }
+
+  cerrarModalWhatsappBaja(): void {
+    const el = document.getElementById('whatsappBajaModal');
+    if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(el).hide();
+    }
+    this.bajaSeleccionadaWa = null;
+    this.whatsappBajaNumber = '';
+    this.whatsappBajaCaption = '';
+    this.whatsappBajaMensaje = null;
+    this.enviandoWhatsappBaja = false;
   }
 
   onSidebarToggle(collapsed: boolean): void {

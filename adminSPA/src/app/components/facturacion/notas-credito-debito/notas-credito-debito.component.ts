@@ -10,10 +10,12 @@ import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { VentasService, NotaCreditoDebitoListado } from '../../../services/ventas.service';
 import { PdfService } from '../../../services/pdf.service';
+import { WhatsappService } from '../../../services/whatsapp.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 
 declare var iziToast: any;
+declare var bootstrap: any;
 
 interface ItemEditable {
   idProducto: string;
@@ -62,11 +64,30 @@ export class NotasCreditoDebitoComponent implements OnInit {
   pdfNotaCargandoId: number | null = null;
   eliminandoIdVenta: number | null = null;
 
+  /** Modal PDF: nota seleccionada y formulario de WhatsApp. */
+  notaSeleccionadaPdf: NotaCreditoDebitoListado | null = null;
+  generandoPdfNota = false;
+  mostrarWhatsappFormNota = false;
+  whatsappNotaNumber = '';
+  whatsappNotaCaption = '';
+  whatsappNotaFormato: 'A4' | 'A5' | 'ticket' = 'A4';
+  enviandoWhatsappNota = false;
+  whatsappNotaMensaje: string | null = null;
+  datosParaWhatsappNota: { datos: unknown; nombreArchivo: string } | null = null;
+
+  /** Modal XML/CDR de la nota seleccionada. */
+  archivoNotaModalId: string | null = null;
+  archivoNotaModalTipo: 'xml' | 'cdr' | null = null;
+  contenidoArchivoNota: string | null = null;
+  loadingArchivoNota = false;
+  archivoNotaError: string | null = null;
+
   constructor(
     private _facturacionService: FacturacionService,
     private _catalogosService: CatalogosService,
     private _ventasService: VentasService,
     private _pdfService: PdfService,
+    private _whatsappService: WhatsappService,
     private route: ActivatedRoute
   ) {}
 
@@ -170,6 +191,216 @@ export class NotasCreditoDebitoComponent implements OnInit {
 
   imprimirNota(idVenta: number): void {
     this.abrirPdfNota(idVenta, 'A4');
+  }
+
+  /** Abre el modal de acciones PDF/WhatsApp para la nota indicada. */
+  abrirModalPdfNota(row: NotaCreditoDebitoListado): void {
+    this.notaSeleccionadaPdf = row;
+    this.mostrarWhatsappFormNota = false;
+    this.datosParaWhatsappNota = null;
+    this.whatsappNotaMensaje = null;
+    this.whatsappNotaNumber = '';
+    this.whatsappNotaCaption = '';
+    this.whatsappNotaFormato = 'A4';
+    setTimeout(() => {
+      const el = document.getElementById('pdfNotaModal');
+      if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  /** Genera y previsualiza el PDF en el formato indicado. */
+  generarPdfNotaSeleccionada(formato: 'A4' | 'A5' | 'ticket'): void {
+    const row = this.notaSeleccionadaPdf;
+    if (!row || row.idVenta == null) return;
+    this.abrirPdfNota(row.idVenta, formato);
+  }
+
+  /** Genera el PDF y prepara los datos para enviar por WhatsApp. */
+  abrirFormWhatsappNota(): void {
+    const row = this.notaSeleccionadaPdf;
+    if (!row || row.idVenta == null) return;
+    this.generandoPdfNota = true;
+    this.whatsappNotaMensaje = null;
+    this._ventasService.getComprobanteParaPdf(row.idVenta).subscribe({
+      next: (res) => {
+        const d = res.data;
+        this.generandoPdfNota = false;
+        if (!d) return;
+        const cantidadLetras = numeroALetras(Number(d.venta?.total ?? 0));
+        const nombreArchivo = `comprobante-${(d.venta?.compVenta || 'nota').replace(/-/g, '_')}.pdf`;
+        const emp = d.empresa ?? {};
+        const empAny = emp as Record<string, unknown>;
+        const logoStr = String(empAny['logo'] ?? empAny['Logo'] ?? '');
+        const empresa: Empresa = {
+          logo: logoStr,
+          nombre: (emp as { nombre?: string }).nombre ?? '',
+          ruc: (emp as { ruc?: string }).ruc ?? '',
+          direccion: (emp as { direccion?: string }).direccion ?? '',
+          telefono: (emp as { telefono?: string }).telefono ?? ''
+        };
+        const datos = {
+          empresa: { ...empresa, ...emp, logo: logoStr },
+          venta: d.venta,
+          cliente: d.cliente,
+          items: d.items,
+          impuestos: Array.isArray(d.impuestos) ? d.impuestos : [],
+          cantidadLetras,
+          nombreArchivo
+        };
+        this.datosParaWhatsappNota = { datos, nombreArchivo };
+        const cli = d.cliente as { celular?: string; rSocial?: string; razonSocial?: string } | undefined;
+        const cel = String(cli?.celular ?? '').trim();
+        const nombre = String(cli?.rSocial ?? cli?.razonSocial ?? '').trim();
+        if (cel) {
+          this.whatsappNotaNumber = cel;
+          this.whatsappNotaCaption = nombre ? `${nombre} aquí envío tu comprobante` : '';
+        } else {
+          this.whatsappNotaNumber = '';
+          this.whatsappNotaCaption = '';
+        }
+        this.mostrarWhatsappFormNota = true;
+      },
+      error: (err) => {
+        this.generandoPdfNota = false;
+        this.whatsappNotaMensaje = err?.error?.error || err?.message || 'No se pudieron cargar los datos.';
+      }
+    });
+  }
+
+  cerrarFormWhatsappNota(): void {
+    this.mostrarWhatsappFormNota = false;
+    this.datosParaWhatsappNota = null;
+    this.whatsappNotaNumber = '';
+    this.whatsappNotaCaption = '';
+    this.whatsappNotaFormato = 'A4';
+    this.whatsappNotaMensaje = null;
+  }
+
+  enviarPdfNotaPorWhatsapp(): void {
+    if (!this.datosParaWhatsappNota || !this.whatsappNotaNumber.trim()) {
+      this.whatsappNotaMensaje = 'Ingrese el número de WhatsApp (ej. 51999999999).';
+      return;
+    }
+    this.enviandoWhatsappNota = true;
+    this.whatsappNotaMensaje = null;
+    const { datos, nombreArchivo } = this.datosParaWhatsappNota;
+    const formato = this.whatsappNotaFormato;
+    this._pdfService.generarPdfComprobanteVenta(datos as never, formato, nombreArchivo).subscribe({
+      next: (blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+          this._whatsappService
+            .enviarArchivo(this.whatsappNotaNumber.trim(), base64, nombreArchivo, 'document', this.whatsappNotaCaption.trim() || undefined)
+            .subscribe({
+              next: (res) => {
+                this.enviandoWhatsappNota = false;
+                this.whatsappNotaMensaje = res.message;
+                if (res.success) setTimeout(() => this.cerrarFormWhatsappNota(), 2000);
+              },
+              error: (err) => {
+                this.enviandoWhatsappNota = false;
+                this.whatsappNotaMensaje = err?.error?.message || err?.message || 'Error al enviar por WhatsApp.';
+              }
+            });
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: () => {
+        this.enviandoWhatsappNota = false;
+        this.whatsappNotaMensaje = 'Error al generar el PDF.';
+      }
+    });
+  }
+
+  /** Abre el modal para ver/descargar XML o CDR de la nota electrónica. */
+  abrirModalArchivoNota(row: NotaCreditoDebitoListado, tipo: 'xml' | 'cdr'): void {
+    const id = row?.idComprobanteElectronico ? String(row.idComprobanteElectronico).trim() : '';
+    if (!id) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({ title: 'Archivo', message: 'La nota aún no tiene comprobante electrónico generado.' });
+      }
+      return;
+    }
+    this.archivoNotaModalId = id;
+    this.archivoNotaModalTipo = tipo;
+    this.contenidoArchivoNota = null;
+    this.archivoNotaError = null;
+    setTimeout(() => {
+      const el = document.getElementById('archivoNotaModal');
+      if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(el).show();
+      }
+    }, 0);
+  }
+
+  cerrarModalArchivoNota(): void {
+    this.archivoNotaModalId = null;
+    this.archivoNotaModalTipo = null;
+    this.contenidoArchivoNota = null;
+    this.archivoNotaError = null;
+    const el = document.getElementById('archivoNotaModal');
+    if (el && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(el).hide();
+    }
+  }
+
+  verArchivoNota(): void {
+    if (!this.archivoNotaModalId || !this.archivoNotaModalTipo) return;
+    this.loadingArchivoNota = true;
+    this.archivoNotaError = null;
+    const obs = this.archivoNotaModalTipo === 'xml'
+      ? this._facturacionService.obtenerXmlComprobante(this.archivoNotaModalId)
+      : this._facturacionService.obtenerCdrComprobante(this.archivoNotaModalId);
+    obs.subscribe({
+      next: (res) => {
+        this.contenidoArchivoNota = res?.data?.content ?? '';
+        this.loadingArchivoNota = false;
+      },
+      error: (err) => {
+        this.archivoNotaError = err?.error?.message || err?.message || 'Error al cargar el archivo';
+        this.loadingArchivoNota = false;
+      }
+    });
+  }
+
+  descargarArchivoNota(): void {
+    if (!this.archivoNotaModalId || !this.archivoNotaModalTipo) return;
+    this.loadingArchivoNota = true;
+    this.archivoNotaError = null;
+    const obs = this.archivoNotaModalTipo === 'xml'
+      ? this._facturacionService.obtenerXmlComprobante(this.archivoNotaModalId)
+      : this._facturacionService.obtenerCdrComprobante(this.archivoNotaModalId);
+    const prefijo = this.archivoNotaModalTipo === 'cdr' ? 'cdr-' : '';
+    const nombre = `${prefijo}nota-${this.archivoNotaModalId}.xml`;
+    obs.subscribe({
+      next: (res) => {
+        const content = res?.data?.content ?? '';
+        this.loadingArchivoNota = false;
+        if (!content) return;
+        const blob = new Blob([content], { type: 'application/xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombre;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      },
+      error: (err) => {
+        this.archivoNotaError = err?.error?.message || err?.message || 'Error al descargar el archivo';
+        this.loadingArchivoNota = false;
+      }
+    });
+  }
+
+  /** True si la nota fue aceptada por SUNAT (solo entonces existe XML/CDR firmado). */
+  notaTieneArchivosSunat(row: NotaCreditoDebitoListado): boolean {
+    if (!row?.idComprobanteElectronico) return false;
+    const id = row.idEstadoSunat;
+    return id === 1 || id === 2 || id === 3;
   }
 
   private abrirPdfNota(idVenta: number, formato: 'A4' | 'A5' | 'ticket'): void {

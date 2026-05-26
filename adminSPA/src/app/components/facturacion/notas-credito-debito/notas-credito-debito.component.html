@@ -207,11 +207,7 @@
             <table class="table table-hover table-bordered mb-0 notas-emitidas-table align-middle">
               <thead class="table-light">
                 <tr>
-                  <th class="notas-th-acciones text-center text-nowrap">
-                    <button type="button" class="btn btn-success btn-sm notas-btn-acciones-header" (click)="scrollToEmitir()" title="Ir a emitir una nueva nota">
-                      <i class="bi bi-plus-lg"></i> Acciones
-                    </button>
-                  </th>
+                  <th>Acciones</th>
                   <th>Fecha</th>
                   <th>Documento</th>
                   <th>Cliente</th>
@@ -223,16 +219,23 @@
                 @for (row of notasEmitidas; track row.idVenta) {
                   <tr>
                     <td class="text-center text-nowrap notas-td-acciones">
-                      <button type="button" class="btn btn-link btn-sm p-1 text-primary" (click)="verNota(row.idVenta)"
-                              [disabled]="pdfNotaCargandoId === row.idVenta" title="Ver">
-                        <i class="bi bi-search"></i>
+                      <button type="button" class="btn btn-danger btn-sm mb-2" (click)="abrirModalPdfNota(row)"
+                              [disabled]="pdfNotaCargandoId === row.idVenta" title="PDF / WhatsApp">
+                      <span class="ms-2">PDF</span>
                       </button>
-                      <button type="button" class="btn btn-link btn-sm p-1 text-warning" (click)="imprimirNota(row.idVenta)"
-                              [disabled]="pdfNotaCargandoId === row.idVenta" title="Imprimir PDF">
-                        <i class="bi bi-printer"></i>
+                      <button type="button" class="btn btn-primary btn-sm mb-2"
+                              [disabled]="!notaTieneArchivosSunat(row)"
+                              [class.text-muted]="!notaTieneArchivosSunat(row)"
+                              (click)="abrirModalArchivoNota(row, 'xml')" title="Ver / Descargar XML">
+                         <span class="ms-2">XML</span>
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm mb-2"
+                              [disabled]="!notaTieneArchivosSunat(row)"
+                              (click)="abrirModalArchivoNota(row, 'cdr')" title="Ver / Descargar CDR">
+                        <span class="ms-2">CDR</span>
                       </button>
                       @if (puedeEliminarNota(row)) {
-                        <button type="button" class="btn btn-link btn-sm p-1 text-danger" (click)="confirmarEliminarNota(row)"
+                        <button type="button" class="btn btn-secondary btn-sm p-1 text-secondary" (click)="confirmarEliminarNota(row)"
                                 [disabled]="eliminandoIdVenta === row.idVenta" title="Eliminar (solo si no fue enviada/aceptada en SUNAT)">
                           @if (eliminandoIdVenta === row.idVenta) {
                             <span class="spinner-border spinner-border-sm" role="status"></span>
@@ -276,3 +279,106 @@
 
   </div>
 </main>
+
+<!-- Modal PDF / WhatsApp para nota seleccionada -->
+<div class="modal fade" id="pdfNotaModal" tabindex="-1" aria-labelledby="pdfNotaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="pdfNotaModalLabel">
+          <i class="bi bi-file-pdf"></i> Generar PDF de la nota
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Seleccione el formato del comprobante:</p>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-outline-primary" [disabled]="generandoPdfNota" (click)="generarPdfNotaSeleccionada('ticket')">
+            <i class="bi bi-receipt"></i> Formato Ticket
+          </button>
+          <button type="button" class="btn btn-outline-primary" [disabled]="generandoPdfNota" (click)="generarPdfNotaSeleccionada('A5')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A5
+          </button>
+          <button type="button" class="btn btn-outline-primary" [disabled]="generandoPdfNota" (click)="generarPdfNotaSeleccionada('A4')">
+            <i class="bi bi-file-earmark-pdf"></i> Formato A4
+          </button>
+        </div>
+        <hr class="my-3" />
+        <button type="button" class="btn btn-outline-success w-100" [disabled]="generandoPdfNota" (click)="abrirFormWhatsappNota()">
+          <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+        </button>
+        @if (mostrarWhatsappFormNota && datosParaWhatsappNota) {
+          <div class="mt-3 p-2 border rounded">
+            <label class="form-label small">Número (código país + número, ej. 51999999999)</label>
+            <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappNotaNumber" placeholder="51999999999" />
+            <label class="form-label small">Formato del PDF</label>
+            <select class="form-select form-select-sm mb-2" [(ngModel)]="whatsappNotaFormato">
+              <option value="ticket">Ticket</option>
+              <option value="A5">A5</option>
+              <option value="A4">A4</option>
+            </select>
+            <label class="form-label small">Mensaje opcional (caption)</label>
+            <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="whatsappNotaCaption" placeholder="Opcional" />
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-success btn-sm" [disabled]="enviandoWhatsappNota" (click)="enviarPdfNotaPorWhatsapp()">
+                @if (enviandoWhatsappNota) {
+                  <span><i class="bi bi-hourglass-split"></i> Enviando...</span>
+                } @else {
+                  <span><i class="bi bi-send"></i> Enviar</span>
+                }
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="enviandoWhatsappNota" (click)="cerrarFormWhatsappNota()">Cancelar</button>
+            </div>
+            @if (whatsappNotaMensaje) {
+              <p class="small mt-2 mb-0"
+                 [class.text-success]="whatsappNotaMensaje && whatsappNotaNumber && !enviandoWhatsappNota"
+                 [class.text-danger]="whatsappNotaMensaje && (!whatsappNotaNumber || enviandoWhatsappNota)">
+                {{ whatsappNotaMensaje }}
+              </p>
+            }
+          </div>
+        }
+        @if (generandoPdfNota && !mostrarWhatsappFormNota) {
+          <p class="text-muted small mt-2 mb-0"><i class="bi bi-hourglass-split"></i> Generando PDF...</p>
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal XML / CDR de la nota electrónica -->
+<div class="modal fade" id="archivoNotaModal" tabindex="-1" aria-labelledby="archivoNotaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header text-white"
+           [class.bg-primary]="archivoNotaModalTipo === 'xml'"
+           [class.bg-info]="archivoNotaModalTipo === 'cdr'">
+        <h5 class="modal-title" id="archivoNotaModalLabel">
+          @if (archivoNotaModalTipo === 'xml') { <span><i class="bi bi-file-code"></i> XML</span> }
+          @if (archivoNotaModalTipo === 'cdr') { <span><i class="bi bi-file-earmark-check"></i> CDR</span> }
+          — Nota electrónica
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar" (click)="cerrarModalArchivoNota()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-2 mb-3">
+          <button type="button" class="btn btn-outline-primary" [disabled]="loadingArchivoNota" (click)="verArchivoNota()">
+            <i class="bi bi-eye"></i> Ver archivo
+          </button>
+          <button type="button" class="btn btn-outline-success" [disabled]="loadingArchivoNota" (click)="descargarArchivoNota()">
+            <i class="bi bi-download"></i> Descargar archivo
+          </button>
+        </div>
+        @if (loadingArchivoNota) {
+          <p class="text-muted small"><i class="bi bi-hourglass-split"></i> Cargando...</p>
+        }
+        @if (archivoNotaError) {
+          <p class="text-danger small">{{ archivoNotaError }}</p>
+        }
+        @if (contenidoArchivoNota && !loadingArchivoNota) {
+          <pre class="bg-light p-3 rounded small overflow-auto" style="max-height: 70vh;"><code>{{ contenidoArchivoNota }}</code></pre>
+        }
+      </div>
+    </div>
+  </div>
+</div>
