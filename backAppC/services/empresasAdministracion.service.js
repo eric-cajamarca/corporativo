@@ -112,9 +112,11 @@ async function actualizarEmpresaDatosContacto(pool, idEmpresa, body, logoFilenam
   return empresasAdministracionRepository.actualizarEmpresaSinLogo(pool, row);
 }
 
-async function cambiarEstadoEmpresa(pool, idEmpresa, estadoBody) {
-  const nuevo_estado = !estadoBody;
-  return empresasAdministracionRepository.actualizarEmpresaEstado(pool, idEmpresa, nuevo_estado);
+async function cambiarEstadoEmpresa(pool, idEmpresa, nuevoEstado) {
+  if (typeof nuevoEstado !== 'boolean') {
+    throw new Error('nuevoEstado debe ser boolean');
+  }
+  return empresasAdministracionRepository.actualizarEmpresaEstado(pool, idEmpresa, nuevoEstado);
 }
 
 async function crearDireccionEmpresa(pool, payload) {

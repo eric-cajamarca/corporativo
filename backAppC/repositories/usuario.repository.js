@@ -214,12 +214,13 @@ exports.updateUsuarioConPassword = async (pool, idUsuario, datos) => {
       .input('apellidos', sql.VarChar, datos.apellidos)
       .input('password', sql.Text, datos.password)
       .input('idRol', sql.UniqueIdentifier, datos.idRol)
+      .input('idEmpresa', sql.UniqueIdentifier, datos.idEmpresa)
       .query(`
-        UPDATE usuarioWeb 
-        SET nombres = @nombres, apellidos = @apellidos, password = @password, idRol = @idRol 
-        WHERE idUsuario = @idUsuario
+        UPDATE usuarioWeb
+        SET nombres = @nombres, apellidos = @apellidos, password = @password, idRol = @idRol
+        WHERE idUsuario = @idUsuario AND idEmpresa = @idEmpresa
       `);
-    
+
     return result.rowsAffected;
   } catch (error) {
     throw new Error(`DB Error updateConPass: ${error.message}`);

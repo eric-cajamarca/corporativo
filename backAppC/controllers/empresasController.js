@@ -6,27 +6,20 @@ const path = require('path');
 const fs = require('fs').promises;
 
 const getEmpresas = async function (req, res, next) {
-        
-    if (req.user) {
-        if (req.user.rol == 'Administrador' || req.user.rol == 'superAdmin') {
-                        try {
-                await withPool(async (pool) => {
-                    const result = await empresasAdministracionService.listarTodas(pool);
-                    res.status(200).send({ data: result });
-                });
-            } catch (error) {
-                console.error('Error al obtener las epresas:', error);
-                return next(error);
-            }
-        } else {
-            return res.status(401).send({ message: 'No autorizado' });
-        }
-
-
-
-    }
-    else {
+    if (!req.user) {
         return res.status(401).send({ message: 'No autorizado' });
+    }
+    if (!puedeAccesoListadoPlataformaEmpresas(req)) {
+        return res.status(403).send({ message: 'No tiene permisos para listar empresas de la plataforma' });
+    }
+    try {
+        await withPool(async (pool) => {
+            const result = await empresasAdministracionService.listarTodas(pool);
+            res.status(200).send({ data: result });
+        });
+    } catch (error) {
+        console.error('Error al obtener las empresas:', error);
+        return next(error);
     }
 };
 
@@ -396,11 +389,25 @@ const cambiar_estado_empresa = async function (req, res, next) {
   if (!req.user) {
     return res.status(401).send({ message: 'No autorizado' });
   }
+  if (!puedeAccesoListadoPlataformaEmpresas(req)) {
+    return res.status(403).send({ message: 'No tiene permisos para cambiar el estado de empresas de la plataforma' });
+  }
   const idEmpresa = req.params['id'];
-  const { estado } = req.body;
+  if (!idEmpresa) {
+    return res.status(400).send({ message: 'idEmpresa requerido' });
+  }
+  const { nuevoEstado, estado } = req.body || {};
+  let estadoFinal;
+  if (typeof nuevoEstado === 'boolean') {
+    estadoFinal = nuevoEstado;
+  } else if (typeof estado === 'boolean') {
+    estadoFinal = !estado;
+  } else {
+    return res.status(400).send({ message: 'Se requiere nuevoEstado (boolean) o estado (boolean legacy)' });
+  }
   try {
     await withPool(async (pool) => {
-      const result = await empresasAdministracionService.cambiarEstadoEmpresa(pool, idEmpresa, estado);
+      const result = await empresasAdministracionService.cambiarEstadoEmpresa(pool, idEmpresa, estadoFinal);
       res.status(200).send({ data: result.rowsAffected });
     });
   } catch (error) {
