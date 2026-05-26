@@ -18,7 +18,21 @@ app.get('/', (req, res) => {
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => {});
+const server = app.listen(PORT, () => {
+  console.error(`pdf-backend: escuchando en http://127.0.0.1:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.error(`pdf-backend: el puerto ${PORT} ya está en uso. Detenga el proceso existente o defina otro PORT en .env.`);
+  } else {
+    console.error('pdf-backend: error al iniciar servidor:', err);
+  }
+  process.exit(1);
+});
+
+process.on('SIGTERM', () => server.close(() => process.exit(0)));
+process.on('SIGINT', () => server.close(() => process.exit(0)));
 
 
 // const express = require('express');
