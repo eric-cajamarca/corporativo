@@ -29,7 +29,7 @@ api.delete('/direccion_empresa/:id',auth.auth, empresasController.deleteDireccio
 
 
 api.get('/direccionempresa',auth.auth, empresasController.getDireccionEmpresa_id);
-api.post('/direccion_empresa', empresasController.createDireccionEmpresa);
+api.post('/direccion_empresa', auth.auth, empresasController.createDireccionEmpresa);
 api.post('/sucursal', auth.auth, empresasController.createSucursalEmpresa);
 api.put('/direccion_empresa/:id',auth.auth, empresasController.updateDireccionEmpresa);
 api.put('/cambiar_principal/:id',auth.auth, empresasController.cambiar_principal_direccion);

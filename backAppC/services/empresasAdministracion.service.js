@@ -82,26 +82,35 @@ function parsePermitirVentaMultiSucursalDesdeBody(body) {
 }
 
 async function actualizarEmpresaDatosContacto(pool, idEmpresa, body, logoFilename) {
-  const {
-    rubro,
-    idRubro,
-    celular,
-    nombreComercial,
-    correo,
-    alias
-  } = body;
-  const idRubroVal =
-    idRubro != null && idRubro !== '' ? (typeof idRubro === 'string' ? parseInt(idRubro, 10) : idRubro) : null;
-  const permitirParsed = parsePermitirVentaMultiSucursalDesdeBody(body);
+  const actualArr = await empresasAdministracionRepository.obtenerEmpresaPorId(pool, idEmpresa);
+  const actual = Array.isArray(actualArr) ? actualArr[0] : actualArr;
+  if (!actual) {
+    throw new Error('EMPRESA_NO_ENCONTRADA');
+  }
+  const tienePropEnBody = (k) => body != null && typeof body === 'object' && Object.prototype.hasOwnProperty.call(body, k);
+  const tomarTexto = (k) => {
+    if (!tienePropEnBody(k)) return actual[k] != null ? String(actual[k]) : '';
+    const v = body[k];
+    return v == null ? '' : String(v);
+  };
+  const idRubroResuelto = tienePropEnBody('idRubro')
+    ? (body.idRubro != null && body.idRubro !== ''
+        ? (typeof body.idRubro === 'string' ? parseInt(body.idRubro, 10) : body.idRubro)
+        : null)
+    : (actual.idRubro != null ? actual.idRubro : null);
+  const permitirEnBody = parsePermitirVentaMultiSucursalDesdeBody(body);
+  const permitirResuelto = permitirEnBody === undefined
+    ? !!actual.permitirVentaMultiSucursal
+    : permitirEnBody;
   const row = {
     idEmpresa,
-    rubro: rubro || '',
-    idRubro: idRubroVal,
-    celular: celular || '',
-    nombreComercial: nombreComercial || '',
-    correo: correo || '',
-    alias: alias || '',
-    ...(permitirParsed === undefined ? {} : { permitirVentaMultiSucursal: permitirParsed })
+    rubro: tomarTexto('rubro'),
+    idRubro: idRubroResuelto,
+    celular: tomarTexto('celular'),
+    nombreComercial: tomarTexto('nombreComercial'),
+    correo: tomarTexto('correo'),
+    alias: tomarTexto('alias'),
+    permitirVentaMultiSucursal: permitirResuelto
   };
   if (logoFilename) {
     return empresasAdministracionRepository.actualizarEmpresaConLogoFilename(pool, {

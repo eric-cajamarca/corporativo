@@ -335,17 +335,20 @@ const verificarEmpresaCodigo = async function (req, res, next) {
 
 const updateEmpresa = async function (req, res, next) {
     try {
-                
-        const idEmpresa = req.user.empresa;
-        const {
-            ruc, correo, celular, nombreComercial,
-            alias, rubro, idRubro, logoAnterior, permitirVentaMultiSucursal
-        } = req.body;
-
-        // Validación básica
-        if ( req.user.rol !== 'Administrador') {
+        if (!req.user) {
             return res.status(401).send({ success: false, message: 'No autorizado' });
         }
+        if (req.user.rol !== 'Administrador') {
+            return res.status(401).send({ success: false, message: 'No autorizado' });
+        }
+
+        const idEmpresa = req.user.empresa;
+        const idEmpresaPath = req.params && req.params.id;
+        if (idEmpresaPath && String(idEmpresaPath).toLowerCase() !== String(idEmpresa).toLowerCase()) {
+            return res.status(403).send({ success: false, message: 'Solo puede actualizar su propia empresa' });
+        }
+
+        const { logoAnterior } = req.body || {};
 
         await withPool(async (pool) => {
             if (req.file && logoAnterior && logoAnterior !== 'undefined' && logoAnterior !== 'null') {
@@ -359,7 +362,7 @@ const updateEmpresa = async function (req, res, next) {
             const result = await empresasAdministracionService.actualizarEmpresaDatosContacto(
                 pool,
                 idEmpresa,
-                { rubro, idRubro, celular, nombreComercial, correo, alias, permitirVentaMultiSucursal },
+                req.body || {},
                 req.file ? req.file.filename : null
             );
 
@@ -375,12 +378,14 @@ const updateEmpresa = async function (req, res, next) {
 
     } catch (error) {
         console.error('Error en updateEmpresa:', error);
-        
-        // Eliminar archivo subido si hubo error después de la subida
+
         if (req.file) {
             fs.unlink(req.file.path, () => {});
         }
 
+        if (error && error.message === 'EMPRESA_NO_ENCONTRADA') {
+            return res.status(404).send({ success: false, message: 'Empresa no encontrada' });
+        }
         return next(error);
     }
 };
@@ -506,10 +511,10 @@ const deleteAdmin = async (req, res, next) => {
 
 const createDireccionEmpresa = async function (req, res, next) {
     try {
-        const idEmpresa = (req.user && (req.user.empresa || req.user.idEmpresa)) ? (req.user.empresa || req.user.idEmpresa) : req.body.idEmpresa;
-        if (!idEmpresa) {
-            return res.status(400).send({ message: 'idEmpresa requerido', data: undefined });
+        if (!req.user || !(req.user.empresa || req.user.idEmpresa)) {
+            return res.status(401).send({ message: 'No autorizado', data: undefined });
         }
+        const idEmpresa = req.user.empresa || req.user.idEmpresa;
         let ubigeo = req.body.ubigeo;
         let codPais = req.body.codpais;
         let region = req.body.region;
