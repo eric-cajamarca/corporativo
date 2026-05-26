@@ -275,14 +275,6 @@ if (process.env.SERVE_SPA_ROOT) {
   }
 }
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'not_found' });
-});
-
-// Errores: 5xx → WhatsApp al desarrollador (throttle en seguridadAlertas); 4xx sin alerta
-const errorHandler = require('./middlewares/errorHandler');
-app.use(errorHandler);
-
 // Health para Kubernetes/Ambassador (sin auth). Con HEALTH_CHECK_DB=1 valida SELECT 1.
 app.get('/health', async (req, res) => {
   const body = { status: 'ok', service: 'backAppC', requestId: req.requestId };
@@ -301,7 +293,13 @@ app.get('/health', async (req, res) => {
   res.status(200).json(body);
 });
 
-// Iniciar servidor
+app.use((req, res) => {
+  res.status(404).json({ error: 'not_found' });
+});
+
+const errorHandler = require('./middlewares/errorHandler');
+app.use(errorHandler);
+
 app.listen(PORT, () => {
   try {
     const envioSunatJob = require('./jobs/envioSunat.job');
