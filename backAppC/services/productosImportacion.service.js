@@ -1,7 +1,7 @@
-const XLSX = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
 const productosMutacionesService = require('./productosMutaciones.service');
+const pdfBackend = require('./pdfBackend.client');
 
 const MAX_FILAS = 4000;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -148,50 +148,52 @@ function filaDesdeMapa(mapaNorm, numeroFila) {
   };
 }
 
-function parseBufferAObjetos(buffer) {
-  if (!buffer || buffer.length > MAX_BYTES) {
-    throw new Error('ARCHIVO_DEMASIADO_GRANDE');
-  }
-  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-  const nombreHoja = wb.SheetNames[0];
-  if (!nombreHoja) {
-    throw new Error('EXCEL_SIN_HOJAS');
-  }
-  const sheet = wb.Sheets[nombreHoja];
-  const optsBase = { defval: '', raw: false, blankrows: false };
-  let filasRaw;
-  const ref = sheet['!ref'];
-  if (ref) {
-    const decoded = XLSX.utils.decode_range(ref);
-    const filasEnRango = decoded.e.r - decoded.s.r + 1;
-    /*
-      Excel a veces guarda !ref hasta la última fila de la hoja (p. ej. A1:J1048571) aunque solo
-      haya datos en las primeras filas. sheet_to_json devolvería >1M filas y dispara DEMASIADAS_FILAS.
-      Se relee acotando a cabecera + máximo MAX_FILAS filas de datos (misma regla de negocio).
-    */
-    if (filasEnRango > MAX_FILAS + 1) {
-      const cappedEndR = decoded.s.r + MAX_FILAS;
-      const limitedRange = { s: decoded.s, e: { r: cappedEndR, c: decoded.e.c } };
-      filasRaw = XLSX.utils.sheet_to_json(sheet, { ...optsBase, range: limitedRange });
-    } else {
-      filasRaw = XLSX.utils.sheet_to_json(sheet, optsBase);
-    }
-  } else {
-    filasRaw = XLSX.utils.sheet_to_json(sheet, optsBase);
-  }
-  if (!Array.isArray(filasRaw) || filasRaw.length === 0) {
+/**
+ * Delega la lectura del xlsx a pdf-backend (POST /api/reports/parse-excel).
+ * Recibe { headers, rows: [{header: value}] } y aplica la normalización de negocio.
+ *
+ * Los códigos de error (ARCHIVO_DEMASIADO_GRANDE, EXCEL_SIN_HOJAS, EXCEL_SIN_DATOS,
+ * DEMASIADAS_FILAS) los devuelve pdf-backend; aquí solo se relanzan tal cual para
+ * que el controller los traduzca a HTTP de cara al frontend.
+ */
+async function parseBufferAObjetos(buffer) {
+  if (!buffer || buffer.length === 0) {
     throw new Error('EXCEL_SIN_DATOS');
   }
-  if (filasRaw.length > MAX_FILAS) {
+  if (buffer.length > MAX_BYTES) {
+    throw new Error('ARCHIVO_DEMASIADO_GRANDE');
+  }
+
+  let parsed;
+  try {
+    parsed = await pdfBackend.parsearExcel(buffer, {
+      fileName: 'productos_importacion.xlsx',
+      maxBytes: MAX_BYTES,
+      maxFilas: MAX_FILAS
+    });
+  } catch (err) {
+    if (err && err.code) {
+      throw new Error(err.code);
+    }
+    console.error('contexto: productosImportacion parseBufferAObjetos pdf-backend', err);
+    throw new Error('EXCEL_SIN_DATOS');
+  }
+
+  const filas = Array.isArray(parsed && parsed.rows) ? parsed.rows : [];
+  if (filas.length === 0) {
+    throw new Error('EXCEL_SIN_DATOS');
+  }
+  if (filas.length > MAX_FILAS) {
     throw new Error('DEMASIADAS_FILAS');
   }
+
   const out = [];
   let i = 0;
-  for (const raw of filasRaw) {
+  for (const raw of filas) {
     i += 1;
     const numeroFila = i + 1;
     const mapaNorm = {};
-    for (const [k, v] of Object.entries(raw)) {
+    for (const [k, v] of Object.entries(raw || {})) {
       mapaNorm[normalizarClaveEncabezado(k)] = v;
     }
     const row = filaDesdeMapa(mapaNorm, numeroFila);
@@ -213,7 +215,7 @@ function parseBufferAObjetos(buffer) {
   return out;
 }
 
-function generarPlantillaBuffer() {
+async function generarPlantillaBuffer() {
   const headers = [
     'codigo',
     'descripcion',
@@ -227,10 +229,11 @@ function generarPlantillaBuffer() {
     'marca'
   ];
   const ejemplo = ['EJEMPLO001', 'Producto de demostración', 'NIU', 10, 5.5, 9.9, 8.99, 8.5, 'VARIOS', 'SM'];
-  const ws = XLSX.utils.aoa_to_sheet([headers, ejemplo]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Productos');
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  return pdfBackend.generarExcel({
+    worksheetName: 'Productos',
+    columns: headers,
+    rows: [ejemplo]
+  });
 }
 
 function nombreNormalizadoLista(v) {
@@ -258,13 +261,19 @@ function resolverListasPrecioImportacion(listas) {
   return out;
 }
 
-function generarNoImportadosBuffer(rowsNoImportados) {
+async function generarNoImportadosBuffer(rowsNoImportados) {
   const headers = ['fila', 'codigo', 'descripcion', 'motivo'];
-  const body = (rowsNoImportados || []).map((r) => [r.fila, r.codigo || '', r.descripcion || '', r.motivo || '']);
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'NoImportados');
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const rows = (rowsNoImportados || []).map((r) => [
+    r.fila,
+    r.codigo || '',
+    r.descripcion || '',
+    r.motivo || ''
+  ]);
+  return pdfBackend.generarExcel({
+    worksheetName: 'NoImportados',
+    columns: headers,
+    rows
+  });
 }
 
 /**
@@ -372,7 +381,7 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
 async function validarArchivo(pool, user, buffer) {
   asegurarPuedeImportar(user);
   const idEmpresa = user.empresa;
-  const filas = parseBufferAObjetos(buffer);
+  const filas = await parseBufferAObjetos(buffer);
   const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
   return {
     totalLeidas: filas.length,
@@ -395,7 +404,7 @@ async function validarArchivo(pool, user, buffer) {
 async function ejecutarImportacion(pool, user, buffer) {
   asegurarPuedeImportar(user);
   const idEmpresa = user.empresa;
-  const filas = parseBufferAObjetos(buffer);
+  const filas = await parseBufferAObjetos(buffer);
   const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
 
   if (filasResueltas.length === 0) {
@@ -410,7 +419,7 @@ async function ejecutarImportacion(pool, user, buffer) {
         ? {
             fileName: `productos_no_importados_${Date.now()}.xlsx`,
             mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            base64: generarNoImportadosBuffer(noImportados).toString('base64'),
+            base64: (await generarNoImportadosBuffer(noImportados)).toString('base64'),
             total: noImportados.length
           }
         : null;
@@ -525,7 +534,7 @@ async function ejecutarImportacion(pool, user, buffer) {
   ];
   let noImportadosExcel = null;
   if (noImportados.length > 0) {
-    const buffer = generarNoImportadosBuffer(noImportados);
+    const buffer = await generarNoImportadosBuffer(noImportados);
     noImportadosExcel = {
       fileName: `productos_no_importados_${Date.now()}.xlsx`,
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

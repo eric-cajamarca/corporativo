@@ -19,7 +19,7 @@ const descargarPlantilla = async (req, res) => {
       }
       throw e;
     }
-    const buf = productosImportacionService.generarPlantillaBuffer();
+    const buf = await productosImportacionService.generarPlantillaBuffer();
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -59,7 +59,11 @@ const validar = async (req, res) => {
         data: undefined
       });
     }
-    if (error.message === 'EXCEL_SIN_DATOS' || error.message === 'EXCEL_SIN_HOJAS') {
+    if (
+      error.message === 'EXCEL_SIN_DATOS' ||
+      error.message === 'EXCEL_SIN_HOJAS' ||
+      error.message === 'EXCEL_INVALIDO'
+    ) {
       return res.status(400).json({ message: 'El Excel no contiene datos válidos.', data: undefined });
     }
     if (error.message === 'SIN_SUCURSAL_PRINCIPAL') {
