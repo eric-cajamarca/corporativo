@@ -23,9 +23,8 @@ export class ConsultaXMLService {
 
 
 
-  // URL base de la API y token de autenticación
-  // private apiUrl = 'https://api.factiliza.com/v1/sunat/xml';
-  // private token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzODc0MiIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6ImNvbnN1bHRvciJ9.zSXlMD3Y18WbWFJCK79YKjI7IoVZ3n-1cIpqqnYLEpc';
+  // El consumo a Factiliza vive en el backend (env FACTILIZA_TOKEN);
+  // el frontend solo llama al proxy del backAppC.
   constructor(private http: HttpClient) { 
     this.url = global.url;
   }

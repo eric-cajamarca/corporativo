@@ -121,7 +121,8 @@ export class CreateProveedorComponent {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
   
-  //https://dniruc.apisperu.com/api/v1/dni/45633353?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImVyaWNvcnRpemd1ZXZhcmFAZ21haWwuY29tIn0.-cs9eKiQegcTM0bbaz7O-BT_sS7_BpV_6cndIqCeHfk
+  // Endpoint legacy: https://dniruc.apisperu.com/api/v1/dni/<DNI>?token=<TOKEN_FROM_BACKEND>
+  // El token vive en el backend (env APISPERU_TOKEN); el frontend nunca debe llevarlo.
 
   // buscar() {
   //   this.contBuscar = 1;
