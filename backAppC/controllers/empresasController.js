@@ -73,6 +73,7 @@ const twoFactorAdminService = require('../services/twoFactorAdmin.service');
 const { obtenerIpCliente } = require('../utils/clientIp.util');
 const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
 const empresaRepository = require('../repositories/empresa.repository');
+const usuarioRepository = require('../repositories/usuario.repository');
 const empresasAdministracionService = require('../services/empresasAdministracion.service');
 const usuarioAdminService = require('../services/usuarioAdmin.service');
 const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
@@ -423,21 +424,46 @@ const cambiar_estado_empresa = async function (req, res, next) {
 
 const obtener_logo = async function (req, res, next) {
     try {
-                
-        const img = req.params.img || 'default.jpg';
-        const logoPath = path.join(__dirname, '../uploads/configuraciones/', img);
-        
-                // Verificar si existe el archivo
+        const baseDir = path.resolve(__dirname, '../uploads/configuraciones');
+        const defaultPath = path.resolve(__dirname, '../public/assets/img/01.jpg');
+
+        async function enviarOFallar(filePath) {
+            try {
+                await fs.access(filePath);
+            } catch (e) {
+                return res.status(404).end();
+            }
+            return res.sendFile(filePath, (err) => {
+                if (err && !res.headersSent) {
+                    res.status(404).end();
+                }
+            });
+        }
+
+        const raw = req.params.img;
+        const img = raw && typeof raw === 'string' ? raw.trim() : 'default.jpg';
+
+        // Whitelist estricta: solo nombres de archivo con extension de imagen.
+        // Bloquea ".." en cualquier forma, separadores y rutas absolutas.
+        const safeName = /^[A-Za-z0-9._-]+\.(jpg|jpeg|png|gif|webp|svg)$/i;
+        if (!safeName.test(img) || img.includes('..')) {
+            return enviarOFallar(defaultPath);
+        }
+
+        const candidate = path.resolve(baseDir, img);
+        if (!candidate.startsWith(baseDir + path.sep) && candidate !== baseDir) {
+            return enviarOFallar(defaultPath);
+        }
+
         try {
-            await fs.access(logoPath);
-            return res.sendFile(logoPath);
+            await fs.access(candidate);
+            return enviarOFallar(candidate);
         } catch (err) {
-                        const defaultPath = path.join(__dirname, '../public/assets/img/01.jpg');
-            return res.sendFile(defaultPath);
+            return enviarOFallar(defaultPath);
         }
     } catch (error) {
-        console.error('Error al obtener logo:', error);
-        return next(error);
+        console.error('Error al obtener logo:', error.message);
+        return res.status(404).end();
     }
 };
 
@@ -758,11 +784,18 @@ const reset2faEmpresa = async (req, res, next) => {
   try {
     await withPool(async (pool) => {
       await twoFactorAdminService.resetearTotpEmpresa(pool, idEmpresaTarget);
+      let emailEjecutor = '';
+      try {
+        const u = await usuarioRepository.buscarPorIdYEmpresa(pool, req.user.sub, req.user.empresa);
+        if (u && u.email) emailEjecutor = String(u.email);
+      } catch (e) {
+        /* auditoria best-effort */
+      }
       await seguridadAuditoriaService.registrar(pool, req, {
         idEmpresa: idEmpresaTarget,
         idUsuario: req.user.sub,
         tipo: 'RESET_2FA_EMPRESA',
-        detalle: String(req.user.email || '').slice(0, 500),
+        detalle: emailEjecutor.slice(0, 500),
         ipCliente
       });
       return res.status(200).send({

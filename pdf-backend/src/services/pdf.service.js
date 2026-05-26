@@ -50,11 +50,37 @@ function extractHtmlDocumentParts(rawHtml) {
  * @param {number} fontSize - Tamaño de fuente base
  * @param {string} formato - 'A4' | 'A5' | 'ticket' (ticket = 80mm ancho; QR comprobante ~2cm en HTML)
  */
+/**
+ * Bloquea cualquier salida de red de la pagina renderizada, salvo recursos
+ * data: e about:blank. Evita SSRF a la red interna y exfiltracion via
+ * fetch/XHR/img/script en HTML controlado por el cliente.
+ *
+ * Se permiten:
+ *  - data: (svg/png/qr inline)
+ *  - about:blank
+ *  - file:// (no se usa, pero Chromium puede emitirlos para about:blank)
+ *  - chrome-extension / devtools (no aplican headless)
+ *
+ * Se bloquea TODO http(s), ws(s), ftp, blob remoto, etc.
+ */
+async function lockdownNetwork(page) {
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    if (req.isInterceptResolutionHandled()) return;
+    const url = String(req.url() || '');
+    if (url.startsWith('data:') || url.startsWith('about:')) {
+      return req.continue();
+    }
+    return req.abort('blockedbyclient');
+  });
+}
+
 async function generatePdfFromHtml(html, fontSize = 11, formato = 'A4') {
   const browser = await getSharedBrowser();
   const page = await browser.newPage();
   try {
     await page.setDefaultNavigationTimeout(15000);
+    await lockdownNetwork(page);
     const { headInject, bodyHtml } = extractHtmlDocumentParts(html);
     const wrappedHtml = `
       <!DOCTYPE html>

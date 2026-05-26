@@ -141,11 +141,22 @@ function buildStaticAllowedOrigins() {
 
 /**
  * Origen en red privada / local (LAN, ng serve --host, sistema.local).
- * Si CORS_ALLOW_LAN=0, no se aplica (solo lista explícita + FRONTEND_URL).
- * En NODE_ENV=production sigue activo salvo CORS_ALLOW_LAN=0 (despliegue LAN tras Nginx).
+ * Politica:
+ *  - En produccion (NODE_ENV=production) NO se acepta LAN salvo que
+ *    CORS_ALLOW_LAN === '1' explicitamente (opt-in).
+ *  - Fuera de produccion, LAN se acepta salvo que CORS_ALLOW_LAN === '0'
+ *    explicitamente (opt-out, para acercarse al comportamiento prod).
+ * Esto evita aceptar cualquier 10.x/172.16-31.x/192.168.x por defecto al
+ * desplegar.
  */
+function corsLanAllowedByConfig() {
+  const v = process.env.CORS_ALLOW_LAN;
+  if (process.env.NODE_ENV === 'production') return v === '1';
+  return v !== '0';
+}
+
 function isPrivateLanOrigin(origin) {
-  if (process.env.CORS_ALLOW_LAN === '0') return false;
+  if (!corsLanAllowedByConfig()) return false;
   try {
     const u = new URL(origin);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
@@ -161,7 +172,14 @@ function isPrivateLanOrigin(origin) {
   }
 }
 
-// Middleware CORS: lista explícita + LAN (ver .env.example, DESPLIEGUE-LAN.md)
+if (process.env.NODE_ENV === 'production' && process.env.CORS_ALLOW_LAN === '1') {
+  console.error('context:', JSON.stringify({
+    level: 'warn',
+    message: 'cors_lan_opt_in_in_production',
+    detail: 'CORS_ALLOW_LAN=1 esta activo en production: se aceptaran origenes de RFC1918 (10/172.16-31/192.168) y *.local. Considere definir CORS_EXTRA_ORIGINS con hostnames explicitos.'
+  }));
+}
+
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -173,7 +191,7 @@ const corsOptions = {
     if (isPrivateLanOrigin(origin)) {
       return callback(null, true);
     }
-    callback(new Error('Not allowed by CORS'));
+    return callback(null, false);
   },
   credentials: true,
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],

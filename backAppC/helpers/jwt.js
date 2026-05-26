@@ -118,13 +118,18 @@ exports.verifyTwoFactorPendingToken = function (token) {
   };
 };
 
+/**
+ * JWT de acceso. Solo claims minimos y no-PII: sub (idUsuario), empresa,
+ * rol, sid (idRefresh). Los datos de perfil (nombres, apellidos, email,
+ * razonSocial) viajan al frontend en la respuesta JSON del login y se
+ * conservan en el state del cliente, NO en el token. Si algun consumidor
+ * server-side necesita el email u otros campos, debe hacer SELECT sobre
+ * UsuarioWeb usando req.user.sub + req.user.empresa.
+ */
 exports.createToken = function (user) {
   const payload = {
     empresa: user.idEmpresa,
     sub: user.idUsuario,
-    nombres: user.nombres,
-    apellidos: user.apellidos,
-    email: user.email,
     rol: user.rol,
     iat: moment().unix(),
     exp: moment().add(ACCESS_EXPIRES_MINUTES, 'minutes').unix()
