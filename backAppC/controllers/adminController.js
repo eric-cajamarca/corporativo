@@ -331,7 +331,6 @@ const admin_login = async (req, res, next) => {
       return res.status(400).send({ message: error.message, data: undefined });
     }
 
-    // Errores de negocio → 401
     const mensajes401 = [
       'RUC no existe o empresa inactiva',
       'El email no existe o no tiene permisos para acceder',
@@ -339,7 +338,7 @@ const admin_login = async (req, res, next) => {
       'El usuario está deshabilitado. Contacte al administrador.'
     ];
     if (mensajes401.includes(error.message)) {
-      return res.status(401).send({ message: error.message, data: undefined });
+      return res.status(401).send({ message: 'Credenciales inválidas', data: undefined });
     }
 
     return next(error);
@@ -444,11 +443,11 @@ const recuperarPassword = async (req, res, next) => {
       });
     });
   } catch (error) {
-    if (error.message === 'RUC_NO_ENCONTRADO') {
-      return res.status(400).send({ message: 'RUC no encontrado o empresa inactiva', data: undefined });
-    }
-    if (error.message === 'EMAIL_NO_COINCIDE') {
-      return res.status(400).send({ message: 'No existe una cuenta con ese RUC y correo', data: undefined });
+    if (error.message === 'RUC_NO_ENCONTRADO' || error.message === 'EMAIL_NO_COINCIDE') {
+      return res.status(200).send({
+        message: 'Si el correo está registrado, recibirá un enlace en su bandeja en los próximos minutos. Revise también la carpeta de spam.',
+        data: undefined
+      });
     }
     if (error.message && error.message.includes('SMTP no configurado') && process.env.NODE_ENV !== 'development') {
       return res.status(503).send({ message: 'El envío de correo no está configurado. Contacte al administrador.', data: undefined });

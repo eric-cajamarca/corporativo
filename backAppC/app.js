@@ -275,6 +275,10 @@ if (process.env.SERVE_SPA_ROOT) {
   }
 }
 
+app.use((req, res) => {
+  res.status(404).json({ error: 'not_found' });
+});
+
 // Errores: 5xx → WhatsApp al desarrollador (throttle en seguridadAlertas); 4xx sin alerta
 const errorHandler = require('./middlewares/errorHandler');
 app.use(errorHandler);
