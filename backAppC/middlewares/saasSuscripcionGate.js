@@ -12,7 +12,6 @@ function isWhitelistedPublic(pathname, method) {
   if (pathname.startsWith('/api/whatsapp-bot/inbound')) return true;
   if (pathname.startsWith('/api/activacion')) return true;
   if (pathname.startsWith('/api/external')) return true;
-  if (pathname === '/api/database') return true;
   if (method === 'GET' && pathname.startsWith('/api/obtener_logo')) return true;
   if (pathname.startsWith('/api/empresa/verificar')) return true;
   if (pathname.startsWith('/api/empresa/enviar-codigo-activacion')) return true;

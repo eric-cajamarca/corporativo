@@ -40,7 +40,6 @@ async function generatePdf(req, res) {
           </div>`
           : '';
 
-        console.log('datos.comprobante', datos);
         const bloqueComprobante = datos.comprobante
           ? `
           <div class="bloque-datos bloque-comprobante">
@@ -220,9 +219,11 @@ th{background:#f2f2f2;font-weight:bold;text-align:center}
     }
     const pdfBuffer = await generatePdfFromHtml(html, pdfFontSize, formatoPdf);
 
-    const nombreArchivo = datos.nombreArchivo || 'documento.pdf';
+    const nombreRaw = String(datos.nombreArchivo || 'documento.pdf');
+    const nombreSinCrlf = nombreRaw.replace(/[\r\n\t"\\]/g, '').trim();
+    const nombreSeguro = nombreSinCrlf.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 100) || 'documento.pdf';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
     res.send(pdfBuffer);
 
   } catch (error) {

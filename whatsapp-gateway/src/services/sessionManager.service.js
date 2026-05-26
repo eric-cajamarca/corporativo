@@ -452,25 +452,101 @@ async function sendText(idEmpresa, number, text, options = {}) {
   return { status: 200, success: true, message: 'Mensaje enviado' };
 }
 
-async function resolveMediaBuffer(media) {
+const PRIVATE_OR_RESERVED_HOST_RE = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^169\.254\./,            // link-local / AWS IMDS 169.254.169.254
+  /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // CG-NAT 100.64/10
+  /^::1$/,
+  /^fe80:/i,
+  /^fc[0-9a-f]{2}:/i,
+  /^fd[0-9a-f]{2}:/i,
+  /\.internal$/i,
+  /\.local$/i
+];
+
+function isHostPrivateOrReserved(host) {
+  const h = String(host || '').toLowerCase();
+  if (!h) return true;
+  return PRIVATE_OR_RESERVED_HOST_RE.some((re) => re.test(h));
+}
+
+const MAX_MEDIA_BYTES = Number(process.env.GATEWAY_MAX_MEDIA_BYTES) || 50 * 1024 * 1024;
+
+function validarMediaPayload(media) {
   const raw = String(media || '').trim();
   if (!raw) throw new Error('El contenido del archivo (media) es requerido');
   if (/^https?:\/\//i.test(raw)) {
-    const res = await axios.get(raw, { responseType: 'arraybuffer', timeout: 60000 });
+    if (process.env.GATEWAY_ALLOW_REMOTE_MEDIA !== '1') {
+      throw new Error('Las URLs remotas no estan permitidas. Envie el archivo como data: o base64.');
+    }
+    let parsed;
+    try {
+      parsed = new URL(raw);
+    } catch (e) {
+      throw new Error('URL invalida');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Protocolo no permitido');
+    }
+    if (isHostPrivateOrReserved(parsed.hostname)) {
+      throw new Error('Host no permitido (red interna o reservada)');
+    }
+    if (parsed.port && !['', '80', '443', '8080', '8443'].includes(String(parsed.port))) {
+      throw new Error('Puerto no permitido');
+    }
+  }
+  return raw;
+}
+
+async function resolveMediaBuffer(media) {
+  const raw = validarMediaPayload(media);
+
+  if (/^https?:\/\//i.test(raw)) {
+    const res = await axios.get(raw, {
+      responseType: 'arraybuffer',
+      timeout: 60000,
+      maxRedirects: 0,
+      maxContentLength: MAX_MEDIA_BYTES,
+      maxBodyLength: MAX_MEDIA_BYTES,
+      validateStatus: (s) => s >= 200 && s < 300
+    });
     return Buffer.from(res.data);
   }
+
   const b64 = raw.replace(/^data:[^;]+;base64,/, '');
-  return Buffer.from(b64, 'base64');
+  const buf = Buffer.from(b64, 'base64');
+  if (buf.length === 0) {
+    throw new Error('El contenido base64 esta vacio o es invalido');
+  }
+  if (buf.length > MAX_MEDIA_BYTES) {
+    throw new Error('Archivo excede el tamano permitido');
+  }
+  return buf;
+}
+
+function sanitizarNombreArchivo(filename, fallback = 'archivo') {
+  const raw = filename != null ? String(filename) : '';
+  const sin_crlf = raw.replace(/[\r\n\t"\\]/g, '').trim();
+  const safe = sin_crlf.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80);
+  return safe || fallback;
 }
 
 async function sendMedia(idEmpresa, number, mediatype, media, filename, caption, options = {}) {
+  // Validar/cargar el media ANTES de requireConnected para no exponer
+  // estado de la sesion ante intentos SSRF/abuso de URL.
+  validarMediaPayload(media);
   const sock = requireConnected(idEmpresa);
   await throttleSend(idEmpresa, options.skipThrottle === true);
   const jid = toWhatsAppJid(number);
   const buffer = await resolveMediaBuffer(media);
   const mt = String(mediatype || 'document').toLowerCase();
   const cap = caption != null && String(caption).trim() !== '' ? String(caption).trim() : undefined;
-  const name = filename != null && String(filename).trim() !== '' ? String(filename).trim() : 'archivo';
+  const name = sanitizarNombreArchivo(filename, 'archivo');
 
   let payload;
   if (mt === 'image') {

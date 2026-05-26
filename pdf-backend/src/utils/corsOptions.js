@@ -1,6 +1,12 @@
 /**
- * CORS alineado con backAppC / DESPLIEGUE-LAN.md (Nginx + SPA mismo host).
- * CORS_ALLOW_LAN=0 → solo orígenes explícitos.
+ * CORS alineado con backAppC (DESPLIEGUE-LAN.md, Nginx + SPA mismo host).
+ *
+ * pdf-backend normalmente NO se consume desde el navegador (backAppC lo
+ * llama via axios), por lo que no necesita ningun origen LAN por defecto.
+ * Si por algun motivo se llama desde el front (devtools, debug), se aplica
+ * la misma politica que en backAppC:
+ *   - En production: LAN solo si CORS_ALLOW_LAN=1 explicito.
+ *   - En desarrollo: LAN permitida salvo CORS_ALLOW_LAN=0.
  */
 
 function buildStaticAllowedOrigins() {
@@ -16,8 +22,14 @@ function buildStaticAllowedOrigins() {
   ].filter(Boolean);
 }
 
+function corsLanAllowedByConfig() {
+  const v = process.env.CORS_ALLOW_LAN;
+  if (process.env.NODE_ENV === 'production') return v === '1';
+  return v !== '0';
+}
+
 function isPrivateLanOrigin(origin) {
-  if (process.env.CORS_ALLOW_LAN === '0') return false;
+  if (!corsLanAllowedByConfig()) return false;
   try {
     const u = new URL(origin);
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
@@ -40,7 +52,7 @@ function createCorsMiddleware() {
       const allowed = buildStaticAllowedOrigins();
       if (allowed.includes(origin)) return callback(null, true);
       if (isPrivateLanOrigin(origin)) return callback(null, true);
-      callback(new Error('Not allowed by CORS'));
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

@@ -16,6 +16,16 @@ app.get('/', (req, res) => {
   res.status(200).type('text/plain').send('OK');
 });
 
+app.use((_req, res) => {
+  res.status(404).json({ error: 'not_found' });
+});
+
+app.use((err, _req, res, _next) => {
+  console.error('pdf-backend unhandled:', err && err.message ? err.message : err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'internal_error' });
+});
+
 const PORT = process.env.PORT || 3002;
 const HOST = process.env.PDF_BACKEND_BIND_HOST || '127.0.0.1';
 const server = app.listen(PORT, HOST, () => {
