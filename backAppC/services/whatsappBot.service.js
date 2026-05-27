@@ -27,18 +27,28 @@ async function enviarRespuestaConTyping(idEmpresa, destino, respuestas, options 
     throw new Error('No hay respuesta que enviar');
   }
   const usarTyping = options.usarTyping !== false;
+  const delayMaxMs = Number.isFinite(options.delayMaxMs) ? options.delayMaxMs : 3000;
+  const unirEnUnaBurbuja = options.unirEnUnaBurbuja === true;
 
-  for (let i = 0; i < burbujas.length; i++) {
-    const txt = burbujas[i];
+  // Si la empresa desactivo la humanizacion, juntamos todas las burbujas en una
+  // sola para que el cliente reciba la respuesta completa de una sola vez.
+  const finales = unirEnUnaBurbuja && burbujas.length > 1
+    ? [burbujas.join('\n\n')]
+    : burbujas;
+
+  for (let i = 0; i < finales.length; i++) {
+    const txt = finales[i];
     if (usarTyping) {
-      await whatsappGatewayClient.sendPresence(idEmpresa, destino, 'composing');
-      await copy.sleep(copy.delaySegunLargo(txt));
+      whatsappGatewayClient.sendPresence(idEmpresa, destino, 'composing').catch(() => {});
+      const baseDelay = copy.delaySegunLargo(txt);
+      const delay = Math.min(baseDelay, delayMaxMs);
+      if (delay > 0) await copy.sleep(delay);
     }
     const r = await whatsappGatewayClient.sendText(idEmpresa, destino, txt, { skipThrottle: true });
     if (!r.success) {
       throw new Error(r.message || 'No se pudo enviar la respuesta');
     }
-    if (i < burbujas.length - 1) {
+    if (i < finales.length - 1) {
       await copy.sleep(copy.delayEntreBurbujas());
     }
   }
@@ -46,7 +56,7 @@ async function enviarRespuestaConTyping(idEmpresa, destino, respuestas, options 
   if (usarTyping) {
     whatsappGatewayClient.sendPresence(idEmpresa, destino, 'paused').catch(() => {});
   }
-  return burbujas;
+  return finales;
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -166,6 +176,40 @@ async function listarLogs(idEmpresa, limite) {
   return withPool((pool) => whatsappBotLogRepository.listar(pool, idEmpresa, limite));
 }
 
+async function listarEscaladas(idEmpresa) {
+  await assertEmpresaPuedeUsarBot(idEmpresa);
+  const filas = await withPool((pool) =>
+    whatsappBotConversacionRepository.listarEscaladas(pool, idEmpresa)
+  );
+  return filas.map((f) => ({
+    telefonoCliente: f.telefonoCliente,
+    motivo: f.slots?.escalada?.motivo || null,
+    numeroVendedor: f.slots?.escalada?.numeroVendedor || null,
+    fEscalado: f.slots?.escalada?.fEscalado || null,
+    expiraEn: f.slots?.escalada?.hasta || f.fExpira || null,
+    fActualizacion: f.fActualizacion
+  }));
+}
+
+async function desescalarManual(idEmpresa, telefonoCliente) {
+  await assertEmpresaPuedeUsarBot(idEmpresa);
+  const tel = String(telefonoCliente || '').replace(/\D/g, '');
+  if (!tel) throw new Error('telefonoCliente requerido');
+  await withPool(async (pool) => {
+    const conv = await whatsappBotConversacionRepository.obtener(pool, idEmpresa, tel);
+    if (!conv) throw new Error('No hay conversacion activa para ese cliente');
+    const slots = { ...(conv.slots || {}) };
+    delete slots.escalada;
+    delete slots.ofreciendoAgente;
+    await whatsappBotConversacionRepository.guardar(pool, idEmpresa, tel, {
+      estado: 'menu',
+      slots,
+      candidatos: []
+    });
+  });
+  return { ok: true, telefonoCliente: tel };
+}
+
 async function procesarInbound(payload) {
   const t0 = Date.now();
   const { idEmpresa, from, messageId, text, timestamp } = payload || {};
@@ -211,23 +255,65 @@ async function procesarInbound(payload) {
       telefonoLog: tel.logId,
       digitosCelular: tel.digitos,
       textoEntrada,
-      config: precarga.config
+      config: precarga.config,
+      telefonoVinculadoBot: wa.telefonoVinculado || null
     },
     precarga
   );
-  const { respuesta, conv, adjunto, limpiarHistorial, reaccion } = turno;
+  const { respuesta, conv, adjunto, limpiarHistorial, reaccion, suprimirRespuesta } = turno;
 
   if (!limpiarHistorial) {
     registrarLogAsync(idEmpresa, 'in', tel.logId, messageId, textoEntrada);
   }
 
-  if (reaccion && messageId) {
+  // Si el dialogo decidio que el bot debe quedarse callado (conversacion escalada),
+  // solo persistimos el contexto y no enviamos nada al cliente.
+  if (suprimirRespuesta) {
+    withPool((pool) =>
+      whatsappBotInboundContext.persistirTurno(
+        pool,
+        idEmpresa,
+        tel.logId,
+        conv,
+        precarga.convNueva
+      )
+    ).catch((err) => console.error('whatsappBot persistir conversacion:', err.message));
+
+    return {
+      ok: true,
+      idEmpresa,
+      from: tel.destino,
+      messageId: messageId || null,
+      timestamp: timestamp || null,
+      respuesta: '',
+      burbujas: 0,
+      pdfEnviado: false,
+      escalada: true,
+      elapsedMs: Date.now() - t0
+    };
+  }
+
+  // Aplicamos tono (tu / usted) y filtramos emojis si la empresa no los quiere.
+  const opcionesTexto = {
+    tonoFormal: precarga.config?.tonoFormal === true,
+    usarEmojis: precarga.config?.usarEmojis !== false
+  };
+  const respuestaArr = Array.isArray(respuesta) ? respuesta : [respuesta];
+  const respuestaAdaptada = respuestaArr.map((b) => copy.adaptarTexto(b, opcionesTexto));
+
+  // Si la empresa desactivo la humanizacion, no mandamos reaccion ni typing.
+  const humanizar = precarga.config?.humanizar !== false;
+  if (humanizar && reaccion && messageId && opcionesTexto.usarEmojis) {
     whatsappGatewayClient
       .sendReaction(idEmpresa, tel.destino, messageId, reaccion)
       .catch(() => {});
   }
 
-  const burbujasEnviadas = await enviarRespuestaConTyping(idEmpresa, tel.destino, respuesta);
+  const burbujasEnviadas = await enviarRespuestaConTyping(idEmpresa, tel.destino, respuestaAdaptada, {
+    usarTyping: humanizar,
+    unirEnUnaBurbuja: !humanizar,
+    delayMaxMs: precarga.config?.delayMaxMs ?? 3000
+  });
   const respuestaPlana = burbujasEnviadas.join('\n\n');
 
   if (limpiarHistorial) {
@@ -302,5 +388,7 @@ module.exports = {
   crearSinonimo,
   eliminarSinonimo,
   listarLogs,
+  listarEscaladas,
+  desescalarManual,
   NOMBRE_SERVICIO_WHATSAPP_BOT
 };

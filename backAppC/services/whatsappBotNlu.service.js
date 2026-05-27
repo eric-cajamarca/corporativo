@@ -20,7 +20,12 @@ const PATRONES = {
   contacto: /\b(telefono|celular|correo|email|e mail|como contact|datos de contacto|numero de contacto)\b/i,
   despedida: /\b(gracias|muchas gracias|mil gracias|te agradezco|ok gracias|listo gracias|hasta pronto|hasta luego|nos vemos|chau|chao|adios|bye|hasta manana|nada mas|eso es todo|fue un gusto)\b/i,
   productosPedido: /\b(productos|producto|detalle|items|que trae|que incluye|lista|ver pedido)\b/i,
-  pdfPedido: /\b(pdf|comprobante|documento|recibo|boleta|factura)\b/i
+  pdfPedido: /\b(pdf|comprobante|documento|recibo|boleta|factura)\b/i,
+  // Solicitud explicita de hablar con un humano (escalamiento Fase 3).
+  solicitarAgente: /\b(agente|asesor|asesora|humano|humana|persona real|alguien real|hablar con alguien|hablar con un|atencion humana|vendedor|vendedora|representante|operador|operadora|ayuda humana)\b/i,
+  // Confirmar/negar oferta de derivar (cuando el bot pregunta).
+  afirmacion: /\b(si|sí|sip|claro|por favor|ok|okay|dale|bueno|de acuerdo|deseo|quiero)\b/i,
+  negacion: /\b(no|nop|nope|negativo|todavia no|aun no|prefiero no|gracias no)\b/i
 };
 
 function aplicarSinonimos(tokens, sinonimosMap) {
@@ -66,6 +71,7 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
   }
 
   if (PATRONES.ping.test(textoNorm)) return 'ping';
+  if (PATRONES.solicitarAgente.test(textoNorm)) return 'solicitar_agente';
   if (PATRONES.menu.test(textoNorm)) return 'menu';
   if (PATRONES.hola.test(textoNorm)) return 'hola';
   if (PATRONES.despedida.test(textoNorm)) return 'despedida';
@@ -171,7 +177,8 @@ function interpretar(mensaje, contexto = {}) {
     'quitar_carrito', 'medio_pago', 'cantidad', 'menu_numero',
     'identidad', 'que_vendes', 'productos_destacados', 'ubicacion', 'contacto',
     'documento_identidad', 'documento_invalido', 'despedida',
-    'productos_pedido', 'pdf_pedido', 'pedido_opcion_invalida'
+    'productos_pedido', 'pdf_pedido', 'pedido_opcion_invalida',
+    'solicitar_agente'
   ];
 
   if (sinTerminos.includes(intencion)) {

@@ -215,6 +215,99 @@ function saludoPersonalizado(rSocial) {
 }
 
 /**
+ * Convierte un texto en tuteo a forma "usted" reemplazando algunos verbos y
+ * pronombres de uso frecuente del bot. NO es traduccion completa: cubre los
+ * casos repetidos (escribe, dime, te, tu/tus, gracias, eres, etc.).
+ *
+ * Si tonoFormal=false (default), retorna el texto sin cambios.
+ */
+function aplicarTono(texto, tonoFormal) {
+  if (!tonoFormal || !texto) return texto || '';
+  let s = String(texto);
+
+  // Pares ordenados (regex global, case-sensitive en mayuscula inicial).
+  const pares = [
+    [/\bEscríbeme\b/g, 'Escríbame'],
+    [/\bescríbeme\b/g, 'escríbame'],
+    [/\bEscríbele\b/g, 'Escríbale'],
+    [/\bescríbele\b/g, 'escríbale'],
+    [/\bEscribe\b/g, 'Escriba'],
+    [/\bescribe\b/g, 'escriba'],
+    [/\bIndícame\b/g, 'Indíqueme'],
+    [/\bindícame\b/g, 'indíqueme'],
+    [/\bIndica\b/g, 'Indique'],
+    [/\bindica\b/g, 'indique'],
+    [/\bDime\b/g, 'Dígame'],
+    [/\bdime\b/g, 'dígame'],
+    [/\bResponde\b/g, 'Responda'],
+    [/\bresponde\b/g, 'responda'],
+    [/\bElige\b/g, 'Elija'],
+    [/\belige\b/g, 'elija'],
+    [/\bConfirma\b/g, 'Confirme'],
+    [/\bconfirma\b/g, 'confirme'],
+    [/\bIntenta\b/g, 'Intente'],
+    [/\bintenta\b/g, 'intente'],
+    [/\bVerifica\b/g, 'Verifique'],
+    [/\bverifica\b/g, 'verifique'],
+    [/\bAgrega\b/g, 'Agregue'],
+    [/\bagrega\b/g, 'agregue'],
+    [/\bPrueba\b/g, 'Pruebe'],
+    [/\bprueba\b/g, 'pruebe'],
+    [/\bScríbeme\b/g, 'Escríbame'],
+    [/\bDescríbelo\b/g, 'Descríbalo'],
+    [/\bdescríbelo\b/g, 'descríbalo'],
+
+    // Posesivos / pronombres
+    [/\bte ayudo\b/g, 'le ayudo'],
+    [/\bTe ayudo\b/g, 'Le ayudo'],
+    [/\bte envío\b/g, 'le envío'],
+    [/\bTe envío\b/g, 'Le envío'],
+    [/\bte derivo\b/g, 'le derivo'],
+    [/\bTe derivo\b/g, 'Le derivo'],
+    [/\bte identifiqué\b/g, 'le identifiqué'],
+    [/\bTe identifiqué\b/g, 'Le identifiqué'],
+    [/\bte registré\b/g, 'le registré'],
+    [/\bTe registré\b/g, 'Le registré'],
+    [/\bte llamará\b/g, 'le llamará'],
+    [/\bte contactará\b/g, 'le contactará'],
+
+    [/\btu ([a-záéíóúñ]+)/g, 'su $1'],
+    [/\bTu ([a-záéíóúñ]+)/g, 'Su $1'],
+    [/\btus ([a-záéíóúñ]+)/g, 'sus $1'],
+    [/\bTus ([a-záéíóúñ]+)/g, 'Sus $1'],
+
+    // saludos comunes
+    [/\b¿En qué te ayudo\b/g, '¿En qué le ayudo'],
+    [/\b¿En qué te puedo ayudar\b/g, '¿En qué le puedo ayudar'],
+    [/\b¿Cómo te puedo ayudar\b/g, '¿Cómo le puedo ayudar'],
+    [/\b¿Cómo te ayudo\b/g, '¿Cómo le ayudo'],
+    [/\b¿Qué necesitas\b/g, '¿Qué necesita'],
+    [/\bcontacta a la empresa\b/g, 'contacte a la empresa']
+  ];
+  for (const [re, rep] of pares) s = s.replace(re, rep);
+  return s;
+}
+
+/**
+ * Quita emojis del texto si la empresa no quiere usarlos.
+ * Usa un rango UNICODE amplio que cubre la mayoria de pictogramas.
+ */
+const EMOJI_REGEX = /[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]|\uFE0F|\u200D/gu;
+function quitarEmojis(texto) {
+  if (!texto) return texto || '';
+  return String(texto).replace(EMOJI_REGEX, '').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+/**
+ * Aplica tono y emojis a un texto (helper que combina ambos).
+ */
+function adaptarTexto(texto, opts = {}) {
+  let s = aplicarTono(texto, opts.tonoFormal === true);
+  if (opts.usarEmojis === false) s = quitarEmojis(s);
+  return s;
+}
+
+/**
  * Reaccion (emoji) sugerida segun la intencion. Devuelve null si no aplica
  * (no toda intencion deberia recibir reaccion).
  */
@@ -249,6 +342,34 @@ function reaccionPorIntencion(intencion) {
   }
 }
 
+/** Variantes adicionales para el flujo de escalamiento Fase 3. */
+VARIANTES.escalamiento = {
+  ofrecerAgente: [
+    'Veo que no estoy logrando ayudarte como necesitas. ¿Quieres que te derive con un asesor humano? (responde *SÍ* o *NO*)',
+    'Parece que esto se complicó por aquí. ¿Te gustaría hablar con un asesor humano? (*SÍ* / *NO*)',
+    'Para que recibas mejor atención, ¿prefieres que te conecte con un asesor de la empresa? (*SÍ* / *NO*)'
+  ],
+  confirmaEscalada: [
+    '¡Listo! Te derivo con un asesor humano. En breve te contactará por aquí mismo. 🙋',
+    'Perfecto, ya avisé a un asesor. Te escribirá pronto en este chat. 🙋',
+    'Hecho. Un asesor te atenderá en este chat en unos momentos. 🙋'
+  ],
+  enModoEscalada: [
+    'Tu conversación está siendo atendida por un asesor humano. Cuando termine la consulta, escríbeme *MENÚ* para volver al bot.',
+    'En este momento te está atendiendo un asesor. Si quieres volver al bot, escribe *MENÚ*.',
+    'Un asesor humano está revisando tu caso. Para volver al bot escribe *MENÚ*.'
+  ],
+  desescaladoManual: [
+    'Volvemos a la atención automática. ¿En qué te puedo ayudar? Escribe *MENÚ* para ver opciones.',
+    'Listo, retomo la atención. Escribe *MENÚ* o el producto que necesites.',
+    'Ya estoy de vuelta. ¿Qué necesitas?'
+  ],
+  rechazaAgente: [
+    'Sin problema. Sigamos por aquí. Si quieres, escribe *MENÚ* o cuéntame qué necesitas.',
+    'Perfecto, seguimos. Cuando quieras, escribe *MENÚ* para ver opciones.'
+  ]
+};
+
 module.exports = {
   pick,
   sleep,
@@ -258,6 +379,9 @@ module.exports = {
   delayEntreBurbujas,
   saludoPersonalizado,
   adjuntarCierre,
+  aplicarTono,
+  quitarEmojis,
+  adaptarTexto,
   reaccionPorIntencion,
   v,
   VARIANTES

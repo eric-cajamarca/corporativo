@@ -63,6 +63,28 @@ async function reiniciar(pool, idEmpresa, telefonoCliente) {
   await guardar(pool, idEmpresa, telefonoCliente, { estado: 'menu', slots: {}, candidatos: [] });
 }
 
+async function listarEscaladas(pool, idEmpresa) {
+  try {
+    const r = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT idConversacion, idEmpresa, telefonoCliente, estado, slotsJson,
+               CONVERT(VARCHAR(19), fExpira, 120) AS fExpira,
+               CONVERT(VARCHAR(19), fActualizacion, 120) AS fActualizacion
+        FROM WhatsAppBotConversacion
+        WHERE idEmpresa = @idEmpresa AND estado = 'escalada' AND fExpira > GETDATE()
+        ORDER BY fActualizacion DESC
+      `);
+    return (r.recordset || []).map((row) => ({
+      ...row,
+      slots: parseJson(row.slotsJson, {})
+    }));
+  } catch (e) {
+    if (e && e.number === 208) return [];
+    throw e;
+  }
+}
+
 async function eliminar(pool, idEmpresa, telefonoCliente) {
   try {
     await pool
@@ -79,4 +101,4 @@ async function eliminar(pool, idEmpresa, telefonoCliente) {
   }
 }
 
-module.exports = { obtener, guardar, reiniciar, eliminar };
+module.exports = { obtener, guardar, reiniciar, eliminar, listarEscaladas };

@@ -15,5 +15,7 @@ router.get('/sinonimos', whatsappBotController.listarSinonimos);
 router.post('/sinonimos', whatsappBotController.crearSinonimo);
 router.delete('/sinonimos/:idSinonimo', whatsappBotController.eliminarSinonimo);
 router.get('/logs', whatsappBotController.listarLogs);
+router.get('/escaladas', whatsappBotController.listarEscaladas);
+router.post('/escaladas/desescalar', whatsappBotController.desescalarManual);
 
 module.exports = router;

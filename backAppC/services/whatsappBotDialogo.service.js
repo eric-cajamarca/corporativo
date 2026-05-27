@@ -8,6 +8,8 @@ const whatsappBotSinonimoRepository = require('../repositories/whatsappBotSinoni
 const whatsappBotCotizacion = require('./whatsappBotCotizacion.service');
 const whatsappBotPedidos = require('./whatsappBotPedidos.service');
 const whatsappBotIdentidad = require('./whatsappBotIdentidad.service');
+const whatsappBotEscalamiento = require('./whatsappBotEscalamiento.service');
+const whatsappBotLogRepository = require('../repositories/whatsappBotLog.repository');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
 
@@ -181,9 +183,59 @@ async function procesarTurno(ctx, precarga = null) {
   const nombreClienteCorto = copy.nombreCorto(resCliente?.cliente?.rSocial);
   const reaccion = copy.reaccionPorIntencion(nlu.intencion);
 
+  // -----------------------------------------------------------------------
+  // Fase 3: si la conversacion esta escalada a un humano, el bot guarda
+  // silencio salvo que el cliente pida volver con MENU explicitamente.
+  // -----------------------------------------------------------------------
+  if (whatsappBotEscalamiento.estaEscalada(conv)) {
+    if (nlu.intencion === 'menu') {
+      const desesc = whatsappBotEscalamiento.desescalar(conv);
+      return {
+        respuesta: copy.pick(copy.VARIANTES.escalamiento.desescaladoManual),
+        conv: desesc,
+        reaccion: '✅'
+      };
+    }
+    // Cualquier otro mensaje: lo logueamos pero NO respondemos para no chocar
+    // con el asesor humano que ya esta atendiendo al cliente.
+    return { respuesta: null, conv, suprimirRespuesta: true };
+  }
+
+  // Si el cliente solicita explicitamente un agente humano.
+  if (nlu.intencion === 'solicitar_agente' && config.escalamientoActivo !== false) {
+    return iniciarEscalamiento(ctx, conv, config, resCliente, 'cliente');
+  }
+
+  // Si esta en estado 'ofreciendo_agente' y responde si/no.
+  if (conv.slots?.ofreciendoAgente) {
+    const t = String(textoEntrada || '').trim().toLowerCase();
+    const esSi = /^(si|sí|sip|claro|por favor|ok|okay|dale|bueno|de acuerdo|deseo|quiero)\b/i.test(t);
+    const esNo = /^(no|nop|nope|negativo|todavia no|aun no|prefiero no|gracias no)\b/i.test(t);
+    if (esSi) {
+      return iniciarEscalamiento(ctx, conv, config, resCliente, 'umbral');
+    }
+    if (esNo) {
+      const slots = { ...(conv.slots || {}) };
+      delete slots.ofreciendoAgente;
+      slots.noEntiendoConsecutivos = 0;
+      return {
+        respuesta: copy.pick(copy.VARIANTES.escalamiento.rechazaAgente),
+        conv: { estado: 'menu', slots, candidatos: [] }
+      };
+    }
+    // Si no respondio si/no claro, dejamos que el flujo continue normal pero
+    // limpiamos el flag para no quedarnos atascados en la oferta.
+    const slots = { ...(conv.slots || {}) };
+    delete slots.ofreciendoAgente;
+    conv = { ...conv, slots };
+  }
+
   if (nlu.intencion === 'despedida') {
+    const textoDespedida = config.mensajeDespedida && String(config.mensajeDespedida).trim() !== ''
+      ? String(config.mensajeDespedida).trim()
+      : copy.v('despedida');
     return {
-      respuesta: copy.v('despedida'),
+      respuesta: textoDespedida,
       conv: { estado: 'menu', slots: {}, candidatos: [] },
       limpiarHistorial: true,
       reaccion
@@ -305,14 +357,95 @@ async function procesarTurno(ctx, precarga = null) {
     };
   }
 
+  return manejarNoEntendi(ctx, conv, config);
+}
+
+/**
+ * Fallback "no entendí" con escalamiento automático cuando se alcanza el umbral.
+ */
+function manejarNoEntendi(ctx, conv, config) {
+  const slotsBase = conservarMemoria(conv.slots, conv.estado, conv.slots || {});
+  const umbral = Number(config?.umbralNoEntiendoEscalar) || 0;
+  const escalamientoActivo = config?.escalamientoActivo !== false;
+  const numeroVendedor = whatsappBotEscalamiento.resolverNumeroVendedor(
+    config,
+    ctx.telefonoVinculadoBot
+  );
+  const previo = Number(slotsBase.noEntiendoConsecutivos || 0);
+  const siguiente = previo + 1;
+
+  if (escalamientoActivo && umbral > 0 && siguiente >= umbral && numeroVendedor) {
+    const slots = { ...slotsBase, noEntiendoConsecutivos: 0, ofreciendoAgente: true };
+    return {
+      respuesta: copy.pick(copy.VARIANTES.escalamiento.ofrecerAgente),
+      conv: { estado: 'ofreciendo_agente', slots, candidatos: [] },
+      reaccion: '🙋'
+    };
+  }
+
   return {
     respuesta: copy.v('noEntendi'),
     conv: {
       estado: conv.estado || 'menu',
-      slots: conservarMemoria(conv.slots, conv.estado, conv.slots || {}),
+      slots: { ...slotsBase, noEntiendoConsecutivos: siguiente },
       candidatos: conv.candidatos || []
     },
     reaccion: '🤔'
+  };
+}
+
+/**
+ * Marca la conversacion como escalada y notifica al vendedor por WhatsApp.
+ * Persiste el contexto y devuelve la respuesta de confirmacion al cliente.
+ */
+async function iniciarEscalamiento(ctx, conv, config, resCliente, motivo) {
+  const numeroVendedor = whatsappBotEscalamiento.resolverNumeroVendedor(
+    config,
+    ctx.telefonoVinculadoBot
+  );
+
+  if (!numeroVendedor) {
+    // Sin numero configurado, fallback graceful: respondemos como "no entendí" + aviso.
+    return {
+      respuesta: 'Por ahora no podemos derivarte con un asesor humano (no hay vendedor disponible). Sigamos por aquí: escribe *MENÚ* o cuéntame lo que necesitas.',
+      conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] }
+    };
+  }
+
+  const timeoutMin = Math.max(1, Math.min(1440, Number(config?.escalamientoTimeoutMin) || 60));
+
+  // Snapshot reciente de mensajes para que el vendedor tenga contexto.
+  let ultimosMensajes = [];
+  try {
+    ultimosMensajes = await withPool((pool) =>
+      whatsappBotLogRepository.listarPorTelefono(pool, ctx.idEmpresa, ctx.telefonoLog, 6)
+    );
+  } catch (e) {
+    // Si el repo no expone listarPorTelefono o falla, seguimos igual.
+  }
+
+  // Notificacion best-effort al vendedor (no bloqueante para la respuesta del bot).
+  whatsappBotEscalamiento.notificarVendedor(ctx.idEmpresa, {
+    numeroVendedor,
+    telefonoCliente: ctx.telefonoLog,
+    nombreCliente: copy.nombreCorto(resCliente?.cliente?.rSocial),
+    motivo,
+    ultimosMensajes,
+    minutosBloqueo: timeoutMin
+  }).catch((err) => {
+    console.error('whatsappBotDialogo iniciarEscalamiento notificar:', err.message);
+  });
+
+  const nueva = whatsappBotEscalamiento.marcarEscalada(conv, {
+    timeoutMin,
+    motivo,
+    numeroVendedor
+  });
+
+  return {
+    respuesta: copy.pick(copy.VARIANTES.escalamiento.confirmaEscalada),
+    conv: nueva,
+    reaccion: '🙋'
   };
 }
 

@@ -135,6 +135,31 @@ async function listarLogs(req, res) {
   }
 }
 
+async function listarEscaladas(req, res) {
+  const idEmpresa = requireEmpresa(req, res);
+  if (!idEmpresa) return;
+  try {
+    const data = await whatsappBotService.listarEscaladas(idEmpresa);
+    return res.status(200).json({ status: 200, success: true, data });
+  } catch (err) {
+    console.error('whatsappBotController listarEscaladas:', err.message);
+    return mapError(err, res);
+  }
+}
+
+async function desescalarManual(req, res) {
+  const idEmpresa = requireEmpresa(req, res);
+  if (!idEmpresa) return;
+  try {
+    const { telefonoCliente } = req.body || {};
+    const data = await whatsappBotService.desescalarManual(idEmpresa, telefonoCliente);
+    return res.status(200).json({ status: 200, success: true, data });
+  } catch (err) {
+    console.error('whatsappBotController desescalarManual:', err.message);
+    return mapError(err, res);
+  }
+}
+
 module.exports = {
   inbound,
   getConfig,
@@ -144,5 +169,7 @@ module.exports = {
   listarSinonimos,
   crearSinonimo,
   eliminarSinonimo,
-  listarLogs
+  listarLogs,
+  listarEscaladas,
+  desescalarManual
 };
