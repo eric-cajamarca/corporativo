@@ -343,4 +343,11 @@ app.listen(PORT, () => {
   } catch (e) {
     console.error('No se pudo iniciar job onboarding automation:', e.message);
   }
+  try {
+    const seguridadAlertasService = require('./services/seguridadAlertas.service');
+    const { withPool } = require('./utils/dbPool.util');
+    seguridadAlertasService.iniciarHealthCheckFactiliza({ withPool });
+  } catch (e) {
+    console.error('No se pudo iniciar health-check Factiliza WhatsApp:', e.message);
+  }
 });

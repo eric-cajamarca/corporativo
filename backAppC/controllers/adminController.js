@@ -20,21 +20,27 @@ const usuarioAdminService = require('../services/usuarioAdmin.service');
 function notificarWhatsappLoginAdmin(pool, datosUsuario, ipCliente) {
   const rol = (datosUsuario.rol || '').toString();
   if (rol === 'superAdmin') {
-    void seguridadAlertasService.notificarLoginSuperAdminExitoso(pool, {
-      idEmpresa: datosUsuario.idEmpresa,
-      nombres: datosUsuario.nombres,
-      apellidos: datosUsuario.apellidos,
-      email: datosUsuario.email,
-      ipCliente
-    });
+    seguridadAlertasService.runSafeAlert(
+      seguridadAlertasService.notificarLoginSuperAdminExitoso(pool, {
+        idEmpresa: datosUsuario.idEmpresa,
+        nombres: datosUsuario.nombres,
+        apellidos: datosUsuario.apellidos,
+        email: datosUsuario.email,
+        ipCliente
+      }),
+      'notificarLoginSuperAdminExitoso'
+    );
     return;
   }
-  void seguridadAlertasService.notificarLoginAdminExitoso(pool, {
-    idEmpresa: datosUsuario.idEmpresa,
-    email: datosUsuario.email,
-    ipCliente,
-    rol: datosUsuario.rol
-  });
+  seguridadAlertasService.runSafeAlert(
+    seguridadAlertasService.notificarLoginAdminExitoso(pool, {
+      idEmpresa: datosUsuario.idEmpresa,
+      email: datosUsuario.email,
+      ipCliente,
+      rol: datosUsuario.rol
+    }),
+    'notificarLoginAdminExitoso'
+  );
 }
 const getAdmin = async function (req, res, next) {
   // 1. Validación de autenticación
@@ -220,6 +226,20 @@ const admin_login = async (req, res, next) => {
   }
 
   const ipCliente = obtenerIpCliente(req);
+
+  // Deteccion temprana de payloads sospechosos (SQLi/XSS/etc.). Cubre incluso el
+  // caso de RUCs inexistentes que no llegan a aplicarFalloLogin. No-bloqueante.
+  seguridadAlertasService.runSafeAlert(
+    withPool((pool) =>
+      seguridadAlertasService.notificarPatronSospechosoEnLogin(pool, {
+        ipCliente,
+        email,
+        password,
+        ruc
+      })
+    ),
+    'notificarPatronSospechosoEnLogin'
+  );
 
   try {
     const loginOutcome = await withPool(async (pool) => {

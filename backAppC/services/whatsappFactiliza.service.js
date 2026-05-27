@@ -43,10 +43,14 @@ async function sendText(config, number, text) {
       validateStatus: () => true
     });
     const data = response.data || {};
+    // La API de Factiliza tiene un typo conocido: usa "succes" (una sola "s")
+    // en lugar de "success" en algunos endpoints. Aceptamos ambos.
+    const isHttpOk = response.status >= 200 && response.status < 300;
+    const apiSuccess = data.success === true || data.succes === true;
     return {
       status: data.status != null ? data.status : response.status,
-      success: data.success === true,
-      message: data.message != null ? String(data.message) : (response.status >= 200 && response.status < 300 ? 'OK' : 'Error en API WhatsApp')
+      success: apiSuccess || (isHttpOk && (data.success === undefined && data.succes === undefined)),
+      message: data.message != null ? String(data.message) : (isHttpOk ? 'OK' : 'Error en API WhatsApp')
     };
   } catch (err) {
     const errData = { message: err?.message, code: err?.code, cause: err?.cause?.message || err?.cause?.code, url };
@@ -102,9 +106,10 @@ async function sendMedia(config, number, mediatype, media, filename, caption) {
     body: JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
+  const apiSuccess = data.success === true || data.succes === true;
   return {
     status: data.status != null ? data.status : response.status,
-    success: data.success === true,
+    success: apiSuccess || (response.ok && (data.success === undefined && data.succes === undefined)),
     message: data.message != null ? String(data.message) : (response.ok ? 'OK' : 'Error en API WhatsApp')
   };
 }

@@ -41,26 +41,183 @@ async function descripcionUbicacionPorIp(ipCliente) {
   return loc || 'No disponible';
 }
 
-async function enviarTextoPlataforma(pool, numeroDestino, texto) {
-  const digits = soloDigitos(numeroDestino);
-  if (digits.length < 9) return;
-  const t = String(texto || '').trim().slice(0, 3500);
-  if (!t) return;
+/**
+ * Estado runtime para health-check de Factiliza WhatsApp:
+ *   - falloConsecutivos: # de envios fallidos seguidos
+ *   - ultimoExitoTs: timestamp ms del ultimo envio OK
+ *   - ultimoErrorTs: timestamp ms del ultimo error
+ *   - notificadoDownEmail: si ya se mando aviso por email para no repetirlo cada minuto
+ */
+const factilizaWhatsAppHealth = {
+  falloConsecutivos: 0,
+  ultimoExitoTs: 0,
+  ultimoErrorTs: 0,
+  ultimoErrorMsg: '',
+  notificadoDownEmail: false,
+  notificadoDownEmailTs: 0
+};
+const FACTILIZA_DOWN_THRESHOLD = parseInt(process.env.FACTILIZA_WHATSAPP_DOWN_THRESHOLD, 10) || 3;
+const FACTILIZA_DOWN_EMAIL_THROTTLE_MS = parseInt(process.env.FACTILIZA_WHATSAPP_DOWN_EMAIL_THROTTLE_MS, 10) || 60 * 60 * 1000;
 
+function ofuscarNumero(num) {
+  const d = soloDigitos(num);
+  if (d.length < 5) return '***';
+  return d.slice(0, 3) + '****' + d.slice(-2);
+}
+
+async function avisarPorEmailFactilizaCaida(detalle) {
+  const ahora = Date.now();
+  if (factilizaWhatsAppHealth.notificadoDownEmail
+    && ahora - factilizaWhatsAppHealth.notificadoDownEmailTs < FACTILIZA_DOWN_EMAIL_THROTTLE_MS) {
+    return;
+  }
+  factilizaWhatsAppHealth.notificadoDownEmail = true;
+  factilizaWhatsAppHealth.notificadoDownEmailTs = ahora;
   try {
-    const config = await obtenerConfigWhatsApp(pool);
-    if (!config || !config.tokenDefault || !String(config.parametroRuta || '').trim()) {
-      console.error('seguridadAlertas: Factiliza WHATSAPP no configurado (token o parametroRuta).');
+    const emailService = require('./email.service');
+    const to = process.env.ALERT_DEV_EMAIL || process.env.SMTP_USER || process.env.SMTP_FROM;
+    if (!to) {
+      console.error('context:', JSON.stringify({
+        level: 'warn',
+        message: 'factiliza_whatsapp_down_email_skip',
+        detail: 'No hay ALERT_DEV_EMAIL/SMTP_USER configurado para enviar aviso por email.'
+      }));
       return;
     }
-    const resultado = await whatsappFactilizaService.sendText(config, digits, t);
-    if (!resultado.success) {
-      console.error('seguridadAlertas: API WhatsApp respondió error:', resultado.message);
-    }
+    await emailService.enviarCorreo({
+      to,
+      subject: '[EFAF] Factiliza WhatsApp caido - alertas de seguridad inactivas',
+      text:
+        'Las alertas WhatsApp del sistema fallan consecutivamente.\n' +
+        `Fallos consecutivos: ${factilizaWhatsAppHealth.falloConsecutivos}\n` +
+        `Ultimo error: ${factilizaWhatsAppHealth.ultimoErrorMsg}\n` +
+        `Detalle: ${detalle}\n\n` +
+        'Acciones recomendadas:\n' +
+        ' 1) Revisar token e instancia en panel Factiliza.\n' +
+        ' 2) Validar fila FactilizaConfig (nombre = "Factiliza WHATSAPP").\n' +
+        ' 3) Reintentar manualmente con backAppC/scripts/_diag-factiliza-fix.js.'
+    });
   } catch (err) {
-    console.error('seguridadAlertas enviarTextoPlataforma:', err.message);
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'factiliza_whatsapp_down_email_failed',
+      err: err.message
+    }));
   }
 }
+
+async function enviarTextoPlataforma(pool, numeroDestino, texto) {
+  const digits = soloDigitos(numeroDestino);
+  if (digits.length < 9) {
+    console.error('context:', JSON.stringify({
+      level: 'info',
+      message: 'alerta_whatsapp_skip_destino_invalido',
+      destinoOfuscado: ofuscarNumero(digits || numeroDestino)
+    }));
+    return { ok: false, skipped: true, reason: 'destino_invalido' };
+  }
+  const t = String(texto || '').trim().slice(0, 3500);
+  if (!t) return { ok: false, skipped: true, reason: 'texto_vacio' };
+
+  let config;
+  try {
+    config = await obtenerConfigWhatsApp(pool);
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_whatsapp_config_load_error',
+      err: err.message
+    }));
+    return { ok: false, error: 'config_load_error' };
+  }
+  if (!config || !config.tokenDefault || !String(config.parametroRuta || '').trim()) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alerta_whatsapp_config_incompleta',
+      detail: 'Factiliza WHATSAPP no tiene tokenDefault o parametroRuta. UPDATE FactilizaConfig requerido.'
+    }));
+    return { ok: false, error: 'config_incompleta' };
+  }
+
+  try {
+    const resultado = await whatsappFactilizaService.sendText(config, digits, t);
+    if (resultado.success) {
+      factilizaWhatsAppHealth.falloConsecutivos = 0;
+      factilizaWhatsAppHealth.ultimoExitoTs = Date.now();
+      factilizaWhatsAppHealth.notificadoDownEmail = false;
+      return { ok: true, status: resultado.status };
+    }
+    factilizaWhatsAppHealth.falloConsecutivos += 1;
+    factilizaWhatsAppHealth.ultimoErrorTs = Date.now();
+    factilizaWhatsAppHealth.ultimoErrorMsg = String(resultado.message || '').slice(0, 200);
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_whatsapp_api_no_ok',
+      status: resultado.status,
+      apiMessage: resultado.message,
+      destinoOfuscado: ofuscarNumero(digits),
+      falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos
+    }));
+    if (factilizaWhatsAppHealth.falloConsecutivos >= FACTILIZA_DOWN_THRESHOLD) {
+      await avisarPorEmailFactilizaCaida(`API responde ${resultado.status} ${resultado.message}`);
+    }
+    return { ok: false, status: resultado.status, message: resultado.message };
+  } catch (err) {
+    factilizaWhatsAppHealth.falloConsecutivos += 1;
+    factilizaWhatsAppHealth.ultimoErrorTs = Date.now();
+    factilizaWhatsAppHealth.ultimoErrorMsg = String(err.message || '').slice(0, 200);
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_whatsapp_send_error',
+      err: err.message,
+      destinoOfuscado: ofuscarNumero(digits),
+      falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos
+    }));
+    if (factilizaWhatsAppHealth.falloConsecutivos >= FACTILIZA_DOWN_THRESHOLD) {
+      await avisarPorEmailFactilizaCaida(`Error en send: ${err.message}`);
+    }
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
+ * Envoltorio para llamadas fire-and-forget (`void seguridadAlertasService.notificarXxx(...)`).
+ * Garantiza que cualquier rejection quede como log JSON estructurado en lugar de
+ * romper el process en `unhandledRejection`.
+ */
+exports.runSafeAlert = function runSafeAlert(promiseOrFn, label) {
+  let p;
+  try {
+    p = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
+  } catch (errSync) {
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_safe_sync_error',
+      label,
+      err: errSync.message
+    }));
+    return;
+  }
+  if (!p || typeof p.then !== 'function') return;
+  p.catch((err) => {
+    console.error('context:', JSON.stringify({
+      level: 'error',
+      message: 'alerta_safe_async_error',
+      label,
+      err: err && err.message ? err.message : String(err)
+    }));
+  });
+};
+
+/** Estado actual del health-check Factiliza WhatsApp (para endpoint admin opcional). */
+exports.obtenerEstadoFactilizaWhatsApp = function () {
+  return {
+    falloConsecutivos: factilizaWhatsAppHealth.falloConsecutivos,
+    ultimoExitoTs: factilizaWhatsAppHealth.ultimoExitoTs,
+    ultimoErrorTs: factilizaWhatsAppHealth.ultimoErrorTs,
+    ultimoErrorMsg: factilizaWhatsAppHealth.ultimoErrorMsg
+  };
+};
 
 /**
  * Tras intento fallido de login: aviso a empresa (3.er y 5.to) y a desarrollador (3 y 5).
@@ -97,6 +254,77 @@ Acción: todas las sesiones del usuario en esa empresa fueron revocadas.`;
   }
 };
 
+/**
+ * Tracker en memoria para detectar credential stuffing / email spraying:
+ * por cada IP guarda los emails distintos que probo en una ventana de tiempo.
+ * Con suficiente cantidad de emails distintos + total de intentos, dispara
+ * alerta al desarrollador (con throttle por IP).
+ */
+const SPRAYING_VENTANA_MS = parseInt(process.env.SPRAYING_VENTANA_MS, 10) || 15 * 60 * 1000;
+const SPRAYING_MIN_EMAILS = parseInt(process.env.SPRAYING_MIN_EMAILS, 10) || 5;
+const SPRAYING_MIN_INTENTOS = parseInt(process.env.SPRAYING_MIN_INTENTOS, 10) || 10;
+const SPRAYING_THROTTLE_MS = parseInt(process.env.SPRAYING_THROTTLE_MS, 10) || 30 * 60 * 1000;
+const sprayingPorIp = new Map(); // ip -> { intentos, emails:Set, primerTs, ultimaAlertaTs }
+
+function trackearIntentoFallidoIp(ipCliente, email) {
+  const ip = String(ipCliente || '').trim();
+  if (!ip) return null;
+  const ahora = Date.now();
+  let info = sprayingPorIp.get(ip);
+  if (!info || ahora - info.primerTs > SPRAYING_VENTANA_MS) {
+    info = { intentos: 0, emails: new Set(), primerTs: ahora, ultimaAlertaTs: 0 };
+    sprayingPorIp.set(ip, info);
+  }
+  info.intentos += 1;
+  if (email) info.emails.add(String(email).toLowerCase().slice(0, 120));
+  if (info.intentos >= SPRAYING_MIN_INTENTOS
+    && info.emails.size >= SPRAYING_MIN_EMAILS
+    && ahora - info.ultimaAlertaTs > SPRAYING_THROTTLE_MS) {
+    info.ultimaAlertaTs = ahora;
+    return {
+      intentos: info.intentos,
+      emailsDistintos: info.emails.size,
+      ventanaMs: ahora - info.primerTs
+    };
+  }
+  return null;
+}
+
+const PATRON_SOSPECHOSO_REGEX = [
+  /'[\s]*(or|and)[\s]+/i,            // ' OR / ' AND
+  /--/,                                // SQL comment
+  /;\s*drop\s+/i,                       // ; DROP
+  /\bunion\s+select\b/i,                // UNION SELECT
+  /<\s*script\b/i,                      // XSS
+  /\bonerror\s*=/i,
+  /\bonload\s*=/i,
+  /\${[a-z]/i,                          // template literal injection
+  /\bxp_cmdshell\b/i,
+  /\bexec\s*\(/i,
+  /%00/,                                 // null byte
+  /\.\.\//,                             // path traversal
+  /\\x[0-9a-f]{2}/i,
+  /<%[=@]/                              // server-side tags
+];
+
+function pareceInyeccion(valor) {
+  const s = String(valor || '');
+  if (s.length === 0 || s.length > 500) return s.length > 500;
+  return PATRON_SOSPECHOSO_REGEX.some((re) => re.test(s));
+}
+
+const ultimaAlertaInyeccionPorIp = new Map();
+const INYECCION_THROTTLE_MS = parseInt(process.env.INYECCION_ALERT_THROTTLE_MS, 10) || 5 * 60 * 1000;
+
+function deberiaAlertarInyeccion(ipCliente) {
+  const ip = String(ipCliente || '').trim() || 'desconocida';
+  const ahora = Date.now();
+  const ult = ultimaAlertaInyeccionPorIp.get(ip) || 0;
+  if (ahora - ult < INYECCION_THROTTLE_MS) return false;
+  ultimaAlertaInyeccionPorIp.set(ip, ahora);
+  return true;
+}
+
 exports.notificarLoginFallido = async (pool, params) => {
   const {
     empresa,
@@ -114,6 +342,28 @@ exports.notificarLoginFallido = async (pool, params) => {
 
   const base = `[EFAF Login] RUC ${ruc} ${razon}\nEmail intentado: ${email}\nIntentos fallidos: ${intentosFallidos}${ipLinea}`;
 
+  // 1) Tracker de spraying por IP (independiente del email/empresa)
+  const spraying = trackearIntentoFallidoIp(ipCliente, email);
+  if (spraying) {
+    const txt = `[EFAF Login] POSIBLE EMAIL-SPRAYING / CREDENTIAL STUFFING
+IP: ${String(ipCliente || '').slice(0, 45)}
+Intentos en ventana: ${spraying.intentos}
+Emails distintos probados: ${spraying.emailsDistintos}
+Ventana: ${Math.round(spraying.ventanaMs / 1000)}s
+Ultima empresa: ${ruc} ${razon}`;
+    await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, txt);
+  }
+
+  // 2) Patrones de inyeccion en el email (SQLi/XSS/path-traversal)
+  if (pareceInyeccion(email) && deberiaAlertarInyeccion(ipCliente)) {
+    const txt = `[EFAF Seguridad] Patron sospechoso en login
+IP: ${String(ipCliente || '').slice(0, 45)}
+Email recibido: ${String(email || '').slice(0, 200)}
+RUC objetivo: ${ruc}`;
+    await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, txt);
+  }
+
+  // 3) Reglas existentes: 3+ fallos consecutivos por (empresa, email) o lockout
   const alertaDev =
     intentosFallidos === 3 || intentosFallidos >= 5 || recienBloqueado;
   if (alertaDev) {
@@ -127,6 +377,29 @@ exports.notificarLoginFallido = async (pool, params) => {
       : `${base}\nAdvertencia de seguridad: si no fue usted, revise sus usuarios.`;
     await enviarTextoPlataforma(pool, celularEmpresa, msgEmpresa);
   }
+};
+
+/**
+ * Detecta payloads sospechosos en cualquier campo del request body de login
+ * (RUC, email o password). Llamar desde el controlador con req.body.
+ * Si encuentra patron sospechoso, alerta al dev (con throttle) sin importar
+ * si el RUC/email son validos. Crucial contra atacantes que prueban RUCs
+ * inexistentes (los cuales NO entran a aplicarFalloLogin).
+ */
+exports.notificarPatronSospechosoEnLogin = async (pool, params) => {
+  const { ipCliente, email, password, ruc } = params || {};
+  const sospechosos = [];
+  if (pareceInyeccion(email)) sospechosos.push(`email=${String(email).slice(0, 80)}`);
+  if (pareceInyeccion(password)) sospechosos.push(`password=<patron>`); // nunca loguear el password real
+  if (pareceInyeccion(ruc)) sospechosos.push(`ruc=${String(ruc).slice(0, 40)}`);
+  if (!sospechosos.length) return;
+  if (!deberiaAlertarInyeccion(ipCliente)) return;
+
+  const ip = String(ipCliente || '').slice(0, 45) || 'desconocida';
+  const txt = `[EFAF Seguridad] Patron sospechoso en /admin_login
+IP: ${ip}
+Hallazgos: ${sospechosos.join(' | ')}`;
+  await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, txt);
 };
 
 /** Solo administrador de empresa: aviso al celular de Empresas. superAdmin usa notificarLoginSuperAdminExitoso. */
@@ -242,4 +515,85 @@ exports.notificarErrorSistemaDesdeRequest = async (pool, err, req) => {
   const path = req && req.originalUrl ? req.originalUrl : '';
   const msg = err && err.message ? err.message : String(err);
   await exports.notificarErrorSistema(pool, `${req?.method || ''} ${path}\n${msg.slice(0, 400)}`);
+};
+
+// =============================================================================
+// Health-check periodico de Factiliza WhatsApp.
+// Cada FACTILIZA_HEALTHCHECK_INTERVAL_MS (default 6h) intenta enviar un
+// mensaje silencioso al destino configurado. Si la API falla repetidamente,
+// avisarPorEmailFactilizaCaida ya esta en enviarTextoPlataforma (al pasar
+// FACTILIZA_DOWN_THRESHOLD fallos). Aqui ademas garantizamos que se realiza
+// el ping aunque no haya logins / fallos en el dia.
+// =============================================================================
+let intervaloHealthCheck = null;
+
+/**
+ * Inicia el health-check periodico que envia un ping a Factiliza WhatsApp.
+ * Si los envios fallan FACTILIZA_DOWN_THRESHOLD veces consecutivas, el aviso
+ * por email se dispara desde enviarTextoPlataforma.
+ *
+ * @param {{ withPool: function(function(pool):Promise):Promise }} deps
+ */
+exports.iniciarHealthCheckFactiliza = function iniciarHealthCheckFactiliza(deps) {
+  if (intervaloHealthCheck) return;
+  const withPool = deps && typeof deps.withPool === 'function' ? deps.withPool : null;
+  if (!withPool) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'factiliza_healthcheck_skip',
+      detail: 'No se paso withPool a iniciarHealthCheckFactiliza.'
+    }));
+    return;
+  }
+  const interval = parseInt(process.env.FACTILIZA_HEALTHCHECK_INTERVAL_MS, 10) || 6 * 60 * 60 * 1000;
+  if (interval <= 0) return;
+  const destino = NUMERO_DESARROLLADOR || NUMERO_SUPERADMIN_LOGIN_ALERT;
+  if (!destino || destino.length < 9) {
+    console.error('context:', JSON.stringify({
+      level: 'info',
+      message: 'factiliza_healthcheck_skip',
+      detail: 'Sin ALERT_DEV_WHATSAPP ni SUPERADMIN_LOGIN_ALERT_WHATSAPP, no se inicia el health-check.'
+    }));
+    return;
+  }
+
+  const ejecutarPing = async () => {
+    try {
+      const ahora = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const r = await withPool((pool) =>
+        enviarTextoPlataforma(pool, destino, `[EFAF Health] Ping Factiliza WhatsApp ${ahora}.`)
+      );
+      if (r && r.ok) {
+        console.error('context:', JSON.stringify({
+          level: 'info',
+          message: 'factiliza_healthcheck_ok',
+          ts: ahora
+        }));
+      }
+    } catch (err) {
+      console.error('context:', JSON.stringify({
+        level: 'error',
+        message: 'factiliza_healthcheck_error',
+        err: err.message
+      }));
+    }
+  };
+
+  intervaloHealthCheck = setInterval(ejecutarPing, interval);
+  if (intervaloHealthCheck && typeof intervaloHealthCheck.unref === 'function') {
+    intervaloHealthCheck.unref();
+  }
+  console.error('context:', JSON.stringify({
+    level: 'info',
+    message: 'factiliza_healthcheck_started',
+    intervalMs: interval,
+    destinoOfuscado: ofuscarNumero(destino)
+  }));
+};
+
+exports.detenerHealthCheckFactiliza = function () {
+  if (intervaloHealthCheck) {
+    clearInterval(intervaloHealthCheck);
+    intervaloHealthCheck = null;
+  }
 };
