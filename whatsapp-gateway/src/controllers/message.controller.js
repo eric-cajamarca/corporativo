@@ -47,4 +47,34 @@ async function sendMedia(req, res) {
   }
 }
 
-module.exports = { sendText, sendMedia };
+async function sendPresence(req, res) {
+  const idEmpresa = validateTenantId(req, res);
+  if (!idEmpresa) return;
+  const { number, type } = req.body || {};
+  if (!number) {
+    return res.status(400).json({ status: 400, success: false, message: 'number es requerido' });
+  }
+  try {
+    const resultado = await sessionManager.sendPresence(idEmpresa, number, type);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return res.status(400).json({ status: 400, success: false, message: err.message || 'Error al enviar presence' });
+  }
+}
+
+async function sendReaction(req, res) {
+  const idEmpresa = validateTenantId(req, res);
+  if (!idEmpresa) return;
+  const { number, messageId, emoji } = req.body || {};
+  if (!number || !messageId) {
+    return res.status(400).json({ status: 400, success: false, message: 'number y messageId son requeridos' });
+  }
+  try {
+    const resultado = await sessionManager.sendReaction(idEmpresa, number, messageId, emoji);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return res.status(400).json({ status: 400, success: false, message: err.message || 'Error al reaccionar' });
+  }
+}
+
+module.exports = { sendText, sendMedia, sendPresence, sendReaction };

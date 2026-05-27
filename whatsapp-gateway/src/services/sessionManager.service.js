@@ -452,6 +452,47 @@ async function sendText(idEmpresa, number, text, options = {}) {
   return { status: 200, success: true, message: 'Mensaje enviado' };
 }
 
+const PRESENCE_ALLOWED = new Set(['available', 'unavailable', 'composing', 'recording', 'paused']);
+
+/**
+ * Envia un presence update al chat (ej. "escribiendo..." / "grabando audio").
+ * NO usa throttle (es muy ligero y se llama varias veces por turno del bot).
+ */
+async function sendPresence(idEmpresa, number, type) {
+  const sock = requireConnected(idEmpresa);
+  const t = String(type || 'composing').toLowerCase();
+  if (!PRESENCE_ALLOWED.has(t)) {
+    throw new Error(`presence type invalido: ${type}`);
+  }
+  const jid = toWhatsAppJid(number);
+  // Baileys exige llamar primero a sendPresenceUpdate('available') para "registrarse"
+  // como online ante el contacto antes de poder enviar 'composing'/'paused'/'recording'.
+  // Lo hacemos solo si el caller pidio 'composing' o 'recording'.
+  if (t === 'composing' || t === 'recording') {
+    try { await sock.sendPresenceUpdate('available', jid); } catch (e) { /* tolerable */ }
+  }
+  await sock.sendPresenceUpdate(t, jid);
+  return { status: 200, success: true, message: 'presence enviado' };
+}
+
+/**
+ * Reacciona a un mensaje del cliente con un emoji (✅, 👋, 🔍, 🛒, etc.).
+ * Si emoji = '' o null, retira la reaccion previa (Baileys lo permite con texto vacio).
+ */
+async function sendReaction(idEmpresa, number, messageId, emoji) {
+  const sock = requireConnected(idEmpresa);
+  if (!messageId) throw new Error('messageId requerido');
+  const jid = toWhatsAppJid(number);
+  const text = emoji != null ? String(emoji) : '';
+  await sock.sendMessage(jid, {
+    react: {
+      text,
+      key: { remoteJid: jid, fromMe: false, id: String(messageId) }
+    }
+  });
+  return { status: 200, success: true, message: text ? 'reaccion enviada' : 'reaccion retirada' };
+}
+
 const PRIVATE_OR_RESERVED_HOST_RE = [
   /^localhost$/i,
   /^127\./,
@@ -575,5 +616,7 @@ module.exports = {
   logoutSession,
   sendText,
   sendMedia,
+  sendPresence,
+  sendReaction,
   preloadSessions
 };

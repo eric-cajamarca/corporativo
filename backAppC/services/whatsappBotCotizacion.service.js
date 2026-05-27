@@ -9,6 +9,7 @@ const whatsappBotLimites = require('./whatsappBotLimites.service');
 const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
+const copy = require('./whatsappBot.copy');
 
 const MEDIOS_PAGO = {
   1: 'Efectivo',
@@ -19,14 +20,14 @@ const MEDIOS_PAGO = {
 };
 
 const TEXTO_MEDIOS_PAGO = [
-  '*Medio de pago preferido:*',
+  '*¿Cuál es tu medio de pago preferido?*',
   '1. Efectivo',
   '2. Transferencia bancaria',
   '3. Yape / Plin',
   '4. Tarjeta',
   '5. Otro',
   '',
-  'Responda con el numero (1-5) o escriba el medio de pago.'
+  'Responde con el número (1-5) o escribe el medio de pago.'
 ].join('\n');
 
 function esEstadoCotizacion(estado) {
@@ -42,16 +43,16 @@ function resolverIdCliente(slots, resCliente) {
 }
 
 function entrarModoCotizacion(idCliente, mensajeExtra) {
-  const prefijo = mensajeExtra ? [`${mensajeExtra}`, ''] : [];
+  const burbujas = [];
+  if (mensajeExtra) burbujas.push(mensajeExtra);
+  burbujas.push([
+    '*Modo cotización* 🛒',
+    'Escríbeme el nombre del producto que quieres agregar al carrito.',
+    '',
+    'Comandos: *CARRITO* | *CONFIRMAR* | *CANCELAR* | *MENÚ*'
+  ].join('\n'));
   return {
-    respuesta: [
-      ...prefijo,
-      '*Modo cotizacion*',
-      'Escriba el nombre del producto que desea agregar.',
-      'Comandos: CARRITO | CONFIRMAR | CANCELAR | MENU',
-      '',
-      formatearCarrito([])
-    ].join('\n'),
+    respuesta: burbujas,
     conv: {
       estado: 'cotiz_activa',
       slots: { carrito: [], idCliente },
@@ -67,8 +68,8 @@ async function solicitarRegistroOIniciarCotizacion(resCliente) {
   if (resCliente.ambiguo) {
     return {
       respuesta: [
-        'Encontramos mas de un cliente con su numero.',
-        'Indique su *DNI* o *RUC* para identificarse y cotizar.',
+        'Encontramos más de un cliente con tu número.',
+        'Indícame tu *DNI* o *RUC* para identificarte y cotizar.',
         '',
         whatsappBotRegistroCliente.TEXTO_SOLICITAR_DOCUMENTO.split('\n').slice(2).join('\n')
       ].join('\n'),
@@ -91,18 +92,19 @@ function totalCarrito(carrito) {
 
 function formatearCarrito(carrito) {
   if (!carrito?.length) {
-    return 'Su carrito esta vacio.\n\nEscriba el nombre de un producto para agregarlo, o MENU para volver.';
+    return copy.v('carritoVacioAviso');
   }
   const lineas = carrito.map((it, i) =>
     `${i + 1}. ${it.descripcion} (${it.codigo}) x${it.cantidad} = ${formatearPrecio(it.total)}`
   );
   return [
-    '*Su cotizacion:*',
+    '*Tu cotización:*',
+    '',
     ...lineas,
     '',
     `*Total: ${formatearPrecio(totalCarrito(carrito))}*`,
     '',
-    'Comandos: AGREGAR otro producto | QUITAR [n] | CONFIRMAR | CANCELAR'
+    'Comandos: *AGREGAR* otro producto | *QUITAR n* | *CONFIRMAR* | *CANCELAR*'
   ].join('\n');
 }
 
@@ -274,25 +276,17 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   const slots = { ...(conv.slots || {}), carrito: Array.isArray(conv.slots?.carrito) ? [...conv.slots.carrito] : [] };
 
   if (esEstadoRegistroDocumento(conv.estado)) {
-    if (nlu.intencion === 'menu') {
+    if (nlu.intencion === 'menu' || nlu.intencion === 'cancelar_cotizacion') {
       return {
-        respuesta: 'Registro cancelado. Escriba MENU para ver opciones.',
-        conv: { estado: 'menu', slots: {}, candidatos: [] }
-      };
-    }
-    if (nlu.intencion === 'cancelar_cotizacion') {
-      return {
-        respuesta: 'Registro cancelado. Escriba MENU para ver opciones.',
+        respuesta: 'Registro cancelado. Escribe *MENÚ* para ver las opciones.',
         conv: { estado: 'menu', slots: {}, candidatos: [] }
       };
     }
     if (nlu.intencion === 'documento_invalido') {
       return {
         respuesta: [
-          'Documento invalido.',
-          'Ingrese *DNI* (8 digitos) o *RUC* (11 digitos). Solo numeros.',
-          '',
-          'Escriba MENU para volver al inicio.'
+          'Ese documento no parece válido.',
+          'Ingresa *DNI* (8 dígitos) o *RUC* (11 dígitos), solo números.'
         ].join('\n'),
         conv: { estado: 'registro_documento', slots: {}, candidatos: [] }
       };
@@ -310,7 +304,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
           respuesta: [
             registro.mensaje,
             '',
-            'Verifique su DNI o RUC e intente de nuevo, o escriba MENU para volver.'
+            'Verifica tu DNI o RUC e inténtalo de nuevo, o escribe *MENÚ* para volver.'
           ].join('\n'),
           conv: { estado: 'registro_documento', slots: {}, candidatos: [] }
         };
@@ -336,7 +330,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
 
   if (nlu.intencion === 'cancelar_cotizacion' || (nlu.intencion === 'menu' && conv.estado !== 'cotiz_medio_pago')) {
     return {
-      respuesta: 'Cotizacion cancelada. Escriba MENU para ver opciones.',
+      respuesta: 'Cotización cancelada. Escribe *MENÚ* para ver las opciones.',
       conv: { estado: 'menu', slots: {}, candidatos: [] }
     };
   }
@@ -350,7 +344,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
 
   if (nlu.intencion === 'confirmar_cotizacion') {
     if (carritoVacio(slots)) {
-      return { respuesta: 'Su carrito esta vacio. Agregue productos antes de confirmar.', conv: { ...conv, slots } };
+      return { respuesta: 'Tu carrito está vacío. Agrega productos antes de confirmar.', conv: { ...conv, slots } };
     }
     const idCliente = resolverIdCliente(slots, resCliente);
     if (!idCliente) {
@@ -360,11 +354,9 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     return {
       respuesta: [
         formatearCarrito(slots.carrito),
-        '',
         TEXTO_MEDIOS_PAGO,
-        '',
-        '_Un vendedor lo contactara para confirmar el pago._'
-      ].join('\n'),
+        '_Un vendedor te contactará para confirmar el pago._'
+      ],
       conv: { estado: 'cotiz_medio_pago', slots: { ...slots, idCliente }, candidatos: [] }
     };
   }
@@ -372,7 +364,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   if (conv.estado === 'cotiz_medio_pago') {
     const medioPago = resolverMedioPago(texto, nlu);
     if (!medioPago) {
-      return { respuesta: 'Medio de pago no valido.\n\n' + TEXTO_MEDIOS_PAGO, conv: { ...conv, slots } };
+      return { respuesta: 'Ese medio de pago no lo reconozco.\n\n' + TEXTO_MEDIOS_PAGO, conv: { ...conv, slots } };
     }
     const idClienteConfirm = resolverIdCliente(slots, resCliente);
     if (!idClienteConfirm) {
@@ -383,7 +375,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
         await whatsappBotLimites.assertLimiteCotizacionesDia(idEmpresa, digitosCelular, idClienteConfirm);
       } catch (limErr) {
         return {
-          respuesta: `${limErr.message} Escriba MENU para volver al inicio.`,
+          respuesta: `${limErr.message} Escribe *MENÚ* para volver al inicio.`,
           conv: { estado: 'menu', slots: {}, candidatos: [] }
         };
       }
@@ -399,33 +391,33 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
         adjunto = {
           pdfBase64: pdf.base64,
           filename: pdf.nombreArchivo,
-          caption: `Cotizacion ${serieNumero}`
+          caption: `Cotización ${serieNumero}`
         };
       } catch (pdfErr) {
         console.error('whatsappBotCotizacion PDF:', pdfErr.message);
       }
-      const respuesta = [
-        `*Cotizacion registrada*`,
-        `Numero: *${serieNumero}*`,
-        `Total: ${formatearPrecio(totalCarrito(slots.carrito))}`,
-        `Medio de pago indicado: ${medioPago}`,
-        '',
+      const burbujas = [
+        `${copy.v('cotizConfirmacion')} ✅`,
+        [
+          `*Cotización ${serieNumero}*`,
+          `Total: ${formatearPrecio(totalCarrito(slots.carrito))}`,
+          `Medio de pago: ${medioPago}`
+        ].join('\n'),
         adjunto
-          ? 'Le enviamos el PDF de su cotizacion. Un vendedor lo llamara pronto para confirmar el pago.'
-          : 'Su cotizacion fue registrada. Un vendedor lo llamara pronto para confirmar el pago.',
-        '',
-        'Escriba MENU para volver al inicio.'
-      ].join('\n');
+          ? 'Te envío el PDF de tu cotización 📄. Un vendedor te llamará pronto para confirmar el pago.'
+          : 'Tu cotización quedó registrada. Un vendedor te llamará pronto para confirmar el pago.'
+      ];
       return {
-        respuesta,
+        respuesta: burbujas,
         conv: { estado: 'menu', slots: {}, candidatos: [] },
         adjunto,
+        reaccion: '✅',
         meta: { idCotizacion, serieNumero, medioPago }
       };
     } catch (err) {
       console.error('whatsappBotCotizacion crear:', err.message);
       return {
-        respuesta: `No pudimos registrar la cotizacion: ${err.message}. Intente de nuevo o contacte a la empresa.`,
+        respuesta: 'No pude registrar la cotización en este momento. Por favor intenta de nuevo en un minuto o contacta a la empresa.',
         conv: { estado: 'cotiz_activa', slots, candidatos: [] }
       };
     }
@@ -435,7 +427,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     const cantidad = parseCantidad(nlu.intencion === 'cantidad' ? String(nlu.entidades?.cantidad ?? texto) : texto);
     if (!cantidad) {
       return {
-        respuesta: 'Indique una cantidad valida (ej. 1, 2, 10.5).',
+        respuesta: 'Indícame una cantidad válida, por ejemplo: *1*, *2*, *10.5*.',
         conv: { ...conv, slots }
       };
     }
@@ -445,11 +437,11 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     slots.carrito = carrito;
     return {
       respuesta: [
-        `Agregado: *${prod.descripcion}* x${cantidad}`,
-        '',
+        `${copy.v('okBreve')} Agregado: *${prod.descripcion}* x${cantidad}`,
         formatearCarrito(carrito)
-      ].join('\n'),
-      conv: { estado: 'cotiz_activa', slots, candidatos: [] }
+      ],
+      conv: { estado: 'cotiz_activa', slots, candidatos: [] },
+      reaccion: '🛒'
     };
   }
 
@@ -457,11 +449,11 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     const idx = Number(nlu.entidades.numero) - 1;
     const candidatos = conv.candidatos || [];
     if (idx < 0 || idx >= candidatos.length) {
-      return { respuesta: 'Opcion invalida. Responda 1-5 o escriba otro termino.', conv };
+      return { respuesta: copy.v('opcionInvalida'), conv };
     }
     slots.productoPendiente = candidatos[idx];
     return {
-      respuesta: `*${candidatos[idx].descripcion}*\nPrecio: ${formatearPrecio(candidatos[idx].precioLista)}\n\n¿Cuantas unidades desea?`,
+      respuesta: `*${candidatos[idx].descripcion}*\nPrecio: ${formatearPrecio(candidatos[idx].precioLista)}\n\n¿Cuántas unidades deseas?`,
       conv: { estado: 'cotiz_cantidad', slots, candidatos: [] }
     };
   }
@@ -469,15 +461,15 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   if (nlu.intencion === 'quitar_carrito') {
     const n = Number(nlu.entidades.numero);
     if (!n || carritoVacio(slots)) {
-      return { respuesta: 'Indique QUITAR seguido del numero de linea (ej. QUITAR 1).', conv: { ...conv, slots } };
+      return { respuesta: 'Indícame *QUITAR* seguido del número de línea (por ejemplo *QUITAR 1*).', conv: { ...conv, slots } };
     }
     const nuevo = quitarDelCarrito(slots.carrito, n);
     if (!nuevo) {
-      return { respuesta: 'Linea invalida. Use CARRITO para ver la lista.', conv: { ...conv, slots } };
+      return { respuesta: 'Línea no válida. Escribe *CARRITO* para ver la lista actualizada.', conv: { ...conv, slots } };
     }
     slots.carrito = nuevo;
     return {
-      respuesta: ['Producto quitado.', '', formatearCarrito(nuevo)].join('\n'),
+      respuesta: [`${copy.v('okBreve')} Quité ese producto.`, formatearCarrito(nuevo)],
       conv: { estado: 'cotiz_activa', slots, candidatos: [] }
     };
   }
@@ -486,34 +478,35 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     const { items } = await whatsappBotCatalogo.buscar(idEmpresa, nlu.terminosBusqueda, 5);
     if (!items.length) {
       return {
-        respuesta: 'No encontramos ese producto. Intente con otro nombre o escriba CARRITO.',
+        respuesta: 'No encontré ese producto. Intenta con otro nombre o escribe *CARRITO*.',
         conv: { estado: 'cotiz_activa', slots, candidatos: [] }
       };
     }
     if (items.length === 1) {
       slots.productoPendiente = items[0];
       return {
-        respuesta: `*${items[0].descripcion}*\nPrecio: ${formatearPrecio(items[0].precioLista)}\n\n¿Cuantas unidades desea?`,
+        respuesta: `*${items[0].descripcion}*\nPrecio: ${formatearPrecio(items[0].precioLista)}\n\n¿Cuántas unidades deseas?`,
         conv: { estado: 'cotiz_cantidad', slots, candidatos: [] }
       };
     }
     const lineas = items.map((p, i) =>
-      `${i + 1}. *${p.descripcion}* (${p.codigo}) - ${formatearPrecio(p.precioLista)}`
+      `${i + 1}. *${p.descripcion}* (${p.codigo}) — ${formatearPrecio(p.precioLista)}`
     );
     return {
-      respuesta: ['Productos encontrados:', ...lineas, '', 'Responda el numero para agregar al carrito.'].join('\n'),
-      conv: { estado: 'cotiz_eligiendo', slots, candidatos: items }
+      respuesta: ['Encontré estos productos:', '', ...lineas, '', 'Responde el número para agregarlo al carrito.'].join('\n'),
+      conv: { estado: 'cotiz_eligiendo', slots, candidatos: items },
+      reaccion: '🔍'
     };
   }
 
   if (esEstadoCotizacion(conv.estado)) {
     return {
       respuesta: [
-        'En modo cotizacion puede:',
-        '- Escribir el producto a buscar',
-        '- CARRITO ver lista',
-        '- CONFIRMAR para registrar',
-        '- CANCELAR para salir'
+        'En modo cotización puedes:',
+        '— Escribir el nombre del producto a buscar',
+        '— *CARRITO* para ver tu lista',
+        '— *CONFIRMAR* para registrar',
+        '— *CANCELAR* para salir'
       ].join('\n'),
       conv: { ...conv, slots }
     };

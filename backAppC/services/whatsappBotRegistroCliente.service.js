@@ -11,14 +11,14 @@ const FACTILIZA_BASE = 'https://api.factiliza.com/v1';
 const FACTILIZA_TIMEOUT_MS = 8000;
 
 const TEXTO_SOLICITAR_DOCUMENTO = [
-  '*Cotizacion*',
-  'Para cotizar indique su *DNI* (8 digitos) o *RUC* (11 digitos).',
-  'Validaremos su documento en SUNAT/RENIEC antes de continuar.',
+  '*Cotización* 🛒',
+  'Para cotizarte necesito tu *DNI* (8 dígitos) o *RUC* (11 dígitos).',
+  'Vamos a validar tu documento en SUNAT/RENIEC antes de continuar.',
   '',
   'Ejemplo DNI: 12345678',
   'Ejemplo RUC: 20123456789',
   '',
-  'Escriba MENU para volver al inicio.'
+  '_Escribe MENÚ si prefieres no continuar._'
 ].join('\n');
 
 function soloDigitos(valor) {
@@ -42,16 +42,16 @@ function parseDocumentoEntrada(texto) {
 
 /** Validacion local basica antes de consultar API. */
 function validarFormatoDocumento(doc) {
-  if (!doc) return { ok: false, mensaje: 'Ingrese DNI (8 digitos) o RUC (11 digitos).' };
+  if (!doc) return { ok: false, mensaje: 'Ingresa DNI (8 dígitos) o RUC (11 dígitos).' };
   if (doc.tipo === 'dni') {
     if (!/^\d{8}$/.test(doc.numero)) {
-      return { ok: false, mensaje: 'DNI invalido. Debe tener 8 digitos.' };
+      return { ok: false, mensaje: 'Ese DNI no es válido. Debe tener 8 dígitos.' };
     }
     return { ok: true };
   }
   if (doc.tipo === 'ruc') {
     if (!/^(10|15|16|17|20)\d{9}$/.test(doc.numero)) {
-      return { ok: false, mensaje: 'RUC invalido. Debe tener 11 digitos y un prefijo valido (10, 15, 16, 17 o 20).' };
+      return { ok: false, mensaje: 'Ese RUC no es válido. Debe tener 11 dígitos y empezar en 10, 15, 16, 17 o 20.' };
     }
     return { ok: true };
   }
@@ -115,23 +115,23 @@ async function consultarDocumentoFactiliza(pool, idEmpresa, doc) {
     const inner = data && (data.data ?? data);
     const hasData = inner && (typeof inner === 'object' && Object.keys(inner).length > 0);
     if (response.status !== 200 || !hasData) {
-      const msg = pick(data, 'message', 'Message') || `Documento ${doc.numero} no encontrado o invalido.`;
+      const msg = pick(data, 'message', 'Message') || `No encontré el documento ${doc.numero}.`;
       return { ok: false, mensaje: String(msg) };
     }
     if (doc.tipo === 'dni') {
       const norm = normalizarRespuestaDni(data);
-      if (!norm) return { ok: false, mensaje: 'DNI no encontrado en RENIEC.' };
+      if (!norm) return { ok: false, mensaje: 'No encontré ese DNI en RENIEC.' };
       return { ok: true, datos: norm };
     }
     const norm = normalizarRespuestaRuc(data);
-    if (!norm) return { ok: false, mensaje: 'RUC no encontrado en SUNAT.' };
+    if (!norm) return { ok: false, mensaje: 'No encontré ese RUC en SUNAT.' };
     if (norm.condicion && !/ACTIVO|HABIDO/i.test(norm.condicion)) {
-      return { ok: false, mensaje: `RUC ${doc.numero} no esta activo/habido en SUNAT (${norm.condicion}).` };
+      return { ok: false, mensaje: `El RUC ${doc.numero} no está activo/habido en SUNAT (${norm.condicion}).` };
     }
     return { ok: true, datos: norm };
   } catch (err) {
     console.error('whatsappBotRegistroCliente consulta:', err.message);
-    return { ok: false, mensaje: 'No pudimos validar su documento. Intente mas tarde.' };
+    return { ok: false, mensaje: 'No pude validar tu documento en este momento. Intenta de nuevo en un minuto.' };
   }
 }
 
@@ -158,8 +158,8 @@ async function validarCelularUnicoDocumento(pool, idEmpresa, variantesCelular, d
       return {
         ok: false,
         mensaje:
-          'Este numero de celular ya esta registrado como contacto de otro cliente. ' +
-          'Use el documento asociado a su numero o contacte a la empresa.'
+          'Este número de celular ya está registrado como contacto de otro cliente. ' +
+          'Usa el documento asociado a tu número o contacta a la empresa.'
       };
     }
   }
@@ -241,8 +241,8 @@ async function registrarPorDocumento(idEmpresa, digitosCelular, textoDocumento, 
       ok: true,
       cliente,
       mensaje: cliente.existente
-        ? `Cliente identificado: *${cliente.rSocial}*. Continuamos con su cotizacion.`
-        : `Cliente registrado: *${cliente.rSocial}*. Continuamos con su cotizacion.`
+        ? `¡Te identifiqué! Hola *${cliente.rSocial}*. Continuamos con tu cotización.`
+        : `¡Listo! Te registré como *${cliente.rSocial}*. Continuamos con tu cotización.`
     };
   });
 }

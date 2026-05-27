@@ -4,6 +4,7 @@ const ventasRepository = require('../repositories/ventas.repository');
 const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
+const copy = require('./whatsappBot.copy');
 
 const PEDIDOS_TOP = 5;
 const PDF_MAX_DIA = parseInt(process.env.WHATSAPP_BOT_PEDIDO_PDF_MAX_DIA, 10) || 3;
@@ -34,9 +35,9 @@ function registrarPdfPedido(idEmpresa, telefonoLog) {
 function requiereCliente(config, resCliente) {
   if (resCliente.encontrado) return null;
   if (resCliente.ambiguo) {
-    return 'Encontramos mas de un cliente con su numero. Contacte a la empresa para actualizar sus datos.';
+    return 'Encontramos más de un cliente con tu número. Por favor contacta a la empresa para actualizar tus datos.';
   }
-  return config.mensajeNoRegistrado || 'No encontramos su numero registrado.';
+  return config.mensajeNoRegistrado || 'No encontramos tu número registrado.';
 }
 
 function marcaPago(idEstadoPago) {
@@ -55,16 +56,16 @@ function formatearListaPedidos(pedidos) {
   });
   const pendientes = pedidos.filter((p) => p.idEstadoPago === 1 || p.idEstadoPago === 3).length;
   const aviso = pendientes > 0
-    ? `_Tiene ${pendientes} pedido(s) pendiente(s) de pago._`
-    : '_Todos sus pedidos estan pagados._';
+    ? `_Tienes ${pendientes} pedido(s) pendiente(s) de pago._`
+    : '_Todos tus pedidos están pagados._ ✅';
   return [
-    '*Sus ultimos pedidos:*',
+    '*Tus últimos pedidos:*',
+    '',
     ...lineas,
     '',
     aviso,
     '',
-    'Responda el *numero* del pedido (1-5) para ver detalle.',
-    'Escriba MENU para volver.'
+    'Responde el *número* del pedido (1-5) para ver el detalle.'
   ].join('\n');
 }
 
@@ -78,18 +79,16 @@ function formatearResumenPedido(pedido) {
     `Estado pedido: ${pedido.estadoPedido || '—'}`,
     `Estado pago: ${pago}`,
     '',
-    'Que desea?',
-    '*PRODUCTOS* - ver items del pedido',
-    '*PDF* - recibir comprobante PDF',
-    '',
-    'Escriba MENU para volver.'
+    '¿Qué deseas?',
+    '*PRODUCTOS* — ver ítems del pedido',
+    '*PDF* — recibir comprobante en PDF'
   ].join('\n');
 }
 
 function formatearProductosPedido(pedido, items) {
   const comp = compPedido(pedido);
   if (!items.length) {
-    return `El pedido ${comp} no tiene productos registrados.\n\nEscriba PDF o MENU.`;
+    return `El pedido ${comp} no tiene productos registrados.\n\nEscribe *PDF* para el comprobante o *MENÚ*.`;
   }
   const lineas = items.map((it, i) => {
     const desc = String(it.descripcion || it.descripcionProducto || 'Producto').trim();
@@ -98,11 +97,12 @@ function formatearProductosPedido(pedido, items) {
   });
   return [
     `*Productos del pedido ${comp}:*`,
+    '',
     ...lineas,
     '',
-    `Total pedido: ${formatearPrecio(pedido.total)}`,
+    `Total: ${formatearPrecio(pedido.total)}`,
     '',
-    'Escriba *PDF* para recibir el comprobante o *MENU* para volver.'
+    'Escribe *PDF* para recibir el comprobante.'
   ].join('\n');
 }
 
@@ -174,7 +174,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     const pedidos = await listarPedidos(idEmpresa, resCliente.cliente.idCliente);
     if (!pedidos.length) {
       return {
-        respuesta: 'No encontramos pedidos recientes a su nombre.',
+        respuesta: 'No encontré pedidos recientes a tu nombre.',
         conv: { estado: 'menu', slots: {}, candidatos: [] }
       };
     }
@@ -190,13 +190,13 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
 
   if (estado === 'pedido_eligiendo') {
     if (nlu.intencion === 'menu') {
-      return { respuesta: 'Volviendo al menu.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
+      return { respuesta: 'Volviendo al menú.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
     }
     if (nlu.intencion === 'pedido') {
       const pedidos = await listarPedidos(idEmpresa, slots.idCliente || resCliente.cliente?.idCliente);
       if (!pedidos.length) {
         return {
-          respuesta: 'No encontramos pedidos recientes a su nombre.',
+          respuesta: 'No encontré pedidos recientes a tu nombre.',
           conv: { estado: 'menu', slots: {}, candidatos: [] }
         };
       }
@@ -211,7 +211,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     }
     if (nlu.intencion !== 'seleccion_numero') {
       return {
-        respuesta: 'Responda el *numero* del pedido de la lista (1-5) o escriba MENU.',
+        respuesta: 'Responde el *número* del pedido de la lista (1-5) o escribe *MENÚ*.',
         conv
       };
     }
@@ -220,14 +220,14 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     const idCliente = slots.idCliente || resCliente.cliente?.idCliente;
     if (idx < 0 || idx >= candidatos.length || !idCliente) {
       return {
-        respuesta: 'Opcion invalida. Responda un numero de la lista o escriba MENU.',
+        respuesta: copy.v('opcionInvalida'),
         conv
       };
     }
     const pedido = await obtenerPedidoSeleccionado(idEmpresa, idCliente, candidatos, idx);
     if (!pedido) {
       return {
-        respuesta: 'No pudimos acceder a ese pedido. Escriba MENU para volver.',
+        respuesta: 'No pude acceder a ese pedido. Escribe *MENÚ* para volver.',
         conv: { estado: 'menu', slots: {}, candidatos: [] }
       };
     }
@@ -243,14 +243,14 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
 
   if (estado === 'pedido_opciones') {
     if (nlu.intencion === 'menu') {
-      return { respuesta: 'Volviendo al menu.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
+      return { respuesta: 'Volviendo al menú.', conv: { estado: 'menu', slots: {}, candidatos: [] } };
     }
     const idCliente = slots.idCliente || resCliente.cliente?.idCliente;
     const idVenta = slots.idVenta;
     const pedido = slots.pedido;
     if (!idCliente || !idVenta || !pedido) {
       return {
-        respuesta: 'Sesion de pedido expirada. Escriba *1* o *mis pedidos* para volver a consultar.',
+        respuesta: copy.v('sesionExpirada'),
         conv: { estado: 'menu', slots: {}, candidatos: [] }
       };
     }
@@ -272,7 +272,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     if (nlu.intencion === 'pdf_pedido') {
       if (!puedeEnviarPdfPedido(idEmpresa, telefonoLog)) {
         return {
-          respuesta: `Solo puede solicitar ${PDF_MAX_DIA} PDF de pedidos por dia desde este numero.\n\nEscriba PRODUCTOS o MENU.`,
+          respuesta: `Solo puedes solicitar ${PDF_MAX_DIA} PDF de pedidos por día desde este número.\n\nEscribe *PRODUCTOS* o *MENÚ*.`,
           conv: {
             estado: 'pedido_opciones',
             slots: { idCliente, idVenta, pedido },
@@ -284,7 +284,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
         const adjunto = await generarPdfPedido(idEmpresa, idVenta, idCliente);
         registrarPdfPedido(idEmpresa, telefonoLog);
         return {
-          respuesta: `Enviando PDF del pedido ${compPedido(pedido)}...`,
+          respuesta: [`Listo, te envío el PDF del pedido ${compPedido(pedido)} 📄`],
           conv: { estado: 'menu', slots: {}, candidatos: [] },
           adjunto: {
             pdfBase64: adjunto.pdfBase64,
@@ -295,7 +295,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
       } catch (err) {
         console.error('whatsappBotPedidos PDF:', err.message);
         return {
-          respuesta: 'No pudimos generar el PDF en este momento. Intente mas tarde o escriba PRODUCTOS.',
+          respuesta: 'No pude generar el PDF en este momento. Intenta más tarde o escribe *PRODUCTOS*.',
           conv: {
             estado: 'pedido_opciones',
             slots: { idCliente, idVenta, pedido },
@@ -306,7 +306,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     }
 
     return {
-      respuesta: 'Escriba *PRODUCTOS* para ver items o *PDF* para recibir el comprobante.\n\nMENU para volver.',
+      respuesta: 'Escribe *PRODUCTOS* para ver los ítems o *PDF* para recibir el comprobante.',
       conv: {
         estado: 'pedido_opciones',
         slots: { idCliente, idVenta, pedido },
@@ -317,7 +317,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
 
   if (esEstadoPedido(estado)) {
     return {
-      respuesta: 'Sesion de pedido expirada. Escriba *1* o *mis pedidos* para consultar de nuevo.',
+      respuesta: copy.v('sesionExpirada'),
       conv: { estado: 'menu', slots: {}, candidatos: [] }
     };
   }

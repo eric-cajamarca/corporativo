@@ -70,6 +70,52 @@ async function sendMedia(idEmpresa, number, mediatype, media, filename, caption,
   };
 }
 
+/**
+ * Envia un "estado de presencia" al chat (composing, paused, recording, available, unavailable).
+ * Best-effort: si el gateway esta caido o no soporta el endpoint, NO debe romper la respuesta.
+ * Por eso devuelve { ok:false } en lugar de lanzar.
+ */
+async function sendPresence(idEmpresa, number, type) {
+  try {
+    const res = await client().post(
+      `/v1/tenants/${idEmpresa}/messages/presence`,
+      { number, type },
+      { headers: authHeaders({ skipThrottle: true }) }
+    );
+    const data = res.data || {};
+    return {
+      success: data.success === true,
+      status: data.status != null ? data.status : res.status,
+      message: data.message || ''
+    };
+  } catch (err) {
+    return { success: false, status: 0, message: err.message };
+  }
+}
+
+/**
+ * Reacciona al mensaje del cliente con un emoji (ej. '👋', '✅', '🛒').
+ * Best-effort: silencia errores; las reacciones son cosmeticas.
+ */
+async function sendReaction(idEmpresa, number, messageId, emoji) {
+  if (!messageId) return { success: false, message: 'messageId requerido' };
+  try {
+    const res = await client().post(
+      `/v1/tenants/${idEmpresa}/messages/reaction`,
+      { number, messageId, emoji: emoji || '' },
+      { headers: authHeaders({ skipThrottle: true }) }
+    );
+    const data = res.data || {};
+    return {
+      success: data.success === true,
+      status: data.status != null ? data.status : res.status,
+      message: data.message || ''
+    };
+  } catch (err) {
+    return { success: false, status: 0, message: err.message };
+  }
+}
+
 function isConfigured() {
   return Boolean(API_KEY && BASE_URL);
 }
@@ -80,5 +126,7 @@ module.exports = {
   logoutSession,
   sendText,
   sendMedia,
+  sendPresence,
+  sendReaction,
   isConfigured
 };

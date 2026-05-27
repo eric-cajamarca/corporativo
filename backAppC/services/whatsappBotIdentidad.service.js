@@ -101,13 +101,13 @@ async function responderIdentidad(idEmpresa) {
   return [
     `Soy *${nombre}*.${rubro}`,
     '',
-    'Puede preguntarme:',
-    '• *QUE VENDES* — categorias y marcas',
-    '• *QUE PRODUCTOS VENDES* — productos destacados',
-    '• *DIRECCION* — donde estamos',
-    '• *CONTACTO* — telefono y correo',
+    'Puedes preguntarme:',
+    '• *QUÉ VENDES* — categorías y marcas',
+    '• *QUÉ PRODUCTOS VENDES* — productos destacados',
+    '• *DIRECCIÓN* — dónde estamos',
+    '• *CONTACTO* — teléfono y correo',
     '',
-    'O escriba MENU para ver opciones de compra.'
+    'O escribe *MENÚ* para ver las opciones de compra.'
   ].join('\n');
 }
 
@@ -116,7 +116,7 @@ async function responderQueVendes(idEmpresa) {
   const perfil = await cargarPerfil(idEmpresa);
   const nombre = perfil?.nombre || 'Nosotros';
   const prefijo = desdeVentas
-    ? `En *${nombre}* comercializamos (segun ventas recientes):`
+    ? `En *${nombre}* comercializamos (según ventas recientes):`
     : `En *${nombre}* trabajamos con:`;
 
   const txtCat = formatearListaNombres(categorias);
@@ -124,17 +124,17 @@ async function responderQueVendes(idEmpresa) {
 
   const bloques = [prefijo, ''];
   if (txtCat) {
-    bloques.push('*Categorias:*', txtCat, '');
+    bloques.push('*Categorías:*', txtCat, '');
   }
   if (txtMar) {
     bloques.push('*Marcas:*', txtMar, '');
   }
   if (!txtCat && !txtMar) {
-    bloques.push('Aun no tenemos catalogo cargado. Escriba el producto que busca.');
+    bloques.push('Aún no tenemos catálogo cargado. Escríbeme el producto que buscas y te ayudo.');
   } else {
     bloques.push(
-      'Para ver *productos destacados* escriba: *QUE PRODUCTOS VENDES*',
-      'O indique que producto esta buscando.'
+      'Para ver *productos destacados* escribe: *QUÉ PRODUCTOS VENDES*',
+      'O dime qué producto estás buscando.'
     );
   }
   return bloques.join('\n');
@@ -149,8 +149,8 @@ async function responderProductosDestacados(idEmpresa) {
     return [
       `*${nombre}*`,
       '',
-      'Aun no hay productos destacados registrados.',
-      'Escriba el nombre del producto que busca (ej. pintura latex) y lo busco en catalogo.'
+      'Aún no tenemos productos destacados registrados.',
+      'Escríbeme el nombre del producto que buscas (por ejemplo, *pintura látex*) y lo busco en el catálogo.'
     ].join('\n');
   }
 
@@ -161,13 +161,12 @@ async function responderProductosDestacados(idEmpresa) {
 
   return [
     `*Productos destacados de ${nombre}*`,
-    desdeVentas ? '(mas vendidos en los ultimos meses)' : '(de nuestro catalogo)',
+    desdeVentas ? '_(más vendidos en los últimos meses)_' : '_(de nuestro catálogo)_',
     '',
     ...lineas,
     '',
-    '*¿Que producto esta buscando?*',
-    'Escriba el nombre y lo busco en nuestro catalogo.',
-    'Escriba MENU para mas opciones.'
+    '*¿Qué producto estás buscando?*',
+    'Escríbeme el nombre y lo busco en nuestro catálogo.'
   ].join('\n');
 }
 
@@ -179,21 +178,19 @@ async function responderUbicacion(idEmpresa) {
     return [
       `*${nombre}*`,
       '',
-      'No tenemos direccion registrada en el sistema.',
-      perfil?.telefono ? `Telefono: ${perfil.telefono}` : '',
-      'Contactenos para indicarle nuestra ubicacion.'
+      'Aún no tenemos una dirección registrada en el sistema.',
+      perfil?.telefono ? `Teléfono: ${perfil.telefono}` : '',
+      'Contáctanos y te indicamos nuestra ubicación.'
     ].filter(Boolean).join('\n');
   }
   const extras = [];
-  if (perfil?.telefono) extras.push(`Telefono: ${perfil.telefono}`);
+  if (perfil?.telefono) extras.push(`Teléfono: ${perfil.telefono}`);
   return [
     `*${nombre}*`,
     '',
-    '*Direccion:*',
+    '*Dirección:*',
     dir,
-    ...extras,
-    '',
-    'Escriba MENU para volver al menu.'
+    ...extras
   ].filter(Boolean).join('\n');
 }
 
@@ -201,13 +198,12 @@ async function responderContacto(idEmpresa) {
   const perfil = await cargarPerfil(idEmpresa);
   const nombre = perfil?.nombre || 'Nuestra empresa';
   const lineas = [`*Contacto — ${nombre}*`, ''];
-  if (perfil?.telefono) lineas.push(`Telefono / WhatsApp: ${perfil.telefono}`);
+  if (perfil?.telefono) lineas.push(`Teléfono / WhatsApp: ${perfil.telefono}`);
   if (perfil?.correo) lineas.push(`Correo: ${perfil.correo}`);
   if (perfil?.ruc) lineas.push(`RUC: ${perfil.ruc}`);
   if (lineas.length <= 2) {
-    lineas.push('No hay datos de contacto registrados.');
+    lineas.push('Aún no tenemos datos de contacto registrados.');
   }
-  lineas.push('', 'Escriba MENU para volver al menu.');
   return lineas.join('\n');
 }
 

@@ -9,6 +9,45 @@ const whatsappBotInboundContext = require('./whatsappBotInboundContext.service')
 const whatsappBotConversacionRepository = require('../repositories/whatsappBotConversacion.repository');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
+const copy = require('./whatsappBot.copy');
+
+/**
+ * Envia una o varias "burbujas" simulando que un humano escribe:
+ *   1) reacciona al mensaje del usuario (si aplica),
+ *   2) por cada burbuja: presence:composing -> sleep(delaySegunLargo) -> sendText
+ *   3) cierra con presence:paused.
+ *
+ * Si el gateway no responde a presence/react (versiones viejas) no falla:
+ * los helpers del cliente devuelven { success:false } sin lanzar.
+ */
+async function enviarRespuestaConTyping(idEmpresa, destino, respuestas, options = {}) {
+  const arr = Array.isArray(respuestas) ? respuestas : [respuestas];
+  const burbujas = arr.map((x) => String(x || '').trim()).filter(Boolean);
+  if (!burbujas.length) {
+    throw new Error('No hay respuesta que enviar');
+  }
+  const usarTyping = options.usarTyping !== false;
+
+  for (let i = 0; i < burbujas.length; i++) {
+    const txt = burbujas[i];
+    if (usarTyping) {
+      await whatsappGatewayClient.sendPresence(idEmpresa, destino, 'composing');
+      await copy.sleep(copy.delaySegunLargo(txt));
+    }
+    const r = await whatsappGatewayClient.sendText(idEmpresa, destino, txt, { skipThrottle: true });
+    if (!r.success) {
+      throw new Error(r.message || 'No se pudo enviar la respuesta');
+    }
+    if (i < burbujas.length - 1) {
+      await copy.sleep(copy.delayEntreBurbujas());
+    }
+  }
+
+  if (usarTyping) {
+    whatsappGatewayClient.sendPresence(idEmpresa, destino, 'paused').catch(() => {});
+  }
+  return burbujas;
+}
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NOMBRE_SERVICIO_WHATSAPP_BOT = whatsappBotInboundContext.NOMBRE_SERVICIO_WHATSAPP_BOT;
@@ -176,16 +215,20 @@ async function procesarInbound(payload) {
     },
     precarga
   );
-  const { respuesta, conv, adjunto, limpiarHistorial } = turno;
+  const { respuesta, conv, adjunto, limpiarHistorial, reaccion } = turno;
 
   if (!limpiarHistorial) {
     registrarLogAsync(idEmpresa, 'in', tel.logId, messageId, textoEntrada);
   }
 
-  const envio = await whatsappGatewayClient.sendText(idEmpresa, tel.destino, respuesta, { skipThrottle: true });
-  if (!envio.success) {
-    throw new Error(envio.message || 'No se pudo enviar la respuesta');
+  if (reaccion && messageId) {
+    whatsappGatewayClient
+      .sendReaction(idEmpresa, tel.destino, messageId, reaccion)
+      .catch(() => {});
   }
+
+  const burbujasEnviadas = await enviarRespuestaConTyping(idEmpresa, tel.destino, respuesta);
+  const respuestaPlana = burbujasEnviadas.join('\n\n');
 
   if (limpiarHistorial) {
     try {
@@ -197,7 +240,7 @@ async function procesarInbound(payload) {
       console.error('whatsappBot limpiar historial:', err.message);
     }
   } else {
-    registrarLogAsync(idEmpresa, 'out', tel.logId, null, respuesta);
+    registrarLogAsync(idEmpresa, 'out', tel.logId, null, respuestaPlana);
 
     withPool((pool) =>
       whatsappBotInboundContext.persistirTurno(
@@ -242,7 +285,8 @@ async function procesarInbound(payload) {
     from: tel.destino,
     messageId: messageId || null,
     timestamp: timestamp || null,
-    respuesta,
+    respuesta: respuestaPlana,
+    burbujas: burbujasEnviadas.length,
     pdfEnviado: Boolean(adjunto?.pdfBase64),
     elapsedMs: ms
   };

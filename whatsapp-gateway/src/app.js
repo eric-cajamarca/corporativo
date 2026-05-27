@@ -26,6 +26,8 @@ app.get('/v1/tenants/:idEmpresa/session/status', sessionController.getStatus);
 app.delete('/v1/tenants/:idEmpresa/session', sessionController.logout);
 app.post('/v1/tenants/:idEmpresa/messages/text', messageController.sendText);
 app.post('/v1/tenants/:idEmpresa/messages/media', messageController.sendMedia);
+app.post('/v1/tenants/:idEmpresa/messages/presence', messageController.sendPresence);
+app.post('/v1/tenants/:idEmpresa/messages/reaction', messageController.sendReaction);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'not_found' });
