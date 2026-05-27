@@ -156,8 +156,25 @@ function shouldForwardInbound(message, t) {
 
   if (key.fromMe) {
     if (key.id && t?.suppressMessageIds?.has(key.id)) return false;
-    const chatOk = isIndividualChatJid(remoteJid) || Boolean(key.senderPn);
-    if (!chatOk) return false;
+    if (!isIndividualChatJid(remoteJid)) return false;
+    // SEGURIDAD: solo permitir mensajes salientes del propio numero vinculado
+    // si son a UNO MISMO (chat consigo mismo / pruebas). Si el dueno del numero
+    // le escribe a OTRO contacto desde su WhatsApp, NO debemos disparar el bot
+    // contra ese contacto: terminariamos respondiendole a alguien que no nos
+    // habia escrito (filtrado de info, spam involuntario al cliente).
+    const vinc = String(t?.telefonoVinculado || '').replace(/\D/g, '');
+    if (!vinc) return false; // sin numero vinculado conocido, mejor descartar
+    if (remoteJid.endsWith('@s.whatsapp.net')) {
+      const remotePhone = jidToPhone(remoteJid);
+      if (!remotePhone || remotePhone !== vinc) return false;
+    } else if (remoteJid.endsWith('@lid')) {
+      const mappedPhone = t?.lidToPhone?.get(remoteJid);
+      // Sin mapeo no sabemos a quien le esta escribiendo: rechazar por seguridad.
+      // Si hay mapeo y NO coincide con el vinculado, tambien rechazar.
+      if (!mappedPhone || mappedPhone !== vinc) return false;
+    } else {
+      return false;
+    }
   } else if (!isIndividualChatJid(remoteJid)) {
     return false;
   }
