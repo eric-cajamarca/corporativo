@@ -5,8 +5,12 @@ const geoIpCliente = require('../utils/geoIpCliente.util');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
-/** Número desarrollador (solo dígitos). Definir ALERT_DEV_WHATSAPP en .env; sin valor no se alerta al dev. */
-const NUMERO_DESARROLLADOR =
+/**
+ * Override opcional por .env. Si se define, se usa SIEMPRE en lugar de la BD.
+ * Util para entornos donde el numero de dev no coincide con la instancia Factiliza
+ * (ej. notificar a un on-call distinto del numero dueño del bot).
+ */
+const NUMERO_DESARROLLADOR_OVERRIDE =
   (process.env.ALERT_DEV_WHATSAPP && String(process.env.ALERT_DEV_WHATSAPP).replace(/\D/g, '')) || '';
 
 /** Mínimo entre alertas globales de error de sistema (evita spam). */
@@ -26,6 +30,67 @@ function soloDigitos(num) {
 async function obtenerConfigWhatsApp(pool) {
   return factilizaRepository.getConfigByNombre(pool, NOMBRE_SERVICIO_WHATSAPP);
 }
+
+/**
+ * Decodifica el parametroRuta de FactilizaConfig (base64 del numero de la
+ * instancia, ej "NTE5OTMyODk0NDA=" -> "51993289440") y lo retorna como
+ * solo digitos. Si no es base64 valido pero ya luce como numero, lo retorna
+ * tal cual (defensa contra cambios futuros).
+ */
+function decodificarNumeroDeParametroRuta(parametroRuta) {
+  const raw = String(parametroRuta || '').trim();
+  if (!raw) return '';
+  if (/^\d{9,}$/.test(raw)) return raw;
+  try {
+    const dec = Buffer.from(raw, 'base64').toString('utf8');
+    return soloDigitos(dec);
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * Cache breve en memoria para evitar query repetida en cada alerta.
+ * TTL configurable; default 5 min.
+ */
+const ALERT_DEV_CACHE_TTL_MS = parseInt(process.env.ALERT_DEV_CACHE_TTL_MS, 10) || 5 * 60 * 1000;
+let cacheNumeroDev = { numero: '', ts: 0 };
+
+/**
+ * Resuelve el numero del desarrollador para alertas:
+ *   1) ALERT_DEV_WHATSAPP en .env si esta definido (override),
+ *   2) decode(parametroRuta) de FactilizaConfig (Factiliza WHATSAPP, estado=1).
+ * Retorna '' si ninguno produce un numero >= 9 digitos.
+ */
+async function obtenerNumeroDev(pool) {
+  if (NUMERO_DESARROLLADOR_OVERRIDE.length >= 9) return NUMERO_DESARROLLADOR_OVERRIDE;
+  const ahora = Date.now();
+  if (cacheNumeroDev.numero && ahora - cacheNumeroDev.ts < ALERT_DEV_CACHE_TTL_MS) {
+    return cacheNumeroDev.numero;
+  }
+  try {
+    const cfg = await obtenerConfigWhatsApp(pool);
+    const num = cfg ? decodificarNumeroDeParametroRuta(cfg.parametroRuta) : '';
+    if (num.length >= 9) {
+      cacheNumeroDev = { numero: num, ts: ahora };
+      return num;
+    }
+  } catch (err) {
+    console.error('context:', JSON.stringify({
+      level: 'warn',
+      message: 'alert_dev_lookup_error',
+      err: err.message
+    }));
+  }
+  return '';
+}
+
+/** Permite invalidar la cache (por ejemplo despues de actualizar FactilizaConfig). */
+exports.invalidarCacheNumeroDev = function () {
+  cacheNumeroDev = { numero: '', ts: 0 };
+};
+
+exports.obtenerNumeroDev = obtenerNumeroDev;
 
 /**
  * Envía texto por Factiliza WHATSAPP (config global). No lanza; registra error en consola.
@@ -227,7 +292,9 @@ exports.obtenerEstadoFactilizaWhatsApp = function () {
  */
 exports.notificarRefreshTokenReplay = async (pool, params) => {
   const { idEmpresa, idUsuario, ipCliente } = params || {};
-  if (!idEmpresa || NUMERO_DESARROLLADOR.length < 9) return;
+  if (!idEmpresa) return;
+  const numeroDev = await obtenerNumeroDev(pool);
+  if (numeroDev.length < 9) return;
 
   const key = String(idEmpresa).toLowerCase();
   const now = Date.now();
@@ -248,7 +315,7 @@ ${razon} (RUC ${ruc})
 idUsuario: ${idUsuario || '—'}
 IP: ${ipLinea}
 Acción: todas las sesiones del usuario en esa empresa fueron revocadas.`;
-    await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, texto);
+    await enviarTextoPlataforma(pool, numeroDev, texto);
   } catch (err) {
     console.error('notificarRefreshTokenReplay:', err.message);
   }
@@ -342,33 +409,35 @@ exports.notificarLoginFallido = async (pool, params) => {
 
   const base = `[EFAF Login] RUC ${ruc} ${razon}\nEmail intentado: ${email}\nIntentos fallidos: ${intentosFallidos}${ipLinea}`;
 
+  const numeroDev = await obtenerNumeroDev(pool);
+
   // 1) Tracker de spraying por IP (independiente del email/empresa)
   const spraying = trackearIntentoFallidoIp(ipCliente, email);
-  if (spraying) {
+  if (spraying && numeroDev.length >= 9) {
     const txt = `[EFAF Login] POSIBLE EMAIL-SPRAYING / CREDENTIAL STUFFING
 IP: ${String(ipCliente || '').slice(0, 45)}
 Intentos en ventana: ${spraying.intentos}
 Emails distintos probados: ${spraying.emailsDistintos}
 Ventana: ${Math.round(spraying.ventanaMs / 1000)}s
 Ultima empresa: ${ruc} ${razon}`;
-    await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, txt);
+    await enviarTextoPlataforma(pool, numeroDev, txt);
   }
 
   // 2) Patrones de inyeccion en el email (SQLi/XSS/path-traversal)
-  if (pareceInyeccion(email) && deberiaAlertarInyeccion(ipCliente)) {
+  if (numeroDev.length >= 9 && pareceInyeccion(email) && deberiaAlertarInyeccion(ipCliente)) {
     const txt = `[EFAF Seguridad] Patron sospechoso en login
 IP: ${String(ipCliente || '').slice(0, 45)}
 Email recibido: ${String(email || '').slice(0, 200)}
 RUC objetivo: ${ruc}`;
-    await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, txt);
+    await enviarTextoPlataforma(pool, numeroDev, txt);
   }
 
   // 3) Reglas existentes: 3+ fallos consecutivos por (empresa, email) o lockout
   const alertaDev =
     intentosFallidos === 3 || intentosFallidos >= 5 || recienBloqueado;
-  if (alertaDev) {
+  if (alertaDev && numeroDev.length >= 9) {
     const extra = recienBloqueado ? '\nEstado: CUENTA BLOQUEADA 30 min.' : '';
-    await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, base + extra);
+    await enviarTextoPlataforma(pool, numeroDev, base + extra);
   }
 
   if (celularEmpresa.length >= 9 && (intentosFallidos === 3 || recienBloqueado)) {
@@ -395,26 +464,18 @@ exports.notificarPatronSospechosoEnLogin = async (pool, params) => {
   if (!sospechosos.length) return;
   if (!deberiaAlertarInyeccion(ipCliente)) return;
 
+  const numeroDev = await obtenerNumeroDev(pool);
+  if (numeroDev.length < 9) return;
+
   const ip = String(ipCliente || '').slice(0, 45) || 'desconocida';
   const txt = `[EFAF Seguridad] Patron sospechoso en /admin_login
 IP: ${ip}
 Hallazgos: ${sospechosos.join(' | ')}`;
-  await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, txt);
+  await enviarTextoPlataforma(pool, numeroDev, txt);
 };
 
 /** Solo administrador de empresa: aviso al celular de Empresas. superAdmin usa notificarLoginSuperAdminExitoso. */
 const ROLES_ADMIN_LOGIN_WHATSAPP = ['Administrador'];
-
-/**
- * Número fijo (solo dígitos) para alertar inicio de sesión del super usuario de plataforma.
- * Sobrescribir con SUPERADMIN_LOGIN_ALERT_WHATSAPP en .env si cambia el destino.
- */
-const NUMERO_SUPERADMIN_LOGIN_ALERT =
-  (() => {
-    const raw = process.env.SUPERADMIN_LOGIN_ALERT_WHATSAPP;
-    const d = raw != null && String(raw).trim() !== '' ? soloDigitos(raw) : '';
-    return d.length >= 9 ? d : '51993289440';
-  })();
 
 /**
  * Aviso por WhatsApp al celular registrado en Empresas tras login exitoso de administrador.
@@ -454,7 +515,8 @@ Ubicación aprox. (por IP): ${ubicacionTxt}`;
 };
 
 /**
- * Inicio de sesión con rol superAdmin: aviso al número de supervisión (Factiliza WHATSAPP global).
+ * Inicio de sesión con rol superAdmin: aviso al número del desarrollador
+ * (parametroRuta de Factiliza WHATSAPP, override por ALERT_DEV_WHATSAPP).
  * Incluye usuario, empresa, RUC, correo e IP de origen.
  */
 exports.notificarLoginSuperAdminExitoso = async (pool, params) => {
@@ -462,6 +524,9 @@ exports.notificarLoginSuperAdminExitoso = async (pool, params) => {
   if (!idEmpresa) return;
 
   try {
+    const numeroDev = await obtenerNumeroDev(pool);
+    if (numeroDev.length < 9) return;
+
     const emp = await empresaRepository.obtenerBasicaPorId(pool, idEmpresa);
     if (!emp) return;
 
@@ -489,7 +554,7 @@ Correo: ${correo}
 IP de origen: ${ipLinea}
 Ubicación aprox. (por IP): ${ubicacionTxt}`;
 
-    await enviarTextoPlataforma(pool, NUMERO_SUPERADMIN_LOGIN_ALERT, texto);
+    await enviarTextoPlataforma(pool, numeroDev, texto);
   } catch (err) {
     console.error('notificarLoginSuperAdminExitoso:', err.message);
   }
@@ -503,9 +568,11 @@ exports.notificarErrorSistema = async (pool, contexto) => {
   if (now - ultimoAlertaSistema < THROTTLE_MS_ERRORES_SISTEMA) return;
   ultimoAlertaSistema = now;
 
+  const numeroDev = await obtenerNumeroDev(pool);
+  if (numeroDev.length < 9) return;
   const ctx = String(contexto || '').slice(0, 500);
   const texto = `[EFAF Sistema] Error interno\n${ctx}\nRevise logs del servidor.`;
-  await enviarTextoPlataforma(pool, NUMERO_DESARROLLADOR, texto);
+  await enviarTextoPlataforma(pool, numeroDev, texto);
 };
 
 /**
@@ -547,22 +614,22 @@ exports.iniciarHealthCheckFactiliza = function iniciarHealthCheckFactiliza(deps)
   }
   const interval = parseInt(process.env.FACTILIZA_HEALTHCHECK_INTERVAL_MS, 10) || 6 * 60 * 60 * 1000;
   if (interval <= 0) return;
-  const destino = NUMERO_DESARROLLADOR || NUMERO_SUPERADMIN_LOGIN_ALERT;
-  if (!destino || destino.length < 9) {
-    console.error('context:', JSON.stringify({
-      level: 'info',
-      message: 'factiliza_healthcheck_skip',
-      detail: 'Sin ALERT_DEV_WHATSAPP ni SUPERADMIN_LOGIN_ALERT_WHATSAPP, no se inicia el health-check.'
-    }));
-    return;
-  }
 
   const ejecutarPing = async () => {
     try {
       const ahora = new Date().toISOString().slice(0, 19).replace('T', ' ');
-      const r = await withPool((pool) =>
-        enviarTextoPlataforma(pool, destino, `[EFAF Health] Ping Factiliza WhatsApp ${ahora}.`)
-      );
+      const r = await withPool(async (pool) => {
+        const destino = await obtenerNumeroDev(pool);
+        if (destino.length < 9) {
+          console.error('context:', JSON.stringify({
+            level: 'info',
+            message: 'factiliza_healthcheck_skip_run',
+            detail: 'No se pudo resolver numero del dev (BD/.env vacios).'
+          }));
+          return { ok: false, skipped: true };
+        }
+        return enviarTextoPlataforma(pool, destino, `[EFAF Health] Ping Factiliza WhatsApp ${ahora}.`);
+      });
       if (r && r.ok) {
         console.error('context:', JSON.stringify({
           level: 'info',
@@ -586,8 +653,7 @@ exports.iniciarHealthCheckFactiliza = function iniciarHealthCheckFactiliza(deps)
   console.error('context:', JSON.stringify({
     level: 'info',
     message: 'factiliza_healthcheck_started',
-    intervalMs: interval,
-    destinoOfuscado: ofuscarNumero(destino)
+    intervalMs: interval
   }));
 };
 
