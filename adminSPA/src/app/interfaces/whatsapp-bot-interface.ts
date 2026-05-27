@@ -7,6 +7,28 @@ export interface WhatsappBotConfig {
   mensajeBienvenida: string;
   mensajeNoRegistrado: string;
   fActualizacion?: string;
+  /** Fase 3: typing, delay, burbujas y reacciones. */
+  humanizar?: boolean;
+  /** Fase 3: false = tuteo, true = trato de usted. */
+  tonoFormal?: boolean;
+  usarEmojis?: boolean;
+  delayMaxMs?: number;
+  mensajeDespedida?: string | null;
+  /** Celular del vendedor que recibe alertas de escalamiento (solo digitos, ej. 51999999999). */
+  numeroEscalamiento?: string | null;
+  escalamientoActivo?: boolean;
+  escalamientoTimeoutMin?: number;
+  umbralNoEntiendoEscalar?: number;
+}
+
+/** Conversacion en handoff a humano (GET /escaladas). */
+export interface WhatsappBotEscalada {
+  telefonoCliente: string;
+  motivo: string | null;
+  numeroVendedor: string | null;
+  fEscalado: string | null;
+  expiraEn: string | null;
+  fActualizacion?: string;
 }
 
 export interface WhatsappBotCatalogoStatus {

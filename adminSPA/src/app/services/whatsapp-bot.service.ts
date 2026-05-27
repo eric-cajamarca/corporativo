@@ -6,6 +6,7 @@ import {
   WhatsappBotApiResponse,
   WhatsappBotCatalogoStatus,
   WhatsappBotConfig,
+  WhatsappBotEscalada,
   WhatsappBotLogEntry,
   WhatsappBotSinonimo
 } from '../interfaces/whatsapp-bot-interface';
@@ -54,5 +55,17 @@ export class WhatsappBotService {
 
   listarLogs(limit = 50): Observable<WhatsappBotApiResponse<WhatsappBotLogEntry[]>> {
     return this.http.get<WhatsappBotApiResponse<WhatsappBotLogEntry[]>>(`${this.baseUrl}/logs?limit=${limit}`, { withCredentials: true });
+  }
+
+  listarEscaladas(): Observable<WhatsappBotApiResponse<WhatsappBotEscalada[]>> {
+    return this.http.get<WhatsappBotApiResponse<WhatsappBotEscalada[]>>(`${this.baseUrl}/escaladas`, { withCredentials: true });
+  }
+
+  desescalarManual(telefonoCliente: string): Observable<WhatsappBotApiResponse<{ ok: boolean; telefonoCliente: string }>> {
+    return this.http.post<WhatsappBotApiResponse<{ ok: boolean; telefonoCliente: string }>>(
+      `${this.baseUrl}/escaladas/desescalar`,
+      { telefonoCliente },
+      { withCredentials: true }
+    );
   }
 }

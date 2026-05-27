@@ -6,7 +6,13 @@ import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { WhatsappBotService } from '../../../services/whatsapp-bot.service';
-import { WhatsappBotCatalogoStatus, WhatsappBotLogEntry, WhatsappBotSinonimo } from '../../../interfaces/whatsapp-bot-interface';
+import {
+  WhatsappBotCatalogoStatus,
+  WhatsappBotConfig,
+  WhatsappBotEscalada,
+  WhatsappBotLogEntry,
+  WhatsappBotSinonimo
+} from '../../../interfaces/whatsapp-bot-interface';
 
 @Component({
   selector: 'app-whatsapp-bot',
@@ -20,7 +26,7 @@ export class WhatsappBotComponent implements OnInit {
   private fb = inject(FormBuilder);
   private botService = inject(WhatsappBotService);
 
-  pestaniaActiva: 'general' | 'catalogo' | 'sinonimos' | 'logs' = 'general';
+  pestaniaActiva: 'general' | 'catalogo' | 'sinonimos' | 'logs' | 'escaladas' = 'general';
   cargando = false;
   mensaje = '';
   error = '';
@@ -29,11 +35,21 @@ export class WhatsappBotComponent implements OnInit {
   catalogoStatus: WhatsappBotCatalogoStatus | null = null;
   sinonimos: WhatsappBotSinonimo[] = [];
   logs: WhatsappBotLogEntry[] = [];
+  escaladas: WhatsappBotEscalada[] = [];
 
   configForm = this.fb.group({
     activoBot: [true],
     mensajeBienvenida: ['', [Validators.required, Validators.maxLength(500)]],
-    mensajeNoRegistrado: ['', [Validators.required, Validators.maxLength(500)]]
+    mensajeNoRegistrado: ['', [Validators.required, Validators.maxLength(500)]],
+    humanizar: [true],
+    tonoFormal: [false],
+    usarEmojis: [true],
+    delayMaxMs: [3000, [Validators.min(0), Validators.max(15000)]],
+    mensajeDespedida: ['', [Validators.maxLength(500)]],
+    escalamientoActivo: [true],
+    numeroEscalamiento: ['', [Validators.maxLength(20)]],
+    escalamientoTimeoutMin: [60, [Validators.min(1), Validators.max(1440)]],
+    umbralNoEntiendoEscalar: [3, [Validators.min(0), Validators.max(20)]]
   });
 
   sinonimoForm = this.fb.group({
@@ -42,6 +58,9 @@ export class WhatsappBotComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.configForm.get('escalamientoActivo')?.valueChanges.subscribe(() => {
+      this.aplicarEstadoCamposEscalamiento();
+    });
     this.cargarTodo();
   }
 
@@ -55,14 +74,25 @@ export class WhatsappBotComponent implements OnInit {
           this.configForm.patchValue({
             activoBot: !!res.data.activoBot,
             mensajeBienvenida: res.data.mensajeBienvenida,
-            mensajeNoRegistrado: res.data.mensajeNoRegistrado
+            mensajeNoRegistrado: res.data.mensajeNoRegistrado,
+            humanizar: res.data.humanizar !== false,
+            tonoFormal: !!res.data.tonoFormal,
+            usarEmojis: res.data.usarEmojis !== false,
+            delayMaxMs: res.data.delayMaxMs ?? 3000,
+            mensajeDespedida: res.data.mensajeDespedida || '',
+            escalamientoActivo: res.data.escalamientoActivo !== false,
+            numeroEscalamiento: res.data.numeroEscalamiento || '',
+            escalamientoTimeoutMin: res.data.escalamientoTimeoutMin ?? 60,
+            umbralNoEntiendoEscalar: res.data.umbralNoEntiendoEscalar ?? 3
           });
           this.aplicarEstadoControlActivoBot();
+          this.aplicarEstadoCamposEscalamiento();
         }
         if (this.servicioAutorizado) {
           this.cargarCatalogoStatus();
           this.cargarSinonimos();
           this.cargarLogs();
+          this.cargarEscaladas();
         } else {
           this.catalogoStatus = null;
           this.sinonimos = [];
@@ -86,6 +116,52 @@ export class WhatsappBotComponent implements OnInit {
     } else {
       ctrl.enable({ emitEvent: false });
     }
+  }
+
+  private aplicarEstadoCamposEscalamiento(): void {
+    const activo = this.configForm.get('escalamientoActivo')?.value === true;
+    const campos = ['numeroEscalamiento', 'escalamientoTimeoutMin', 'umbralNoEntiendoEscalar'];
+    for (const nombre of campos) {
+      const c = this.configForm.get(nombre);
+      if (!c) continue;
+      if (activo) c.enable({ emitEvent: false });
+      else c.disable({ emitEvent: false });
+    }
+  }
+
+  /** Solo digitos; vacio = null (backend usa telefono vinculado del bot). */
+  private normalizarNumeroEscalamiento(valor: string | null | undefined): string | null {
+    const digits = String(valor || '').replace(/\D/g, '');
+    if (!digits) return null;
+    if (digits.length < 9 || digits.length > 15) {
+      throw new Error('Numero de escalamiento invalido: use 9 a 15 digitos (ej. 51999999999)');
+    }
+    return digits;
+  }
+
+  private armarPayloadConfig(): Partial<WhatsappBotConfig> {
+    const raw = this.configForm.getRawValue();
+    let numeroEscalamiento: string | null = null;
+    try {
+      numeroEscalamiento = this.normalizarNumeroEscalamiento(raw.numeroEscalamiento);
+    } catch (e) {
+      throw e;
+    }
+    const mensajeDespedida = String(raw.mensajeDespedida || '').trim();
+    return {
+      activoBot: !!raw.activoBot,
+      mensajeBienvenida: raw.mensajeBienvenida || '',
+      mensajeNoRegistrado: raw.mensajeNoRegistrado || '',
+      humanizar: !!raw.humanizar,
+      tonoFormal: !!raw.tonoFormal,
+      usarEmojis: !!raw.usarEmojis,
+      delayMaxMs: Number(raw.delayMaxMs) || 3000,
+      mensajeDespedida: mensajeDespedida || null,
+      escalamientoActivo: !!raw.escalamientoActivo,
+      numeroEscalamiento,
+      escalamientoTimeoutMin: Number(raw.escalamientoTimeoutMin) || 60,
+      umbralNoEntiendoEscalar: Number(raw.umbralNoEntiendoEscalar) ?? 3
+    };
   }
 
   cargarCatalogoStatus(): void {
@@ -118,15 +194,25 @@ export class WhatsappBotComponent implements OnInit {
 
   guardarConfig(): void {
     if (this.configForm.invalid) return;
-    const raw = this.configForm.getRawValue();
-    if (!this.servicioAutorizado) {
-      raw.activoBot = false;
+    let payload: Partial<WhatsappBotConfig>;
+    try {
+      payload = this.armarPayloadConfig();
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'Numero de escalamiento invalido';
+      return;
     }
-    this.botService.updateConfig(raw as { activoBot: boolean; mensajeBienvenida: string; mensajeNoRegistrado: string }).subscribe({
+    if (!this.servicioAutorizado) {
+      payload.activoBot = false;
+    }
+    this.error = '';
+    this.botService.updateConfig(payload).subscribe({
       next: (res) => {
         if (res.success && res.data) {
           this.servicioAutorizado = res.data.servicioAutorizado !== false;
-          this.configForm.patchValue({ activoBot: !!res.data.activoBot }, { emitEvent: false });
+          this.configForm.patchValue({
+            activoBot: !!res.data.activoBot,
+            numeroEscalamiento: res.data.numeroEscalamiento || ''
+          }, { emitEvent: false });
           this.aplicarEstadoControlActivoBot();
         }
         this.mensaje = 'Configuracion guardada';
@@ -135,6 +221,38 @@ export class WhatsappBotComponent implements OnInit {
         this.error = err?.error?.message || 'Error al guardar';
       }
     });
+  }
+
+  cargarEscaladas(): void {
+    this.botService.listarEscaladas().subscribe({
+      next: (res) => {
+        this.escaladas = res.data || [];
+      },
+      error: (err) => {
+        this.error = err?.error?.message || 'Error al cargar escaladas';
+      }
+    });
+  }
+
+  desescalar(telefonoCliente: string): void {
+    const tel = String(telefonoCliente || '').replace(/\D/g, '');
+    if (!tel) return;
+    this.botService.desescalarManual(tel).subscribe({
+      next: () => {
+        this.mensaje = 'Conversacion liberada; el bot puede responder de nuevo';
+        this.cargarEscaladas();
+      },
+      error: (err) => {
+        this.error = err?.error?.message || 'Error al desescalar';
+      }
+    });
+  }
+
+  etiquetaMotivoEscalada(motivo: string | null): string {
+    if (motivo === 'umbral') return 'Bot no entendio varias veces';
+    if (motivo === 'admin') return 'Liberado por admin';
+    if (motivo === 'cliente') return 'Cliente lo pidio';
+    return motivo || '—';
   }
 
   sincronizarCatalogo(): void {

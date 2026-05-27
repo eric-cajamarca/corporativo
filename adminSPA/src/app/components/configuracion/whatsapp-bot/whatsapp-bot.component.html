@@ -52,6 +52,11 @@
         </button>
       </li>
       <li class="nav-item" role="presentation">
+        <button type="button" class="nav-link" [class.active]="pestaniaActiva === 'escaladas'" [disabled]="!servicioAutorizado" (click)="pestaniaActiva = 'escaladas'; cargarEscaladas()">
+          <i class="bi bi-headset me-1"></i> Escaladas
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
         <button type="button" class="nav-link" [class.active]="pestaniaActiva === 'logs'" [disabled]="!servicioAutorizado" (click)="pestaniaActiva = 'logs'">
           <i class="bi bi-journal-text me-1"></i> Logs
         </button>
@@ -88,6 +93,80 @@
                   <div class="form-text">Se muestra al consultar pedidos o deuda sin celular en Clientes.</div>
                 </div>
               </div>
+
+              <hr class="my-4" />
+              <h6 class="fw-semibold mb-3"><i class="bi bi-chat-heart me-2 text-primary"></i>Personalidad del bot</h6>
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="humanizar" formControlName="humanizar" />
+                    <label class="form-check-label" for="humanizar">Respuestas humanizadas</label>
+                    <div class="form-text">Indicador de escritura, pausas y varias burbujas.</div>
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="tonoFormal" formControlName="tonoFormal" />
+                    <label class="form-check-label" for="tonoFormal">Trato de usted</label>
+                    <div class="form-text">Si esta apagado, el bot te tuteara.</div>
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="usarEmojis" formControlName="usarEmojis" />
+                    <label class="form-check-label" for="usarEmojis">Usar emojis</label>
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="delayMaxMs">Delay maximo (ms)</label>
+                  <input type="number" class="form-control" id="delayMaxMs" formControlName="delayMaxMs" min="0" max="15000" />
+                  <div class="form-text">Tope de la pausa antes de cada mensaje (0–15000).</div>
+                </div>
+                <div class="col-12 col-md-8">
+                  <label class="form-label" for="mensajeDespedida">Mensaje de despedida (opcional)</label>
+                  <textarea class="form-control" id="mensajeDespedida" rows="2" formControlName="mensajeDespedida" placeholder="Dejar vacio para usar el mensaje predeterminado del bot"></textarea>
+                </div>
+              </div>
+
+              <hr class="my-4" />
+              <h6 class="fw-semibold mb-3"><i class="bi bi-headset me-2 text-warning"></i>Escalamiento a asesor humano</h6>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="escalamientoActivo" formControlName="escalamientoActivo" />
+                <label class="form-check-label fw-semibold" for="escalamientoActivo">Permitir derivar a un asesor</label>
+                <div class="form-text">El cliente puede escribir "agente", "asesor" o "humano". Tras varios "no entiendo", el bot ofrece derivar.</div>
+              </div>
+              <div class="row g-3">
+                <div class="col-12 col-lg-5">
+                  <label class="form-label" for="numeroEscalamiento">Celular del vendedor / asesor</label>
+                  <input
+                    type="tel"
+                    class="form-control"
+                    id="numeroEscalamiento"
+                    formControlName="numeroEscalamiento"
+                    placeholder="51999999999"
+                    inputmode="numeric"
+                    autocomplete="tel"
+                  />
+                  <div class="form-text">
+                    Solo digitos con codigo de pais (ej. Peru 51…). Recibe el aviso cuando un cliente pide hablar con una persona.
+                    Si lo deja vacio, se usa el numero vinculado al bot en <a routerLink="/configuracion/whatsapp">Vincular WhatsApp</a>.
+                  </div>
+                  @if (configForm.get('numeroEscalamiento')?.invalid && configForm.get('numeroEscalamiento')?.touched) {
+                    <div class="text-danger small mt-1">Use entre 9 y 15 digitos o deje el campo vacio.</div>
+                  }
+                </div>
+                <div class="col-6 col-lg-3">
+                  <label class="form-label" for="escalamientoTimeoutMin">Bot en pausa (min)</label>
+                  <input type="number" class="form-control" id="escalamientoTimeoutMin" formControlName="escalamientoTimeoutMin" min="1" max="1440" />
+                  <div class="form-text">Minutos sin respuestas automaticas tras escalar.</div>
+                </div>
+                <div class="col-6 col-lg-4">
+                  <label class="form-label" for="umbralNoEntiendoEscalar">Umbral "no entiendo"</label>
+                  <input type="number" class="form-control" id="umbralNoEntiendoEscalar" formControlName="umbralNoEntiendoEscalar" min="0" max="20" />
+                  <div class="form-text">Veces seguidas antes de ofrecer asesor (0 = nunca ofrecer).</div>
+                </div>
+              </div>
+
               <div class="mt-4">
                 <button type="submit" class="btn btn-primary" [disabled]="configForm.invalid">
                   <i class="bi bi-save me-1"></i> Guardar
@@ -175,6 +254,54 @@
                   }
                   @if (sinonimos.length === 0) {
                     <tr><td colspan="3" class="text-muted text-center py-4">Sin sinonimos configurados</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (pestaniaActiva === 'escaladas') {
+        <div class="card shadow-sm">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="card-title mb-0">Conversaciones con asesor humano</h5>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarEscaladas()">
+              <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <p class="text-muted small px-3 pt-3 mb-0">
+              Mientras aparecen aqui, el bot no responde a ese cliente para no interferir con el asesor.
+              Libere la conversacion cuando el asesor termine la atencion.
+            </p>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Motivo</th>
+                    <th>Vendedor notificado</th>
+                    <th>Expira</th>
+                    <th class="text-end">Accion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (e of escaladas; track e.telefonoCliente) {
+                    <tr>
+                      <td class="text-nowrap">+{{ e.telefonoCliente }}</td>
+                      <td>{{ etiquetaMotivoEscalada(e.motivo) }}</td>
+                      <td class="text-nowrap">{{ e.numeroVendedor ? '+' + e.numeroVendedor : '—' }}</td>
+                      <td class="text-nowrap small">{{ e.expiraEn || '—' }}</td>
+                      <td class="text-end">
+                        <button type="button" class="btn btn-outline-primary btn-sm" (click)="desescalar(e.telefonoCliente)">
+                          Liberar bot
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                  @if (escaladas.length === 0) {
+                    <tr><td colspan="5" class="text-muted text-center py-4">No hay conversaciones escaladas en este momento</td></tr>
                   }
                 </tbody>
               </table>
