@@ -3,6 +3,7 @@ const multer = require('multer');
 const { generatePdf } = require('../controllers/pdf.controller');
 const { generateExcel } = require('../controllers/excel.controller');
 const { parseExcel, MAX_BYTES } = require('../controllers/excelParse.controller');
+const { parseList } = require('../controllers/listParse.controller');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -14,5 +15,6 @@ const router = express.Router();
 router.post('/generate-pdf', generatePdf);
 router.post('/generate-excel', generateExcel);
 router.post('/parse-excel', upload.single('file'), parseExcel);
+router.post('/parse-list', upload.single('file'), parseList);
 
 module.exports = router;

@@ -24,7 +24,7 @@ interface IntegracionesFlags {
 
 const PROVEEDORES = [
   { id: 'twilio', nombre: 'Twilio (WhatsApp)', keys: ['accountSid', 'authToken', 'whatsappFrom'], flag: 'twilioHabilitado' },
-  { id: 'izipay', nombre: 'Izipay (Pagos)', keys: ['merchantId', 'publicKey', 'secretKey'], flag: 'izipayHabilitado' },
+  { id: 'izipay', nombre: 'Izipay (Pagos)', keys: ['merchantId', 'publicKey', 'secretKey', 'hmacSha256'], flag: 'izipayHabilitado' },
   { id: 'culqi', nombre: 'Culqi (Pagos)', keys: ['publicKey', 'secretKey'], flag: 'culqiHabilitado' },
 ] as const;
 

@@ -21,14 +21,15 @@ function requireEmpresa(req, res) {
 }
 
 async function inbound(req, res) {
-  const { idEmpresa, from, messageId, text, timestamp } = req.body || {};
+  const { idEmpresa, from, messageId, text, timestamp, attachment } = req.body || {};
   try {
     const resultado = await whatsappBotService.procesarInbound({
       idEmpresa,
       from,
       messageId,
       text,
-      timestamp
+      timestamp,
+      attachment
     });
     return res.status(200).json({ status: 200, success: true, data: resultado });
   } catch (err) {

@@ -9,12 +9,13 @@ const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBoots
 
 /**
  * Webhooks multiempresa: identifican pago por orderNumber (patrón idEmpresa-uuid o CHK-uuid para checkout público).
+ * Montados en app.js bajo /api/webhooks (firma validada antes de llegar aquí).
  */
 
 /**
- * Webhook Izipay. Campos soportados: order_number|orderNumber, status|transactionStatus|payment_status|result, transactionId|id.
+ * Webhook Izipay (IPN Lyra: kr-answer + kr-hash, o JSON con HMAC / secret compartido).
  */
-api.post('/webhooks/izipay', async (req, res) => {
+api.post('/izipay', async (req, res) => {
   try {
     const payload = req.body || {};
     const orderNumber = payload.order_number || payload.orderNumber || payload.merchant_order_id || null;
@@ -63,10 +64,9 @@ api.post('/webhooks/izipay', async (req, res) => {
 });
 
 /**
- * Webhook Culqi. Eventos tipo charge.paid, charge.failed, etc. order_number en data.object o en metadata.
- * Producción: exponer solo tras proxy y validar firma Culqi (requiere capturar rawBody en middleware dedicado).
+ * Webhook Culqi. Eventos charge.paid, etc. Verificación: API Culqi + secret opcional (ver pasarelaWebhookVerify).
  */
-api.post('/webhooks/culqi', async (req, res) => {
+api.post('/culqi', async (req, res) => {
   try {
     const event = req.body || {};
     const obj = (event.data && event.data.object) ? event.data.object : event;

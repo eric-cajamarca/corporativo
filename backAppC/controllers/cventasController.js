@@ -3,7 +3,7 @@ const { withPool } = require('../utils/dbPool.util');
 
 const getCompVentaById_Empresa = async (req, res) => {
   if (!req.user) {
-    return res.status(500).send({ message: 'No Access' });
+    return res.status(401).send({ message: 'No autorizado' });
   }
   try {
     const data = await withPool((pool) =>
@@ -21,7 +21,7 @@ const getCompVentaById_Empresa = async (req, res) => {
 
 const updateCompVenta = async (req, res) => {
   if (!req.user) {
-    return res.status(500).send({ message: 'No Access' });
+    return res.status(401).send({ message: 'No autorizado' });
   }
   try {
     await withPool((pool) => cventasService.actualizarEstados(pool, req.body));
@@ -34,7 +34,7 @@ const updateCompVenta = async (req, res) => {
 
 const deleteCompVenta = async (req, res) => {
   if (!req.user) {
-    return res.status(500).send({ message: 'No Access' });
+    return res.status(401).send({ message: 'No autorizado' });
   }
   try {
     await withPool((pool) => cventasService.eliminar(pool, req.params.id));

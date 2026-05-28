@@ -15,9 +15,9 @@ api.get('/cventas/:id/:aliasempresa', auth.auth, cventasController.getCompVentaB
 // api.get('/cventas/:id', auth.auth, cventasController.getCompVentaById);
 
 // UPDATE
-api.put('/cventas/:id', cventasController.updateCompVenta);
+api.put('/cventas/:id', auth.auth, cventasController.updateCompVenta);
 
 // DELETE
-api.delete('/cventas/:id', cventasController.deleteCompVenta);
+api.delete('/cventas/:id', auth.auth, cventasController.deleteCompVenta);
 
 module.exports = api;

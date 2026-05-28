@@ -12,6 +12,7 @@ const {
 const config = require('../config');
 const { toWhatsAppJid, jidToPhone, resolveInboundSender, isIndividualChatJid } = require('../utils/phone.util');
 const inboundWebhook = require('./inboundWebhook.service');
+const inboundMedia = require('../utils/inboundMedia.util');
 
 const tenants = new Map();
 const QR_WAIT_MS = Number(process.env.QR_WAIT_MS) || 30000;
@@ -132,14 +133,6 @@ async function destroySocket(t) {
   t.sock = null;
 }
 
-function extractMessageText(message) {
-  const content = message?.message;
-  if (!content) return null;
-  if (content.conversation) return content.conversation;
-  if (content.extendedTextMessage?.text) return content.extendedTextMessage.text;
-  return null;
-}
-
 function rememberOutboundMessage(t, sentMsg) {
   const id = sentMsg?.key?.id;
   if (!id || !t) return;
@@ -181,9 +174,7 @@ function shouldForwardInbound(message, t) {
 
   if (key.id && t?.processedMessageIds?.has(key.id)) return false;
 
-  const text = extractMessageText(message);
-  if (!text || !String(text).trim()) return false;
-  return true;
+  return inboundMedia.inboundTieneContenido(message);
 }
 
 function rememberLidMapping(t, lid, jid) {
@@ -224,7 +215,7 @@ function bindInboundListener(idEmpresa, sock) {
       const resolved = resolveInboundSender(message, t, t.telefonoVinculado);
       if (!resolved?.replyTo) continue;
 
-      const text = String(extractMessageText(message) || '').trim();
+      const text = String(inboundMedia.extractMessageText(message) || '').trim();
       const messageId = message.key.id || null;
       if (messageId) {
         t.processedMessageIds.add(messageId);
@@ -234,17 +225,54 @@ function bindInboundListener(idEmpresa, sock) {
         ? Number(message.messageTimestamp) * 1000
         : Date.now();
 
-      console.error(`sessionManager inbound ${idEmpresa}: ${resolved.logId} -> "${text.slice(0, 40)}"`);
+      const sock = t.sock;
+      const pinoLogger = pino({ level: 'silent' });
+      let attachment = null;
+      try {
+        attachment = await inboundMedia.descargarAdjunto(message, sock, pinoLogger);
+      } catch (mediaErr) {
+        console.error(`sessionManager inbound media ${idEmpresa}:`, mediaErr.message);
+      }
 
-      inboundWebhook.postInbound({
-        idEmpresa,
-        from: resolved.replyTo,
-        messageId,
-        text,
-        timestamp
-      }).catch((err) => {
-        console.error(`sessionManager inbound ${idEmpresa}:`, err.message);
-      });
+      if (attachment?.tooLarge) {
+        console.error(`sessionManager inbound ${idEmpresa}: adjunto demasiado grande`);
+        inboundWebhook
+          .postInbound({
+            idEmpresa,
+            from: resolved.replyTo,
+            messageId,
+            text: 'El archivo es demasiado grande. Máximo 4 MB.',
+            timestamp
+          })
+          .catch((err) => {
+            console.error(`sessionManager inbound ${idEmpresa}:`, err.message);
+          });
+        continue;
+      }
+
+      const preview = text || (attachment ? `[archivo ${attachment.fileName}]` : '');
+      console.error(`sessionManager inbound ${idEmpresa}: ${resolved.logId} -> "${preview.slice(0, 40)}"`);
+
+      inboundWebhook
+        .postInbound({
+          idEmpresa,
+          from: resolved.replyTo,
+          messageId,
+          text: text || attachment?.caption || '',
+          timestamp,
+          attachment: attachment
+            ? {
+                kind: attachment.kind,
+                mimeType: attachment.mimeType,
+                fileName: attachment.fileName,
+                base64: attachment.base64,
+                sizeBytes: attachment.sizeBytes
+              }
+            : undefined
+        })
+        .catch((err) => {
+          console.error(`sessionManager inbound ${idEmpresa}:`, err.message);
+        });
     }
   });
 }

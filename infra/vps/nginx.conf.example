@@ -1,0 +1,99 @@
+# Nginx — VPS Linux (Ubuntu/Debian + Hostinger)
+# 1. Copiar: sudo cp infra/vps/nginx.conf.example /etc/nginx/sites-available/efaf
+# 2. Enlazar: sudo ln -sf /etc/nginx/sites-available/efaf /etc/nginx/sites-enabled/
+# 3. Ajustar server_name, root y rutas de certificado
+# 4. sudo nginx -t && sudo systemctl reload nginx
+# 5. SSL: sudo certbot --nginx -d tudominio.com -d www.tudominio.com
+#
+# Build Angular en el servidor:
+#   cd adminSPA && npm run build -- --configuration=production
+# root debe apuntar a: .../adminSPA/dist/admin-spa/browser
+
+# Redirigir HTTP → HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name tudominio.com www.tudominio.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name tudominio.com www.tudominio.com;
+
+    # Certbot (tras certbot --nginx) o rutas manuales:
+    ssl_certificate     /etc/letsencrypt/live/tudominio.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/tudominio.com/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Ajustar a la ruta real del repo en el VPS
+    root /var/www/efaf/adminSPA/dist/admin-spa/browser;
+    index index.html;
+
+    # Límite subida (logos, adjuntos API)
+    client_max_body_size 50m;
+
+    # SPA Angular
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Archivos estáticos del backend (logos, productos) — proxy a backAppC
+    location ^~ /logos/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ /productos-img/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # pdf-backend (más específico que /api/)
+    location ^~ /api/reports/ {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # backAppC — sin barra final en proxy_pass para conservar /api/...
+    location ^~ /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # Cabeceras de seguridad adicionales (Helmet ya pone varias en Node)
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+}
+
+# IMPORTANTE: NO agregar bloques que expongan:
+#   - :3000, :3002, :3010 al público
+#   - SQL Server :1433

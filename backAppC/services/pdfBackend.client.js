@@ -22,6 +22,10 @@ function excelParseUrl() {
   return `${BASE_URL}/api/reports/parse-excel`;
 }
 
+function listParseUrl() {
+  return `${BASE_URL}/api/reports/parse-list`;
+}
+
 /**
  * Genera PDF de comprobante/cotización vía pdf-backend.
  * @returns {Promise<Buffer>}
@@ -112,6 +116,43 @@ async function parsearExcel(buffer, opts = {}) {
   throw e;
 }
 
+/**
+ * Parsea Excel o PDF (texto) a filas normalizadas para cotización WhatsApp.
+ * @returns {Promise<{ source: 'excel'|'pdf', items: Array<{linea, descripcion, cantidad, codigo?, unidad?}>, headers?: string[] }>}
+ */
+async function parsearListaCotizacion(buffer, opts = {}) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    const e = new Error('ARCHIVO_REQUERIDO');
+    e.code = 'ARCHIVO_REQUERIDO';
+    throw e;
+  }
+
+  const FormData = require('form-data');
+  const form = new FormData();
+  const fileName = opts.fileName || 'lista.xlsx';
+  const ext = fileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  form.append('file', buffer, { filename: fileName, contentType: ext });
+  if (opts.maxBytes) form.append('maxBytes', String(opts.maxBytes));
+  if (opts.maxFilas) form.append('maxFilas', String(opts.maxFilas));
+
+  const res = await axios.post(listParseUrl(), form, {
+    headers: authHeaders(form.getHeaders()),
+    timeout: TIMEOUT_MS,
+    validateStatus: () => true,
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity
+  });
+
+  if (res.status >= 200 && res.status < 300) {
+    return res.data;
+  }
+
+  const data = res.data || {};
+  const e = new Error(data.error || `pdf-backend HTTP ${res.status}`);
+  if (data.code) e.code = data.code;
+  throw e;
+}
+
 function isConfigured() {
   return Boolean(BASE_URL);
 }
@@ -120,5 +161,6 @@ module.exports = {
   generarPdfComprobanteVenta,
   generarExcel,
   parsearExcel,
+  parsearListaCotizacion,
   isConfigured
 };

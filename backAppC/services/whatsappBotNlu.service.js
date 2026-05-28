@@ -9,6 +9,7 @@ const PATRONES = {
   stock: /\b(stock|disponible|disponibilidad|hay|tienen|queda|quedan|existencia)\b/i,
   precio: /\b(precio|precios|cuanto cuesta|cuanto cuestan|valor|vale)\b/i,
   cotizar: /\b(cotizar|cotizacion|cotizaciones|presupuesto|presupuestar)\b/i,
+  agregarACotizacion: /\b(agregar al carrito|agregar a la cotizacion|agregar a cotizacion|agregar este producto|cotizar este producto|anadir al carrito|añadir al carrito|poner en el carrito|sumar al carrito|meter al carrito)\b/i,
   confirmar: /\b(confirmar|confirmo|finalizar|enviar cotizacion|registrar cotizacion)\b/i,
   cancelar: /\b(cancelar|anular|vaciar carrito|borrar carrito)\b/i,
   carrito: /\b(carrito|mi lista|ver lista|mi cotizacion)\b/i,
@@ -81,7 +82,10 @@ function detectarIntencion(textoNorm, mensajeRaw, contexto) {
 
   if (PATRONES.confirmar.test(textoNorm) || t.toUpperCase() === 'CONFIRMAR') return 'confirmar_cotizacion';
   if (PATRONES.cancelar.test(textoNorm) || t.toUpperCase() === 'CANCELAR') return 'cancelar_cotizacion';
-  if (PATRONES.carrito.test(textoNorm) || t.toUpperCase() === 'CARRITO') return 'carrito';
+  if (PATRONES.agregarACotizacion.test(textoNorm)) return 'agregar_a_cotizacion';
+  if (t.toUpperCase() === 'CARRITO' || (PATRONES.carrito.test(textoNorm) && !PATRONES.agregarACotizacion.test(textoNorm))) {
+    return 'carrito';
+  }
   if (PATRONES.cotizar.test(textoNorm) || t.toUpperCase() === 'COTIZAR') return 'cotizar';
   if (PATRONES.quitar.test(textoNorm)) return 'quitar_carrito';
   if (PATRONES.pedido.test(textoNorm)) return 'pedido';
@@ -100,7 +104,28 @@ function interpretar(mensaje, contexto = {}) {
   const textoNorm = normalizarTexto(mensaje);
   const sinonimosMap = contexto.sinonimosMap || new Map();
   const estado = contexto.estado || 'menu';
+  const slots = contexto.slots || {};
   const t = String(mensaje || '').trim();
+
+  // Pistas en slots: mas fiable que el estado persistido si el usuario responde rapido.
+  if (slots.productoPendiente && /^\d+([.,]\d+)?$/.test(t)) {
+    const cantidad = parseCantidadTexto(t);
+    return {
+      intencion: 'cantidad',
+      terminosBusqueda: [],
+      entidades: { cantidad },
+      textoNorm
+    };
+  }
+  if (slots.esperandoMedioPago && /^\d+$/.test(t)) {
+    const n = Number(t);
+    return {
+      intencion: 'medio_pago',
+      terminosBusqueda: [],
+      entidades: { numero: n },
+      textoNorm
+    };
+  }
 
   if (/^\d+$/.test(t) && estado === 'pedido_eligiendo') {
     return {
@@ -178,7 +203,7 @@ function interpretar(mensaje, contexto = {}) {
     'identidad', 'que_vendes', 'productos_destacados', 'ubicacion', 'contacto',
     'documento_identidad', 'documento_invalido', 'despedida',
     'productos_pedido', 'pdf_pedido', 'pedido_opcion_invalida',
-    'solicitar_agente'
+    'solicitar_agente', 'agregar_a_cotizacion'
   ];
 
   if (sinTerminos.includes(intencion)) {
@@ -190,6 +215,12 @@ function interpretar(mensaje, contexto = {}) {
   }
 
   return { intencion, terminosBusqueda: terminos, entidades, textoNorm };
+}
+
+function parseCantidadTexto(t) {
+  const n = Number(String(t || '').trim().replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 1000) / 1000;
 }
 
 module.exports = { interpretar, detectarIntencion };

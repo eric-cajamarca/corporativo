@@ -71,6 +71,11 @@ const inventarioRoutes = require('./routes/inventario');
 const reservasRoutes = require('./routes/reservas');
 const consumoHabitacionRoutes = require('./routes/consumoHabitacion');
 const webhooksRoutes = require('./routes/webhooks');
+const {
+  pasarelaWebhookRawBody,
+  verificarWebhookPasarela,
+  esRutaWebhook
+} = require('./middlewares/pasarelaWebhook.middleware');
 const suscripcionRoutes = require('./routes/suscripcion');
 
 
@@ -118,9 +123,15 @@ app.use(cookieParser());
 app.use(requestContextMiddleware);
 const PORT = process.env.PORT || 3000;
 
-// Middleware para parsear JSON y formularios
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// JSON / formularios (webhooks usan cuerpo crudo en /api/webhooks)
+app.use((req, res, next) => {
+  if (esRutaWebhook(req)) return next();
+  return express.json({ limit: '50mb' })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (esRutaWebhook(req)) return next();
+  return express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
+});
 
 
 /**
@@ -205,6 +216,9 @@ app.use(cors(corsOptions));
 app.use('/api/whatsapp-bot', whatsappBotRoutes);
 console.error('context:', JSON.stringify({ level: 'info', message: 'whatsapp_bot_inbound_ready', path: '/api/whatsapp-bot/inbound', port: process.env.PORT || 3000 }));
 
+// Webhooks de pasarelas (sin JWT; firma HMAC / API Culqi). Antes de routers /api con auth global.
+app.use('/api/webhooks', pasarelaWebhookRawBody, verificarWebhookPasarela, webhooksRoutes);
+
 app.use('/api', auth.optionalAuth);
 app.use('/api', querySafeMiddleware); // Agrega req.querySafe
 app.use('/api', saasSuscripcionGate);
@@ -270,8 +284,6 @@ app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api', reservasRoutes);
 app.use('/api', consumoHabitacionRoutes);
-// Webhooks de pasarelas de pago (públicos, identifican empresa por orderNumber = idEmpresa-uuid)
-app.use('/api', webhooksRoutes);
 app.use('/api', suscripcionRoutes);
 const grifoRoutes = require('./routes/grifo');
 app.use('/api', grifoRoutes);

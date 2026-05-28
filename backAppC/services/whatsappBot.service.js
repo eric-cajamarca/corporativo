@@ -212,7 +212,7 @@ async function desescalarManual(idEmpresa, telefonoCliente) {
 
 async function procesarInbound(payload) {
   const t0 = Date.now();
-  const { idEmpresa, from, messageId, text, timestamp } = payload || {};
+  const { idEmpresa, from, messageId, text, timestamp, attachment } = payload || {};
   validarUuid(idEmpresa);
 
   if (esDuplicado(idEmpresa, messageId)) {
@@ -222,8 +222,19 @@ async function procesarInbound(payload) {
   const tel = normalizarTelefonoWhatsApp(from);
   if (!tel.destino) throw new Error('Telefono de origen requerido');
 
-  const textoEntrada = String(text || '').trim();
-  if (!textoEntrada) throw new Error('Mensaje de texto vacio');
+  const adjuntoEntrada =
+    attachment && attachment.base64
+      ? {
+          kind: attachment.kind || 'document',
+          mimeType: attachment.mimeType || '',
+          fileName: attachment.fileName || 'archivo',
+          base64: attachment.base64,
+          sizeBytes: Number(attachment.sizeBytes) || 0
+        }
+      : null;
+
+  const textoEntrada = String(text || adjuntoEntrada?.caption || '').trim();
+  if (!textoEntrada && !adjuntoEntrada) throw new Error('Mensaje de texto vacio');
 
   const precarga = await whatsappBotInboundContext.precargar(idEmpresa, tel.logId, tel.digitos);
 
@@ -254,7 +265,8 @@ async function procesarInbound(payload) {
       idEmpresa,
       telefonoLog: tel.logId,
       digitosCelular: tel.digitos,
-      textoEntrada,
+      textoEntrada: textoEntrada || '[archivo]',
+      adjuntoEntrada,
       config: precarga.config,
       telefonoVinculadoBot: wa.telefonoVinculado || null
     },
@@ -269,6 +281,9 @@ async function procesarInbound(payload) {
   // Si el dialogo decidio que el bot debe quedarse callado (conversacion escalada),
   // solo persistimos el contexto y no enviamos nada al cliente.
   if (suprimirRespuesta) {
+    console.error(
+      `whatsappBot inbound: sin respuesta (conversacion escalada a humano) idEmpresa=${idEmpresa} tel=${tel.logId}`
+    );
     withPool((pool) =>
       whatsappBotInboundContext.persistirTurno(
         pool,
@@ -299,7 +314,33 @@ async function procesarInbound(payload) {
     usarEmojis: precarga.config?.usarEmojis !== false
   };
   const respuestaArr = Array.isArray(respuesta) ? respuesta : [respuesta];
-  const respuestaAdaptada = respuestaArr.map((b) => copy.adaptarTexto(b, opcionesTexto));
+  const respuestaAdaptada = respuestaArr
+    .map((b) => copy.adaptarTexto(b, opcionesTexto))
+    .map((b) => String(b || '').trim())
+    .filter(Boolean);
+
+  if (!respuestaAdaptada.length) {
+    console.error('whatsappBot inbound: respuesta vacia tras procesar turno', {
+      idEmpresa,
+      telefono: tel.logId,
+      estado: conv?.estado,
+      intencion: turno.intencion || null
+    });
+    withPool((pool) =>
+      whatsappBotInboundContext.persistirTurno(pool, idEmpresa, tel.logId, conv, precarga.convNueva)
+    ).catch((err) => console.error('whatsappBot persistir conversacion:', err.message));
+    return {
+      ok: true,
+      idEmpresa,
+      from: tel.destino,
+      messageId: messageId || null,
+      respuesta: '',
+      burbujas: 0,
+      pdfEnviado: false,
+      aviso: 'respuesta_vacia',
+      elapsedMs: Date.now() - t0
+    };
+  }
 
   // Si la empresa desactivo la humanizacion, no mandamos reaccion ni typing.
   const humanizar = precarga.config?.humanizar !== false;
@@ -328,15 +369,19 @@ async function procesarInbound(payload) {
   } else {
     registrarLogAsync(idEmpresa, 'out', tel.logId, null, respuestaPlana);
 
-    withPool((pool) =>
-      whatsappBotInboundContext.persistirTurno(
-        pool,
-        idEmpresa,
-        tel.logId,
-        conv,
-        precarga.convNueva
-      )
-    ).catch((err) => console.error('whatsappBot persistir conversacion:', err.message));
+    try {
+      await withPool((pool) =>
+        whatsappBotInboundContext.persistirTurno(
+          pool,
+          idEmpresa,
+          tel.logId,
+          conv,
+          precarga.convNueva
+        )
+      );
+    } catch (err) {
+      console.error('whatsappBot persistir conversacion:', err.message);
+    }
   }
 
   if (adjunto?.pdfBase64 && adjunto?.filename) {

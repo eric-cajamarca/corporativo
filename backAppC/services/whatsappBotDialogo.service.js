@@ -172,10 +172,12 @@ async function procesarTurno(ctx, precarga = null) {
       conv = { estado: 'menu', slots: {}, candidatos: [] };
     }
   }
+  conv = whatsappBotEscalamiento.limpiarEscaladaExpirada(conv);
 
   const nlu = whatsappBotNlu.interpretar(textoEntrada, {
     estado: conv.estado,
-    sinonimosMap
+    sinonimosMap,
+    slots: conv.slots || {}
   });
 
   const resCliente =
@@ -188,16 +190,26 @@ async function procesarTurno(ctx, precarga = null) {
   // silencio salvo que el cliente pida volver con MENU explicitamente.
   // -----------------------------------------------------------------------
   if (whatsappBotEscalamiento.estaEscalada(conv)) {
-    if (nlu.intencion === 'menu') {
+    // MENU, hola o ping: el cliente quiere retomar el bot (no solo la palabra MENU).
+    if (nlu.intencion === 'menu' || nlu.intencion === 'hola' || nlu.intencion === 'ping') {
       const desesc = whatsappBotEscalamiento.desescalar(conv);
+      const burbujas = [];
+      if (nlu.intencion === 'hola') {
+        burbujas.push(copy.saludoPersonalizado(resCliente?.cliente?.rSocial));
+      }
+      if (nlu.intencion === 'ping') {
+        burbujas.push(TEXTO_PING);
+      } else {
+        burbujas.push(copy.pick(copy.VARIANTES.escalamiento.desescaladoManual));
+      }
+      burbujas.push(TEXTO_MENU_BASE);
       return {
-        respuesta: copy.pick(copy.VARIANTES.escalamiento.desescaladoManual),
+        respuesta: burbujas.filter(Boolean),
         conv: desesc,
         reaccion: '✅'
       };
     }
-    // Cualquier otro mensaje: lo logueamos pero NO respondemos para no chocar
-    // con el asesor humano que ya esta atendiendo al cliente.
+    // Cualquier otro mensaje: silencio para no interferir con el asesor humano.
     return { respuesta: null, conv, suprimirRespuesta: true };
   }
 

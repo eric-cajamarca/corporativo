@@ -118,7 +118,26 @@ async function crearCargo({ secretKey, amountCentimos, email, tokenId, metadata,
   return { ok: false, status: res.status, message: errMsg, raw: data };
 }
 
+/**
+ * Consulta un cargo en Culqi (verificación server-side de webhooks).
+ */
+async function obtenerCargo(secretKey, chargeId) {
+  if (!secretKey || !chargeId) return null;
+  const res = await axios.get(`${CULQI_API}/charges/${encodeURIComponent(chargeId)}`, {
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json'
+    },
+    validateStatus: () => true
+  });
+  if (res.status !== 200 || !res.data || !res.data.id) {
+    return null;
+  }
+  return res.data;
+}
+
 module.exports = {
   crearCargo,
-  cargoCulqiPagado
+  cargoCulqiPagado,
+  obtenerCargo
 };

@@ -42,6 +42,22 @@ function estaEscalada(conv) {
   return hasta > Date.now();
 }
 
+/**
+ * Si la escalada ya vencio (o el slot quedo inconsistente), limpia el estado
+ * para que el bot vuelva a responder sin esperar MENU manual.
+ */
+function limpiarEscaladaExpirada(conv) {
+  if (!conv) return conv;
+  const e = conv.slots?.escalada;
+  const estadoEscalado = conv.estado === 'escalada' || conv.estado === 'ofreciendo_agente';
+
+  if (!e && !estadoEscalado) return conv;
+
+  if (e?.hasta && estaEscalada(conv)) return conv;
+
+  return desescalar(conv);
+}
+
 function marcarEscalada(conv, { timeoutMin, motivo, numeroVendedor }) {
   const slots = { ...(conv?.slots || {}) };
   const min = Math.max(1, Math.min(1440, Number(timeoutMin) || 60));
@@ -126,6 +142,7 @@ async function notificarVendedor(idEmpresa, params) {
 
 module.exports = {
   estaEscalada,
+  limpiarEscaladaExpirada,
   marcarEscalada,
   desescalar,
   notificarVendedor,

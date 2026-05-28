@@ -10,6 +10,10 @@ function assertProductionEnv() {
     console.error('context:', 'NODE_ENV=production requiere JWT_SECRET definido y no vacío');
     process.exit(1);
   }
+  if (process.env.WEBHOOK_SKIP_SIGNATURE_VERIFY === 'true') {
+    console.error('context:', 'NODE_ENV=production no permite WEBHOOK_SKIP_SIGNATURE_VERIFY=true');
+    process.exit(1);
+  }
 }
 
 module.exports = { assertProductionEnv };

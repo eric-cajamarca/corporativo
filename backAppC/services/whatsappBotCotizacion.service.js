@@ -10,6 +10,7 @@ const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
+const whatsappBotListaArchivo = require('./whatsappBotListaArchivo.service');
 
 const MEDIOS_PAGO = {
   1: 'Efectivo',
@@ -275,6 +276,27 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   const texto = String(textoEntrada || '').trim();
   const slots = { ...(conv.slots || {}), carrito: Array.isArray(conv.slots?.carrito) ? [...conv.slots.carrito] : [] };
 
+  const confirmLista = whatsappBotListaArchivo.procesarConfirmacionLista(ctx, conv, {
+    agregarAlCarrito,
+    formatearCarrito
+  });
+  if (confirmLista) return confirmLista;
+
+  const elegirLista = whatsappBotListaArchivo.procesarElegirOpcionLista(ctx, conv, {
+    agregarAlCarrito,
+    formatearCarrito
+  });
+  if (elegirLista) return elegirLista;
+
+  if (ctx.adjuntoEntrada?.base64) {
+    const desdeArchivo = await whatsappBotListaArchivo.procesarAdjuntoCotizacion(ctx, conv, resCliente, {
+      esEstadoCotizacion,
+      solicitarRegistroOIniciarCotizacion,
+      agregarAlCarrito
+    });
+    if (desdeArchivo) return desdeArchivo;
+  }
+
   if (esEstadoRegistroDocumento(conv.estado)) {
     if (nlu.intencion === 'menu' || nlu.intencion === 'cancelar_cotizacion') {
       return {
@@ -321,6 +343,11 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     return solicitarRegistroOIniciarCotizacion(resCliente);
   }
 
+  if (nlu.intencion === 'agregar_a_cotizacion') {
+    const agregar = await intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente);
+    if (agregar) return agregar;
+  }
+
   if (!esEstadoCotizacion(conv.estado) && nlu.intencion !== 'carrito' && nlu.intencion !== 'confirmar_cotizacion') {
     if (nlu.intencion === 'cancelar_cotizacion' && !carritoVacio(slots)) {
       return solicitarRegistroOIniciarCotizacion(resCliente);
@@ -351,6 +378,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
       return solicitarRegistroOIniciarCotizacion(resCliente);
     }
     slots.idCliente = idCliente;
+    slots.esperandoMedioPago = true;
     return {
       respuesta: [
         formatearCarrito(slots.carrito),
@@ -361,7 +389,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     };
   }
 
-  if (conv.estado === 'cotiz_medio_pago') {
+  if (conv.estado === 'cotiz_medio_pago' || (nlu.intencion === 'medio_pago' && !carritoVacio(slots))) {
     const medioPago = resolverMedioPago(texto, nlu);
     if (!medioPago) {
       return { respuesta: 'Ese medio de pago no lo reconozco.\n\n' + TEXTO_MEDIOS_PAGO, conv: { ...conv, slots } };
@@ -407,6 +435,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
           ? 'Te envío el PDF de tu cotización 📄. Un vendedor te llamará pronto para confirmar el pago.'
           : 'Tu cotización quedó registrada. Un vendedor te llamará pronto para confirmar el pago.'
       ];
+      delete slots.esperandoMedioPago;
       return {
         respuesta: burbujas,
         conv: { estado: 'menu', slots: {}, candidatos: [] },
@@ -423,7 +452,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     }
   }
 
-  if ((conv.estado === 'cotiz_cantidad' || nlu.intencion === 'cantidad') && slots.productoPendiente) {
+  if (slots.productoPendiente && (conv.estado === 'cotiz_cantidad' || nlu.intencion === 'cantidad')) {
     const cantidad = parseCantidad(nlu.intencion === 'cantidad' ? String(nlu.entidades?.cantidad ?? texto) : texto);
     if (!cantidad) {
       return {
@@ -504,6 +533,7 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
       respuesta: [
         'En modo cotización puedes:',
         '— Escribir el nombre del producto a buscar',
+        '— Enviar *Excel (.xlsx)* o *PDF con texto* con tu lista',
         '— *CARRITO* para ver tu lista',
         '— *CONFIRMAR* para registrar',
         '— *CANCELAR* para salir'
@@ -515,8 +545,82 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   return null;
 }
 
+/**
+ * Desde busqueda general (sin haber entrado a "COTIZAR"): agrega el producto
+ * mostrado o el de la lista segun ultima seleccion / numero en el mensaje.
+ */
+async function intentarAgregarDesdeBusquedaGeneral(ctx, conv, nlu, resCliente) {
+  const registro = await solicitarRegistroOIniciarCotizacion(resCliente);
+  if (registro.conv.estado === 'registro_documento') {
+    return registro;
+  }
+
+  const idCliente = resolverIdCliente(registro.conv.slots, resCliente);
+  const slots = {
+    ...(registro.conv.slots || {}),
+    carrito: Array.isArray(registro.conv.slots?.carrito) ? [...registro.conv.slots.carrito] : []
+  };
+  if (idCliente) slots.idCliente = idCliente;
+
+  let producto = null;
+
+  if (nlu.intencion === 'seleccion_numero' && conv.candidatos?.length) {
+    const idx = Number(nlu.entidades?.numero) - 1;
+    if (idx >= 0 && idx < conv.candidatos.length) producto = conv.candidatos[idx];
+  }
+
+  if (!producto && conv.slots?.ultimoCandidato) {
+    producto = conv.slots.ultimoCandidato;
+  }
+
+  if (!producto && conv.slots?.ultimaBusqueda?.candidatos?.length === 1) {
+    producto = conv.slots.ultimaBusqueda.candidatos[0];
+  }
+
+  if (!producto && conv.candidatos?.length === 1) {
+    producto = conv.candidatos[0];
+  }
+
+  if (!producto && conv.candidatos?.length > 1) {
+    const lineas = conv.candidatos.map((p, i) =>
+      `${i + 1}. *${p.descripcion}* (${p.codigo}) — ${formatearPrecio(p.precioLista)}`
+    );
+    return {
+      respuesta: [
+        'Para agregar a la cotización, responde con el *número* del producto de la lista:',
+        '',
+        ...lineas
+      ].join('\n'),
+      conv: {
+        estado: 'cotiz_eligiendo',
+        slots: { ...slots, ultimaBusqueda: conv.slots?.ultimaBusqueda },
+        candidatos: conv.candidatos
+      },
+      reaccion: '🛒'
+    };
+  }
+
+  if (!producto) {
+    return {
+      respuesta: [
+        'Primero dime qué producto quieres cotizar (escribe el nombre) o elige uno de una lista.',
+        'También puedes escribir *COTIZAR* para entrar al modo cotización.'
+      ].join('\n'),
+      conv: { estado: 'cotiz_activa', slots, candidatos: [] }
+    };
+  }
+
+  slots.productoPendiente = producto;
+  return {
+    respuesta: `*${producto.descripcion}*\nPrecio: ${formatearPrecio(producto.precioLista)}\n\n¿Cuántas unidades deseas?`,
+    conv: { estado: 'cotiz_cantidad', slots, candidatos: [] },
+    reaccion: '🛒'
+  };
+}
+
 module.exports = {
   intentarProcesar,
+  intentarAgregarDesdeBusquedaGeneral,
   esEstadoCotizacion,
   MEDIOS_PAGO,
   TEXTO_MEDIOS_PAGO
