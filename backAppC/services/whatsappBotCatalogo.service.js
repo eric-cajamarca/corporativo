@@ -1,10 +1,12 @@
 const Fuse = require('fuse.js');
 const { withPool } = require('../utils/dbPool.util');
 const whatsappBotCatalogoRepository = require('../repositories/whatsappBotCatalogo.repository');
-const { normalizarTexto, tokenizar } = require('../utils/whatsappBotTexto.util');
+const { normalizarTexto, tokenizar, expandirVariantesLexica, textoIncluyeAlgunaVariante } = require('../utils/whatsappBotTexto.util');
 
 const fuseCache = new Map();
 const FUSE_TTL_MS = 5 * 60 * 1000;
+/** Opciones numeradas en WhatsApp (no conviene listar decenas: mensaje largo y difícil de elegir). */
+const LIMITE_OPCIONES_CHAT = 8;
 
 function construirTextoBusqueda(row) {
   return normalizarTexto([
@@ -70,19 +72,38 @@ async function buscarFuzzy(idEmpresa, terminos, limite = 5, threshold = 0.4) {
   return hits.map((h) => h.item);
 }
 
-async function buscar(idEmpresa, terminos, limite = 5) {
+async function buscar(idEmpresa, terminos, limite = LIMITE_OPCIONES_CHAT) {
+  const tokens = (terminos || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 6);
+  const lim = Math.min(LIMITE_OPCIONES_CHAT, Math.max(1, parseInt(limite, 10) || LIMITE_OPCIONES_CHAT));
+
   const result = await withPool((pool) =>
-    whatsappBotCatalogoRepository.buscarPorTerminos(pool, idEmpresa, terminos, 20)
+    whatsappBotCatalogoRepository.buscarPorTerminos(pool, idEmpresa, tokens, lim)
   );
 
   let items = result.items || [];
-  if (items.length === 0 && terminos.length > 0) {
-    items = await buscarFuzzy(idEmpresa, terminos, limite);
+  let totalEncontrados = Number(result.totalEncontrados) || items.length;
+
+  if (items.length === 0 && tokens.length > 0) {
+    const fuzzyLim = tokens.length > 1 ? Math.min(40, lim * 5) : lim;
+    items = await buscarFuzzy(idEmpresa, tokens, fuzzyLim);
+    if (tokens.length > 1) {
+      items = items.filter((p) => coincideMultipalabra(p, tokens));
+    }
+    totalEncontrados = items.length;
   }
 
+  if (tokens.length > 1 && items.length > 1) {
+    items = [...items].sort(
+      (a, b) => puntuarCoincidencia(b, tokens) - puntuarCoincidencia(a, tokens)
+    );
+  }
+
+  const mostrados = items.slice(0, lim);
   return {
-    total: items.length,
-    items: items.slice(0, limite)
+    totalEncontrados,
+    hayMas: totalEncontrados > mostrados.length,
+    total: mostrados.length,
+    items: mostrados
   };
 }
 
@@ -90,13 +111,31 @@ async function statusCatalogo(idEmpresa) {
   return withPool((pool) => whatsappBotCatalogoRepository.contarPorEmpresa(pool, idEmpresa));
 }
 
+function coincideMultipalabra(producto, tokens) {
+  const lista = (tokens || []).map((t) => normalizarTexto(t)).filter((t) => t.length >= 1);
+  if (!lista.length) return true;
+  const txt = normalizarTexto(
+    [producto.textoBusqueda, producto.descripcion, producto.codigo].filter(Boolean).join(' ')
+  );
+  return lista.every((t) => textoIncluyeAlgunaVariante(txt, t));
+}
+
 function puntuarCoincidencia(producto, tokens) {
+  const lista = (tokens || []).map((t) => normalizarTexto(t)).filter((t) => t.length >= 1);
   const txt = normalizarTexto(
     [producto.descripcion, producto.codigo, producto.textoBusqueda].filter(Boolean).join(' ')
   );
   let score = 0;
-  for (const t of tokens) {
-    if (txt.includes(t)) score += t.length;
+  let matched = 0;
+  for (const t of lista) {
+    if (textoIncluyeAlgunaVariante(txt, t)) {
+      const variantes = expandirVariantesLexica(t);
+      score += Math.max(...variantes.map((v) => (txt.includes(v) ? v.length : 0)), 0);
+      matched += 1;
+    }
+  }
+  if (lista.length > 0 && matched === lista.length) {
+    score += lista.join('').length;
   }
   return score;
 }
@@ -114,6 +153,9 @@ async function buscarMejorCoincidencia(idEmpresa, descripcion, limite = 8, opts 
   const fraseNorm = normalizarTexto(desc);
 
   let hits = await buscarFuzzyConScore(idEmpresa, desc, limite, 0.52);
+  if (tokens.length > 1) {
+    hits = hits.filter((h) => coincideMultipalabra(h.item, tokens));
+  }
   let items = hits.map((h) => h.item);
 
   if (!items.length && tokens.length) {
@@ -126,6 +168,9 @@ async function buscarMejorCoincidencia(idEmpresa, descripcion, limite = 8, opts 
 
   if (!items.length && tokens.length) {
     hits = await buscarFuzzyConScore(idEmpresa, tokens, limite, 0.58);
+    if (tokens.length > 1) {
+      hits = hits.filter((h) => coincideMultipalabra(h.item, tokens));
+    }
     items = hits.map((h) => h.item);
   }
 
@@ -186,4 +231,10 @@ async function buscarMejorCoincidencia(idEmpresa, descripcion, limite = 8, opts 
   };
 }
 
-module.exports = { syncCatalogo, buscar, buscarMejorCoincidencia, statusCatalogo };
+module.exports = {
+  syncCatalogo,
+  buscar,
+  buscarMejorCoincidencia,
+  statusCatalogo,
+  LIMITE_OPCIONES_CHAT
+};

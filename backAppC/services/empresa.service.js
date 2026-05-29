@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
 const empresasAdministracionRepository = require('../repositories/empresasAdministracion.repository');
+const authService = require('./auth.service');
 
 /** Catálogo inicial de comprobantes por sucursal (alta empresa o al pasar a series propias). */
 const COMPROBANTES_PREDETERMINADOS = [
@@ -35,14 +36,30 @@ const COMPROBANTES_PREDETERMINADOS = [
  */
 exports.getDatosEmpresaLogin = async (pool, user) => {
     if (!user) return null;
+    const idEmpresa = user.empresa || user.idEmpresa || null;
+    const idUsuario = user.sub || user.idUsuario || null;
+    if (pool && idEmpresa && idUsuario) {
+        const perfil = await authService.reconstruirDatosUsuarioParaToken(pool, idUsuario, idEmpresa);
+        if (perfil) {
+            return {
+                idEmpresa: perfil.idEmpresa,
+                razonSocial: perfil.razonSocial || '',
+                nombres: perfil.nombres || '',
+                apellidos: perfil.apellidos || '',
+                email: perfil.email || '',
+                rol: perfil.rol || 'Administrador',
+                roles: perfil.rol || 'Administrador'
+            };
+        }
+    }
     return {
-        idEmpresa: user.empresa || null,
+        idEmpresa,
         razonSocial: user.razonSocial || '',
         nombres: user.nombres || '',
         apellidos: user.apellidos || '',
         email: user.email || '',
         rol: user.rol || 'Administrador',
-        roles: user.rol || 'Administrador' // frontend usa response.data.roles
+        roles: user.rol || 'Administrador'
     };
 };
 

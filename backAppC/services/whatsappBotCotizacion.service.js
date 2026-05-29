@@ -504,7 +504,12 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   }
 
   if (esEstadoCotizacion(conv.estado) && nlu.terminosBusqueda.length > 0 && nlu.intencion !== 'confirmar_cotizacion') {
-    const { items } = await whatsappBotCatalogo.buscar(idEmpresa, nlu.terminosBusqueda, 5);
+    const limite = whatsappBotCatalogo.LIMITE_OPCIONES_CHAT;
+    const { totalEncontrados, hayMas, items } = await whatsappBotCatalogo.buscar(
+      idEmpresa,
+      nlu.terminosBusqueda,
+      limite
+    );
     if (!items.length) {
       return {
         respuesta: 'No encontré ese producto. Intenta con otro nombre o escribe *CARRITO*.',
@@ -521,8 +526,14 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
     const lineas = items.map((p, i) =>
       `${i + 1}. *${p.descripcion}* (${p.codigo}) — ${formatearPrecio(p.precioLista)}`
     );
+    const pie = ['Responde el número para agregarlo al carrito.'];
+    if (hayMas) {
+      pie.unshift(
+        `Hay ${totalEncontrados} coincidencias; muestro las ${items.length} más relevantes. Escribe más detalle para afinar.`
+      );
+    }
     return {
-      respuesta: ['Encontré estos productos:', '', ...lineas, '', 'Responde el número para agregarlo al carrito.'].join('\n'),
+      respuesta: ['Encontré estos productos:', '', ...lineas, '', ...pie].join('\n'),
       conv: { estado: 'cotiz_eligiendo', slots, candidatos: items },
       reaccion: '🔍'
     };

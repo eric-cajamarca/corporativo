@@ -1,4 +1,8 @@
 const sql = require('mssql');
+const { expandirVariantesLexica } = require('../utils/whatsappBotTexto.util');
+
+/** Máximo de filas devueltas por SQL antes de recortar en servicio. */
+const MAX_FILAS_BUSQUEDA = 50;
 
 async function contarPorEmpresa(pool, idEmpresa) {
   try {
@@ -79,25 +83,34 @@ async function obtenerFilasSync(pool, idEmpresa) {
   return r.recordset || [];
 }
 
+/**
+ * Búsqueda multipalabra (AND): cada token debe aparecer en textoBusqueda
+ * (código + descripción + marca + categoría), igual que crear venta / buscar-venta.
+ */
 async function buscarPorTerminos(pool, idEmpresa, terminos, limite = 20) {
   const tokens = (terminos || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 6);
-  if (tokens.length === 0) return { total: 0, items: [] };
+  if (tokens.length === 0) return { totalEncontrados: 0, items: [] };
 
   const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-  const ors = tokens.map((tok, i) => {
-    const p = `t${i}`;
-    req.input(p, sql.NVarChar(120), `%${tok.replace(/[%_[\]]/g, '')}%`);
-    return `textoBusqueda LIKE @${p}`;
+  const ands = tokens.map((tok, i) => {
+    const variants = expandirVariantesLexica(tok);
+    const ors = variants.map((variant, j) => {
+      const p = `t${i}_${j}`;
+      req.input(p, sql.NVarChar(120), `%${variant.replace(/[%_[\]]/g, '')}%`);
+      return `textoBusqueda LIKE @${p}`;
+    });
+    return `(${ors.join(' OR ')})`;
   });
 
   const r = await req.query(`
-    SELECT idProducto, codigo, descripcion, precioLista, stockTotal, textoBusqueda
+    SELECT TOP (${MAX_FILAS_BUSQUEDA})
+      idProducto, codigo, descripcion, precioLista, stockTotal, textoBusqueda
     FROM WhatsAppBotCatalogoIndice
-    WHERE idEmpresa = @idEmpresa AND (${ors.join(' OR ')})
+    WHERE idEmpresa = @idEmpresa AND (${ands.join(' AND ')})
     ORDER BY descripcion
   `);
-  const items = r.recordset || [];
-  return { total: items.length, items: items.slice(0, limite) };
+  const all = r.recordset || [];
+  return { totalEncontrados: all.length, items: all.slice(0, limite) };
 }
 
 async function listarTodos(pool, idEmpresa) {

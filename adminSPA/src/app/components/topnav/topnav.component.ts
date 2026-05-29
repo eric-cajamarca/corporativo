@@ -40,7 +40,6 @@ declare const iziToast: any;
 export class TopnavComponent implements OnInit, OnDestroy {
   // Datos del usuario
   public userName: string = '';
-  public userRole: string = '';
   public empresaNombre: string = '';
   public empresaLogo: string = '';
   public isAuthenticated: boolean = false;
@@ -100,7 +99,6 @@ export class TopnavComponent implements OnInit, OnDestroy {
       const userData = this.authService.userData();
       if (userData) {
         this.userName = userData.nombres || 'Usuario';
-        this.userRole = userData.rol || '';
         this.empresaNombre = userData.razonSocial || '';
         this.isAuthenticated = true;
         this.cargarTipoCambio();
@@ -108,7 +106,6 @@ export class TopnavComponent implements OnInit, OnDestroy {
         this.appBanner.refrescar();
       } else {
         this.userName = '';
-        this.userRole = '';
         this.empresaNombre = '';
         this.isAuthenticated = false;
         this.appBanner.limpiar();
@@ -296,7 +293,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
    * Verifica si el usuario tiene un rol específico
    */
   hasRole(role: string): boolean {
-    return this.userRole === role;
+    return String(this.authService.userData()?.rol || '').trim() === role;
   }
 
   /**

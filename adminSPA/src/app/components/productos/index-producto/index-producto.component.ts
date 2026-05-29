@@ -250,6 +250,7 @@ export class IndexProductoComponent {
   }
 
   initData(evitarCache = false) {
+    this.catalogoInicialCargado = false;
     this._productoService.obtenerProductosTodos(evitarCache ? { evitarCache: true } : undefined).subscribe(
       (response: any) => {
         if (response.data == undefined) {
@@ -271,6 +272,13 @@ export class IndexProductoComponent {
       (error: any) => {
         console.error('Error al cargar productos:', error);
         this.catalogoInicialCargado = true;
+        const msg =
+          error?.error?.message ||
+          error?.message ||
+          'No se pudo cargar el listado de productos.';
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
+        }
       }
     );
   }

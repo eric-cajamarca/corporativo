@@ -68,24 +68,38 @@ const construirFiltroTokensBusqueda = (request, tokens, aliasMarca, aliasCategor
   return ` AND (${conds.join(' AND ')}) `;
 };
 
-const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProductoFiltro = null) => {
-  const ids = (idsEmpresa || []).filter(Boolean);
-  if (!recordset || recordset.length === 0) {
-    return [];
+/** SQL Server limita ~2100 parámetros por petición; evitar IN con miles de idProducto. */
+const MAX_IN_PRODUCTOS_PRECIO = 500;
+
+const agregarPrecioAMapa = (preciosMap, precio) => {
+  if (!precio?.idProducto) return;
+  if (!preciosMap[precio.idProducto]) {
+    preciosMap[precio.idProducto] = {};
   }
-  const idsProdUnicos =
-    idsProductoFiltro && idsProductoFiltro.length
-      ? [...new Set(idsProductoFiltro.filter(Boolean))]
-      : [...new Set(recordset.map((r) => r.idProducto).filter(Boolean))];
+  preciosMap[precio.idProducto][precio.idLista] = {
+    precio: precio.precio,
+    idPrecio: precio.idPrecio,
+    nombreLista: precio.nombreLista,
+    principal: precio.principal,
+    simboloMoneda: precio.simboloMoneda,
+    fActualizacion: precio.fActualizacion
+  };
+};
 
-  const preciosRequest = pool.request();
-  const inClausePrecios = construirInClause(preciosRequest, ids, 'idEmpresaPrecio');
-  const inClauseProd =
-    idsProdUnicos.length > 0 ? construirInClause(preciosRequest, idsProdUnicos, 'idProdPrecio') : null;
-  const filtroProdSql = inClauseProd ? ` AND pp.idProducto IN (${inClauseProd}) ` : '';
+/**
+ * Precios por lista para productos de una o más empresas.
+ * Con catálogos grandes (>500 IDs) consulta por idEmpresa y filtra en memoria.
+ */
+const cargarPreciosMapProductos = async (pool, idsEmpresa, idsProductos) => {
+  const ids = (idsEmpresa || []).filter(Boolean);
+  const idsProd = [...new Set((idsProductos || []).filter(Boolean))];
+  const preciosMap = {};
+  if (ids.length === 0) {
+    return preciosMap;
+  }
 
-  const preciosResult = await preciosRequest.query(`
-        SELECT 
+  const sqlPrecios = (inClausePrecios, filtroProdSql) => `
+        SELECT
             pp.idProducto,
             pp.idLista,
             pp.precio,
@@ -101,22 +115,54 @@ const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProdu
         WHERE p.idEmpresa IN (${inClausePrecios})
         ${filtroProdSql}
         AND lp.activo = 1
-      `);
+      `;
 
-  const preciosMap = {};
-  preciosResult.recordset.forEach((precio) => {
-    if (!preciosMap[precio.idProducto]) {
-      preciosMap[precio.idProducto] = {};
+  const usarFiltroSqlPorProducto =
+    idsProd.length > 0 && idsProd.length <= MAX_IN_PRODUCTOS_PRECIO;
+
+  if (usarFiltroSqlPorProducto) {
+    for (let i = 0; i < idsProd.length; i += MAX_IN_PRODUCTOS_PRECIO) {
+      const chunk = idsProd.slice(i, i + MAX_IN_PRODUCTOS_PRECIO);
+      const req = pool.request();
+      const inClausePrecios = construirInClause(req, ids, 'idEmpresaPrecio');
+      const inClauseProd = construirInClause(req, chunk, 'idProdPrecio');
+      const filtroProdSql = ` AND pp.idProducto IN (${inClauseProd}) `;
+      const res = await req.query(sqlPrecios(inClausePrecios, filtroProdSql));
+      (res.recordset || []).forEach((precio) => agregarPrecioAMapa(preciosMap, precio));
     }
-    preciosMap[precio.idProducto][precio.idLista] = {
-      precio: precio.precio,
-      idPrecio: precio.idPrecio,
-      nombreLista: precio.nombreLista,
-      principal: precio.principal,
-      simboloMoneda: precio.simboloMoneda,
-      fActualizacion: precio.fActualizacion
-    };
+    return preciosMap;
+  }
+
+  const req = pool.request();
+  const inClausePrecios = construirInClause(req, ids, 'idEmpresaPrecio');
+  const res = await req.query(sqlPrecios(inClausePrecios, ''));
+  const permitidos =
+    idsProd.length > 0
+      ? new Set(idsProd.map((id) => String(id).toLowerCase()))
+      : null;
+  (res.recordset || []).forEach((precio) => {
+    if (
+      permitidos &&
+      !permitidos.has(String(precio.idProducto).toLowerCase())
+    ) {
+      return;
+    }
+    agregarPrecioAMapa(preciosMap, precio);
   });
+  return preciosMap;
+};
+
+const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProductoFiltro = null) => {
+  const ids = (idsEmpresa || []).filter(Boolean);
+  if (!recordset || recordset.length === 0) {
+    return [];
+  }
+  const idsProdUnicos =
+    idsProductoFiltro && idsProductoFiltro.length
+      ? [...new Set(idsProductoFiltro.filter(Boolean))]
+      : [...new Set(recordset.map((r) => r.idProducto).filter(Boolean))];
+
+  const preciosMap = await cargarPreciosMapProductos(pool, ids, idsProdUnicos);
 
   return (recordset || []).map((producto) => {
     const preciosProducto = preciosMap[producto.idProducto] || {};

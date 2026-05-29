@@ -155,6 +155,41 @@ export class AuthService {
   }
 
   /**
+   * Nombre visible en sidebar/topnav (nombres + apellidos, o razón social de respaldo).
+   */
+  private buildDisplayName(data: {
+    nombres?: string;
+    apellidos?: string;
+    razonSocial?: string;
+  }): string {
+    const full = [data.nombres, data.apellidos]
+      .filter((x) => x != null && String(x).trim() !== '')
+      .join(' ')
+      .trim();
+    if (full) return full;
+    const rs = String(data.razonSocial || '').trim();
+    if (rs) return rs;
+    return 'Usuario';
+  }
+
+  private mapSessionUserData(d: {
+    idEmpresa?: string | null;
+    razonSocial?: string;
+    nombres?: string;
+    apellidos?: string;
+    rol?: string;
+    roles?: string;
+  }): UserData {
+    return {
+      idEmpresa: d.idEmpresa ?? null,
+      razonSocial: d.razonSocial || '',
+      nombres: this.buildDisplayName(d),
+      rol: d.roles ?? d.rol ?? '',
+      lastVerified: Date.now()
+    };
+  }
+
+  /**
    * Establece los datos del usuario desde la respuesta del login (sin llamar al backend).
    * Usar después de login exitoso para evitar verificar token en el mismo tick (cookie puede no estar lista).
    */
@@ -166,28 +201,13 @@ export class AuthService {
     rol?: string;
   }) {
     if (!data) return;
-    this._userData.set({
-      idEmpresa: data.idEmpresa ?? null,
-      razonSocial: data.razonSocial || '',
-      nombres:
-        data.nombres || data.apellidos
-          ? `${data.nombres || ''} ${data.apellidos || ''}`.trim()
-          : 'Usuario',
-      rol: data.rol || '',
-      lastVerified: Date.now()
-    });
+    this._userData.set(this.mapSessionUserData(data));
   }
 
   private handleAuthResponse(response: any) {
     if (response?.active === true && response?.data) {
       const d = response.data;
-      this._userData.set({
-        idEmpresa: d.idEmpresa ?? null,
-        razonSocial: d.razonSocial || '',
-        nombres: d.nombres || '',
-        rol: d.roles ?? d.rol ?? '',
-        lastVerified: Date.now()
-      });
+      this._userData.set(this.mapSessionUserData(d));
     } else {
       this._userData.set(null);
       if (!this.isPublicRoute()) {

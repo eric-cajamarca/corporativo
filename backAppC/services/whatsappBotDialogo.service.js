@@ -106,8 +106,9 @@ async function resumenDeuda(idEmpresa, idCliente) {
  * Busca productos y arma la respuesta. Devuelve estado para guardar en conv.slots.ultimaBusqueda.
  */
 async function buscarYResponder(idEmpresa, terminos, intencion) {
-  const { total, items } = await whatsappBotCatalogo.buscar(idEmpresa, terminos, 5);
-  if (total === 0) {
+  const limite = whatsappBotCatalogo.LIMITE_OPCIONES_CHAT;
+  const { totalEncontrados, hayMas, items } = await whatsappBotCatalogo.buscar(idEmpresa, terminos, limite);
+  if (!items.length) {
     return {
       texto: copy.v('noEncontrado'),
       candidatos: [],
@@ -115,7 +116,7 @@ async function buscarYResponder(idEmpresa, terminos, intencion) {
       ultimaBusqueda: null
     };
   }
-  if (total === 1) {
+  if (items.length === 1) {
     return {
       texto: formatearDetalleProducto(items[0]),
       candidatos: items,
@@ -127,8 +128,14 @@ async function buscarYResponder(idEmpresa, terminos, intencion) {
   const prefijo = intencion === 'precio'
     ? 'Estos productos coinciden (con precio y stock):'
     : 'Encontré varios productos que pueden interesarte:';
+  const pie = [`Responde el número (1-${items.length}) para ver el detalle, o escribe una búsqueda más específica.`];
+  if (hayMas) {
+    pie.unshift(
+      `Hay *${totalEncontrados}* coincidencias. Te muestro las *${items.length}* más relevantes; agrega marca, código o modelo para afinar.`
+    );
+  }
   return {
-    texto: [prefijo, '', ...lineas, '', 'Responde el número (1-5) para ver el detalle, o escríbeme con más detalle.'].join('\n'),
+    texto: [prefijo, '', ...lineas, '', ...pie].join('\n'),
     candidatos: items,
     estado: 'eligiendo_candidato',
     ultimaBusqueda: { terminos, candidatos: items, intencion }

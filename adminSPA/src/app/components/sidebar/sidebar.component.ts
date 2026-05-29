@@ -28,7 +28,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   
   // Datos del usuario
   userName = signal<string>('Usuario');
-  userRole = signal<string>('');
   empresaNombre = signal<string>('');
 
   // Estado de configuración de la empresa
@@ -50,7 +49,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
       const userData = this.authService.userData();
       if (userData) {
         this.userName.set(userData.nombres || 'Usuario');
-        this.userRole.set(userData.rol || '');
         this.empresaNombre.set(userData.razonSocial || '');
       }
     });

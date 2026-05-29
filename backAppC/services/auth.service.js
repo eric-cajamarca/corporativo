@@ -12,6 +12,36 @@ const saasPlanLimitesService = require('./saasPlanLimites.service');
 const LOGIN_INTENTOS_MAX = 5;
 const LOGIN_BLOQUEO_MINUTOS = 30;
 
+/** Nombre visible cuando el login es con credenciales de empresa (sin fila UsuarioWeb). */
+function nombrePerfilDesdeEmpresa(emp) {
+  if (!emp) {
+    return { nombres: 'Administrador', apellidos: 'Sistema' };
+  }
+  const comercial = String(emp.nombreComercial || '').trim();
+  if (comercial) {
+    return { nombres: comercial, apellidos: '' };
+  }
+  const rs = String(emp.razon_Social || '').trim();
+  if (rs) {
+    const parts = rs.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return { nombres: parts[0], apellidos: parts.slice(1, 3).join(' ') };
+    }
+    return { nombres: rs, apellidos: '' };
+  }
+  const mail = String(emp.correo || '').trim();
+  if (mail.includes('@')) {
+    const local = mail
+      .split('@')[0]
+      .replace(/[._+-]+/g, ' ')
+      .trim();
+    if (local) {
+      return { nombres: local, apellidos: '' };
+    }
+  }
+  return { nombres: 'Administrador', apellidos: 'Sistema' };
+}
+
 function empresaExige2faAdmin(empresa) {
   if (!empresa) return true;
   const v = empresa.adminRequiere2FA;
@@ -190,12 +220,13 @@ exports.adminLogin = async (pool, email, password, ruc, ipCliente = null) => {
   }
 
   // 5. Sin usuario administrador: datos básicos de empresa (idUsuario = idEmpresa; no hay fila típica en UsuarioWeb)
+  const perfilEmpresa = nombrePerfilDesdeEmpresa(empresa);
   const datosSynthetic = {
     idUsuario: empresa.idEmpresa,
     idEmpresa: empresa.idEmpresa,
     razonSocial: empresa.razon_Social,
-    nombres: 'Administrador',
-    apellidos: 'Sistema',
+    nombres: perfilEmpresa.nombres,
+    apellidos: perfilEmpresa.apellidos,
     email: empresa.correo,
     rol: 'Administrador'
   };
@@ -212,12 +243,13 @@ exports.construirDatosUsuarioPost2FA = async (pool, idUsuario, idEmpresa, synthe
   if (!empresaActiva) return null;
 
   if (synthetic) {
+    const perfilEmpresa = nombrePerfilDesdeEmpresa(emp);
     return {
       idUsuario: idEmpresa,
       idEmpresa,
       razonSocial: emp.razon_Social,
-      nombres: 'Administrador',
-      apellidos: 'Sistema',
+      nombres: perfilEmpresa.nombres,
+      apellidos: perfilEmpresa.apellidos,
       email: emp.correo,
       rol: 'Administrador'
     };
@@ -281,12 +313,13 @@ exports.reconstruirDatosUsuarioParaToken = async (pool, idUsuario, idEmpresa) =>
     };
   }
 
+  const perfilEmpresa = nombrePerfilDesdeEmpresa(emp);
   return {
     idUsuario: idEmpresa,
     idEmpresa,
     razonSocial: emp.razon_Social,
-    nombres: 'Administrador',
-    apellidos: 'Sistema',
+    nombres: perfilEmpresa.nombres,
+    apellidos: perfilEmpresa.apellidos,
     email: emp.correo,
     rol: 'Administrador'
   };

@@ -13,7 +13,12 @@ const STOPWORDS_ES = new Set([
   'vais', 'valor', 'vamos', 'van', 'vosotras', 'vosotros', 'vuestra', 'vuestras', 'vuestro', 'vuestros', 'y',
   'ya', 'yo', 'buenos', 'dias', 'tardes', 'noches', 'porfavor', 'favor', 'tiene', 'tienen', 'hay', 'cuanto',
   'cuanta', 'cuesta', 'cuestan', 'precio', 'valor', 'dime', 'dame', 'quisiera', 'necesito', 'busco', 'buscar',
-  'producto', 'productos', 'item', 'articulo', 'articulos', 'ver', 'mostrar', 'muestrame', 'deseo', 'quisera'
+  'producto', 'productos', 'item', 'articulo', 'articulos', 'ver', 'mostrar', 'muestrame', 'deseo', 'quisera',
+  'quiero', 'quisiera', 'quisera', 'necesito', 'compro', 'comprar', 'compras', 'comprame', 'comprarme',
+  'vendes', 'vendas', 'vende', 'vender', 'vendan', 'vendeme', 'vendeme', 'venderme', 'vendernos',
+  'podrias', 'podria', 'puedes', 'puede', 'pueden', 'podrian', 'podria', 'interesa', 'interesado',
+  'mandame', 'mandar', 'envia', 'enviar', 'enviame', 'facturame', 'cotizame', 'regalame', 'traeme', 'traer',
+  'algun', 'alguna', 'algunos', 'algunas', 'ese', 'esa', 'esos', 'esas', 'este', 'esta', 'estos', 'estas'
 ]);
 
 module.exports = { STOPWORDS_ES };
