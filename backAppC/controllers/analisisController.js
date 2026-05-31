@@ -5,8 +5,13 @@ const GastosService = require('../services/gastos.service');
 // Obtener dashboard ejecutivo
 const obtenerDashboardEjecutivo = async (req, res) => {
   try {
+    const { periodo, fechaDesde, fechaHasta } = req.query;
     const dashboard = await withPool(async (pool) =>
-      AnalisisServices.obtenerDashboardEjecutivoService(pool, req.user)
+      AnalisisServices.obtenerDashboardEjecutivoService(pool, req.user, {
+        periodo: periodo || 'MES_ACTUAL',
+        fechaDesde: fechaDesde || null,
+        fechaHasta: fechaHasta || null
+      })
     );
 
     res.status(200).send({ data: dashboard });
@@ -25,10 +30,14 @@ const obtenerDashboardEjecutivo = async (req, res) => {
 // Obtener balance general
 const obtenerBalanceGeneral = async (req, res) => {
   try {
-    const { periodo } = req.query;
+    const { periodo, fechaDesde, fechaHasta } = req.query;
 
     const balance = await withPool(async (pool) =>
-      AnalisisServices.obtenerBalanceGeneralService(pool, req.user, periodo)
+      AnalisisServices.obtenerBalanceGeneralService(pool, req.user, {
+        periodo: periodo || 'MES_ACTUAL',
+        fechaDesde: fechaDesde || null,
+        fechaHasta: fechaHasta || null
+      })
     );
 
     res.status(200).send({ data: balance });
@@ -115,11 +124,16 @@ const obtenerAnalisisRentabilidad = async (req, res) => {
   }
 };
 
-// Obtener flujo de efectivo
-const obtenerFlujoEfectivo = async (req, res) => {
+// Flujo de caja del período (sin aperturas de caja)
+const obtenerFlujoCaja = async (req, res) => {
   try {
+    const { periodo, fechaDesde, fechaHasta } = req.query;
     const flujo = await withPool(async (pool) =>
-      AnalisisServices.obtenerFlujoEfectivoService(pool, req.user)
+      AnalisisServices.obtenerFlujoCajaService(pool, req.user, {
+        periodo: periodo || 'MES_ACTUAL',
+        fechaDesde: fechaDesde || null,
+        fechaHasta: fechaHasta || null
+      })
     );
 
     res.status(200).send({ data: flujo });
@@ -127,9 +141,33 @@ const obtenerFlujoEfectivo = async (req, res) => {
     if (error.message === "NO_ACCESS") {
       return res.status(401).send({ message: "No autorizado", data: undefined });
     }
-    console.error("Error obtener flujo de efectivo:", error);
+    console.error("Error obtener flujo de caja:", error);
     res.status(500).send({
-      message: "Error al obtener el flujo de efectivo",
+      message: "Error al obtener el flujo de caja",
+      data: undefined
+    });
+  }
+};
+
+const obtenerFlujoCajaSerie = async (req, res) => {
+  try {
+    const { periodo, fechaDesde, fechaHasta } = req.query;
+    const serie = await withPool(async (pool) =>
+      AnalisisServices.obtenerFlujoCajaSerieService(pool, req.user, {
+        periodo: periodo || 'ANO_ACTUAL',
+        fechaDesde: fechaDesde || null,
+        fechaHasta: fechaHasta || null
+      })
+    );
+
+    res.status(200).send({ data: serie });
+  } catch (error) {
+    if (error.message === "NO_ACCESS") {
+      return res.status(401).send({ message: "No autorizado", data: undefined });
+    }
+    console.error("Error obtener serie flujo de caja:", error);
+    res.status(500).send({
+      message: "Error al obtener la serie de flujo de caja",
       data: undefined
     });
   }
@@ -268,7 +306,8 @@ module.exports = {
   obtenerEstadoResultados,
   obtenerRatiosFinancieros,
   obtenerAnalisisRentabilidad,
-  obtenerFlujoEfectivo,
+  obtenerFlujoCaja,
+  obtenerFlujoCajaSerie,
   obtenerEficienciaOperativa,
   obtenerProyeccionVentas,
   obtenerPuntoEquilibrio,

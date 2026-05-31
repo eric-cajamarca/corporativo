@@ -172,6 +172,81 @@
 }
 
 /* Separador */
+/* Dominio desplegable */
+.nav-dominio > .nav-link-dominio {
+  font-weight: 600;
+}
+
+.submenu-dominio {
+  padding-left: 4px;
+}
+
+.submenu-module {
+  margin: 2px 0;
+}
+
+.submenu-module-head {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 16px 8px 40px;
+  border: 0;
+  background: transparent;
+  color: #9aa8b4;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  gap: 8px;
+  text-align: left;
+}
+
+.submenu-module-head:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.submenu-module-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.submenu-module-head .module-arrow {
+  margin-left: auto;
+  font-size: 0.65rem;
+  transition: transform 0.25s ease;
+}
+
+.submenu-module.open .submenu-module-head .module-arrow {
+  transform: rotate(180deg);
+}
+
+.submenu-module-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.submenu-module-links.show {
+  max-height: 1200px;
+}
+
+.submenu-module-links .submenu-link {
+  padding-left: 56px;
+  font-size: 0.8rem;
+}
+
+.submenu-tooltip-dominio .tooltip-section {
+  padding: 6px 12px 2px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  list-style: none;
+}
+
 .nav-separator {
   padding: 8px 16px;
 }

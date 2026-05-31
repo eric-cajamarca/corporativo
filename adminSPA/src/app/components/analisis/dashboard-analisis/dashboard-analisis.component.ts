@@ -8,7 +8,9 @@ import {
   BalanceGeneral,
   EstadoResultados,
   RatiosFinancieros,
-  DiagnosticoFinanciero
+  DiagnosticoFinanciero,
+  FlujoCajaAnalisis,
+  FlujoCajaSerieMensual
 } from '../../../interfaces/analisis-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
@@ -24,12 +26,16 @@ export class DashboardAnalisisComponent implements OnInit {
 
   public dashboard: DashboardEjecutivo | null = null;
   public balanceGeneral: BalanceGeneral | null = null;
+  public balanceGeneralList: BalanceGeneral[] = [];
+  public balanceGeneralIndex = 0;
+  public flujoCaja: FlujoCajaAnalisis | null = null;
+  public flujoCajaSerie: FlujoCajaSerieMensual | null = null;
   public estadoResultados: EstadoResultados | null = null;
   public ratiosFinancieros: RatiosFinancieros | null = null;
   public diagnosticoFinanciero: DiagnosticoFinanciero | null = null;
 
   public periodoSeleccionado = 'MES_ACTUAL';
-  public vistaActiva: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' | 'gastos' = 'dashboard';
+  public vistaActiva: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' | 'gastos' | 'flujo-caja' = 'dashboard';
 
   public loading = {
     dashboard: false,
@@ -37,7 +43,8 @@ export class DashboardAnalisisComponent implements OnInit {
     resultados: false,
     ratios: false,
     diagnostico: false,
-    gastos: false
+    gastos: false,
+    flujoCaja: false
   };
 
   public listGastos: { idGasto: string; fecha: string; tipo: string; monto: number; descripcion?: string }[] = [];
@@ -68,12 +75,12 @@ export class DashboardAnalisisComponent implements OnInit {
     this.cargarDiagnosticoFinanciero();
   }
 
-  cambiarVista(vista: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' | 'gastos') {
+  cambiarVista(vista: 'dashboard' | 'balance' | 'resultados' | 'ratios' | 'diagnostico' | 'gastos' | 'flujo-caja') {
     this.vistaActiva = vista;
 
     switch (vista) {
       case 'balance':
-        if (!this.balanceGeneral) this.cargarBalanceGeneral();
+        if (!this.balanceGeneralList.length) this.cargarBalanceGeneral();
         break;
       case 'resultados':
         if (!this.estadoResultados) this.cargarEstadoResultados();
@@ -87,7 +94,22 @@ export class DashboardAnalisisComponent implements OnInit {
       case 'gastos':
         this.cargarGastos();
         break;
+      case 'flujo-caja':
+        this.cargarFlujoCaja();
+        break;
     }
+  }
+
+  private filtrosConsulta() {
+    const rangoManual =
+      !!this.filtros.fechaDesde &&
+      !!this.filtros.fechaHasta &&
+      (this.vistaActiva === 'resultados' || this.vistaActiva === 'flujo-caja');
+    return {
+      periodo: this.filtros.periodo || 'MES_ACTUAL',
+      fechaDesde: rangoManual ? this.filtros.fechaDesde : undefined,
+      fechaHasta: rangoManual ? this.filtros.fechaHasta : undefined
+    };
   }
 
   cargarGastos() {
@@ -122,6 +144,7 @@ export class DashboardAnalisisComponent implements OnInit {
         this.cargarGastos();
         this.cargarEstadoResultados();
         this.cargarDashboard();
+        if (this.vistaActiva === 'flujo-caja') this.cargarFlujoCaja();
       },
       error: (err) => {
         iziToast.error({ title: 'Error', message: err?.error?.message || 'No se pudo registrar el gasto.' });
@@ -136,6 +159,7 @@ export class DashboardAnalisisComponent implements OnInit {
         this.cargarGastos();
         this.cargarEstadoResultados();
         this.cargarDashboard();
+        if (this.vistaActiva === 'flujo-caja') this.cargarFlujoCaja();
       },
       error: () => iziToast.error({ title: 'Error', message: 'No se pudo eliminar.' })
     });
@@ -143,7 +167,7 @@ export class DashboardAnalisisComponent implements OnInit {
 
   cargarDashboard() {
     this.loading.dashboard = true;
-    this.analisisService.obtenerDashboardEjecutivo().subscribe({
+    this.analisisService.obtenerDashboardEjecutivo(this.filtrosConsulta()).subscribe({
       next: (response) => {
         if (response.data) {
           this.dashboard = response.data;
@@ -163,12 +187,18 @@ export class DashboardAnalisisComponent implements OnInit {
 
   cargarBalanceGeneral() {
     this.loading.balance = true;
-    const periodo = this.filtros.periodo || 'MES_ACTUAL';
-    this.analisisService.obtenerBalanceGeneral(periodo).subscribe({
+    this.analisisService.obtenerBalanceGeneral(this.filtrosConsulta()).subscribe({
       next: (response) => {
-        if (response.data) {
-          this.balanceGeneral = Array.isArray(response.data) ? response.data[0] : response.data;
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          this.balanceGeneralList = response.data;
+          this.balanceGeneralIndex = Math.max(0, response.data.length - 1);
+          this.balanceGeneral = response.data[this.balanceGeneralIndex];
+        } else if (response.data) {
+          this.balanceGeneralList = [response.data];
+          this.balanceGeneralIndex = 0;
+          this.balanceGeneral = response.data;
         } else {
+          this.balanceGeneralList = [];
           this.balanceGeneral = null;
         }
         this.loading.balance = false;
@@ -266,11 +296,46 @@ export class DashboardAnalisisComponent implements OnInit {
     });
   }
 
+  cargarFlujoCaja() {
+    this.loading.flujoCaja = true;
+    const filtros = this.filtrosConsulta();
+    this.analisisService.obtenerFlujoCaja(filtros).subscribe({
+      next: (response) => {
+        this.flujoCaja = response.data || null;
+        this.loading.flujoCaja = false;
+      },
+      error: () => {
+        this.flujoCaja = null;
+        this.loading.flujoCaja = false;
+        iziToast.error({ title: 'Error', message: 'No se pudo cargar el flujo de caja.' });
+      }
+    });
+    if (filtros.periodo === 'ANO_ACTUAL') {
+      this.analisisService.obtenerFlujoCajaSerie(filtros).subscribe({
+        next: (res) => { this.flujoCajaSerie = res.data || null; },
+        error: () => { this.flujoCajaSerie = null; }
+      });
+    } else {
+      this.flujoCajaSerie = null;
+    }
+  }
+
   aplicarFiltros() {
-    if (this.vistaActiva === 'balance') {
+    if (this.vistaActiva === 'dashboard') {
+      this.cargarDashboard();
+    } else if (this.vistaActiva === 'balance') {
       this.cargarBalanceGeneral();
     } else if (this.vistaActiva === 'resultados') {
       this.cargarEstadoResultados();
+    } else if (this.vistaActiva === 'flujo-caja') {
+      this.cargarFlujoCaja();
+    }
+  }
+
+  seleccionarPeriodoBalance(index: number) {
+    if (this.balanceGeneralList[index]) {
+      this.balanceGeneralIndex = index;
+      this.balanceGeneral = this.balanceGeneralList[index];
     }
   }
 

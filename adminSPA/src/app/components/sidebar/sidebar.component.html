@@ -1,144 +1,374 @@
 <!-- Botón toggle para móvil -->
+
 <button 
+
   class="sidebar-mobile-toggle d-lg-none" 
+
   (click)="toggleMobileSidebar()"
+
   [class.active]="isMobileOpen()">
+
   <i class="bi" [class.bi-list]="!isMobileOpen()" [class.bi-x-lg]="isMobileOpen()"></i>
+
 </button>
 
+
+
 <!-- Overlay para móvil -->
+
 <div 
+
   class="sidebar-overlay d-lg-none" 
+
   [class.show]="isMobileOpen()" 
+
   (click)="closeMobileSidebar()">
+
 </div>
 
+
+
 <!-- Sidebar principal -->
+
 <aside 
+
   class="sidebar" 
+
   [class.collapsed]="isCollapsed()" 
+
   [class.mobile-open]="isMobileOpen()">
+
   
+
   <!-- Header del sidebar -->
+
   <div class="sidebar-header">
+
     <div class="sidebar-brand" *ngIf="!isCollapsed()">
-     
+
       <span class="brand-text">{{empresaNombre() || 'ERP'}}</span>
+
     </div>
-    <div class="sidebar-brand-collapsed" *ngIf="isCollapsed()">
-     
-    </div>
+
+    <div class="sidebar-brand-collapsed" *ngIf="isCollapsed()"></div>
+
     
-    <!-- Botón toggle desktop -->
+
     <button 
+
       class="sidebar-toggle-btn d-none d-lg-flex" 
+
       (click)="toggleSidebar()" 
+
       [title]="isCollapsed() ? 'Expandir menú' : 'Colapsar menú'">
+
       <i class="bi" [class.bi-chevron-left]="!isCollapsed()" [class.bi-chevron-right]="isCollapsed()"></i>
+
     </button>
+
     
-    <!-- Botón cerrar móvil -->
+
     <button 
+
       class="sidebar-close-btn d-lg-none" 
+
       (click)="closeMobileSidebar()">
+
       <i class="bi bi-x-lg"></i>
+
     </button>
+
   </div>
 
-  <!-- Información del usuario -->
+
+
   <div class="sidebar-user" [class.collapsed]="isCollapsed()">
+
     <div class="user-avatar">
+
       <span class="avatar-initials">{{getUserInitials()}}</span>
+
     </div>
+
     <div class="user-info" *ngIf="!isCollapsed()">
+
       <div class="user-name">{{userName()}}</div>
+
     </div>
+
   </div>
 
-  <!-- Navegación -->
+
+
   <nav class="sidebar-nav">
+
     <ul class="nav-list">
+
       <ng-container *ngFor="let item of menuItems()">
-        <!-- Separador -->
+
         <li *ngIf="item.tipo === 'separador'" class="nav-separator">
+
           <hr *ngIf="!isCollapsed()">
+
         </li>
 
-        <!-- Item sin submenú -->
-        <li 
-          *ngIf="!item.tipo && !item.submenu && item.visible !== false" 
-          class="nav-item"
-          [class.active]="isRouteActive(item.ruta || null)">
-          <button
-            type="button"
-            class="nav-link" 
-            (click)="navigateTo(item.ruta || null)"
-            [title]="isCollapsed() ? item.nombre : ''">
-            <i class="nav-icon" [class]="item.icono"></i>
-            <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
-          </button>
-        </li>
 
-        <!-- Item con submenú -->
-        <li 
-          *ngIf="!item.tipo && item.submenu && item.submenu.length > 0 && item.visible !== false" 
-          class="nav-item has-submenu"
-          [class.open]="isSubmenuOpen(item.modulo || '')"
-          [class.active]="isSubmenuOpen(item.modulo || '')">
+
+        <!-- Dominio desplegable (Comercial, Tesorería, …) -->
+
+        <li
+
+          *ngIf="esDominio(item)"
+
+          class="nav-item has-submenu nav-dominio"
+
+          [class.open]="isSubmenuOpen(item.modulo || '')">
+
           <button
+
             type="button"
-            class="nav-link" 
-            (click)="toggleSubmenu(item.modulo || '')"
+
+            class="nav-link nav-link-dominio"
+
+            (click)="toggleSubmenu(item.modulo || '', $event)"
+
             [title]="isCollapsed() ? item.nombre : ''">
+
             <i class="nav-icon" [class]="item.icono"></i>
-            <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
+
+            <span class="nav-text" *ngIf="!isCollapsed()">{{ item.nombre }}</span>
+
             <i class="submenu-arrow bi bi-chevron-down" *ngIf="!isCollapsed()"></i>
+
           </button>
-          
-          <!-- Submenú -->
-          <ul class="submenu" [class.show]="isSubmenuOpen(item.modulo || '') && !isCollapsed()">
-            <ng-container *ngFor="let subItem of item.submenu">
-              <li 
-                *ngIf="subItem.visible !== false"
-                class="submenu-item"
-                [class.active]="isRouteActive(subItem.ruta)">
+
+
+
+          <ul class="submenu submenu-dominio" [class.show]="isSubmenuOpen(item.modulo || '') && !isCollapsed()">
+
+            <ng-container *ngFor="let sub of item.submenu">
+
+              <!-- Módulo hijo (Ventas, Caja, …) -->
+
+              <li *ngIf="esSubmenuModulo(sub)" class="submenu-module" [class.open]="isSubmenuOpen(sub.modulo || '')">
+
                 <button
+
                   type="button"
-                  class="submenu-link" 
-                  (click)="navigateTo(subItem.ruta)">
-                  <i class="bi bi-circle submenu-dot"></i>
-                  <span>{{subItem.nombre}}</span>
+
+                  class="submenu-module-head"
+
+                  (click)="toggleSubmenu(sub.modulo || '', $event)">
+
+                  <i class="bi submenu-module-icon" [class]="sub.icono || 'bi bi-folder2'"></i>
+
+                  <span>{{ sub.nombre }}</span>
+
+                  <i class="module-arrow bi bi-chevron-down"></i>
+
                 </button>
+
+                <ul class="submenu-module-links" [class.show]="isSubmenuOpen(sub.modulo || '')">
+
+                  <li
+
+                    *ngFor="let link of sub.submenu"
+
+                    class="submenu-item"
+
+                    [class.active]="isRouteActive(link.ruta || null)">
+
+                    <button type="button" class="submenu-link" (click)="navigateTo(link.ruta || null)">
+
+                      <i class="bi bi-circle submenu-dot"></i>
+
+                      <span>{{ link.nombre }}</span>
+
+                    </button>
+
+                  </li>
+
+                </ul>
+
               </li>
+
+              <!-- Enlace directo dentro del dominio (Análisis, Reportes, Empresa) -->
+
+              <li
+
+                *ngIf="!esSubmenuModulo(sub) && sub.visible !== false"
+
+                class="submenu-item"
+
+                [class.active]="isRouteActive(sub.ruta || null)">
+
+                <button type="button" class="submenu-link" (click)="navigateTo(sub.ruta || null)">
+
+                  <i class="bi bi-circle submenu-dot"></i>
+
+                  <span>{{ sub.nombre }}</span>
+
+                </button>
+
+              </li>
+
             </ng-container>
+
           </ul>
 
-          <!-- Tooltip con submenú cuando está colapsado -->
-          <div class="submenu-tooltip" *ngIf="isCollapsed()">
-            <div class="tooltip-header">{{item.nombre}}</div>
+
+
+          <div class="submenu-tooltip submenu-tooltip-dominio" *ngIf="isCollapsed()">
+
+            <div class="tooltip-header">{{ item.nombre }}</div>
+
             <ul class="tooltip-menu">
-              <ng-container *ngFor="let subItem of item.submenu">
-                <li *ngIf="subItem.visible !== false">
-                  <a href="#" (click)="navigateTo(subItem.ruta); $event.preventDefault()">
-                    {{subItem.nombre}}
-                  </a>
+
+              <ng-container *ngFor="let sub of item.submenu">
+
+                <ng-container *ngIf="esSubmenuModulo(sub)">
+
+                  <li class="tooltip-section">{{ sub.nombre }}</li>
+
+                  <li *ngFor="let link of sub.submenu">
+
+                    <a href="#" (click)="navigateTo(link.ruta || null); $event.preventDefault()">{{ link.nombre }}</a>
+
+                  </li>
+
+                </ng-container>
+
+                <li *ngIf="!esSubmenuModulo(sub) && sub.visible !== false">
+
+                  <a href="#" (click)="navigateTo(sub.ruta || null); $event.preventDefault()">{{ sub.nombre }}</a>
+
                 </li>
+
               </ng-container>
+
             </ul>
+
           </div>
+
         </li>
+
+
+
+        <!-- Item sin submenú (Dashboard, etc.) -->
+
+        <li
+
+          *ngIf="esItemMenu(item) && !esDominio(item) && !item.submenu"
+
+          class="nav-item"
+
+          [class.active]="isRouteActive(item.ruta || null)">
+
+          <button
+
+            type="button"
+
+            class="nav-link"
+
+            (click)="navigateTo(item.ruta || null)"
+
+            [title]="isCollapsed() ? item.nombre : ''">
+
+            <i class="nav-icon" [class]="item.icono"></i>
+
+            <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
+
+          </button>
+
+        </li>
+
+
+
+        <!-- Item con submenú clásico (compatibilidad) -->
+
+        <li
+
+          *ngIf="esItemMenu(item) && !esDominio(item) && item.submenu && item.submenu.length > 0"
+
+          class="nav-item has-submenu"
+
+          [class.open]="isSubmenuOpen(item.modulo || '')">
+
+          <button
+
+            type="button"
+
+            class="nav-link"
+
+            (click)="toggleSubmenu(item.modulo || '', $event)"
+
+            [title]="isCollapsed() ? item.nombre : ''">
+
+            <i class="nav-icon" [class]="item.icono"></i>
+
+            <span class="nav-text" *ngIf="!isCollapsed()">{{item.nombre}}</span>
+
+            <i class="submenu-arrow bi bi-chevron-down" *ngIf="!isCollapsed()"></i>
+
+          </button>
+
+
+
+          <ul class="submenu" [class.show]="isSubmenuOpen(item.modulo || '') && !isCollapsed()">
+
+            <ng-container *ngFor="let subItem of item.submenu">
+
+              <li
+
+                *ngIf="subItem.visible !== false && !esSubmenuModulo(subItem)"
+
+                class="submenu-item"
+
+                [class.active]="isRouteActive(subItem.ruta || null)">
+
+                <button type="button" class="submenu-link" (click)="navigateTo(subItem.ruta || null)">
+
+                  <i class="bi bi-circle submenu-dot"></i>
+
+                  <span>{{subItem.nombre}}</span>
+
+                </button>
+
+              </li>
+
+            </ng-container>
+
+          </ul>
+
+
+
+          <div class="submenu-tooltip" *ngIf="isCollapsed()">
+
+            <div class="tooltip-header">{{item.nombre}}</div>
+
+            <ul class="tooltip-menu">
+
+              <ng-container *ngFor="let subItem of item.submenu">
+
+                <li *ngIf="subItem.visible !== false && subItem.ruta">
+
+                  <a href="#" (click)="navigateTo(subItem.ruta); $event.preventDefault()">{{subItem.nombre}}</a>
+
+                </li>
+
+              </ng-container>
+
+            </ul>
+
+          </div>
+
+        </li>
+
       </ng-container>
+
     </ul>
+
   </nav>
 
-  <!-- Footer del sidebar 
-  <div class="sidebar-footer">
-    <button 
-      class="logout-btn" 
-      (click)="logout()"
-      [title]="isCollapsed() ? 'Cerrar sesión' : ''">
-      <i class="bi bi-box-arrow-right"></i>
-      <span *ngIf="!isCollapsed()">Cerrar sesión</span>
-    </button>
-  </div>-->
 </aside>
+

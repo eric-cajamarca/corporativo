@@ -6,6 +6,8 @@ import { normalizarRutaAbsoluta } from './saas-plan-reglas.util';
  * `null` = no aplica tope por plan (cuenta, plataforma, etc.).
  */
 const REGLAS: readonly { prefijo: string; modulo: string }[] = [
+  { prefijo: '/configuracion/whatsapp-bot', modulo: 'CONFIGURACION' },
+  { prefijo: '/configuracion/whatsapp', modulo: 'CONFIGURACION' },
   { prefijo: '/configuracion/integraciones', modulo: 'CONFIGURACION' },
   { prefijo: '/facturacion/guias/configuracion', modulo: 'FACTURACION' },
   { prefijo: '/facturacion/', modulo: 'FACTURACION' },
@@ -52,6 +54,7 @@ const REGLAS: readonly { prefijo: string; modulo: string }[] = [
   { prefijo: '/caja', modulo: 'CAJA' },
   { prefijo: '/creditos', modulo: 'CAJA' },
   { prefijo: '/analisis', modulo: 'ANALISIS' },
+  { prefijo: '/facturacion', modulo: 'FACTURACION' },
   { prefijo: '/configuracion', modulo: 'CONFIGURACION' },
   { prefijo: '/rubros', modulo: 'CONFIGURACION' },
   { prefijo: '/auditoria', modulo: 'CONFIGURACION' },

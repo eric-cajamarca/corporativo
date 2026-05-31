@@ -734,3 +734,24 @@ exports.obtenerCostoUnitarioProducto = async (conn, idEmpresa, idProducto) => {
   const row = r.recordset && r.recordset[0];
   return row ? Number(row.cUnitario) || 0 : 0;
 };
+
+/**
+ * Valorizado total alineado con Inventario → Stock actual: stock agregado × Productos.cUnitario.
+ */
+exports.obtenerInventarioValorizadoEmpresa = async (pool, idEmpresa) => {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT ISNULL(SUM(COALESCE(stk.stock, 0) * p.cUnitario), 0) AS valor
+      FROM Productos p
+      LEFT JOIN (
+        SELECT l.idProducto, CAST(SUM(l.cantidadDisponible) AS DECIMAL(18, 3)) AS stock
+        FROM Lotes l
+        WHERE l.idEmpresa = @idEmpresa
+        GROUP BY l.idProducto
+      ) stk ON stk.idProducto = p.idProducto
+      WHERE p.idEmpresa = @idEmpresa AND p.estado = 1
+    `);
+  return Number((r.recordset[0] || {}).valor || 0);
+};

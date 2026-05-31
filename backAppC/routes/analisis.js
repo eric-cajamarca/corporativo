@@ -14,7 +14,8 @@ router.get('/dashboard', analisisController.obtenerDashboardEjecutivo);
 // Estados financieros
 router.get('/balance-general', analisisController.obtenerBalanceGeneral);
 router.get('/estado-resultados', analisisController.obtenerEstadoResultados);
-router.get('/flujo-efectivo', analisisController.obtenerFlujoEfectivo);
+router.get('/flujo-caja', analisisController.obtenerFlujoCaja);
+router.get('/flujo-caja/serie', analisisController.obtenerFlujoCajaSerie);
 
 // Ratios financieros
 router.get('/ratios', analisisController.obtenerRatiosFinancieros);

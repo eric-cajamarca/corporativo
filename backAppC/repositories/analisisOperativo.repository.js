@@ -1,4 +1,16 @@
 const sql = require('mssql');
+const {
+  periodoARango,
+  calcularResumenFinancieroPeriodo,
+  obtenerGastosAgrupadosPorMes
+} = require('../utils/kpisFinancierosOperativo.util');
+const {
+  resolverRangoConsultaAnalisis,
+  listarPeriodosMensuales,
+  rangoPeriodoAnterior
+} = require('../utils/analisisPeriodo.util');
+const { obtenerFlujoCajaPeriodo } = require('../utils/flujoCajaAnalisis.util');
+const InventarioRepository = require('./inventario.repository');
 
 /**
  * Resuelve período nominal a YYYY-MM usando la fecha actual.
@@ -22,21 +34,6 @@ function resolverPeriodo(periodo) {
   }
 }
 
-/**
- * Obtiene rango de fechas (primer y último día) para un período YYYY-MM.
- */
-function periodoARango(periodo) {
-  if (!periodo || periodo.length < 6) {
-    const d = new Date();
-    periodo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }
-  const [y, m] = periodo.split('-').map(Number);
-  const inicio = new Date(y, m - 1, 1);
-  const fin = new Date(y, m, 0);
-  const fmt = (x) => x.toISOString().slice(0, 10);
-  return { fechaInicio: fmt(inicio), fechaFin: fmt(fin) };
-}
-
 /** Cuentas por pagar: suma de Compras con idEstadoPago = 1 (Pendiente). */
 async function obtenerCxPRepo(pool, idEmpresa) {
   try {
@@ -53,213 +50,224 @@ async function obtenerCxPRepo(pool, idEmpresa) {
   }
 }
 
-/** Efectivo: saldo actual de todas las cajas (aperturas abiertas). */
-async function obtenerEfectivoRepo(pool, idEmpresa) {
+async function obtenerCuentasPorCobrarRepo(pool, idEmpresa) {
   try {
-    const r = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .query(`
-        SELECT ISNULL(SUM(ac.montoInicial + ISNULL(ing.ingresos,0) - ISNULL(eg.egresos,0)), 0) AS efectivo
-        FROM AperturasCaja ac
-        INNER JOIN Cajas c ON ac.idCaja = c.idCaja
-        LEFT JOIN (
-          SELECT mc.idApertura, SUM(mc.monto) AS ingresos
-          FROM MovimientosCaja mc
-          INNER JOIN TiposMovimientoCaja t ON mc.idTipoMovimientoCaja = t.idTipoMovimientoCaja AND t.tipo = 'I'
-          GROUP BY mc.idApertura
-        ) ing ON ac.idApertura = ing.idApertura
-        LEFT JOIN (
-          SELECT mc.idApertura, SUM(mc.monto) AS egresos
-          FROM MovimientosCaja mc
-          INNER JOIN TiposMovimientoCaja t ON mc.idTipoMovimientoCaja = t.idTipoMovimientoCaja AND t.tipo = 'E'
-          GROUP BY mc.idApertura
-        ) eg ON ac.idApertura = eg.idApertura
-        WHERE c.idEmpresa = @idEmpresa AND ac.estado = 1
-      `);
-    return Number((r.recordset[0] || {}).efectivo || 0);
-  } catch (e) {
+    const r = await pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
+      SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
+      FROM CuotasCredito cu
+      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO')
+    `);
+    return Number((r.recordset[0] || {}).saldo || 0);
+  } catch (_) {
     return 0;
   }
 }
 
-/** Gastos del período: tabla Gastos + egresos de caja (se suman ambas fuentes). */
-async function obtenerGastosPeriodoRepo(pool, idEmpresa, fechaInicio, fechaFin) {
-  let totalGastos = 0;
-  try {
-    const r = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('fechaInicio', sql.Date, fechaInicio)
-      .input('fechaFin', sql.Date, fechaFin)
-      .query(`
-        SELECT ISNULL(SUM(monto), 0) AS total FROM Gastos
-        WHERE idEmpresa = @idEmpresa AND fecha >= @fechaInicio AND fecha <= @fechaFin
-      `);
-    totalGastos += Number((r.recordset[0] || {}).total || 0);
-  } catch (_) {}
-  try {
-    const r = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('fechaInicio', sql.Date, fechaInicio)
-      .input('fechaFin', sql.Date, fechaFin)
-      .query(`
-        SELECT ISNULL(SUM(mc.monto), 0) AS total
-        FROM MovimientosCaja mc
-        INNER JOIN TiposMovimientoCaja t ON mc.idTipoMovimientoCaja = t.idTipoMovimientoCaja AND t.tipo = 'E'
-        WHERE mc.idEmpresa = @idEmpresa
-          AND CONVERT(DATE, mc.fechaMovimiento) >= @fechaInicio AND CONVERT(DATE, mc.fechaMovimiento) <= @fechaFin
-      `);
-    totalGastos += Number((r.recordset[0] || {}).total || 0);
-  } catch (_) {}
-  return totalGastos;
+/**
+ * Patrimonio simplificado al cierre del período consultado.
+ * Flujo de caja del período (sin aperturas) + inventario + CxC − CxP.
+ */
+async function obtenerSituacionPatrimonialRepo(pool, idEmpresa, fechaInicio, fechaFin) {
+  const [inventarioTotal, cuentasPorCobrar, cuentasPorPagar, flujo] = await Promise.all([
+    InventarioRepository.obtenerInventarioValorizadoEmpresa(pool, idEmpresa),
+    obtenerCuentasPorCobrarRepo(pool, idEmpresa),
+    obtenerCxPRepo(pool, idEmpresa),
+    obtenerFlujoCajaPeriodo(pool, idEmpresa, fechaInicio, fechaFin)
+  ]);
+
+  const flujoNetoCaja = Number(flujo.flujoNeto || 0);
+  const activoCorriente = inventarioTotal + cuentasPorCobrar + flujoNetoCaja;
+  const pasivoCorriente = cuentasPorPagar;
+  const patrimonio = activoCorriente - pasivoCorriente;
+
+  return {
+    inventarioTotal,
+    cuentasPorCobrar,
+    cuentasPorPagar,
+    flujoNetoCaja,
+    ingresosEfectivo: Number(flujo.ingresosEfectivo || 0),
+    egresosEfectivo: Number(flujo.egresosEfectivo || 0),
+    flujoNetoEfectivo: Number(flujo.flujoNetoEfectivo || 0),
+    totalIngresosCaja: Number(flujo.totalIngresos || 0),
+    totalEgresosCaja: Number(flujo.totalEgresos || 0),
+    activoCorriente,
+    pasivoCorriente,
+    patrimonio
+  };
+}
+
+function mapBalanceDesdePatrimonio(periodo, sit) {
+  const activoFijo = 0;
+  const activoTotal = sit.activoCorriente + activoFijo;
+  const pasivoLargoPlazo = 0;
+  const pasivoTotal = sit.pasivoCorriente + pasivoLargoPlazo;
+  const ratioLiquidez =
+    sit.pasivoCorriente > 0
+      ? sit.activoCorriente / sit.pasivoCorriente
+      : (sit.activoCorriente > 0 ? 99 : 0);
+  const totalPasivoPatrimonio = pasivoTotal + sit.patrimonio;
+  const ratioEndeudamiento =
+    totalPasivoPatrimonio > 0 ? pasivoTotal / totalPasivoPatrimonio : 0;
+
+  return {
+    periodo,
+    inventarioTotal: sit.inventarioTotal,
+    cuentasPorCobrar: sit.cuentasPorCobrar,
+    cuentasPorPagar: sit.cuentasPorPagar,
+    flujoNetoCaja: sit.flujoNetoCaja,
+    activoCorriente: sit.activoCorriente,
+    activoFijo,
+    activoTotal,
+    pasivoCorriente: sit.pasivoCorriente,
+    pasivoLargoPlazo,
+    pasivoTotal,
+    patrimonio: sit.patrimonio,
+    ratioLiquidez,
+    ratioEndeudamiento
+  };
 }
 
 /**
- * Dashboard ejecutivo con datos reales: Ventas, DetalleVenta, Lotes, CxC, CxP, Efectivo, Gastos.
+ * Dashboard ejecutivo: KPIs del período + patrimonio según rango consultado.
  */
-async function obtenerDashboardEjecutivoRepo(pool, idEmpresa) {
-  const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
-  const ahora = new Date();
-  const mesActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
-  const mesAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
-  const periodoAnterior = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
-  const { fechaInicio, fechaFin } = periodoARango(mesActual);
-  const { fechaInicio: iniAnt, fechaFin: finAnt } = periodoARango(periodoAnterior);
+async function obtenerDashboardEjecutivoRepo(pool, idEmpresa, filtros = {}) {
+  const rango = resolverRangoConsultaAnalisis(filtros);
+  const { fechaInicio, fechaFin, periodoEtiqueta } = rango;
+  const ant = rangoPeriodoAnterior(fechaInicio, fechaFin);
 
-  const [ventasActual, ventasAnterior, inventario, cuentasPorCobrar, cuentasPorPagar, efectivo, gastosMes] = await Promise.all([
-    req.query(`
-      SELECT
-        ISNULL(SUM(v.total), 0) AS ventasTotales,
-        ISNULL(SUM(dv.costoTotal), 0) AS costoVentas
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= '${fechaInicio}' AND CONVERT(DATE, v.fEmision) <= '${fechaFin}'
-    `),
-    pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(v.total), 0) AS ventasTotales
-      FROM Ventas v
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= '${iniAnt}' AND CONVERT(DATE, v.fEmision) <= '${finAnt}'
-    `),
-    pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(l.cantidadDisponible * ISNULL(l.costoUnitario, 0)), 0) AS valor
-      FROM Lotes l
-      WHERE l.idEmpresa = @idEmpresa
-    `),
-    pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
-      FROM CuotasCredito cu
-      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO')
-    `).catch(() => ({ recordset: [{ saldo: 0 }] })),
-    obtenerCxPRepo(pool, idEmpresa),
-    obtenerEfectivoRepo(pool, idEmpresa),
-    obtenerGastosPeriodoRepo(pool, idEmpresa, fechaInicio, fechaFin)
+  const [kpisFin, sit] = await Promise.all([
+    calcularResumenFinancieroPeriodo(pool, idEmpresa, fechaInicio, fechaFin, ant),
+    obtenerSituacionPatrimonialRepo(pool, idEmpresa, fechaInicio, fechaFin)
   ]);
 
-  const vAct = ventasActual.recordset[0] || {};
-  const vAnt = ventasAnterior.recordset[0] || {};
-  const ventasTotales = Number(vAct.ventasTotales || 0);
-  const costoVentas = Number(vAct.costoVentas || 0);
-  const utilidadBruta = ventasTotales - costoVentas;
-  const ventasAnteriorVal = Number(vAnt.ventasTotales || 0);
-  const crecimientoVentas = ventasAnteriorVal !== 0 ? (ventasTotales - ventasAnteriorVal) / ventasAnteriorVal : 0;
-  const inventarioTotal = Number((inventario.recordset[0] || {}).valor || 0);
-  const cuentasPorCobrarVal = Number((cuentasPorCobrar.recordset[0] || {}).saldo || 0);
-  const cuentasPorPagarVal = Number(cuentasPorPagar);
-  const efectivoVal = Number(efectivo);
-  const gastosOperativos = Number(gastosMes);
-  const utilidadNeta = utilidadBruta - gastosOperativos;
-  const activo = inventarioTotal + cuentasPorCobrarVal + efectivoVal;
-  const pasivo = cuentasPorPagarVal;
-  const patrimonio = Math.max(0, activo - pasivo);
-
-  return {
-    periodo: mesActual,
+  const {
     ventasTotales,
     costoVentas,
     utilidadBruta,
     gastosOperativos,
-    utilidadOperativa: utilidadBruta - gastosOperativos,
     utilidadNeta,
-    margenBruto: ventasTotales > 0 ? utilidadBruta / ventasTotales : 0,
-    margenOperativo: ventasTotales > 0 ? (utilidadBruta - gastosOperativos) / ventasTotales : 0,
-    margenNeto: ventasTotales > 0 ? utilidadNeta / ventasTotales : 0,
+    utilidadOperativa,
+    margenBruto,
+    margenOperativo,
+    margenNeto,
+    crecimientoVentas
+  } = kpisFin;
+
+  const activo = sit.activoCorriente;
+  const patrimonio = sit.patrimonio;
+
+  return {
+    periodo: periodoEtiqueta,
+    fechaInicio,
+    fechaFin,
+    ventasTotales,
+    costoVentas,
+    utilidadBruta,
+    gastosOperativos,
+    utilidadOperativa,
+    utilidadNeta,
+    margenBruto,
+    margenOperativo,
+    margenNeto,
     crecimientoVentas,
-    roi: (activo > 0 ? utilidadNeta / activo : 0),
-    inventarioTotal,
-    cuentasPorCobrar: cuentasPorCobrarVal,
-    cuentasPorPagar: cuentasPorPagarVal,
-    flujoCaja: utilidadNeta,
+    roi: activo > 0 ? utilidadNeta / activo : 0,
+    inventarioTotal: sit.inventarioTotal,
+    cuentasPorCobrar: sit.cuentasPorCobrar,
+    cuentasPorPagar: sit.cuentasPorPagar,
+    flujoCaja: sit.flujoNetoCaja,
+    flujoNetoEfectivo: sit.flujoNetoEfectivo,
+    ingresosEfectivo: sit.ingresosEfectivo,
     patrimonio
   };
 }
 
 /**
- * Balance general a partir de inventario, CxC, Efectivo (caja) y CxP (compras pendientes).
+ * Balance general por período: patrimonio con flujo de caja real del rango (sin aperturas).
+ * ANO_ACTUAL o rango multi-mes devuelve un registro por mes.
  */
-async function obtenerBalanceGeneralRepo(pool, idEmpresa, periodo) {
-  const periodoResuelto = resolverPeriodo(periodo);
-  const { fechaInicio, fechaFin } = periodoARango(periodoResuelto);
+async function obtenerBalanceGeneralRepo(pool, idEmpresa, filtros = {}) {
+  const periodoNom = String(filtros.periodo || 'MES_ACTUAL').toUpperCase();
+  const rango = resolverRangoConsultaAnalisis(filtros);
+  const { fechaInicio, fechaFin } = rango;
 
-  const req = pool.request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('fechaInicio', sql.Date, fechaInicio)
-    .input('fechaFin', sql.Date, fechaFin);
+  const periodosMensuales = listarPeriodosMensuales(fechaInicio, fechaFin);
+  const desgloseMensual =
+    periodoNom === 'ANO_ACTUAL' ||
+    (filtros.agruparMensual && periodosMensuales.length > 1);
 
-  const [inv, cxc, cxp, efectivo, ventasCosto] = await Promise.all([
-    req.query(`
-      SELECT ISNULL(SUM(l.cantidadDisponible * ISNULL(l.costoUnitario, 0)), 0) AS valor
-      FROM Lotes l WHERE l.idEmpresa = @idEmpresa
-    `),
-    pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
-      FROM CuotasCredito cu
-      WHERE cu.idEmpresa = @idEmpresa AND cu.estado IN ('PENDIENTE', 'VENCIDO')
-    `).catch(() => ({ recordset: [{ saldo: 0 }] })),
-    obtenerCxPRepo(pool, idEmpresa),
-    obtenerEfectivoRepo(pool, idEmpresa),
-    req.query(`
-      SELECT
-        ISNULL(SUM(v.total), 0) AS ingresos,
-        ISNULL(SUM(dv.costoTotal), 0) AS costoVentas
-      FROM Ventas v
-      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-      WHERE v.idEmpresa = @idEmpresa
-        AND CONVERT(DATE, v.fEmision) >= @fechaInicio AND CONVERT(DATE, v.fEmision) <= @fechaFin
-    `)
-  ]);
+  if (desgloseMensual && periodosMensuales.length > 1) {
+    const filas = await Promise.all(
+      periodosMensuales.map(async (p) => {
+        const { fechaInicio: fi, fechaFin: ff } = periodoARango(p);
+        const sit = await obtenerSituacionPatrimonialRepo(pool, idEmpresa, fi, ff);
+        return mapBalanceDesdePatrimonio(p, sit);
+      })
+    );
+    const sitAnual = await obtenerSituacionPatrimonialRepo(pool, idEmpresa, fechaInicio, fechaFin);
+    return [
+      ...filas,
+      mapBalanceDesdePatrimonio(String(rango.periodoEtiqueta), sitAnual)
+    ];
+  }
 
-  const inventarioVal = Number((inv.recordset[0] || {}).valor || 0);
-  const cxcVal = Number((cxc.recordset[0] || {}).saldo || 0);
-  const cxpVal = Number(cxp);
-  const efectivoVal = Number(efectivo);
-  const activoCorriente = inventarioVal + cxcVal + efectivoVal;
-  const activoFijo = 0;
-  const activoTotal = activoCorriente + activoFijo;
-  const pasivoCorriente = cxpVal;
-  const pasivoLargoPlazo = 0;
-  const pasivoTotal = pasivoCorriente + pasivoLargoPlazo;
-  const patrimonio = Math.max(0, activoTotal - pasivoTotal);
-  const ratioLiquidez = pasivoCorriente > 0 ? activoCorriente / pasivoCorriente : (activoCorriente > 0 ? 99 : 0);
-  const totalPasivoPatrimonio = pasivoTotal + patrimonio;
-  const ratioEndeudamiento = totalPasivoPatrimonio > 0 ? pasivoTotal / totalPasivoPatrimonio : 0;
+  const sit = await obtenerSituacionPatrimonialRepo(pool, idEmpresa, fechaInicio, fechaFin);
+  return [mapBalanceDesdePatrimonio(rango.periodoEtiqueta, sit)];
+}
 
-  return [{
-    periodo: periodoResuelto,
-    activoCorriente,
-    activoFijo,
-    activoTotal,
-    pasivoCorriente,
-    pasivoLargoPlazo,
-    pasivoTotal,
-    patrimonio,
-    ratioLiquidez,
-    ratioEndeudamiento
-  }];
+/** Flujo de caja del período (alineado al arqueo, sin APERTURA_CAJA). */
+async function obtenerFlujoCajaAnalisisRepo(pool, idEmpresa, filtros = {}) {
+  const rango = resolverRangoConsultaAnalisis(filtros);
+  const flujo = await obtenerFlujoCajaPeriodo(
+    pool,
+    idEmpresa,
+    rango.fechaInicio,
+    rango.fechaFin
+  );
+  const sit = await obtenerSituacionPatrimonialRepo(
+    pool,
+    idEmpresa,
+    rango.fechaInicio,
+    rango.fechaFin
+  );
+  return {
+    periodo: rango.periodoEtiqueta,
+    fechaInicio: rango.fechaInicio,
+    fechaFin: rango.fechaFin,
+    ...flujo,
+    patrimonioEstimado: sit.patrimonio,
+    inventarioTotal: sit.inventarioTotal,
+    cuentasPorCobrar: sit.cuentasPorCobrar,
+    cuentasPorPagar: sit.cuentasPorPagar
+  };
+}
+
+/** Serie mensual de flujo de caja (reporte anual). */
+async function obtenerFlujoCajaSerieMensualRepo(pool, idEmpresa, filtros = {}) {
+  const rango = resolverRangoConsultaAnalisis(filtros);
+  const periodos = listarPeriodosMensuales(rango.fechaInicio, rango.fechaFin);
+  const serie = await Promise.all(
+    periodos.map(async (p) => {
+      const { fechaInicio, fechaFin } = periodoARango(p);
+      const flujo = await obtenerFlujoCajaPeriodo(pool, idEmpresa, fechaInicio, fechaFin);
+      const sit = await obtenerSituacionPatrimonialRepo(pool, idEmpresa, fechaInicio, fechaFin);
+      return {
+        periodo: p,
+        fechaInicio,
+        fechaFin,
+        totalIngresos: flujo.totalIngresos,
+        totalEgresos: flujo.totalEgresos,
+        flujoNeto: flujo.flujoNeto,
+        ingresosEfectivo: flujo.ingresosEfectivo,
+        flujoNetoEfectivo: flujo.flujoNetoEfectivo,
+        patrimonio: sit.patrimonio
+      };
+    })
+  );
+  return { periodo: rango.periodoEtiqueta, serie };
 }
 
 /**
- * Estado de resultados por período (mes) con datos reales. Incluye gastos (Gastos o egresos caja).
+ * Estado de resultados por período (mes) con datos reales. Gastos operativos desde tabla Gastos.
  */
 async function obtenerEstadoResultadosRepo(pool, idEmpresa, filtros) {
   let fechaInicio, fechaFin;
@@ -296,38 +304,12 @@ async function obtenerEstadoResultadosRepo(pool, idEmpresa, filtros) {
       ORDER BY YEAR(v.fEmision), MONTH(v.fEmision)
     `);
 
-  const gastosPorPeriodo = {};
-  try {
-    const rg = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('fechaInicio', sql.Date, fechaInicio)
-      .input('fechaFin', sql.Date, fechaFin)
-      .query(`
-        SELECT CONCAT(YEAR(fecha), '-', RIGHT('0' + CAST(MONTH(fecha) AS VARCHAR(2)), 2)) AS periodo, ISNULL(SUM(monto), 0) AS gastos
-        FROM Gastos
-        WHERE idEmpresa = @idEmpresa AND fecha >= @fechaInicio AND fecha <= @fechaFin
-        GROUP BY YEAR(fecha), MONTH(fecha)
-      `);
-    (rg.recordset || []).forEach((row) => { gastosPorPeriodo[row.periodo] = Number(row.gastos || 0); });
-  } catch (_) {}
-  try {
-    const rm = await pool.request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-      .input('fechaInicio', sql.Date, fechaInicio)
-      .input('fechaFin', sql.Date, fechaFin)
-      .query(`
-        SELECT CONCAT(YEAR(mc.fechaMovimiento), '-', RIGHT('0' + CAST(MONTH(mc.fechaMovimiento) AS VARCHAR(2)), 2)) AS periodo, ISNULL(SUM(mc.monto), 0) AS gastos
-        FROM MovimientosCaja mc
-        INNER JOIN TiposMovimientoCaja t ON mc.idTipoMovimientoCaja = t.idTipoMovimientoCaja AND t.tipo = 'E'
-        WHERE mc.idEmpresa = @idEmpresa
-          AND CONVERT(DATE, mc.fechaMovimiento) >= @fechaInicio AND CONVERT(DATE, mc.fechaMovimiento) <= @fechaFin
-        GROUP BY YEAR(mc.fechaMovimiento), MONTH(mc.fechaMovimiento)
-      `);
-    (rm.recordset || []).forEach((row) => {
-      const p = row.periodo;
-      gastosPorPeriodo[p] = (gastosPorPeriodo[p] || 0) + Number(row.gastos || 0);
-    });
-  } catch (_) {}
+  const gastosPorPeriodo = await obtenerGastosAgrupadosPorMes(
+    pool,
+    idEmpresa,
+    fechaInicio,
+    fechaFin
+  );
 
   return (rs.recordset || []).map((r) => {
     const periodo = String(r.periodo || '');
@@ -419,13 +401,10 @@ async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
   const mesActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
   const { fechaInicio, fechaFin } = periodoARango(mesActual);
 
-  const [balance, estado, inv, cxcSaldo, cxpSaldo, ventasCreditoMes, comprasCreditoMes] = await Promise.all([
+  const [balance, estado, inventarioValor, cxcSaldo, cxpSaldo, ventasCreditoMes, comprasCreditoMes] = await Promise.all([
     obtenerBalanceGeneralRepo(pool, idEmpresa, 'MES_ACTUAL'),
     obtenerEstadoResultadosRepo(pool, idEmpresa, { periodoInicio: mesActual, periodoFin: mesActual }),
-    pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
-      SELECT ISNULL(SUM(l.cantidadDisponible * ISNULL(l.costoUnitario, 0)), 0) AS valor
-      FROM Lotes l WHERE l.idEmpresa = @idEmpresa
-    `),
+    InventarioRepository.obtenerInventarioValorizadoEmpresa(pool, idEmpresa),
     pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa).query(`
       SELECT ISNULL(SUM(cu.saldoPendiente), 0) AS saldo
       FROM CuotasCredito cu
@@ -446,7 +425,7 @@ async function obtenerRatiosFinancierosRepo(pool, idEmpresa) {
   const pasivoCorriente = Number(bg.pasivoCorriente || 0) || 1;
   const activoTotal = Number(bg.activoTotal || 0) || 1;
   const patrimonio = Number(bg.patrimonio || 0) || 1;
-  const inventarioVal = Number((inv.recordset[0] || {}).valor || 0);
+  const inventarioVal = Number(inventarioValor || 0);
   const cxcPromedio = Number((cxcSaldo.recordset[0] || {}).saldo || 0);
   const cxpPromedio = Number(cxpSaldo);
   const ventasCredito = Number(ventasCreditoMes);
@@ -553,6 +532,9 @@ async function obtenerDiagnosticoFinancieroRepo(pool, idEmpresa) {
 module.exports = {
   obtenerDashboardEjecutivoRepo,
   obtenerBalanceGeneralRepo,
+  obtenerFlujoCajaAnalisisRepo,
+  obtenerFlujoCajaSerieMensualRepo,
+  obtenerSituacionPatrimonialRepo,
   obtenerEstadoResultadosRepo,
   obtenerRatiosFinancierosRepo,
   obtenerDiagnosticoFinancieroRepo,

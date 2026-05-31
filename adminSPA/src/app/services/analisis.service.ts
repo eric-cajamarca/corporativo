@@ -15,20 +15,41 @@ export class AnalisisService {
     this.url = global.url;
   }
 
+  private buildQueryParams(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): string {
+    if (!filtros) return '';
+    const q = new URLSearchParams();
+    if (filtros.periodo) q.append('periodo', filtros.periodo);
+    if (filtros.fechaDesde) q.append('fechaDesde', filtros.fechaDesde);
+    if (filtros.fechaHasta) q.append('fechaHasta', filtros.fechaHasta);
+    const s = q.toString();
+    return s ? `?${s}` : '';
+  }
+
   // Dashboard Ejecutivo
-  obtenerDashboardEjecutivo(): Observable<any> {
+  obtenerDashboardEjecutivo(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'analisis/dashboard', {
+    return this._http.get(this.url + 'analisis/dashboard' + this.buildQueryParams(filtros), {
       headers: headers,
       withCredentials: true
     });
   }
 
   // Balance General
-  obtenerBalanceGeneral(periodo?: string): Observable<any> {
+  obtenerBalanceGeneral(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    let params = periodo ? `?periodo=${periodo}` : '';
-    return this._http.get(this.url+'analisis/balance-general' + params, {
+    return this._http.get(this.url + 'analisis/balance-general' + this.buildQueryParams(filtros), {
       headers: headers,
       withCredentials: true
     });
@@ -89,10 +110,26 @@ export class AnalisisService {
     });
   }
 
-  // Flujo de Efectivo
-  obtenerFlujoEfectivo(): Observable<any> {
+  // Flujo de caja (período, sin aperturas)
+  obtenerFlujoCaja(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'analisis/flujo-efectivo', {
+    return this._http.get(this.url + 'analisis/flujo-caja' + this.buildQueryParams(filtros), {
+      headers: headers,
+      withCredentials: true
+    });
+  }
+
+  obtenerFlujoCajaSerie(filtros?: {
+    periodo?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<any> {
+    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
+    return this._http.get(this.url + 'analisis/flujo-caja/serie' + this.buildQueryParams(filtros), {
       headers: headers,
       withCredentials: true
     });

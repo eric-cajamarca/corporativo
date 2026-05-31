@@ -1,5 +1,7 @@
 export interface DashboardEjecutivo {
   periodo: string;
+  fechaInicio?: string;
+  fechaFin?: string;
   ventasTotales: number;
   costoVentas: number;
   utilidadBruta: number;
@@ -14,12 +16,19 @@ export interface DashboardEjecutivo {
   inventarioTotal: number;
   cuentasPorCobrar: number;
   cuentasPorPagar: number;
+  /** Flujo neto de caja del período (sin aperturas). */
   flujoCaja: number;
+  flujoNetoEfectivo?: number;
+  ingresosEfectivo?: number;
   patrimonio: number;
 }
 
 export interface BalanceGeneral {
   periodo: string;
+  inventarioTotal?: number;
+  cuentasPorCobrar?: number;
+  cuentasPorPagar?: number;
+  flujoNetoCaja?: number;
   activoCorriente: number;
   activoFijo: number;
   activoTotal: number;
@@ -29,6 +38,54 @@ export interface BalanceGeneral {
   patrimonio: number;
   ratioLiquidez: number;
   ratioEndeudamiento: number;
+}
+
+export interface FlujoCajaConcepto {
+  concepto: string;
+  tipoOperacion: 'I' | 'E';
+  importe: number;
+  informativo?: boolean;
+}
+
+export interface FlujoCajaFormaPago {
+  formaPago: string;
+  importe: number;
+}
+
+export interface FlujoCajaAnalisis {
+  periodo: string;
+  fechaInicio: string;
+  fechaFin: string;
+  resumenConceptos: FlujoCajaConcepto[];
+  movimientosIngresos: FlujoCajaFormaPago[];
+  movimientosEgresos: FlujoCajaFormaPago[];
+  ventasCredito: number;
+  cobroCreditos: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  flujoNeto: number;
+  ingresosEfectivo: number;
+  egresosEfectivo: number;
+  flujoNetoEfectivo: number;
+  patrimonioEstimado?: number;
+  inventarioTotal?: number;
+  cuentasPorCobrar?: number;
+  cuentasPorPagar?: number;
+}
+
+export interface FlujoCajaSerieMensual {
+  periodo: string;
+  serie: {
+    periodo: string;
+    fechaInicio: string;
+    fechaFin: string;
+    totalIngresos: number;
+    totalEgresos: number;
+    flujoNeto: number;
+    ingresosEfectivo: number;
+    flujoNetoEfectivo: number;
+    patrimonio: number;
+  }[];
 }
 
 export interface EstadoResultados {

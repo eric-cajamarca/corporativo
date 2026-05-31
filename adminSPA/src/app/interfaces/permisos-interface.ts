@@ -45,9 +45,14 @@ export interface PermisosUsuario {
 
 export interface SubMenuItem {
     nombre: string;
-    ruta: string;
-    permiso: string;
+    ruta?: string;
+    permiso?: string;
     visible: boolean;
+    /** Hijo de dominio con enlaces propios (acordeón en sidebar). */
+    tipo?: 'modulo' | string;
+    modulo?: string;
+    icono?: string;
+    submenu?: SubMenuItem[];
 }
 
 export interface MenuItem {
@@ -58,7 +63,7 @@ export interface MenuItem {
     permiso?: string;
     visible?: boolean;
     submenu?: SubMenuItem[];
-    tipo?: string; // 'separador'
+    tipo?: 'separador' | 'grupo' | 'dominio' | string;
 }
 
 export interface NavegacionSidebar {

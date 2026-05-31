@@ -24,7 +24,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   
   // Navegación
   menuItems = signal<MenuItem[]>([]);
-  openSubmenu = signal<string | null>(null);
+  /** Módulos/dominios con submenú abierto (varios a la vez: dominio + módulo activo). */
+  openSubmenus = signal<ReadonlySet<string>>(new Set());
   
   // Datos del usuario
   userName = signal<string>('Usuario');
@@ -115,6 +116,87 @@ export class SidebarComponent implements OnInit, OnDestroy {
     });
   }
 
+  private patchItemNavegacion(item: MenuItem, estado: any): MenuItem {
+    if (item.tipo === 'grupo' || item.tipo === 'separador') {
+      return item;
+    }
+    if (item.tipo === 'dominio' && item.submenu?.length) {
+      return {
+        ...item,
+        submenu: item.submenu.map((s) => this.patchSubmenuDominio(s, estado))
+      };
+    }
+    const mod = (item.modulo || '').toString().toLowerCase();
+    if (!item.submenu && item.ruta === '/compras') {
+      return {
+        nombre: item.nombre,
+        icono: item.icono || 'bi bi-bag',
+        modulo: 'compras',
+        visible: item.visible !== false,
+        submenu: this.buildSubmenuCompras()
+      };
+    }
+    if (item.submenu?.length && mod === 'compras') {
+      return { ...item, submenu: this.mergeSubmenuComprasSunat(item.submenu, item.visible !== false) };
+    }
+    if (item.submenu && mod === 'facturacion') {
+      return { ...item, submenu: this.mergeSubmenuFacturacionGuias(item.submenu, estado) };
+    }
+    return item;
+  }
+
+  private patchSubmenuDominio(sub: SubMenuItem, estado: any): SubMenuItem {
+    if (sub.tipo === 'modulo' && sub.modulo) {
+      const mod = sub.modulo.toString().toLowerCase();
+      if (mod === 'compras' && sub.submenu) {
+        return { ...sub, submenu: this.mergeSubmenuComprasSunat(sub.submenu, true) };
+      }
+      if (mod === 'facturacion' && sub.submenu) {
+        return { ...sub, submenu: this.mergeSubmenuFacturacionGuias(sub.submenu, estado) };
+      }
+    }
+    return sub;
+  }
+
+  private mergeSubmenuComprasSunat(submenu: SubMenuItem[], visibleParent: boolean): SubMenuItem[] {
+    const sunatRuta = '/compras/comprobantes-sunat';
+    const visSunat = this.puedeVerComprasSunatMenu();
+    const base = submenu.filter((s) => s.ruta !== sunatRuta);
+    const insert: SubMenuItem = {
+      nombre: 'Compras SUNAT',
+      ruta: sunatRuta,
+      permiso: 'VER_COMPRAS',
+      visible: visSunat && visibleParent
+    };
+    const idxLista = base.findIndex((s) => s.ruta === '/compras');
+    return idxLista >= 0
+      ? [...base.slice(0, idxLista + 1), insert, ...base.slice(idxLista + 1)]
+      : [...base, insert];
+  }
+
+  private mergeSubmenuFacturacionGuias(submenu: SubMenuItem[], estado: any): SubMenuItem[] {
+    let base = submenu.filter(
+      (s) => s.ruta !== '/facturacion/guias-remision' && s.ruta !== '/facturacion/guias-transportista'
+    );
+    if (!base.some((s) => s.ruta === '/facturacion/emision-guias')) {
+      const idxCom = base.findIndex((s) => s.ruta === '/facturacion/comunicacion-baja');
+      const emisionItem: SubMenuItem = {
+        nombre: 'Emisión de guías',
+        ruta: '/facturacion/emision-guias',
+        permiso: '',
+        visible: true
+      };
+      base = idxCom >= 0 ? [...base.slice(0, idxCom + 1), emisionItem, ...base.slice(idxCom + 1)] : [...base, emisionItem];
+    }
+    const guiasItems: SubMenuItem[] = estado?.habilitarGuiasElectronicas
+      ? [
+          { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
+          { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
+        ]
+      : [];
+    return [...base, ...guiasItems];
+  }
+
   /**
    * Actualiza la navegación basada en el estado de configuración.
    * No reemplaza el menú cuando la API ya devolvió ítems con submenús (para conservar las flechas).
@@ -124,66 +206,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
     const navegacionDesdeApi = this.permisosService.navegacion();
     const tieneMenuConSubmenus = navegacionDesdeApi?.some(
-      (item) => item.submenu && (item.submenu?.length ?? 0) > 0
+      (item) =>
+        item.tipo === 'dominio' ||
+        (item.submenu && (item.submenu?.length ?? 0) > 0)
     ) ?? false;
 
     if (tieneMenuConSubmenus && navegacionDesdeApi && navegacionDesdeApi.length > 0) {
-      const items: MenuItem[] = navegacionDesdeApi.map((i: MenuItem) => {
-        const mod = (i.modulo || '').toString().toLowerCase();
-        if (!i.submenu && i.ruta === '/compras') {
-          return {
-            nombre: i.nombre,
-            icono: i.icono || 'bi bi-bag',
-            modulo: 'compras',
-            visible: i.visible !== false,
-            submenu: this.buildSubmenuCompras()
-          };
-        }
-        if (i.submenu?.length && mod === 'compras') {
-          const sunatRuta = '/compras/comprobantes-sunat';
-          const visSunat = this.puedeVerComprasSunatMenu();
-          const base = i.submenu.filter((s: SubMenuItem) => s.ruta !== sunatRuta);
-          const insert: SubMenuItem = {
-            nombre: 'Compras SUNAT',
-            ruta: sunatRuta,
-            permiso: 'VER_COMPRAS',
-            visible: visSunat && i.visible !== false
-          };
-          const idxLista = base.findIndex((s) => s.ruta === '/compras');
-          const merged =
-            idxLista >= 0 ? [...base.slice(0, idxLista + 1), insert, ...base.slice(idxLista + 1)] : [...base, insert];
-          return { ...i, submenu: merged };
-        }
-        if (i.submenu && mod === 'facturacion') {
-          let base: SubMenuItem[] = i.submenu.filter((s: SubMenuItem) =>
-            s.ruta !== '/facturacion/guias-remision' &&
-            s.ruta !== '/facturacion/guias-transportista'
-          );
-          const tieneEmision = base.some((s) => s.ruta === '/facturacion/emision-guias');
-          if (!tieneEmision) {
-            const idxCom = base.findIndex((s) => s.ruta === '/facturacion/comunicacion-baja');
-            const emisionItem: SubMenuItem = {
-              nombre: 'Emisión de guías',
-              ruta: '/facturacion/emision-guias',
-              permiso: '',
-              visible: true
-            };
-            base =
-              idxCom >= 0
-                ? [...base.slice(0, idxCom + 1), emisionItem, ...base.slice(idxCom + 1)]
-                : [...base, emisionItem];
-          }
-          const guiasItems: SubMenuItem[] = estado.habilitarGuiasElectronicas
-            ? [
-                //{ nombre: 'Configuración de guías electrónicas', ruta: '/facturacion/guias/configuracion', permiso: '', visible: true },
-                { nombre: 'Guías de remisión', ruta: '/facturacion/guias-remision', permiso: '', visible: true },
-                { nombre: 'Guías transportista', ruta: '/facturacion/guias-transportista', permiso: '', visible: true }
-              ]
-            : [];
-          return { ...i, submenu: [...base, ...guiasItems] };
-        }
-        return i;
-      });
+      const items: MenuItem[] = navegacionDesdeApi.map((i: MenuItem) => this.patchItemNavegacion(i, estado));
       if (!estado.tieneColaboradores) {
         const sepIndex = items.findIndex((i: any) => i.tipo === 'separador');
         const insertIndex = sepIndex >= 0 ? sepIndex + 1 : items.length;
@@ -301,14 +330,37 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private abrirSubmenuSegunRutaActual(): void {
     const url = this.router.url;
     const items = this.menuItems();
+    const abiertos = new Set<string>();
+
+    const rutaActiva = (ruta?: string | null): boolean => {
+      if (!ruta) return false;
+      return url === ruta || url.startsWith(ruta + '/');
+    };
+
     for (const item of items) {
-      if (item.submenu?.length) {
-        const modulo = item.modulo ?? '';
-        const algunaRutaActiva = item.submenu.some(
-          (sub) => sub.ruta === url || url.startsWith(sub.ruta + '/')
-        );
-        if (algunaRutaActiva) {
-          this.openSubmenu.set(modulo);
+      if (item.tipo === 'dominio' && item.submenu?.length && item.modulo) {
+        for (const sub of item.submenu) {
+          if (sub.tipo === 'modulo' && sub.submenu?.length && sub.modulo) {
+            const activo = sub.submenu.some((link) => rutaActiva(link.ruta));
+            if (activo) {
+              abiertos.add(item.modulo);
+              abiertos.add(sub.modulo);
+              this.openSubmenus.set(abiertos);
+              return;
+            }
+          }
+          if (rutaActiva(sub.ruta)) {
+            abiertos.add(item.modulo);
+            this.openSubmenus.set(abiertos);
+            return;
+          }
+        }
+      }
+      if (item.submenu?.length && item.modulo) {
+        const activo = item.submenu.some((sub) => rutaActiva(sub.ruta));
+        if (activo) {
+          abiertos.add(item.modulo);
+          this.openSubmenus.set(abiertos);
           return;
         }
       }
@@ -390,7 +442,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     
     // Cerrar submenús cuando se colapsa
     if (newState) {
-      this.openSubmenu.set(null);
+      this.openSubmenus.set(new Set());
     }
   }
 
@@ -416,19 +468,47 @@ export class SidebarComponent implements OnInit, OnDestroy {
   /**
    * Toggle de submenú
    */
-  toggleSubmenu(modulo: string): void {
-    if (this.openSubmenu() === modulo) {
-      this.openSubmenu.set(null);
+  toggleSubmenu(modulo: string, event?: Event): void {
+    event?.stopPropagation();
+    const next = new Set(this.openSubmenus());
+    const esDominio = modulo.startsWith('DOMINIO_');
+
+    if (next.has(modulo)) {
+      next.delete(modulo);
+      if (esDominio) {
+        this.menuItems().forEach((item) => {
+          if (item.tipo === 'dominio' && item.modulo === modulo && item.submenu) {
+            item.submenu.forEach((sub) => {
+              if (sub.tipo === 'modulo' && sub.modulo) {
+                next.delete(sub.modulo);
+              }
+            });
+          }
+        });
+      }
     } else {
-      this.openSubmenu.set(modulo);
+      if (esDominio) {
+        [...next].forEach((k) => {
+          if (k.startsWith('DOMINIO_')) {
+            next.delete(k);
+          }
+        });
+      }
+      next.add(modulo);
     }
+    this.openSubmenus.set(next);
   }
 
-  /**
-   * Verifica si un submenú está abierto
-   */
   isSubmenuOpen(modulo: string): boolean {
-    return this.openSubmenu() === modulo;
+    return this.openSubmenus().has(modulo);
+  }
+
+  esSubmenuModulo(sub: SubMenuItem): boolean {
+    return sub.tipo === 'modulo' && !!sub.submenu?.length;
+  }
+
+  esDominio(item: MenuItem): boolean {
+    return item.tipo === 'dominio' && !!item.submenu?.length;
   }
 
   /**
@@ -459,6 +539,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
     const r = String(ruta || '').trim();
     if (!r) return '/home';
     return r.startsWith('/') ? r : `/${r}`;
+  }
+
+  /** Ítem navegable (excluye separadores y etiquetas de dominio). */
+  esItemMenu(item: MenuItem): boolean {
+    if (item.tipo === 'separador' || item.tipo === 'grupo') {
+      return false;
+    }
+    if (item.tipo === 'dominio') {
+      return item.visible !== false;
+    }
+    return item.visible !== false;
   }
 
   /**

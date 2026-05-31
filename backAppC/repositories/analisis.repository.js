@@ -1,7 +1,7 @@
 const sql = require("mssql");
 const AnalisisOperativo = require("./analisisOperativo.repository");
 
-exports.obtenerDashboardEjecutivoRepo = async (pool, idEmpresa) => {
+exports.obtenerDashboardEjecutivoRepo = async (pool, idEmpresa, filtros = {}) => {
   try {
     const result = await pool
       .request()
@@ -15,29 +15,32 @@ exports.obtenerDashboardEjecutivoRepo = async (pool, idEmpresa) => {
     if (row) return [row];
   } catch (err) {
     if (err.number === 208 || /Invalid object name|vw_DashboardFinanciero/.test(String(err.message))) {
-      const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa);
+      const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa, filtros);
       return [data];
     }
     throw err;
   }
-  const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa);
+  const data = await AnalisisOperativo.obtenerDashboardEjecutivoRepo(pool, idEmpresa, filtros);
   return [data];
 };
 
-exports.obtenerBalanceGeneralRepo = async (pool, idEmpresa, periodo) => {
+exports.obtenerBalanceGeneralRepo = async (pool, idEmpresa, filtros = {}) => {
   try {
     let query = "SELECT * FROM vw_BalanceGeneral WHERE idEmpresa = @idEmpresa";
-    if (periodo) query += " AND periodo = @periodo";
+    if (filtros.periodo) query += " AND periodo = @periodo";
     query += " ORDER BY periodo DESC";
     const result = await pool
       .request()
       .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .input("periodo", sql.VarChar, periodo || null)
+      .input("periodo", sql.VarChar, filtros.periodo || null)
       .query(query);
     if (result.recordset && result.recordset.length > 0) {
-      const row = result.recordset[0];
-      return [{
+      return result.recordset.map((row) => ({
         periodo: row.periodo,
+        inventarioTotal: Number(row.inventarioTotal || 0),
+        cuentasPorCobrar: Number(row.cuentasPorCobrar || 0),
+        cuentasPorPagar: Number(row.cuentasPorPagar || 0),
+        flujoNetoCaja: Number(row.flujoNetoCaja || 0),
         activoCorriente: Number(row.activoCorriente || 0),
         activoFijo: Number(row.activoNoCorriente || row.activoFijo || 0),
         activoTotal: Number(row.totalActivo || row.activoTotal || 0),
@@ -47,15 +50,15 @@ exports.obtenerBalanceGeneralRepo = async (pool, idEmpresa, periodo) => {
         patrimonio: Number(row.patrimonio || 0),
         ratioLiquidez: row.ratioLiquidez != null ? Number(row.ratioLiquidez) : 0,
         ratioEndeudamiento: row.ratioEndeudamiento != null ? Number(row.ratioEndeudamiento) : 0
-      }];
+      }));
     }
   } catch (err) {
     if (err.number === 208 || /Invalid object name|vw_BalanceGeneral/.test(String(err.message))) {
-      return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, periodo);
+      return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, filtros);
     }
     throw err;
   }
-  return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, periodo);
+  return AnalisisOperativo.obtenerBalanceGeneralRepo(pool, idEmpresa, filtros);
 };
 
 exports.obtenerEstadoResultadosRepo = async (pool, idEmpresa, filtros) => {
@@ -164,17 +167,12 @@ exports.obtenerAnalisisRentabilidadRepo = async (pool, idEmpresa, tipo) => {
   return result.recordset;
 };
 
-exports.obtenerFlujoEfectivoRepo = async (pool, idEmpresa) => {
-  const result = await pool
-    .request()
-    .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT * FROM vw_FlujoEfectivo
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY periodo DESC
-    `);
+exports.obtenerFlujoCajaRepo = async (pool, idEmpresa, filtros = {}) => {
+  return AnalisisOperativo.obtenerFlujoCajaAnalisisRepo(pool, idEmpresa, filtros);
+};
 
-  return result.recordset;
+exports.obtenerFlujoCajaSerieRepo = async (pool, idEmpresa, filtros = {}) => {
+  return AnalisisOperativo.obtenerFlujoCajaSerieMensualRepo(pool, idEmpresa, filtros);
 };
 
 exports.obtenerEficienciaOperativaRepo = async (pool, idEmpresa) => {

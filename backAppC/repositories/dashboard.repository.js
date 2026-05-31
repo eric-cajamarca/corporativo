@@ -1,4 +1,7 @@
 const sql = require("mssql");
+const {
+  calcularResumenFinancieroPeriodo
+} = require("../utils/kpisFinancierosOperativo.util");
 
 /**
  * Obtiene el resumen del dashboard principal (inicio) con datos reales de la empresa.
@@ -235,40 +238,20 @@ exports.obtenerResumenDashboardRepo = async (
       ? ((clientesActualCount - clientesAnteriorCount) / clientesAnteriorCount) * 100
       : (clientesActualCount > 0 ? 100 : 0);
 
-  // Costos de ventas: suma de costoTotal en DetalleVenta del período
-  let costos = 0;
-  try {
-    const costoVentasRs = await pool
-      .request()
-      .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-      .input("fechaInicio", sql.Date, fechaInicio)
-      .input("fechaFin", sql.Date, fechaFin)
-      .query(`
-        SELECT ISNULL(SUM(dv.costoTotal), 0) AS costoVentas
-        FROM DetalleVenta dv
-        INNER JOIN Ventas v ON dv.idVenta = v.idVenta
-        WHERE v.idEmpresa = @idEmpresa
-          AND CONVERT(DATE, v.fEmision) >= @fechaInicio
-          AND CONVERT(DATE, v.fEmision) <= @fechaFin
-      `);
-    const costoRow = row(costoVentasRs);
-    costos = toNum(costoRow.costoVentas ?? costoRow.costo_ventas);
-  } catch (err) {
-    costos = 0;
-  }
-
-  const ingresos = ventasTotales;
-  const utilidadBruta = ingresos - costos;
-  const gastosOperativos = 0;
-  const utilidadNeta = utilidadBruta - gastosOperativos;
-  const utilidadAnterior = Math.max(0, ventasTotalesAnterior * 0.2);
-  const utilidadVariacion =
-    utilidadAnterior > 0
-      ? ((utilidadNeta - utilidadAnterior) / utilidadAnterior) * 100
-      : (utilidadNeta > 0 ? 100 : 0);
-
-  // ROI simplificado (utilidad / ventas * 100 si hay ventas)
-  const roi = ventasTotales > 0 ? (utilidadNeta / ventasTotales) * 100 : 0;
+  const kpisFin = await calcularResumenFinancieroPeriodo(
+    pool,
+    idEmpresa,
+    fechaInicio,
+    fechaFin,
+    { fechaInicioAnterior, fechaFinAnterior }
+  );
+  const ingresos = kpisFin.ingresos;
+  const costos = kpisFin.costos;
+  const utilidadBruta = kpisFin.utilidadBruta;
+  const gastosOperativos = kpisFin.gastosOperativos;
+  const utilidadNeta = kpisFin.utilidadNeta;
+  const utilidadVariacion = kpisFin.utilidadVariacion;
+  const roi = kpisFin.roiPctVentas;
 
   const alertas = [];
   stockBajo.recordset.forEach((r) => {

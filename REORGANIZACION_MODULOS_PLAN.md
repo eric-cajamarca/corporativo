@@ -19,9 +19,9 @@ Agrupar capacidades existentes en dominios claros sin duplicar ERPs (RRHH, conta
 
 ## Fases (esta rama)
 
-1. Menú y navegación: sidebar agrupado por dominio (sin mover carpetas aún).
-2. Mapa rutas ↔ módulos SaaS: alinear `adminSPA/src/app/config/ruta-plan-modulo.map.ts`.
-3. Análisis financiero: unificar KPIs home vs `/analisis`.
+1. **Hecho:** Menú y navegación por dominios (`backAppC/utils/navegacionDominios.util.js`, etiquetas `tipo: 'grupo'` en sidebar).
+2. **Hecho:** Mapa rutas ↔ módulos SaaS (`ruta-plan-modulo.map.ts` + `ruta-plan-modulo.map.spec.ts`).
+3. **Hecho:** Análisis financiero unificado — KPIs compartidos; flujo de caja en pestaña `/analisis` (sin aperturas); patrimonio según período consultado (inventario + CxC + flujo caja − CxP); balance anual por mes.
 4. Opcional: reubicar carpetas Angular/backend por dominio.
 
 ## Fuera de alcance inicial

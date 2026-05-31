@@ -1,6 +1,7 @@
 const { isSaas } = require('../config/deployment.config');
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const saasPlanAccesoRepository = require('../repositories/saasPlanAcceso.repository');
+const { limpiarGruposVacios } = require('../utils/navegacionDominios.util');
 
 /**
  * Plan efectivo para límites de menú y APIs.
@@ -30,6 +31,36 @@ function nivelPlan(planCode) {
   return orden[p] || 2;
 }
 
+function filtrarLinksModulo(modulo, links, planCode, nv) {
+  let sub = links.map((s) => ({ ...s }));
+  const mod = (modulo || '').toString().trim().toUpperCase();
+  const pc = (planCode || '').toLowerCase();
+
+  if (mod === 'VENTAS' && nv < 2) {
+    sub = sub.filter((s) => (s.ruta || '').toString() !== '/cotizaciones');
+  }
+
+  if (mod === 'CAJA' && pc === 'demo') {
+    const ruta = (s) => (s.ruta || '').toString();
+    sub = sub.filter(
+      (s) => ruta(s) === '/caja' || ruta(s) === '/caja/arqueo' || ruta(s).startsWith('/caja/arqueo/')
+    );
+  }
+
+  if (mod === 'CONFIGURACION' && pc === 'demo') {
+    const ruta = (s) => (s.ruta || '').toString();
+    sub = sub.filter((s) => {
+      const r = ruta(s);
+      if (r === '/sucursal' || r.startsWith('/sucursal/')) return false;
+      if (r === '/rol' || r.startsWith('/rol/')) return false;
+      if (r === '/auditoria' || r.startsWith('/auditoria/')) return false;
+      return true;
+    });
+  }
+
+  return sub.filter((s) => s.visible !== false);
+}
+
 /**
  * Filtra ítems de navegación según SaasPlanModulo y reglas de submenú (caja / cotizaciones).
  */
@@ -52,47 +83,45 @@ async function filtrarNavegacionPorPlan(pool, idEmpresa, items) {
 
   const out = [];
   for (const item of items) {
+    if (item.tipo === 'grupo') {
+      continue;
+    }
     if (item.tipo === 'separador') {
       out.push(item);
       continue;
     }
+
+    if (item.tipo === 'dominio') {
+      let sub = (item.submenu || []).map((s) => ({ ...s }));
+      sub = sub
+        .map((s) => {
+          if (s.tipo === 'modulo') {
+            const mod = (s.modulo || '').toString().trim().toUpperCase();
+            if (mod && !set.has(mod)) return null;
+            const links = filtrarLinksModulo(mod, s.submenu || [], planCode, nv);
+            if (!links.length) return null;
+            return { ...s, submenu: links };
+          }
+          const modLeaf = (s.modulo || '').toString().trim().toUpperCase();
+          if (modLeaf && !set.has(modLeaf)) return null;
+          if (s.visible === false) return null;
+          return s;
+        })
+        .filter(Boolean);
+      if (sub.length === 0) continue;
+      out.push({ ...item, submenu: sub });
+      continue;
+    }
+
     const mod = (item.modulo || '').toString().trim().toUpperCase();
     if (mod && !set.has(mod)) {
       continue;
     }
 
     if (item.submenu && item.submenu.length > 0) {
-      let sub = item.submenu.map((s) => ({ ...s }));
-
-      if (mod === 'VENTAS' && nv < 2) {
-        sub = sub.filter((s) => (s.ruta || '').toString() !== '/cotizaciones');
-      }
-
-      const pc = (planCode || '').toLowerCase();
-
-      if (mod === 'CAJA' && pc === 'demo') {
-        // Demo: solo Gestión de cajas y Arqueo (el resto de planes ve todos los subítems permitidos por rol).
-        const ruta = (s) => (s.ruta || '').toString();
-        sub = sub.filter(
-          (s) => ruta(s) === '/caja' || ruta(s) === '/caja/arqueo' || ruta(s).startsWith('/caja/arqueo/')
-        );
-      }
-
-      if (mod === 'CONFIGURACION' && pc === 'demo') {
-        const ruta = (s) => (s.ruta || '').toString();
-        sub = sub.filter((s) => {
-          const r = ruta(s);
-          if (r === '/sucursal' || r.startsWith('/sucursal/')) return false;
-          if (r === '/rol' || r.startsWith('/rol/')) return false;
-          if (r === '/auditoria' || r.startsWith('/auditoria/')) return false;
-          return true;
-        });
-      }
-
-      if (sub.length === 0) {
-        continue;
-      }
-      out.push({ ...item, submenu: sub });
+      const links = filtrarLinksModulo(mod, item.submenu, planCode, nv);
+      if (links.length === 0) continue;
+      out.push({ ...item, submenu: links });
       continue;
     }
 
@@ -115,7 +144,7 @@ async function filtrarNavegacionPorPlan(pool, idEmpresa, items) {
   while (collapsed.length > 0 && collapsed[collapsed.length - 1].tipo === 'separador') {
     collapsed.pop();
   }
-  return collapsed;
+  return limpiarGruposVacios(collapsed);
 }
 
 module.exports = {

@@ -1,21 +1,20 @@
 const AnalisisRepository = require('../repositories/analisis.repository');
 
-exports.obtenerDashboardEjecutivoService = async (pool, user) => {
+exports.obtenerDashboardEjecutivoService = async (pool, user, filtros = {}) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const recordset = await AnalisisRepository.obtenerDashboardEjecutivoRepo(pool, user.empresa);
+  const recordset = await AnalisisRepository.obtenerDashboardEjecutivoRepo(pool, user.empresa, filtros);
   return recordset && recordset.length > 0 ? recordset[0] : null;
 };
 
-exports.obtenerBalanceGeneralService = async (pool, user, periodo) => {
+exports.obtenerBalanceGeneralService = async (pool, user, filtros = {}) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const balance = await AnalisisRepository.obtenerBalanceGeneralRepo(pool, user.empresa, periodo);
-  return Array.isArray(balance) && balance.length > 0 ? balance[0] : balance;
+  return AnalisisRepository.obtenerBalanceGeneralRepo(pool, user.empresa, filtros);
 };
 
 exports.obtenerEstadoResultadosService = async (pool, user, filtros) => {
@@ -45,13 +44,20 @@ exports.obtenerAnalisisRentabilidadService = async (pool, user, tipo) => {
   return rentabilidad;
 };
 
-exports.obtenerFlujoEfectivoService = async (pool, user) => {
+exports.obtenerFlujoCajaService = async (pool, user, filtros = {}) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
 
-  const flujo = await AnalisisRepository.obtenerFlujoEfectivoRepo(pool, user.empresa);
-  return flujo;
+  return AnalisisRepository.obtenerFlujoCajaRepo(pool, user.empresa, filtros);
+};
+
+exports.obtenerFlujoCajaSerieService = async (pool, user, filtros = {}) => {
+  if (!user) {
+    throw new Error("NO_ACCESS");
+  }
+
+  return AnalisisRepository.obtenerFlujoCajaSerieRepo(pool, user.empresa, filtros);
 };
 
 exports.obtenerEficienciaOperativaService = async (pool, user) => {
