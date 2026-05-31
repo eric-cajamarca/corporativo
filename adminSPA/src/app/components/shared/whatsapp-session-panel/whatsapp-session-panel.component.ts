@@ -196,8 +196,12 @@ export class WhatsappSessionPanelComponent implements OnInit, OnDestroy {
     this.session = data;
     this.proveedorSeleccionado =
       String(data.proveedor).toLowerCase() === 'baileys' ? 'baileys' : 'factiliza';
-    if (data.lastError && !this.conectado) {
-      this.errorMsg = data.lastError;
+    if (data.lastError && !this.conectado && !data.qrDataUrl) {
+      this.errorMsg = data.mensaje || data.lastError;
+    } else if (data.mensaje && !this.conectado && !data.qrDataUrl) {
+      this.errorMsg = data.mensaje;
+    } else if (this.conectado || data.qrDataUrl) {
+      this.errorMsg = null;
     }
     this.sessionChange.emit(this.session);
     this.ajustarPolling();

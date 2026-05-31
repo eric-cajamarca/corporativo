@@ -18,7 +18,7 @@
       }
 
       @if (checkout(); as c) {
-        <div class="card shadow-sm">
+        <div class="card shadow-sm auth-form-shell">
           <div class="card-body">
             <h1 class="h4 mb-3">Pago de suscripción</h1>
             <p class="text-muted small mb-2">Plan: <strong>{{ c.planCode }}</strong> · Ciclo: <strong>{{ c.billingCycle }}</strong></p>

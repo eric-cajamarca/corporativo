@@ -1,190 +1,231 @@
 <!-- Sidebar -->
- <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
- <!-- Topnav -->
- <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
- <!-- Contenido principal -->
- <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
-
-  <div class="container">
-    <div class="card">
-      <div class="card-header ">
-
-        <div class="d-flex justify-content-between align-items-center">
-        <!-- Title -->
-          <h4 class="card-header-title mb-0">
-            Mostrando todos los registros
-          </h4>
-
-          <button class="btn btn-primary" [routerLink]="['/categorias/create']" routerLinkActive="active"
-            title="Crear nueva categoría">
-            <i class="bi bi-plus-circle"></i> Crear nueva categoría</button>
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<!-- Topnav -->
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+<!-- Contenido principal -->
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="categorias-page-wrap">
+      <div class="card categorias-list-card">
+        <div class="card-header">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h4 class="card-header-title mb-0">Listado de categorías</h4>
+            <button
+              class="btn btn-primary"
+              [routerLink]="['/categorias/create']"
+              routerLinkActive="active"
+              title="Crear nueva categoría">
+              <i class="bi bi-plus-circle"></i> Crear nueva categoría
+            </button>
+          </div>
+          <div class="input-group">
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Buscar por nombre o descripción..."
+              name="filtroCategorias"
+              [(ngModel)]="filtro"
+              (keyup.enter)="filtrar()"
+              (input)="filtrar()" />
+            <button class="btn btn-primary" type="button" (click)="filtrar()">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+          </div>
         </div>
-        <div class="card-body">
-            <div class="input-group input-group-merge">
-              <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
-                [(ngModel)]="filtro">
-              <div class="input-group-append">
-                <button class="btn btn-primary" (click)="filtrar()">
-                  Buscar
-                </button>
-              </div>
-            </div>
-        </div>
 
-      </div>
-
-      <ng-container *ngIf="categorias.length === 0">
-        <div class="row">
-          <div class="col-12">
-            <div class="alert alert-danger" role="alert">
-              <div class="alert-text">
-                <p>No tienes categorias registradas</p>
+        <ng-container *ngIf="categorias_const.length === 0">
+          <div class="row">
+            <div class="col-12">
+              <div class="alert alert-danger m-3" role="alert">
+                <p class="mb-0">No tienes categorías registradas</p>
               </div>
             </div>
           </div>
-        </div>
-      </ng-container>
+        </ng-container>
 
-      <ng-container *ngIf="categorias.length > 0">
-       
-            <table class="table table-striped">
-              <thead>
-                <tr>
-                  <th scope="col">Nombre</th>
-                  <th scope="col">Descripción</th>
-                  <th scope="col">Estado</th>
-                  <th scope="col">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let item of categorias | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
-                  <td>{{ item.nombre }}</td>
-                  <td>{{ item.descripcion }}</td>
-                
-                  <td>
-                    <span class="badge bg-success" *ngIf="item.estado">Activo</span>
-                    <span class="badge bg-danger" *ngIf="!item.estado">Desactivado</span>
-                  <td>
-                    <div class="btn-group" ngbDropdown>
-                      <button  class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown"
-                        aria-expanded="false" ngbDropdownToggle>
-                        Opciones
-                      </button>
-                      <ul class="dropdown-menu">
-                        <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.estado" data-bs-toggle="modal"
-                          [attr.data-bs-target]="'#delete-'+item.idCategoria">
-                          <i class="bi bi-x-circle"></i> &nbsp; Desactivar
-                        </a>
-                        <a style="cursor: pointer;" class="dropdown-item" *ngIf="!item.estado" data-bs-toggle="modal"
-                          [attr.data-bs-target]="'#delete-'+item.idCategoria">
-                          <i class="bi bi-check-circle"></i> &nbsp; Activar
-                        </a>
-                        <a style="cursor: pointer;" class="dropdown-item" (click)="seleccionar(item.idCategoria)"
-                          data-bs-toggle="modal" [attr.data-bs-target]="'#editar-'+item.idCategoria">
-                          <i class="bi bi-pencil"></i> &nbsp; Editar
-                        </a>
-                      </ul>
+        <ng-container *ngIf="categorias_const.length > 0 && categorias.length === 0">
+          <div class="row">
+            <div class="col-12">
+              <div class="alert alert-warning m-3" role="alert">
+                No se encontraron categorías con ese criterio de búsqueda.
+              </div>
+            </div>
+          </div>
+        </ng-container>
 
-                      <div class="modal fade" id="delete-{{item.idCategoria}}" tabindex="-1" role="dialog"
-                      aria-labelledby="exampleModalLabel" aria-hidden="true">
-                      <div class="modal-dialog" role="document">
-                        <div class="modal-content">
-                          <div class="modal-header">
-                            <h5 class="modal-title" id="exampleModalLabel">Ventana de cambio de estado de la categoría :
-                              {{item.nombre}}
-                            </h5>
+        <ng-container *ngIf="categorias.length > 0">
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 categorias-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Descripción</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let item of categorias | slice: (page - 1) * pageSize : (page - 1) * pageSize + pageSize">
+                    <td>{{ item.nombre }}</td>
+                    <td>{{ item.descripcion }}</td>
+                    <td>
+                      <span class="badge bg-success" *ngIf="item.estado">Activo</span>
+                      <span class="badge bg-danger" *ngIf="!item.estado">Desactivado</span>
+                    </td>
+                    <td>
+                      <div class="btn-group">
+                        <button
+                          type="button"
+                          class="btn btn-primary dropdown-toggle"
+                          data-bs-toggle="dropdown"
+                          aria-expanded="false">
+                          Opciones
+                        </button>
+                        <ul class="dropdown-menu">
+                          <a
+                            style="cursor: pointer"
+                            class="dropdown-item"
+                            *ngIf="item.estado"
+                            data-bs-toggle="modal"
+                            [attr.data-bs-target]="'#delete-' + item.idCategoria">
+                            <i class="bi bi-x-circle"></i> &nbsp; Desactivar
+                          </a>
+                          <a
+                            style="cursor: pointer"
+                            class="dropdown-item"
+                            *ngIf="!item.estado"
+                            data-bs-toggle="modal"
+                            [attr.data-bs-target]="'#delete-' + item.idCategoria">
+                            <i class="bi bi-check-circle"></i> &nbsp; Activar
+                          </a>
+                          <a
+                            style="cursor: pointer"
+                            class="dropdown-item"
+                            (click)="seleccionar(item.idCategoria)"
+                            data-bs-toggle="modal"
+                            [attr.data-bs-target]="'#editar-' + item.idCategoria">
+                            <i class="bi bi-pencil"></i> &nbsp; Editar
+                          </a>
+                        </ul>
+                      </div>
 
-                          </div>
-                          <div class="modal-body">
-                            <p>Está seguro que desea cambiar el estado de la categoría?.</p>
-                          </div>
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-warning font-weight-bold"
-                              data-bs-dismiss="modal">Cerrar</button>
-                            <button *ngIf="!load_estado" type="button" class="btn btn-danger font-weight-bold"
-                              (click)="cambiarEstado(item?.idCategoria, item?.estado)" data-bs-dismiss="modal">Sí,
-                              cambiar</button>
-
-                            <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
-                              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                              Cambiando...
-                            </button>
+                      <div
+                        class="modal fade"
+                        id="delete-{{ item.idCategoria }}"
+                        tabindex="-1"
+                        role="dialog"
+                        aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="exampleModalLabel">
+                                Ventana de cambio de estado de la categoría: {{ item.nombre }}
+                              </h5>
+                            </div>
+                            <div class="modal-body">
+                              <p>¿Está seguro que desea cambiar el estado de la categoría?</p>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">
+                                Cerrar
+                              </button>
+                              <button
+                                *ngIf="!load_estado"
+                                type="button"
+                                class="btn btn-danger font-weight-bold"
+                                (click)="cambiarEstado(item?.idCategoria, item?.estado)"
+                                data-bs-dismiss="modal">
+                                Sí, cambiar
+                              </button>
+                              <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Cambiando...
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    <div class="modal fade" id="editar-{{item.idCategoria}}" tabindex="-1" role="dialog"
-                      aria-labelledby="exampleModalLabel" aria-hidden="true" >
-                      <div class="modal-dialog" role="document">
-                        <div class="modal-content">
-                          <div class="modal-header">
-                            <h5 class="modal-title" id="exampleModalLabel">Ventana para editar la categoría:
-                              {{item.nombre}}
-                            </h5>
 
-                          </div>
-                          <div class="modal-body">
-                            <p>Está seguro que desea editar la categoría?.</p>
-                            <div>
-                              <div class="col-12">
-                                <div>
-                                  <label for="nombre">Nombre</label>
-                                  <input type="text" class="form-control" name="nombre"
-                                    [(ngModel)]="prod_Modificar.nombre">
-                                </div>
-
-                                <div>
-                                  <label for="descripcion">Descripción</label>
-                                  <input type="text" class="form-control" name="descripcion"
-                                    [(ngModel)]="prod_Modificar.descripcion">
+                      <div
+                        class="modal fade"
+                        id="editar-{{ item.idCategoria }}"
+                        tabindex="-1"
+                        role="dialog"
+                        aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                          <div class="modal-content">
+                            <div class="modal-header">
+                              <h5 class="modal-title" id="exampleModalLabel">
+                                Ventana para editar la categoría: {{ item.nombre }}
+                              </h5>
+                            </div>
+                            <div class="modal-body">
+                              <p>¿Está seguro que desea editar la categoría?</p>
+                              <div>
+                                <div class="col-12">
+                                  <div>
+                                    <label for="nombre">Nombre</label>
+                                    <input
+                                      type="text"
+                                      class="form-control"
+                                      name="nombre"
+                                      [(ngModel)]="prod_Modificar.nombre" />
+                                  </div>
+                                  <div>
+                                    <label for="descripcion">Descripción</label>
+                                    <input
+                                      type="text"
+                                      class="form-control"
+                                      name="descripcion"
+                                      [(ngModel)]="prod_Modificar.descripcion" />
+                                  </div>
                                 </div>
                               </div>
-
-                              
                             </div>
-
-
-                          </div>
-
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-warning font-weight-bold"
-                              data-bs-dismiss="modal">Cerrar</button>
-                            <button *ngIf="!load_estado" type="button" class="btn btn-primary font-weight-bold"
-                              (click)="editarCategorias(prod_Modificar.idCategoria)" data-bs-dismiss="modal">Sí, guardar
-                              cambios</button>
-
-                            <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
-                              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                              Modificando...
-                            </button>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-warning font-weight-bold" data-bs-dismiss="modal">
+                                Cerrar
+                              </button>
+                              <button
+                                *ngIf="!load_estado"
+                                type="button"
+                                class="btn btn-primary font-weight-bold"
+                                (click)="editarCategorias(prod_Modificar.idCategoria)"
+                                data-bs-dismiss="modal">
+                                Sí, guardar cambios
+                              </button>
+                              <button *ngIf="load_estado" class="btn btn-danger" type="button" disabled>
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Modificando...
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                      
-                    </div>
-                    
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ng-container>
 
-                  
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-       
-      </ng-container>
-
-      <ngb-pagination 
-            *ngIf="categorias.length > 0"
-            [(page)]="page"
-            [pageSize]="pageSize"
-            [collectionSize]="categorias.length"
-            [maxSize]="maxSize"
-            [rotate]="rotate"
-            [boundaryLinks]="boundaryLinks"
-            (pageChange)="onPageChange($event)"
-            aria-label="Paginación de categorias"
-            class="d-flex justify-content-center my-4">
-          </ngb-pagination>
+        <ngb-pagination
+          *ngIf="categorias.length > pageSize"
+          [(page)]="page"
+          [pageSize]="pageSize"
+          [collectionSize]="categorias.length"
+          [maxSize]="5"
+          [rotate]="true"
+          [boundaryLinks]="true"
+          (pageChange)="onPageChange($event)"
+          aria-label="Paginación de categorías"
+          class="d-flex justify-content-center my-4">
+        </ngb-pagination>
+      </div>
     </div>
   </div>
 </main>

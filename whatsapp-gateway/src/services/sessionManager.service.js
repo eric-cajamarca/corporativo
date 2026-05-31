@@ -104,7 +104,9 @@ function waitForSessionReady(idEmpresa, timeoutMs = QR_WAIT_MS) {
         resolve(t);
         return;
       }
-      if (t.status === 'error' || t.lastError) {
+      // No salir por lastError durante reconexion: Baileys puede emitir fallo transitorio
+      // y generar el QR unos segundos despues en el reintento programado.
+      if (t.status === 'error' || t.status === 'desconectado') {
         resolve(t);
         return;
       }
@@ -116,6 +118,36 @@ function waitForSessionReady(idEmpresa, timeoutMs = QR_WAIT_MS) {
     };
     tick();
   });
+}
+
+function esErrorSesionRecuperable(lastError) {
+  const msg = String(lastError || '').toLowerCase();
+  return (
+    msg.includes('connection failure') ||
+    msg.includes('stream errored') ||
+    msg.includes('conflict') ||
+    msg.includes('connection replaced')
+  );
+}
+
+function mensajeConexionAmigable(lastError) {
+  const msg = String(lastError || '').toLowerCase();
+  if (msg.includes('conflict') || msg.includes('connection replaced')) {
+    return (
+      'WhatsApp detecto otra sesion activa con este numero. ' +
+      'Cierre WhatsApp Web en otros equipos, pulse *Desvincular* y vuelva a generar el codigo QR.'
+    );
+  }
+  if (msg.includes('connection failure')) {
+    return (
+      'No se pudo abrir la sesion con WhatsApp. Pulse *Desvincular*, espere unos segundos y vuelva a *Generar codigo QR*. ' +
+      'Si persiste, verifique internet/firewall hacia web.whatsapp.com.'
+    );
+  }
+  if (lastError) {
+    return `Error de conexion: ${lastError}. Pulse *Desvincular* e intente de nuevo.`;
+  }
+  return null;
 }
 
 async function destroySocket(t) {
@@ -427,17 +459,32 @@ async function connectTenant(idEmpresa, options = {}) {
 
 async function startSession(idEmpresa, options = {}) {
   await connectTenant(idEmpresa, { forceNew: true, ...options });
-  const t = await waitForSessionReady(idEmpresa);
+  let t = await waitForSessionReady(idEmpresa);
+
+  if (!t.qrDataUrl && t.status !== 'conectado' && esErrorSesionRecuperable(t.lastError)) {
+    await logoutSession(idEmpresa);
+    await connectTenant(idEmpresa, { forceNew: true, ...options });
+    t = await waitForSessionReady(idEmpresa);
+  }
+
   const status = getSessionStatus(idEmpresa);
-  if (t.status === 'conectando' && !t.qrDataUrl) {
+  if (status.qrDataUrl || status.estadoSesion === 'conectado') {
+    status.mensaje = null;
+    status.lastError = null;
+  } else if (status.lastError) {
+    status.mensaje = mensajeConexionAmigable(status.lastError);
+  } else if (t.status === 'conectando' && !t.qrDataUrl) {
     status.mensaje =
-      'No se recibio el codigo QR. Verifique que whatsapp-gateway tenga acceso a internet, pulse Actualizar o Desvincular e intente de nuevo.';
+      'No se recibio el codigo QR. Verifique que whatsapp-gateway tenga acceso a internet, pulse Desvincular e intente de nuevo.';
   }
   return status;
 }
 
 function getSessionStatus(idEmpresa) {
   const t = getTenantState(idEmpresa);
+  const lastError = t.qrDataUrl || t.status === 'conectado' ? null : t.lastError || null;
+  const mensaje =
+    t.qrDataUrl || t.status === 'conectado' ? null : mensajeConexionAmigable(lastError);
   return {
     idEmpresa,
     proveedor: 'baileys',
@@ -446,7 +493,8 @@ function getSessionStatus(idEmpresa) {
     qr: t.qr,
     qrDataUrl: t.qrDataUrl,
     nombreDispositivo: t.nombreDispositivo || null,
-    lastError: t.lastError || null
+    lastError,
+    mensaje
   };
 }
 

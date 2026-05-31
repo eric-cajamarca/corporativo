@@ -27,13 +27,11 @@ export class IndexMarcaComponent {
   public prod_Modificar: any = {};
   public load_estado = false;
   public token: any = '';
+  public filtro = '';
 
   // Configuración de paginación
   public page = 1;
-  public pageSize = 10;
-  public maxSize = 10;
-  public rotate = true;
-  public boundaryLinks = true;
+  public readonly pageSize = 10;
 
   
   constructor(
@@ -54,13 +52,30 @@ export class IndexMarcaComponent {
       response => {
                         if (response.data == undefined) {
                   } else {
-          this.marcas = response.data;
           this.marcas_const = response.data;
+          this.filtrar();
         }
       },
       error => {
                       }
     );
+  }
+
+  filtrar(): void {
+    const texto = String(this.filtro || '').trim();
+    if (texto) {
+      const term = new RegExp(texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      this.marcas = this.marcas_const.filter(
+        (item) =>
+          term.test(String(item.nombre || '')) ||
+          term.test(String(item.descripcion || '')) ||
+          term.test(String(item.contacto || '')) ||
+          term.test(String(item.paginaWeb || ''))
+      );
+    } else {
+      this.marcas = [...this.marcas_const];
+    }
+    this.page = 1;
   }
 
   cambiarEstado(id: any, estado: any) {

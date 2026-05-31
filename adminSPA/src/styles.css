@@ -90,6 +90,22 @@ body.app-has-banner-ribbon .main-content {
   margin-top: calc(64px + 2.85rem);
 }
 
+/**
+ * Botones con clase w-100: ancho natural (contenido), no bloque a todo el ancho.
+ * Excepciones: tiles de inventario, tarjetas de buscador en compras, CTAs en landing/auth.
+ */
+.main-content :is(a, button).btn.w-100:not(.quick-action-btn):not(.buscador-compra-card),
+.modal :is(a, button).btn.w-100:not(.buscador-compra-card) {
+  width: auto;
+  max-width: 100%;
+}
+
+.auth-form-shell :is(a, button).btn.w-100,
+.auth-form-shell :is(a, button).btn.btn-block,
+.planes-pricing-card :is(a, button).btn.w-100 {
+  width: 100%;
+}
+
 /* Búsqueda de productos (modales): categoría y marca angostas con ellipsis; más ancho para descripción */
 th.efaf-buscador-col-cat,
 td.efaf-buscador-col-cat {

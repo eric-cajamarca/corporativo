@@ -1,39 +1,93 @@
 /* Layout: espacio para sidebar (260px) y topnav (64px) */
 :host {
-    display: block;
-    min-height: 100vh;
-    background: #f5f7fa;
-  }
-  
-  .main-content {
-    margin-left: 260px;
-    margin-top: 64px;
-    padding: 24px;
-    min-height: calc(100vh - 64px);
-    transition: margin-left 0.3s ease;
-  }
-  
-  .main-content.sidebar-collapsed {
-    margin-left: 70px;
-  }
-  
-  @media (max-width: 991.98px) {
-    .main-content {
-      margin-left: 0;
-    }
-  }
-  
-  .card-header .card-title i {
-    font-size: 1rem;
-  }
-
-
-
-.card {
-    margin: 0 auto;
-    float: none;
-    max-width: 600px;
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
 }
 
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
 
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
 
+@media (max-width: 991.98px) {
+  .main-content {
+    margin-left: 0;
+  }
+}
+
+.content-header {
+  width: 100%;
+}
+
+.marcas-page-wrap {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.marcas-list-card {
+  width: 100%;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.marcas-list-card .card-header {
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.marcas-list-card .input-group {
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.marcas-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+.marcas-table th,
+.marcas-table td {
+  vertical-align: middle;
+}
+
+.marcas-table th:nth-child(2),
+.marcas-table td:nth-child(2) {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marcas-table th:last-child,
+.marcas-table td:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+  .marcas-page-wrap {
+    max-width: 100%;
+  }
+
+  .marcas-list-card .input-group {
+    max-width: 100%;
+  }
+
+  .marcas-table th:nth-child(2),
+  .marcas-table td:nth-child(2) {
+    max-width: 140px;
+  }
+}

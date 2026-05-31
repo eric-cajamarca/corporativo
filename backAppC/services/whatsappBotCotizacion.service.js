@@ -10,7 +10,6 @@ const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
-const whatsappBotListaArchivo = require('./whatsappBotListaArchivo.service');
 
 const MEDIOS_PAGO = {
   1: 'Efectivo',
@@ -276,27 +275,6 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
   const texto = String(textoEntrada || '').trim();
   const slots = { ...(conv.slots || {}), carrito: Array.isArray(conv.slots?.carrito) ? [...conv.slots.carrito] : [] };
 
-  const confirmLista = whatsappBotListaArchivo.procesarConfirmacionLista(ctx, conv, {
-    agregarAlCarrito,
-    formatearCarrito
-  });
-  if (confirmLista) return confirmLista;
-
-  const elegirLista = whatsappBotListaArchivo.procesarElegirOpcionLista(ctx, conv, {
-    agregarAlCarrito,
-    formatearCarrito
-  });
-  if (elegirLista) return elegirLista;
-
-  if (ctx.adjuntoEntrada?.base64) {
-    const desdeArchivo = await whatsappBotListaArchivo.procesarAdjuntoCotizacion(ctx, conv, resCliente, {
-      esEstadoCotizacion,
-      solicitarRegistroOIniciarCotizacion,
-      agregarAlCarrito
-    });
-    if (desdeArchivo) return desdeArchivo;
-  }
-
   if (esEstadoRegistroDocumento(conv.estado)) {
     if (nlu.intencion === 'menu' || nlu.intencion === 'cancelar_cotizacion') {
       return {
@@ -544,7 +522,6 @@ async function intentarProcesar(ctx, conv, nlu, config, resCliente) {
       respuesta: [
         'En modo cotización puedes:',
         '— Escribir el nombre del producto a buscar',
-        '— Enviar *Excel (.xlsx)* o *PDF con texto* con tu lista',
         '— *CARRITO* para ver tu lista',
         '— *CONFIRMAR* para registrar',
         '— *CANCELAR* para salir'

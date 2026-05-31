@@ -4,6 +4,7 @@
   "description": "Monorepo CRM: adminSPA + backAppC",
   "scripts": {
     "verify": "node scripts/verify.mjs",
+    "build:desktop-exe": "powershell -NoProfile -ExecutionPolicy Bypass -File CRM/packaging/build-desktop-exe.ps1",
     "e2e": "npm run e2e --prefix adminSPA",
     "e2e:ui": "npm run e2e:ui --prefix adminSPA",
     "e2e:headed": "npm run e2e:headed --prefix adminSPA",

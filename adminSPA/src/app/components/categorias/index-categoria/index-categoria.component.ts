@@ -31,10 +31,7 @@ export class IndexCategoriaComponent {
   
   // Configuración de paginación
   public page = 1;
-  public pageSize = 10;
-  public maxSize = 10;
-  public rotate = true;
-  public boundaryLinks = true;
+  public readonly pageSize = 10;
 
   constructor(
     private _router: Router,
@@ -61,8 +58,8 @@ export class IndexCategoriaComponent {
       response => {
                         if (response.data == undefined) {
                   } else {
-          this.categorias = response.data;
           this.categorias_const = response.data;
+          this.filtrar();
         }
       },
       error => {
@@ -98,14 +95,19 @@ export class IndexCategoriaComponent {
 
   }
 
-  filtrar() {
-    if (this.filtro) {
-      //
-      var term = new RegExp(this.filtro, 'i');
-      this.categorias = this.categorias_const.filter(item => term.test(item.nombre) || term.test(item.descripcion) );
+  filtrar(): void {
+    const texto = String(this.filtro || '').trim();
+    if (texto) {
+      const term = new RegExp(texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      this.categorias = this.categorias_const.filter(
+        (item) =>
+          term.test(String(item.nombre || '')) ||
+          term.test(String(item.descripcion || ''))
+      );
     } else {
-      this.categorias = this.categorias_const;
+      this.categorias = [...this.categorias_const];
     }
+    this.page = 1;
   }
 
   seleccionar(id: any) {

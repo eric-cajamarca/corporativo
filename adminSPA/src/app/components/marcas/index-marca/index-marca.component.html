@@ -1,28 +1,40 @@
 <!-- Sidebar -->
 <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
 <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
 <!-- Contenido principal -->
 <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-header">
     
 
-    <div class="container">
-      <div class="card" >
-        <div class="card-header d-flex justify-content-between align-items-center">
-
-          
-         <h4 class="card-header-title mb-0">Listado de marcas</h4>
-
-          <button class="btn btn-primary" [routerLink]="['/marcas/create']" routerLinkActive="active"
-          title="Crear nueva marca">
-          <i class="bi bi-plus-circle"></i> Crear nueva marca</button>
-
+    <div class="marcas-page-wrap">
+      <div class="card marcas-list-card">
+        <div class="card-header">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h4 class="card-header-title mb-0">Listado de marcas</h4>
+            <button
+              class="btn btn-primary"
+              [routerLink]="['/marcas/create']"
+              routerLinkActive="active"
+              title="Crear nueva marca">
+              <i class="bi bi-plus-circle"></i> Crear nueva marca
+            </button>
+          </div>
+          <div class="input-group">
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Buscar por nombre, descripción, contacto o web..."
+              name="filtroMarcas"
+              [(ngModel)]="filtro"
+              (keyup.enter)="filtrar()"
+              (input)="filtrar()" />
+            <button class="btn btn-primary" type="button" (click)="filtrar()">
+              <i class="bi bi-search"></i> Buscar
+            </button>
+          </div>
         </div>
 
-        <ng-container *ngIf="marcas.length === 0">
+        <ng-container *ngIf="marcas_const.length === 0">
           <div class="row">
             <div class="col-12">
               <div class="alert alert-danger" role="alert">
@@ -34,10 +46,20 @@
           </div>
         </ng-container>
 
+        <ng-container *ngIf="marcas_const.length > 0 && marcas.length === 0">
+          <div class="row">
+            <div class="col-12">
+              <div class="alert alert-warning m-3" role="alert">
+                No se encontraron marcas con ese criterio de búsqueda.
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
         <ng-container *ngIf="marcas.length > 0">
-          <div class="card">
-            <div class="card-body">
-              <table class="table table-hover">
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0 marcas-table">
                 <thead>
                   <tr>
                     <th scope="col">Nombre</th>
@@ -53,6 +75,7 @@
                     <td>
                       <span class="badge bg-success" *ngIf="marca.estado">Activo</span>
                       <span class="badge bg-danger" *ngIf="!marca.estado">Desactivado</span>
+                    </td>
                     <td>
                       <div class="btn-group">
                         <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown"
@@ -168,18 +191,16 @@
                 </tbody>
               </table>
             </div>
-            
           </div>
-
         </ng-container>
-        <ngb-pagination 
-              *ngIf="marcas.length > 0"
+        <ngb-pagination
+              *ngIf="marcas.length > pageSize"
               [(page)]="page"
               [pageSize]="pageSize"
               [collectionSize]="marcas.length"
-              [maxSize]="maxSize"
-              [rotate]="rotate"
-              [boundaryLinks]="boundaryLinks"
+              [maxSize]="5"
+              [rotate]="true"
+              [boundaryLinks]="true"
               (pageChange)="onPageChange($event)"
               aria-label="Paginación de marcas"
               class="d-flex justify-content-center my-4">

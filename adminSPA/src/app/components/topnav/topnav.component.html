@@ -95,10 +95,11 @@
           class="topnav-btn" 
           type="button" 
           data-bs-toggle="dropdown" 
-          aria-expanded="false">
+          aria-expanded="false"
+          (click)="onAbrirNotificaciones()">
           <i class="bi bi-bell"></i>
           <span class="notification-badge" *ngIf="notificacionesCount > 0">
-            {{notificacionesCount}}
+            {{ notificacionesCount > 99 ? '99+' : notificacionesCount }}
           </span>
         </button>
         <div class="dropdown-menu dropdown-menu-end notifications-dropdown">
@@ -106,8 +107,9 @@
             <span>Notificaciones</span>
             <button 
               class="btn btn-sm btn-link p-0" 
+              type="button"
               *ngIf="notificacionesCount > 0"
-              (click)="marcarTodasComoLeidas()">
+              (click)="marcarTodasComoLeidas(); $event.stopPropagation()">
               Marcar todas como leídas
             </button>
           </div>
@@ -116,14 +118,14 @@
               class="notification-item" 
               *ngFor="let notif of notificaciones"
               [class.unread]="!notif.leido"
-              (click)="marcarComoLeida(notif.id)">
+              (click)="onNotificacionClick(notif, $event)">
               <div class="notification-icon">
                 <i [class]="getNotificacionIcon(notif.tipo)"></i>
               </div>
               <div class="notification-content">
-                <div class="notification-title">{{notif.titulo}}</div>
-                <div class="notification-message">{{notif.mensaje}}</div>
-                <div class="notification-time">{{notif.fecha | date:'short'}}</div>
+                <div class="notification-title">{{ notif.titulo }}</div>
+                <div class="notification-message">{{ notif.mensaje }}</div>
+                <div class="notification-time">{{ notif.fecha | date:'short' }}</div>
               </div>
             </div>
             <div class="notification-empty" *ngIf="notificaciones.length === 0">
@@ -132,7 +134,7 @@
             </div>
           </div>
           <div class="dropdown-footer">
-            <a href="#" class="text-center d-block">Ver todas las notificaciones</a>
+            <a routerLink="/home" fragment="alertas" class="text-center d-block">Ver todas las notificaciones</a>
           </div>
         </div>
       </div>

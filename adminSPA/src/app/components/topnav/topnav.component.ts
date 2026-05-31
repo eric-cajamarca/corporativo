@@ -20,6 +20,8 @@ import { AppBannerRibbonComponent } from '../app-banner-ribbon/app-banner-ribbon
 import { AppBannerService } from '../../services/app-banner.service';
 import { ConsultarPlacaModalOpenerService } from '../../services/consultar-placa-modal-opener.service';
 import { SidebarStateService } from '../../services/sidebar-state.service';
+import { NotificacionesService } from '../../services/notificaciones.service';
+import { NotificacionItem } from '../../models/notificacion.model';
 
 declare const iziToast: any;
 
@@ -44,9 +46,9 @@ export class TopnavComponent implements OnInit, OnDestroy {
   public empresaLogo: string = '';
   public isAuthenticated: boolean = false;
 
-  // Estado de notificaciones (ejemplo)
-  public notificacionesCount: number = 0;
-  public notificaciones: any[] = [];
+  // Notificaciones (dashboard + SOAT)
+  public notificaciones: NotificacionItem[] = [];
+  public notificacionesCount = 0;
 
   // Tipo de cambio (solo si empresa autorizada)
   public tipoCambio: TipoCambioData | null = null;
@@ -92,7 +94,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
     private saasSubscription: SaasSubscriptionService,
     private appBanner: AppBannerService,
     private consultarPlacaOpener: ConsultarPlacaModalOpenerService,
-    private sidebarState: SidebarStateService
+    private sidebarState: SidebarStateService,
+    public notificacionesService: NotificacionesService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -104,11 +107,14 @@ export class TopnavComponent implements OnInit, OnDestroy {
         this.cargarTipoCambio();
         this.cargarSoatVencidoCount(true);
         this.appBanner.refrescar();
+        this.notificacionesService.refrescar();
       } else {
         this.userName = '';
         this.empresaNombre = '';
         this.isAuthenticated = false;
         this.appBanner.limpiar();
+        this.notificacionesService.limpiar();
+        this.syncNotificacionesUi();
         this.tipoCambio = null;
         this.ultimaEmpresaMiEstado = null;
         this.planSuscripcionCode = null;
@@ -166,6 +172,12 @@ export class TopnavComponent implements OnInit, OnDestroy {
         }
       });
     });
+
+    effect(() => {
+      this.notificacionesService.items();
+      this.notificacionesService.noLeidasCount();
+      this.syncNotificacionesUi();
+    });
   }
 
   private aplicarFlagsTarjetaPerfil(
@@ -187,8 +199,6 @@ export class TopnavComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       if (this.isAuthenticated) this.cargarTipoCambio();
     }, 600);
-    // Cargar notificaciones (ejemplo)
-    this.cargarNotificaciones();
 
     this.bannerNavSub = this.router.events
       .pipe(
@@ -198,12 +208,14 @@ export class TopnavComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         if (this.isAuthenticated) {
           this.appBanner.refrescar();
+          this.notificacionesService.refrescar();
         }
       });
 
     setTimeout(() => {
       if (this.isAuthenticated) {
         this.appBanner.refrescar();
+        this.notificacionesService.refrescar();
       }
     }, 1600);
 
@@ -223,6 +235,9 @@ export class TopnavComponent implements OnInit, OnDestroy {
       next: (res) => {
         const list = res?.data || [];
         this.soatVencidoCount = list.length;
+        if (this.soatVencidoCount > 0) {
+          this.notificacionesService.refrescar();
+        }
         if (this.soatVencidoCount > 0 && mostrarToast && !this.soatVencidoToastYaMostrado && typeof iziToast !== 'undefined') {
           this.soatVencidoToastYaMostrado = true;
           iziToast.warning({
@@ -250,6 +265,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
    */
   logout(): void {
     this.appBanner.limpiar();
+    this.notificacionesService.limpiar();
+    this.syncNotificacionesUi();
     this.permisosService.limpiarPermisos();
     this.authService.forceLogout();
   }
@@ -386,60 +403,46 @@ export class TopnavComponent implements OnInit, OnDestroy {
     return nombres[mes - 1] || '';
   }
 
-  /**
-   * Carga notificaciones del usuario
-   */
-  private cargarNotificaciones(): void {
-    // Ejemplo de notificaciones
-    this.notificaciones = [
-      {
-        id: 1,
-        titulo: 'Stock bajo',
-        mensaje: 'Producto XYZ tiene menos de 10 unidades',
-        tipo: 'warning',
-        fecha: new Date(),
-        leido: false
-      },
-      {
-        id: 2,
-        titulo: 'Nueva venta',
-        mensaje: 'Se registró una venta por S/ 1,250.00',
-        tipo: 'success',
-        fecha: new Date(),
-        leido: false
-      }
-    ];
-    this.notificacionesCount = this.notificaciones.filter(n => !n.leido).length;
+  private syncNotificacionesUi(): void {
+    this.notificaciones = this.notificacionesService.items();
+    this.notificacionesCount = this.notificacionesService.noLeidasCount();
+    this.cdr.markForCheck();
   }
 
-  /**
-   * Marca una notificación como leída
-   */
-  marcarComoLeida(id: number): void {
-    const notificacion = this.notificaciones.find(n => n.id === id);
-    if (notificacion) {
-      notificacion.leido = true;
-      this.notificacionesCount = this.notificaciones.filter(n => !n.leido).length;
+  onAbrirNotificaciones(): void {
+    if (this.isAuthenticated) {
+      this.notificacionesService.refrescar();
     }
   }
 
-  /**
-   * Marca todas las notificaciones como leídas
-   */
-  marcarTodasComoLeidas(): void {
-    this.notificaciones.forEach(n => n.leido = true);
-    this.notificacionesCount = 0;
+  onNotificacionClick(notif: NotificacionItem, event: Event): void {
+    this.notificacionesService.marcarLeida(notif.id);
+    if (notif.id === 'soat-vencido') {
+      event.preventDefault();
+      this.abrirModalPlaca();
+      return;
+    }
+    if (notif.ruta) {
+      event.preventDefault();
+      this.router.navigateByUrl(notif.ruta);
+    }
   }
 
-  /**
-   * Obtiene el icono según el tipo de notificación
-   */
+  marcarComoLeida(id: string): void {
+    this.notificacionesService.marcarLeida(id);
+  }
+
+  marcarTodasComoLeidas(): void {
+    this.notificacionesService.marcarTodasLeidas();
+  }
+
   getNotificacionIcon(tipo: string): string {
     const icons: { [key: string]: string } = {
-      'warning': 'fas fa-exclamation-triangle text-warning',
-      'success': 'fas fa-check-circle text-success',
-      'error': 'fas fa-times-circle text-danger',
-      'info': 'fas fa-info-circle text-info'
+      warning: 'fas fa-exclamation-triangle text-warning',
+      success: 'fas fa-check-circle text-success',
+      error: 'fas fa-times-circle text-danger',
+      danger: 'fas fa-times-circle text-danger',
+      info: 'fas fa-info-circle text-info'
     };
     return icons[tipo] || icons['info'];
   }

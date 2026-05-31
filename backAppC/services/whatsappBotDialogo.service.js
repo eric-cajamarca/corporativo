@@ -18,7 +18,7 @@ const TEXTO_MENU_BASE = [
   '1. Mis pedidos',
   '2. Mi deuda',
   '3. Buscar producto',
-  '4. Cotizar (armar lista y recibir PDF)',
+  '4. Cotizar (por texto y recibir PDF)',
   '',
   'También puedes escribir el nombre del producto o *COTIZAR*.',
   'Pregúntame: *QUIÉN ERES* | *QUÉ VENDES* | *QUÉ PRODUCTOS VENDES* | *DIRECCIÓN* | *CONTACTO*'
@@ -142,12 +142,22 @@ async function buscarYResponder(idEmpresa, terminos, intencion) {
   };
 }
 
-async function requiereCliente(config, resCliente) {
+function requiereCliente(config, resCliente) {
   if (resCliente.encontrado) return null;
   if (resCliente.ambiguo) {
     return 'Encontramos más de un cliente con tu número. Por favor contacta a la empresa para actualizar tus datos.';
   }
   return config.mensajeNoRegistrado || 'No encontramos tu número registrado.';
+}
+
+/** Bloquea catálogo/precios/stock si el celular no está en Clientes de la empresa. */
+function respuestaSiClienteNoRegistrado(config, resCliente, conv) {
+  const msg = requiereCliente(config, resCliente);
+  if (!msg) return null;
+  return {
+    respuesta: msg,
+    conv: { estado: 'menu', slots: conservarMemoria(conv.slots), candidatos: [] }
+  };
 }
 
 /**
@@ -180,6 +190,17 @@ async function procesarTurno(ctx, precarga = null) {
     }
   }
   conv = whatsappBotEscalamiento.limpiarEscaladaExpirada(conv);
+
+  if (ctx.adjuntoEntrada?.base64) {
+    const msgArchivo =
+      (config.mensajeArchivosNoPermitidos && String(config.mensajeArchivosNoPermitidos).trim()) ||
+      'Por seguridad no aceptamos archivos adjuntos (Excel, PDF u otros documentos). Escribe el nombre del producto o escribe *MENÚ*.';
+    return {
+      respuesta: msgArchivo,
+      conv: { estado: conv.estado || 'menu', slots: conservarMemoria(conv.slots), candidatos: [] },
+      reaccion: '🛡️'
+    };
+  }
 
   const nlu = whatsappBotNlu.interpretar(textoEntrada, {
     estado: conv.estado,
@@ -274,6 +295,13 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (whatsappBotIdentidad.INTENCIONES_IDENTIDAD.has(nlu.intencion)) {
+    if (nlu.intencion === 'productos_destacados') {
+      const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
+      if (bloqueo) {
+        bloqueo.reaccion = reaccion;
+        return bloqueo;
+      }
+    }
     const respuesta = await whatsappBotIdentidad.getRespuesta(idEmpresa, nlu.intencion);
     return {
       respuesta,
@@ -313,6 +341,8 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (conv.estado === 'eligiendo_candidato' && nlu.intencion === 'seleccion_numero') {
+    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
+    if (bloqueo) return bloqueo;
     const idx = Number(nlu.entidades.numero) - 1;
     const candidatos = conv.candidatos || [];
     if (idx >= 0 && idx < candidatos.length) {
@@ -327,7 +357,7 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (nlu.intencion === 'deuda') {
-    const msg = await requiereCliente(config, resCliente);
+    const msg = requiereCliente(config, resCliente);
     if (msg) return { respuesta: msg, conv: { estado: 'menu', slots: {}, candidatos: [] } };
     const respuesta = await resumenDeuda(idEmpresa, resCliente.cliente.idCliente);
     return {
@@ -340,6 +370,11 @@ async function procesarTurno(ctx, precarga = null) {
   // aclarar_producto: si hay memoria de la ultima busqueda, reusarla en lugar
   // de pedir al usuario que repita. "¿y el precio?" tras "taladro" funciona.
   if (nlu.intencion === 'aclarar_producto') {
+    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
+    if (bloqueo) {
+      bloqueo.reaccion = '🔍';
+      return bloqueo;
+    }
     const ult = conv.slots?.ultimaBusqueda;
     if (ult && Array.isArray(ult.candidatos) && ult.candidatos.length > 0) {
       const r = await buscarYResponder(idEmpresa, ult.terminos, nlu.intencion === 'aclarar_producto' ? 'precio' : nlu.intencion);
@@ -357,6 +392,11 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (['producto', 'precio', 'stock'].includes(nlu.intencion) && nlu.terminosBusqueda.length > 0) {
+    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
+    if (bloqueo) {
+      bloqueo.reaccion = '🔍';
+      return bloqueo;
+    }
     const r = await buscarYResponder(idEmpresa, nlu.terminosBusqueda, nlu.intencion);
     const slots = conservarMemoria(conv.slots, r.estado, { ultimaBusqueda: r.ultimaBusqueda });
     return {
@@ -367,6 +407,11 @@ async function procesarTurno(ctx, precarga = null) {
   }
 
   if (conv.estado === 'buscando_producto' && nlu.terminosBusqueda.length > 0) {
+    const bloqueo = respuestaSiClienteNoRegistrado(config, resCliente, conv);
+    if (bloqueo) {
+      bloqueo.reaccion = '🔍';
+      return bloqueo;
+    }
     const r = await buscarYResponder(idEmpresa, nlu.terminosBusqueda, 'producto');
     const slots = conservarMemoria(conv.slots, r.estado, { ultimaBusqueda: r.ultimaBusqueda });
     return {
