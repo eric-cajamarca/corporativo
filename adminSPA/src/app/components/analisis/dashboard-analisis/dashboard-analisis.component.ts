@@ -2,7 +2,12 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { AnalisisService } from '../../../services/analisis.service';
+import { PdfService, PdfDatosDinamicos } from '../../../services/pdf.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { Empresa as EmpresaPdf } from '../../../interfaces/pdf-interface';
 import {
   DashboardEjecutivo,
   BalanceGeneral,
@@ -60,8 +65,13 @@ export class DashboardAnalisisComponent implements OnInit {
   public estadoResultadosList: EstadoResultados[] = [];
   public estadoResultadosIndex = 0;
 
+  public empresa: EmpresaPdf | null = null;
+  public generandoInformePdf = false;
+
   constructor(
-    private analisisService: AnalisisService
+    private analisisService: AnalisisService,
+    private pdfService: PdfService,
+    private empresaService: EmpresaService
   ) {}
 
   ngOnInit(): void {
@@ -71,6 +81,19 @@ export class DashboardAnalisisComponent implements OnInit {
     const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
     if (!this.filtros.fechaDesde) this.filtros.fechaDesde = `${y}-${m}-01`;
     if (!this.filtros.fechaHasta) this.filtros.fechaHasta = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    this.empresaService.getEmpresa$().subscribe((emp) => {
+      const e = emp as { razon_Social?: string; nombreComercial?: string; nombre?: string; ruc?: string; direccion?: string; telefono?: string; logo?: string };
+      if (emp) {
+        const nombre = e.razon_Social || e.nombreComercial || e.nombre || '';
+        this.empresa = {
+          logo: e.logo || '',
+          nombre,
+          ruc: e.ruc || '',
+          direccion: e.direccion || '',
+          telefono: e.telefono || ''
+        };
+      }
+    });
     this.cargarDashboard();
     this.cargarDiagnosticoFinanciero();
   }
@@ -345,6 +368,138 @@ export class DashboardAnalisisComponent implements OnInit {
       this.cambiarVista(this.vistaActiva);
     }
     this.cargarDiagnosticoFinanciero();
+  }
+
+  /** Rango de fechas del informe según filtro de período (para PDF e estado de resultados). */
+  private obtenerRangoInforme(): { fechaInicio: string; fechaFin: string; periodoLabel: string } {
+    const manual =
+      !!this.filtros.fechaDesde &&
+      !!this.filtros.fechaHasta &&
+      (this.vistaActiva === 'resultados' || this.vistaActiva === 'flujo-caja');
+    if (manual) {
+      return {
+        fechaInicio: this.filtros.fechaDesde,
+        fechaFin: this.filtros.fechaHasta,
+        periodoLabel: `${this.filtros.fechaDesde} — ${this.filtros.fechaHasta}`
+      };
+    }
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    switch (this.filtros.periodo || 'MES_ACTUAL') {
+      case 'MES_ANTERIOR': {
+        const ini = new Date(y, m - 1, 1);
+        const fin = new Date(y, m, 0);
+        const p = `${ini.getFullYear()}-${String(ini.getMonth() + 1).padStart(2, '0')}`;
+        return { fechaInicio: fmt(ini), fechaFin: fmt(fin), periodoLabel: p };
+      }
+      case 'TRIMESTRE': {
+        const trim = Math.floor(m / 3);
+        const ini = new Date(y, trim * 3, 1);
+        const fin = new Date(y, trim * 3 + 3, 0);
+        return { fechaInicio: fmt(ini), fechaFin: fmt(fin), periodoLabel: `T${trim + 1}-${y}` };
+      }
+      case 'ANO_ACTUAL':
+        return {
+          fechaInicio: `${y}-01-01`,
+          fechaFin: `${y}-12-31`,
+          periodoLabel: String(y)
+        };
+      default: {
+        const ini = new Date(y, m, 1);
+        const fin = new Date(y, m + 1, 0);
+        const p = `${y}-${String(m + 1).padStart(2, '0')}`;
+        return { fechaInicio: fmt(ini), fechaFin: fmt(fin), periodoLabel: p };
+      }
+    }
+  }
+
+  /** Genera PDF del análisis completo: una sección por hoja. */
+  imprimirInformeFinanciero(): void {
+    this.generandoInformePdf = true;
+    const filtrosApi = this.filtrosConsulta();
+    const rango = this.obtenerRangoInforme();
+
+    forkJoin({
+      dashboard: this.analisisService.obtenerDashboardEjecutivo(filtrosApi).pipe(
+        map((r) => r.data),
+        catchError(() => of(null))
+      ),
+      balanceList: this.analisisService.obtenerBalanceGeneral(filtrosApi).pipe(
+        map((r) => (Array.isArray(r.data) ? r.data : r.data ? [r.data] : [])),
+        catchError(() => of([]))
+      ),
+      flujoCaja: this.analisisService.obtenerFlujoCaja(filtrosApi).pipe(
+        map((r) => r.data),
+        catchError(() => of(null))
+      ),
+      estadoResultadosList: this.analisisService
+        .obtenerEstadoResultados({
+          fechaDesde: rango.fechaInicio,
+          fechaHasta: rango.fechaFin,
+          agruparPor: 'MES'
+        })
+        .pipe(
+          map((r) => (Array.isArray(r.data) ? r.data : r.data ? [r.data] : [])),
+          catchError(() => of([]))
+        ),
+      ratios: this.analisisService.obtenerRatiosFinancieros().pipe(
+        map((r) => r.data),
+        catchError(() => of(null))
+      ),
+      diagnostico: this.analisisService.obtenerDiagnosticoFinanciero().pipe(
+        map((r) => r.data),
+        catchError(() => of(null))
+      ),
+      gastos: this.analisisService.listarGastos(rango.fechaInicio, rango.fechaFin).pipe(
+        map((r) => (Array.isArray(r.data) ? r.data : [])),
+        catchError(() => of([]))
+      ),
+      flujoSerie:
+        filtrosApi.periodo === 'ANO_ACTUAL'
+          ? this.analisisService.obtenerFlujoCajaSerie(filtrosApi).pipe(
+              map((r) => r.data),
+              catchError(() => of(null))
+            )
+          : of(null)
+    }).subscribe({
+      next: (pack) => {
+        const nombreArchivo = `analisis-financiero-${rango.periodoLabel.replace(/\s/g, '_')}.pdf`;
+        const datos: PdfDatosDinamicos = {
+          empresa: this.empresa ?? {
+            logo: '',
+            nombre: '',
+            ruc: '',
+            direccion: '',
+            telefono: ''
+          },
+          periodoLabel: rango.periodoLabel,
+          ...pack
+        };
+        this.pdfService.generarPdfAnalisisFinanciero(datos, nombreArchivo).subscribe({
+          next: (blob) => {
+            this.generandoInformePdf = false;
+            this.pdfService.previsualizar(blob);
+            iziToast.success({
+              title: 'Informe generado',
+              message: 'Se abrió el PDF con una sección por hoja.'
+            });
+          },
+          error: (err) => {
+            this.generandoInformePdf = false;
+            iziToast.error({
+              title: 'Error',
+              message: err?.error?.error || err?.message || 'No se pudo generar el PDF (verifique pdf-backend).'
+            });
+          }
+        });
+      },
+      error: () => {
+        this.generandoInformePdf = false;
+        iziToast.error({ title: 'Error', message: 'No se pudieron cargar los datos del informe.' });
+      }
+    });
   }
 
   // Helpers para formato y colores

@@ -51,6 +51,28 @@ export class PdfService {
     );
   }
 
+  /** Informe completo de análisis financiero (una sección por hoja A4). */
+  generarPdfAnalisisFinanciero(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    const payload = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'analisis-financiero', fontSize: 10, formato: 'A4' },
+      { responseType: 'blob' }
+    );
+  }
+
+  /** Pack de reportes del módulo Reportes (ventas, compras, inventario, etc.) — una sección por hoja. */
+  generarPdfReportesNegocio(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    const payload = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'reportes-negocio', fontSize: 9, formato: 'A4' },
+      { responseType: 'blob' }
+    );
+  }
+
   generarPdfComprobanteDespacho(datos: PdfDatosDinamicos, formato: 'A4' | 'A5' | 'ticket', nombreArchivo?: string): Observable<Blob> {
     const payload = { ...datos };
     if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;

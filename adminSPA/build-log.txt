@@ -1,0 +1,172 @@
+﻿
+> admin-spa@0.0.0 build
+> ng build
+
+> Building...
+ÔêÜ Building...
+Initial chunk files   | Names         |  Raw size | Estimated transfer size
+main-JFWBC2XA.js      | main          |   3.47 MB |               578.07 kB
+styles-T36GPGXF.css   | styles        | 271.90 kB |                32.05 kB
+scripts-UHQIFY6J.js   | scripts       |  98.98 kB |                25.87 kB
+polyfills-DHHU6LMO.js | polyfills     |  35.09 kB |                11.53 kB
+chunk-4IDNTCH7.js     | -             |   1.37 kB |               603 bytes
+
+                      | Initial total |   3.88 MB |               648.12 kB
+
+Lazy chunk files      | Names         |  Raw size | Estimated transfer size
+chunk-SEGDKLAE.js     | browser       |  24.61 kB |                 8.30 kB
+
+Application bundle generation complete. [70.529 seconds] - 2026-05-31T17:46:15.470Z
+
+npm : Ôû▓ [WARNING] bundle initial exceeded maximum budget. Budget 3.50 MB was not met by 378.83 kB with a total of 
+3.88 MB.
+En C:\Users\DELL\AppData\Local\Temp\ps-script-7f38f86d-f969-4955-86c8-6cf399ba62ab.ps1: 104 Carácter: 26
++ cd c:\EFAF2026\adminSPA; npm run build 2>&1 | Out-File -FilePath c:\E ...
++                          ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Ôû▓ [WARNING] b...tal of 3.88 MB.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+Ôû▓ [WARNING] src/app/components/login-empresa/login-empresa.component.css exceeded maximum budget. Budget 4.00 kB was 
+not met by 3.29 kB with a total of 7.29 kB.
+
+
+Ôû▓ [WARNING] src/app/components/compras/create-compras/create-compras.component.css exceeded maximum budget. Budget 
+4.00 kB was not met by 3.01 kB with a total of 7.01 kB.
+
+
+Ôû▓ [WARNING] src/app/components/ventas/create-ventas/create-ventas.component.css exceeded maximum budget. Budget 4.00 
+kB was not met by 3.32 kB with a total of 7.32 kB.
+
+
+Ôû▓ [WARNING] src/app/components/ventas/ventas-hoteles/ventas-hoteles.component.css exceeded maximum budget. Budget 
+4.00 kB was not met by 4.56 kB with a total of 8.56 kB.
+
+
+Ôû▓ [WARNING] src/app/components/reportes/index-reportes/index-reportes.component.css exceeded maximum budget. Budget 
+4.00 kB was not met by 1.22 kB with a total of 5.22 kB.
+
+
+Ôû▓ [WARNING] src/app/components/topnav/topnav.component.css exceeded maximum budget. Budget 4.00 kB was not met by 
+3.23 kB with a total of 7.23 kB.
+
+
+Ôû▓ [WARNING] src/app/components/inicio/inicio.component.css exceeded maximum budget. Budget 4.00 kB was not met by 
+1.50 kB with a total of 5.50 kB.
+
+
+Ôû▓ [WARNING] src/app/components/sidebar/sidebar.component.css exceeded maximum budget. Budget 4.00 kB was not met by 
+2.80 kB with a total of 6.80 kB.
+
+
+Ôû▓ [WARNING] src/app/components/ventas/ventas-grifo/ventas-grifo.component.css exceeded maximum budget. Budget 4.00 
+kB was not met by 47 bytes with a total of 4.05 kB.
+
+
+Ôû▓ [WARNING] src/app/components/compras/update-compras/update-compras.component.css exceeded maximum budget. Budget 
+4.00 kB was not met by 1.56 kB with a total of 5.56 kB.
+
+
+Ôû▓ [WARNING] src/app/components/ventas/index-ventas/index-ventas.component.css exceeded maximum budget. Budget 4.00 
+kB was not met by 2.25 kB with a total of 6.25 kB.
+
+
+Ôû▓ [WARNING] src/app/components/empresa/create-empresa/create-empresa.component.css exceeded maximum budget. Budget 
+4.00 kB was not met by 1.44 kB with a total of 5.44 kB.
+
+
+Ôû▓ [WARNING] Module 'dijkstrajs' used by 'node_modules/qrcode/lib/core/segments.js' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+Ôû▓ [WARNING] Module 'file-saver' used by 'src/app/services/consulta-xml.service.ts' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+Ôû▓ [WARNING] Module 'jszip' used by 'src/app/services/consulta-xml.service.ts' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+Ôû▓ [WARNING] Module 'qrcode' used by 'src/app/utils/guia-representacion-impresa-qr.util.ts' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+Ôû▓ [WARNING] Unable to locate stylesheet: C:\assets\css\iziToast.min.css
+
+
+Ôû▓ [WARNING] 62 rules skipped due to selector errors:
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  50% -> Unmatched selector: %
+  70% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  40% -> Unmatched selector: %
+  60% -> Unmatched selector: %
+  80% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  40% -> Unmatched selector: %
+  60% -> Unmatched selector: %
+  80% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  30% -> Unmatched selector: %
+  0% -> Unmatched selector: %
+  30% -> Unmatched selector: %
+
+Output location: C:\EFAF2026\adminSPA\dist\admin-spa
+
+

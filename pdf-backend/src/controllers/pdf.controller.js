@@ -1,5 +1,7 @@
 const { generatePdfFromHtml } = require('../services/pdf.service');
 const htmlBuilder = require('../services/htmlBuilder.service');
+const { construirHtmlAnalisisFinanciero } = require('../services/analisisFinancieroPdf.service');
+const { construirHtmlReportesNegocio } = require('../services/reportesNegocioPdf.service');
 
 async function generatePdf(req, res) {
   const { datos, tipo, fontSize, formato } = req.body;
@@ -116,6 +118,14 @@ async function generatePdf(req, res) {
         break;
       }
       
+
+      case 'analisis-financiero':
+        html = construirHtmlAnalisisFinanciero(datos);
+        break;
+
+      case 'reportes-negocio':
+        html = construirHtmlReportesNegocio(datos);
+        break;
 
       case 'arqueo-caja': {
         const fc = (n) => (n ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

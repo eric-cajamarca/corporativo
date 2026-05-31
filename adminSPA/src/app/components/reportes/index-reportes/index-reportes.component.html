@@ -29,8 +29,14 @@
             </ul>
           </div>
           <div class="btn-group">
-            <button class="btn btn-outline-success" (click)="exportarReporte('pdf')">
-              <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+            <button
+              class="btn btn-outline-success"
+              type="button"
+              title="PDF con todos los reportes: ventas, compras, inventario, clientes, créditos, etc. (una hoja cada uno)"
+              (click)="generarPdfTodosReportes()"
+              [disabled]="generandoInformePdf">
+              <span *ngIf="generandoInformePdf" class="spinner-border spinner-border-sm me-1" role="status"></span>
+              <i class="bi bi-file-earmark-pdf me-1" *ngIf="!generandoInformePdf"></i>PDF
             </button>
             <button class="btn btn-outline-success" (click)="exportarReporte('excel')">
               <i class="bi bi-file-earmark-excel me-1"></i>Excel
@@ -54,8 +60,8 @@
           <label for="fechaFin" class="form-label">Fecha Fin</label>
           <input type="date" class="form-control" id="fechaFin" [(ngModel)]="fechaFin">
         </div>
-        <div class="col-md-3">
-          <button class="btn btn-primary" (click)="cargarReportesPrincipales()">
+        <div class="col-md-3 d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary" type="button" (click)="aplicarFiltroFechas()">
             <i class="bi bi-search me-1"></i>Filtrar
           </button>
         </div>

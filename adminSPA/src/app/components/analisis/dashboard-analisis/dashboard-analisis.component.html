@@ -9,10 +9,20 @@
               <i class="bi bi-graph-up-arrow me-2"></i>
               Análisis Financiero
             </h5>
-            <button class="btn btn-light btn-sm" (click)="refrescarDatos()" [disabled]="loading.dashboard">
-              <i class="bi bi-arrow-repeat me-1" [class.fa-spin]="loading.dashboard"></i>
-              Actualizar
-            </button>
+            <div class="d-flex gap-2">
+              <button
+                type="button"
+                class="btn btn-outline-light btn-sm"
+                (click)="imprimirInformeFinanciero()"
+                [disabled]="generandoInformePdf">
+                <i class="bi bi-printer me-1"></i>
+                {{ generandoInformePdf ? 'Generando…' : 'Imprimir informe' }}
+              </button>
+              <button class="btn btn-light btn-sm" (click)="refrescarDatos()" [disabled]="loading.dashboard">
+                <i class="bi bi-arrow-repeat me-1" [class.fa-spin]="loading.dashboard"></i>
+                Actualizar
+              </button>
+            </div>
           </div>
         </div>
         <div class="card-body">
@@ -26,9 +36,16 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link" [class.active]="vistaActiva === 'flujo-caja'"
+                 (click)="cambiarVista('flujo-caja')" href="javascript:void(0)">
+                <i class="bi bi-cash-coin me-1"></i>
+                Flujo de Caja
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'balance'"
                  (click)="cambiarVista('balance')" href="javascript:void(0)">
-                <i class="bi bi-balance-scale me-1"></i>
+                <i class="bi bi-file-earmark-bar-graph"></i>
                 Balance General
               </a>
             </li>
@@ -49,17 +66,11 @@
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'diagnostico'"
                  (click)="cambiarVista('diagnostico')" href="javascript:void(0)">
-                <i class="bi bi-stethoscope me-1"></i>
+                <i class="bi bi-clipboard-check"></i>
                 Diagnóstico
               </a>
             </li>
-            <li class="nav-item">
-              <a class="nav-link" [class.active]="vistaActiva === 'flujo-caja'"
-                 (click)="cambiarVista('flujo-caja')" href="javascript:void(0)">
-                <i class="bi bi-cash-coin me-1"></i>
-                Flujo de Caja
-              </a>
-            </li>
+            
             <li class="nav-item">
               <a class="nav-link" [class.active]="vistaActiva === 'gastos'"
                  (click)="cambiarVista('gastos')" href="javascript:void(0)">
@@ -281,6 +292,124 @@
             <div class="card-body text-center py-5 text-muted">
               <i class="bi bi-speedometer2 fa-3x mb-3"></i>
               <p class="mb-0">No hay datos para el dashboard. Verifique que existan ventas en el período.</p>
+            </div>
+          </div>
+        </div>
+
+         <!-- FLUJO DE CAJA -->
+         <div *ngSwitchCase="'flujo-caja'">
+          <div *ngIf="!loading.flujoCaja && flujoCaja" class="row">
+            <div class="col-12 mb-3">
+              <div class="alert alert-light border mb-0">
+                <strong>Período:</strong> {{flujoCaja.fechaInicio}} — {{flujoCaja.fechaFin}}
+                <span class="ms-3"><strong>Flujo neto:</strong> {{formatCurrency(flujoCaja.flujoNeto)}}</span>
+                <span class="ms-3"><strong>Efectivo:</strong> {{formatCurrency(flujoCaja.flujoNetoEfectivo)}}</span>
+                <span class="ms-3 text-muted small">(sin aperturas de caja)</span>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100">
+                <div class="card-header"><h6 class="mb-0">Resumen por concepto</h6></div>
+                <div class="card-body p-0">
+                  <table class="table table-sm mb-0">
+                    <tbody>
+                      <tr *ngFor="let c of flujoCaja.resumenConceptos">
+                        <td>{{c.concepto}}</td>
+                        <td class="text-end" [class.text-success]="c.tipoOperacion === 'I'" [class.text-danger]="c.tipoOperacion === 'E'">
+                          {{formatCurrency(c.importe)}}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100">
+                <div class="card-header"><h6 class="mb-0">Movimientos de ingresos</h6></div>
+                <div class="card-body p-0">
+                  <table class="table table-sm mb-0">
+                    <tbody>
+                      <tr *ngFor="let m of flujoCaja.movimientosIngresos">
+                        <td>{{m.formaPago}}</td>
+                        <td class="text-end">{{formatCurrency(m.importe)}}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr><th>Total ingresos caja</th><th class="text-end">{{formatCurrency(flujoCaja.totalIngresos)}}</th></tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100">
+                <div class="card-header"><h6 class="mb-0">Movimientos de egresos</h6></div>
+                <div class="card-body p-0">
+                  <table class="table table-sm mb-0">
+                    <tbody>
+                      <tr *ngFor="let m of flujoCaja.movimientosEgresos">
+                        <td>{{m.formaPago}}</td>
+                        <td class="text-end text-danger">{{formatCurrency(m.importe)}}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr><th>Total egresos</th><th class="text-end">{{formatCurrency(flujoCaja.totalEgresos)}}</th></tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 border-warning">
+                <div class="card-header bg-warning bg-opacity-10"><h6 class="mb-0">Patrimonio estimado del período</h6></div>
+                <div class="card-body">
+                  <div class="d-flex justify-content-between mb-2"><span>Inventario</span><strong>{{formatCurrency(flujoCaja.inventarioTotal || 0)}}</strong></div>
+                  <div class="d-flex justify-content-between mb-2"><span>Por cobrar</span><strong>{{formatCurrency(flujoCaja.cuentasPorCobrar || 0)}}</strong></div>
+                  <div class="d-flex justify-content-between mb-2"><span>Flujo caja neto</span><strong>{{formatCurrency(flujoCaja.flujoNeto)}}</strong></div>
+                  <div class="d-flex justify-content-between mb-2"><span>Por pagar</span><strong class="text-danger">− {{formatCurrency(flujoCaja.cuentasPorPagar || 0)}}</strong></div>
+                  <hr>
+                  <div class="d-flex justify-content-between"><strong>Patrimonio</strong><strong class="text-warning">{{formatCurrency(flujoCaja.patrimonioEstimado || 0)}}</strong></div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12" *ngIf="flujoCajaSerie?.serie?.length">
+              <div class="card">
+                <div class="card-header"><h6 class="mb-0">Serie mensual — flujo y patrimonio ({{flujoCajaSerie?.periodo}})</h6></div>
+                <div class="card-body p-0">
+                  <table class="table table-sm table-striped mb-0">
+                    <thead>
+                      <tr>
+                        <th>Mes</th>
+                        <th class="text-end">Ingresos</th>
+                        <th class="text-end">Egresos</th>
+                        <th class="text-end">Flujo neto</th>
+                        <th class="text-end">Efectivo</th>
+                        <th class="text-end">Patrimonio est.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let row of flujoCajaSerie!.serie">
+                        <td>{{row.periodo}}</td>
+                        <td class="text-end">{{formatCurrency(row.totalIngresos)}}</td>
+                        <td class="text-end">{{formatCurrency(row.totalEgresos)}}</td>
+                        <td class="text-end">{{formatCurrency(row.flujoNeto)}}</td>
+                        <td class="text-end">{{formatCurrency(row.flujoNetoEfectivo)}}</td>
+                        <td class="text-end">{{formatCurrency(row.patrimonio)}}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="loading.flujoCaja" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Cargando flujo de caja...</p>
+          </div>
+          <div *ngIf="!loading.flujoCaja && !flujoCaja" class="card">
+            <div class="card-body text-center py-5 text-muted">
+              <p class="mb-0">No hay movimientos de caja en el período seleccionado.</p>
             </div>
           </div>
         </div>
@@ -777,124 +906,6 @@
             <div class="card-body text-center py-5 text-muted">
               <i class="bi bi-stethoscope fa-3x mb-3"></i>
               <p class="mb-0">No hay datos suficientes para generar el diagnóstico financiero.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- FLUJO DE CAJA -->
-        <div *ngSwitchCase="'flujo-caja'">
-          <div *ngIf="!loading.flujoCaja && flujoCaja" class="row">
-            <div class="col-12 mb-3">
-              <div class="alert alert-light border mb-0">
-                <strong>Período:</strong> {{flujoCaja.fechaInicio}} — {{flujoCaja.fechaFin}}
-                <span class="ms-3"><strong>Flujo neto:</strong> {{formatCurrency(flujoCaja.flujoNeto)}}</span>
-                <span class="ms-3"><strong>Efectivo:</strong> {{formatCurrency(flujoCaja.flujoNetoEfectivo)}}</span>
-                <span class="ms-3 text-muted small">(sin aperturas de caja)</span>
-              </div>
-            </div>
-            <div class="col-md-6 mb-4">
-              <div class="card h-100">
-                <div class="card-header"><h6 class="mb-0">Resumen por concepto</h6></div>
-                <div class="card-body p-0">
-                  <table class="table table-sm mb-0">
-                    <tbody>
-                      <tr *ngFor="let c of flujoCaja.resumenConceptos">
-                        <td>{{c.concepto}}</td>
-                        <td class="text-end" [class.text-success]="c.tipoOperacion === 'I'" [class.text-danger]="c.tipoOperacion === 'E'">
-                          {{formatCurrency(c.importe)}}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6 mb-4">
-              <div class="card h-100">
-                <div class="card-header"><h6 class="mb-0">Movimientos de ingresos</h6></div>
-                <div class="card-body p-0">
-                  <table class="table table-sm mb-0">
-                    <tbody>
-                      <tr *ngFor="let m of flujoCaja.movimientosIngresos">
-                        <td>{{m.formaPago}}</td>
-                        <td class="text-end">{{formatCurrency(m.importe)}}</td>
-                      </tr>
-                    </tbody>
-                    <tfoot>
-                      <tr><th>Total ingresos caja</th><th class="text-end">{{formatCurrency(flujoCaja.totalIngresos)}}</th></tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6 mb-4">
-              <div class="card h-100">
-                <div class="card-header"><h6 class="mb-0">Movimientos de egresos</h6></div>
-                <div class="card-body p-0">
-                  <table class="table table-sm mb-0">
-                    <tbody>
-                      <tr *ngFor="let m of flujoCaja.movimientosEgresos">
-                        <td>{{m.formaPago}}</td>
-                        <td class="text-end text-danger">{{formatCurrency(m.importe)}}</td>
-                      </tr>
-                    </tbody>
-                    <tfoot>
-                      <tr><th>Total egresos</th><th class="text-end">{{formatCurrency(flujoCaja.totalEgresos)}}</th></tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6 mb-4">
-              <div class="card h-100 border-warning">
-                <div class="card-header bg-warning bg-opacity-10"><h6 class="mb-0">Patrimonio estimado del período</h6></div>
-                <div class="card-body">
-                  <div class="d-flex justify-content-between mb-2"><span>Inventario</span><strong>{{formatCurrency(flujoCaja.inventarioTotal || 0)}}</strong></div>
-                  <div class="d-flex justify-content-between mb-2"><span>Por cobrar</span><strong>{{formatCurrency(flujoCaja.cuentasPorCobrar || 0)}}</strong></div>
-                  <div class="d-flex justify-content-between mb-2"><span>Flujo caja neto</span><strong>{{formatCurrency(flujoCaja.flujoNeto)}}</strong></div>
-                  <div class="d-flex justify-content-between mb-2"><span>Por pagar</span><strong class="text-danger">− {{formatCurrency(flujoCaja.cuentasPorPagar || 0)}}</strong></div>
-                  <hr>
-                  <div class="d-flex justify-content-between"><strong>Patrimonio</strong><strong class="text-warning">{{formatCurrency(flujoCaja.patrimonioEstimado || 0)}}</strong></div>
-                </div>
-              </div>
-            </div>
-            <div class="col-12" *ngIf="flujoCajaSerie?.serie?.length">
-              <div class="card">
-                <div class="card-header"><h6 class="mb-0">Serie mensual — flujo y patrimonio ({{flujoCajaSerie?.periodo}})</h6></div>
-                <div class="card-body p-0">
-                  <table class="table table-sm table-striped mb-0">
-                    <thead>
-                      <tr>
-                        <th>Mes</th>
-                        <th class="text-end">Ingresos</th>
-                        <th class="text-end">Egresos</th>
-                        <th class="text-end">Flujo neto</th>
-                        <th class="text-end">Efectivo</th>
-                        <th class="text-end">Patrimonio est.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let row of flujoCajaSerie!.serie">
-                        <td>{{row.periodo}}</td>
-                        <td class="text-end">{{formatCurrency(row.totalIngresos)}}</td>
-                        <td class="text-end">{{formatCurrency(row.totalEgresos)}}</td>
-                        <td class="text-end">{{formatCurrency(row.flujoNeto)}}</td>
-                        <td class="text-end">{{formatCurrency(row.flujoNetoEfectivo)}}</td>
-                        <td class="text-end">{{formatCurrency(row.patrimonio)}}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div *ngIf="loading.flujoCaja" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-2 text-muted">Cargando flujo de caja...</p>
-          </div>
-          <div *ngIf="!loading.flujoCaja && !flujoCaja" class="card">
-            <div class="card-body text-center py-5 text-muted">
-              <p class="mb-0">No hay movimientos de caja en el período seleccionado.</p>
             </div>
           </div>
         </div>

@@ -15,6 +15,9 @@ import {
 } from '../../../services/utilidades.service';
 import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
+import { EmpresaService } from '../../../services/empresa.service';
+import { Empresa as EmpresaPdf } from '../../../interfaces/pdf-interface';
+import { ReportesNegocioPdfService } from '../../../services/reportes-negocio-pdf.service';
 import {
   ReportesService,
   CompraProveedorItem,
@@ -23,6 +26,8 @@ import {
   CarteraCreditosResumen,
 } from '../../../services/reportes.service';
 import { Chart } from 'chart.js/auto';
+
+declare var iziToast: { success: (o: object) => void; error: (o: object) => void };
 
 type ReporteId =
   | 'ventas'
@@ -58,6 +63,11 @@ export class IndexReportesComponent implements OnInit {
   private pdfService = inject(PdfService);
   private excelService = inject(ExcelService);
   private reportesService = inject(ReportesService);
+  private empresaService = inject(EmpresaService);
+  private reportesNegocioPdf = inject(ReportesNegocioPdfService);
+
+  generandoInformePdf = false;
+  empresaPdf: EmpresaPdf | null = null;
 
   // Filtros de fecha
   fechaInicio: string = '';
@@ -146,7 +156,32 @@ export class IndexReportesComponent implements OnInit {
 
   ngOnInit(): void {
     this.inicializarFechas();
+    this.cargarEmpresaPdf();
     this.cargarReportesPrincipales();
+  }
+
+  private cargarEmpresaPdf(): void {
+    this.empresaService.getEmpresa$().subscribe((emp) => {
+      const e = emp as {
+        razon_Social?: string;
+        nombreComercial?: string;
+        nombre?: string;
+        ruc?: string;
+        direccion?: string;
+        telefono?: string;
+        logo?: string;
+      };
+      if (emp) {
+        const nombre = e.razon_Social || e.nombreComercial || e.nombre || '';
+        this.empresaPdf = {
+          logo: e.logo || '',
+          nombre,
+          ruc: e.ruc || '',
+          direccion: e.direccion || '',
+          telefono: e.telefono || ''
+        };
+      }
+    });
   }
 
   onSidebarToggle(collapsed: boolean): void {
@@ -159,6 +194,13 @@ export class IndexReportesComponent implements OnInit {
     const fmt = (n: Date) => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
     this.fechaFin = fmt(hoy);
     this.fechaInicio = fmt(primerDiaMes);
+  }
+
+  aplicarFiltroFechas(): void {
+    this.cargarReportesPrincipales();
+    if (this.reporteActual) {
+      this.cargarDatosReporte(this.reporteActual.id);
+    }
   }
 
   cargarReportesPrincipales(): void {
@@ -571,8 +613,104 @@ export class IndexReportesComponent implements OnInit {
 
   cambiarPeriodo(periodo: string): void {
     this.periodoSeleccionado = periodo;
-    // Recargar datos según el período
+    this.aplicarRangoPeriodo(periodo);
     this.cargarReportesPrincipales();
+    if (this.reporteActual) {
+      this.cargarDatosReporte(this.reporteActual.id);
+    }
+  }
+
+  /** Sincroniza fechas del filtro con el período rápido (alineado a análisis financiero). */
+  private aplicarRangoPeriodo(periodo: string): void {
+    const hoy = new Date();
+    const fmt = (n: Date) =>
+      `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth();
+    switch (periodo) {
+      case 'Hoy':
+        this.fechaInicio = fmt(hoy);
+        this.fechaFin = fmt(hoy);
+        break;
+      case 'Esta Semana': {
+        const dia = hoy.getDay();
+        const diff = dia === 0 ? 6 : dia - 1;
+        const ini = new Date(hoy);
+        ini.setDate(hoy.getDate() - diff);
+        this.fechaInicio = fmt(ini);
+        this.fechaFin = fmt(hoy);
+        break;
+      }
+      case 'Este Año':
+        this.fechaInicio = `${y}-01-01`;
+        this.fechaFin = `${y}-12-31`;
+        break;
+      case 'Este Mes':
+      default: {
+        const ini = new Date(y, m, 1);
+        const fin = new Date(y, m + 1, 0);
+        this.fechaInicio = fmt(ini);
+        this.fechaFin = fmt(fin);
+        break;
+      }
+    }
+  }
+
+  /**
+   * PDF con todos los reportes del módulo (una hoja por reporte).
+   * Usa las mismas fuentes que las tarjetas: dashboard, reportes API y utilidades.
+   */
+  generarPdfTodosReportes(): void {
+    if (!this.fechaInicio || !this.fechaFin) {
+      iziToast.error({
+        title: 'Fechas requeridas',
+        message: 'Indique fecha inicio y fecha fin antes de generar el PDF.'
+      });
+      return;
+    }
+    this.generandoInformePdf = true;
+    const periodoLabel = `${this.fechaInicio} — ${this.fechaFin}`;
+
+    this.reportesNegocioPdf
+      .cargarPack(this.periodoSeleccionado, this.fechaInicio, this.fechaFin)
+      .subscribe({
+        next: (pack) => {
+          const nombreArchivo = `reportes-negocio-${this.fechaInicio}_${this.fechaFin}.pdf`;
+          const datos = this.reportesNegocioPdf.armarDatosPdf(
+            pack,
+            this.empresaPdf,
+            periodoLabel,
+            this.periodoSeleccionado
+          );
+          this.pdfService.generarPdfReportesNegocio(datos, nombreArchivo).subscribe({
+            next: (blob) => {
+              this.generandoInformePdf = false;
+              this.pdfService.previsualizar(blob);
+              iziToast.success({
+                title: 'PDF generado',
+                message: 'Informe con todos los reportes (una sección por hoja).'
+              });
+            },
+            error: (err) => {
+              this.generandoInformePdf = false;
+              iziToast.error({
+                title: 'Error PDF',
+                message:
+                  err?.error?.error ||
+                  err?.message ||
+                  'No se pudo generar el PDF (verifique pdf-backend).'
+              });
+            }
+          });
+        },
+        error: () => {
+          this.generandoInformePdf = false;
+          iziToast.error({
+            title: 'Error',
+            message: 'No se pudieron cargar los datos de los reportes.'
+          });
+        }
+      });
   }
 
   getObjectKeys(obj: DatosReporteRow): string[] {
@@ -597,7 +735,15 @@ export class IndexReportesComponent implements OnInit {
   }
 
   exportarReporte(formato: string): void {
+    if (formato === 'pdf') {
+      this.generarPdfTodosReportes();
+      return;
+    }
     if (!this.reporteActual || this.datosReporte.length === 0) {
+      iziToast.error({
+        title: 'Sin datos',
+        message: 'Seleccione un reporte con datos para exportar a Excel.'
+      });
       return;
     }
 
@@ -608,33 +754,7 @@ export class IndexReportesComponent implements OnInit {
 
     const titulo = `${this.reporteActual.nombre} - ${this.fechaInicio} a ${this.fechaFin}`;
 
-    if (formato === 'pdf') {
-      this.pdfService
-        .generarPdfDinamico(
-          {
-            titulo,
-            columnas,
-            filas,
-          },
-          'reporte',
-          10,
-          'A4'
-        )
-        .subscribe({
-          next: (blob) => {
-            this.pdfService.descargar(
-              blob,
-              `${this.reporteActual?.id}-reporte-${this.fechaInicio}-${this.fechaFin}.pdf`
-            );
-          },
-          error: (err) => {
-            this.error =
-              err?.error?.message ||
-              err?.message ||
-              'Error al exportar reporte a PDF';
-          },
-        });
-    } else if (formato === 'excel') {
+    if (formato === 'excel') {
       this.excelService
         .generarExcel({
           title: titulo,
