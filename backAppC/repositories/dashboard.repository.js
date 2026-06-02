@@ -34,9 +34,16 @@ exports.obtenerResumenDashboardRepo = async (
 
   // Ventas totales del período actual
   const ventasActual = await req.query(`
-    SELECT ISNULL(SUM(v.total), 0) AS total
+    SELECT ISNULL(SUM(
+      CASE
+        WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
+        ELSE v.total
+      END
+    ), 0) AS total
     FROM Ventas v
+    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
     WHERE v.idEmpresa = @idEmpresa
+      AND ISNULL(v.eliminado, 0) = 0
       AND CONVERT(DATE, v.fEmision) >= @fechaInicio
       AND CONVERT(DATE, v.fEmision) <= @fechaFin
   `);
@@ -48,9 +55,16 @@ exports.obtenerResumenDashboardRepo = async (
     .input("fechaInicioAnterior", sql.Date, fechaInicioAnterior)
     .input("fechaFinAnterior", sql.Date, fechaFinAnterior)
     .query(`
-    SELECT ISNULL(SUM(v.total), 0) AS total
+    SELECT ISNULL(SUM(
+      CASE
+        WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
+        ELSE v.total
+      END
+    ), 0) AS total
     FROM Ventas v
+    LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
     WHERE v.idEmpresa = @idEmpresa
+      AND ISNULL(v.eliminado, 0) = 0
       AND CONVERT(DATE, v.fEmision) >= @fechaInicioAnterior
       AND CONVERT(DATE, v.fEmision) <= @fechaFinAnterior
   `);

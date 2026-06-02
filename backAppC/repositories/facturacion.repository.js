@@ -19,6 +19,7 @@ const {
 } = require("../utils/sunatCodigoComprobante.util");
 const { extraerCodigoHashDesdeXmlFirmado } = require("../utils/sunatCodigoHash.util");
 const notaCreditoSunatStockService = require("../services/notaCreditoSunatStock.service");
+const notaCreditoCobranzaService = require("../services/notaCreditoCobranza.service");
 const bajaSunatStockService = require("../services/bajaSunatStock.service");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 const saasContadorComprobantesSunatService = require("../services/saasContadorComprobantesSunat.service");
@@ -901,7 +902,7 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
         subtotal, igv, exonerado, gratuito, otrosCargos, descuentos, total, idMediosPago, idEstadoPedido, idEstadoPago, idEstadoSunat, compRelacionado, observaciones, idUsuario, tipoComprobanteRef, codigoMotivoNotaCredito)
       OUTPUT INSERTED.idVenta INTO @ins
       VALUES (@idEmpresa, @idSucursal, @serie, @numero, @compVenta, @idComprobante, @fEmision, @fEmision, @idCliente, @idMoneda, @tCambio,
-        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 1, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito);
+        @subtotal, @igv, 0, 0, 0, 0, @total, @idMediosPago, 1, 2, 7, @compRelacionado, @observaciones, @idUsuario, @tipoComprobanteRef, @codigoMotivoNotaCredito);
       SELECT idVenta FROM @ins;
     `);
     const idVenta = ventaInsertResult.recordset && ventaInsertResult.recordset[0] && ventaInsertResult.recordset[0].idVenta;
@@ -1445,6 +1446,14 @@ exports.actualizarEstadoComprobantesRepo = async (
         idUsuarioEjecutor
       );
 
+      await notaCreditoCobranzaService.aplicarCobranzaPorNotaCreditoSiCorresponde(
+        transaction,
+        id,
+        idEstadoAnterior,
+        idEstadoSunat,
+        idUsuarioEjecutor
+      );
+
       if (aplicarStockComunicacionBaja) {
         await bajaSunatStockService.aplicarStockPorComunicacionBajaAceptadaSiCorresponde(
           transaction,
@@ -1597,6 +1606,14 @@ exports.actualizarResultadoEnvioRepo = async (pool, idComprobanteElectronico, re
       `);
 
     await notaCreditoSunatStockService.aplicarStockPorNotaCreditoSiCorresponde(
+      transaction,
+      idComprobanteElectronico,
+      idEstadoAnterior,
+      resultado.idEstadoSunat,
+      idUsuarioEjecutor
+    );
+
+    await notaCreditoCobranzaService.aplicarCobranzaPorNotaCreditoSiCorresponde(
       transaction,
       idComprobanteElectronico,
       idEstadoAnterior,

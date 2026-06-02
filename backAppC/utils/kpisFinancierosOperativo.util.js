@@ -43,11 +43,23 @@ async function obtenerVentasYCostoPeriodo(pool, idEmpresa, fechaInicio, fechaFin
     .input('fechaFin', sql.Date, fechaFin)
     .query(`
       SELECT
-        ISNULL(SUM(v.total), 0) AS ventasTotales,
-        ISNULL(SUM(dv.costoTotal), 0) AS costoVentas
+        ISNULL(SUM(
+          CASE
+            WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
+            ELSE v.total
+          END
+        ), 0) AS ventasTotales,
+        ISNULL(SUM(
+          CASE
+            WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(ISNULL(dv.costoTotal, 0))
+            ELSE ISNULL(dv.costoTotal, 0)
+          END
+        ), 0) AS costoVentas
       FROM Ventas v
+      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
       LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
       WHERE v.idEmpresa = @idEmpresa
+        AND ISNULL(v.eliminado, 0) = 0
         AND CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
     `);
@@ -65,9 +77,16 @@ async function obtenerVentasPeriodo(pool, idEmpresa, fechaInicio, fechaFin) {
     .input('fechaInicio', sql.Date, fechaInicio)
     .input('fechaFin', sql.Date, fechaFin)
     .query(`
-      SELECT ISNULL(SUM(v.total), 0) AS ventasTotales
+      SELECT ISNULL(SUM(
+          CASE
+            WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
+            ELSE v.total
+          END
+        ), 0) AS ventasTotales
       FROM Ventas v
+      LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
       WHERE v.idEmpresa = @idEmpresa
+        AND ISNULL(v.eliminado, 0) = 0
         AND CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
     `);

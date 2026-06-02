@@ -2216,6 +2216,7 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
   const { idVenta, cliente } = filtros;
   const request = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
   let whereClause = `v.idEmpresa = @idEmpresa AND v.idEstadoPago = 1
+    AND UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) NOT IN ('F7','B7','F8','B8','07','08')
     AND NOT (
       UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('01', '03')
       AND (
@@ -2225,7 +2226,21 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
           AND LOWER(ISNULL(mp.descripcion, '')) NOT LIKE '%tarjeta%'
         )
       )
-    )`;
+    )
+    AND (
+      v.total - ISNULL((
+        SELECT SUM(vnc.total)
+        FROM Ventas vnc
+        INNER JOIN Comprobantes cnc ON cnc.idComprobante = vnc.idComprobante AND cnc.idEmpresa = vnc.idEmpresa
+        INNER JOIN ComprobantesElectronicos ce ON ce.idVenta = vnc.idVenta AND ce.idEmpresa = vnc.idEmpresa
+        WHERE vnc.idEmpresa = v.idEmpresa
+          AND ISNULL(vnc.eliminado, 0) = 0
+          AND UPPER(LTRIM(RTRIM(ISNULL(cnc.codigo, '')))) IN ('F7','B7','07')
+          AND ce.tipoComprobante = '07'
+          AND ce.idEstadoSunat IN (1, 2, 3)
+          AND RTRIM(LTRIM(UPPER(ISNULL(vnc.compRelacionado, '')))) = RTRIM(LTRIM(UPPER(ISNULL(v.compVenta, ''))))
+      ), 0)
+    ) > 0.01`;
   if (idVenta != null && String(idVenta).trim() !== '') {
     request.input('idVenta', sql.Int, parseInt(idVenta, 10));
     whereClause += ' AND v.idVenta = @idVenta';
@@ -2242,6 +2257,20 @@ exports.listarPendientesPago = async (pool, idEmpresa, filtros = {}) => {
       v.numero,
       CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
       v.total,
+      (
+        v.total - ISNULL((
+          SELECT SUM(vnc.total)
+          FROM Ventas vnc
+          INNER JOIN Comprobantes cnc ON cnc.idComprobante = vnc.idComprobante AND cnc.idEmpresa = vnc.idEmpresa
+          INNER JOIN ComprobantesElectronicos ce ON ce.idVenta = vnc.idVenta AND ce.idEmpresa = vnc.idEmpresa
+          WHERE vnc.idEmpresa = v.idEmpresa
+            AND ISNULL(vnc.eliminado, 0) = 0
+            AND UPPER(LTRIM(RTRIM(ISNULL(cnc.codigo, '')))) IN ('F7','B7','07')
+            AND ce.tipoComprobante = '07'
+            AND ce.idEstadoSunat IN (1, 2, 3)
+            AND RTRIM(LTRIM(UPPER(ISNULL(vnc.compRelacionado, '')))) = RTRIM(LTRIM(UPPER(ISNULL(v.compVenta, ''))))
+        ), 0)
+      ) AS saldoPendiente,
       v.idEstadoPago,
       cl.rSocial AS clienteRazonSocial,
       cl.ruc AS clienteRuc

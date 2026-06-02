@@ -332,6 +332,14 @@ exports.postCobrarVenta = async (pool, user, idVenta, body) => {
     e.clientMessage = 'La venta ya está pagada o no está pendiente de pago';
     throw e;
   }
+  const { esSoloNotaCreditoCodigo } = require('../utils/sunatCodigoComprobante.util');
+  if (esSoloNotaCreditoCodigo(venta.codigoComprobante)) {
+    const e = new Error('NC_NO_COBRABLE');
+    e.httpStatus = 400;
+    e.clientMessage =
+      'Las notas de crédito no se cobran desde pendientes de pago; se aplican a la factura origen al aceptar SUNAT.';
+    throw e;
+  }
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {

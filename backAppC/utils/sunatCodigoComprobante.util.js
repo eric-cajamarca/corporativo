@@ -44,9 +44,16 @@ function codigoInternoNotaDebitoPorOrigen(ceTipoOrigen) {
   return t === "03" ? "B8" : "F8";
 }
 
+/** Solo nota de crédito (no débito). */
+function esSoloNotaCreditoCodigo(codigo) {
+  const c = String(codigo || "").trim().toUpperCase();
+  return c === "07" || c === "F7" || c === "B7";
+}
+
 module.exports = {
   tipoSunatDesdeCodigoComprobante,
   esNotaCreditoCodigoComprobante,
+  esSoloNotaCreditoCodigo,
   codigoInternoNotaCreditoPorOrigen,
   codigoInternoNotaDebitoPorOrigen
 };

@@ -361,9 +361,43 @@ async function obtenerVentasCreditoPeriodoRepo(pool, idEmpresa, fechaInicio, fec
       .input('fechaInicio', sql.Date, fechaInicio)
       .input('fechaFin', sql.Date, fechaFin)
       .query(`
-        SELECT ISNULL(SUM(v.total), 0) AS total
+        SELECT ISNULL(SUM(
+          CASE
+            WHEN (
+              v.total - ISNULL((
+                SELECT SUM(vnc.total)
+                FROM Ventas vnc
+                INNER JOIN Comprobantes cnc ON cnc.idComprobante = vnc.idComprobante AND cnc.idEmpresa = vnc.idEmpresa
+                INNER JOIN ComprobantesElectronicos ce ON ce.idVenta = vnc.idVenta AND ce.idEmpresa = vnc.idEmpresa
+                WHERE vnc.idEmpresa = v.idEmpresa
+                  AND ISNULL(vnc.eliminado, 0) = 0
+                  AND UPPER(LTRIM(RTRIM(ISNULL(cnc.codigo, '')))) IN ('F7','B7','07')
+                  AND ce.tipoComprobante = '07'
+                  AND ce.idEstadoSunat IN (1, 2, 3)
+                  AND RTRIM(LTRIM(UPPER(ISNULL(vnc.compRelacionado, '')))) = RTRIM(LTRIM(UPPER(ISNULL(v.compVenta, ''))))
+              ), 0)
+            ) < 0 THEN 0
+            ELSE (
+              v.total - ISNULL((
+                SELECT SUM(vnc.total)
+                FROM Ventas vnc
+                INNER JOIN Comprobantes cnc ON cnc.idComprobante = vnc.idComprobante AND cnc.idEmpresa = vnc.idEmpresa
+                INNER JOIN ComprobantesElectronicos ce ON ce.idVenta = vnc.idVenta AND ce.idEmpresa = vnc.idEmpresa
+                WHERE vnc.idEmpresa = v.idEmpresa
+                  AND ISNULL(vnc.eliminado, 0) = 0
+                  AND UPPER(LTRIM(RTRIM(ISNULL(cnc.codigo, '')))) IN ('F7','B7','07')
+                  AND ce.tipoComprobante = '07'
+                  AND ce.idEstadoSunat IN (1, 2, 3)
+                  AND RTRIM(LTRIM(UPPER(ISNULL(vnc.compRelacionado, '')))) = RTRIM(LTRIM(UPPER(ISNULL(v.compVenta, ''))))
+              ), 0)
+            )
+          END
+        ), 0) AS total
         FROM Ventas v
+        LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         WHERE v.idEmpresa = @idEmpresa AND v.idEstadoPago = 1
+          AND ISNULL(v.eliminado, 0) = 0
+          AND UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) NOT IN ('F7','B7','F8','B8','07','08')
           AND CONVERT(DATE, v.fEmision) >= @fechaInicio AND CONVERT(DATE, v.fEmision) <= @fechaFin
       `);
     return Number((r.recordset[0] || {}).total || 0);
