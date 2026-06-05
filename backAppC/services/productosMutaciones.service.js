@@ -14,6 +14,25 @@ async function resolverIdUsuarioParaProducto(pool, idEmpresa, subFromToken) {
   return null;
 }
 
+async function construirErrorCodigoDuplicado(pool, idEmpresa, codigo, descripcionLinea) {
+  const cod = String(codigo || '').trim();
+  const existentes = await ProductosRepository.listarProductosPorCodigoRepo(pool, idEmpresa, cod);
+  const nombresExistentes = existentes
+    .map((p) => `«${p.descripcion || '(sin descripción)'}»`)
+    .join(', ');
+  let msg = `Ya existe un producto con el código «${cod}» en su empresa`;
+  if (nombresExistentes) {
+    msg += `: ${nombresExistentes}`;
+  }
+  const descLinea = String(descripcionLinea || '').trim();
+  if (descLinea) {
+    msg += `. Producto en la compra: «${descLinea}»`;
+  }
+  msg +=
+    '. Use un código diferente o seleccione el producto existente para registrar stock en la sucursal correcta.';
+  return msg;
+}
+
 async function obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpresa) {
   const maxIntentos = 500;
   for (let intento = 0; intento < maxIntentos; intento += 1) {
@@ -128,7 +147,14 @@ async function crearProductoConTransaccion(pool, params) {
       const dupCodigo =
         err.number === 2627 && (/codigo/i.test(msg) || /duplicate key/i.test(msg) || /UNIQUE KEY/i.test(msg));
       if (!usarCorrelativo && (err.message === 'CODIGO_PRODUCTO_DUPLICADO' || dupCodigo)) {
-        throw new Error('Ya existe un producto con ese código en su empresa. Use un código diferente o seleccione el producto existente para registrar stock en la sucursal correcta.');
+        throw new Error(
+          await construirErrorCodigoDuplicado(
+            pool,
+            idEmpresa,
+            datosProducto.Codigo,
+            datosProducto.descripcion
+          )
+        );
       }
       if (dupCodigo && attempt < maxIntentosCodigo) {
         lastDupErr = err;

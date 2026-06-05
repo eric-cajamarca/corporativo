@@ -326,6 +326,7 @@ export class InicioComponent implements OnInit {
       'analisis': '/analisis',
       'ventas': '/ventas',
       'ventas-create': '/ventas/create',
+      'ventas-rapida': '/ventas/rapida',
       'compras': '/compras',
       'compras-create': '/compras/create',
       'inventario': '/inventario',

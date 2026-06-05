@@ -595,7 +595,6 @@ exports.buscarProductosVentaRepo = async (
 
 exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = null) => {
   try {
-    // Primero, obtener productos básicos (obtenerProductosCompras)
     const reqCompras = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
     let filtroSucCompras = '';
     const sf = (idsSucursalesFiltro || []).filter(Boolean);
@@ -607,6 +606,33 @@ exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = 
       });
       filtroSucCompras = ` AND ss.idSucursal IN (${ph.join(', ')}) `;
     }
+    const inSucClause = sf.length > 0 ? sf.map((_, i) => `@idSucComp${i}`).join(', ') : null;
+    const applySucursalSinLotes = inSucClause
+      ? `OUTER APPLY (
+          SELECT TOP 1 su.idSucursal AS idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+            AND su.idSucursal IN (${inSucClause})
+          ORDER BY su.nombre
+        ) defFilt
+        OUTER APPLY (
+          SELECT TOP 1 su.idSucursal AS idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+          ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+        ) defFb`
+      : `CROSS APPLY (
+          SELECT TOP 1 su.idSucursal AS idSucursal
+          FROM Sucursal su
+          WHERE su.idEmpresa = p.idEmpresa
+            AND ISNULL(su.estado, 1) = 1
+          ORDER BY CASE WHEN ISNULL(su.esPrincipal, 0) = 1 THEN 0 ELSE 1 END, su.nombre
+        ) defFb`;
+    const idSucursalSinLotesExpr = inSucClause
+      ? 'COALESCE(defFilt.idSucursal, defFb.idSucursal)'
+      : 'defFb.idSucursal';
     const result = await reqCompras.query(`
         SELECT 
             ss.idProducto,
@@ -626,12 +652,43 @@ exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = 
             p.fProduccion,
             p.fVencimiento
         FROM (SELECT idEmpresa, idSucursal, idProducto, SUM(cantidadDisponible) AS cantidad FROM Lotes GROUP BY idEmpresa, idSucursal, idProducto) ss
-        INNER JOIN Productos p ON ss.idProducto = p.idProducto
+        INNER JOIN Productos p ON ss.idProducto = p.idProducto AND p.idEmpresa = ss.idEmpresa
         INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
         INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
         INNER JOIN Sucursal s ON ss.idSucursal = s.idSucursal AND ISNULL(s.estado, 1) = 1
         INNER JOIN Marcas m ON p.idMarca = m.idMarca
         WHERE ss.idEmpresa = @idEmpresa ${filtroSucCompras}
+
+        UNION ALL
+
+        SELECT 
+            p.idProducto,
+            p.codigo,
+            c2.nombre as categoria,
+            p.idCategoria,            
+            p.descripcion,
+            p.idMarca,
+            m2.nombre as marca,
+            p.idPresentacion,
+            pr2.codigo as codigoPresentacion,
+            pr2.descripcion as descripcionPres,
+            ${idSucursalSinLotesExpr} AS idSucursal,
+            s2.nombre as sucursal,
+            p.cUnitario,
+            CAST(0 AS DECIMAL(18, 3)) AS stock,
+            p.fProduccion,
+            p.fVencimiento
+        FROM Productos p
+        INNER JOIN Categorias c2 ON p.idCategoria = c2.idCategoria
+        INNER JOIN Presentacion pr2 ON p.idPresentacion = pr2.idPresentacion
+        INNER JOIN Marcas m2 ON p.idMarca = m2.idMarca
+        ${applySucursalSinLotes}
+        INNER JOIN Sucursal s2 ON s2.idSucursal = ${idSucursalSinLotesExpr} AND ISNULL(s2.estado, 1) = 1
+        WHERE p.idEmpresa = @idEmpresa
+        AND NOT EXISTS (
+          SELECT 1 FROM Lotes l
+          WHERE l.idProducto = p.idProducto AND l.idEmpresa = p.idEmpresa
+        )
       `);
 
     // Obtener precios por separado
@@ -863,6 +920,27 @@ exports.contarProductoPorCodigo = async (transaction, idEmpresa, codigo) => {
       WHERE idEmpresa = @idEmpresa
         AND RTRIM(LTRIM(Codigo)) = @Codigo
     `);
+};
+
+/** Productos del catálogo con el mismo código (para mensajes de error en compras/alta). */
+exports.listarProductosPorCodigoRepo = async (executor, idEmpresa, codigo) => {
+  const cod = String(codigo || '').trim();
+  if (!cod) return [];
+  const result = await executor
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('Codigo', sql.VarChar(50), cod)
+    .query(`
+      SELECT
+        idProducto,
+        RTRIM(LTRIM(Codigo)) AS codigo,
+        RTRIM(LTRIM(descripcion)) AS descripcion
+      FROM Productos
+      WHERE idEmpresa = @idEmpresa
+        AND RTRIM(LTRIM(Codigo)) = @Codigo
+      ORDER BY descripcion
+    `);
+  return result.recordset || [];
 };
 
 exports.insertarProducto = async (transaction, row) => {

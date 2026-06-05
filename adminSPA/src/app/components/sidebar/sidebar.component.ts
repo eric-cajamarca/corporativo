@@ -517,7 +517,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   navigateTo(ruta: string | null): void {
     if (ruta) {
       const target = this.normalizarRuta(ruta);
-      if (target === '/ventas/create') {
+      if (target === '/ventas/create' || target === '/ventas/rapida') {
         const segments = target.split('/').filter(Boolean);
         const url = this.router.serializeUrl(this.router.createUrlTree(segments));
         window.open(url, '_blank');

@@ -30,6 +30,10 @@ import { ProveedoresService } from '../../../services/proveedores.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
+import {
+  ProductoCreadoModalResult,
+  ProductoCrearModalService,
+} from '../../../services/producto-crear-modal.service';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
@@ -182,6 +186,7 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     private _presentacionService: PresentacionService,
     private _marcaService: variosService,
     private inventarioModal: InventarioModalService,
+    private _productoCrearModal: ProductoCrearModalService,
     private _router: Router,
     private modalService: NgbModal,
 
@@ -1621,7 +1626,66 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     if (!this.validarComprobanteSunatParaRegistrar()) {
       return false;
     }
+    const msgCodigos = this.validarCodigosProductosDetalle();
+    if (msgCodigos) {
+      iziToast.show({
+        title: 'ERROR',
+        titleColor: '#FF0000',
+        color: '#FFF',
+        class: 'text-danger',
+        position: 'topRight',
+        message: msgCodigos,
+      });
+      this.loadButton = false;
+      return false;
+    }
     return true;
+  }
+
+  /**
+   * Detecta códigos repetidos en el detalle o ya registrados en catálogo (productos nuevos en la compra).
+   */
+  private validarCodigosProductosDetalle(): string | null {
+    const errores: string[] = [];
+    const codigosEnDetalle = new Map<string, string[]>();
+
+    for (const line of this.detalleCompras || []) {
+      if (line?.idProducto) continue;
+      if (line?.useCorrelativo) continue;
+      const codigo = String(line?.codigo ?? line?.Codigo ?? '').trim();
+      if (!codigo) continue;
+      const desc = String(line?.descripcion ?? '').trim() || '(sin descripción)';
+      const key = codigo.toUpperCase();
+      const lista = codigosEnDetalle.get(key) || [];
+      lista.push(desc);
+      codigosEnDetalle.set(key, lista);
+    }
+
+    for (const [codigo, descripciones] of codigosEnDetalle.entries()) {
+      if (descripciones.length > 1) {
+        errores.push(
+          `Código «${codigo}» repetido en el detalle: ${descripciones.map((d) => `«${d}»`).join(', ')}`
+        );
+      }
+
+      const catalogo = Array.isArray(this.productos_const) ? this.productos_const : [];
+      const existente = catalogo.find(
+        (p: Record<string, unknown>) =>
+          String(p['codigo'] ?? p['Codigo'] ?? '')
+            .trim()
+            .toUpperCase() === codigo
+      );
+      if (existente) {
+        const nomExistente =
+          String(existente['descripcion'] ?? '').trim() || '(sin descripción)';
+        const lineasCompra = descripciones.map((d) => `«${d}»`).join(', ');
+        errores.push(
+          `Código «${codigo}» ya registrado como «${nomExistente}». Línea(s) en compra: ${lineasCompra}`
+        );
+      }
+    }
+
+    return errores.length ? errores.join(' | ') : null;
   }
 
   private mostrarErrorValidacion(esCredito?: boolean): void {
@@ -1958,6 +2022,134 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
 
   productoSinStockEnBusquedaModal(p: unknown): boolean {
     return productoSinStockEnBusqueda(p as Record<string, unknown>);
+  }
+
+  /** Mismo modal de crear producto que en el listado de productos (ProductoCrearModalService). */
+  async abrirCrearProductoCompras(): Promise<void> {
+    const creado = await this._productoCrearModal.abrir();
+    if (!creado) {
+      return;
+    }
+    this._productoService.limpiarCacheListaProductos();
+    this._productoService.obtenerProductosCompras({ evitarCache: true }).subscribe({
+      next: (response) => {
+        if (response.data != undefined) {
+          this.productos = response.data;
+        }
+        this.productos_const = this.productos;
+        this.buscarProductos();
+        this.aplicarProductoCreadoEnCompra(creado);
+      },
+      error: () => {
+        this.aplicarProductoCreadoEnCompra(creado);
+      },
+    });
+  }
+
+  private aplicarProductoCreadoEnCompra(creado: ProductoCreadoModalResult): void {
+    const enCatalogo = (this.productos_const || []).find(
+      (p: { idProducto?: string }) => p.idProducto === creado.idProducto
+    );
+    const productoBase =
+      enCatalogo ??
+      ({
+        idProducto: creado.idProducto,
+        codigo: creado.codigo,
+        descripcion: creado.descripcion,
+        cUnitario: creado.costoUnitario ?? 0,
+      } as Record<string, unknown>);
+
+    const idSucursal =
+      this.compras.idSucursal ||
+      creado.idSucursalLote ||
+      this.obtenerIdSucursalPrincipal() ||
+      (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
+    if (!this.compras.idSucursal && idSucursal) {
+      this.compras.idSucursal = idSucursal;
+    }
+
+    const cantidad =
+      creado.cantidadDesdeLote != null && creado.cantidadDesdeLote > 0
+        ? Number(creado.cantidadDesdeLote)
+        : 1;
+    const costo =
+      creado.costoUnitario != null && creado.costoUnitario > 0
+        ? Number(creado.costoUnitario)
+        : Number(
+            (productoBase as { cUnitario?: number; pUnitario?: number }).cUnitario ??
+              (productoBase as { pUnitario?: number }).pUnitario ??
+              0
+          );
+
+    const idPresentacion =
+      (productoBase as { idPresentacion?: number }).idPresentacion ??
+      (productoBase as { presentacion?: { idPresentacion?: number } }).presentacion?.idPresentacion;
+    const sucursalObj =
+      this.sucursales?.find((s: { idSucursal?: string }) => s.idSucursal === idSucursal) ?? null;
+    const presentacionObj =
+      this.presentacion?.find((p: { idPresentacion?: number }) => p.idPresentacion === idPresentacion) ??
+      (productoBase as { presentacion?: unknown }).presentacion ??
+      null;
+    const idMarca =
+      (productoBase as { idMarca?: number }).idMarca ??
+      (productoBase as { marca?: { idMarca?: number } }).marca?.idMarca;
+    const idCategoria =
+      (productoBase as { idCategoria?: number }).idCategoria ??
+      (productoBase as { categoria?: { idCategoria?: number } }).categoria?.idCategoria;
+    const marcaObj = this.marcas?.find((m: { idMarca?: number }) => Number(m.idMarca) === Number(idMarca));
+    const categoriaObj = this.categoria?.find(
+      (c: { idCategoria?: number }) => Number(c.idCategoria) === Number(idCategoria)
+    );
+
+    const existe = this.detalleCompras.find(
+      (p: { idProducto?: string }) => p.idProducto === creado.idProducto
+    );
+    if (existe) {
+      existe.cantidad = (Number(existe.cantidad) || 0) + cantidad;
+      if (costo > 0) {
+        existe.cUnitario = costo;
+        existe.pUnitario = costo;
+      }
+      if (creado.fechaVencimiento) {
+        const fv = String(creado.fechaVencimiento).slice(0, 10);
+        existe.fVencimiento = fv;
+        existe.fvencimiento = fv;
+      }
+      existe.subtotal =
+        (Number(existe.cantidad) || 0) * (Number(existe.cUnitario ?? existe.pUnitario ?? 0));
+    } else {
+      const linea: Record<string, unknown> = {
+        ...productoBase,
+        idSucursal,
+        sucursal: sucursalObj,
+        idPresentacion: idPresentacion ?? (presentacionObj as { idPresentacion?: number })?.idPresentacion,
+        presentacion: presentacionObj,
+        idMarca,
+        marca: marcaObj,
+        idCategoria,
+        categoria: categoriaObj,
+        cantidad,
+        cUnitario: costo,
+        pUnitario: costo,
+        subtotal: cantidad * costo,
+      };
+      if (creado.fechaVencimiento) {
+        const fv = String(creado.fechaVencimiento).slice(0, 10);
+        linea['fVencimiento'] = fv;
+        linea['fvencimiento'] = fv;
+      }
+      this.detalleCompras.push(linea);
+    }
+
+    this.sumarFooterFactura();
+    iziToast.show({
+      title: 'OK',
+      titleColor: '#1DC74C',
+      color: '#FFF',
+      class: 'text-success',
+      position: 'topRight',
+      message: 'Producto creado y agregado al detalle de la compra.',
+    });
   }
 
   agregarDetallesCompra(producto: any): void {

@@ -38,6 +38,7 @@ import { UpdateProgramacionComponent } from './components/programaciones/update-
 import { VentasContainerComponent } from './components/ventas/ventas-container/ventas-container.component';
 import { IndexVentasComponent } from './components/ventas/index-ventas/index-ventas.component';
 import { CreateVentasComponent } from './components/ventas/create-ventas/create-ventas.component';
+import { CreateVentaRapidaComponent } from './components/ventas/create-venta-rapida/create-venta-rapida.component';
 import { DetalleVentaComponent } from './components/ventas/detalle-venta/detalle-venta.component';
 import { UpdateVentaComponent } from './components/ventas/update-venta/update-venta.component';
 import { IndexCotizacionesComponent } from './components/cotizaciones/index-cotizaciones/index-cotizaciones.component';
@@ -256,6 +257,7 @@ export const routes: Routes = [
       children: [
         { path: '', component: IndexVentasComponent, title: 'Resumen de ventas' },
         { path: 'create', component: CreateVentasComponent, title: 'Crear nueva venta' },
+        { path: 'rapida', component: CreateVentaRapidaComponent, title: 'Venta rápida' },
         { path: 'detalle/:id', component: DetalleVentaComponent, title: 'Detalle de venta' },
         { path: 'editar/:id', component: UpdateVentaComponent, title: 'Editar venta' },
       ]

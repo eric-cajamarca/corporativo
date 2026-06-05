@@ -165,6 +165,7 @@ function construirNavegacionPorDominios(ctx) {
 
   if (can('VER_VENTAS')) {
     const subVentas = [
+      { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
       { nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
       { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
       { nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true }
@@ -459,7 +460,10 @@ function construirNavegacionGestoraPorDominios(ctx) {
 
   const comercial = [];
   const subVentas = [];
-  if (can('CREAR_VENTAS')) subVentas.push({ nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: true });
+  if (can('CREAR_VENTAS')) {
+    subVentas.push({ nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'CREAR_VENTAS', visible: true });
+    subVentas.push({ nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: true });
+  }
   if (can('VER_VENTAS')) {
     subVentas.push({ nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true });
     subVentas.push({ nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true });

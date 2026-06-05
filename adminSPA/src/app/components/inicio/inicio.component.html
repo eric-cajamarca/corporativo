@@ -56,9 +56,13 @@
 
   <!-- Accesos rápidos -->
   <div class="quick-actions mb-4">
+    <button class="quick-action-btn" (click)="navigateTo('ventas-rapida')">
+      <i class="bi bi-lightning-charge"></i>
+      <span>Venta rápida</span>
+    </button>
     <button class="quick-action-btn" (click)="navigateTo('ventas-create')">
       <i class="bi bi-plus-circle"></i>
-      <span>Nueva Venta</span>
+      <span>Nueva venta</span>
     </button>
     <ng-container *ngIf="!esGestora">
       <button class="quick-action-btn" (click)="navigateTo('compras-create')">
