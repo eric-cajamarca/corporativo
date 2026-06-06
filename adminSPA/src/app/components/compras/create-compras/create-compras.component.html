@@ -34,19 +34,19 @@
                                 <div class="col-12" style="margin-bottom: 20px;">
         
                                     <label for="ruc">Número de documento</label>
-                                    <div class="input-group-append" style="display: flex;">
-                                        <input type="text" class="form-control form-control-appended"
-                                            placeholder="ingrese RUC o DNI" name="ruc" [(ngModel)]="compras.ruc"
-                                            style="width: 40%;">
-        
-                                        <button class="btn btn-primary" (click)="buscar()" style="margin-left: 10px;">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control"
+                                            placeholder="Ingrese RUC o DNI" name="ruc" [(ngModel)]="compras.ruc">
+                                        <button type="button" class="btn btn-primary" (click)="buscar()">
                                             Buscar
                                         </button>
-                                        <button class="btn btn-primary" (click)="agregarNuevoProveedor()">
-        
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal"
+                                            data-bs-target="#proveedoresModal" title="Elegir proveedor de la lista">
+                                            <i class="bi bi-people me-1"></i>Elegir
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" (click)="agregarNuevoProveedor()">
                                             Nuevo
                                         </button>
-        
                                     </div>
                                     <ng-container>
                                         <div *ngIf="compras.idProveedor">
@@ -234,8 +234,8 @@
                                 title="Gestionar Lotes e Inventario">
                                 <i class="bi bi-boxes"></i><span class="d-none d-sm-inline"> Gestionar Inventario</span><span class="d-sm-none"> Inventario</span>
                             </button>
-                                <button type="button" class="btn btn-success btn-lg compra-detalle-header-btn flex-grow-1 flex-lg-grow-0" data-bs-toggle="modal" data-bs-target="#buscadorModal"
-                                    style="border: 0.2px solid white;">
+                                <button type="button" class="btn btn-success btn-lg compra-detalle-header-btn flex-grow-1 flex-lg-grow-0"
+                                    (click)="abrirBuscadorProductos()" style="border: 0.2px solid white;">
                                     <i class="bi bi-search"></i> Buscar
                                 </button>
                                 <button type="button" class="btn btn-success btn-lg compra-detalle-header-btn flex-grow-1 flex-lg-grow-0"
@@ -757,87 +757,6 @@
         
                         </div>
                     </div>
-        
-                    <!-- MODAL BUSCADOR DE PRODUCTOS -->
-                    <div class="modal fade" id="buscadorModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-scrollable buscador-productos-compra-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header bg-primary text-white">
-                                    <h5 class="modal-title">Buscar productos</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                                        aria-label="Cerrar"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-12 col-lg-8">
-                                            <input id="create-compras-buscador-modal-search" type="search" class="form-control" placeholder="Nombre o código..."
-                                                [(ngModel)]="searchTerm" (input)="buscarProductos()">
-                                        </div>
-                                        <div class="col-12 col-lg-4">
-                                            <button type="button" class="btn btn-outline-light w-100" (click)="recargarProductosModalCompras()">
-                                                <i class="bi bi-search"></i> Buscar
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap">
-                                        <table class="table table-hover align-middle mb-0">
-                                            <thead class="buscador-compra-thead">
-                                                <tr>
-                                                    <th *ngIf="muestraEmpresaEnBuscadorCompras()">Empresa</th>
-                                                    <th>Código</th>
-                                                    <th class="efaf-buscador-col-cat">Categoría</th>
-                                                    <th class="efaf-buscador-col-marca">Marca</th>
-                                                    <th class="efaf-buscador-col-desc">Producto</th>
-                                                    <th>U.Medida</th>
-                                                    <th>Precio ref.</th>
-                                                    <th>Sucursal</th>
-                                                    <th>Stock</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr *ngFor="let p of productos_filtrados" role="button" class="table-row-hover"
-                                                    [class.efaf-buscador-row-sin-stock]="productoSinStockEnBusquedaModal(p)"
-                                                    (click)="seleccionaProducto(p)">
-                                                    <td *ngIf="muestraEmpresaEnBuscadorCompras()">
-                                                        <span class="badge bg-light text-dark">{{ p.aliasEmpresa || p.razonSocialEmpresa || '—' }}</span>
-                                                    </td>
-                                                    <td>{{ p.codigo }}</td>
-                                                    <td class="efaf-buscador-col-cat" [title]="p.categoria">{{ p.categoria }}</td>
-                                                    <td class="efaf-buscador-col-marca" [title]="marcaColumnaCompras(p)">{{ marcaColumnaCompras(p) }}</td>
-                                                    <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
-                                                    <td>{{ uMedidaColumnaCompras(p) }}</td>
-                                                    <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
-                                                    <td>{{ p.sucursal }}</td>
-                                                    <td>{{ p.stock }}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div class="d-lg-none buscador-compra-cards">
-                                        <button type="button" class="btn btn-outline-secondary w-100 text-start mb-2 p-3 buscador-compra-card"
-                                            *ngFor="let p of productos_filtrados" [class.efaf-buscador-card-sin-stock]="productoSinStockEnBusquedaModal(p)" (click)="seleccionaProducto(p)">
-                                            <div class="d-flex justify-content-between align-items-start gap-2">
-                                                <span class="fw-semibold text-truncate">{{ p.codigo }}</span>
-                                                <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
-                                            </div>
-                                            <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorCompras()">{{ p.aliasEmpresa || p.razonSocialEmpresa || '—' }}</div>
-                                            <div class="small mt-1">{{ p.descripcion }}</div>
-                                            <div class="small text-muted mt-1">{{ p.categoria }} · {{ marcaColumnaCompras(p) }} · {{ uMedidaColumnaCompras(p) }}</div>
-                                            <div class="small d-flex justify-content-between mt-2">
-                                                <span>{{ p.sucursal }}</span>
-                                                <span>Stock: {{ p.stock }}</span>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
         
         
@@ -1109,3 +1028,24 @@
         }
   </div>
 </main>
+
+<!-- Modal: lista de proveedores -->
+<div class="modal fade" id="proveedoresModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-truck me-2"></i>Seleccionar proveedor</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body p-0 overflow-hidden">
+        <app-index-proveedor
+          [modoSelector]="true"
+          (proveedorElegido)="proveedorSeleccionado($event)">
+        </app-index-proveedor>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,28 +1,65 @@
-/* Layout: espacio para sidebar (260px) y topnav (64px) */
 :host {
-    display: block;
-    min-height: 100vh;
-    background: #f5f7fa;
-  }
-  
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+:host.modo-selector-host {
+  display: block;
+  min-height: auto;
+  background: transparent;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+.main-content.p-0 {
+  margin-left: 0;
+  margin-top: 0;
+  padding: 0;
+  min-height: auto;
+}
+
+:host.modo-selector-host .main-content,
+:host.modo-selector-host .container,
+:host.modo-selector-host .row {
+  min-height: auto !important;
+  height: auto !important;
+}
+
+:host.modo-selector-host .table-responsive {
+  max-height: min(52vh, 440px);
+  overflow-y: auto;
+}
+
+:host.modo-selector-host ngb-pagination {
+  margin-bottom: 0 !important;
+  padding-bottom: 0.25rem;
+}
+
+.proveedor-fila-selector {
+  cursor: pointer;
+}
+
+.proveedor-fila-selector:hover {
+  background-color: rgba(13, 110, 253, 0.08);
+}
+
+@media (max-width: 991.98px) {
   .main-content {
-    margin-left: 260px;
-    margin-top: 64px;
-    padding: 24px;
-    min-height: calc(100vh - 64px);
-    transition: margin-left 0.3s ease;
+    margin-left: 0;
   }
-  
-  .main-content.sidebar-collapsed {
-    margin-left: 70px;
-  }
-  
-  @media (max-width: 991.98px) {
-    .main-content {
-      margin-left: 0;
-    }
-  }
-  
-  .card-header .card-title i {
-    font-size: 1rem;
-  }
+}
+
+.card-header .card-title i {
+  font-size: 1rem;
+}

@@ -1,15 +1,25 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { EMPTY, Subject, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { ProductoService } from '../../../services/producto.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
-import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
+import {
+  marcaProductoEnLista,
+  productoActivoParaVenta,
+  productoSinStockEnBusqueda
+} from '../../../utils/producto-busqueda.util';
 import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 import { StockUbicacionProductoFila } from '../../../models/producto.models';
+import {
+  BuscadorProductosModo,
+  BuscadorProductosVentaOpciones
+} from '../../../services/buscador-productos-modal.opciones';
 
 export interface ProductoSeleccionado {
   idProducto: string;
@@ -25,6 +35,8 @@ export interface ProductoSeleccionado {
   sucursal?: string;
   stock?: number;
   idSucursal?: string | number;
+  aliasEmpresa?: string;
+  razonSocialEmpresa?: string;
   [key: string]: unknown;
 }
 
@@ -35,14 +47,23 @@ export interface ProductoSeleccionado {
   templateUrl: './buscador-productos-modal.component.html',
   styleUrl: './buscador-productos-modal.component.css'
 })
-export class BuscadorProductosModalComponent implements OnInit {
+export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
   @ViewChild('inputBuscar') inputBuscar?: ElementRef<HTMLInputElement>;
+
+  modo: BuscadorProductosModo = 'catalogo';
+  ventaOpciones?: BuscadorProductosVentaOpciones;
+  etiquetaPrecio = 'Precio';
 
   searchTerm = '';
   productosConst: ProductoSeleccionado[] = [];
   productosFiltrados: ProductoSeleccionado[] = [];
   loading = false;
   idSucursal: string | null = null;
+
+  readonly buscadorMinCaracteres = 2;
+  readonly buscadorLimiteFilas = 80;
+  buscadorBuscando = false;
+  buscadorMensaje = '';
 
   /** Galería: solo si está habilitado en configuración de inventario */
   productosConImagenes = false;
@@ -54,17 +75,15 @@ export class BuscadorProductosModalComponent implements OnInit {
   stockUbCargando = false;
   stockUbFilas: StockUbicacionProductoFila[] = [];
   stockUbProductoDesc = '';
-  /** Imágenes del producto cuya galería se está viendo */
   imagenesProductoActual: ImagenProducto[] = [];
   visorAbierto = false;
   visorIndex = 0;
-  /** idProducto del que se están cargando imágenes (para mostrar spinner solo en esa fila) */
   idProductoCargandoImagenes: string | null = null;
-  /** Cache: idProducto -> URL de la primera imagen, o null si no tiene imágenes */
   imagenPrincipalPorProducto: Record<string, string | null> = {};
-  /** IDs para los que ya pedimos la primera imagen (evitar doble petición) */
   private idsSolicitadosImagen = new Set<string>();
-  /** URL por defecto cuando el producto no tiene imagen (placeholder) */
+  private readonly busquedaProducto$ = new Subject<string>();
+  private busquedaProductoSub?: Subscription;
+
   readonly imagenPorDefecto = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>');
 
   constructor(
@@ -77,8 +96,13 @@ export class BuscadorProductosModalComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Cargar productos de inmediato para que el modal muestre datos aunque la config tarde o falle
-    this.cargarProductos();
+    if (this.modo === 'venta') {
+      this.buscadorMensaje = `Escriba al menos ${this.buscadorMinCaracteres} caracteres para buscar productos.`;
+      this.inicializarBusquedaVentaDebounced();
+    } else {
+      this.cargarCatalogo();
+    }
+
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (res) => {
         this.esEmpresaGestoraPorEstado = !!(res?.data?.esGestora);
@@ -117,22 +141,20 @@ export class BuscadorProductosModalComponent implements OnInit {
     });
   }
 
-  cargarProductos(opciones?: { evitarCache?: boolean }): void {
+  ngOnDestroy(): void {
+    this.busquedaProductoSub?.unsubscribe();
+  }
+
+  private cargarCatalogo(opciones?: { evitarCache?: boolean }): void {
+    if (this.modo === 'compra') {
+      this.cargarProductosCompras(opciones);
+      return;
+    }
     this.loading = true;
     this.cdr.detectChanges();
     this.productoService.obtenerProductosTodos(opciones).subscribe({
       next: (response: any) => {
-        const raw = response?.data;
-        let data: any[] = [];
-        if (Array.isArray(raw)) {
-          data = raw;
-        } else if (raw != null && typeof raw === 'object') {
-          if (raw.idProducto != null) data = [raw];
-          else if (Array.isArray(raw.productos)) data = raw.productos;
-          else if (Array.isArray(raw.items)) data = raw.items;
-          else if (Array.isArray(raw.data)) data = raw.data;
-        }
-        this.productosConst = data;
+        this.productosConst = this.normalizarListaProductos(response);
         this.loading = false;
         this.cdr.detectChanges();
         this.buscarProductos();
@@ -146,7 +168,39 @@ export class BuscadorProductosModalComponent implements OnInit {
     });
   }
 
-  /** Carga la primera imagen del producto para la miniatura (solo si no está ya cargada). */
+  private cargarProductosCompras(opciones?: { evitarCache?: boolean }): void {
+    this.loading = true;
+    this.cdr.detectChanges();
+    this.productoService.obtenerProductosCompras(opciones).subscribe({
+      next: (response: any) => {
+        this.productosConst = this.normalizarListaProductos(response);
+        this.loading = false;
+        this.cdr.detectChanges();
+        this.buscarProductos();
+      },
+      error: () => {
+        this.productosConst = [];
+        this.productosFiltrados = [];
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private normalizarListaProductos(response: any): ProductoSeleccionado[] {
+    const raw = response?.data;
+    let data: any[] = [];
+    if (Array.isArray(raw)) {
+      data = raw;
+    } else if (raw != null && typeof raw === 'object') {
+      if (raw.idProducto != null) data = [raw];
+      else if (Array.isArray(raw.productos)) data = raw.productos;
+      else if (Array.isArray(raw.items)) data = raw.items;
+      else if (Array.isArray(raw.data)) data = raw.data;
+    }
+    return data;
+  }
+
   cargarPrimeraImagenSiNecesario(p: ProductoSeleccionado): void {
     const id = p?.idProducto;
     if (!id || this.imagenPrincipalPorProducto[id] !== undefined || this.idsSolicitadosImagen.has(id)) return;
@@ -166,7 +220,6 @@ export class BuscadorProductosModalComponent implements OnInit {
     });
   }
 
-  /** Devuelve la URL de la miniatura: imagen principal o placeholder. */
   getThumbUrl(p: ProductoSeleccionado): string {
     const id = p?.idProducto;
     if (!id) return this.imagenPorDefecto;
@@ -174,13 +227,11 @@ export class BuscadorProductosModalComponent implements OnInit {
     return typeof url === 'string' ? url : this.imagenPorDefecto;
   }
 
-  /** True si el producto tiene al menos una imagen (ya cargada). */
   tieneImagen(p: ProductoSeleccionado): boolean {
     const id = p?.idProducto;
     return id ? this.imagenPrincipalPorProducto[id] === undefined ? false : this.imagenPrincipalPorProducto[id] !== null : false;
   }
 
-  /** Si la miniatura falla al cargar, usar placeholder. */
   onThumbError(p: ProductoSeleccionado): void {
     const id = p?.idProducto;
     if (id) {
@@ -189,7 +240,6 @@ export class BuscadorProductosModalComponent implements OnInit {
     }
   }
 
-  /** Texto de marca para columna (API: marca / nombreMarca). */
   uMedidaColumna(p: ProductoSeleccionado): string {
     return descripcionUnidadMedidaProducto(p as Record<string, unknown>);
   }
@@ -203,11 +253,52 @@ export class BuscadorProductosModalComponent implements OnInit {
     return productoSinStockEnBusqueda(p as Record<string, unknown>);
   }
 
-  /**
-   * Vuelve a consultar el catálogo en el servidor y reaplica el filtro del input sin modificarlo.
-   */
+  muestraColumnaEmpresa(): boolean {
+    if (this.modo === 'venta') {
+      return !!this.ventaOpciones?.esGestora;
+    }
+    if (this.modo === 'compra') {
+      return this.productosConst.some(
+        (p) =>
+          !!(p?.aliasEmpresa && String(p.aliasEmpresa).trim()) ||
+          !!(p?.razonSocialEmpresa && String(p.razonSocialEmpresa).trim())
+      );
+    }
+    return false;
+  }
+
+  textoSucursal(p: ProductoSeleccionado): string {
+    if (this.modo === 'venta' && this.ventaOpciones?.esGestora) {
+      const alias = p?.aliasEmpresa || '';
+      const suc = p?.sucursal || '';
+      return alias ? `${alias} - ${suc}` : suc;
+    }
+    return String(p?.sucursal ?? '');
+  }
+
+  trackByProducto(_index: number, p: ProductoSeleccionado): string {
+    return `${p.idProducto || ''}|${p.idSucursal || ''}|${p['idEmpresa'] || ''}`;
+  }
+
   recargarProductosDesdeServidor(): void {
-    this.cargarProductos({ evitarCache: true });
+    if (this.modo === 'venta') {
+      const term = this.searchTerm.trim();
+      if (term.length < this.buscadorMinCaracteres) {
+        this.onBusquedaVentaInput();
+        return;
+      }
+      this.ejecutarBusquedaVentaServidor(term, true);
+      return;
+    }
+    this.cargarCatalogo({ evitarCache: true });
+  }
+
+  onBusquedaInput(): void {
+    if (this.modo === 'venta') {
+      this.onBusquedaVentaInput();
+      return;
+    }
+    this.buscarProductos();
   }
 
   buscarProductos(): void {
@@ -235,6 +326,156 @@ export class BuscadorProductosModalComponent implements OnInit {
     }
   }
 
+  private inicializarBusquedaVentaDebounced(): void {
+    this.busquedaProductoSub = this.busquedaProducto$
+      .pipe(
+        debounceTime(320),
+        distinctUntilChanged(),
+        switchMap((term) => {
+          const local = this.buscarVentaEnLocal(term);
+          if (local !== null) {
+            this.buscadorBuscando = false;
+            this.aplicarResultadosVenta(local);
+            return EMPTY;
+          }
+          this.buscadorBuscando = true;
+          this.cdr.detectChanges();
+          return this.productoService
+            .buscarProductosVenta({
+              q: term,
+              limit: this.buscadorLimiteFilas,
+              idSucursal: this.ventaOpciones?.idSucursalApi
+            })
+            .pipe(
+              tap({
+                error: () => {
+                  this.buscadorBuscando = false;
+                  this.cdr.detectChanges();
+                }
+              })
+            );
+        })
+      )
+      .subscribe({
+        next: (response) => {
+          if (!response) {
+            return;
+          }
+          this.buscadorBuscando = false;
+          const filas = Array.isArray(response?.data) ? response.data : [];
+          this.aplicarResultadosVenta(this.filasVentaActivasDesdeApi(filas));
+        },
+        error: (err) => {
+          this.buscadorBuscando = false;
+          this.productosFiltrados = [];
+          this.buscadorMensaje = err?.error?.message || 'Error al buscar productos.';
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  private buscarVentaEnLocal(term: string): ProductoSeleccionado[] | null {
+    if (this.ventaOpciones?.buscarLocal) {
+      return this.ventaOpciones.buscarLocal(term);
+    }
+    return null;
+  }
+
+  private filasVentaActivasDesdeApi(filas: unknown[]): ProductoSeleccionado[] {
+    return filas
+      .filter((item) => productoActivoParaVenta(item as Record<string, unknown>))
+      .map((item) => this.mapFilaVenta(item as Record<string, unknown>));
+  }
+
+  private mapFilaVenta(item: Record<string, unknown>): ProductoSeleccionado {
+    return {
+      ...item,
+      idProducto: String(item['idProducto'] ?? ''),
+      codigo: String(item['codigo'] ?? ''),
+      descripcion: String(item['descripcion'] ?? ''),
+      pVenta: Number(item['pVenta'] ?? 0)
+    };
+  }
+
+  private filtrarFilasVenta(filas: ProductoSeleccionado[]): ProductoSeleccionado[] {
+    const fn = this.ventaOpciones?.filtrarFila;
+    if (!fn || !filas?.length) {
+      return filas || [];
+    }
+    return filas.filter((row) => fn(row as Record<string, unknown>));
+  }
+
+  private aplicarResultadosVenta(activos: ProductoSeleccionado[]): void {
+    const filtrados = this.filtrarFilasVenta(activos);
+    this.productosFiltrados = filtrados;
+    if (filtrados.length === 0) {
+      this.buscadorMensaje = 'No se encontraron productos con ese criterio.';
+    } else if (filtrados.length >= this.buscadorLimiteFilas) {
+      this.buscadorMensaje = `Mostrando los primeros ${this.buscadorLimiteFilas} resultados. Refine la búsqueda si no ve el producto.`;
+    } else {
+      this.buscadorMensaje = '';
+    }
+    if (this.productosConImagenes) {
+      filtrados.forEach((p) => this.cargarPrimeraImagenSiNecesario(p));
+    }
+    this.cdr.detectChanges();
+  }
+
+  onBusquedaVentaInput(): void {
+    const term = this.searchTerm.trim();
+    if (term.length < this.buscadorMinCaracteres) {
+      this.productosFiltrados = [];
+      this.buscadorBuscando = false;
+      this.buscadorMensaje =
+        term.length === 0
+          ? `Escriba al menos ${this.buscadorMinCaracteres} caracteres para buscar productos.`
+          : `Escriba al menos ${this.buscadorMinCaracteres} caracteres.`;
+      this.cdr.detectChanges();
+      return;
+    }
+    const local = this.buscarVentaEnLocal(term);
+    if (local !== null) {
+      this.buscadorBuscando = false;
+      this.aplicarResultadosVenta(local);
+      return;
+    }
+    this.buscadorMensaje = '';
+    this.buscadorBuscando = true;
+    this.cdr.detectChanges();
+    this.busquedaProducto$.next(term);
+  }
+
+  private ejecutarBusquedaVentaServidor(term: string, evitarCache = false): void {
+    const local = !evitarCache ? this.buscarVentaEnLocal(term) : null;
+    if (local !== null) {
+      this.buscadorBuscando = false;
+      this.aplicarResultadosVenta(local);
+      return;
+    }
+    this.buscadorBuscando = true;
+    this.cdr.detectChanges();
+    this.productoService
+      .buscarProductosVenta({
+        q: term,
+        limit: this.buscadorLimiteFilas,
+        idSucursal: this.ventaOpciones?.idSucursalApi,
+        evitarCache
+      })
+      .subscribe({
+        next: (response) => {
+          this.buscadorBuscando = false;
+          const filas = Array.isArray(response?.data) ? response.data : [];
+          this.aplicarResultadosVenta(this.filasVentaActivasDesdeApi(filas));
+        },
+        error: (err) => {
+          this.buscadorBuscando = false;
+          this.productosFiltrados = [];
+          this.buscadorMensaje = err?.error?.message || 'Error al buscar productos.';
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
   seleccionar(p: ProductoSeleccionado): void {
     this.activeModal.close(p);
   }
@@ -243,10 +484,6 @@ export class BuscadorProductosModalComponent implements OnInit {
     this.activeModal.dismiss();
   }
 
-  /**
-   * Enfoca el campo de búsqueda tras abrir el modal (invocado desde el servicio al emitirse `shown`).
-   * NgbModal suele enfocar antes el primer control del encabezado (p. ej. cerrar); se reintenta unas veces.
-   */
   enfocarCampoBusqueda(): void {
     const el = (): HTMLInputElement | null => {
       const ref = this.inputBuscar?.nativeElement;
@@ -286,8 +523,12 @@ export class BuscadorProductosModalComponent implements OnInit {
           this.visorIndex = 0;
           this.visorAbierto = true;
         }
+        this.cdr.detectChanges();
       },
-      error: () => { this.idProductoCargandoImagenes = null; }
+      error: () => {
+        this.idProductoCargandoImagenes = null;
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -305,16 +546,27 @@ export class BuscadorProductosModalComponent implements OnInit {
     this.visorIndex = (this.visorIndex + 1) % this.imagenesProductoActual.length;
   }
 
+  idSucursalParaStockUb(p: ProductoSeleccionado | null | undefined): string {
+    const fromProd = p?.idSucursal != null ? String(p.idSucursal).trim() : '';
+    if (fromProd) {
+      return fromProd;
+    }
+    const def = this.ventaOpciones?.idSucursalDefault ?? this.idSucursal;
+    return def != null ? String(def).trim() : '';
+  }
+
   puedeVerStockUbicaciones(p: ProductoSeleccionado): boolean {
     if (!this.mostrarColumnaUbicacionesBuscador()) {
       return false;
     }
-    const sid = this.idSucursal ?? p.idSucursal;
-    return sid != null && String(sid).trim() !== '';
+    const sid = this.idSucursalParaStockUb(p);
+    return sid.length > 0;
   }
 
-  /** Columna Ubic.: config VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR o empresa gestora. */
   mostrarColumnaUbicacionesBuscador(): boolean {
+    if (this.modo === 'venta') {
+      return this.mostrarStockUbicacionesEnBuscador || !!this.ventaOpciones?.esGestora;
+    }
     return this.mostrarStockUbicacionesEnBuscador || this.esEmpresaGestoraPorEstado;
   }
 
@@ -324,8 +576,7 @@ export class BuscadorProductosModalComponent implements OnInit {
     if (!id) {
       return;
     }
-    const sidRaw = this.idSucursal ?? p.idSucursal;
-    const idSucursal = sidRaw != null ? String(sidRaw).trim() : '';
+    const idSucursal = this.idSucursalParaStockUb(p);
     if (!idSucursal) {
       return;
     }
@@ -354,7 +605,6 @@ export class BuscadorProductosModalComponent implements OnInit {
     this.stockUbCargando = false;
   }
 
-  /** Suma cantidades del modal (incluye fila «sin ubicación» si viene del API). */
   stockUbTotalCantidad(): number {
     if (!this.stockUbFilas?.length) {
       return 0;

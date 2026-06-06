@@ -118,7 +118,8 @@ export class CreateValeDespachoComponent implements OnInit {
 
   /** Abre el modal de búsqueda de productos (el mismo que usa crear nueva venta). */
   abrirModalProducto(): void {
-    this.buscadorProductosModal.abrir().then((p: ProductoSeleccionado | null) => {
+    const idSucursal = this.form.idSucursal || undefined;
+    this.buscadorProductosModal.abrir({ idSucursal }).then((p: ProductoSeleccionado | null) => {
       if (p) this.agregarProductoDesdeModal(p);
     });
   }

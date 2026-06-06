@@ -1,6 +1,4 @@
 import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
-import { EMPTY, Subject, Subscription } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +21,7 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
@@ -31,12 +30,15 @@ import {
   productoCoincideBusquedaMultipalabra,
   productoSinStockEnBusqueda
 } from '../../../utils/producto-busqueda.util';
-import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
+import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
+import { VentaCotizacionUiService } from '../../../services/venta-cotizacion-ui.service';
+import { VentaProvisionalUiService } from '../../../services/venta-provisional-ui.service';
 import {
-  CotizacionesService,
-  CotizacionListado,
-  CotizacionParaVentaResponse
-} from '../../../services/cotizaciones.service';
+  cerrarModalCotizacionSiCorresponde,
+  mapearCotizacionACarrito,
+  notificarCotizacionCargada,
+  validarCotizacionParaCarrito
+} from '../../../utils/venta-cotizacion.util';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { AuthService } from '../../../services/auth.service';
@@ -48,12 +50,9 @@ import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
-import { VentaSesionService } from '../../../services/venta-sesion.service';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
-import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
-import { StockUbicacionProductoFila } from '../../../models/producto.models';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
@@ -78,18 +77,7 @@ interface DocumentoResponse {
 })
 export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
-  public productos: any[] = [];
-  private productos_const: any[] = [];
-  public productos_filtrados: any[] = [];
-  public productoEncontrado: any = null;
-  public searchTerm: string = '';
-  /** Mínimo de caracteres antes de consultar al servidor. */
-  readonly buscadorMinCaracteres = 2;
   readonly buscadorLimiteFilas = 80;
-  buscadorCargando = false;
-  buscadorMensaje = 'Escriba al menos 2 caracteres para buscar productos.';
-  private readonly busquedaProducto$ = new Subject<string>();
-  private busquedaProductoSub?: Subscription;
   public searchCodigo = '';
   public categoria: any = [];
   public presentacion: Presentacion[] = [];
@@ -207,20 +195,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   sesionesGuardadas: VentaSesion[] = [];
   mostrarModalRecuperar = false;
 
-  /** Galería en modal Buscar productos: solo si está habilitado en Config > Inventario. */
-  productosConImagenes = false;
   /** Config inventario: permitir vender con stock 0 o negativo. */
   permitirVentasNegativas = false;
-  /** Config ventas: botón ojo / stock por ubicación en modal Buscar productos */
-  mostrarStockUbicacionesEnBuscador = false;
-  modalStockUbAbierto = false;
-  stockUbCargando = false;
-  stockUbFilas: StockUbicacionProductoFila[] = [];
-  stockUbTitulo = '';
-  imagenesProductoActual: ImagenProducto[] = [];
-  visorAbierto = false;
-  visorIndex = 0;
-  idProductoCargandoImagenes: string | null = null;
 
   /** Modal Cargar desde cotización */
   cotizacionesParaCargar: CotizacionListado[] = [];
@@ -273,16 +249,17 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private _tablasSunatService: TablasSunatService,
     private _documentosService: DocumentoService,
     private modalService: ModalService,
+    private buscadorProductosModal: BuscadorProductosModalService,
     private ventasService: VentasService,
     private cotizacionesService: CotizacionesService,
     private cajaService: CajaService,
     private _factilizaService: FactilizaService,
     private _impuestoService: ImpuestoService,
-    private ventaSesionService: VentaSesionService,
+    private ventaProvisionalUi: VentaProvisionalUiService,
+    private ventaCotizacionUi: VentaCotizacionUiService,
     private creditosService: CreditosService,
     public sidebarState: SidebarStateService,
     private gestoresService: GestoresService,
-    private productosImagenService: ProductosImagenService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
     private valesDespachoService: ValesDespachoService,
     private empresaService: EmpresaService,
@@ -296,16 +273,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private router: Router
   ) {}
 
-  /** Referencia al modal Bootstrap “Buscar productos” para registrar/quitar el listener. */
-  private buscadorModalEl: HTMLElement | null = null;
-  /** Handler estable para removeEventListener en ngOnDestroy. */
-  private readonly onBuscadorModalShownBound = (): void => {
-    this.ngZone.run(() => {
-      this.enfocarInputBuscadorModalVentas();
-      this.refrescarFlagStockUbicacionesBuscador();
-      this.precargarCatalogoProductosEnSegundoPlano();
-    });
-  };
 
   private pdfPostVentaModalEl: HTMLElement | null = null;
   private readonly onPdfPostVentaModalHiddenBound = (): void => {
@@ -320,8 +287,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   ngAfterViewInit(): void {
-    this.buscadorModalEl = document.getElementById('buscadorModal');
-    this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
     this.pdfPostVentaModalEl = document.getElementById('pdfModalPostVenta');
     this.pdfPostVentaModalEl?.addEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.modalEditarClienteEl = document.getElementById('modalEditarClienteVenta');
@@ -329,59 +294,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.busquedaProductoSub?.unsubscribe();
-    this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
-    this.buscadorModalEl = null;
     this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.pdfPostVentaModalEl = null;
     this.modalEditarClienteEl?.removeEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
     this.modalEditarClienteEl = null;
   }
 
-  /**
-   * Pone el foco en el input de búsqueda del modal (Bootstrap suele dejarlo en el botón cerrar).
-   */
-  enfocarInputBuscadorModalVentas(): void {
-    const intentar = () => {
-      const el = document.getElementById('create-ventas-buscador-modal-search');
-      if (el instanceof HTMLInputElement) {
-        el.focus({ preventScroll: true });
-        if (el.value.length > 0) {
-          el.select();
-        }
-      }
-    };
-    intentar();
-    setTimeout(intentar, 80);
-    setTimeout(intentar, 200);
-  }
-
-  /**
-   * Vuelve a leer Gestores al abrir el modal de productos (evita SPA obsoleto si se guardó config en otra pestaña
-   * y acepta valor true/1/yes además de la cadena "true").
-   */
-  private refrescarFlagStockUbicacionesBuscador(): void {
-    this.gestoresService.obtenerConfiguracion().subscribe({
-      next: (res) => {
-        const lista = Array.isArray(res?.data) ? res.data : [];
-        const normClave = (c: { clave?: string; Clave?: string }) =>
-          String(c?.clave ?? c?.Clave ?? '')
-            .trim()
-            .toUpperCase();
-        const itemStockUb = lista.find(
-          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR'
-        );
-        const vStockUb =
-          itemStockUb && (itemStockUb as { valor?: string; Valor?: string }).valor !== undefined
-            ? (itemStockUb as { valor?: string; Valor?: string }).valor
-            : (itemStockUb as { valor?: string; Valor?: string })?.Valor;
-        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(vStockUb, false);
-      },
-      error: () => {}
-    });
-  }
-
   ngOnInit(): void {
+    this.ventaProvisionalUi.configurarModo('completa');
     this.gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
@@ -389,11 +309,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           String(c?.clave ?? c?.Clave ?? '')
             .trim()
             .toUpperCase();
-        const item = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'PRODUCTOS_CON_IMAGENES');
-        const valor = item && (item as { valor?: string; Valor?: string }).valor !== undefined
-          ? (item as { valor?: string; Valor?: string }).valor
-          : (item as { valor?: string; Valor?: string }).Valor;
-        this.productosConImagenes = interpretarBooleanoConfig(valor, false);
         const itemDesc = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_USAR_DESCUENTO_EN_TOTAL');
         const vDesc =
           itemDesc && (itemDesc as { valor?: string; Valor?: string }).valor !== undefined
@@ -408,14 +323,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
             ? (itemPdfModal as { valor?: string; Valor?: string }).valor
             : (itemPdfModal as { valor?: string; Valor?: string })?.Valor;
         this.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(vPdfModal, true);
-        const itemStockUb = lista.find(
-          (c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR'
-        );
-        const vStockUb =
-          itemStockUb && (itemStockUb as { valor?: string; Valor?: string }).valor !== undefined
-            ? (itemStockUb as { valor?: string; Valor?: string }).valor
-            : (itemStockUb as { valor?: string; Valor?: string })?.Valor;
-        this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(vStockUb, false);
         const itemPermNeg = lista.find(
           (c: { clave?: string; Clave?: string }) => normClave(c) === 'INVENTARIO_PERMITIR_VENTAS_NEGATIVAS'
         );
@@ -475,7 +382,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.carrito = this.carrito.filter((ln) => this.productoPerteneceEmpresaOperativa(ln));
         }
         this.cargarPermitirVentaMultiSucursal();
-        this.buscarProductos();
       },
       error: () => {
         this.esGestora = false;
@@ -483,11 +389,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this._productoService.limpiarCacheListaProductos();
         this.stockSucursales_const = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const);
         this.cargarPermitirVentaMultiSucursal();
-        this.buscarProductos();
       }
     });
     this.cargarSucursalesUsuario();
-    this.inicializarBusquedaProductosDebounced();
     this.cargarDatosAuxiliaresVenta();
     this.cargarConfigDefaultsVenta();
     const duplicarDesdeCot = this.route.snapshot.queryParamMap.get('duplicarDesdeCotizacion');
@@ -570,19 +474,16 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cotizacionesService.obtenerParaVenta(idCotizacion).subscribe({
       next: (res) => {
         const data = res.data;
-        if (!this.validarCotizacionParaCarrito(data)) {
+        if (!validarCotizacionParaCarrito(data)) {
           this.limpiarQueryDuplicarDesdeCotizacion();
           return;
         }
         this.limpiarVenta();
-        this.rellenarCarritoDesdeCotizacionData(data, false);
+        this.aplicarCotizacionEnCarrito(data, false);
         this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
           next: (pr: any) => {
             if (pr?.data) {
-              this.productos = pr.data;
-              this.productos_const = pr.data;
               this.stockSucursales_const = pr.data;
-              this.buscarProductos();
             }
             this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
             this.actualizaTotales();
@@ -616,75 +517,20 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private validarCotizacionParaCarrito(data: CotizacionParaVentaResponse | null | undefined): boolean {
-    if (!data?.cabecera || !data?.detalles?.length) {
-      if (typeof iziToast !== 'undefined') {
-        iziToast.warning({ title: 'Aviso', message: 'Cotización sin detalle válido.', position: 'topRight' });
-      }
-      return false;
+  private aplicarCotizacionEnCarrito(data: Parameters<typeof mapearCotizacionACarrito>[0], cerrarModal: boolean): void {
+    const mapped = mapearCotizacionACarrito(data);
+    this.carrito = mapped.carrito as typeof this.carrito;
+    if (mapped.idSucursal) {
+      this.ventas.idSucursal = mapped.idSucursal;
     }
-    const conProducto = data.detalles.filter((d) => d.idProducto != null);
-    if (conProducto.length === 0) {
-      if (typeof iziToast !== 'undefined') {
-        iziToast.warning({
-          title: 'Aviso',
-          message: 'No se encontraron productos por código en esta cotización.',
-          position: 'topRight'
-        });
-      }
-      return false;
-    }
-    return true;
-  }
-
-  /** Asume `validarCotizacionParaCarrito` ya pasó. */
-  private rellenarCarritoDesdeCotizacionData(data: CotizacionParaVentaResponse, cerrarModal: boolean): void {
-    const lineas = data.detalles.filter((d: { idProducto: string | null }) => d.idProducto != null) as Array<{
-      idProducto: string;
-      idEmpresaProducto?: string | null;
-      aliasEmpresa?: string;
-      codigo: string;
-      descripcion: string;
-      codigoPresentacion: string;
-      idPresentacion: number;
-      cantidad: number;
-      pVenta: number;
-      idSucursal?: string;
-      nombreSucursal?: string;
-    }>;
-    this.carrito = lineas.map((d) => ({
-      idProducto: d.idProducto,
-      idEmpresa: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : undefined,
-      codigo: d.codigo,
-      descripcion: d.descripcion,
-      descripcionOriginal: (d.descripcion ?? '').toString().trim(),
-      permiteDescripcionEnVenta: false,
-      codigoPresentacion: d.codigoPresentacion ?? '',
-      cantidad: Number(d.cantidad) || 0,
-      pVenta: Number(d.pVenta) || 0,
-      idSucursal: d.idSucursal,
-      sucursal: (d.nombreSucursal ?? '').trim() || undefined,
-      aliasEmpresa: (d.aliasEmpresa ?? '').trim() || undefined
-    }));
-    const primeraSucursal = lineas[0]?.idSucursal;
-    if (primeraSucursal) {
-      this.ventas.idSucursal = primeraSucursal;
-    }
-    const cab = data.cabecera;
-    if (cab.idCliente != null) {
-      this.cliente.idCliente = cab.idCliente;
-      this.cliente.rSocial = cab.clienteRazonSocial ?? '';
-      this.cliente.ruc = cab.clienteRuc ?? '';
+    if (mapped.cliente.idCliente != null) {
+      this.cliente.idCliente = mapped.cliente.idCliente;
+      this.cliente.rSocial = mapped.cliente.rSocial ?? '';
+      this.cliente.ruc = mapped.cliente.ruc ?? '';
     }
     this.actualizaTotales();
-    const modalEl = document.getElementById('modalCotizacion');
-    if (modalEl && cerrarModal) {
-      const modal = bootstrap.Modal.getInstance(modalEl);
-      modal?.hide();
-    }
-    if (cerrarModal && typeof iziToast !== 'undefined') {
-      iziToast.success({ title: 'Éxito', message: 'Cotización cargada en la venta.' });
-    }
+    cerrarModalCotizacionSiCorresponde(cerrarModal);
+    notificarCotizacionCargada(cerrarModal);
   }
 
   /**
@@ -719,10 +565,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
           next: (pr: any) => {
             if (pr?.data) {
-              this.productos = pr.data;
-              this.productos_const = pr.data;
               this.stockSucursales_const = pr.data;
-              this.buscarProductos();
             }
             this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
             this.actualizaTotales();
@@ -825,11 +668,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     return Number.isFinite(n) ? n : null;
   }
 
-  /** Modal buscar productos: sin stock o stock ≤ 0 (solo aviso visual si no está permitido vender sin stock). */
-  productoBusquedaSinStockSuficiente(p: any): boolean {
-    if (this.permitirVentasNegativas) return false;
-    return productoSinStockEnBusqueda(p as Record<string, unknown>);
-  }
 
   private obtenerStockDisponibleParaLineaCarrito(item: any): number | null {
     const list = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const || []);
@@ -878,26 +716,22 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Tras cargar datos, revisa si hay ventas provisionales y ofrece recuperarlas. */
   revisarVentasProvisionales(): void {
-    if (!this.ventaSesionService.tieneSesionesGuardadas()) return;
-    this.sesionesGuardadas = this.ventaSesionService.getSesionesGuardadas();
+    if (!this.ventaProvisionalUi.tieneSesionesGuardadas()) return;
+    this.sesionesGuardadas = this.ventaProvisionalUi.listarSesionesGuardadas();
     this.mostrarModalRecuperar = true;
-    setTimeout(() => {
-      const el = document.getElementById('modalRecuperar');
-      if (el) bootstrap.Modal.getOrCreateInstance(el).show();
-    }, 300);
+    this.ventaProvisionalUi.abrirModalRecuperar();
   }
 
   /** Recupera una venta provisional por id y cierra el modal. */
   recuperarSesion(sesion: VentaSesion): void {
-    const modalEl = document.getElementById('modalRecuperar');
-    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
-    this.ventaSesionService.cargarSesion(sesion.id);
-    this.carrito = Array.isArray(sesion.carrito) ? sesion.carrito.map((x: any) => ({ ...x })) : [];
-    this.ventas = sesion.ventas ? { ...sesion.ventas } : this.ventas;
-    this.detallePago = Array.isArray(sesion.detallePago) ? sesion.detallePago.map((x: any) => ({ ...x })) : [];
-    this.cliente = sesion.cliente ? { ...sesion.cliente } : this.cliente;
-    this.pagaCon = Number(sesion.pagaCon) || 0;
-    this.vuelto = Number(sesion.vuelto) || 0;
+    const recuperada = this.ventaProvisionalUi.prepararRecuperacion(sesion);
+    if (!recuperada) return;
+    this.carrito = Array.isArray(recuperada.carrito) ? recuperada.carrito.map((x: any) => ({ ...x })) : [];
+    this.ventas = recuperada.ventas ? { ...recuperada.ventas } : this.ventas;
+    this.detallePago = Array.isArray(recuperada.detallePago) ? recuperada.detallePago.map((x: any) => ({ ...x })) : [];
+    this.cliente = recuperada.cliente ? { ...recuperada.cliente } : this.cliente;
+    this.pagaCon = Number(recuperada.pagaCon) || 0;
+    this.vuelto = Number(recuperada.vuelto) || 0;
     this.mostrarModalRecuperar = false;
     this.sesionesGuardadas = [];
     this.actualizaTotales();
@@ -905,33 +739,25 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Descarta todas las ventas provisionales y cierra el modal. */
   descartarTodasLasProvisionales(): void {
-    const modalEl = document.getElementById('modalRecuperar');
-    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
-    this.ventaSesionService.descartarTodas();
+    this.ventaProvisionalUi.descartarTodasLasSesiones();
     this.mostrarModalRecuperar = false;
     this.sesionesGuardadas = [];
   }
 
   /** Cierra el modal de recuperación sin elegir (sigue con venta nueva). */
   cerrarModalRecuperar(): void {
-    const modalEl = document.getElementById('modalRecuperar');
-    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+    this.ventaProvisionalUi.cerrarModalRecuperar();
     this.mostrarModalRecuperar = false;
     this.sesionesGuardadas = [];
   }
 
   /** Guarda el estado actual en la sesión activa (localStorage). No guarda idEmpresa. */
   guardarEstadoProvisional(): void {
-    const tieneDatos = this.carrito.length > 0 || this.ventas.idComprobante || (this.cliente?.idCliente && this.cliente.idCliente !== '');
-    if (!tieneDatos) return;
-    if (!this.ventaSesionService.getSesionActivaId()) {
-      this.ventaSesionService.obtenerOCrearSesionActiva();
-    }
-    this.ventaSesionService.actualizarSesionActiva({
-      carrito: this.carrito.map((x: any) => ({ ...x })),
-      ventas: { ...this.ventas },
-      detallePago: this.detallePago.map((x: any) => ({ ...x })),
-      cliente: { ...this.cliente },
+    this.ventaProvisionalUi.guardarEstadoActual({
+      carrito: this.carrito,
+      ventas: this.ventas,
+      detallePago: this.detallePago,
+      cliente: this.cliente,
       pagaCon: this.pagaCon,
       vuelto: this.vuelto
     });
@@ -940,7 +766,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Anula la venta actual (elimina de provisionales) y deja pantalla lista para nueva venta. */
   anularVenta(): void {
     if (!confirm('¿Anular esta venta? Se eliminará de las ventas provisionales.')) return;
-    this.ventaSesionService.eliminarSesionActiva();
+    this.ventaProvisionalUi.eliminarSesionActiva();
     this.limpiarVenta();
   }
   /** Catálogo Comprobantes (venta) para la sucursal operativa; sin idSucursal no llama al API. */
@@ -964,10 +790,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           const data = this.filtrarFilasCatalogoEmpresaOperativa(
             Array.isArray(response.data) ? response.data : []
           );
-          this.productos = data;
-          this.productos_const = data;
           this.stockSucursales_const = data;
-          this.buscarProductos();
         }
       },
       error: (err) => {
@@ -976,19 +799,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  /** Vuelve a ejecutar la búsqueda actual contra el servidor. */
-  recargarCatalogoProductosModal(): void {
-    const term = this.searchTerm.trim();
-    if (term.length < this.buscadorMinCaracteres) {
-      this.onBusquedaProductoInput();
-      return;
-    }
-    this.ejecutarBusquedaServidor(term, true);
-  }
-
-  uMedidaColumnaVentas(p: any): string {
-    return descripcionUnidadMedidaProducto(p);
-  }
 
   marcaColumnaVentas(p: any): string {
     const t = marcaProductoEnLista(p as Record<string, unknown>);
@@ -1078,11 +888,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
 
-
-  /** Columna Empresa en el modal Buscar productos: solo tiene sentido para empresa gestora (listado multi-empresa). */
-  muestraEmpresaEnBuscadorVentas(): boolean {
-    return this.esGestora;
-  }
 
   private cargarPermitirVentaMultiSucursal(): void {
     this.empresaService.refreshEmpresaFromApi().subscribe({
@@ -1202,7 +1007,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.bloqueoPorSucursalUsuario) {
       this.ventas.idSucursal = '';
       this.comprobantes = [];
-      this.buscarProductos();
       return;
     }
     if (!this.permitirVentaMultiSucursal && this.sucursalesPermitidasVenta.length > 0) {
@@ -1219,7 +1023,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.ultimaSucursalSeleccionada = String(this.ventas.idSucursal || '');
     }
     this.aplicarSucursalConCajaAbiertaPreferida();
-    this.buscarProductos();
     this.cargarComprobantesVentaInicial();
   }
 
@@ -1289,7 +1092,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     this.ultimaSucursalSeleccionada = idNueva;
-    this.buscarProductos();
     this.cargarComprobantesVentaInicial();
   }
 
@@ -1307,18 +1109,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     return ids.size > 1;
   }
 
-  private aplicarResultadosBusqueda(activos: any[]): void {
-    const filtrados = this.filtrarFilasCatalogoEmpresaOperativa(activos);
-    this.productos_filtrados = filtrados;
-    this.fusionarFilasEnCatalogoMemoria(filtrados);
-    if (filtrados.length === 0) {
-      this.buscadorMensaje = 'No se encontraron productos con ese criterio.';
-    } else if (filtrados.length >= this.buscadorLimiteFilas) {
-      this.buscadorMensaje = `Mostrando los primeros ${this.buscadorLimiteFilas} resultados. Refine la búsqueda si no ve el producto.`;
-    } else {
-      this.buscadorMensaje = '';
-    }
-  }
 
   /** Búsqueda instantánea si el catálogo ya está en memoria (SPA u otra pantalla). */
   private buscarEnCatalogoLocal(term: string): any[] | null {
@@ -1335,108 +1125,23 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.obtenerCatalogoProductosOperativo(fuente).slice(0, this.buscadorLimiteFilas);
   }
 
-  private inicializarBusquedaProductosDebounced(): void {
-    this.busquedaProductoSub = this.busquedaProducto$
-      .pipe(
-        debounceTime(320),
-        distinctUntilChanged(),
-        switchMap((term) => {
-          const local = this.buscarEnCatalogoLocal(term);
-          if (local !== null) {
-            this.buscadorCargando = false;
-            this.aplicarResultadosBusqueda(local);
-            return EMPTY;
-          }
-          this.buscadorCargando = true;
-          return this._productoService
-            .buscarProductosVenta({
-              q: term,
-              limit: this.buscadorLimiteFilas,
-              idSucursal: this.idSucursalParaBusquedaApi()
-            })
-            .pipe(
-              tap({
-                error: () => {
-                  this.buscadorCargando = false;
-                }
-              })
-            );
-        })
-      )
-      .subscribe({
-        next: (response) => {
-          if (!response) {
-            return;
-          }
-          this.buscadorCargando = false;
-          const filas = Array.isArray(response?.data) ? response.data : [];
-          const activos = filas.filter((item: any) =>
-            productoActivoParaVenta(item as Record<string, unknown>)
-          );
-          this.aplicarResultadosBusqueda(activos);
-        },
-        error: (err) => {
-          this.buscadorCargando = false;
-          this.productos_filtrados = [];
-          this.buscadorMensaje = err?.error?.message || 'Error al buscar productos.';
-          console.error('Error al buscar productos:', err);
-        }
-      });
-  }
-
-  onBusquedaProductoInput(): void {
-    const term = this.searchTerm.trim();
-    if (term.length < this.buscadorMinCaracteres) {
-      this.productos_filtrados = [];
-      this.buscadorCargando = false;
-      this.buscadorMensaje =
-        term.length === 0
-          ? 'Escriba al menos 2 caracteres para buscar productos.'
-          : `Escriba al menos ${this.buscadorMinCaracteres} caracteres.`;
-      return;
-    }
-    const local = this.buscarEnCatalogoLocal(term);
-    if (local !== null) {
-      this.buscadorCargando = false;
-      this.aplicarResultadosBusqueda(local);
-      return;
-    }
-    this.buscadorMensaje = '';
-    this.buscadorCargando = true;
-    this.busquedaProducto$.next(term);
-  }
-
-  private ejecutarBusquedaServidor(term: string, evitarCache = false): void {
-    const local = !evitarCache ? this.buscarEnCatalogoLocal(term) : null;
-    if (local !== null) {
-      this.buscadorCargando = false;
-      this.aplicarResultadosBusqueda(local);
-      return;
-    }
-    this.buscadorCargando = true;
-    this._productoService
-      .buscarProductosVenta({
-        q: term,
-        limit: this.buscadorLimiteFilas,
-        idSucursal: this.idSucursalParaBusquedaApi(),
-        evitarCache
-      })
-      .subscribe({
-        next: (response) => {
-          this.buscadorCargando = false;
-          const filas = Array.isArray(response?.data) ? response.data : [];
-          const activos = filas.filter((item: any) =>
-            productoActivoParaVenta(item as Record<string, unknown>)
-          );
-          this.aplicarResultadosBusqueda(activos);
-        },
-        error: (err) => {
-          this.buscadorCargando = false;
-          this.productos_filtrados = [];
-          this.buscadorMensaje = err?.error?.message || 'Error al buscar productos.';
-          console.error('Error al buscar productos:', err);
-        }
-      });
+  abrirBuscadorProductos(): void {
+    this.buscadorProductosModal.abrir({
+      modo: 'venta',
+      idSucursal: String(this.ventas.idSucursal || ''),
+      venta: {
+        idSucursalApi: this.idSucursalParaBusquedaApi(),
+        esGestora: this.esGestora,
+        idSucursalDefault: String(this.ventas.idSucursal || ''),
+        buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
+        filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
+        onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano()
+      }
+    }).then((prod) => {
+      if (!prod) return;
+      this.fusionarFilasEnCatalogoMemoria([prod]);
+      this.agregarAlCarrito(prod);
+    });
   }
 
   private idSucursalParaBusquedaApi(): string | undefined {
@@ -1468,25 +1173,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this.stockSucursales_const = [...map.values()];
   }
 
-  trackByProductoBuscador(_index: number, p: { idProducto?: string; idSucursal?: string; idEmpresa?: string }): string {
-    return `${p.idProducto || ''}|${p.idSucursal || ''}|${p.idEmpresa || ''}`;
-  }
-
-  /** Re-ejecuta búsqueda si hay término; si no, limpia resultados. */
-  buscarProductos(): void {
-    const term = this.searchTerm.trim();
-    if (term.length >= this.buscadorMinCaracteres) {
-      this.ejecutarBusquedaServidor(term);
-    } else {
-      this.productos_filtrados = [];
-    }
-  }
-
-  // Función para limpiar la búsqueda
-  limpiarBusqueda(): void {
-    this.searchTerm = '';
-    this.buscarProductos();
-  }
 
   /** Retorna el idMediosPago de CONTADO para usar como valor por defecto. */
   getIdMediosPagoContado(): string {
@@ -1585,108 +1271,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  seleccionaProducto(prod: any): void {
-    this.fusionarFilasEnCatalogoMemoria([prod]);
-    this.agregarAlCarrito(prod);
-
-    // 2.  Cierra el modal (por JS)
-    const buscador = bootstrap.Modal.getInstance(
-      document.getElementById('buscadorModal')!
-    );
-    buscador?.hide();
-  }
-
-  verImagenesProducto(p: any, event: Event): void {
-    event.stopPropagation();
-    const idProducto = p?.idProducto;
-    if (!idProducto) return;
-    this.idProductoCargandoImagenes = idProducto;
-    this.visorAbierto = false;
-    this.productosImagenService.listar(idProducto).subscribe({
-      next: (res) => {
-        this.imagenesProductoActual = res.data ?? [];
-        this.idProductoCargandoImagenes = null;
-        if (this.imagenesProductoActual.length > 0) {
-          this.visorIndex = 0;
-          this.visorAbierto = true;
-        }
-      },
-      error: () => { this.idProductoCargandoImagenes = null; }
-    });
-  }
-
-  cerrarVisorImagenes(): void {
-    this.visorAbierto = false;
-  }
-
-  anteriorImagenVisor(): void {
-    if (this.imagenesProductoActual.length === 0) return;
-    this.visorIndex = (this.visorIndex - 1 + this.imagenesProductoActual.length) % this.imagenesProductoActual.length;
-  }
-
-  siguienteImagenVisor(): void {
-    if (this.imagenesProductoActual.length === 0) return;
-    this.visorIndex = (this.visorIndex + 1) % this.imagenesProductoActual.length;
-  }
-
-  /** idSucursal del ítem o el de la venta en curso (para API stock por ubicación). */
-  idSucursalParaStockUbVentas(p: { idSucursal?: string | number } | null | undefined): string {
-    const fromProd = p?.idSucursal != null ? String(p.idSucursal).trim() : '';
-    if (fromProd) {
-      return fromProd;
-    }
-    return String(this.ventas?.idSucursal ?? '').trim();
-  }
-
-  /** Columna y acciones «Ubic.»: config ventas o empresa gestora (venta corporativa). */
-  mostrarColumnaUbicacionesBuscadorVentas(): boolean {
-    return this.mostrarStockUbicacionesEnBuscador || this.esGestora;
-  }
-
-  puedeVerStockUbVentas(p: { idSucursal?: string | number } | null | undefined): boolean {
-    if (!this.mostrarColumnaUbicacionesBuscadorVentas()) {
-      return false;
-    }
-    return this.idSucursalParaStockUbVentas(p).length > 0;
-  }
-
-  abrirStockUbicacionesVentas(p: { idProducto?: string; codigo?: string; descripcion?: string; idSucursal?: string | number }, ev: Event): void {
-    ev.stopPropagation();
-    const id = p?.idProducto;
-    const sid = this.idSucursalParaStockUbVentas(p);
-    if (!id || !sid) {
-      return;
-    }
-    this.stockUbTitulo = `${p.codigo ?? ''} — ${p.descripcion ?? ''}`.replace(/^[\s—]+|[\s—]+$/g, '').trim() || String(id);
-    this.modalStockUbAbierto = true;
-    this.stockUbCargando = true;
-    this.stockUbFilas = [];
-    this._productoService.obtenerStockUbicacionesProducto(String(id), sid).subscribe({
-      next: (res) => {
-        this.stockUbFilas = Array.isArray(res?.data) ? res.data : [];
-        this.stockUbCargando = false;
-      },
-      error: () => {
-        this.stockUbFilas = [];
-        this.stockUbCargando = false;
-      }
-    });
-  }
-
-  cerrarStockUbVentas(): void {
-    this.modalStockUbAbierto = false;
-    this.stockUbFilas = [];
-    this.stockUbCargando = false;
-    this.stockUbTitulo = '';
-  }
-
-  /** Suma cantidades del modal (incluye fila «sin ubicación» si viene del API). */
-  stockUbTotalCantidad(): number {
-    if (!this.stockUbFilas?.length) {
-      return 0;
-    }
-    return this.stockUbFilas.reduce((s, u) => s + (Number(u.cantidad) || 0), 0);
-  }
 
   agregarAlCarrito(producto: any): void {
     if (!this.productoPerteneceEmpresaOperativa(producto)) {
@@ -1803,13 +1387,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private aplicarResultadoBusquedaCodigo(encontrado: any | null): void {
-      this.productoEncontrado = encontrado ?? null;
-      if (this.productoEncontrado) {
-        // Agregar al carrito usando la función existente
-        //this.productoEncontrado.pVenta = this.obtenerPrecioPrincipal(this.productoEncontrado);
-        this.agregarAlCarrito(this.productoEncontrado);
-        this.searchCodigo = ''; // limpiar campo de búsqueda
-        // iziToast.show({ title: 'OK', titleColor: '#1DC74C', message: 'Producto agregado al carrito', position: 'topRight' });
+      if (encontrado) {
+        this.agregarAlCarrito(encontrado);
+        this.searchCodigo = '';
       } else {
         iziToast.show({
           title: 'ERROR',
@@ -2005,12 +1585,6 @@ abrirModalPrecios(item: any) {
     }
   }
   
-
-  abrirBuscadorModal(): void {
-    const el = document.getElementById('buscadorModal');
-    if (!el) return;
-    bootstrap.Modal.getOrCreateInstance(el).show();
-  }
 
   onInputChangesCompventas() {
       }
@@ -3014,7 +2588,7 @@ abrirModalPrecios(item: any) {
       next: () => {
         this.loading = false;
         iziToast.success({ title: 'Éxito', message: 'Cotización registrada correctamente.' });
-        this.ventaSesionService.eliminarSesionActiva();
+        this.ventaProvisionalUi.eliminarSesionActiva();
         this.limpiarVenta();
       },
       error: (err) => {
@@ -3221,7 +2795,7 @@ abrirModalPrecios(item: any) {
             }
           }, 0);
         } else {
-          this.ventaSesionService.eliminarSesionActiva();
+          this.ventaProvisionalUi.eliminarSesionActiva();
           this.limpiarVenta();
         }
       },
@@ -3246,7 +2820,7 @@ abrirModalPrecios(item: any) {
     this.postVentaIdVenta = null;
     this.cerrarPostVentaWhatsappForm();
     this.postVentaGenerandoPdf = false;
-    this.ventaSesionService.eliminarSesionActiva();
+    this.ventaProvisionalUi.eliminarSesionActiva();
     this.limpiarVenta();
   }
 
@@ -3504,29 +3078,25 @@ abrirModalPrecios(item: any) {
   abrirModalCotizacion(): void {
     this.cotizacionesParaCargar = [];
     this.loadingCotizaciones = true;
-    this.cotizacionesService.listar().subscribe({
-      next: (res) => {
-        this.cotizacionesParaCargar = res.data ?? [];
+    this.ventaCotizacionUi.listarParaModal().subscribe({
+      next: (listado) => {
+        this.cotizacionesParaCargar = listado;
         this.loadingCotizaciones = false;
       },
       error: () => {
         this.loadingCotizaciones = false;
-        iziToast.error({ title: 'Error', message: 'No se pudieron cargar las cotizaciones.' });
       }
     });
   }
 
   cargarCotizacion(idCotizacion: number): void {
-    this.cotizacionesService.obtenerParaVenta(idCotizacion).subscribe({
-      next: (res) => {
-        const data = res.data;
-        if (!data || !this.validarCotizacionParaCarrito(data)) {
+    this.ventaCotizacionUi.obtenerDetalleParaVenta(idCotizacion).subscribe({
+      next: (data) => {
+        if (!data || !validarCotizacionParaCarrito(data)) {
           return;
         }
-        this.rellenarCarritoDesdeCotizacionData(data, true);
-      },
-      error: (err) => {
-        iziToast.error({ title: 'Error', message: err?.error?.error || err?.error?.message || 'Error al cargar la cotización.' });
+        this.aplicarCotizacionEnCarrito(data, true);
+        this.guardarEstadoProvisional();
       }
     });
   }

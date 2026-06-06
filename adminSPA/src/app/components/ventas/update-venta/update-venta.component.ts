@@ -567,7 +567,7 @@ export class UpdateVentaComponent implements OnInit {
 
   agregarProductos(): void {
     const idSucursal = this.idSucursal || undefined;
-    this.buscadorProductosModal.abrir(idSucursal).then((producto: ProductoSeleccionado | null) => {
+    this.buscadorProductosModal.abrir({ idSucursal }).then((producto: ProductoSeleccionado | null) => {
       if (producto == null) return;
       const pVenta = Number(producto.pVenta) || 0;
       const desc = (producto.descripcion ?? '').toString();

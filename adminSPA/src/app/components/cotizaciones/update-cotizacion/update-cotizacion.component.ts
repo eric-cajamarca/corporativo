@@ -137,7 +137,7 @@ export class UpdateCotizacionComponent implements OnInit {
     const idSucursal = this.detalles.length > 0 && this.detalles[0].idSucursal != null
       ? String(this.detalles[0].idSucursal)
       : undefined;
-    this.buscadorProductosModal.abrir(idSucursal).then((producto: ProductoSeleccionado | null) => {
+    this.buscadorProductosModal.abrir({ idSucursal }).then((producto: ProductoSeleccionado | null) => {
       if (producto == null) return;
       const idSucursalDetalle = this.detalles.length > 0 ? this.detalles[0].idSucursal : undefined;
       const pVenta = Number(producto.pVenta) || 0;

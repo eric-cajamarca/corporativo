@@ -19,6 +19,11 @@ export interface FilaUtilidadDetalle {
   precioVenta: number;
   costo: number;
   utilidadBruta: number;
+  eliminado?: boolean;
+  idEstadoSunat?: number | null;
+  /** Anulado, rechazado SUNAT o baja aceptada: visible pero no suma en totales. */
+  excluirDeTotales?: boolean;
+  estadoComprobante?: string | null;
 }
 
 export interface UtilidadesResponse {

@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, Component, OnDestroy, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, signal } from '@angular/core';
 import { ComprasService } from '../../../services/compras.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -18,8 +18,7 @@ import { ProveedoresService } from '../../../services/proveedores.service';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
-import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
-import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -31,7 +30,7 @@ declare var bootstrap: any;
   templateUrl: './update-compras.component.html',
   styleUrl: './update-compras.component.css'
 })
-export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
+export class UpdateComprasComponent {
   public compras: any = {
     idEmpresa: '',
     idSucursal: '',
@@ -63,8 +62,6 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
   public stockSucursales_const: any = [];
   public filtro: any = {};
   public filtroConsulta: any = '';
-  public searchTerm = '';
-  public productos_filtrados: any[] = [];
   public documento: any = [];
   public moneda: any = [];
   public estadoPago: any = [];
@@ -114,39 +111,10 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
     private _router: Router,
     private _cdr: ChangeDetectorRef,
     public sidebarState: SidebarStateService,
-    private modalService: NgbModal
+    private modalService: NgbModal,
+    private buscadorProductosModal: BuscadorProductosModalService
   ) {
     //this.token = this._cookieService.get('token');
-  }
-
-  private buscadorModalEl: HTMLElement | null = null;
-  private readonly onBuscadorModalShownBound = (): void => {
-    this.enfocarInputBuscadorModalCompras();
-  };
-
-  ngAfterViewInit(): void {
-    this.buscadorModalEl = document.getElementById('buscadorModal');
-    this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
-  }
-
-  ngOnDestroy(): void {
-    this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
-    this.buscadorModalEl = null;
-  }
-
-  enfocarInputBuscadorModalCompras(): void {
-    const intentar = () => {
-      const el = document.getElementById('update-compras-buscador-modal-search');
-      if (el instanceof HTMLInputElement) {
-        el.focus({ preventScroll: true });
-        if (el.value.length > 0) {
-          el.select();
-        }
-      }
-    };
-    intentar();
-    setTimeout(intentar, 80);
-    setTimeout(intentar, 200);
   }
 
   ngOnInit(): void {
@@ -415,43 +383,11 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
           }
         }
         this.productos_const = this.productos;
-        this.buscarProductos();
       },
       (error: any) => {
         console.error('Error al cargar productos:', error);
       }
     );
-  }
-
-  recargarProductosModalUpdateCompras(): void {
-    this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe(
-      (response: any) => {
-        if (response.data != undefined) {
-          this.productos = response.data;
-          if (this.detalleCompras?.length) {
-            this.llenarDetalleCompras();
-          }
-        }
-        this.productos_const = this.productos;
-        this.buscarProductos();
-      },
-      (error: any) => {
-        console.error('Error al cargar productos:', error);
-      }
-    );
-  }
-
-  uMedidaColumnaUpdateCompras(p: any): string {
-    return descripcionUnidadMedidaProducto(p);
-  }
-
-  marcaColumnaUpdateCompras(p: any): string {
-    const t = marcaProductoEnLista(p as Record<string, unknown>);
-    return t || '—';
-  }
-
-  productoSinStockEnBusquedaModal(p: unknown): boolean {
-    return productoSinStockEnBusqueda(p as Record<string, unknown>);
   }
 
   obtenerStockSucursal() {
@@ -659,15 +595,6 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  muestraEmpresaEnBuscadorCompras(): boolean {
-    const list = Array.isArray(this.productos_const) ? this.productos_const : [];
-    return list.some(
-      (p: { aliasEmpresa?: string; razonSocialEmpresa?: string }) =>
-        !!(p?.aliasEmpresa && String(p.aliasEmpresa).trim()) ||
-        !!(p?.razonSocialEmpresa && String(p.razonSocialEmpresa).trim())
-    );
-  }
-
   textoMarcaDetalle(item: any): string {
     if (!item) return '—';
     const m = item.marca ?? item.producto?.marca;
@@ -708,26 +635,19 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
     return '—';
   }
 
-  buscarProductos(): void {
-    const term = (this.searchTerm || '').toLowerCase().trim();
-    if (term === '') {
-      this.productos_filtrados = Array.isArray(this.productos_const) ? [...this.productos_const] : [];
-    } else {
-      this.productos_filtrados = (this.productos_const || []).filter((item: any) => {
-        const descripcion = (item.descripcion ?? '').toString().toLowerCase();
-        const codigo = (item.codigo ?? '').toString().toLowerCase();
-        const marcaCol = marcaProductoEnLista(item).toLowerCase();
-        const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
-        const categoria = (item.categoria ?? '').toString().toLowerCase();
-        return (
-          descripcion.includes(term) ||
-          codigo.includes(term) ||
-          marcaCol.includes(term) ||
-          marcaLegacy.includes(term) ||
-          categoria.includes(term)
-        );
+  abrirBuscadorProductos(): void {
+    const idSucursal = this.compras.idSucursal || undefined;
+    this.buscadorProductosModal
+      .abrir({
+        modo: 'compra',
+        etiquetaPrecio: 'Precio ref.',
+        idSucursal,
+      })
+      .then((p) => {
+        if (p) {
+          this.seleccionaProducto(p);
+        }
       });
-    }
   }
 
   seleccionaProducto(p: any): void {
@@ -770,11 +690,6 @@ export class UpdateComprasComponent implements AfterViewInit, OnDestroy {
     }
     this.sumarDetalleCompras();
     this.sumarFooterFactura();
-    const el = document.getElementById('buscadorModal');
-    if (el && typeof bootstrap !== 'undefined') {
-      const modal = bootstrap.Modal.getInstance(el);
-      modal?.hide();
-    }
   }
 
   onselectMarca(selectedValue: any) {

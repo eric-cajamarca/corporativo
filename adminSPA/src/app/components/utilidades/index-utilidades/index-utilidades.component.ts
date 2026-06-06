@@ -34,6 +34,7 @@ export class IndexUtilidadesComponent implements OnInit {
   fechaInicio = '';
   fechaFin = '';
   datos: FilaUtilidadDetalle[] = [];
+  busquedaTabla = '';
   cargando = false;
   error = '';
   private readonly hoy = new Date();
@@ -104,6 +105,7 @@ export class IndexUtilidadesComponent implements OnInit {
       return;
     }
     this.cargando = true;
+    this.busquedaTabla = '';
     this.utilidadesService
       .getUtilidadesDetalle(this.fechaInicio, this.fechaFin)
       .subscribe({
@@ -121,10 +123,36 @@ export class IndexUtilidadesComponent implements OnInit {
       });
   }
 
+  get datosVisibles(): FilaUtilidadDetalle[] {
+    const term = this.busquedaTabla.trim().toLowerCase();
+    if (!term) return this.datos;
+    return this.datos.filter(
+      (r) =>
+        (r.nombreProducto || '').toLowerCase().includes(term) ||
+        (r.comprobante || '').toLowerCase().includes(term)
+    );
+  }
+
+  esFilaExcluida(fila: FilaUtilidadDetalle): boolean {
+    if (fila.excluirDeTotales === true) return true;
+    if (fila.eliminado) return true;
+    const id = fila.idEstadoSunat;
+    return id === 4 || id === 8;
+  }
+
+  etiquetaEstadoFila(fila: FilaUtilidadDetalle): string | null {
+    if (fila.estadoComprobante) return fila.estadoComprobante;
+    if (fila.eliminado) return 'Anulado';
+    if (fila.idEstadoSunat === 4) return 'Rechazado SUNAT';
+    if (fila.idEstadoSunat === 8) return 'Baja aceptada';
+    return null;
+  }
+
   private recalcularTotales(): void {
-    this.totalPrecioVenta = this.datos.reduce((s, r) => s + Number(r.precioVenta || 0), 0);
-    this.totalCosto = this.datos.reduce((s, r) => s + Number(r.costo || 0), 0);
-    this.totalUtilidadBruta = this.datos.reduce((s, r) => s + Number(r.utilidadBruta || 0), 0);
+    const validas = this.datos.filter((r) => !this.esFilaExcluida(r));
+    this.totalPrecioVenta = validas.reduce((s, r) => s + Number(r.precioVenta || 0), 0);
+    this.totalCosto = validas.reduce((s, r) => s + Number(r.costo || 0), 0);
+    this.totalUtilidadBruta = validas.reduce((s, r) => s + Number(r.utilidadBruta || 0), 0);
   }
 
   exportarPdf(): void {
@@ -265,20 +293,22 @@ export class IndexUtilidadesComponent implements OnInit {
 
   private construirDatosExport(): { columnas: string[]; filas: (string | number)[][] } {
     const columnas = [
-      'Nombre producto',
-      'Fecha venta',
+      'Producto',
       'Comprobante',
+      'Estado',
+      'Fecha venta',
       'Precio venta',
       'Costo',
       'Utilidad bruta',
     ];
     const filas = this.datos.map((r) => [
       r.nombreProducto,
-      r.fechaVenta,
       r.comprobante,
-      Number(r.precioVenta),
-      Number(r.costo),
-      Number(r.utilidadBruta),
+      this.etiquetaEstadoFila(r) || 'Vigente',
+      r.fechaVenta,
+      this.esFilaExcluida(r) ? 0 : Number(r.precioVenta),
+      this.esFilaExcluida(r) ? 0 : Number(r.costo),
+      this.esFilaExcluida(r) ? 0 : Number(r.utilidadBruta),
     ]);
     return { columnas, filas };
   }

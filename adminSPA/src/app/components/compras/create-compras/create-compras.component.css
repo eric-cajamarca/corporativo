@@ -34,6 +34,15 @@
   margin-right: 0;
 }
 
+#proveedoresModal .modal-body {
+  max-height: min(78vh, 640px);
+  overflow: hidden;
+}
+
+#proveedoresModal app-index-proveedor {
+  display: block;
+}
+
 /* Estilos generales para el contenedor principal */
 .container {
   width: 100%;
@@ -411,32 +420,6 @@
 
   .create-compras-detalle-table.table-striped > tbody > tr.d-none.d-lg-table-row:nth-child(4n + 1) {
     --bs-table-accent-bg: var(--bs-table-striped-bg);
-  }
-}
-
-.buscador-compra-thead {
-  background-color: #20c997;
-  color: #fff;
-}
-
-.buscador-compra-thead th {
-  border: none;
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-
-.buscador-compra-table-wrap {
-  max-height: min(50vh, 420px);
-}
-
-@media (max-width: 991.98px) {
-  .buscador-productos-compra-dialog .modal-body {
-    padding-bottom: 1rem;
-  }
-
-  .buscador-compra-card {
-    min-height: 3.25rem;
-    border-radius: 0.5rem;
   }
 }
 

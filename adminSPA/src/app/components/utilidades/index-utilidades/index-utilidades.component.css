@@ -90,6 +90,31 @@
   color: #0d9488;
 }
 
+.utilidad-producto-nombre {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.utilidad-producto-comprobante {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-top: 0.1rem;
+}
+
+.utilidad-estado-badge {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 500;
+}
+
+.utilidad-fila-excluida {
+  background: #fafafa;
+}
+
+.utilidad-fila-excluida:hover {
+  background: #f5f5f5;
+}
+
 .table-utilidades tfoot.table-totals th {
   background: #f1f5f9;
   border-top: 2px solid #e2e8f0;

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, EventEmitter, inject, Input, Output } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { FormsModule } from '@angular/forms';
@@ -18,9 +18,15 @@ declare var $: any;
   standalone: true,
   imports: [FormsModule, CommonModule, TopnavComponent, NgbPaginationModule, RouterModule, SidebarComponent],
   templateUrl: './index-proveedor.component.html',
-  styleUrl: './index-proveedor.component.css'
+  styleUrl: './index-proveedor.component.css',
+  host: {
+    '[class.modo-selector-host]': 'modoSelector'
+  }
 })
 export class IndexProveedorComponent {
+  @Input() modoSelector = false;
+  @Output() proveedorElegido = new EventEmitter<Record<string, unknown>>();
+
   public sidebarState = inject(SidebarStateService);
 
   public proveedores: Array<any> = [];
@@ -86,10 +92,15 @@ export class IndexProveedorComponent {
   
   
     filtrar() {
-      if (this.filtro) {
-        //
-        var term = new RegExp(this.filtro, 'i');
-        this.proveedores = this.proveedores_const.filter(item => term.test(item.rSocial) || term.test(item.apellidos) || term.test(item.correo) || term.test(item.ruc));
+      if (this.filtro && this.filtro.trim()) {
+        const term = new RegExp(this.filtro.trim(), 'i');
+        this.proveedores = this.proveedores_const.filter(
+          (item) =>
+            term.test(item.rSocial || '') ||
+            term.test(item.apellidos || '') ||
+            term.test(item.correo || '') ||
+            term.test(item.ruc || '')
+        );
       } else {
         this.proveedores = this.proveedores_const;
       }
@@ -185,7 +196,10 @@ export class IndexProveedorComponent {
   
     onPageChange(newPage: number) {
       this.page = newPage;
-      // Puedes agregar lógica adicional aquí si necesitas
-      // cargar más datos cuando cambia la página
+    }
+
+    elegir(proveedor: Record<string, unknown>): void {
+      if (!this.modoSelector) return;
+      this.proveedorElegido.emit(proveedor);
     }
 }

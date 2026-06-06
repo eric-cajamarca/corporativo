@@ -39,13 +39,23 @@
   vertical-align: middle;
 }
 
+.kardex-fila-excluida td:not(:nth-child(n+10):nth-child(-n+12)) {
+  opacity: 0.85;
+}
+
+.kardex-estado-badge {
+  font-size: 0.65rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+
 @media print {
   app-sidebar,
   app-topnav,
   .btn,
   .content-header a,
   .input-group input,
-  .form-select,
+  .kardex-producto-picker,
   .d-flex.gap-2.mb-2,
   .modal {
     display: none !important;

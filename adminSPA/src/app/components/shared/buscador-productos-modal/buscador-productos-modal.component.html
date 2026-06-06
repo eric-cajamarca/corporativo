@@ -10,43 +10,60 @@
         id="buscador-productos-modal-search"
         type="search"
         class="form-control"
-        placeholder="Nombre o código..."
+        [placeholder]="modo === 'venta' ? 'Código, descripción, marca, categoría…' : 'Nombre o código...'"
         [(ngModel)]="searchTerm"
-        (input)="buscarProductos()"
+        (input)="onBusquedaInput()"
         autocomplete="off"
       />
     </div>
     <div class="col-12 col-lg-4">
-      <button type="button" class="btn btn-outline-light w-100" (click)="recargarProductosDesdeServidor()">
+      <button type="button" class="btn btn-outline-light w-100" (click)="recargarProductosDesdeServidor()" [disabled]="loading || buscadorBuscando">
         <i class="bi bi-search"></i> Buscar
       </button>
     </div>
   </div>
-  <p class="text-muted small mb-0" *ngIf="loading"><i class="bi bi-hourglass-split"></i> Actualizando lista, stock y precios…</p>
 
-  <!-- Escritorio: tabla (mismo criterio que crear venta: lg en adelante) -->
-  <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap" *ngIf="!loading">
-    <table class="table table-hover align-middle mb-0">
+  <p class="text-muted small mb-0" *ngIf="loading && modo !== 'venta'">
+    <i class="bi bi-hourglass-split"></i> Actualizando lista, stock y precios…
+  </p>
+  <p *ngIf="modo === 'venta' && buscadorMensaje" class="small text-white-50 mb-2">{{ buscadorMensaje }}</p>
+  <div *ngIf="modo === 'venta' && buscadorBuscando" class="text-center py-2">
+    <span class="spinner-border spinner-border-sm text-light" role="status" aria-hidden="true"></span>
+    <span class="ms-2 small text-white-50">Buscando…</span>
+  </div>
+
+  <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap" *ngIf="!loading && !(modo === 'venta' && buscadorBuscando)">
+    <table class="table table-hover align-middle mb-0" *ngIf="productosFiltrados.length > 0 || modo !== 'venta'">
       <thead class="buscador-compra-thead">
         <tr>
           <th *ngIf="productosConImagenes">Imagen</th>
+          <th *ngIf="muestraColumnaEmpresa()">Empresa</th>
           <th>Código</th>
           <th class="efaf-buscador-col-cat">Categoría</th>
           <th class="efaf-buscador-col-marca">Marca</th>
           <th class="efaf-buscador-col-desc">Producto</th>
           <th>U.Medida</th>
-          <th>Precio</th>
+          <th>{{ etiquetaPrecio }}</th>
           <th>Sucursal</th>
           <th>Stock</th>
-                <th *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center" style="width:3rem" title="Stock por ubicación">Ubic.</th>
+          <th *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center text-nowrap" style="width:3rem" title="Stock por ubicación">Ubic.</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let p of productosFiltrados" role="button" class="table-row-hover" [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p)" (click)="seleccionar(p)">
+        <tr
+          *ngFor="let p of productosFiltrados; trackBy: trackByProducto"
+          role="button"
+          class="table-row-hover"
+          [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p)"
+          (click)="seleccionar(p)"
+        >
           <td *ngIf="productosConImagenes" class="align-middle p-1" (click)="$event.stopPropagation()">
             <div class="thumb-cell" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
               <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
             </div>
+          </td>
+          <td *ngIf="muestraColumnaEmpresa()">
+            <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
           </td>
           <td>{{ p.codigo }}</td>
           <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
@@ -54,9 +71,9 @@
           <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
           <td>{{ uMedidaColumna(p) }}</td>
           <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
-          <td>{{ p.sucursal }}</td>
+          <td>{{ textoSucursal(p) }}</td>
           <td>{{ p.stock }}</td>
-          <td *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-nowrap" (click)="$event.stopPropagation()">
+          <td *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center align-middle" (click)="$event.stopPropagation()">
             <button
               *ngIf="puedeVerStockUbicaciones(p)"
               type="button"
@@ -74,9 +91,12 @@
     </table>
   </div>
 
-  <!-- Móvil / tablet: tarjetas -->
-  <div class="d-lg-none buscador-compra-cards" *ngIf="!loading">
-    <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productosFiltrados" [class.efaf-buscador-card-sin-stock]="sinStockBusqueda(p)">
+  <div class="d-lg-none buscador-compra-cards" *ngIf="!loading && !(modo === 'venta' && buscadorBuscando)">
+    <div
+      class="border rounded mb-2 p-3 buscador-compra-card bg-white"
+      *ngFor="let p of productosFiltrados; trackBy: trackByProducto"
+      [class.efaf-buscador-card-sin-stock]="sinStockBusqueda(p)"
+    >
       <div class="d-flex gap-2 align-items-start">
         <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
           <div class="thumb-cell thumb-cell--card" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
@@ -88,10 +108,11 @@
             <span class="fw-semibold text-truncate">{{ p?.codigo }}</span>
             <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
           </div>
+          <div class="small text-primary" *ngIf="muestraColumnaEmpresa()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
           <div class="small mt-1">{{ p?.descripcion }}</div>
           <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumna(p) }} · {{ uMedidaColumna(p) }}</div>
           <div class="small d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
-            <span class="text-truncate me-1">{{ p?.sucursal }}</span>
+            <span class="text-truncate me-1">{{ textoSucursal(p) }}</span>
             <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>
             <button
               *ngIf="mostrarColumnaUbicacionesBuscador() && puedeVerStockUbicaciones(p)"
@@ -107,13 +128,14 @@
     </div>
   </div>
 
-  <p class="text-muted small mt-2 mb-0" *ngIf="!loading && productosFiltrados.length === 0">No hay productos que coincidan.</p>
+  <p class="text-muted small mt-2 mb-0" *ngIf="!loading && !(modo === 'venta' && buscadorBuscando) && productosFiltrados.length === 0 && modo !== 'venta'">
+    No hay productos que coincidan.
+  </p>
 </div>
 <div class="modal-footer">
   <button type="button" class="btn btn-secondary" (click)="cerrar()">Cerrar</button>
 </div>
 
-<!-- Lightbox galería -->
 <div class="visor-fullscreen-overlay" *ngIf="visorAbierto && imagenesProductoActual.length > 0" (click)="cerrarVisor()">
   <div class="visor-fullscreen-contenido" (click)="$event.stopPropagation()">
     <button type="button" class="visor-btn-cerrar" (click)="cerrarVisor()" aria-label="Cerrar">×</button>
@@ -124,7 +146,6 @@
   </div>
 </div>
 
-<!-- Overlay: stock por ubicación -->
 <div class="visor-fullscreen-overlay" *ngIf="modalStockUbicacionesAbierto" (click)="cerrarStockUbicaciones()">
   <div class="bg-white rounded shadow p-3 mx-2" style="max-width: 440px; width: 100%; max-height: 85vh; overflow: auto" (click)="$event.stopPropagation()">
     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">

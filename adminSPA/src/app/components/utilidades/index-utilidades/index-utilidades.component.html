@@ -56,13 +56,30 @@
     @if (cargando) {
       <p class="text-muted">Cargando...</p>
     } @else {
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-4">
+          <label for="busquedaTabla" class="form-label">Buscar en tabla</label>
+          <input
+            id="busquedaTabla"
+            type="search"
+            class="form-control"
+            [(ngModel)]="busquedaTabla"
+            placeholder="Producto o número de comprobante..."
+            autocomplete="off"
+          />
+        </div>
+        @if (busquedaTabla.trim()) {
+          <div class="col-auto">
+            <span class="small text-muted">Mostrando {{ datosVisibles.length }} de {{ datos.length }}</span>
+          </div>
+        }
+      </div>
       <div class="table-responsive">
         <table class="table table-hover table-utilidades">
           <thead>
             <tr>
-              <th>Nombre producto</th>
+              <th>Producto / Comprobante</th>
               <th>Fecha venta</th>
-              <th>Comprobante</th>
               <th class="text-end">Precio venta</th>
               <th class="text-end">Costo</th>
               <th class="text-end">Utilidad bruta</th>
@@ -70,14 +87,27 @@
             </tr>
           </thead>
           <tbody>
-            @for (fila of datos; track fila.idVenta + fila.nombreProducto + $index) {
-              <tr>
-                <td>{{ fila.nombreProducto }}</td>
-                <td>{{ fila.fechaVenta }}</td>
-                <td>{{ fila.comprobante }}</td>
-                <td class="text-end">{{ formatearMoneda(fila.precioVenta) }}</td>
-                <td class="text-end">{{ formatearMoneda(fila.costo) }}</td>
-                <td class="text-end utilidad">{{ formatearMoneda(fila.utilidadBruta) }}</td>
+            @for (fila of datosVisibles; track fila.idVenta + fila.nombreProducto + $index) {
+              <tr [class.utilidad-fila-excluida]="esFilaExcluida(fila)">
+                <td>
+                  <div class="utilidad-producto-nombre" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                    {{ fila.nombreProducto }}
+                  </div>
+                  <div class="utilidad-producto-comprobante">{{ fila.comprobante || '—' }}</div>
+                  @if (etiquetaEstadoFila(fila); as estado) {
+                    <span class="badge utilidad-estado-badge mt-1">{{ estado }}</span>
+                  }
+                </td>
+                <td [class.text-muted]="esFilaExcluida(fila)">{{ fila.fechaVenta }}</td>
+                <td class="text-end" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                  {{ formatearMoneda(fila.precioVenta) }}
+                </td>
+                <td class="text-end" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                  {{ formatearMoneda(fila.costo) }}
+                </td>
+                <td class="text-end utilidad" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                  {{ formatearMoneda(fila.utilidadBruta) }}
+                </td>
                 <td class="text-center">
                   <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleComprobante(fila)" title="Ver detalle del comprobante">
                     <i class="fas fa-file-invoice"></i> Ver detalle
@@ -88,7 +118,7 @@
           </tbody>
           <tfoot>
             <tr class="table-totals">
-              <th colspan="3" class="text-end">Total</th>
+              <th colspan="2" class="text-end">Total (solo comprobantes vigentes)</th>
               <th class="text-end">{{ formatearMoneda(totalPrecioVenta) }}</th>
               <th class="text-end">{{ formatearMoneda(totalCosto) }}</th>
               <th class="text-end utilidad">{{ formatearMoneda(totalUtilidadBruta) }}</th>
@@ -99,6 +129,9 @@
       </div>
       @if (datos.length === 0 && !error) {
         <p class="text-muted">No hay datos para el período seleccionado.</p>
+      }
+      @if (datos.length > 0 && datosVisibles.length === 0) {
+        <p class="text-muted">No hay coincidencias para la búsqueda.</p>
       }
     }
   </div>

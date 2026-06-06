@@ -1,13 +1,20 @@
 import { Injectable } from '@angular/core';
 import { VentaSesion, VentasProvisionalStorage } from '../interfaces/venta-sesion.interface';
 
-const STORAGE_KEY = 'ventasProvisional';
+export type VentaSesionModo = 'completa' | 'rapida';
+
+const STORAGE_KEYS: Record<VentaSesionModo, string> = {
+  completa: 'ventasProvisional',
+  rapida: 'ventasProvisionalRapida'
+};
+
 const MAX_SESIONES = 10;
 
 @Injectable({
   providedIn: 'root'
 })
 export class VentaSesionService {
+  private modo: VentaSesionModo = 'completa';
   private sesiones: VentaSesion[] = [];
   private sesionActivaId: string | null = null;
 
@@ -15,9 +22,24 @@ export class VentaSesionService {
     this.cargarDesdeStorage();
   }
 
+  setModo(modo: VentaSesionModo): void {
+    if (this.modo === modo) return;
+    this.modo = modo;
+    this.sesionActivaId = null;
+    this.cargarDesdeStorage();
+  }
+
+  getModo(): VentaSesionModo {
+    return this.modo;
+  }
+
+  private getStorageKey(): string {
+    return STORAGE_KEYS[this.modo];
+  }
+
   private cargarDesdeStorage(): void {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(this.getStorageKey());
       if (!raw) {
         this.sesiones = [];
         return;
@@ -39,34 +61,29 @@ export class VentaSesionService {
         sesiones: this.sesiones,
         ultimaActualizacion: new Date().toISOString()
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(this.getStorageKey(), JSON.stringify(data));
     } catch (e) {
       console.error('VentaSesionService persist:', e);
     }
   }
 
-  /** Devuelve las sesiones guardadas (para mostrar en modal de recuperación). */
   getSesionesGuardadas(): VentaSesion[] {
     return [...this.sesiones];
   }
 
-  /** Indica si hay sesiones guardadas. */
   tieneSesionesGuardadas(): boolean {
     return this.sesiones.length > 0;
   }
 
-  /** ID de la sesión activa (la que se está editando), o null. */
   getSesionActivaId(): string | null {
     return this.sesionActivaId;
   }
 
-  /** Genera un nombre por defecto para una nueva sesión. */
   private generarNombre(): string {
     const n = this.sesiones.length + 1;
-    return `Venta ${n}`;
+    return this.modo === 'rapida' ? `Venta r?pida ${n}` : `Venta ${n}`;
   }
 
-  /** Crea una nueva sesión vacía y la devuelve. */
   crearSesion(nombre?: string): VentaSesion {
     if (this.sesiones.length >= MAX_SESIONES) {
       this.sesiones.shift();
@@ -91,7 +108,7 @@ export class VentaSesionService {
     return sesion;
   }
 
-  private getVentasVacio(): any {
+  private getVentasVacio(): Record<string, unknown> {
     return {
       compVenta: '0000-00000000',
       idComprobante: '',
@@ -121,7 +138,7 @@ export class VentaSesionService {
     };
   }
 
-  private getClienteVacio(): any {
+  private getClienteVacio(): Record<string, unknown> {
     return {
       idCliente: '',
       idDocumento: '',
@@ -134,19 +151,17 @@ export class VentaSesionService {
     };
   }
 
-  /** Carga una sesión por id como activa y la devuelve (o null). */
   cargarSesion(id: string): VentaSesion | null {
-    const sesion = this.sesiones.find(s => s.id === id) ?? null;
+    const sesion = this.sesiones.find((s) => s.id === id) ?? null;
     if (sesion) {
       this.sesionActivaId = id;
     }
     return sesion;
   }
 
-  /** Actualiza la sesión activa con el estado actual del componente. */
   actualizarSesionActiva(payload: Partial<Omit<VentaSesion, 'id' | 'nombre' | 'fechaCreacion'>>): void {
     if (!this.sesionActivaId) return;
-    const idx = this.sesiones.findIndex(s => s.id === this.sesionActivaId);
+    const idx = this.sesiones.findIndex((s) => s.id === this.sesionActivaId);
     if (idx === -1) return;
     const ahora = new Date().toISOString();
     this.sesiones[idx] = {
@@ -160,41 +175,38 @@ export class VentaSesionService {
     this.persist();
   }
 
-  /** Elimina la sesión activa del almacenamiento. */
   eliminarSesionActiva(): void {
     if (!this.sesionActivaId) return;
-    this.sesiones = this.sesiones.filter(s => s.id !== this.sesionActivaId);
+    this.sesiones = this.sesiones.filter((s) => s.id !== this.sesionActivaId);
     this.sesionActivaId = null;
     this.persist();
   }
 
-  /** Elimina una sesión por id. */
   eliminarSesion(id: string): void {
-    this.sesiones = this.sesiones.filter(s => s.id !== id);
+    this.sesiones = this.sesiones.filter((s) => s.id !== id);
     if (this.sesionActivaId === id) {
       this.sesionActivaId = null;
     }
     this.persist();
   }
 
-  /** Descarta todas las sesiones guardadas. */
   descartarTodas(): void {
     this.sesiones = [];
     this.sesionActivaId = null;
     try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
+      localStorage.removeItem(this.getStorageKey());
+    } catch {
+      /* ignore */
+    }
   }
 
-  /** Marca que estamos editando esta sesión (sin crear una nueva). */
   setSesionActivaId(id: string | null): void {
     this.sesionActivaId = id;
   }
 
-  /** Asegura que hay una sesión activa; si no, crea una. Devuelve la sesión activa. */
   obtenerOCrearSesionActiva(): VentaSesion {
     if (this.sesionActivaId) {
-      const s = this.sesiones.find(x => x.id === this.sesionActivaId);
+      const s = this.sesiones.find((x) => x.id === this.sesionActivaId);
       if (s) return s;
     }
     return this.crearSesion();

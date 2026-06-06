@@ -8,8 +8,9 @@ import {
   KardexFila,
   MovimientoDetalle
 } from '../../../services/movimiento-inventario.service';
-import { ProductoService } from '../../../services/producto.service';
 import { ComprasService } from '../../../services/compras.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 import { VentasService, ComprobantePdfData } from '../../../services/ventas.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
@@ -39,14 +40,14 @@ export class KardexComponent implements AfterViewInit {
 
   sidebarState = inject(SidebarStateService);
   private movimientoService = inject(MovimientoInventarioService);
-  private productoService = inject(ProductoService);
+  private buscadorProductosModal = inject(BuscadorProductosModalService);
   private comprasService = inject(ComprasService);
   private ventasService = inject(VentasService);
   private excelService = inject(ExcelService);
   private fb = inject(FormBuilder);
 
   form: FormGroup;
-  productos: Array<{ idProducto: string; codigo?: string; descripcion?: string; nombre?: string }> = [];
+  productoSeleccionado: { idProducto: string; codigo: string; descripcion: string } | null = null;
   data: KardexResponse | null = null;
   cargando = false;
   filtroTexto = '';
@@ -80,18 +81,23 @@ export class KardexComponent implements AfterViewInit {
     }
   }
 
-  ngOnInit(): void {
-    this.cargarProductos();
+  abrirBuscadorProductos(): void {
+    this.buscadorProductosModal.abrir().then((p: ProductoSeleccionado | null) => {
+      if (!p?.idProducto) return;
+      this.productoSeleccionado = {
+        idProducto: String(p.idProducto),
+        codigo: String(p.codigo ?? ''),
+        descripcion: String(p.descripcion ?? p['nombre'] ?? '')
+      };
+      this.form.patchValue({ idProducto: this.productoSeleccionado.idProducto });
+      this.data = null;
+    });
   }
 
-  cargarProductos(): void {
-    this.productoService.obtenerProductosTodos().subscribe({
-      next: (res) => {
-        const raw = res?.data;
-        this.productos = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-      },
-      error: () => iziToast.error({ title: 'Error', message: 'No se pudieron cargar productos', position: 'topRight' })
-    });
+  limpiarProducto(): void {
+    this.productoSeleccionado = null;
+    this.form.patchValue({ idProducto: '' });
+    this.data = null;
   }
 
   buscar(): void {
@@ -114,6 +120,10 @@ export class KardexComponent implements AfterViewInit {
         iziToast.error({ title: 'Error', message: msg, position: 'topRight' });
       }
     });
+  }
+
+  esFilaExcluida(fila: KardexFila): boolean {
+    return fila.excluidoDeTotales === true;
   }
 
   get filasVisibles(): KardexFila[] {
@@ -211,14 +221,15 @@ export class KardexComponent implements AfterViewInit {
       iziToast.warning({ title: 'Sin datos', message: 'Busque un producto primero.', position: 'topRight' });
       return;
     }
-    const cols = ['Fecha', 'TipoMov', 'NroDocum', 'Entrada Cant', 'Entrada P.Unit', 'Entrada Importe', 'Salida Cant', 'Salida P.Unit', 'Salida Importe', 'Saldo Cant', 'Saldo P.Unit', 'Saldo Importe'];
+    const cols = ['Fecha', 'TipoMov', 'NroDocum', 'Estado', 'Entrada Cant', 'Entrada P.Unit', 'Entrada Importe', 'Salida Cant', 'Salida P.Unit', 'Salida Importe', 'Saldo Cant', 'Saldo P.Unit', 'Saldo Importe'];
     const rows: any[][] = [];
-    rows.push(['***SALDO INICIAL***', '', '', '', '', '', '', '', '', this.data.saldoInicial?.cantidad ?? 0, this.data.saldoInicial?.pUnitario ?? 0, this.data.saldoInicial?.importe ?? 0]);
+    rows.push(['***SALDO INICIAL***', '', '', '', '', '', '', '', '', '', this.data.saldoInicial?.cantidad ?? 0, this.data.saldoInicial?.pUnitario ?? 0, this.data.saldoInicial?.importe ?? 0]);
     for (const f of this.data.filas) {
       rows.push([
         this.formatearFecha(f.fecha),
         f.tipoMov,
         f.nroDocum,
+        f.estadoComprobante || '',
         f.cantidadEntrada || '',
         f.pUnitarioEntrada || '',
         f.importeEntrada || '',
@@ -231,7 +242,14 @@ export class KardexComponent implements AfterViewInit {
       ]);
     }
     if (this.data.totales) {
-      rows.push(['TOTALES', '', '', this.data.totales.totalEntradaCantidad, '', this.data.totales.totalEntradaImporte, this.data.totales.totalSalidaCantidad, '', this.data.totales.totalSalidaImporte, this.data.totales.saldoFinalCantidad, '', this.data.totales.saldoFinalImporte]);
+      rows.push([
+        'TOTALES', '', '', '',
+        this.data.totales.totalEntradaCantidad, '', this.data.totales.totalEntradaImporte,
+        this.data.totales.totalSalidaCantidad, '', this.data.totales.totalSalidaImporte,
+        this.data.totales.saldoFinalCantidad,
+        this.data.totales.saldoFinalPUnitario ?? '',
+        this.data.totales.saldoFinalImporte
+      ]);
     }
     const excelData: ExcelData = {
       title: `Kardex ${this.data.producto?.codigo ?? ''}`,

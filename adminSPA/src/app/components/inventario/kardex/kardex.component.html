@@ -26,14 +26,26 @@
           </div>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-6 kardex-producto-picker">
           <label class="form-label">Producto <span class="text-danger">*</span></label>
-          <select class="form-select" formControlName="idProducto">
-            <option value="">-- Seleccione producto --</option>
-            @for (p of productos; track p.idProducto) {
-              <option [value]="p.idProducto">{{ p.descripcion || p.nombre }} ({{ p.codigo || 'N/D' }})</option>
+          <div class="d-flex flex-wrap gap-2 align-items-stretch">
+            <button type="button" class="btn btn-success" (click)="abrirBuscadorProductos()">
+              <i class="bi bi-search me-1"></i> Buscar producto
+            </button>
+            @if (productoSeleccionado) {
+              <div class="flex-grow-1 d-flex align-items-center gap-2 border rounded px-3 py-2 bg-light min-w-0">
+                <div class="min-w-0">
+                  <div class="fw-semibold text-truncate">{{ productoSeleccionado.descripcion }}</div>
+                  <div class="small text-muted">Código: {{ productoSeleccionado.codigo || 'N/D' }}</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-auto flex-shrink-0" (click)="limpiarProducto()" title="Quitar producto">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            } @else {
+              <span class="text-muted small align-self-center">Seleccione un producto para consultar el kardex.</span>
             }
-          </select>
+          </div>
         </div>
         <div class="col-md-2">
           <button type="submit" class="btn btn-primary w-100" [disabled]="cargando">
@@ -114,16 +126,21 @@
                 <td></td>
               </tr>
               @for (f of filasVisibles; track $index) {
-                <tr>
-                  <td>{{ formatearFecha(f.fecha) }}</td>
-                  <td>{{ f.tipoMov }}</td>
-                  <td>{{ f.nroDocum }}</td>
-                  <td class="text-end">{{ f.cantidadEntrada ? (f.cantidadEntrada | number:'1.3-3') : '-' }}</td>
-                  <td class="text-end">{{ f.cantidadEntrada ? (f.pUnitarioEntrada | number:'1.2-2') : '-' }}</td>
-                  <td class="text-end">{{ f.cantidadEntrada ? (f.importeEntrada | number:'1.2-2') : '-' }}</td>
-                  <td class="text-end">{{ f.cantidadSalida ? (f.cantidadSalida | number:'1.3-3') : '-' }}</td>
-                  <td class="text-end">{{ f.cantidadSalida ? (f.pUnitarioSalida | number:'1.2-2') : '-' }}</td>
-                  <td class="text-end">{{ f.cantidadSalida ? (f.importeSalida | number:'1.2-2') : '-' }}</td>
+                <tr [class.kardex-fila-excluida]="esFilaExcluida(f)">
+                  <td [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ formatearFecha(f.fecha) }}</td>
+                  <td [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">
+                    {{ f.tipoMov }}
+                    @if (f.estadoComprobante) {
+                      <span class="badge bg-secondary ms-1 kardex-estado-badge">{{ f.estadoComprobante }}</span>
+                    }
+                  </td>
+                  <td [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.nroDocum }}</td>
+                  <td class="text-end" [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.cantidadEntrada ? (f.cantidadEntrada | number:'1.3-3') : '-' }}</td>
+                  <td class="text-end" [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.cantidadEntrada ? (f.pUnitarioEntrada | number:'1.2-2') : '-' }}</td>
+                  <td class="text-end" [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.cantidadEntrada ? (f.importeEntrada | number:'1.2-2') : '-' }}</td>
+                  <td class="text-end" [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.cantidadSalida ? (f.cantidadSalida | number:'1.3-3') : '-' }}</td>
+                  <td class="text-end" [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.cantidadSalida ? (f.pUnitarioSalida | number:'1.2-2') : '-' }}</td>
+                  <td class="text-end" [class.text-decoration-line-through]="esFilaExcluida(f)" [class.text-muted]="esFilaExcluida(f)">{{ f.cantidadSalida ? (f.importeSalida | number:'1.2-2') : '-' }}</td>
                   <td class="text-end">{{ f.saldoCantidad | number:'1.3-3' }}</td>
                   <td class="text-end">{{ f.saldoPUnitario | number:'1.2-2' }}</td>
                   <td class="text-end">{{ f.saldoImporte | number:'1.2-2' }}</td>
@@ -144,7 +161,7 @@
                   <td class="text-end">-</td>
                   <td class="text-end">{{ data?.totales?.totalSalidaImporte | number:'1.2-2' }}</td>
                   <td class="text-end">{{ data?.totales?.saldoFinalCantidad | number:'1.3-3' }}</td>
-                  <td class="text-end">-</td>
+                  <td class="text-end">{{ data?.totales?.saldoFinalPUnitario != null ? (data?.totales?.saldoFinalPUnitario | number:'1.2-2') : '-' }}</td>
                   <td class="text-end">{{ data?.totales?.saldoFinalImporte | number:'1.2-2' }}</td>
                   <td></td>
                 </tr>

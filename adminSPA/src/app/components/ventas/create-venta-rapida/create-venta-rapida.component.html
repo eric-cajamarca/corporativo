@@ -91,6 +91,11 @@
                   <span class="text-muted small ms-2" *ngIf="carrito.length">({{ carrito.length }} ítem{{ carrito.length === 1 ? '' : 's' }})</span>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-info btn-sm" (click)="abrirRecuperarVentasGuardadas()"
+                    [class.btn-info]="hayVentasGuardadas" [class.text-white]="hayVentasGuardadas"
+                    title="Recuperar ventas en curso guardadas">
+                    <i class="bi bi-cloud-download me-1"></i>Recuperar
+                  </button>
                   <button type="button" class="btn btn-outline-danger btn-sm" (click)="anularVenta()"
                     [disabled]="carrito.length === 0 && !ventas.idComprobante">
                     <i class="bi bi-x-circle me-1"></i>Anular
@@ -115,8 +120,11 @@
               <div class="d-flex flex-wrap align-items-stretch align-items-lg-center gap-2 w-100 w-lg-auto justify-content-lg-end">
                 <input type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()"
                   placeholder="Código de barras / producto" (keyup.enter)="buscarCodigoProd()">
-                <button type="button" class="btn btn-success btn-lg flex-grow-1 flex-lg-grow-0" data-bs-toggle="modal" data-bs-target="#vr-buscadorModal">
+                <button type="button" class="btn btn-success btn-lg flex-grow-1 flex-lg-grow-0" (click)="abrirBuscadorProductos()">
                   <i class="bi bi-search"></i> Buscar productos
+                </button>
+                <button type="button" class="btn btn-outline-light btn-sm create-ventas-icon-btn" data-bs-toggle="modal" data-bs-target="#modalCotizacion" (click)="abrirModalCotizacion()" title="Cargar desde cotización">
+                  <i class="bi bi-file-text"></i>
                 </button>
               </div>
             </div>
@@ -315,176 +323,6 @@
         </button>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- ------------------------------------------------------------------ -->
-<!-- MODAL (fuera del card, al final del template) -->
-<!-- ------------------------------------------------------------------ -->
-<!---->
-<div class="modal fade" id="vr-buscadorModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-fullscreen-lg-down modal-xl modal-dialog-scrollable buscador-productos-compra-dialog">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title">Buscar productos</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-2 mb-3">
-          <div class="col-12 col-lg-8">
-            <input id="vr-buscador-modal-search" type="search" class="form-control" placeholder="Código, descripción, marca, categoría…" [(ngModel)]="searchTerm"
-              (input)="onBusquedaProductoInput()" autocomplete="off">
-          </div>
-          <div class="col-12 col-lg-4">
-            <button type="button" class="btn btn-outline-light w-100" (click)="recargarCatalogoProductosModal()" [disabled]="buscadorCargando">
-              <i class="bi bi-search"></i> Buscar
-            </button>
-          </div>
-        </div>
-        <p *ngIf="buscadorMensaje" class="small text-white-50 mb-2">{{ buscadorMensaje }}</p>
-        <div *ngIf="buscadorCargando" class="text-center py-2">
-          <span class="spinner-border spinner-border-sm text-light" role="status" aria-hidden="true"></span>
-          <span class="ms-2 small text-white-50">Buscando…</span>
-        </div>
-
-        <div class="d-none d-lg-block table-responsive buscador-compra-table-wrap" *ngIf="productos_filtrados.length > 0">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="buscador-compra-thead">
-              <tr>
-                <th *ngIf="productosConImagenes">Imagen</th>
-                <th *ngIf="muestraEmpresaEnBuscadorVentas()">Empresa</th>
-                <th>Código</th>
-                <th class="efaf-buscador-col-cat">Categoría</th>
-                <th class="efaf-buscador-col-marca">Marca</th>
-                <th class="efaf-buscador-col-desc">Producto</th>
-                <th>U.Medida</th>
-                <th>Precio</th>
-                <th>Sucursal</th>
-                <th>Stock</th>
-                <th *ngIf="mostrarColumnaUbicacionesBuscadorVentas()" class="text-center text-nowrap" style="width:3rem" title="Stock por ubicación">Ubic.</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let p of productos_filtrados; trackBy: trackByProductoBuscador" role="button" class="table-row-hover" [class.efaf-buscador-row-sin-stock]="productoBusquedaSinStockSuficiente(p)" (click)="seleccionaProducto(p)">
-                <td *ngIf="productosConImagenes" class="align-middle" (click)="$event.stopPropagation()">
-                  <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
-                    (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
-                    <i class="bi bi-images" *ngIf="idProductoCargandoImagenes !== p.idProducto"></i>
-                    <span class="spinner-border spinner-border-sm" *ngIf="idProductoCargandoImagenes === p.idProducto"></span>
-                  </button>
-                </td>
-                <td *ngIf="muestraEmpresaEnBuscadorVentas()">
-                  <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
-                </td>
-                <td>{{ p.codigo }}</td>
-                <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
-                <td class="efaf-buscador-col-marca" [title]="marcaColumnaVentas(p)">{{ marcaColumnaVentas(p) }}</td>
-                <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
-                <td>{{ uMedidaColumnaVentas(p) }}</td>
-                <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
-                <td>{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</td>
-                <td>{{ p.stock }}</td>
-                <td *ngIf="mostrarColumnaUbicacionesBuscadorVentas()" class="text-center align-middle" (click)="$event.stopPropagation()">
-                  <button
-                    *ngIf="puedeVerStockUbVentas(p)"
-                    type="button"
-                    class="btn btn-sm btn-outline-secondary py-0 px-2"
-                    (click)="abrirStockUbicacionesVentas(p, $event)"
-                    title="Ver stock por ubicación"
-                    aria-label="Ver stock por ubicación"
-                  >
-                    <i class="bi bi-eye"></i>
-                  </button>
-                  <span *ngIf="!puedeVerStockUbVentas(p)" class="text-white-50 small">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="d-lg-none buscador-compra-cards" *ngIf="productos_filtrados.length > 0">
-          <div class="border rounded mb-2 p-3 buscador-compra-card bg-white" *ngFor="let p of productos_filtrados; trackBy: trackByProductoBuscador" [class.efaf-buscador-card-sin-stock]="productoBusquedaSinStockSuficiente(p)">
-            <div class="d-flex gap-2 align-items-start">
-              <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">
-                <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center galeria-btn"
-                  (click)="verImagenesProducto(p, $event)" [disabled]="idProductoCargandoImagenes !== null" title="Ver galería">
-                  <i class="bi bi-images" *ngIf="idProductoCargandoImagenes !== p.idProducto"></i>
-                  <span class="spinner-border spinner-border-sm" *ngIf="idProductoCargandoImagenes === p.idProducto"></span>
-                </button>
-              </div>
-              <div class="flex-grow-1 min-w-0" role="button" (click)="seleccionaProducto(p)">
-                <div class="d-flex justify-content-between align-items-start gap-2">
-                  <span class="fw-semibold text-truncate">{{ p?.codigo }}</span>
-                  <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
-                </div>
-                <div class="small text-primary" *ngIf="muestraEmpresaEnBuscadorVentas()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
-                <div class="small mt-1">{{ p?.descripcion }}</div>
-                <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumnaVentas(p) }} · {{ uMedidaColumnaVentas(p) }}</div>
-                <div class="small d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
-                  <span class="text-truncate me-1">{{ esGestora ? (p.aliasEmpresa || '') + ' - ' + (p.sucursal || '') : p.sucursal }}</span>
-                  <span class="text-nowrap">Stock: {{ p?.stock ?? '—' }}</span>
-                  <button
-                    *ngIf="mostrarColumnaUbicacionesBuscadorVentas() && puedeVerStockUbVentas(p)"
-                    type="button"
-                    class="btn btn-sm btn-outline-primary py-0 px-2"
-                    (click)="abrirStockUbicacionesVentas(p, $event)"
-                  >
-                    <i class="bi bi-eye me-1"></i>Ubicaciones
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Lightbox galería (modal Buscar productos) -->
-<div class="visor-fullscreen-overlay" *ngIf="visorAbierto && imagenesProductoActual.length > 0" (click)="cerrarVisorImagenes()">
-  <div class="visor-fullscreen-contenido" (click)="$event.stopPropagation()">
-    <button type="button" class="visor-btn-cerrar" (click)="cerrarVisorImagenes()" aria-label="Cerrar">×</button>
-    <button type="button" class="visor-btn-nav visor-btn-ant" (click)="anteriorImagenVisor(); $event.stopPropagation()" aria-label="Anterior">‹</button>
-    <img [src]="imagenesProductoActual[visorIndex].url" [alt]="'Imagen ' + (visorIndex + 1)" (click)="$event.stopPropagation()" />
-    <button type="button" class="visor-btn-nav visor-btn-sig" (click)="siguienteImagenVisor(); $event.stopPropagation()" aria-label="Siguiente">›</button>
-    <span class="visor-contador">{{ visorIndex + 1 }} / {{ imagenesProductoActual.length }}</span>
-  </div>
-</div>
-
-<!-- Stock por ubicación (modal Buscar productos, Nueva venta) -->
-<div class="visor-fullscreen-overlay" *ngIf="modalStockUbAbierto" (click)="cerrarStockUbVentas()">
-  <div class="bg-white rounded shadow p-3 mx-2" style="max-width: 440px; width: 100%; max-height: 85vh; overflow: auto" (click)="$event.stopPropagation()">
-    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-      <h6 class="mb-0">Stock por ubicación</h6>
-      <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarStockUbVentas()"></button>
-    </div>
-    <p class="small text-muted mb-2">{{ stockUbTitulo }}</p>
-    <p class="small text-muted mb-0" *ngIf="stockUbCargando"><i class="bi bi-hourglass-split"></i> Cargando…</p>
-    <table class="table table-sm table-bordered mb-0" *ngIf="!stockUbCargando && stockUbFilas.length > 0">
-      <thead class="table-light">
-        <tr>
-          <th>Ubicación</th>
-          <th class="text-end">Cantidad</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let u of stockUbFilas" [class.text-muted]="u.esSinUbicacion">
-          <td>{{ u.codigoUbicacion || ('#' + u.idUbicacion) }}</td>
-          <td class="text-end">{{ u.cantidad | number : '1.0-3' }}</td>
-        </tr>
-      </tbody>
-      <tfoot *ngIf="!stockUbCargando && stockUbFilas.length > 0" class="table-light">
-        <tr class="fw-semibold">
-          <td>Total (todas las filas)</td>
-          <td class="text-end">{{ stockUbTotalCantidad() | number : '1.0-3' }}</td>
-        </tr>
-      </tfoot>
-    </table>
-    <p class="small text-muted mb-0" *ngIf="!stockUbCargando && stockUbFilas.length === 0">Sin datos de ubicación.</p>
   </div>
 </div>
 

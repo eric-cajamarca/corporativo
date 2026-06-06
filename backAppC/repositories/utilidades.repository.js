@@ -1,5 +1,25 @@
 const sql = require('mssql');
 
+/** Ventas anuladas, rechazadas o con baja SUNAT aceptada no suman en utilidades. */
+const FILTRO_VENTA_VALIDA_UTILIDADES = `
+  AND ISNULL(v.eliminado, 0) = 0
+  AND (v.idEstadoSunat IS NULL OR v.idEstadoSunat NOT IN (4, 8))
+`;
+
+function ventaExcluidaDeUtilidades(eliminado, idEstadoSunat) {
+  if (eliminado) return true;
+  const id = idEstadoSunat != null ? Number(idEstadoSunat) : null;
+  return id === 4 || id === 8;
+}
+
+function etiquetaEstadoComprobanteUtilidad(eliminado, idEstadoSunat, estadoSunatDesc) {
+  if (eliminado) return 'Anulado';
+  const id = idEstadoSunat != null ? Number(idEstadoSunat) : null;
+  if (id === 4) return 'Rechazado SUNAT';
+  if (id === 8) return estadoSunatDesc || 'Baja aceptada';
+  return null;
+}
+
 /**
  * Obtiene utilidades agrupadas por período (día, mes, año o rango).
  * Utiliza Ventas.total como ingresos y DetalleVenta.costoTotal para costos.
@@ -27,6 +47,7 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
       WHERE v.idEmpresa = @idEmpresa
         AND CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        ${FILTRO_VENTA_VALIDA_UTILIDADES}
     `);
     const r = (rs.recordset && rs.recordset[0]) ? rs.recordset[0] : {};
     return [{
@@ -49,6 +70,7 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
       WHERE v.idEmpresa = @idEmpresa
         AND CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        ${FILTRO_VENTA_VALIDA_UTILIDADES}
       GROUP BY CONVERT(DATE, v.fEmision)
       ORDER BY CONVERT(DATE, v.fEmision)
     `);
@@ -72,6 +94,7 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
       WHERE v.idEmpresa = @idEmpresa
         AND CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        ${FILTRO_VENTA_VALIDA_UTILIDADES}
       GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
       ORDER BY YEAR(v.fEmision), MONTH(v.fEmision)
     `);
@@ -95,6 +118,7 @@ async function obtenerUtilidades(pool, idEmpresa, tipo, fechaInicio, fechaFin) {
       WHERE v.idEmpresa = @idEmpresa
         AND CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
+        ${FILTRO_VENTA_VALIDA_UTILIDADES}
       GROUP BY YEAR(v.fEmision)
       ORDER BY YEAR(v.fEmision)
     `);
@@ -133,10 +157,14 @@ async function obtenerUtilidadesDetalle(pool, idEmpresa, fechaInicio, fechaFin) 
         p.descripcion AS nombreProducto,
         ISNULL(dv.total, dv.subtotal) AS precioVenta,
         ISNULL(dv.costoTotal, 0) AS costo,
-        ISNULL(dv.total, dv.subtotal) - ISNULL(dv.costoTotal, 0) AS utilidadBruta
+        ISNULL(dv.total, dv.subtotal) - ISNULL(dv.costoTotal, 0) AS utilidadBruta,
+        ISNULL(v.eliminado, 0) AS eliminado,
+        v.idEstadoSunat,
+        ISNULL(es.descripcion, '') AS estadoSunatDesc
       FROM DetalleVenta dv
       INNER JOIN Ventas v ON dv.idVenta = v.idVenta AND v.idEmpresa = @idEmpresa
       INNER JOIN Productos p ON dv.idProducto = p.idProducto AND p.idEmpresa = @idEmpresa
+      LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
       WHERE CONVERT(DATE, v.fEmision) >= @fechaInicio
         AND CONVERT(DATE, v.fEmision) <= @fechaFin
       ORDER BY v.fEmision, v.idVenta
@@ -144,15 +172,24 @@ async function obtenerUtilidadesDetalle(pool, idEmpresa, fechaInicio, fechaFin) 
   } catch (repoErr) {
     throw repoErr;
   }
-  const rows = (rs.recordset || []).map((r) => ({
-    idVenta: r.idVenta,
-    comprobante: String(r.comprobante || ''),
-    fechaVenta: r.fechaVenta ? formatFecha(r.fechaVenta) : '',
-    nombreProducto: String(r.nombreProducto || ''),
-    precioVenta: Number(r.precioVenta || 0),
-    costo: Number(r.costo || 0),
-    utilidadBruta: Number(r.utilidadBruta != null ? r.utilidadBruta : (r.precioVenta || 0) - (r.costo || 0)),
-  }));
+  const rows = (rs.recordset || []).map((r) => {
+    const eliminado = !!r.eliminado;
+    const idEstadoSunat = r.idEstadoSunat != null ? Number(r.idEstadoSunat) : null;
+    const excluirDeTotales = ventaExcluidaDeUtilidades(eliminado, idEstadoSunat);
+    return {
+      idVenta: r.idVenta,
+      comprobante: String(r.comprobante || ''),
+      fechaVenta: r.fechaVenta ? formatFecha(r.fechaVenta) : '',
+      nombreProducto: String(r.nombreProducto || ''),
+      precioVenta: Number(r.precioVenta || 0),
+      costo: Number(r.costo || 0),
+      utilidadBruta: Number(r.utilidadBruta != null ? r.utilidadBruta : (r.precioVenta || 0) - (r.costo || 0)),
+      eliminado,
+      idEstadoSunat,
+      excluirDeTotales,
+      estadoComprobante: etiquetaEstadoComprobanteUtilidad(eliminado, idEstadoSunat, r.estadoSunatDesc),
+    };
+  });
   return rows;
 }
 

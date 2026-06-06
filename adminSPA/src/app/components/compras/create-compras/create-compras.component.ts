@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, OnDestroy, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComprasService } from '../../../services/compras.service';
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ProductoService } from '../../../services/producto.service';
@@ -21,8 +21,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { ConsultaXMLService } from '../../../services/consulta-xml.service';
-import { marcaProductoEnLista, productoSinStockEnBusqueda } from '../../../utils/producto-busqueda.util';
-import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { saveAs } from 'file-saver';
 import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
@@ -37,6 +36,8 @@ import {
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
+import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
+import { aplicarProveedorEnCompra } from '../../../utils/proveedor-compra.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -58,11 +59,12 @@ interface CuotaCompraSunatForm {
     TopnavComponent,
     SidebarComponent,
     ReactiveFormsModule,
+    IndexProveedorComponent,
   ],
   templateUrl: './create-compras.component.html',
   styleUrl: './create-compras.component.css',
 })
-export class CreateComprasComponent implements AfterViewInit, OnDestroy {
+export class CreateComprasComponent {
   public compras: any = {
     idSucursal: '',
     idComprobante: '',
@@ -105,10 +107,7 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
   public productos: any = {};
   public prodSelecionado: any = {};
   public productos_const: any = {};
-  public productos_filtrados: any[] = [];
   public productoEncontrado: any = null;
-  public searchTerm: string = '';
-  public buscadorModal: any;
   public sucursales: any = [];
   public stockSucursales: any = [];
   public stockSucursales_const: any = [];
@@ -187,6 +186,7 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     private _marcaService: variosService,
     private inventarioModal: InventarioModalService,
     private _productoCrearModal: ProductoCrearModalService,
+    private buscadorProductosModal: BuscadorProductosModalService,
     private _router: Router,
     private modalService: NgbModal,
 
@@ -209,36 +209,6 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     this.uploadForm = this.fb.group({
       xmlFile: [null],
     });
-  }
-
-  private buscadorModalEl: HTMLElement | null = null;
-  private readonly onBuscadorModalShownBound = (): void => {
-    this.enfocarInputBuscadorModalCompras();
-  };
-
-  ngAfterViewInit(): void {
-    this.buscadorModalEl = document.getElementById('buscadorModal');
-    this.buscadorModalEl?.addEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
-  }
-
-  ngOnDestroy(): void {
-    this.buscadorModalEl?.removeEventListener('shown.bs.modal', this.onBuscadorModalShownBound);
-    this.buscadorModalEl = null;
-  }
-
-  enfocarInputBuscadorModalCompras(): void {
-    const intentar = () => {
-      const el = document.getElementById('create-compras-buscador-modal-search');
-      if (el instanceof HTMLInputElement) {
-        el.focus({ preventScroll: true });
-        if (el.value.length > 0) {
-          el.select();
-        }
-      }
-    };
-    intentar();
-    setTimeout(intentar, 80);
-    setTimeout(intentar, 200);
   }
 
   ngOnInit(): void {
@@ -700,7 +670,6 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
           this.productos = response.data;
         }
         this.productos_const = this.productos;
-        this.buscarProductos();
       },
       (error) => {
       }
@@ -830,16 +799,12 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
   }
 
   buscar() {
-        
     this._proveedoresService.obtener_proveedor_ruc(this.compras.ruc).subscribe({
       next: (response) => {
         if (response?.data && response.data.length > 0) {
-          this.proveedores = response.data[0];
-          this.compras.idProveedor = this.proveedores?.idProveedor;
-          this.compras.idDocumento = this.proveedores?.idDocumento;
+          this.asignarProveedorEnCompra(response.data[0]);
         } else {
-          this.proveedores = {};
-          this.compras.idProveedor = '';
+          this.limpiarProveedorEnCompra();
           iziToast.show({
             title: 'ERROR',
             titleColor: '#FF0000',
@@ -852,10 +817,55 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
       },
       error: (err) => {
         console.error('buscar proveedor:', err);
-        this.proveedores = {};
-        this.compras.idProveedor = '';
+        this.limpiarProveedorEnCompra();
       },
     });
+  }
+
+  proveedorSeleccionado(proveedor: Record<string, unknown>): void {
+    const aplicado = this.asignarProveedorEnCompra(proveedor);
+    if (!aplicado) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'No se pudo cargar el proveedor seleccionado.',
+        position: 'topRight'
+      });
+      return;
+    }
+    this.cerrarModalProveedores();
+    iziToast.success({
+      title: 'Proveedor',
+      message: `${this.compras.rSocial || 'Proveedor'} cargado correctamente.`,
+      position: 'topRight'
+    });
+  }
+
+  private cerrarModalProveedores(): void {
+    const modalEl = document.getElementById('proveedoresModal');
+    if (!modalEl || typeof bootstrap === 'undefined') return;
+    const inst = bootstrap.Modal.getInstance(modalEl) ?? bootstrap.Modal.getOrCreateInstance(modalEl);
+    inst.hide();
+  }
+
+  private asignarProveedorEnCompra(proveedor: Record<string, unknown> | null | undefined): boolean {
+    const mapped = aplicarProveedorEnCompra(proveedor);
+    if (!mapped) {
+      this.limpiarProveedorEnCompra();
+      return false;
+    }
+    this.proveedores = mapped.proveedores;
+    this.compras.ruc = mapped.ruc;
+    this.compras.idProveedor = mapped.idProveedor;
+    this.compras.idDocumento = mapped.idDocumento;
+    this.compras.rSocial = mapped.rSocial;
+    return true;
+  }
+
+  private limpiarProveedorEnCompra(): void {
+    this.proveedores = {};
+    this.compras.idProveedor = '';
+    this.compras.idDocumento = '';
+    this.compras.rSocial = '';
   }
 
   quitar(idx: any, subtotal: any) {
@@ -1923,16 +1933,6 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  /** True si el listado de productos trae empresa (gestora / multi-empresa en compras). */
-  muestraEmpresaEnBuscadorCompras(): boolean {
-    const list = Array.isArray(this.productos_const) ? this.productos_const : [];
-    return list.some(
-      (p: { aliasEmpresa?: string; razonSocialEmpresa?: string }) =>
-        !!(p?.aliasEmpresa && String(p.aliasEmpresa).trim()) ||
-        !!(p?.razonSocialEmpresa && String(p.razonSocialEmpresa).trim())
-    );
-  }
-
   /** Marca para filas de detalle (objeto, string, producto o idMarca + catálogo). */
   textoMarcaDetalle(item: any): string {
     if (!item) return '—';
@@ -1975,55 +1975,6 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     return '—';
   }
 
-  buscarProductos(): void {
-    const term: string = this.searchTerm.toLowerCase().trim();
-    if (term === '') {
-      this.productos_filtrados = this.productos_const;
-    } else {
-      this.productos_filtrados = this.productos_const.filter((item: any) => {
-        const descripcion = (item.descripcion ?? '').toString().toLowerCase();
-        const codigo = (item.codigo ?? '').toString().toLowerCase();
-        const marcaCol = marcaProductoEnLista(item).toLowerCase();
-        const marcaLegacy = (item.nombre ?? '').toString().toLowerCase();
-        const categoria = (item.categoria ?? '').toString().toLowerCase();
-        return (
-          descripcion.includes(term) ||
-          codigo.includes(term) ||
-          marcaCol.includes(term) ||
-          marcaLegacy.includes(term) ||
-          categoria.includes(term)
-        );
-      });
-    }
-  }
-
-  /** Vuelve a cargar productos desde BD y reaplica el filtro sin tocar el input. */
-  recargarProductosModalCompras(): void {
-    this._productoService.obtenerProductosCompras({ evitarCache: true }).subscribe({
-      next: (response) => {
-        if (response.data != undefined) {
-          this.productos = response.data;
-        }
-        this.productos_const = this.productos;
-        this.buscarProductos();
-      },
-      error: () => {}
-    });
-  }
-
-  uMedidaColumnaCompras(p: any): string {
-    return descripcionUnidadMedidaProducto(p);
-  }
-
-  marcaColumnaCompras(p: any): string {
-    const t = marcaProductoEnLista(p as Record<string, unknown>);
-    return t || '—';
-  }
-
-  productoSinStockEnBusquedaModal(p: unknown): boolean {
-    return productoSinStockEnBusqueda(p as Record<string, unknown>);
-  }
-
   /** Mismo modal de crear producto que en el listado de productos (ProductoCrearModalService). */
   async abrirCrearProductoCompras(): Promise<void> {
     const creado = await this._productoCrearModal.abrir();
@@ -2037,7 +1988,6 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
           this.productos = response.data;
         }
         this.productos_const = this.productos;
-        this.buscarProductos();
         this.aplicarProductoCreadoEnCompra(creado);
       },
       error: () => {
@@ -2181,26 +2131,26 @@ export class CreateComprasComponent implements AfterViewInit, OnDestroy {
     this.sumarFooterFactura();
   }
 
-  seleccionaProducto(prod: any): void {
-        // 1.  Agrega al carrito
-    this.agregarDetallesCompra(prod);
-
-
-    // 2.  Cierra el modal (por JS)
-    const buscador = bootstrap.Modal.getInstance(
-      document.getElementById('buscadorModal')!
-    );
-    buscador?.hide();
+  abrirBuscadorProductos(): void {
+    const idSucursal =
+      this.compras.idSucursal ||
+      this.obtenerIdSucursalPrincipal() ||
+      undefined;
+    this.buscadorProductosModal
+      .abrir({
+        modo: 'compra',
+        etiquetaPrecio: 'Precio ref.',
+        idSucursal,
+      })
+      .then((p) => {
+        if (p) {
+          this.seleccionaProducto(p);
+        }
+      });
   }
 
-  abrirBuscadorModal(): void {
-    this.searchTerm = '';
-    this.productos_filtrados = this.productos_const ?? [];
-    const el: HTMLElement | null = document.getElementById('buscadorModal');
-    if (el) {
-      const modal = new bootstrap.Modal(el);
-      modal.show();
-    }
+  seleccionaProducto(prod: any): void {
+    this.agregarDetallesCompra(prod);
   }
 
   /** Limpia tipo de cambio SUNAT cuando no aplica (soles o contado). */

@@ -238,7 +238,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
 
   async abrirBuscadorProductos(): Promise<void> {
     const idSucursal = this.form.get('idSucursal')?.value || undefined;
-    const seleccionado = await this.buscadorProductosModal.abrir(idSucursal);
+    const seleccionado = await this.buscadorProductosModal.abrir({ idSucursal });
     if (!seleccionado) return;
     this.agregarProductoSeleccionado(seleccionado);
   }

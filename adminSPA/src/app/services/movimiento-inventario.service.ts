@@ -275,6 +275,8 @@ export interface KardexFila {
   saldoCantidad: number;
   saldoPUnitario: number;
   saldoImporte: number;
+  excluidoDeTotales?: boolean;
+  estadoComprobante?: string | null;
 }
 
 export interface KardexTotales {
@@ -284,6 +286,8 @@ export interface KardexTotales {
   totalSalidaImporte: number;
   saldoFinalCantidad: number;
   saldoFinalImporte: number;
+  saldoFinalPUnitario?: number;
+  stockActualSistema?: number;
 }
 
 export interface KardexResponse {
