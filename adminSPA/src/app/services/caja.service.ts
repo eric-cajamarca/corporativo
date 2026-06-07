@@ -164,7 +164,7 @@ export class CajaService {
     return this._http.get(this.url + 'caja/recibos-egreso', { headers, withCredentials: true, params });
   }
 
-  // Recibos de ingreso (solo movimientos RI, sin ventas)
+  // Recibos de ingreso (movimientos RI y saldo anterior SA, sin ventas)
   getRecibosIngreso(filtros?: { fechaDesde?: string; fechaHasta?: string }, idEmpresaOperacion?: string | null): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     let params = new HttpParams()

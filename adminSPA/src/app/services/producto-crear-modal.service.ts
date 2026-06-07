@@ -7,6 +7,10 @@ export interface ProductoCreadoModalResult {
   idProducto: string;
   codigo: string;
   descripcion: string;
+  idCategoria?: number;
+  idMarca?: number;
+  idPresentacion?: number;
+  fProduccion?: string;
   /** Cantidad del lote inicial si se registró en el modal */
   cantidadDesdeLote?: number;
   costoUnitario?: number;

@@ -43,6 +43,7 @@ function repartirDetallePagoEntreComprobantes(lineasComprobante, detallePago) {
     idEmpresa: l.idEmpresa,
     compVenta: l.compVenta,
     idSucursal: l.idSucursal,
+    fEmision: l.fEmision,
     total: round2(Number(l.total) || 0),
   }));
 

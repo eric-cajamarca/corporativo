@@ -1431,7 +1431,8 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       .input('idVenta', sql.Int, idVenta)
       .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .query(`
-        SELECT ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, c.codigo AS codigoComprobante, v.fEmision,
+        SELECT ISNULL(v.eliminado, 0) AS eliminado, v.idEstadoSunat, c.codigo AS codigoComprobante,
+          CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
           v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario,
           ISNULL(v.total, 0) AS totalAnterior, v.idEstadoPago, v.idVentaAgrupada
         FROM Ventas v
@@ -2191,7 +2192,8 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
             idUsuario: idUsuarioCajaRaw,
             idVenta,
             compVenta: compVenta || 'S/N',
-            detallePago: detalleCajaSync
+            detallePago: detalleCajaSync,
+            fechaMovimiento: rowChk.fEmision || null
           });
         } else {
           await transaction
@@ -2801,6 +2803,7 @@ exports.listarVentasEmpresaPorAgrupada = async (transaction, idVentaAgrupada) =>
         ve.total,
         ve.idCliente,
         v.idSucursal,
+        CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
         UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
       FROM VentaEmpresa ve
       LEFT JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
@@ -3227,6 +3230,7 @@ exports.obtenerVentaParaCobroPendiente = async (pool, idVenta, idEmpresa) => {
         v.idEstadoPago,
         v.idCliente,
         v.total,
+        CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
         CONVERT(VARCHAR(10), v.fVencimiento, 23) AS fVencimiento,
         UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
       FROM Ventas v

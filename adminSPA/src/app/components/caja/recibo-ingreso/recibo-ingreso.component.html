@@ -53,30 +53,29 @@
             <tr *ngIf="loading">
               <td colspan="9" class="text-center py-3">Cargando...</td>
             </tr>
-            <tr *ngFor="let item of listPaginated">
+            <tr *ngFor="let item of listPaginated" [class.movimiento-eliminado]="esEliminado(item)">
               <td>
-                <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar">
+                <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar"
+                        [disabled]="esEliminado(item)">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar">
+                <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar"
+                        [disabled]="esEliminado(item)">
                   <i class="bi bi-trash"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-info me-1" (click)="ver(item)" title="Consultar">
-                  <i class="bi bi-search"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-warning" (click)="imprimir(item)" title="Imprimir">
                   <i class="bi bi-printer"></i>
                 </button>
               </td>
-              <td>{{ formatFecha(item.fechaMovimiento) }}</td>
-              <td *ngIf="empresasOperacion.length > 1">{{ item.empresaMovimiento || '—' }}</td>
-              <td>{{ item.documentoRelacionado || '-' }}</td>
-              <td>{{ item.concepto }}</td>
-              <td>{{ item.glosa || '------' }}</td>
-              <td>{{ item.recibidoDe || '-' }}</td>
-              <td class="text-end">{{ formatCurrency(item.monto) }}</td>
-              <td>{{ item.medioPago ? (item.medioPago).slice(0, 3).toUpperCase() : '-' }}</td>
-              <td>{{ item.usuario || '-' }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ formatFecha(item.fechaMovimiento) }}</td>
+              <td *ngIf="empresasOperacion.length > 1" [class.text-decoration-line-through]="esEliminado(item)">{{ item.empresaMovimiento || '—' }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.documentoRelacionado || '-' }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.concepto }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.glosa || '------' }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.recibidoDe || '-' }}</td>
+              <td class="text-end" [class.text-decoration-line-through]="esEliminado(item)">{{ formatCurrency(item.monto) }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.medioPago ? (item.medioPago).slice(0, 3).toUpperCase() : '-' }}</td>
+              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.usuario || '-' }}</td>
             </tr>
             <tr *ngIf="!loading && list.length === 0">
               <td [attr.colspan]="colspanTablaRecibos" class="text-center py-4 text-muted">No hay recibos de ingreso.</td>

@@ -28,6 +28,7 @@ export interface ReciboIngresoItem {
   usuario?: string;
   glosa?: string;
   recibidoDe?: string;
+  eliminado?: boolean;
 }
 
 @Component({
@@ -266,6 +267,10 @@ export class ReciboIngresoComponent implements OnInit {
     });
   }
 
+  esEliminado(item: ReciboIngresoItem): boolean {
+    return item.eliminado === true;
+  }
+
   private mapItem(m: any): ReciboIngresoItem {
     const obs = (m.observaciones || '').trim();
     let recibidoDe = '';
@@ -282,6 +287,11 @@ export class ReciboIngresoComponent implements OnInit {
       }
     }
     const doc = m.documentoRelacionado || ('RI 0001-' + (m.idMovimientoCaja || '').slice(-6));
+    const esSaldoAnterior = (m.concepto || '').toLowerCase().includes('saldo del día anterior')
+      || (doc || '').trim().toUpperCase().startsWith('SA ');
+    if (esSaldoAnterior && !recibidoDe) {
+      glosa = obs || 'Saldo del día anterior';
+    }
     return {
       idMovimientoCaja: m.idMovimientoCaja,
       empresaMovimiento: m.empresaMovimiento,
@@ -295,7 +305,8 @@ export class ReciboIngresoComponent implements OnInit {
       observaciones: m.observaciones,
       usuario: m.usuario,
       glosa,
-      recibidoDe: recibidoDe || (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : '')
+      recibidoDe: recibidoDe || (esSaldoAnterior ? '—' : (m.observaciones && !m.observaciones.includes('|') ? m.observaciones : '')),
+      eliminado: m.eliminado === true || m.eliminado === 1
     };
   }
 
@@ -322,6 +333,7 @@ export class ReciboIngresoComponent implements OnInit {
   }
 
   editar(item: ReciboIngresoItem): void {
+    if (this.esEliminado(item)) return;
     this.editandoId = item.idMovimientoCaja;
     this.form = {
       idApertura: item.idApertura || '',
@@ -468,6 +480,7 @@ export class ReciboIngresoComponent implements OnInit {
   }
 
   eliminar(item: ReciboIngresoItem): void {
+    if (this.esEliminado(item)) return;
     if (!confirm('¿Eliminar este recibo de ingreso?')) return;
     this.cajaService.eliminarMovimiento(item.idMovimientoCaja).subscribe({
       next: () => {

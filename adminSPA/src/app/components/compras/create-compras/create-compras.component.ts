@@ -1996,22 +1996,78 @@ export class CreateComprasComponent {
     });
   }
 
+  private fechaDetalleCompra(valor: unknown): string {
+    if (valor == null || String(valor).trim() === '') {
+      return '';
+    }
+    const s = String(valor).trim();
+    return s.length >= 10 ? s.slice(0, 10) : s;
+  }
+
+  /** Completa categoria, marca, presentacion y sucursal en una línea del detalle a partir de los catálogos cargados. */
+  private enriquecerObjetosDetalleCompra(linea: Record<string, unknown>): void {
+    const idSucursal = linea['idSucursal'];
+    if (idSucursal != null) {
+      const sucursalObj = this.sucursales?.find(
+        (s: { idSucursal?: string }) => String(s.idSucursal) === String(idSucursal)
+      );
+      if (sucursalObj) {
+        linea['sucursal'] = sucursalObj;
+      }
+    }
+
+    const idCategoria = linea['idCategoria'];
+    if (idCategoria != null) {
+      const categoriaObj = this.categoria?.find(
+        (c: { idCategoria?: number }) => Number(c.idCategoria) === Number(idCategoria)
+      );
+      if (categoriaObj) {
+        linea['categoria'] = categoriaObj;
+      } else if (typeof linea['categoria'] === 'string' && String(linea['categoria']).trim()) {
+        linea['categoria'] = { nombre: String(linea['categoria']).trim() };
+      }
+    }
+
+    const idMarca = linea['idMarca'];
+    if (idMarca != null) {
+      const marcaObj = this.marcas?.find(
+        (m: { idMarca?: number }) => Number(m.idMarca) === Number(idMarca)
+      );
+      if (marcaObj) {
+        linea['marca'] = marcaObj;
+      } else if (typeof linea['marca'] === 'string' && String(linea['marca']).trim()) {
+        linea['marca'] = { nombre: String(linea['marca']).trim(), idMarca: Number(idMarca) };
+      }
+    }
+
+    const idPresentacion = linea['idPresentacion'];
+    if (idPresentacion != null) {
+      const presentacionObj = this.presentacion?.find(
+        (p: { idPresentacion?: number }) => Number(p.idPresentacion) === Number(idPresentacion)
+      );
+      if (presentacionObj) {
+        linea['presentacion'] = presentacionObj;
+      } else if (linea['codigoPresentacion'] != null || linea['descripcionPres'] != null) {
+        linea['presentacion'] = {
+          idPresentacion: Number(idPresentacion),
+          codigo: linea['codigoPresentacion'] ?? '',
+          descripcion: linea['descripcionPres'] ?? '',
+          Descripcion: linea['descripcionPres'] ?? '',
+        };
+      }
+    }
+  }
+
   private aplicarProductoCreadoEnCompra(creado: ProductoCreadoModalResult): void {
     const enCatalogo = (this.productos_const || []).find(
-      (p: { idProducto?: string }) => p.idProducto === creado.idProducto
+      (p: { idProducto?: string }) =>
+        String(p.idProducto).toLowerCase() === String(creado.idProducto).toLowerCase()
     );
-    const productoBase =
-      enCatalogo ??
-      ({
-        idProducto: creado.idProducto,
-        codigo: creado.codigo,
-        descripcion: creado.descripcion,
-        cUnitario: creado.costoUnitario ?? 0,
-      } as Record<string, unknown>);
 
     const idSucursal =
       this.compras.idSucursal ||
       creado.idSucursalLote ||
+      enCatalogo?.idSucursal ||
       this.obtenerIdSucursalPrincipal() ||
       (this.sucursales?.length === 1 ? this.sucursales[0].idSucursal : null);
     if (!this.compras.idSucursal && idSucursal) {
@@ -2025,34 +2081,19 @@ export class CreateComprasComponent {
     const costo =
       creado.costoUnitario != null && creado.costoUnitario > 0
         ? Number(creado.costoUnitario)
-        : Number(
-            (productoBase as { cUnitario?: number; pUnitario?: number }).cUnitario ??
-              (productoBase as { pUnitario?: number }).pUnitario ??
-              0
-          );
+        : Number(enCatalogo?.cUnitario ?? enCatalogo?.pUnitario ?? 0);
 
-    const idPresentacion =
-      (productoBase as { idPresentacion?: number }).idPresentacion ??
-      (productoBase as { presentacion?: { idPresentacion?: number } }).presentacion?.idPresentacion;
-    const sucursalObj =
-      this.sucursales?.find((s: { idSucursal?: string }) => s.idSucursal === idSucursal) ?? null;
-    const presentacionObj =
-      this.presentacion?.find((p: { idPresentacion?: number }) => p.idPresentacion === idPresentacion) ??
-      (productoBase as { presentacion?: unknown }).presentacion ??
-      null;
-    const idMarca =
-      (productoBase as { idMarca?: number }).idMarca ??
-      (productoBase as { marca?: { idMarca?: number } }).marca?.idMarca;
-    const idCategoria =
-      (productoBase as { idCategoria?: number }).idCategoria ??
-      (productoBase as { categoria?: { idCategoria?: number } }).categoria?.idCategoria;
-    const marcaObj = this.marcas?.find((m: { idMarca?: number }) => Number(m.idMarca) === Number(idMarca));
-    const categoriaObj = this.categoria?.find(
-      (c: { idCategoria?: number }) => Number(c.idCategoria) === Number(idCategoria)
-    );
+    const idCategoria = creado.idCategoria ?? enCatalogo?.idCategoria;
+    const idMarca = creado.idMarca ?? enCatalogo?.idMarca;
+    const idPresentacion = creado.idPresentacion ?? enCatalogo?.idPresentacion;
+    const codigo = String(creado.codigo || enCatalogo?.codigo || '').trim();
+    const descripcion = String(creado.descripcion || enCatalogo?.descripcion || '').trim();
+    const fproduccion = this.fechaDetalleCompra(creado.fProduccion ?? enCatalogo?.fProduccion);
+    const fvencimiento = this.fechaDetalleCompra(creado.fechaVencimiento ?? enCatalogo?.fVencimiento);
 
     const existe = this.detalleCompras.find(
-      (p: { idProducto?: string }) => p.idProducto === creado.idProducto
+      (p: { idProducto?: string }) =>
+        String(p.idProducto).toLowerCase() === String(creado.idProducto).toLowerCase()
     );
     if (existe) {
       existe.cantidad = (Number(existe.cantidad) || 0) + cantidad;
@@ -2060,34 +2101,54 @@ export class CreateComprasComponent {
         existe.cUnitario = costo;
         existe.pUnitario = costo;
       }
-      if (creado.fechaVencimiento) {
-        const fv = String(creado.fechaVencimiento).slice(0, 10);
-        existe.fVencimiento = fv;
-        existe.fvencimiento = fv;
+      if (codigo) {
+        existe.codigo = codigo;
       }
+      if (idCategoria != null) {
+        existe.idCategoria = idCategoria;
+      }
+      if (idMarca != null) {
+        existe.idMarca = idMarca;
+      }
+      if (idPresentacion != null) {
+        existe.idPresentacion = idPresentacion;
+      }
+      if (fproduccion) {
+        existe.fproduccion = fproduccion;
+        existe.fProduccion = fproduccion;
+      }
+      if (fvencimiento) {
+        existe.fVencimiento = fvencimiento;
+        existe.fvencimiento = fvencimiento;
+      }
+      this.enriquecerObjetosDetalleCompra(existe);
       existe.subtotal =
         (Number(existe.cantidad) || 0) * (Number(existe.cUnitario ?? existe.pUnitario ?? 0));
     } else {
       const linea: Record<string, unknown> = {
-        ...productoBase,
-        idSucursal,
-        sucursal: sucursalObj,
-        idPresentacion: idPresentacion ?? (presentacionObj as { idPresentacion?: number })?.idPresentacion,
-        presentacion: presentacionObj,
-        idMarca,
-        marca: marcaObj,
+        idProducto: creado.idProducto,
+        codigo,
+        descripcion,
         idCategoria,
-        categoria: categoriaObj,
+        idMarca,
+        idPresentacion,
+        idSucursal,
         cantidad,
         cUnitario: costo,
         pUnitario: costo,
         subtotal: cantidad * costo,
+        fproduccion,
+        fProduccion: fproduccion,
+        fVencimiento: fvencimiento,
+        fvencimiento,
       };
-      if (creado.fechaVencimiento) {
-        const fv = String(creado.fechaVencimiento).slice(0, 10);
-        linea['fVencimiento'] = fv;
-        linea['fvencimiento'] = fv;
+      if (enCatalogo) {
+        linea['categoria'] = enCatalogo.categoria;
+        linea['marca'] = enCatalogo.marca;
+        linea['codigoPresentacion'] = enCatalogo.codigoPresentacion;
+        linea['descripcionPres'] = enCatalogo.descripcionPres;
       }
+      this.enriquecerObjetosDetalleCompra(linea);
       this.detalleCompras.push(linea);
     }
 

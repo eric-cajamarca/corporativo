@@ -296,7 +296,8 @@ exports.postCobrarVentaAgrupada = async (pool, user, idVentaAgrupada, body) => {
         idEmpresa: v.idEmpresa,
         compVenta: v.compVenta,
         total: v.total,
-        idSucursal: v.idSucursal
+        idSucursal: v.idSucursal,
+        fEmision: v.fEmision
       })),
       detallePago,
       idEmpresaCobradora: user.empresa,
@@ -391,7 +392,8 @@ exports.postCobrarVenta = async (pool, user, idVenta, body) => {
         idUsuario: user.sub,
         idVenta,
         compVenta: venta.compVenta || '',
-        detallePago: detalleCaja
+        detallePago: detalleCaja,
+        fechaMovimiento: venta.fEmision || null
       });
     }
     await transaction.commit();

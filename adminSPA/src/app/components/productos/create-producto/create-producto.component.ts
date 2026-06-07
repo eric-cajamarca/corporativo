@@ -822,10 +822,24 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       ? String(v.fVencimiento).trim()
       : '';
     const fv = fvRaw.length >= 10 ? fvRaw.slice(0, 10) : fvRaw;
+    const fpRaw = v.fProduccion != null && String(v.fProduccion).trim() !== ''
+      ? String(v.fProduccion).trim()
+      : '';
+    const fp = fpRaw.length >= 10 ? fpRaw.slice(0, 10) : fpRaw;
     return {
       idProducto,
       codigo: String(v.codigo || ''),
       descripcion: String(v.descripcion || ''),
+      idCategoria: v.idCategoria != null && String(v.idCategoria).trim() !== ''
+        ? Number(v.idCategoria)
+        : undefined,
+      idMarca: v.idMarca != null && String(v.idMarca).trim() !== ''
+        ? Number(v.idMarca)
+        : undefined,
+      idPresentacion: v.idPresentacion != null && String(v.idPresentacion).trim() !== ''
+        ? Number(v.idPresentacion)
+        : undefined,
+      fProduccion: fp || undefined,
       cantidadDesdeLote: loteQty > 0 ? loteQty : undefined,
       costoUnitario: costo > 0 ? costo : undefined,
       fechaVencimiento: fv || undefined,

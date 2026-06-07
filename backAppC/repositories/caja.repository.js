@@ -216,7 +216,7 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
           ISNULL(SUM(CASE WHEN tmc.tipo = 'I' THEN mc.monto ELSE 0 END), 0) AS ingresos,
           ISNULL(SUM(CASE WHEN tmc.tipo = 'E' THEN mc.monto ELSE 0 END), 0) AS egresos
         FROM AperturasCaja ac
-        LEFT JOIN MovimientosCaja mc ON ac.idApertura = mc.idApertura
+        LEFT JOIN MovimientosCaja mc ON ac.idApertura = mc.idApertura AND ISNULL(mc.eliminado, 0) = 0
         LEFT JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
         WHERE ac.idApertura = @idApertura
         GROUP BY ac.montoInicial
@@ -474,10 +474,13 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
     whereClause += " AND tmc.tipo = @tipoMovimiento";
   }
   if (filtros.soloRecibos && filtros.tipoMovimiento === "I") {
-    whereClause += " AND mc.documentoRelacionado LIKE 'RI %'";
+    whereClause += " AND (mc.documentoRelacionado LIKE 'RI %' OR mc.documentoRelacionado LIKE 'SA %')";
   }
   if (filtros.soloRecibos && filtros.tipoMovimiento === "E") {
     whereClause += " AND mc.documentoRelacionado LIKE 'RE %'";
+  }
+  if (!filtros.soloRecibos) {
+    whereClause += " AND ISNULL(mc.eliminado, 0) = 0";
   }
 
   request
@@ -511,6 +514,7 @@ exports.obtenerMovimientosCajaRepo = async (pool, idsEmpresa, filtros, opcionesV
         mon.simbolo + ' ' + mon.descripcion AS moneda,
         mc.documentoRelacionado,
         mc.observaciones,
+        ISNULL(mc.eliminado, 0) AS eliminado,
         LTRIM(RTRIM(ISNULL(uw.nombres, '') + ' ' + ISNULL(uw.apellidos, ''))) AS usuario
       FROM MovimientosCaja mc
       ${joinAperturaCaja}
@@ -545,8 +549,11 @@ exports.eliminarMovimientoCajaRepo = async (pool, idMovimientoCaja, idEmpresa) =
     .input("idMovimientoCaja", sql.UniqueIdentifier, idMovimientoCaja)
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .query(`
-      DELETE FROM MovimientosCaja
-      WHERE idMovimientoCaja = @idMovimientoCaja AND idEmpresa = @idEmpresa
+      UPDATE MovimientosCaja
+      SET eliminado = 1
+      WHERE idMovimientoCaja = @idMovimientoCaja
+        AND idEmpresa = @idEmpresa
+        AND ISNULL(eliminado, 0) = 0
     `);
   return result.rowsAffected[0];
 };
@@ -566,7 +573,9 @@ exports.actualizarMovimientoCajaRepo = async (pool, idEmpresa, datos) => {
       UPDATE MovimientosCaja
       SET concepto = @concepto, idConcepto = @idConcepto, monto = @monto, idMediosPago = @idMediosPago,
           documentoRelacionado = @documentoRelacionado, observaciones = @observaciones
-      WHERE idMovimientoCaja = @idMovimientoCaja AND idEmpresa = @idEmpresa
+      WHERE idMovimientoCaja = @idMovimientoCaja
+        AND idEmpresa = @idEmpresa
+        AND ISNULL(eliminado, 0) = 0
     `);
   return result.rowsAffected[0];
 };
@@ -650,7 +659,7 @@ exports.obtenerResumenCajaDiarioRepo = async (pool, idEmpresa, fecha) => {
       FROM AperturasCaja ac
       INNER JOIN Cajas c ON ac.idCaja = c.idCaja
       INNER JOIN Sucursal s ON ac.idSucursal = s.idSucursal
-      LEFT JOIN MovimientosCaja mc ON ac.idApertura = mc.idApertura
+      LEFT JOIN MovimientosCaja mc ON ac.idApertura = mc.idApertura AND ISNULL(mc.eliminado, 0) = 0
       LEFT JOIN TiposMovimientoCaja tmc ON mc.idTipoMovimientoCaja = tmc.idTipoMovimientoCaja
       LEFT JOIN CierresCaja cc ON ac.idApertura = cc.idApertura
       LEFT JOIN UsuarioWeb uw ON ac.idUsuario = uw.idUsuario
@@ -722,6 +731,7 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
     compVenta,
     detallePago,
     conceptoVentaCaja,
+    fechaMovimiento,
   } = payload;
   if (!idApertura || !idVenta || !detallePago || detallePago.length === 0) return;
 
@@ -765,9 +775,10 @@ exports.registrarMovimientosVentaContadoRepo = async (transaction, payload) => {
       .input("idMoneda", sql.Int, 1)
       .input("documentoRelacionado", sql.VarChar(20), compNorm.length > 20 ? compNorm.substring(0, 20) : compNorm)
       .input("idVenta", sql.Int, idVenta)
+      .input("fechaMovimiento", sql.VarChar(23), fechaMovimiento || null)
       .query(`
         INSERT INTO MovimientosCaja (idApertura, idEmpresa, idSucursal, idUsuario, idTipoMovimientoCaja, fechaMovimiento, concepto, monto, idMediosPago, idMoneda, documentoRelacionado, idVenta)
-        VALUES (@idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja, GETDATE(), @concepto, @monto, @idMediosPago, @idMoneda, @documentoRelacionado, @idVenta)
+        VALUES (@idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja, ISNULL(TRY_CONVERT(DATETIME, @fechaMovimiento, 120), GETDATE()), @concepto, @monto, @idMediosPago, @idMoneda, @documentoRelacionado, @idVenta)
       `);
   }
 };
@@ -838,7 +849,10 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
   }
   if (filtrarPorCaja) request.input("idCaja", sql.UniqueIdentifier, idCaja);
 
-  const condicionFecha = usaRango
+  const condicionFechaVentas = usaRango
+    ? "AND CONVERT(DATE, v.fEmision) >= @fechaInicial AND CONVERT(DATE, v.fEmision) <= @fechaFinal"
+    : "AND CONVERT(DATE, v.fEmision) = @fecha";
+  const condicionFechaOtros = usaRango
     ? "AND CONVERT(DATE, mc.fechaMovimiento) >= @fechaInicial AND CONVERT(DATE, mc.fechaMovimiento) <= @fechaFinal"
     : "AND CONVERT(DATE, mc.fechaMovimiento) = @fecha";
 
@@ -860,7 +874,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE ${whereMcPrincipal}
-      ${condicionFecha}
+      ${condicionFechaVentas}
+      AND ISNULL(mc.eliminado, 0) = 0
       AND mc.idVenta IS NOT NULL
       ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
     GROUP BY tmc.nombre, tmc.tipo, fp.descripcion, mp.descripcion
@@ -877,7 +892,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE ${whereMcPrincipal}
-      ${condicionFecha}
+      ${condicionFechaOtros}
+      AND ISNULL(mc.eliminado, 0) = 0
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)
       ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
     GROUP BY tmc.nombre, tmc.tipo, fp.descripcion, mp.descripcion
@@ -936,7 +952,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE ${whereMcDetalle}
-      ${condicionFecha}
+      ${condicionFechaVentas}
+      AND ISNULL(mc.eliminado, 0) = 0
       AND mc.idVenta IS NOT NULL
       ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
   `;
@@ -954,7 +971,8 @@ exports.obtenerArqueoDinamicoRepo = async (pool, idsEmpresa, filtros, opcionesVi
     LEFT JOIN FormasPago fp ON fp.idFormaPago = mc.idMediosPago
     LEFT JOIN MediosPago mp ON mp.idMediosPago = mc.idMediosPago
     WHERE ${whereMcDetalle}
-      ${condicionFecha}
+      ${condicionFechaOtros}
+      AND ISNULL(mc.eliminado, 0) = 0
       AND (mc.idVenta IS NULL OR mc.idVenta = 0)
       ${filtrarPorCaja ? "AND ac.idCaja = @idCaja" : ""}
   `;

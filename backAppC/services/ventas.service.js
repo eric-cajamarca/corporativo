@@ -746,6 +746,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
       compVenta,
       total: totalesEmpresa.total,
       idSucursal: idSucursalLinea,
+      fEmision: fechaEmisionConHora,
     }];
 
     if (detallePago && Array.isArray(detallePago) && detallePago.length > 0 && ventasEmpresa.length > 0) {
@@ -768,6 +769,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
           compVenta: v.compVenta,
           total: v.total,
           idSucursal: v.idSucursal,
+          fEmision: v.fEmision,
         })),
         detallePago,
         idEmpresaCobradora: user.empresa,
@@ -1238,6 +1240,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
         compVenta,
         total: totalesEmpresa.total,
         idSucursal: idSucursalEmpresa,
+        fEmision: fechaEmisionConHora,
       });
       }
     }
@@ -1278,6 +1281,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           compVenta: v.compVenta,
           total: v.total,
           idSucursal: v.idSucursal,
+          fEmision: v.fEmision,
         })),
         detallePago,
         idEmpresaCobradora: user.empresa,

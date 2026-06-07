@@ -127,6 +127,7 @@ exports.aplicarCobroVentasAgrupadasMulticompania = async (pool, transaction, pay
       compVenta: compHijo || 'S/N',
       conceptoVentaCaja,
       detallePago: detalleCaja,
+      fechaMovimiento: linea.fEmision || null,
     });
   }
 };
