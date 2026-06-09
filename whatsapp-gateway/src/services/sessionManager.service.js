@@ -172,41 +172,38 @@ function rememberOutboundMessage(t, sentMsg) {
   setTimeout(() => t.suppressMessageIds.delete(id), 60000);
 }
 
-function shouldForwardInbound(message, t) {
+function inboundSkipReason(message, t) {
   const key = message?.key;
-  if (!key) return false;
+  if (!key) return 'sin_key';
 
   const remoteJid = String(key.remoteJid || '');
-  if (remoteJid.endsWith('@g.us') || remoteJid.includes('@broadcast')) return false;
+  if (remoteJid.endsWith('@g.us') || remoteJid.includes('@broadcast')) return 'grupo_o_broadcast';
 
   if (key.fromMe) {
-    if (key.id && t?.suppressMessageIds?.has(key.id)) return false;
-    if (!isIndividualChatJid(remoteJid)) return false;
-    // SEGURIDAD: solo permitir mensajes salientes del propio numero vinculado
-    // si son a UNO MISMO (chat consigo mismo / pruebas). Si el dueno del numero
-    // le escribe a OTRO contacto desde su WhatsApp, NO debemos disparar el bot
-    // contra ese contacto: terminariamos respondiendole a alguien que no nos
-    // habia escrito (filtrado de info, spam involuntario al cliente).
+    if (key.id && t?.suppressMessageIds?.has(key.id)) return 'eco_propio';
+    if (!isIndividualChatJid(remoteJid)) return 'fromMe_chat_no_individual';
     const vinc = String(t?.telefonoVinculado || '').replace(/\D/g, '');
-    if (!vinc) return false; // sin numero vinculado conocido, mejor descartar
+    if (!vinc) return 'fromMe_sin_telefono_vinculado';
     if (remoteJid.endsWith('@s.whatsapp.net')) {
       const remotePhone = jidToPhone(remoteJid);
-      if (!remotePhone || remotePhone !== vinc) return false;
+      if (!remotePhone || remotePhone !== vinc) return 'fromMe_otro_contacto';
     } else if (remoteJid.endsWith('@lid')) {
       const mappedPhone = t?.lidToPhone?.get(remoteJid);
-      // Sin mapeo no sabemos a quien le esta escribiendo: rechazar por seguridad.
-      // Si hay mapeo y NO coincide con el vinculado, tambien rechazar.
-      if (!mappedPhone || mappedPhone !== vinc) return false;
+      if (!mappedPhone || mappedPhone !== vinc) return 'fromMe_lid_otro_contacto';
     } else {
-      return false;
+      return 'fromMe_jid_no_soportado';
     }
   } else if (!isIndividualChatJid(remoteJid)) {
-    return false;
+    return 'chat_no_individual';
   }
 
-  if (key.id && t?.processedMessageIds?.has(key.id)) return false;
+  if (key.id && t?.processedMessageIds?.has(key.id)) return 'duplicado';
+  if (!inboundMedia.inboundTieneContenido(message)) return 'sin_contenido_util';
+  return null;
+}
 
-  return inboundMedia.inboundTieneContenido(message);
+function shouldForwardInbound(message, t) {
+  return inboundSkipReason(message, t) == null;
 }
 
 function rememberLidMapping(t, lid, jid) {
@@ -242,10 +239,20 @@ function bindInboundListener(idEmpresa, sock) {
     if (!inboundWebhook.isConfigured()) return;
 
     for (const message of event.messages) {
-      if (!shouldForwardInbound(message, t)) continue;
+      const skipReason = inboundSkipReason(message, t);
+      if (skipReason) {
+        if (skipReason !== 'duplicado' && skipReason !== 'eco_propio') {
+          const previewJid = String(message?.key?.remoteJid || '').slice(0, 40);
+          console.error(`sessionManager inbound skip ${idEmpresa} (${skipReason}) jid=${previewJid}`);
+        }
+        continue;
+      }
 
       const resolved = resolveInboundSender(message, t, t.telefonoVinculado);
-      if (!resolved?.replyTo) continue;
+      if (!resolved?.replyTo) {
+        console.error(`sessionManager inbound skip ${idEmpresa} (remitente_no_resuelto)`);
+        continue;
+      }
 
       const text = String(inboundMedia.extractMessageText(message) || '').trim();
       const messageId = message.key.id || null;

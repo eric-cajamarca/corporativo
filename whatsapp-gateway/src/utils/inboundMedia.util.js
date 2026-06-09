@@ -8,8 +8,22 @@ function extractMessageText(message) {
   if (!content) return '';
   if (content.conversation) return content.conversation;
   if (content.extendedTextMessage?.text) return content.extendedTextMessage.text;
+  if (content.buttonsResponseMessage?.selectedDisplayText) {
+    return content.buttonsResponseMessage.selectedDisplayText;
+  }
+  if (content.listResponseMessage?.singleSelectReply?.selectedRowId) {
+    return content.listResponseMessage.singleSelectReply.selectedRowId;
+  }
+  if (content.listResponseMessage?.title) return content.listResponseMessage.title;
   if (content.imageMessage?.caption) return content.imageMessage.caption;
   if (content.documentMessage?.caption) return content.documentMessage.caption;
+  if (content.videoMessage?.caption) return content.videoMessage.caption;
+  if (content.audioMessage) return '[audio]';
+  if (content.stickerMessage) return '[sticker]';
+  if (content.imageMessage) return '[imagen]';
+  if (content.videoMessage) return '[video]';
+  if (content.locationMessage || content.liveLocationMessage) return '[ubicacion]';
+  if (content.contactMessage) return '[contacto]';
   return '';
 }
 

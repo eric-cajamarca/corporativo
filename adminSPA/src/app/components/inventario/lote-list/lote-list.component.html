@@ -87,9 +87,12 @@
             </tr>
           } @else {
             @for (lote of lotesFiltrados; track lote.idLote) {
-              <tr>
+              <tr [class.table-secondary]="lote.activo === false">
                 <td>
                   <code class="small">{{ lote.idLote | slice:0:8 }}...</code>
+                  @if (lote.activo === false) {
+                    <span class="badge bg-secondary ms-1">Inactivo</span>
+                  }
                 </td>
                 <td>{{ lote.nombreProducto || 'N/D' }}</td>
             <td>{{ lote.aliasEmpresa || 'N/D' }}</td>

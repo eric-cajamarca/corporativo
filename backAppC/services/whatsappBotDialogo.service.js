@@ -385,8 +385,12 @@ async function procesarTurno(ctx, precarga = null) {
         reaccion: '🔍'
       };
     }
+    const ejemplo = await whatsappBotIdentidad.obtenerNombreProductoEjemplo(idEmpresa);
+    const desdeMenuBuscar = Number(nlu.entidades?.menuNumero) === 3;
     return {
-      respuesta: copy.v('aclararProducto'),
+      respuesta: desdeMenuBuscar
+        ? copy.mensajeBuscarProductoMenu(ejemplo)
+        : copy.mensajeAclararProducto(ejemplo),
       conv: { estado: 'buscando_producto', slots: conservarMemoria(conv.slots), candidatos: [] }
     };
   }

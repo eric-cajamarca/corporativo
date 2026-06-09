@@ -25,10 +25,14 @@ const getById = async function (req, res) {
     }else{
         try {
             const { idLote } = req.params;
-                        const lote = await lotesService.getById(idLote);
-                        res.status(200).send({ success: true, data: lote });
+            const idEmpresa = req.user.empresa;
+            const lote = await lotesService.getById(idLote, idEmpresa);
+            if (!lote) {
+                return res.status(404).send({ success: false, error: 'Lote no encontrado' });
+            }
+            res.status(200).send({ success: true, data: lote });
         } catch (error) {
-            res.status(500).send({ success: false, data:undefined });
+            res.status(500).send({ success: false, data: undefined, error: error.message });
         }
     }
 }
@@ -73,8 +77,9 @@ const update = async function (req, res) {
     }else{
         try {
             const { idLote } = req.params;
+            const idEmpresa = req.user.empresa;
             const loteData = req.body;
-            const loteActualizado = await lotesService.update(idLote, loteData);
+            const loteActualizado = await lotesService.update(idLote, idEmpresa, loteData);
             res.status(200).send({ success: true, data: loteActualizado });
         } catch (error) {
             res.status(500).send({ success: false, error: error.message });

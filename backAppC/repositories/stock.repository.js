@@ -17,37 +17,140 @@ async function obtenerCostoUnitarioProducto(transaction, idEmpresa, idProducto) 
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Solo lotes habilitados para ventas/descuentos. */
+const FILTRO_LOTE_ACTIVO = ' AND ISNULL(activo, 1) = 1';
+
+/** Orden FIFO: primero el lote más antiguo con stock disponible. */
+const ORDER_LOTES_FIFO_ASC = 'fechaIngreso ASC, idLote ASC';
+/** Último lote FIFO (para continuar saldo negativo en el mismo bucket). */
+const ORDER_LOTES_FIFO_DESC = 'fechaIngreso DESC, idLote DESC';
+
 /**
  * Descuenta cantidad dejando cantidadDisponible negativa en un lote (venta sin stock).
+ * Antes de ir a negativo, intenta tomar de lotes con cantidadDisponible > 0 (FIFO).
  * Crea lote en 0 si el producto no tiene ninguno en la sucursal.
  */
-async function aplicarSaldoNegativoEnLote(transaction, { idEmpresa, idSucursal, idProducto, cantidad, consumos }) {
-  const cant = parseFloat(cantidad) || 0;
-  if (cant <= 0 || !idEmpresa || !idProducto) return;
+async function aplicarSaldoNegativoEnLote(transaction, {
+  idEmpresa,
+  idSucursal,
+  idProducto,
+  cantidad,
+  consumos,
+  idLotePreferido
+}) {
+  let restante = parseFloat(cantidad) || 0;
+  if (restante <= 0 || !idEmpresa || !idProducto) return;
   const conSucursal = idSucursal != null && idSucursal !== '';
+  const whereSuc = conSucursal ? ' AND idSucursal = @idSucursal' : '';
+
+  const consumirLotePositivo = async (row) => {
+    const disp = parseFloat(row.cantidadDisponible) || 0;
+    if (disp <= 0 || restante <= 0) return null;
+    const tomar = Math.min(restante, disp);
+    const nuevaCant = disp - tomar;
+    const costoUnitario = row.costoUnitario != null ? parseFloat(row.costoUnitario) : 0;
+    await transaction
+      .request()
+      .input('idLote', sql.UniqueIdentifier, row.idLote)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('nuevaCantidad', sql.Decimal(18, 2), nuevaCant)
+      .query(`
+        UPDATE Lotes SET cantidadDisponible = @nuevaCantidad
+        WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+      `);
+    consumos.push({
+      idLote: row.idLote,
+      cantidadTomada: tomar,
+      costoUnitario: Number.isFinite(costoUnitario) ? costoUnitario : 0
+    });
+    restante -= tomar;
+    return row.idLote;
+  };
+
+  const reqPositivos = transaction.request();
+  reqPositivos.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  reqPositivos.input('idProducto', sql.UniqueIdentifier, idProducto);
+  if (conSucursal) reqPositivos.input('idSucursal', sql.UniqueIdentifier, idSucursal);
+  const rsPositivos = await reqPositivos.query(`
+    SELECT idLote, ISNULL(costoUnitario, 0) AS costoUnitario,
+      CONVERT(DECIMAL(18, 2), cantidadDisponible) AS cantidadDisponible
+    FROM Lotes
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto
+      AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}
+    ORDER BY ${ORDER_LOTES_FIFO_ASC}
+  `);
+  let ultimoLote = null;
+  for (const row of rsPositivos.recordset || []) {
+    const id = await consumirLotePositivo(row);
+    if (id) ultimoLote = id;
+    if (restante <= 0) return;
+  }
+
+  if (!conSucursal && restante > 0) {
+    const reqPosGlobal = transaction.request();
+    reqPosGlobal.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    reqPosGlobal.input('idProducto', sql.UniqueIdentifier, idProducto);
+    const rsPosGlobal = await reqPosGlobal.query(`
+      SELECT idLote, ISNULL(costoUnitario, 0) AS costoUnitario,
+        CONVERT(DECIMAL(18, 2), cantidadDisponible) AS cantidadDisponible
+      FROM Lotes
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}
+      ORDER BY ${ORDER_LOTES_FIFO_ASC}
+    `);
+    for (const row of rsPosGlobal.recordset || []) {
+      const id = await consumirLotePositivo(row);
+      if (id) ultimoLote = id;
+      if (restante <= 0) return;
+    }
+  }
+
   const req = transaction.request();
   req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
   req.input('idProducto', sql.UniqueIdentifier, idProducto);
-  const whereSuc = conSucursal ? ' AND idSucursal = @idSucursal' : '';
   if (conSucursal) req.input('idSucursal', sql.UniqueIdentifier, idSucursal);
 
-  const rs = await req.query(`
-    SELECT TOP 1 idLote, ISNULL(costoUnitario, 0) AS costoUnitario,
-      CONVERT(DECIMAL(18, 2), cantidadDisponible) AS cantidadDisponible
-    FROM Lotes
-    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto${whereSuc}
-    ORDER BY fechaIngreso DESC, idLote DESC
-  `);
+  let idLote = idLotePreferido || ultimoLote || null;
+  let costoUnitario = 0;
+  let disp = 0;
 
-  let idLote = rs.recordset && rs.recordset[0] ? rs.recordset[0].idLote : null;
-  let costoUnitario =
-    rs.recordset && rs.recordset[0] && rs.recordset[0].costoUnitario != null
-      ? parseFloat(rs.recordset[0].costoUnitario)
-      : 0;
-  let disp =
-    rs.recordset && rs.recordset[0] && rs.recordset[0].cantidadDisponible != null
-      ? parseFloat(rs.recordset[0].cantidadDisponible)
-      : 0;
+  if (idLote) {
+    const rsPref = await transaction
+      .request()
+      .input('idLote', sql.UniqueIdentifier, idLote)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT ISNULL(costoUnitario, 0) AS costoUnitario,
+          CONVERT(DECIMAL(18, 2), cantidadDisponible) AS cantidadDisponible
+        FROM Lotes
+        WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+      `);
+    const pref = rsPref.recordset && rsPref.recordset[0];
+    if (pref) {
+      costoUnitario = pref.costoUnitario != null ? parseFloat(pref.costoUnitario) : 0;
+      disp = pref.cantidadDisponible != null ? parseFloat(pref.cantidadDisponible) : 0;
+    } else {
+      idLote = null;
+    }
+  }
+
+  if (!idLote) {
+    const rs = await req.query(`
+      SELECT TOP 1 idLote, ISNULL(costoUnitario, 0) AS costoUnitario,
+        CONVERT(DECIMAL(18, 2), cantidadDisponible) AS cantidadDisponible
+      FROM Lotes
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto${FILTRO_LOTE_ACTIVO}${whereSuc}
+      ORDER BY ${ORDER_LOTES_FIFO_DESC}
+    `);
+    idLote = rs.recordset && rs.recordset[0] ? rs.recordset[0].idLote : null;
+    costoUnitario =
+      rs.recordset && rs.recordset[0] && rs.recordset[0].costoUnitario != null
+        ? parseFloat(rs.recordset[0].costoUnitario)
+        : 0;
+    disp =
+      rs.recordset && rs.recordset[0] && rs.recordset[0].cantidadDisponible != null
+        ? parseFloat(rs.recordset[0].cantidadDisponible)
+        : 0;
+  }
 
   if (!idLote) {
     if (!conSucursal) {
@@ -68,7 +171,7 @@ async function aplicarSaldoNegativoEnLote(transaction, { idEmpresa, idSucursal, 
     throw new Error('No se pudo registrar el saldo negativo del producto.');
   }
 
-  const nuevaCant = (Number.isFinite(disp) ? disp : 0) - cant;
+  const nuevaCant = (Number.isFinite(disp) ? disp : 0) - restante;
   await transaction
     .request()
     .input('idLote', sql.UniqueIdentifier, idLote)
@@ -81,7 +184,7 @@ async function aplicarSaldoNegativoEnLote(transaction, { idEmpresa, idSucursal, 
 
   consumos.push({
     idLote,
-    cantidadTomada: cant,
+    cantidadTomada: restante,
     costoUnitario: Number.isFinite(costoUnitario) ? costoUnitario : 0
   });
 }
@@ -125,7 +228,7 @@ exports.obtenerStockDisponible = async (transaction, idEmpresa, idProducto, idSu
   const rs = await req.query(`
     SELECT ISNULL(SUM(cantidadDisponible), 0) AS total
     FROM Lotes
-    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${whereSuc}
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}
   `);
   const total = rs.recordset?.[0]?.total;
   return total != null ? parseFloat(total) : 0;
@@ -165,9 +268,10 @@ const queryFilasPorPrioridad = async (transaction, idEmpresa, idProducto, idSucu
     WHERE l.idEmpresa = @idEmpresa
       AND l.idProducto = @idProducto
       AND l.cantidadDisponible > 0
+      AND ISNULL(l.activo, 1) = 1
       ${whereSucursal}
       ${whereUb}
-    ORDER BY up.prioridad ASC, l.idLote
+    ORDER BY up.prioridad ASC, l.fechaIngreso ASC, l.idLote ASC
   `);
   return rs.recordset || [];
 };
@@ -197,6 +301,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const conSucursal = idSucursal != null && idSucursal !== '';
   let restante = cant;
   const consumos = [];
+  let ultimoLoteConsumido = null;
 
   const descontarPorPrioridad = async (filas) => {
     for (const row of filas) {
@@ -225,6 +330,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         cantidadTomada: tomar,
         costoUnitario: costoLote
       });
+      ultimoLoteConsumido = row.idLote;
       restante -= tomar;
     }
   };
@@ -247,13 +353,15 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         reqOtras.input('idSucursal', sql.UniqueIdentifier, idSucursal);
         reqOtras.input('idProducto', sql.UniqueIdentifier, idProducto);
         const rsOtras = await reqOtras.query(`
-          SELECT l.idLote, lu.idUbicacion, CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
+          SELECT l.idLote, l.costoUnitario, lu.idUbicacion,
+            CONVERT(DECIMAL(18,2), lu.cantidad) AS cantidadUbicacion
           FROM Lotes l
           INNER JOIN LotesUbicacion lu ON lu.idLote = l.idLote AND lu.cantidad > 0
           INNER JOIN UbicacionesPrioridad up ON up.idUbicacion = lu.idUbicacion AND up.idSucursal = l.idSucursal
           WHERE l.idEmpresa = @idEmpresa AND l.idProducto = @idProducto
             AND l.idSucursal <> @idSucursal AND l.cantidadDisponible > 0
-          ORDER BY up.prioridad ASC, l.idLote
+            AND ISNULL(l.activo, 1) = 1
+          ORDER BY up.prioridad ASC, l.fechaIngreso ASC, l.idLote ASC
         `);
         await descontarPorPrioridad(rsOtras.recordset || []);
       } else {
@@ -272,7 +380,8 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         idSucursal,
         idProducto,
         cantidad: restante,
-        consumos
+        consumos,
+        idLotePreferido: ultimoLoteConsumido
       });
       return { consumosPorLote: consumos };
     }
@@ -300,6 +409,7 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         cantidadTomada: tomar,
         costoUnitario: costoLote
       });
+      ultimoLoteConsumido = row.idLote;
       restante -= tomar;
     }
   };
@@ -312,8 +422,8 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
   const rsFallback = await reqFallback.query(`
     SELECT idLote, costoUnitario, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
     FROM Lotes
-    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${whereSuc}
-    ORDER BY idLote ASC
+    WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}${whereSuc}
+    ORDER BY ${ORDER_LOTES_FIFO_ASC}
   `);
   await ejecutarDescuentoSoloLotes(rsFallback.recordset || []);
 
@@ -325,9 +435,9 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
     const rsFallback2 = await reqFallback2.query(`
       SELECT idLote, costoUnitario, CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
       FROM Lotes
-      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND cantidadDisponible > 0${FILTRO_LOTE_ACTIVO}
         AND idSucursal <> @idSucursalExcluida
-      ORDER BY idLote ASC
+      ORDER BY ${ORDER_LOTES_FIFO_ASC}
     `);
     await ejecutarDescuentoSoloLotes(rsFallback2.recordset || []);
   }
@@ -339,7 +449,8 @@ exports.descontarDesdeLotes = async (transaction, stockData, opciones = {}) => {
         idSucursal,
         idProducto,
         cantidad: restante,
-        consumos
+        consumos,
+        idLotePreferido: ultimoLoteConsumido
       });
       return { consumosPorLote: consumos };
     }

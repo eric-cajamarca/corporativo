@@ -7,6 +7,7 @@ export interface Lote {
   costoUnitario: number;
   cantidadIngresada: number;
   cantidadDisponible: number;
+  activo?: boolean;
   fechaIngreso?: Date;
   // Propiedades extendidas para UI
   nombreProducto?: string;

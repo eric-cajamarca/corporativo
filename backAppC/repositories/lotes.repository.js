@@ -29,6 +29,7 @@ async function getAll(idEmpresa) {
                 l.costoUnitario, 
                 l.cantidadIngresada, 
                 l.cantidadDisponible,
+                ISNULL(l.activo, 1) AS activo,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
                 p.descripcion AS nombreProducto,
                 p.codigo AS codigoProducto,
@@ -62,6 +63,7 @@ async function getAllPorEmpresas(idsEmpresa) {
                 l.costoUnitario, 
                 l.cantidadIngresada, 
                 l.cantidadDisponible,
+                ISNULL(l.activo, 1) AS activo,
                 CONVERT(VARCHAR(19), l.fechaIngreso, 120) AS fechaIngreso,
                 p.descripcion AS nombreProducto,
                 p.codigo AS codigoProducto,
@@ -78,12 +80,13 @@ async function getAllPorEmpresas(idsEmpresa) {
   });
 }
 
-async function getById(idLote) {
+async function getById(idLote, idEmpresa) {
   return withPool(async (pool) => {
     try {
-      const result = await pool.request()
-        .input('idLote', sql.UniqueIdentifier, idLote)
-        .query(`
+      const req = pool.request().input('idLote', sql.UniqueIdentifier, idLote);
+      const whereEmpresa = idEmpresa ? ' AND idEmpresa = @idEmpresa' : '';
+      if (idEmpresa) req.input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+      const result = await req.query(`
                 SELECT 
                     idLote, 
                     idEmpresa, 
@@ -91,9 +94,10 @@ async function getById(idLote) {
                     idSucursal, 
                     CONVERT(DECIMAL(18,6), costoUnitario) AS costoUnitario,
                     CONVERT(DECIMAL(18,2), cantidadIngresada) AS cantidadIngresada,
-                    CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible
+                    CONVERT(DECIMAL(18,2), cantidadDisponible) AS cantidadDisponible,
+                    ISNULL(activo, 1) AS activo
                 FROM Lotes 
-                WHERE idLote = @idLote
+                WHERE idLote = @idLote${whereEmpresa}
             `);
       const row = result.recordset && result.recordset[0];
       if (!row) return null;
@@ -104,7 +108,8 @@ async function getById(idLote) {
         idSucursal: row.idSucursal,
         costoUnitario: row.costoUnitario != null ? Number(row.costoUnitario) : 0,
         cantidadIngresada: row.cantidadIngresada != null ? Number(row.cantidadIngresada) : 0,
-        cantidadDisponible: row.cantidadDisponible != null ? Number(row.cantidadDisponible) : 0
+        cantidadDisponible: row.cantidadDisponible != null ? Number(row.cantidadDisponible) : 0,
+        activo: row.activo !== false && row.activo !== 0
       };
     } catch (err) {
       console.error('lotes.repository getById error:', err.message);
@@ -140,16 +145,54 @@ async function create(loteData) {
   });
 }
 
-async function update(idLote, loteData) {
-  const { costoUnitario, cantidadDisponible } = loteData;
-
+async function update(idLote, idEmpresa, loteData) {
   return withPool(async (pool) => {
-    const result = await pool.request()
+    const existente = await getById(idLote, idEmpresa);
+    if (!existente) {
+      throw new Error('Lote no encontrado');
+    }
+
+    const costoUnitario =
+      loteData.costoUnitario != null ? Number(loteData.costoUnitario) : existente.costoUnitario;
+    if (!Number.isFinite(costoUnitario) || costoUnitario < 0) {
+      throw new Error('El costo unitario debe ser un número mayor o igual a 0');
+    }
+
+    let cantidadDisponible = existente.cantidadDisponible;
+    if (loteData.cantidadDisponible != null && loteData.cantidadDisponible !== '') {
+      cantidadDisponible = Number(loteData.cantidadDisponible);
+    } else if (loteData.cantidadIngresada != null && loteData.cantidadIngresada !== '') {
+      cantidadDisponible = Number(loteData.cantidadIngresada);
+    }
+    if (!Number.isFinite(cantidadDisponible)) {
+      throw new Error('La cantidad disponible no es válida');
+    }
+
+    const activo =
+      loteData.activo != null
+        ? (loteData.activo === true || loteData.activo === 1 || loteData.activo === '1' || loteData.activo === 'true')
+        : existente.activo;
+
+    await pool.request()
       .input('idLote', sql.UniqueIdentifier, idLote)
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
       .input('costoUnitario', sql.Decimal(18, 6), costoUnitario)
-      .input('cantidadDisponible', sql.Int, cantidadDisponible)
-      .query('UPDATE Lotes SET costoUnitario = @costoUnitario, cantidadDisponible = @cantidadDisponible WHERE idLote = @idLote');
-    return result;
+      .input('cantidadDisponible', sql.Decimal(18, 2), cantidadDisponible)
+      .input('activo', sql.Bit, activo ? 1 : 0)
+      .query(`
+        UPDATE Lotes
+        SET costoUnitario = @costoUnitario,
+            cantidadDisponible = @cantidadDisponible,
+            activo = @activo
+        WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+      `);
+
+    return {
+      ...existente,
+      costoUnitario,
+      cantidadDisponible,
+      activo
+    };
   });
 }
 

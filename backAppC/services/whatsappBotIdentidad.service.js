@@ -2,6 +2,7 @@ const { withPool } = require('../utils/dbPool.util');
 const whatsappBotIdentidadRepository = require('../repositories/whatsappBotIdentidad.repository');
 const { limpiarCodigosSunatAlFinal } = require('../utils/direccionClientePdf.util');
 const { resolverNombresUbigeo } = require('../utils/ubigeoNombres.util');
+const copy = require('./whatsappBot.copy');
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const cache = new Map();
@@ -94,6 +95,30 @@ async function cargarProductosDestacados(idEmpresa) {
   return items;
 }
 
+function acortarNombreProductoEjemplo(descripcion, max = 45) {
+  const d = String(descripcion || '').trim();
+  if (!d) return '';
+  if (d.length <= max) return d;
+  const corto = d.slice(0, max).trim();
+  const lastSpace = corto.lastIndexOf(' ');
+  if (lastSpace > 20) return corto.slice(0, lastSpace);
+  return `${corto}…`;
+}
+
+/** Nombre corto del producto mas vendido (o del catalogo) para ejemplos de busqueda. */
+async function obtenerNombreProductoEjemplo(idEmpresa) {
+  const key = `ejemploBusqueda:${idEmpresa}`;
+  const cached = cacheGet(key);
+  if (cached !== null && cached !== undefined) return cached;
+
+  const descripcion = await withPool((pool) =>
+    whatsappBotIdentidadRepository.productoEjemploBusqueda(pool, idEmpresa)
+  );
+  const nombre = acortarNombreProductoEjemplo(descripcion);
+  cacheSet(key, nombre);
+  return nombre;
+}
+
 async function responderIdentidad(idEmpresa) {
   const perfil = await cargarPerfil(idEmpresa);
   const nombre = perfil?.nombre || perfil?.razonSocial || 'nuestra empresa';
@@ -150,7 +175,7 @@ async function responderProductosDestacados(idEmpresa) {
       `*${nombre}*`,
       '',
       'Aún no tenemos productos destacados registrados.',
-      'Escríbeme el nombre del producto que buscas (por ejemplo, *pintura látex*) y lo busco en el catálogo.'
+      copy.fraseEjemploBusqueda('')
     ].join('\n');
   }
 
@@ -166,7 +191,7 @@ async function responderProductosDestacados(idEmpresa) {
     ...lineas,
     '',
     '*¿Qué producto estás buscando?*',
-    'Escríbeme el nombre y lo busco en nuestro catálogo.'
+    copy.fraseEjemploBusqueda(acortarNombreProductoEjemplo(productos[0]?.descripcion))
   ].join('\n');
 }
 
@@ -234,6 +259,7 @@ async function getRespuesta(idEmpresa, intencion) {
 
 module.exports = {
   getRespuesta,
+  obtenerNombreProductoEjemplo,
   INTENCIONES_IDENTIDAD,
   invalidarCache: (idEmpresa) => {
     const p = String(idEmpresa);

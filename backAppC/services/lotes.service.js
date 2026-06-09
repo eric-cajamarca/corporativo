@@ -13,8 +13,8 @@ async function getAllConsolidadoGestora(idEmpresaJwt) {
   });
 }
 
-async function getById(idLote) {
-    return await lotesRepository.getById(idLote);
+async function getById(idLote, idEmpresa) {
+    return await lotesRepository.getById(idLote, idEmpresa);
 }
 
 async function getBySucursal(idEmpresa, idSucursal) {
@@ -25,8 +25,11 @@ async function create(loteData) {
     return await lotesRepository.create(loteData);
 }
 
-async function update(idLote, loteData) {
-    return await lotesRepository.update(idLote, loteData);
+async function update(idLote, idEmpresa, loteData) {
+    if (!idEmpresa) {
+        throw new Error('Empresa no identificada');
+    }
+    return await lotesRepository.update(idLote, idEmpresa, loteData);
 }
 
 async function deleted(idLote) {

@@ -107,10 +107,11 @@ const VARIANTES = {
   ],
 
   // Pedir mas detalle de un producto cuando intencion=precio/stock sin terminos.
-  aclararProducto: [
-    'Indícame qué producto buscas, por ejemplo: *pintura látex*.',
-    '¿Qué producto necesitas? Escríbeme el nombre, por ejemplo: *taladro*.',
-    'Dime el nombre del producto que buscas. Por ejemplo: *cemento bolsa 42.5 kg*.'
+  // Usar mensajeAclararProducto(nombreEjemplo) en lugar de v('aclararProducto').
+  aclararProductoSinEjemplo: [
+    'Indícame qué producto buscas y lo busco en el catálogo.',
+    '¿Qué producto necesitas? Escríbeme el nombre.',
+    'Dime el nombre del producto que buscas.'
   ],
 
   // Bus queda sin resultados.
@@ -185,6 +186,42 @@ function v(key) {
   const arr = VARIANTES[key];
   if (!arr) return '';
   return pick(arr) || '';
+}
+
+/**
+ * Mensaje para pedir el nombre del producto a buscar.
+ * Si se pasa nombreEjemplo (p. ej. el mas vendido de la empresa), lo usa en la variante.
+ */
+function mensajeAclararProducto(nombreEjemplo) {
+  const ej = String(nombreEjemplo || '').trim();
+  if (!ej) return v('aclararProductoSinEjemplo');
+  const variantes = [
+    `Indícame qué producto buscas, por ejemplo: *${ej}*.`,
+    `¿Qué producto necesitas? Escríbeme el nombre, por ejemplo: *${ej}*.`,
+    `Dime el nombre del producto que buscas. Por ejemplo: *${ej}*.`
+  ];
+  return pick(variantes) || variantes[0];
+}
+
+/**
+ * Frase corta con ejemplo de busqueda para incrustar en otros mensajes.
+ */
+function fraseEjemploBusqueda(nombreEjemplo) {
+  const ej = String(nombreEjemplo || '').trim();
+  if (!ej) return 'Escríbeme el nombre del producto que buscas y lo busco en el catálogo.';
+  return `Escríbeme el nombre del producto que buscas (por ejemplo, *${ej}*) y lo busco en el catálogo.`;
+}
+
+/** Mensaje al elegir opcion 3 del menu (Buscar producto). */
+function mensajeBuscarProductoMenu(nombreEjemplo) {
+  const ej = String(nombreEjemplo || '').trim();
+  if (!ej) {
+    return 'Escribe el nombre del producto que buscas y te muestro precio y stock.';
+  }
+  return [
+    'Escribe el nombre del producto que buscas.',
+    `Por ejemplo: *${ej}*`
+  ].join('\n');
 }
 
 /**
@@ -383,6 +420,9 @@ module.exports = {
   quitarEmojis,
   adaptarTexto,
   reaccionPorIntencion,
+  mensajeAclararProducto,
+  mensajeBuscarProductoMenu,
+  fraseEjemploBusqueda,
   v,
   VARIANTES
 };

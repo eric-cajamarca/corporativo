@@ -123,19 +123,76 @@ async function marcasActivasFallback(pool, idEmpresa, top = 12) {
   return r.recordset || [];
 }
 
-async function productosCatalogoFallback(pool, idEmpresa, top = 8) {
-  const r = await pool.request()
+/**
+ * Un producto representativo para ejemplos de busqueda en el chat.
+ * Prioridad: mas vendido (6 meses) > indice WA con stock > indice WA > producto activo con stock.
+ */
+async function productoEjemploBusqueda(pool, idEmpresa) {
+  const desde = fechaDesdeVentas();
+  const topVendidos = await productosMasVendidos(pool, idEmpresa, 1);
+  const vendido = String(topVendidos[0]?.descripcion || '').trim();
+  if (vendido) return vendido;
+
+  try {
+    const conStock = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT TOP 1 LTRIM(RTRIM(descripcion)) AS descripcion
+        FROM WhatsAppBotCatalogoIndice
+        WHERE idEmpresa = @idEmpresa AND ISNULL(stockTotal, 0) > 0
+        ORDER BY stockTotal DESC, descripcion
+      `);
+    const indiceStock = String(conStock.recordset[0]?.descripcion || '').trim();
+    if (indiceStock) return indiceStock;
+
+    const cualquieraIndice = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT TOP 1 LTRIM(RTRIM(descripcion)) AS descripcion
+        FROM WhatsAppBotCatalogoIndice
+        WHERE idEmpresa = @idEmpresa
+        ORDER BY descripcion
+      `);
+    const indice = String(cualquieraIndice.recordset[0]?.descripcion || '').trim();
+    if (indice) return indice;
+  } catch (e) {
+    if (!(e && e.number === 208)) throw e;
+  }
+
+  const rProd = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('top', sql.Int, top)
     .query(`
-      SELECT TOP (@top)
-        LTRIM(RTRIM(descripcion)) AS descripcion,
-        LTRIM(RTRIM(codigo)) AS codigo
-      FROM WhatsAppBotCatalogoIndice
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY descripcion
+      SELECT TOP 1 LTRIM(RTRIM(p.descripcion)) AS descripcion
+      FROM Productos p
+      LEFT JOIN (
+        SELECT l.idProducto, SUM(CONVERT(DECIMAL(18,6), ISNULL(l.cantidadDisponible, 0))) AS stockTotal
+        FROM Lotes l
+        WHERE l.idEmpresa = @idEmpresa AND ISNULL(l.cantidadDisponible, 0) > 0
+        GROUP BY l.idProducto
+      ) st ON st.idProducto = p.idProducto
+      WHERE p.idEmpresa = @idEmpresa AND ISNULL(p.estado, 1) = 1
+      ORDER BY ISNULL(st.stockTotal, 0) DESC, p.descripcion
     `);
-  if (r.recordset?.length) return r.recordset;
+  return String(rProd.recordset[0]?.descripcion || '').trim();
+}
+
+async function productosCatalogoFallback(pool, idEmpresa, top = 8) {
+  try {
+    const r = await pool.request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('top', sql.Int, top)
+      .query(`
+        SELECT TOP (@top)
+          LTRIM(RTRIM(descripcion)) AS descripcion,
+          LTRIM(RTRIM(codigo)) AS codigo
+        FROM WhatsAppBotCatalogoIndice
+        WHERE idEmpresa = @idEmpresa
+        ORDER BY descripcion
+      `);
+    if (r.recordset?.length) return r.recordset;
+  } catch (e) {
+    if (!(e && e.number === 208)) throw e;
+  }
   const r2 = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('top', sql.Int, top)
@@ -158,5 +215,6 @@ module.exports = {
   categoriasActivasFallback,
   marcasActivasFallback,
   productosCatalogoFallback,
+  productoEjemploBusqueda,
   MESES_VENTAS
 };

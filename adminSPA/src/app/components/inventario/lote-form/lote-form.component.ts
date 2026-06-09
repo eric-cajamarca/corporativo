@@ -18,22 +18,17 @@ declare var iziToast: any;
   styleUrl: './lote-form.component.css'
 })
 export class LoteFormComponent implements OnInit {
-  // Formulario reactivo
   loteForm: FormGroup;
-  
-  // Modo edición o creación
+
   isEditMode = false;
-  
-  // ID del lote en modo edición
+
   @Input() idLote: string | null = null;
   @Input() idProducto: string | null = null;
   @Input() idSucursal: string | null = null;
 
-  // Datos para selects
   productos: any[] = [];
   sucursales: any[] = [];
 
-  // Estados
   cargando = false;
   guardando = false;
 
@@ -44,22 +39,22 @@ export class LoteFormComponent implements OnInit {
     private productoService: ProductoService,
     private sucursalService: SucursalService
   ) {
-    // Inicializa el formulario con validaciones
     this.loteForm = this.fb.group({
       idProducto: ['', [Validators.required]],
       idSucursal: ['', [Validators.required]],
       costoUnitario: [0, [Validators.required, Validators.min(0)]],
-      cantidadIngresada: [0, [Validators.required, Validators.min(1)]]
+      cantidadIngresada: [0, [Validators.required, Validators.min(1)]],
+      cantidadDisponible: [0],
+      activo: [true]
     });
   }
 
   ngOnInit(): void {
-    // Detecta si estamos editando
     if (this.idLote) {
       this.isEditMode = true;
+      this.configurarFormularioEdicion();
       this.cargarLote();
     } else {
-      // Si hay datos iniciales, aplicarlos
       if (this.idProducto) {
         this.loteForm.patchValue({ idProducto: this.idProducto });
       }
@@ -67,16 +62,22 @@ export class LoteFormComponent implements OnInit {
         this.loteForm.patchValue({ idSucursal: this.idSucursal });
       }
     }
-    
+
     this.cargarDatosIniciales();
   }
 
-  /**
-   * Carga productos y sucursales para los selects
-   */
+  private configurarFormularioEdicion(): void {
+    this.loteForm.get('cantidadIngresada')?.clearValidators();
+    this.loteForm.get('cantidadIngresada')?.updateValueAndValidity({ emitEvent: false });
+    this.loteForm.get('cantidadDisponible')?.setValidators([Validators.required]);
+    this.loteForm.get('cantidadDisponible')?.updateValueAndValidity({ emitEvent: false });
+    this.loteForm.get('idProducto')?.disable({ emitEvent: false });
+    this.loteForm.get('idSucursal')?.disable({ emitEvent: false });
+  }
+
   cargarDatosIniciales(): void {
     this.cargando = true;
-    
+
     forkJoin({
       productos: this.productoService.obtenerProductosTodos(),
       sucursales: this.sucursalService.obtener_sucursal_todos()
@@ -100,14 +101,10 @@ export class LoteFormComponent implements OnInit {
     });
   }
 
-  /**
-   * Carga datos del lote en modo edición
-   */
   cargarLote(): void {
     if (!this.idLote) return;
-    
+
     this.cargando = true;
-    this.loteForm.enable();
     this.loteService.obtener_lote_id(this.idLote).subscribe({
       next: (response: any) => {
         const lote = response.data || response;
@@ -116,7 +113,9 @@ export class LoteFormComponent implements OnInit {
             idProducto: lote.idProducto,
             idSucursal: lote.idSucursal,
             costoUnitario: lote.costoUnitario ?? 0,
-            cantidadIngresada: lote.cantidadIngresada ?? lote.cantidadDisponible ?? 0
+            cantidadIngresada: lote.cantidadIngresada ?? 0,
+            cantidadDisponible: lote.cantidadDisponible ?? 0,
+            activo: lote.activo !== false && lote.activo !== 0
           });
         }
         this.cargando = false;
@@ -124,20 +123,16 @@ export class LoteFormComponent implements OnInit {
       error: (error) => {
         console.error('Error al cargar lote', error);
         this.cargando = false;
-        this.loteForm.enable();
         iziToast.show({
           title: 'Error',
           titleColor: '#dc3545',
-          message: 'No se pudo cargar el lote',
+          message: error.error?.message || 'No se pudo cargar el lote',
           position: 'topRight'
         });
       }
     });
   }
 
-  /**
-   * Guarda el lote (crear o actualizar)
-   */
   guardarLote(): void {
     if (this.loteForm.invalid) {
       this.marcarCamposComoTocados();
@@ -150,16 +145,22 @@ export class LoteFormComponent implements OnInit {
       return;
     }
 
-    const loteData = this.loteForm.getRawValue();
+    const raw = this.loteForm.getRawValue();
     this.guardando = true;
     this.loteForm.disable();
 
     if (this.isEditMode && this.idLote) {
-      // Modo edición
+      const loteData = {
+        costoUnitario: Number(raw.costoUnitario) || 0,
+        cantidadDisponible: Number(raw.cantidadDisponible),
+        activo: !!raw.activo
+      };
+
       this.loteService.actualizar_lote(this.idLote, loteData).subscribe({
         next: (response: any) => {
           this.guardando = false;
           this.loteForm.enable();
+          this.configurarFormularioEdicion();
           iziToast.show({
             title: 'Éxito',
             titleColor: '#28a745',
@@ -171,22 +172,28 @@ export class LoteFormComponent implements OnInit {
         error: (error) => {
           this.guardando = false;
           this.loteForm.enable();
+          this.configurarFormularioEdicion();
           iziToast.show({
             title: 'Error',
             titleColor: '#dc3545',
-            message: error.error?.message || 'Error al actualizar el lote',
+            message: error.error?.error || error.error?.message || 'Error al actualizar el lote',
             position: 'topRight'
           });
         }
       });
     } else {
-      // Modo creación
       const nuevoLote: LoteCreate = {
-        ...loteData,
-        cantidadDisponible: loteData.cantidadIngresada // Al crear, disponible = ingresado
+        idProducto: raw.idProducto,
+        idSucursal: raw.idSucursal,
+        costoUnitario: Number(raw.costoUnitario) || 0,
+        cantidadIngresada: Number(raw.cantidadIngresada) || 0
       };
 
-      this.loteService.crear_lote(nuevoLote).subscribe({
+      this.loteService.crear_lote({
+        ...nuevoLote,
+        cantidadDisponible: nuevoLote.cantidadIngresada,
+        activo: true
+      }).subscribe({
         next: (response: any) => {
           this.guardando = false;
           this.loteForm.enable();
@@ -197,9 +204,9 @@ export class LoteFormComponent implements OnInit {
             position: 'topRight'
           });
           const loteCreado = response.data || nuevoLote;
-          this.activeModal.close({ 
-            success: true, 
-            lote: loteCreado, 
+          this.activeModal.close({
+            success: true,
+            lote: loteCreado,
             modo: 'creacion',
             idLote: loteCreado.idLote || response.data?.idLote
           });
@@ -210,7 +217,7 @@ export class LoteFormComponent implements OnInit {
           iziToast.show({
             title: 'Error',
             titleColor: '#dc3545',
-            message: error.error?.message || 'Error al crear el lote',
+            message: error.error?.error || error.error?.message || 'Error al crear el lote',
             position: 'topRight'
           });
         }
@@ -218,26 +225,17 @@ export class LoteFormComponent implements OnInit {
     }
   }
 
-  /**
-   * Marca todos los campos como tocados para mostrar errores
-   */
   private marcarCamposComoTocados(): void {
     Object.keys(this.loteForm.controls).forEach(key => {
       this.loteForm.get(key)?.markAsTouched();
     });
   }
 
-  /**
-   * Verifica si un campo tiene error
-   */
   hasError(field: string): boolean {
     const control = this.loteForm.get(field);
     return !!(control?.invalid && control?.touched);
   }
 
-  /**
-   * Obtiene el mensaje de error de un campo
-   */
   getError(field: string): string {
     const control = this.loteForm.get(field);
     if (control?.errors?.['required']) return 'Este campo es requerido';
@@ -245,11 +243,7 @@ export class LoteFormComponent implements OnInit {
     return '';
   }
 
-  /**
-   * Cancela y cierra el modal
-   */
   cancelar(): void {
     this.activeModal.dismiss();
   }
-
 }

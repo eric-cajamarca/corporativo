@@ -29,6 +29,15 @@ function resolveInboundSender(message, lidMaps, telefonoVinculado) {
     };
   }
 
+  // Baileys 6.7+: cuando remoteJid es @lid, remoteJidAlt suele traer el JID con telefono real.
+  const remoteJidAlt = String(key.remoteJidAlt || '');
+  if (remoteJidAlt.endsWith('@s.whatsapp.net')) {
+    const phoneAlt = jidToPhone(remoteJidAlt);
+    if (phoneAlt) {
+      return { replyTo: phoneAlt, logId: phoneAlt };
+    }
+  }
+
   const remoteJid = String(key.remoteJid || '');
   if (remoteJid.endsWith('@s.whatsapp.net')) {
     const phone = jidToPhone(remoteJid);
