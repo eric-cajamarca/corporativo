@@ -399,7 +399,7 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
       OUTPUT INSERTED.idMovimientoCaja
       VALUES (
         @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
-        ISNULL(TRY_CONVERT(DATETIME, @fechaMovimiento, 23), GETDATE()), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
+        ISNULL(@fechaMovimiento, GETDATE()), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
         @documentoRelacionado, @observaciones
       )
     `);

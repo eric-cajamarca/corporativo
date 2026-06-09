@@ -31,6 +31,33 @@
       </div>
     </div>
     <div class="card-body">
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-auto">
+          <label class="form-label small mb-0">Fecha desde</label>
+          <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaDesde">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0">Fecha hasta</label>
+          <input type="date" class="form-control form-control-sm" [(ngModel)]="filtros.fechaHasta">
+        </div>
+        <div class="col-auto d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-primary" (click)="buscar()" [disabled]="loading">
+            <i class="fas fa-filter me-1"></i>Filtrar
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="limpiarFiltroFechas()" [disabled]="loading || !hayFiltroFecha">
+            Ver todos
+          </button>
+        </div>
+        <div class="col">
+          <span class="small text-muted">
+            @if (hayFiltroFecha) {
+              Mostrando recibos en el rango seleccionado.
+            } @else {
+              Mostrando todos los recibos de egreso registrados (sin límite de fecha).
+            }
+          </span>
+        </div>
+      </div>
       <div class="table-responsive">
         <table class="table table-hover table-sm">
           <thead class="table-light">
@@ -58,9 +85,10 @@
             </tr>
             <tr *ngFor="let item of listPaginated">
               <td>
+                <!--
                 <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar">
                   <i class="bi bi-pencil"></i>
-                </button>
+                </button> -->
                 <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar">
                   <i class="bi bi-trash"></i>
                 </button>

@@ -116,11 +116,9 @@ export class ReciboEgresoComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
-    const hace30 = new Date();
-    hace30.setDate(hace30.getDate() - 30);
-    this.filtros.fechaDesde = (() => { const n = hace30; return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
-    this.filtros.fechaHasta = hoy;
+    const hoy = this.fechaLocalHoy();
+    this.filtros.fechaDesde = '';
+    this.filtros.fechaHasta = '';
     this.form.fechaEmision = hoy;
     this.cajaOpCtx.cargarContexto().subscribe({
       next: () => {
@@ -194,10 +192,6 @@ export class ReciboEgresoComponent implements OnInit {
     return this.empresasOperacion.length > 1;
   }
 
-  private idEmpresaOperacionParaListado(): string | null {
-    return this.esCajaMultiEmpresa() ? null : (this.idEmpresaOperacionSel || null);
-  }
-
   get colspanTablaRecibos(): number {
     return this.esCajaMultiEmpresa() ? 10 : 9;
   }
@@ -233,13 +227,28 @@ export class ReciboEgresoComponent implements OnInit {
     });
   }
 
+  private fechaLocalHoy(): string {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  }
+
+  get hayFiltroFecha(): boolean {
+    return !!(this.filtros.fechaDesde || this.filtros.fechaHasta);
+  }
+
+  limpiarFiltroFechas(): void {
+    this.filtros.fechaDesde = '';
+    this.filtros.fechaHasta = '';
+    this.cargarRecibos();
+  }
+
   cargarRecibos(): void {
     this.loading = true;
-    const desde = this.filtros.fechaDesde ? this.filtros.fechaDesde + 'T00:00:00' : '';
-    const hasta = this.filtros.fechaHasta ? this.filtros.fechaHasta + 'T23:59:59' : '';
+    const desde = this.filtros.fechaDesde ? this.filtros.fechaDesde + 'T00:00:00' : undefined;
+    const hasta = this.filtros.fechaHasta ? this.filtros.fechaHasta + 'T23:59:59' : undefined;
     this.cajaService.getRecibosEgreso(
-      { fechaDesde: desde || undefined, fechaHasta: hasta || undefined },
-      this.idEmpresaOperacionParaListado()
+      { fechaDesde: desde, fechaHasta: hasta },
+      this.idEmpresaOperacionSel || null
     ).subscribe({
       next: (r) => {
         let data = (r.data || []).map((m: any) => this.mapItem(m));

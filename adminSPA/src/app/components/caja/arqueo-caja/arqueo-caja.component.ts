@@ -680,9 +680,6 @@ export class ArqueoCajaComponent implements OnInit {
       return;
     }
     const fechaBase = this.fechaFinal || this.fecha;
-    const [y, m, d] = fechaBase.split('-').map(Number);
-    const diaSiguiente = new Date(y, m - 1, d + 1);
-    const fechaSiguiente = `${diaSiguiente.getFullYear()}-${String(diaSiguiente.getMonth() + 1).padStart(2, '0')}-${String(diaSiguiente.getDate()).padStart(2, '0')}`;
     this.documentoService.getFormasPago().subscribe({
       next: (r) => {
         const formasPago = r.data || [];
@@ -703,15 +700,15 @@ export class ArqueoCajaComponent implements OnInit {
             this.cajaService.registrarMovimientoIngreso({
               idApertura: (caja as any).idApertura,
               idTipoMovimientoCaja: idTipo,
-              fechaMovimiento: fechaSiguiente + 'T00:00:00',
+              fechaMovimiento: fechaBase + 'T00:00:00',
               concepto: 'Saldo del día anterior',
               monto: saldo,
               idMediosPago: idFormaPago,
-              documentoRelacionado: `SA ${fechaSiguiente}`,
+              documentoRelacionado: `SA ${fechaBase}`,
               observaciones: `Saldo anterior del día ${this.fecha}${this.fechaFinal ? ' al ' + this.fechaFinal : ''}. Generado desde arqueo.`
             }).subscribe({
               next: () => {
-                iziToast.success({ title: 'Éxito', message: 'Recibo de ingreso "Saldo del día anterior" registrado para el ' + fechaSiguiente + '.' });
+                iziToast.success({ title: 'Éxito', message: 'Recibo de ingreso "Saldo del día anterior" registrado con fecha ' + fechaBase + '.' });
                 this.consultar();
               },
               error: (e) => {
