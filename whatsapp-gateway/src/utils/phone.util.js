@@ -20,7 +20,34 @@ function isIndividualChatJid(jid) {
 
 function resolveInboundSender(message, lidMaps, telefonoVinculado) {
   const key = message?.key || {};
+  const remoteJid = String(key.remoteJid || '');
+  const remoteJidAlt = String(key.remoteJidAlt || '');
   const senderPn = key.senderPn || key.participantPn;
+
+  // WhatsApp moderno usa @lid: hay que responder al MISMO JID o el celular muestra
+  // "Esperando mensaje" (fallo de descifrado E2E).
+  if (remoteJid.endsWith('@lid')) {
+    let logId = remoteJid.split('@')[0];
+    let phone = '';
+    if (senderPn) phone = jidToPhone(senderPn);
+    if (!phone && remoteJidAlt.endsWith('@s.whatsapp.net')) {
+      phone = jidToPhone(remoteJidAlt);
+    }
+    if (!phone) {
+      const mappedJid = lidMaps?.lidToJid?.get(remoteJid);
+      if (mappedJid) phone = jidToPhone(mappedJid);
+    }
+    if (!phone) {
+      const mappedPhone = lidMaps?.lidToPhone?.get(remoteJid);
+      if (mappedPhone) phone = mappedPhone;
+    }
+    if (!phone && key.fromMe && telefonoVinculado) {
+      phone = String(telefonoVinculado).replace(/\D/g, '');
+    }
+    if (phone) logId = phone;
+    return { replyTo: remoteJid, logId };
+  }
+
   if (senderPn) {
     const phone = jidToPhone(senderPn);
     return {
@@ -29,8 +56,6 @@ function resolveInboundSender(message, lidMaps, telefonoVinculado) {
     };
   }
 
-  // Baileys 6.7+: cuando remoteJid es @lid, remoteJidAlt suele traer el JID con telefono real.
-  const remoteJidAlt = String(key.remoteJidAlt || '');
   if (remoteJidAlt.endsWith('@s.whatsapp.net')) {
     const phoneAlt = jidToPhone(remoteJidAlt);
     if (phoneAlt) {
@@ -38,42 +63,31 @@ function resolveInboundSender(message, lidMaps, telefonoVinculado) {
     }
   }
 
-  const remoteJid = String(key.remoteJid || '');
   if (remoteJid.endsWith('@s.whatsapp.net')) {
     const phone = jidToPhone(remoteJid);
     if (phone) return { replyTo: phone, logId: phone };
   }
 
-  if (remoteJid.endsWith('@lid')) {
-    const mappedJid = lidMaps?.lidToJid?.get(remoteJid);
-    if (mappedJid) {
-      const phone = jidToPhone(mappedJid);
-      return {
-        replyTo: phone || mappedJid,
-        logId: phone || remoteJid.split('@')[0]
-      };
-    }
-    const mappedPhone = lidMaps?.lidToPhone?.get(remoteJid);
-    if (mappedPhone) {
-      return { replyTo: mappedPhone, logId: mappedPhone };
-    }
-    // Chat consigo mismo / pruebas desde el mismo celular vinculado al bot (LID sin mapear).
-    if (key.fromMe && telefonoVinculado) {
-      const phone = String(telefonoVinculado).replace(/\D/g, '');
-      if (phone) return { replyTo: phone, logId: phone };
-    }
-    return {
-      replyTo: remoteJid,
-      logId: remoteJid.split('@')[0]
-    };
-  }
-
   return null;
+}
+
+/**
+ * JID de salida: si conocemos el @lid del contacto, usarlo en lugar de @s.whatsapp.net.
+ */
+function resolveOutboundJid(number, lidMaps) {
+  const raw = String(number || '').trim();
+  if (raw.includes('@')) return raw;
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) throw new Error('Numero de destino invalido');
+  const lid = lidMaps?.phoneToLid?.get(digits);
+  if (lid) return lid;
+  return `${digits}@s.whatsapp.net`;
 }
 
 module.exports = {
   toWhatsAppJid,
   jidToPhone,
   isIndividualChatJid,
-  resolveInboundSender
+  resolveInboundSender,
+  resolveOutboundJid
 };

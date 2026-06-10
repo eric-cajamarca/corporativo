@@ -10,7 +10,12 @@ const {
   fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 const config = require('../config');
-const { toWhatsAppJid, jidToPhone, resolveInboundSender, isIndividualChatJid } = require('../utils/phone.util');
+const {
+  jidToPhone,
+  resolveInboundSender,
+  resolveOutboundJid,
+  isIndividualChatJid
+} = require('../utils/phone.util');
 const inboundWebhook = require('./inboundWebhook.service');
 const inboundMedia = require('../utils/inboundMedia.util');
 
@@ -31,6 +36,7 @@ function getTenantState(idEmpresa) {
       lastError: null,
       lidToPhone: new Map(),
       lidToJid: new Map(),
+      phoneToLid: new Map(),
       nombreDispositivo: null,
       suppressMessageIds: new Set(),
       processedMessageIds: new Set()
@@ -210,7 +216,27 @@ function rememberLidMapping(t, lid, jid) {
   if (!lid || !jid) return;
   t.lidToJid.set(lid, jid);
   const phone = jidToPhone(jid);
-  if (phone) t.lidToPhone.set(lid, phone);
+  if (phone) {
+    t.lidToPhone.set(lid, phone);
+    t.phoneToLid.set(phone, lid);
+  }
+}
+
+function captureLidFromInboundMessage(t, message) {
+  const key = message?.key || {};
+  const remoteJid = String(key.remoteJid || '');
+  const remoteJidAlt = String(key.remoteJidAlt || '');
+  if (remoteJid.endsWith('@lid') && remoteJidAlt.endsWith('@s.whatsapp.net')) {
+    rememberLidMapping(t, remoteJid, remoteJidAlt);
+  }
+}
+
+function lidMapsForTenant(t) {
+  return {
+    lidToJid: t.lidToJid,
+    lidToPhone: t.lidToPhone,
+    phoneToLid: t.phoneToLid
+  };
 }
 
 function bindLidMappingListener(t, sock) {
@@ -248,7 +274,8 @@ function bindInboundListener(idEmpresa, sock) {
         continue;
       }
 
-      const resolved = resolveInboundSender(message, t, t.telefonoVinculado);
+      captureLidFromInboundMessage(t, message);
+      const resolved = resolveInboundSender(message, lidMapsForTenant(t), t.telefonoVinculado);
       if (!resolved?.replyTo) {
         console.error(`sessionManager inbound skip ${idEmpresa} (remitente_no_resuelto)`);
         continue;
@@ -546,7 +573,7 @@ async function sendText(idEmpresa, number, text, options = {}) {
   const t = getTenantState(idEmpresa);
   const sock = requireConnected(idEmpresa);
   await throttleSend(idEmpresa, options.skipThrottle === true);
-  const jid = toWhatsAppJid(number);
+  const jid = resolveOutboundJid(number, lidMapsForTenant(t));
   const sent = await sock.sendMessage(jid, { text: String(text).trim() });
   rememberOutboundMessage(t, sent);
   return { status: 200, success: true, message: 'Mensaje enviado' };
@@ -560,18 +587,19 @@ const PRESENCE_ALLOWED = new Set(['available', 'unavailable', 'composing', 'reco
  */
 async function sendPresence(idEmpresa, number, type) {
   const sock = requireConnected(idEmpresa);
-  const t = String(type || 'composing').toLowerCase();
-  if (!PRESENCE_ALLOWED.has(t)) {
+  const presenceType = String(type || 'composing').toLowerCase();
+  if (!PRESENCE_ALLOWED.has(presenceType)) {
     throw new Error(`presence type invalido: ${type}`);
   }
-  const jid = toWhatsAppJid(number);
+  const tenant = getTenantState(idEmpresa);
+  const jid = resolveOutboundJid(number, lidMapsForTenant(tenant));
   // Baileys exige llamar primero a sendPresenceUpdate('available') para "registrarse"
   // como online ante el contacto antes de poder enviar 'composing'/'paused'/'recording'.
   // Lo hacemos solo si el caller pidio 'composing' o 'recording'.
-  if (t === 'composing' || t === 'recording') {
+  if (presenceType === 'composing' || presenceType === 'recording') {
     try { await sock.sendPresenceUpdate('available', jid); } catch (e) { /* tolerable */ }
   }
-  await sock.sendPresenceUpdate(t, jid);
+  await sock.sendPresenceUpdate(presenceType, jid);
   return { status: 200, success: true, message: 'presence enviado' };
 }
 
@@ -582,7 +610,8 @@ async function sendPresence(idEmpresa, number, type) {
 async function sendReaction(idEmpresa, number, messageId, emoji) {
   const sock = requireConnected(idEmpresa);
   if (!messageId) throw new Error('messageId requerido');
-  const jid = toWhatsAppJid(number);
+  const t = getTenantState(idEmpresa);
+  const jid = resolveOutboundJid(number, lidMapsForTenant(t));
   const text = emoji != null ? String(emoji) : '';
   await sock.sendMessage(jid, {
     react: {
@@ -683,7 +712,8 @@ async function sendMedia(idEmpresa, number, mediatype, media, filename, caption,
   validarMediaPayload(media);
   const sock = requireConnected(idEmpresa);
   await throttleSend(idEmpresa, options.skipThrottle === true);
-  const jid = toWhatsAppJid(number);
+  const t = getTenantState(idEmpresa);
+  const jid = resolveOutboundJid(number, lidMapsForTenant(t));
   const buffer = await resolveMediaBuffer(media);
   const mt = String(mediatype || 'document').toLowerCase();
   const cap = caption != null && String(caption).trim() !== '' ? String(caption).trim() : undefined;
