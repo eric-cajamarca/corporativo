@@ -136,6 +136,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
         submenu: this.buildSubmenuCompras()
       };
     }
+    if (!item.submenu && item.ruta === '/ventas') {
+      return {
+        nombre: item.nombre,
+        icono: item.icono || 'bi bi-cart',
+        modulo: 'ventas',
+        visible: item.visible !== false,
+        submenu: this.buildSubmenuVentas()
+      };
+    }
     if (item.submenu?.length && mod === 'compras') {
       return { ...item, submenu: this.mergeSubmenuComprasSunat(item.submenu, item.visible !== false) };
     }
@@ -298,12 +307,30 @@ export class SidebarComponent implements OnInit, OnDestroy {
     return [
       { nombre: 'Listado de compras', ruta: '/compras', permiso: '', visible: true },
       {
+        nombre: 'Reporte detallado',
+        ruta: '/compras/reporte-detallado',
+        permiso: 'REPORTE_DETALLADO_COMPRAS',
+        visible: this.permisosService.tienePermiso('REPORTE_DETALLADO_COMPRAS')
+      },
+      {
         nombre: 'Compras SUNAT',
         ruta: '/compras/comprobantes-sunat',
         permiso: '',
         visible: this.puedeVerComprasSunatMenu()
       }
-    ];
+    ].filter((s) => s.visible !== false);
+  }
+
+  private buildSubmenuVentas(): SubMenuItem[] {
+    return [
+      { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
+      {
+        nombre: 'Reporte detallado',
+        ruta: '/ventas/reporte-detallado',
+        permiso: 'REPORTE_DETALLADO_VENTAS',
+        visible: this.permisosService.tienePermiso('REPORTE_DETALLADO_VENTAS')
+      }
+    ].filter((s) => s.visible !== false);
   }
 
   /** Submenú Facturación: emisión de guías siempre visible; resto de guías si están habilitadas en empresa. */

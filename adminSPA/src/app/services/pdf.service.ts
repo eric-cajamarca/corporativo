@@ -22,6 +22,26 @@ export class PdfService {
   constructor(private http: HttpClient) {}
 
   // Método principal - recibe datos estructurados
+  generarPdfVentasDetallado(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    const payload = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'ventas-detallado', fontSize: 9, formato: 'A4' },
+      { responseType: 'blob' }
+    );
+  }
+
+  generarPdfComprasDetallado(datos: PdfDatosDinamicos, nombreArchivo?: string): Observable<Blob> {
+    const payload = { ...datos };
+    if (nombreArchivo) payload['nombreArchivo'] = nombreArchivo;
+    return this.http.post(
+      `${this.baseUrl}/generate-pdf`,
+      { datos: payload, tipo: 'compras-detallado', fontSize: 9, formato: 'A4' },
+      { responseType: 'blob' }
+    );
+  }
+
   generarPdfDinamico(datos: PdfDatosDinamicos, tipo: string = 'reporte', fontSize: number = 10, formato?: 'A4' | 'A5' | 'ticket'): Observable<Blob> {
     return this.http.post(
       `${this.baseUrl}/generate-pdf`,

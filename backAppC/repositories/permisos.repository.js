@@ -199,11 +199,13 @@ const inicializarPermisosDefecto = async (pool, idEmpresa) => {
         { nombre: 'CREAR_VENTAS', descripcion: 'Crear nuevas ventas', modulo: 'VENTAS' },
         { nombre: 'EDITAR_VENTAS', descripcion: 'Editar ventas existentes', modulo: 'VENTAS' },
         { nombre: 'ANULAR_VENTAS', descripcion: 'Anular ventas', modulo: 'VENTAS' },
+        { nombre: 'REPORTE_DETALLADO_VENTAS', descripcion: 'Ver reporte detallado de ventas (PDF/Excel)', modulo: 'VENTAS' },
         
         // Módulo Compras
         { nombre: 'VER_COMPRAS', descripcion: 'Ver listado de compras', modulo: 'COMPRAS' },
         { nombre: 'CREAR_COMPRAS', descripcion: 'Registrar nuevas compras', modulo: 'COMPRAS' },
         { nombre: 'EDITAR_COMPRAS', descripcion: 'Editar compras existentes', modulo: 'COMPRAS' },
+        { nombre: 'REPORTE_DETALLADO_COMPRAS', descripcion: 'Ver reporte detallado de compras (PDF/Excel)', modulo: 'COMPRAS' },
         
         // Módulo Inventario
         { nombre: 'VER_INVENTARIO', descripcion: 'Ver inventario', modulo: 'INVENTARIO' },

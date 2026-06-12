@@ -27,6 +27,8 @@ import { CreateComprasComponent } from './components/compras/create-compras/crea
 import { UpdateComprasComponent } from './components/compras/update-compras/update-compras.component';
 import { DetalleComprasComponent } from './components/compras/detalle-compras/detalle-compras.component';
 import { IndexComprobantesCompraSunatComponent } from './components/compras/index-comprobantes-compra-sunat/index-comprobantes-compra-sunat.component';
+import { ReporteComprasDetalladoComponent } from './components/compras/reporte-compras-detallado/reporte-compras-detallado.component';
+import { ReporteVentasDetalladoComponent } from './components/ventas/reporte-ventas-detallado/reporte-ventas-detallado.component';
 import { IndexClientesComponent } from './components/clientes/index-clientes/index-clientes.component';
 import { UpdateClientesComponent } from './components/clientes/update-clientes/update-clientes.component';
 import { CreateClientesComponent } from './components/clientes/create-clientes/create-clientes.component';
@@ -223,6 +225,7 @@ export const routes: Routes = [
      { path: 'compras', component: IndexComprasComponent,canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Compras' },
      { path: 'compras/create', component: CreateComprasComponent,canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Crear Compra' },
      { path: 'compras/comprobantes-sunat', component: IndexComprobantesCompraSunatComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Compras SUNAT' },
+     { path: 'compras/reporte-detallado', component: ReporteComprasDetalladoComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Reporte detallado de compras' },
      { path: 'compras/:id', component: UpdateComprasComponent,canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Actualizar Compra' },
      { path: 'detalle-compras', component: DetalleComprasComponent,canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Detalle Compra' },
      { path: 'inventario', component: PrincipalInventarioComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Inventario'},
@@ -260,6 +263,7 @@ export const routes: Routes = [
         { path: 'rapida', component: CreateVentaRapidaComponent, title: 'Venta rápida' },
         { path: 'detalle/:id', component: DetalleVentaComponent, title: 'Detalle de venta' },
         { path: 'editar/:id', component: UpdateVentaComponent, title: 'Editar venta' },
+        { path: 'reporte-detallado', component: ReporteVentasDetalladoComponent, title: 'Reporte detallado de ventas' },
       ]
     },
 

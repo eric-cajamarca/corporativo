@@ -604,7 +604,28 @@ const anularVenta = async (req, res) => {
   }
 };
 
+const getReporteDetallado = async function (req, res) {
+  if (!req.user) {
+    return res.status(401).send({ message: 'No autorizado', data: undefined });
+  }
+  const idEmpresa = req.user.empresa || req.user.idEmpresa;
+  if (!idEmpresa) {
+    return res.status(403).send({ message: 'Empresa no identificada en la sesión', data: undefined });
+  }
+  try {
+    const data = await ventasService.obtenerReporteDetallado(idEmpresa, req.query);
+    res.status(200).send({ message: 'OK', data });
+  } catch (error) {
+    if (error.message === 'Indique fechaInicio y fechaFin' || error.message.includes('fecha')) {
+      return res.status(400).send({ message: error.message, data: undefined });
+    }
+    console.error('getReporteDetallado ventas:', error);
+    res.status(500).send({ message: 'Error al obtener reporte detallado de ventas', data: undefined });
+  }
+};
+
 module.exports = {
+  getReporteDetallado,
   crearVenta,
   crearVentaCompleta,
   crearVentaDesdeVale,

@@ -27,6 +27,22 @@ export class ExcelService {
     );
   }
 
+  generarExcelComprasDetallado(data: Record<string, unknown>): Observable<Blob> {
+    return this.http.post(
+      `${this.baseUrl}/generate-excel`,
+      { data: { ...data, tipo: 'compras-detallado' } },
+      { responseType: 'blob' }
+    );
+  }
+
+  generarExcelVentasDetallado(data: Record<string, unknown>): Observable<Blob> {
+    return this.http.post(
+      `${this.baseUrl}/generate-excel`,
+      { data: { ...data, tipo: 'ventas-detallado' } },
+      { responseType: 'blob' }
+    );
+  }
+
   descargar(blob: Blob, nombreArchivo = 'reporte.xlsx'): void {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

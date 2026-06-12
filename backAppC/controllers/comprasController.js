@@ -290,11 +290,32 @@ const editar_correlativos_empresa = async (req, res, next) => {
     }
 };
 
+const getReporteDetallado = async (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    const idEmpresa = req.user.empresa || req.user.idEmpresa;
+    if (!idEmpresa) {
+        return res.status(403).send({ message: 'Empresa no identificada en la sesión', data: undefined });
+    }
+    try {
+        const data = await comprasService.obtenerReporteDetallado(idEmpresa, req.query);
+        res.status(200).send({ message: 'OK', data });
+    } catch (error) {
+        if (error.message === 'Indique fechaInicio y fechaFin' || error.message.includes('fecha')) {
+            return res.status(400).send({ message: error.message, data: undefined });
+        }
+        console.error('getReporteDetallado:', error);
+        return next(error);
+    }
+};
+
 module.exports = {
     obtener_compras_todos,
     obtener_compras_id,
     obtener_compras_idCompra_idEmpresa,
     obtener_compras_todos_idEmpresa,
+    getReporteDetallado,
     crear_compra,
     editar_compra,
     eliminar_idcompra_empresa,

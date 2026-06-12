@@ -4,6 +4,7 @@ import { global } from './global';
 import { environment } from '../../environments/environment';
 import { Observable } from 'rxjs/internal/Observable';
 import type { ComprobanteCompraSunatListaItem } from '../models/comprobante-compra-sunat.model';
+import type { ReporteComprasDetalladoData } from '../models/reporte-compras-detallado.model';
 
 @Injectable({
   providedIn: 'root'
@@ -206,6 +207,28 @@ export class ComprasService {
   }
 
   /** Listado ComprobantesCompraSunat (CPE reales) con filtros opcionales en query. */
+  obtenerReporteDetallado(params: {
+    fechaInicio: string;
+    fechaFin: string;
+    proveedorRuc?: string;
+    proveedorRazon?: string;
+  }): Observable<{ message: string; data: ReporteComprasDetalladoData }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let httpParams = new HttpParams()
+      .set('fechaInicio', params.fechaInicio)
+      .set('fechaFin', params.fechaFin);
+    if (params.proveedorRuc?.trim()) {
+      httpParams = httpParams.set('proveedorRuc', params.proveedorRuc.trim());
+    }
+    if (params.proveedorRazon?.trim()) {
+      httpParams = httpParams.set('proveedorRazon', params.proveedorRazon.trim());
+    }
+    return this._http.get<{ message: string; data: ReporteComprasDetalladoData }>(
+      environment.API_URL + 'compras/reporte-detallado',
+      { headers, withCredentials: true, params: httpParams }
+    );
+  }
+
   listarComprobantesCompraSunat(params?: Record<string, string>): Observable<{ data: ComprobanteCompraSunatListaItem[] }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
     let httpParams = new HttpParams();

@@ -7,6 +7,9 @@ var auth  = require('../middlewares/autenticate');
 // Listado de compras de la empresa logueada (ruta única para evitar que otra ruta capture la petición)
 api.get('/compras-por-empresa', auth.auth, comprasController.obtener_compras_todos_idEmpresa);
 
+/** Reporte detallado de compras por comprobante (cabecera + líneas). */
+api.get('/compras/reporte-detallado', auth.auth, comprasController.getReporteDetallado);
+
 /** CPE de compra (SUNAT) registrados por empresa; filtros vía query string. */
 api.get('/comprobantes-compra-sunat', auth.auth, comprobantesCompraSunatController.listar);
 

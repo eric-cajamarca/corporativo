@@ -2,6 +2,8 @@ const { generatePdfFromHtml } = require('../services/pdf.service');
 const htmlBuilder = require('../services/htmlBuilder.service');
 const { construirHtmlAnalisisFinanciero } = require('../services/analisisFinancieroPdf.service');
 const { construirHtmlReportesNegocio } = require('../services/reportesNegocioPdf.service');
+const { construirHtmlComprasDetallado } = require('../services/comprasDetallePdf.service');
+const { construirHtmlVentasDetallado } = require('../services/ventasDetallePdf.service');
 
 async function generatePdf(req, res) {
   const { datos, tipo, fontSize, formato } = req.body;
@@ -23,6 +25,14 @@ async function generatePdf(req, res) {
           empresa: datos.empresa,
           tablaHtml: htmlBuilder.construirTablaHtml(datos.columnas, datos.filas)
         });
+        break;
+
+      case 'compras-detallado':
+        html = construirHtmlComprasDetallado(datos);
+        break;
+
+      case 'ventas-detallado':
+        html = construirHtmlVentasDetallado(datos);
         break;
 
       case 'factura': {

@@ -4,6 +4,7 @@ const { withPool } = require('../utils/dbPool.util');
 const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
 const comprasRepository = require('../repositories/compras.repository');
+const comprasDetalleReporteRepository = require('../repositories/comprasDetalleReporte.repository');
 const CajaRepository = require('../repositories/caja.repository');
 const comprobantesCompraSunatService = require('./comprobantesCompraSunat.service');
 const {
@@ -270,4 +271,122 @@ exports.listarCorrelativos = async (idEmpresa) => {
 
 exports.actualizarCorrelativo = async (idEmpresa, idCorrelativo, numero) => {
     return withPool((pool) => comprasRepository.actualizarCorrelativo(pool, idEmpresa, idCorrelativo, numero));
+};
+
+function abreviaturaComprobante(codigo, nombre) {
+    const c = String(codigo || '').trim();
+    if (c === '01') return 'FC';
+    if (c === '03') return 'BC';
+    if (c === '07') return 'NC';
+    if (c === '08') return 'ND';
+    const n = String(nombre || '').toLowerCase();
+    if (n.includes('factura')) return 'FC';
+    if (n.includes('boleta')) return 'BC';
+    if (n.includes('crédito') || n.includes('credito')) return 'NC';
+    if (n.includes('débito') || n.includes('debito')) return 'ND';
+    return 'DOC';
+}
+
+function etiquetaEstadoCompra(descripcion) {
+    const d = String(descripcion || '').trim().toLowerCase();
+    if (d.includes('pagad')) return 'CONFIRMADO';
+    if (d.includes('pendient')) return 'PENDIENTE';
+    return String(descripcion || '—').toUpperCase();
+}
+
+function etiquetaDocumento(row) {
+    const abrev = abreviaturaComprobante(row.codigoComprobante, row.tipoComprobante);
+    const comp = String(row.compCompra || '').trim();
+    if (comp) return `${abrev} ${comp}`;
+    const serie = String(row.serie || '').trim();
+    const numero = row.numero != null ? String(row.numero).trim() : '';
+    if (serie || numero) return `${abrev} ${serie}-${numero}`;
+    return abrev;
+}
+
+function agruparLineasReporteDetallado(lineas) {
+    const map = new Map();
+    for (const row of lineas || []) {
+        const key = String(row.idCompra);
+        if (!map.has(key)) {
+            map.set(key, {
+                idCompra: row.idCompra,
+                proveedor: String(row.rSocial || ''),
+                ruc: String(row.ruc || ''),
+                documento: etiquetaDocumento(row),
+                fecha: String(row.fEmision || ''),
+                estado: etiquetaEstadoCompra(row.estadoPago),
+                subTotal: Number(row.subTotal) || 0,
+                igv: Number(row.igv) || 0,
+                descuentos: Number(row.descuentos) || 0,
+                total: Number(row.total) || 0,
+                lineas: [],
+            });
+        }
+        const comp = map.get(key);
+        comp.lineas.push({
+            codigo: String(row.codigo || ''),
+            producto: String(row.producto || ''),
+            cantidad: Number(row.cantidad) || 0,
+            precio: Number(row.pUnitario) || 0,
+            importe: Number(row.importeLinea) || 0,
+        });
+    }
+    return Array.from(map.values());
+}
+
+/**
+ * Reporte detallado de compras por comprobante (cabecera + líneas de producto).
+ */
+exports.obtenerReporteDetallado = async (idEmpresa, query) => {
+    if (!idEmpresa) {
+        throw new Error('Empresa no identificada');
+    }
+    const fechaInicio = query.fechaInicio || query.fechaDesde;
+    const fechaFin = query.fechaFin || query.fechaHasta;
+    if (!fechaInicio || !fechaFin) {
+        throw new Error('Indique fechaInicio y fechaFin');
+    }
+    const desde = new Date(fechaInicio);
+    const hasta = new Date(fechaFin);
+    if (desde > hasta) {
+        throw new Error('La fecha inicio no puede ser mayor que la fecha fin');
+    }
+
+    const rucLike =
+        query.proveedorRuc && String(query.proveedorRuc).trim()
+            ? `%${String(query.proveedorRuc).trim()}%`
+            : null;
+    const razonLike =
+        query.proveedorRazon && String(query.proveedorRazon).trim()
+            ? `%${String(query.proveedorRazon).trim()}%`
+            : null;
+
+    return withPool(async (pool) => {
+        const lineas = await comprasDetalleReporteRepository.listarLineasReporteDetallado(pool, {
+            idEmpresa,
+            fechaInicio,
+            fechaFin,
+            proveedorRucLike: rucLike,
+            proveedorRazonLike: razonLike,
+        });
+        const comprobantes = agruparLineasReporteDetallado(lineas);
+        const totales = comprobantes.reduce(
+            (acc, c) => {
+                acc.subTotal += c.subTotal;
+                acc.igv += c.igv;
+                acc.descuentos += c.descuentos;
+                acc.total += c.total;
+                return acc;
+            },
+            { subTotal: 0, igv: 0, descuentos: 0, total: 0, cantidadComprobantes: comprobantes.length }
+        );
+        totales.cantidadComprobantes = comprobantes.length;
+        return {
+            fechaInicio: String(fechaInicio).slice(0, 10),
+            fechaFin: String(fechaFin).slice(0, 10),
+            comprobantes,
+            totales,
+        };
+    });
 };

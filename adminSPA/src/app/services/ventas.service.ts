@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs';
+import type { ReporteVentasDetalladoData } from '../models/reporte-ventas-detallado.model';
 
 export interface VentaCompletaPayload {
   venta: {
@@ -252,6 +253,28 @@ export class VentasService {
     return this._http.delete<{ message: string }>(
       this.url + 'ventas/anular/' + idVenta,
       { withCredentials: true }
+    );
+  }
+
+  obtenerReporteDetallado(params: {
+    fechaInicio: string;
+    fechaFin: string;
+    clienteRuc?: string;
+    clienteRazon?: string;
+  }): Observable<{ message: string; data: ReporteVentasDetalladoData }> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    let httpParams = new HttpParams()
+      .set('fechaInicio', params.fechaInicio)
+      .set('fechaFin', params.fechaFin);
+    if (params.clienteRuc?.trim()) {
+      httpParams = httpParams.set('clienteRuc', params.clienteRuc.trim());
+    }
+    if (params.clienteRazon?.trim()) {
+      httpParams = httpParams.set('clienteRazon', params.clienteRazon.trim());
+    }
+    return this._http.get<{ message: string; data: ReporteVentasDetalladoData }>(
+      this.url + 'ventas/reporte-detallado',
+      { headers, withCredentials: true, params: httpParams }
     );
   }
 }

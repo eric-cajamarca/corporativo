@@ -168,6 +168,7 @@ function construirNavegacionPorDominios(ctx) {
       { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
       { nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
       { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
+      { nombre: 'Reporte detallado', ruta: '/ventas/reporte-detallado', permiso: 'REPORTE_DETALLADO_VENTAS', visible: can('REPORTE_DETALLADO_VENTAS') },
       { nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true }
     ].filter((s) => s.visible);
     if (subVentas.length) {
@@ -230,6 +231,7 @@ function construirNavegacionPorDominios(ctx) {
       submenu: [
         { nombre: 'Registrar Compras', ruta: '/compras/create', permiso: 'CREAR_COMPRAS', visible: can('CREAR_COMPRAS') },
         { nombre: 'Consultar Compras', ruta: '/compras', permiso: 'VER_COMPRAS', visible: true },
+        { nombre: 'Reporte detallado', ruta: '/compras/reporte-detallado', permiso: 'REPORTE_DETALLADO_COMPRAS', visible: can('REPORTE_DETALLADO_COMPRAS') },
         {
           nombre: 'Compras SUNAT',
           ruta: '/compras/comprobantes-sunat',
@@ -467,6 +469,14 @@ function construirNavegacionGestoraPorDominios(ctx) {
   if (can('VER_VENTAS')) {
     subVentas.push({ nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true });
     subVentas.push({ nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true });
+  }
+  if (can('REPORTE_DETALLADO_VENTAS')) {
+    subVentas.push({
+      nombre: 'Reporte detallado',
+      ruta: '/ventas/reporte-detallado',
+      permiso: 'REPORTE_DETALLADO_VENTAS',
+      visible: true
+    });
   }
   if (subVentas.length) {
     comercial.push({

@@ -34,7 +34,13 @@ export class VentasContainerComponent implements OnInit {
   /** True si la ruta actual es una ruta hija de ventas (create, detalle, editar) para mostrar el outlet. */
   get isChildRoute(): boolean {
     const url = this.router.url;
-    return url.includes('/ventas/create') || url.includes('/ventas/rapida') || url.includes('/ventas/detalle/') || url.includes('/ventas/editar/');
+    return (
+      url.includes('/ventas/create') ||
+      url.includes('/ventas/rapida') ||
+      url.includes('/ventas/detalle/') ||
+      url.includes('/ventas/editar/') ||
+      url.includes('/ventas/reporte-detallado')
+    );
   }
 
   ngOnInit(): void {
