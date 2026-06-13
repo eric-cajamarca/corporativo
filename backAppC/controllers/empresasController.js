@@ -148,6 +148,7 @@ const createEmpresa = async function (req, res, next) {
                     razon_Social,
                     correo,
                     celular,
+                    idRubro: req.body.idRubro || null,
                     direccion: req.body.direccion || 'Sin dirección',
                     ubigeo: req.body.ubigeo,
                     codPais: req.body.codPais,

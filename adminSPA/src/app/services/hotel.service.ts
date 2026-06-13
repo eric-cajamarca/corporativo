@@ -99,6 +99,11 @@ export class HotelService {
   limpiarConsumoHabitacion(idProductoHabitacion: string): Observable<{ data: { ok: boolean } }> {
     return this.http.delete<{ data: { ok: boolean } }>(this.url + 'consumo-habitacion/habitacion/' + idProductoHabitacion, { withCredentials: true });
   }
+
+  /** Tras facturar desde habitación: limpia consumo y cierra reserva vigente. */
+  cerrarPostVenta(body: { idProductoHabitacion: string; idVenta: number; idReserva?: string | null }): Observable<{ data: { ok: boolean } }> {
+    return this.http.post<{ data: { ok: boolean } }>(this.url + 'hotel/cerrar-post-venta', body, { withCredentials: true });
+  }
 }
 
 export interface ConsumoHabitacionLinea {

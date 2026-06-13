@@ -54,6 +54,7 @@ import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
+import { HotelService } from '../../../services/hotel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
@@ -261,6 +262,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     public sidebarState: SidebarStateService,
     private gestoresService: GestoresService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
+    private hotelService: HotelService,
     private valesDespachoService: ValesDespachoService,
     private empresaService: EmpresaService,
     private auth: AuthService,
@@ -451,6 +453,44 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       };
     });
     this.actualizaTotales();
+    if (preload.idCliente != null && Number(preload.idCliente) > 0) {
+      this._clienteService.obtener_cliente_id(preload.idCliente).subscribe({
+        next: (res) => {
+          const row = res?.data?.[0] ?? res?.data;
+          if (!row) return;
+          this.cliente = {
+            idCliente: row.idCliente,
+            idDocumento: row.idDocumento,
+            ruc: row.ruc,
+            rSocial: (row.rSocial ?? row.r_Social ?? row.rsocial ?? row.razonSocial ?? row.RazonSocial ?? preload.habitacionDescripcion ?? '').toString().trim(),
+            direccion: (row.direccion ?? '').toString(),
+            correo: row.correo ?? '',
+            celular: row.celular ?? '',
+            condicion: row.condicion ?? 'ACTIVO',
+            sujetoCredito: row.sujetoCredito === true || row.sujetoCredito === 1,
+            lineaCredito: row.lineaCredito != null && !isNaN(Number(row.lineaCredito)) ? Number(row.lineaCredito) : undefined
+          };
+          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+            next: (dirRes) => this.aplicarPrimeraDireccionClienteAlContexto(dirRes),
+            error: () => {}
+          });
+        },
+        error: () => {}
+      });
+    }
+  }
+
+  /** Tras registrar venta desde hotel: limpia consumo y cierra reserva en backend. */
+  private finalizarHotelPostVentaSiCorresponde(idVenta: number | null): void {
+    const ctx = this.hotelPreloadVentaService.getAndClearPendientePostVenta();
+    if (!ctx || idVenta == null || idVenta <= 0) return;
+    this.hotelService.cerrarPostVenta({
+      idProductoHabitacion: ctx.idProductoHabitacion,
+      idVenta,
+      idReserva: ctx.idReserva ?? undefined
+    }).subscribe({
+      error: () => {}
+    });
   }
 
   /** Quitar query `duplicarDesdeVenta` de la URL tras procesar. */
@@ -2783,6 +2823,7 @@ abrirModalPrecios(item: any) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
+        this.finalizarHotelPostVentaSiCorresponde(idVentaPdf);
         const abrirPdf =
           this.mostrarModalPdfTrasRegistrarVenta && idVentaPdf != null;
         if (abrirPdf) {

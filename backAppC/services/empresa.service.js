@@ -22,13 +22,32 @@ const COMPROBANTES_PREDETERMINADOS = [
   { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
   { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
   { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 },
-  { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 },
   { codigo: 'II', nombre: 'Inventario Inicial', serie: 'II01', numero: 0, activo: 1 },
   { codigo: 'IN', nombre: 'Ingreso', serie: 'IN01', numero: 0, activo: 1 },
   { codigo: 'IV', nombre: 'Inventario', serie: 'IV01', numero: 0, activo: 1 },
   { codigo: 'SA', nombre: 'Salida', serie: 'SA01', numero: 0, activo: 1 },
   { codigo: 'TF', nombre: 'Transferencia', serie: 'TF01', numero: 0, activo: 1 }
 ];
+
+const COMPROBANTE_VALE_DESPACHO = { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 };
+
+async function incluirValeDespachoEnAlta(pool, idRubro) {
+  if (!idRubro) return false;
+  const sql = require('mssql');
+  const result = await pool.request()
+    .input('idRubro', sql.Int, idRubro)
+    .query(`SELECT LTRIM(RTRIM(codigo)) AS codigo FROM Rubros WHERE idRubro = @idRubro`);
+  const codigo = String(result.recordset?.[0]?.codigo || '').trim().toUpperCase();
+  return codigo === 'GRF' || codigo === 'GRIFO';
+}
+
+async function listaComprobantesAlta(pool, idRubro) {
+  const base = [...COMPROBANTES_PREDETERMINADOS];
+  if (await incluirValeDespachoEnAlta(pool, idRubro)) {
+    base.push(COMPROBANTE_VALE_DESPACHO);
+  }
+  return base;
+}
 
 /**
  * Obtiene datos de empresa/usuario para la respuesta de getEmpresa_login (verificación de token).
@@ -113,14 +132,15 @@ exports.crearRolesPredeterminados = async (pool, idEmpresa) => {
  * @param {String} idEmpresa - ID de la empresa
  * @returns {Array} Array con los comprobantes creados
  */
-exports.crearComprobantesPredeterminados = async (pool, idEmpresa, idSucursal) => {
+exports.crearComprobantesPredeterminados = async (pool, idEmpresa, idSucursal, idRubro = null) => {
     const comprobantesCreados = [];
 
     if (!idSucursal) {
         throw new Error('idSucursal es requerido para crear comprobantes predeterminados');
     }
     try {
-        for (const comp of COMPROBANTES_PREDETERMINADOS) {
+        const catalogo = await listaComprobantesAlta(pool, idRubro);
+        for (const comp of catalogo) {
             const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
             const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
             const result = await pool.request()
@@ -155,13 +175,14 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa, idSucursal) =
  * Inserta comprobantes predeterminados solo si faltan (empresa+sucursal+código).
  * Usar al pasar una sucursal a series propias (idSucursalSeriesPadre NULL) sin filas en Comprobantes.
  */
-exports.asegurarComprobantesPredeterminadosPorSucursal = async (pool, idEmpresa, idSucursal) => {
+exports.asegurarComprobantesPredeterminadosPorSucursal = async (pool, idEmpresa, idSucursal, idRubro = null) => {
   if (!idSucursal) {
     throw new Error('idSucursal es requerido para asegurar comprobantes predeterminados');
   }
   const insertados = [];
   try {
-    for (const comp of COMPROBANTES_PREDETERMINADOS) {
+    const catalogo = await listaComprobantesAlta(pool, idRubro);
+    for (const comp of catalogo) {
       const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
       const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
       const result = await pool
@@ -768,7 +789,8 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
                 resultado.comprobantes = await exports.crearComprobantesPredeterminados(
                     pool,
                     idEmpresa,
-                    resultado.sucursal.idSucursal
+                    resultado.sucursal.idSucursal,
+                    datosEmpresa.idRubro || null
                 );
             } else {
                 throw new Error('No hay sucursal principal; no se pueden crear comprobantes');

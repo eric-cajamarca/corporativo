@@ -287,6 +287,8 @@ app.use('/api', consumoHabitacionRoutes);
 app.use('/api', suscripcionRoutes);
 const grifoRoutes = require('./routes/grifo');
 app.use('/api', grifoRoutes);
+const hotelRoutes = require('./routes/hotel');
+app.use('/api', hotelRoutes);
 
 // Modo una sola máquina (sin Nginx): sirve el build Angular desde SERVE_SPA_ROOT (p. ej. C:\EFAF\app\www)
 if (process.env.SERVE_SPA_ROOT) {

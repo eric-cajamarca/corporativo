@@ -123,11 +123,76 @@ async function eliminar(pool, idReserva, idEmpresa) {
     return result.rowsAffected[0];
 }
 
+/**
+ * Detecta solapamiento de fechas con otra reserva vigente en la misma habitación.
+ */
+async function existeSolapamiento(pool, idEmpresa, idProductoHabitacion, fechaEntrada, fechaSalida, excluirIdReserva = null) {
+    let query = `
+        SELECT TOP 1 r.idReserva
+        FROM Reservas r
+        WHERE r.idEmpresa = @idEmpresa
+          AND r.idProductoHabitacion = @idProductoHabitacion
+          AND r.estado = 'vigente'
+          AND r.fechaEntrada < @fechaSalida
+          AND r.fechaSalida > @fechaEntrada
+    `;
+    const req = pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
+        .input('fechaEntrada', sql.Date, fechaEntrada)
+        .input('fechaSalida', sql.Date, fechaSalida);
+    if (excluirIdReserva) {
+        query += ' AND r.idReserva <> @excluirIdReserva';
+        req.input('excluirIdReserva', sql.UniqueIdentifier, excluirIdReserva);
+    }
+    const result = await req.query(query);
+    return !!(result.recordset && result.recordset[0]);
+}
+
+async function cerrarPostVenta(pool, idEmpresa, { idProductoHabitacion, idVenta, idReserva = null }) {
+    if (!idProductoHabitacion) throw new Error('Habitación requerida');
+    if (!idVenta) throw new Error('idVenta requerido');
+
+    await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
+        .query(`
+            DELETE FROM ConsumoHabitacion
+            WHERE idEmpresa = @idEmpresa AND idProductoHabitacion = @idProductoHabitacion
+        `);
+
+    if (idReserva) {
+        await pool.request()
+            .input('idReserva', sql.UniqueIdentifier, idReserva)
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idVenta', sql.Int, idVenta)
+            .query(`
+                UPDATE Reservas
+                SET estado = 'sin_efecto', idVenta = @idVenta
+                WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa
+            `);
+    } else {
+        await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
+            .input('idVenta', sql.Int, idVenta)
+            .query(`
+                UPDATE Reservas
+                SET estado = 'sin_efecto', idVenta = @idVenta
+                WHERE idEmpresa = @idEmpresa
+                  AND idProductoHabitacion = @idProductoHabitacion
+                  AND estado = 'vigente'
+            `);
+    }
+}
+
 module.exports = {
     listar,
     obtenerPorId,
     siguienteCodigo,
     crear,
     actualizar,
-    eliminar
+    eliminar,
+    existeSolapamiento,
+    cerrarPostVenta
 };

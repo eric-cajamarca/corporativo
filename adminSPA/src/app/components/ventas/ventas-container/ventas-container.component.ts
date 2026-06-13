@@ -2,11 +2,11 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 import { EmpresaService } from '../../../services/empresa.service';
-import { Empresa } from '../../../models/empresa.model';
 import { VentasGrifoComponent } from '../ventas-grifo/ventas-grifo.component';
 import { VentasHotelesComponent } from '../ventas-hoteles/ventas-hoteles.component';
-import { VentasRopaComponent } from '../ventas-ropa/ventas-ropa.component';
-import { VentasRestaurantesComponent } from '../ventas-restaurantes/ventas-restaurantes.component';
+
+/** Rubros con pantalla vertical dedicada en /ventas (histórico). El resto usa POS estándar. */
+const RUBROS_LEGACY_VERTICAL = new Set(['ROPA', 'REST', 'FERR', 'RETAIL']);
 
 @Component({
   selector: 'app-ventas-container',
@@ -15,9 +15,7 @@ import { VentasRestaurantesComponent } from '../ventas-restaurantes/ventas-resta
     CommonModule,
     RouterOutlet,
     VentasGrifoComponent,
-    VentasHotelesComponent,
-    VentasRopaComponent,
-    VentasRestaurantesComponent
+    VentasHotelesComponent
   ],
   templateUrl: './ventas-container.component.html',
   styleUrl: './ventas-container.component.css'
@@ -44,15 +42,22 @@ export class VentasContainerComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Cargar empresa desde la API para tener codigoRubro actualizado (evita ver listado habitual si el rubro es Hotel/Grifo/etc.)
     this.empresaService.refreshEmpresaFromApi().subscribe({
       next: (emp) => {
-        this.codigoRubro = emp?.codigoRubro ?? null;
+        this.codigoRubro = this.normalizarCodigoRubro(emp?.codigoRubro ?? null);
         this.loading = false;
       },
       error: () => {
         this.loading = false;
       }
     });
+  }
+
+  /** GEN/FERR/RETAIL/null → POS estándar; GRF/HOTEL → módulo vertical. */
+  private normalizarCodigoRubro(codigo: string | null): string | null {
+    const c = (codigo ?? '').trim().toUpperCase();
+    if (!c || c === 'GEN' || RUBROS_LEGACY_VERTICAL.has(c)) return null;
+    if (c === 'GRIFO') return 'GRF';
+    return c;
   }
 }

@@ -9,6 +9,7 @@ import { IndexVentasComponent } from '../index-ventas/index-ventas.component';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 import { HotelService, type Reserva, type ProductoHabitacion, type ConsumoHabitacionLinea } from '../../../services/hotel.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
 import { productoActivoParaVenta } from '../../../utils/producto-busqueda.util';
@@ -46,6 +47,7 @@ export interface ProductoParaConsumo {
 export class VentasHotelesComponent implements OnInit {
   private hotelService = inject(HotelService);
   private preloadVenta = inject(HotelPreloadVentaService);
+  private buscadorProductosModal = inject(BuscadorProductosModalService);
   private productoService = inject(ProductoService);
   private router = inject(Router);
   sidebarState = inject(SidebarStateService);
@@ -59,14 +61,12 @@ export class VentasHotelesComponent implements OnInit {
   productosParaConsumo: ProductoParaConsumo[] = [];
   /** Producto elegido en el modal de búsqueda (para mostrar descripción y precio en el form). */
   productoSeleccionadoConsumo: ProductoParaConsumo | null = null;
-  showModalBuscarProducto = signal(false);
-  searchTermProducto = '';
-  productosFiltradosBusqueda: ProductoParaConsumo[] = [];
 
   loading = signal(false);
   errorMessage = signal<string | null>(null);
 
   showModalReserva = signal(false);
+  reservaEditando: Reserva | null = null;
   formReserva = {
     idProductoHabitacion: '',
     idCliente: null as number | null,
@@ -210,34 +210,17 @@ export class VentasHotelesComponent implements OnInit {
   }
 
   abrirModalBuscarProductoConsumo(): void {
-    this.searchTermProducto = '';
-    this.productosFiltradosBusqueda = [...this.productosParaConsumo];
-    this.showModalBuscarProducto.set(true);
-  }
-
-  cerrarModalBuscarProductoConsumo(): void {
-    this.showModalBuscarProducto.set(false);
+    this.buscadorProductosModal.abrir({ modo: 'catalogo', etiquetaPrecio: 'P. venta' }).then((p) => {
+      if (!p) return;
+      this.seleccionarProductoConsumo(this.mapearProductoParaConsumo(p as unknown as Record<string, unknown>));
+    });
   }
 
   uMedidaColumnaConsumo(p: ProductoParaConsumo): string {
     return descripcionUnidadMedidaProducto(p as unknown as Record<string, unknown>);
   }
 
-  buscarProductosConsumo(): void {
-    const term = this.searchTermProducto.toLowerCase().trim();
-    if (term === '') {
-      this.productosFiltradosBusqueda = [...this.productosParaConsumo];
-    } else {
-      this.productosFiltradosBusqueda = this.productosParaConsumo.filter((item) => {
-        const descripcion = (item.descripcion ?? '').toLowerCase();
-        const codigo = (item.codigo ?? '').toLowerCase();
-        const categoria = (item.categoria ?? '').toLowerCase();
-        return descripcion.includes(term) || codigo.includes(term) || categoria.includes(term);
-      });
-    }
-  }
-
-  /** Recarga catálogo desde BD y reaplica el filtro del input (p. ej. producto recién creado). */
+  /** Recarga catálogo desde BD (p. ej. producto recién creado desde el buscador compartido). */
   recargarProductosConsumoDesdeServidor(): void {
     this.productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
       next: (r) => {
@@ -245,7 +228,6 @@ export class VentasHotelesComponent implements OnInit {
         this.productosParaConsumo = data
           .filter((p: unknown) => productoActivoParaVenta(p as Record<string, unknown>))
           .map((p: unknown) => this.mapearProductoParaConsumo(p));
-        this.buscarProductosConsumo();
       },
       error: () => {}
     });
@@ -256,7 +238,6 @@ export class VentasHotelesComponent implements OnInit {
     this.formConsumo.pUnitario = p.pVenta ?? 0;
     this.formConsumo.cantidad = 1;
     this.productoSeleccionadoConsumo = p;
-    this.cerrarModalBuscarProductoConsumo();
   }
 
   guardarConsumo(): void {
@@ -380,14 +361,16 @@ export class VentasHotelesComponent implements OnInit {
   }
 
   generarVenta(habitacion: ProductoHabitacion): void {
+    const reserva = this.getReservaVigentePorHabitacion(habitacion.idProducto);
     const lineasConsumo = this.getConsumoDeHabitacion(habitacion.idProducto);
+    const precioHabitacion = reserva?.total ?? 0;
     const lineas: { idProducto: string; codigo: string; descripcion: string; cantidad: number; pVenta: number }[] = [];
     lineas.push({
       idProducto: habitacion.idProducto,
       codigo: habitacion.codigo,
       descripcion: habitacion.descripcion,
       cantidad: 1,
-      pVenta: 0
+      pVenta: precioHabitacion
     });
     for (const c of lineasConsumo) {
       lineas.push({
@@ -402,12 +385,15 @@ export class VentasHotelesComponent implements OnInit {
       idProductoHabitacion: habitacion.idProducto,
       habitacionCodigo: habitacion.codigo,
       habitacionDescripcion: habitacion.descripcion,
+      idCliente: reserva?.idCliente ?? null,
+      idReserva: reserva?.idReserva ?? null,
       lineas
     });
     this.router.navigate(['/ventas/create']);
   }
 
   abrirModalNuevaReserva(): void {
+    this.reservaEditando = null;
     this.errorMessage.set(null);
     this.formReserva = {
       idProductoHabitacion: '',
@@ -426,6 +412,47 @@ export class VentasHotelesComponent implements OnInit {
 
   cerrarModalReserva(): void {
     this.showModalReserva.set(false);
+    this.reservaEditando = null;
+  }
+
+  abrirModalEditarReserva(reserva: Reserva): void {
+    this.reservaEditando = reserva;
+    this.errorMessage.set(null);
+    this.formReserva = {
+      idProductoHabitacion: reserva.idProductoHabitacion,
+      idCliente: reserva.idCliente,
+      nombreHuesped: reserva.nombreHuesped,
+      fechaEntrada: reserva.fechaEntrada,
+      fechaSalida: reserva.fechaSalida,
+      total: reserva.total ?? 0,
+      codigo: reserva.codigo
+    };
+    this.showModalReserva.set(true);
+  }
+
+  eliminarReserva(reserva: Reserva): void {
+    if (!confirm(`¿Eliminar la reserva ${reserva.codigo}?`)) return;
+    this.hotelService.eliminarReserva(reserva.idReserva).subscribe({
+      next: () => this.cargarDatos(),
+      error: (err) => this.errorMessage.set(err?.error?.message || 'Error al eliminar reserva')
+    });
+  }
+
+  anularReserva(reserva: Reserva): void {
+    if (!confirm('¿Anular esta reserva (sin efecto)?')) return;
+    this.hotelService.actualizarReserva(reserva.idReserva, {
+      idProductoHabitacion: reserva.idProductoHabitacion,
+      idCliente: reserva.idCliente ?? 0,
+      codigo: reserva.codigo,
+      nombreHuesped: reserva.nombreHuesped,
+      fechaEntrada: reserva.fechaEntrada,
+      fechaSalida: reserva.fechaSalida,
+      estado: 'sin_efecto',
+      total: reserva.total
+    }).subscribe({
+      next: () => this.cargarDatos(),
+      error: (err) => this.errorMessage.set(err?.error?.message || 'Error al anular reserva')
+    });
   }
 
   abrirModalCliente(): void {
@@ -452,23 +479,38 @@ export class VentasHotelesComponent implements OnInit {
     }
     this.guardandoReserva = true;
     this.errorMessage.set(null);
-    this.hotelService.crearReserva({
+    const payload = {
       idProductoHabitacion: this.formReserva.idProductoHabitacion,
       idCliente: this.formReserva.idCliente ?? undefined,
       nombreHuesped: this.formReserva.nombreHuesped.trim(),
       fechaEntrada: this.formReserva.fechaEntrada,
       fechaSalida: this.formReserva.fechaSalida,
-      codigo: this.formReserva.codigo || undefined,
+      codigo: this.formReserva.codigo || this.reservaEditando?.codigo || '',
       total: this.formReserva.total ?? 0,
       estado: 'vigente'
-    }).subscribe({
+    };
+    if (this.reservaEditando) {
+      this.hotelService.actualizarReserva(this.reservaEditando.idReserva, payload).subscribe({
+        next: () => {
+          this.cerrarModalReserva();
+          this.cargarDatos();
+          this.guardandoReserva = false;
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.errorMessage.set(err?.error?.message || 'Error al guardar reserva');
+          this.guardandoReserva = false;
+        }
+      });
+      return;
+    }
+    this.hotelService.crearReserva(payload).subscribe({
       next: () => {
         this.cerrarModalReserva();
         this.cargarDatos();
         this.guardandoReserva = false;
       },
-      error: (err) => {
-        this.errorMessage.set(err?.error?.message || 'Error al crear reserva');
+      error: (err: { error?: { message?: string } }) => {
+        this.errorMessage.set(err?.error?.message || 'Error al guardar reserva');
         this.guardandoReserva = false;
       }
     });
