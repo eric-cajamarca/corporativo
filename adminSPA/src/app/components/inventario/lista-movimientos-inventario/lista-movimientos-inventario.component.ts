@@ -13,6 +13,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 import {
   MovimientoInventarioCabecera,
   MovimientoInventarioLineaDetalle,
@@ -56,19 +57,11 @@ export class ListaMovimientosInventarioComponent implements OnInit {
 
   private buscarSubject = new Subject<string>();
 
-  /** Fecha local YYYY-MM-DD (evita desfase UTC de toISOString). */
-  private fechaLocalYmd(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-
   ngOnInit(): void {
     const hoy = new Date();
     const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
-    this.fechaDesde = this.fechaLocalYmd(inicioAnio);
-    this.fechaHasta = this.fechaLocalYmd(hoy);
+    this.fechaDesde = formatFechaLocal(inicioAnio);
+    this.fechaHasta = getFechaHoyLocal();
 
     this.buscarSubject.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.cargar());
 
@@ -275,8 +268,8 @@ export class ListaMovimientosInventarioComponent implements OnInit {
   limpiarFiltros(): void {
     const hoy = new Date();
     const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
-    this.fechaDesde = this.fechaLocalYmd(inicioAnio);
-    this.fechaHasta = this.fechaLocalYmd(hoy);
+    this.fechaDesde = formatFechaLocal(inicioAnio);
+    this.fechaHasta = getFechaHoyLocal();
     this.idSucursal = '';
     this.codigoTipo = '';
     this.buscar = '';

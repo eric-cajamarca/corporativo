@@ -29,6 +29,7 @@ import { ProveedoresService } from '../../../services/proveedores.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
+import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 import {
   ProductoCreadoModalResult,
   ProductoCrearModalService,
@@ -1321,7 +1322,10 @@ export class CreateComprasComponent {
     }
 
     const idSucursalCompra = this.compras.idSucursal;
-    const cuerpoCompra: Record<string, unknown> = { ...this.compras };
+    const cuerpoCompra: Record<string, unknown> = {
+      ...this.compras,
+      fEmision: fechaEmisionVentaParaApi(this.compras.fEmision)
+    };
     const snap = this.buildComprobanteSunatPayload();
     if (snap) {
       cuerpoCompra['comprobanteSunat'] = snap;

@@ -2,7 +2,7 @@
 const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 const { v4: uuidv4 } = require('uuid');
-const { getFechaSoloSQLString, getNowLocalSQLString } = require('../utils/fechaHoraLocal.util');
+const { getFechaSoloSQLString, getNowLocalSQLString, parseFEmisionCabeceraSQL } = require('../utils/fechaHoraLocal.util');
 const comprasRepository = require('../repositories/compras.repository');
 const comprasDetalleReporteRepository = require('../repositories/comprasDetalleReporte.repository');
 const CajaRepository = require('../repositories/caja.repository');
@@ -97,7 +97,7 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
     }
 
     const idCompra = uuidv4();
-    const fEmisionSQL = getFechaSoloSQLString(fEmision) || getNowLocalSQLString();
+    const fEmisionSQL = parseFEmisionCabeceraSQL(fEmision) || getNowLocalSQLString();
     const fVencimientoSQL = getFechaSoloSQLString(fVencimiento) || fEmisionSQL;
     const compRelacionadoVal = compRelacionado || null;
 

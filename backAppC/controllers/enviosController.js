@@ -282,7 +282,7 @@ const eliminarEnvio = async (req, res) => {
 const actualizarEstadoEnvio = async (req, res) => {
   try {
     const { idEnvio } = req.params;
-    const { idEstadoEnvio, observaciones, evidenciaFoto } = req.body;
+    const { idEstadoEnvio, observaciones, evidenciaFoto, fechaEntrega, fechaCambio } = req.body;
 
     // Validación básica
     if (!idEstadoEnvio) {
@@ -297,7 +297,9 @@ const actualizarEstadoEnvio = async (req, res) => {
       idEnvio,
       idEstadoEnvio,
       observaciones,
-      evidenciaFoto
+      evidenciaFoto,
+      fechaEntrega,
+      fechaCambio
       })
     );
 

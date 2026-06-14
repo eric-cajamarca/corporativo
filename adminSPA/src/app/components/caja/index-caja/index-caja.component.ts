@@ -9,6 +9,7 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -280,7 +281,8 @@ export class IndexCajaComponent implements OnInit {
     this.loading = true;
     this.cajaService.abrirCaja({
       idCaja: this.cajaSeleccionada.idCaja,
-      montoInicial: this.montoInicial
+      montoInicial: this.montoInicial,
+      fechaApertura: fechaHoraVentaClienteAhora()
     }).subscribe({
       next: (response) => {
         iziToast.success({
@@ -326,7 +328,8 @@ export class IndexCajaComponent implements OnInit {
       concepto: this.movimiento.descripcion.trim(),
       monto: this.movimiento.monto,
       idMediosPago,
-      observaciones: this.movimiento.referencia?.trim() || undefined
+      observaciones: this.movimiento.referencia?.trim() || undefined,
+      fechaMovimiento: fechaHoraVentaClienteAhora()
     }).subscribe({
       next: (response) => {
         iziToast.success({
@@ -355,8 +358,9 @@ export class IndexCajaComponent implements OnInit {
     }
 
     this.loading = true;
-    const payload: { idApertura: string; montoFinal?: number } = {
-      idApertura: this.cajaSeleccionada.idApertura
+    const payload: { idApertura: string; montoFinal?: number; fechaCierre?: string } = {
+      idApertura: this.cajaSeleccionada.idApertura,
+      fechaCierre: fechaHoraVentaClienteAhora()
     };
     if (this.montoCierre != null && !Number.isNaN(this.montoCierre)) {
       payload.montoFinal = this.montoCierre;

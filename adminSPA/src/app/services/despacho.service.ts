@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
+import { fechaHoraVentaClienteAhora } from '../utils/fecha-local.util';
 import {
   CrearDevolucionDespachoRequest,
   DevolucionDespachoDetalle,
@@ -41,7 +42,10 @@ export class DespachoService {
     mercaderiaPendienteDeCarga?: boolean;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.post(this.url+'despachos/', data, {
+    return this._http.post(this.url+'despachos/', {
+      ...data,
+      fechaDespacho: fechaHoraVentaClienteAhora()
+    }, {
       headers: headers,
       withCredentials: true
     });
@@ -54,7 +58,8 @@ export class DespachoService {
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'despachos/detalle/' + data.idDetalle + '/cantidad', {
-      cantidadDespachada: data.cantidadDespachada
+      cantidadDespachada: data.cantidadDespachada,
+      fechaDespacho: fechaHoraVentaClienteAhora()
     }, {
       headers: headers,
       withCredentials: true
@@ -69,7 +74,7 @@ export class DespachoService {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.put<{ message: string; data: { idDespacho: string; todosDetallesDespachados: boolean } }>(
       this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/registrar-cantidades',
-      { items },
+      { items, fechaDespacho: fechaHoraVentaClienteAhora() },
       { headers, withCredentials: true }
     );
   }
@@ -146,7 +151,10 @@ export class DespachoService {
   /** Registrar devolución de despacho */
   crearDevolucionDespacho(idDespacho: string, data: CrearDevolucionDespachoRequest): Observable<any> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    return this._http.post(this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/devoluciones', data, {
+    return this._http.post(this.url + 'despachos/' + encodeURIComponent(idDespacho) + '/devoluciones', {
+      ...data,
+      fechaCambio: fechaHoraVentaClienteAhora()
+    }, {
       headers,
       withCredentials: true
     });

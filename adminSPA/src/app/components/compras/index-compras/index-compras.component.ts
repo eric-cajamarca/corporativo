@@ -19,6 +19,7 @@ import { Empresa } from '../../../models/empresa.model';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
+import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 
 
@@ -242,7 +243,7 @@ export class IndexComprasComponent {
     let list = [...this.compras_const];
 
     if (this.filtroFecha === 'today') {
-      const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+      const hoy = getFechaHoyLocal();
       list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) === hoy);
     } else if (this.filtroFecha === 'month') {
       const now = new Date();

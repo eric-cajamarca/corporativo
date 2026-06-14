@@ -3,7 +3,7 @@ const DashboardServices = require("../services/dashboard.service");
 
 const obtenerResumenDashboard = async (req, res) => {
   try {
-    const { periodo } = req.query;
+    const { periodo, fechaReferencia } = req.query;
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!idEmpresa) {
       return res.status(403).send({
@@ -12,7 +12,7 @@ const obtenerResumenDashboard = async (req, res) => {
       });
     }
     const data = await withPool(async (pool) =>
-      DashboardServices.obtenerResumenDashboardService(pool, req.user, periodo || "Este Mes")
+      DashboardServices.obtenerResumenDashboardService(pool, req.user, periodo || "Este Mes", fechaReferencia)
     );
     res.status(200).send({ data });
   } catch (error) {
@@ -29,7 +29,7 @@ const obtenerResumenDashboard = async (req, res) => {
 
 const obtenerResumenConsolidadoGestora = async (req, res) => {
   try {
-    const { periodo } = req.query;
+    const { periodo, fechaReferencia } = req.query;
     const idEmpresa = req.user?.empresa || req.user?.idEmpresa;
     if (!idEmpresa) {
       return res.status(403).send({
@@ -38,7 +38,7 @@ const obtenerResumenConsolidadoGestora = async (req, res) => {
       });
     }
     const data = await withPool(async (pool) =>
-      DashboardServices.obtenerResumenConsolidadoGestoraService(pool, req.user, periodo || "Este Mes")
+      DashboardServices.obtenerResumenConsolidadoGestoraService(pool, req.user, periodo || "Este Mes", fechaReferencia)
     );
     res.status(200).send({ data });
   } catch (error) {

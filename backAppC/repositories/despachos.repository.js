@@ -1,4 +1,5 @@
 const sql = require("mssql");
+const { resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 
 exports.obtenerDespachosVentaRepo = async (pool, idEmpresa, idVenta) => {
   const result = await pool
@@ -80,6 +81,7 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
 
     const mercaderiaPendienteDeCarga = datos.mercaderiaPendienteDeCarga === true;
     const estadoCabecera = mercaderiaPendienteDeCarga ? "PENDIENTE" : "COMPLETADO";
+    const fechaDespachoSql = resolveFechaHoraClienteSql(datos.fechaDespacho);
 
     const reqDespacho = transaction.request();
     const despachoResult = await reqDespacho
@@ -90,6 +92,7 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
       .input("idUsuarioDespacho", sql.UniqueIdentifier, user.sub)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
       .input("estadoCabecera", sql.VarChar(20), estadoCabecera)
+      .input("fechaDespacho", sql.VarChar(23), fechaDespachoSql)
       .query(`
         INSERT INTO Despachos (
           idEmpresa, idSucursal, idVenta, idTipoDespacho,
@@ -98,7 +101,7 @@ exports.crearDespachoRepo = async (pool, user, datos) => {
         OUTPUT INSERTED.idDespacho
         VALUES (
           @idEmpresa, @idSucursal, @idVenta, @idTipoDespacho,
-          @idUsuarioDespacho, @observaciones, GETDATE(), @estadoCabecera
+          @idUsuarioDespacho, @observaciones, TRY_CONVERT(DATETIME, @fechaDespacho, 120), @estadoCabecera
         )
       `);
 
@@ -262,6 +265,9 @@ exports.actualizarCantidadDespachadaRepo = async (pool, user, datos) => {
   const row = detalleRow.recordset[0];
   if (!row) throw new Error("DETALLE_NO_ENCONTRADO");
   const estado = datos.cantidadDespachada >= row.cantidadSolicitada ? "DESPACHADO" : "PENDIENTE";
+  const fechaDespachoSql = estado === "DESPACHADO"
+    ? resolveFechaHoraClienteSql(datos.fechaDespacho)
+    : null;
 
   await req
     .input("idDetalleDespacho", sql.UniqueIdentifier, datos.idDetalleDespacho)
@@ -269,13 +275,14 @@ exports.actualizarCantidadDespachadaRepo = async (pool, user, datos) => {
     .input("ubicacionOrigen", sql.VarChar, datos.ubicacionOrigen || null)
     .input("ubicacionDestino", sql.VarChar, datos.ubicacionDestino || null)
     .input("estado", sql.VarChar, estado)
+    .input("fechaDespacho", sql.VarChar(23), fechaDespachoSql)
     .query(`
       UPDATE DetalleDespachos
       SET cantidadDespachada = @cantidadDespachada,
           ubicacionOrigen = @ubicacionOrigen,
           ubicacionDestino = @ubicacionDestino,
           estado = @estado,
-          fechaDespacho = CASE WHEN @estado = 'DESPACHADO' THEN GETDATE() ELSE fechaDespacho END
+          fechaDespacho = CASE WHEN @estado = 'DESPACHADO' THEN TRY_CONVERT(DATETIME, @fechaDespacho, 120) ELSE fechaDespacho END
       WHERE idDetalleDespacho = @idDetalleDespacho
     `);
 
@@ -327,7 +334,7 @@ exports.actualizarCantidadDespachadaRepo = async (pool, user, datos) => {
  * Registra cantidades retiradas para varias líneas del mismo despacho (una transacción).
  * items: [{ idDetalleDespacho, cantidadDespachada, ubicacionOrigen?, ubicacionDestino? }]
  */
-exports.actualizarCantidadesDespachoBatchRepo = async (pool, _user, idDespacho, items) => {
+exports.actualizarCantidadesDespachoBatchRepo = async (pool, _user, idDespacho, items, fechaDespachoCliente) => {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error("ITEMS_VACIOS");
   }
@@ -369,6 +376,9 @@ exports.actualizarCantidadesDespachoBatchRepo = async (pool, _user, idDespacho, 
       }
       const estado = cant >= Number(row.cantidadSolicitada) ? "DESPACHADO" : "PENDIENTE";
       idDetallesVentaSync.add(row.idDetalleVenta);
+      const fechaDespachoSql = estado === "DESPACHADO"
+        ? resolveFechaHoraClienteSql(fechaDespachoCliente)
+        : null;
 
       await transaction
         .request()
@@ -377,13 +387,14 @@ exports.actualizarCantidadesDespachoBatchRepo = async (pool, _user, idDespacho, 
         .input("ubicacionOrigen", sql.VarChar, it.ubicacionOrigen || null)
         .input("ubicacionDestino", sql.VarChar, it.ubicacionDestino || null)
         .input("estado", sql.VarChar, estado)
+        .input("fechaDespacho", sql.VarChar(23), fechaDespachoSql)
         .query(`
           UPDATE DetalleDespachos
           SET cantidadDespachada = @cantidadDespachada,
               ubicacionOrigen = @ubicacionOrigen,
               ubicacionDestino = @ubicacionDestino,
               estado = @estado,
-              fechaDespacho = CASE WHEN @estado = 'DESPACHADO' THEN GETDATE() ELSE fechaDespacho END
+              fechaDespacho = CASE WHEN @estado = 'DESPACHADO' THEN TRY_CONVERT(DATETIME, @fechaDespacho, 120) ELSE fechaDespacho END
           WHERE idDetalleDespacho = @idDetalleDespacho
         `);
     }

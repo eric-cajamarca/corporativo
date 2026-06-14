@@ -2,7 +2,7 @@ const sql = require("mssql");
 const fs = require("fs");
 const path = require("path");
 const ventasRepository = require("../repositories/ventas.repository");
-const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
+const { getNowLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 const debugSunatLog = require("../utils/debugSunatLog.util");
 const { formatearHoraEnvioParaInput } = require("../utils/limaSunat.util");
 const { escribirArchivosPlanos, escribirXmlFirma, nombreArchivoComprobante } = require("../utils/facturadorSunat.util");
@@ -873,7 +873,7 @@ exports.crearNotaCreditoDebitoRepo = async (pool, idEmpresa, idUsuario, datos) =
       total += Number(it.total) || 0;
     }
     const igv = Math.round((total - subtotal) * 100) / 100;
-    const fEmision = getNowLocalSQLString().slice(0, 19).replace("T", " ");
+    const fEmision = resolveFechaHoraClienteSql(datos.fEmision).slice(0, 19).replace("T", " ");
 
     const insertVenta = transaction.request();
     insertVenta.input("idEmpresa", sql.UniqueIdentifier, idEmpresa);

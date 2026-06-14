@@ -50,6 +50,7 @@ import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
+import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
@@ -170,6 +171,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Hasta que llegue gestores/config, no aplicar descuento lista vs vendido (evita total erróneo con default true). */
   private descuentoEnTotalConfigListo = false;
+
+  /** Gestora: descuento en total por empresa del producto (idEmpresa en minúsculas). */
+  private descuentoPorEmpresa = new Map<string, boolean>();
 
   /** Config > Ventas: mostrar modal PDF/WhatsApp al registrar venta (por defecto activo). */
   mostrarModalPdfTrasRegistrarVenta = true;
@@ -305,7 +309,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   ngOnInit(): void {
     this.ventaProvisionalUi.configurarModo('rapida');
-    this.gestoresService.obtenerConfiguracion().subscribe({
+    this.gestoresService.obtenerConfiguracion({ evitarCache: true }).subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
         const normClave = (c: { clave?: string; Clave?: string }) =>
@@ -366,9 +370,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       },
       error: () => {}
     });
-    const now = new Date();
-    const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
-    const hoy = `${y}-${m}-${d}`;
+    const hoy = getFechaHoyLocal();
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
     //if (!this.ventas.fVencimiento) this.ventas.fVencimiento=hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
@@ -379,6 +381,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         const estado = res?.data;
         this.esGestora = !!estado?.esGestora;
         this.esEmpresaGestionada = !!(estado as { esEmpresaGestionada?: boolean })?.esEmpresaGestionada;
+        if (this.esGestora) {
+          this.cargarDescuentoPorEmpresaGestora();
+        }
         if (!this.esGestora) {
           this._productoService.limpiarCacheListaProductos();
           this.stockSucursales_const = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const);
@@ -457,11 +462,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.aplicarClienteVariosPorDefecto();
     }
     if (!this.ventas.fEmision) {
-      const hoy = new Date();
-      const y = hoy.getFullYear();
-      const m = String(hoy.getMonth() + 1).padStart(2, '0');
-      const d = String(hoy.getDate()).padStart(2, '0');
-      this.ventas.fEmision = `${y}-${m}-${d}`;
+      this.ventas.fEmision = getFechaHoyLocal();
     }
   }
 
@@ -1577,25 +1578,25 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.ventas.igvMonto = 0;
     this.ventas.total = 0;
 
-    const aplicarDescuentoLista = this.descuentoEnTotalConfigListo && this.usarDescuentoEnTotal;
-
     this.carrito.forEach(item => {
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
-      const subtotalItem = Math.round(pVenta * cant * 100) / 100;
-      this.ventas.subTotal += subtotalItem;
-      if (aplicarDescuentoLista) {
+      const aplicarDescuentoLinea = this.aplicaDescuentoEnTotalLinea(item);
+
+      if (aplicarDescuentoLinea) {
         const precioPrincipal = this.obtenerPrecioPrincipal(item);
+        const subtotalItem = Math.round(precioPrincipal * cant * 100) / 100;
+        this.ventas.subTotal += subtotalItem;
         if (precioPrincipal > pVenta) {
           this.ventas.descuentos += Math.round((precioPrincipal - pVenta) * cant * 100) / 100;
         }
+      } else {
+        const subtotalItem = Math.round(pVenta * cant * 100) / 100;
+        this.ventas.subTotal += subtotalItem;
       }
     });
 
     this.ventas.subTotal = Math.round(this.ventas.subTotal * 100) / 100;
-    if (!aplicarDescuentoLista) {
-      this.ventas.descuentos = 0;
-    }
     this.ventas.descuentos = Math.round(this.ventas.descuentos * 100) / 100;
     const neto = Math.round((this.ventas.subTotal - this.ventas.descuentos) * 100) / 100;
 
@@ -1673,6 +1674,34 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   //return listaPrincipal ? listaPrincipal.precio : item.precio || 0;
   return listaPrincipal ? (listaPrincipal as any).precio : item.pVenta || 0;
 }
+
+  private aplicaDescuentoEnTotalLinea(item: { idEmpresa?: string | null }): boolean {
+    if (!this.descuentoEnTotalConfigListo) return false;
+    if (!this.esGestora) return this.usarDescuentoEnTotal;
+    const idJwt = this.idEmpresaOperacionJwt().toLowerCase();
+    const idEmp =
+      item?.idEmpresa != null && String(item.idEmpresa).trim() !== ''
+        ? String(item.idEmpresa).trim().toLowerCase()
+        : idJwt;
+    if (this.descuentoPorEmpresa.has(idEmp)) {
+      return this.descuentoPorEmpresa.get(idEmp)!;
+    }
+    return this.usarDescuentoEnTotal;
+  }
+
+  private cargarDescuentoPorEmpresaGestora(): void {
+    this.gestoresService.obtenerDescuentoVentaPorEmpresas().subscribe({
+      next: (res) => {
+        const data = res?.data ?? {};
+        this.descuentoPorEmpresa.clear();
+        for (const [idEmpresa, activo] of Object.entries(data)) {
+          this.descuentoPorEmpresa.set(String(idEmpresa).trim().toLowerCase(), !!activo);
+        }
+        this.actualizaTotales();
+      },
+      error: () => {}
+    });
+  }
 
 /**
  * Abre el modal de selección de precios
@@ -2848,8 +2877,8 @@ abrirModalPrecios(item: any) {
       numero: String(this.ventas.numero || '00000000').substring(0, 8),
       compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
       idComprobante: Number(this.ventas.idComprobante),
-      fEmision: this.ventas.fEmision ? new Date(this.ventas.fEmision).toISOString() : new Date().toISOString(),
-      fVencimiento: this.ventas.fVencimiento ? new Date(this.ventas.fVencimiento).toISOString() : null,
+      fEmision: fechaEmisionVentaParaApi(this.ventas.fEmision),
+      fVencimiento: fechaVentaOpcionalParaApi(this.ventas.fVencimiento),
       idCliente,
       idMoneda: Number(this.ventas.idMoneda) || 1,
       tCambio: 1,
@@ -2893,7 +2922,7 @@ abrirModalPrecios(item: any) {
         igv: 0,
         isc: 0,
         total: subtotal,
-        hVenta: new Date().toISOString(),
+        hVenta: fechaEmisionVentaParaApi(this.ventas.fEmision),
         cantEntregada: esEstadoPendiente ? 0 : cant,
         idEstadoPedido: idEstadoPedidoVenta,
         idSucursalEmpresa: item.idSucursal || undefined,
@@ -3336,7 +3365,7 @@ abrirModalPrecios(item: any) {
       idEstadoPedido: this.configDefaults.idEstadoPedidoPorDefecto,
       idEstadoPago: this.configDefaults.idEstadoPagoPorDefecto,
       idMediosPago: this.getIdMediosPagoContado(),
-      fEmision: '',
+      fEmision: getFechaHoyLocal(),
       fechaPago: '',
       fVencimiento: '',
       observacion: '',

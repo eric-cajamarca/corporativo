@@ -37,7 +37,7 @@ export class CajaService {
   }
 
   // Abrir caja
-  abrirCaja(data: { idCaja: string; montoInicial: number }): Observable<any> {
+  abrirCaja(data: { idCaja: string; montoInicial: number; fechaApertura?: string; observaciones?: string }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'caja/abrir', data, {
       headers: headers,
@@ -46,7 +46,7 @@ export class CajaService {
   }
 
   // Cerrar caja (cierra la apertura activa)
-  cerrarCaja(data: { idApertura: string; montoFinal?: number; observaciones?: string }): Observable<any> {
+  cerrarCaja(data: { idApertura: string; montoFinal?: number; observaciones?: string; fechaCierre?: string }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'caja/cerrar', data, {
       headers: headers,
@@ -63,6 +63,7 @@ export class CajaService {
     idMediosPago?: number | null;
     idMoneda?: number;
     observaciones?: string;
+    fechaMovimiento?: string;
   }): Observable<any> {
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     const body = {
@@ -72,7 +73,8 @@ export class CajaService {
       monto: data.monto,
       idMediosPago: data.idMediosPago ?? undefined,
       idMoneda: data.idMoneda ?? 1,
-      observaciones: data.observaciones
+      observaciones: data.observaciones,
+      fechaMovimiento: data.fechaMovimiento ?? undefined
     };
     return this._http.post(this.url+'caja/movimiento', body, {
       headers: headers,

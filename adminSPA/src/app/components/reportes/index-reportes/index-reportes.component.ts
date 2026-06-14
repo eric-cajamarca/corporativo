@@ -17,6 +17,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa as EmpresaPdf } from '../../../interfaces/pdf-interface';
+import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 import { ReportesNegocioPdfService } from '../../../services/reportes-negocio-pdf.service';
 import {
   ReportesService,
@@ -191,9 +192,8 @@ export class IndexReportesComponent implements OnInit {
   inicializarFechas(): void {
     const hoy = new Date();
     const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    const fmt = (n: Date) => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
-    this.fechaFin = fmt(hoy);
-    this.fechaInicio = fmt(primerDiaMes);
+    this.fechaFin = getFechaHoyLocal();
+    this.fechaInicio = formatFechaLocal(primerDiaMes);
   }
 
   aplicarFiltroFechas(): void {
@@ -623,8 +623,7 @@ export class IndexReportesComponent implements OnInit {
   /** Sincroniza fechas del filtro con el período rápido (alineado a análisis financiero). */
   private aplicarRangoPeriodo(periodo: string): void {
     const hoy = new Date();
-    const fmt = (n: Date) =>
-      `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    const fmt = formatFechaLocal;
     const y = hoy.getFullYear();
     const m = hoy.getMonth();
     switch (periodo) {

@@ -5,6 +5,7 @@ import { FacturacionService } from '../../../services/facturacion.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -47,8 +48,8 @@ export class ResumenesDiariosComponent implements OnInit {
   establecerRangoMes(): void {
     const hoy = new Date();
     const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    this.fechaDesde = primerDia.toISOString().slice(0, 10);
-    this.fechaHasta = hoy.toISOString().slice(0, 10);
+    this.fechaDesde = formatFechaLocal(primerDia);
+    this.fechaHasta = getFechaHoyLocal();
   }
 
   cargar(): void {

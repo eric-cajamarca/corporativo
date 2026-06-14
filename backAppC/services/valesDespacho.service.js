@@ -44,7 +44,8 @@ exports.crear = async (idEmpresa, idUsuario, body) => {
         idComprobante: idComprobanteVD,
         serie,
         numero: numeroStr,
-        observaciones: body.observaciones
+        observaciones: body.observaciones,
+        fEmision: body.fEmision
       }, idEmpresa, idUsuario);
 
       const items = body.detalle || [];

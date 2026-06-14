@@ -11,6 +11,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
+import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -77,7 +78,7 @@ export class IndexCotizacionesComponent implements OnInit {
   aplicarFiltrosLocales(): void {
     let list = [...this.cotizacionesConst];
     if (this.filtroFecha === 'today') {
-      const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+      const hoy = getFechaHoyLocal();
       list = list.filter((c) => (c.fEmision || '').toString().slice(0, 10) === hoy);
     } else if (this.filtroFecha === 'month') {
       const now = new Date();

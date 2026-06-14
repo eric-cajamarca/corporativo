@@ -9,7 +9,13 @@ const facturacionRepository = require('../repositories/facturacion.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const stockService = require('./stock.service');
 const inventarioRepository = require('../repositories/inventario.repository');
-const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const {
+  getNowLocalSQLString,
+  getFechaSoloSQLString,
+  parseFEmisionCabeceraSQL,
+  resolveFechaHoraClienteSql,
+  parteFechaDesdeFEmisionInput
+} = require('../utils/fechaHoraLocal.util');
 const {
   interpretarBooleanoConfig,
   leerPermitirVentasNegativas,
@@ -53,6 +59,29 @@ async function cargarFlagsInventarioPorEmpresas(pool, idsEmpresa) {
     });
   }
   return cache;
+}
+
+/** VENTAS_USAR_DESCUENTO_EN_TOTAL por empresa; clave = idEmpresa en minúsculas. */
+async function cargarDescuentoVentaPorEmpresas(pool, idsEmpresa) {
+  const cache = new Map();
+  const unicos = [...new Set((idsEmpresa || []).filter(Boolean).map(String))];
+  for (const idEmpresa of unicos) {
+    const key = idEmpresa.toLowerCase();
+    if (cache.has(key)) continue;
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+    const getConfig = crearLectorConfiguracionEmpresa(configRows);
+    cache.set(
+      key,
+      interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true)
+    );
+  }
+  return cache;
+}
+
+function descuentoVentaEmpresa(cache, idEmpresa, predeterminado = true) {
+  if (idEmpresa == null || String(idEmpresa).trim() === '') return predeterminado;
+  const val = cache.get(String(idEmpresa).toLowerCase());
+  return typeof val === 'boolean' ? val : predeterminado;
 }
 
 function flagsInventarioEmpresa(cache, idEmpresa) {
@@ -147,14 +176,25 @@ exports.obtenerVentaParaCobroPendiente = async (pool, idVenta, idEmpresa) => {
   return ventasRepository.obtenerVentaParaCobroPendiente(pool, idVenta, idEmpresa);
 };
 
+/**
+ * Normaliza fEmision para guardar en BD.
+ * Prioridad: fecha+hora enviada por el cliente (navegador del cajero); no reemplazar la hora por la del servidor.
+ */
 function fechaEmisionConHoraActual(fEmision) {
-  if (!fEmision) return getNowLocalSQLString();
-  const str = typeof fEmision === 'string'
-    ? fEmision.trim()
-    : (fEmision instanceof Date ? fEmision.toISOString().slice(0, 19).replace('T', ' ') : '');
-  const parteFecha = str.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(parteFecha)) return getNowLocalSQLString();
-  return getFechaEmisionSQLString(parteFecha);
+  const raw = fEmision != null ? String(fEmision).trim() : '';
+  if (raw && /[T ]\d{2}:\d{2}:\d{2}/.test(raw)) {
+    const sql = parseFEmisionCabeceraSQL(fEmision);
+    if (sql) return sql;
+  }
+  if (raw) {
+    const sqlSoloFecha = parseFEmisionCabeceraSQL(fEmision);
+    if (sqlSoloFecha) return sqlSoloFecha;
+  }
+  const parteFecha = parteFechaDesdeFEmisionInput(fEmision);
+  if (parteFecha) {
+    return getFechaSoloSQLString(parteFecha);
+  }
+  return getNowLocalSQLString();
 }
 
 const asegurarUsuarioEmpresaDestino = async (transaction, idEmpresaDestino, idEmpresaGestora, vendedor) => {
@@ -688,7 +728,7 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         idVenta,
         cantEntregada,
         idEstadoPedido: idEstadoPedidoVenta,
-        hVenta: getNowLocalSQLString(),
+        hVenta: fechaEmisionConHora,
         costoUnitario: costoUnitarioProm,
         costoTotal: costoTotalLinea
       });
@@ -825,7 +865,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
   try {
     const configRowsGestora = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
     const getConfigGestora = crearLectorConfiguracionEmpresa(configRowsGestora);
-    const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfigGestora('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
+    const usarDescuentoEnTotalGestora = interpretarBooleanoConfig(
+      getConfigGestora('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'),
+      true
+    );
 
     let idSucursalCobradora = venta.idSucursal || null;
     if (!idSucursalCobradora) {
@@ -890,6 +933,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       user.empresa,
       ...Array.from(detallesPorEmpresa.keys())
     ]);
+    const descuentoVentaCache = await cargarDescuentoVentaPorEmpresas(pool, [
+      user.empresa,
+      ...Array.from(detallesPorEmpresa.keys())
+    ]);
 
     const clienteSeleccionado = await ventasRepository.obtenerClientePorIdEnEmpresas(
       transaction,
@@ -928,10 +975,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const montosCabAgr = resolverMontosCabeceraImpuestos(ventaConHora, totalesAgrupados);
     const descuentosClienteAgr = Number(venta.descuentos);
     let descuentosCabeceraVA = totalesAgrupados.descuentos;
-    if (!usarDescuentoEnTotal) {
-      descuentosCabeceraVA = 0;
-    } else if (Number.isFinite(descuentosClienteAgr) && descuentosClienteAgr >= 0) {
+    if (Number.isFinite(descuentosClienteAgr) && descuentosClienteAgr >= 0) {
       descuentosCabeceraVA = Math.round(descuentosClienteAgr * 100) / 100;
+    } else if (!usarDescuentoEnTotalGestora) {
+      descuentosCabeceraVA = 0;
     }
     const ventaAgrupada = await ventasRepository.insertarVentaAgrupada(transaction, {
       idEmpresaCobradora: user.empresa,
@@ -1038,7 +1085,12 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const exoneradoHija = redondear2((montosCabAgr.exonerado || 0) * propSub);
       const gratuitoHija = redondear2((montosCabAgr.gratuito || 0) * propSub);
       const otrosCargosHija = redondear2((montosCabAgr.otrosCargos || 0) * propSub);
-      if (!usarDescuentoEnTotal) {
+      const usarDescuentoEmpresa = descuentoVentaEmpresa(
+        descuentoVentaCache,
+        idEmpresaProducto,
+        usarDescuentoEnTotalGestora
+      );
+      if (!usarDescuentoEmpresa) {
         descuentosHija = 0;
       } else if (
         Number.isFinite(descuentosClienteAgr) &&
@@ -1133,7 +1185,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           idVenta,
           cantEntregada,
           idEstadoPedido: idEstadoPedidoVenta,
-          hVenta: getNowLocalSQLString(),
+          hVenta: fechaEmisionConHora,
           costoUnitario: costoUnitarioProm,
           costoTotal: costoTotalLinea
         });
@@ -1326,7 +1378,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
  * @returns {{ idVenta: number, compVenta: string }}
  */
 exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, payload) => {
-  const { idValeDespacho, idComprobante } = payload;
+  const { idValeDespacho, idComprobante, fEmision: fEmisionCliente } = payload;
   if (!idValeDespacho || idComprobante == null) {
     throw new Error('Faltan idValeDespacho o idComprobante (Factura/Boleta).');
   }
@@ -1365,7 +1417,7 @@ exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, pa
   );
   const compVenta = serie + '-' + numero;
   const totalVenta = detalleVale.reduce((sum, d) => sum + (Number(d.total) || 0), 0);
-  const fEmision = getNowLocalSQLString();
+  const fEmision = resolveFechaHoraClienteSql(fEmisionCliente);
 
   const datosVenta = {
     idSucursal: vale.idSucursal,

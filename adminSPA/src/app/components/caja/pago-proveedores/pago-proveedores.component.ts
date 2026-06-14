@@ -10,6 +10,7 @@ import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -445,6 +446,7 @@ export class PagoProveedoresComponent implements OnInit {
     this.cajaService.registrarMovimientoEgreso({
       idApertura: this.form.idApertura,
       idTipoMovimientoCaja: this.form.idTipoMovimientoCaja,
+      fechaMovimiento: fechaEmisionVentaParaApi(this.form.fechaEmision),
       concepto,
       monto: importe,
       idMediosPago: this.form.idMediosPago ?? undefined,

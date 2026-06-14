@@ -10,6 +10,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa as EmpresaModel } from '../../../models/empresa.model';
+import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -79,8 +80,8 @@ export class ComunicacionBajaComponent implements OnInit {
   establecerRangoMes(): void {
     const hoy = new Date();
     const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    this.fechaDesde = primerDia.toISOString().slice(0, 10);
-    this.fechaHasta = hoy.toISOString().slice(0, 10);
+    this.fechaDesde = formatFechaLocal(primerDia);
+    this.fechaHasta = getFechaHoyLocal();
   }
 
   cargarComprobantes(): void {

@@ -6,6 +6,10 @@ const comprobantesRepository = require('../repositories/comprobantes.repository'
 const empresaSuscripcionRepository = require('../repositories/empresaSuscripcion.repository');
 const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
 const sistemaBackupService = require('./sistemaBackup.service');
+const {
+    interpretarBooleanoConfig,
+    crearLectorConfiguracionEmpresa
+} = require('../utils/configBoolean.util');
 
 const CLAVES_CONFIG_SISTEMA_OPERATIVO = new Set([
     'SISTEMA_BACKUP_AUTOMATICO',
@@ -266,6 +270,41 @@ const guardarConfiguracion = async (pool, configuraciones, user) => {
 const ejecutarBackupAhora = async (pool, user, overrides) =>
     sistemaBackupService.ejecutarBackupAhora(pool, user, overrides);
 
+async function idsEmpresaJwtYGestionadas(pool, idEmpresaUsuario) {
+    const ids = new Set();
+    if (idEmpresaUsuario) ids.add(String(idEmpresaUsuario));
+    try {
+        const gestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, idEmpresaUsuario);
+        for (const g of gestionadas || []) {
+            if (g.idEmpresa) ids.add(String(g.idEmpresa));
+        }
+    } catch (_) {
+        /* solo JWT */
+    }
+    return Array.from(ids);
+}
+
+/**
+ * Mapa idEmpresa (minúsculas) → VENTAS_USAR_DESCUENTO_EN_TOTAL para gestora y empresas gestionadas.
+ */
+const obtenerDescuentoVentaPorEmpresas = async (pool, user) => {
+    if (!user || !user.empresa) {
+        throw new Error('USUARIO_NO_VALIDO');
+    }
+
+    const ids = await idsEmpresaJwtYGestionadas(pool, user.empresa);
+    const mapa = {};
+    for (const idEmpresa of ids) {
+        const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+        const getConfig = crearLectorConfiguracionEmpresa(configRows);
+        mapa[String(idEmpresa).toLowerCase()] = interpretarBooleanoConfig(
+            getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'),
+            true
+        );
+    }
+    return mapa;
+};
+
 module.exports = {
     obtenerEmpresasGestionadas,
     obtenerTodosGestores,
@@ -277,5 +316,6 @@ module.exports = {
     obtenerConfiguracion,
     obtenerPermisosConfiguracionSistema,
     guardarConfiguracion,
-    ejecutarBackupAhora
+    ejecutarBackupAhora,
+    obtenerDescuentoVentaPorEmpresas
 };

@@ -13,6 +13,7 @@ import { BuscadorProductosModalService } from '../../../services/buscador-produc
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 import { VentasService, ComprobantePdfData } from '../../../services/ventas.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
+import { formatFechaLocal } from '../../../utils/fecha-local.util';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -72,7 +73,7 @@ export class KardexComponent implements AfterViewInit {
   }
 
   private formatDate(d: Date): string {
-    return d.toISOString().slice(0, 10);
+    return formatFechaLocal(d);
   }
 
   ngAfterViewInit(): void {

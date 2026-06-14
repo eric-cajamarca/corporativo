@@ -15,6 +15,7 @@ import {
   ReporteVentasDetalladoData,
   TotalesVentaDetalleReporte,
 } from '../../../models/reporte-ventas-detallado.model';
+import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare const iziToast: {
   success: (o: object) => void;
@@ -67,10 +68,8 @@ export class ReporteVentasDetalladoComponent implements OnInit {
   private inicializarFechas(): void {
     const hoy = new Date();
     const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    this.fechaInicio = fmt(inicioAnio);
-    this.fechaFin = fmt(hoy);
+    this.fechaInicio = formatFechaLocal(inicioAnio);
+    this.fechaFin = getFechaHoyLocal();
   }
 
   get comprobantesFiltrados(): ComprobanteVentaDetalleReporte[] {

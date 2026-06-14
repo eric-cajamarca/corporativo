@@ -2,6 +2,18 @@ const sql = require("mssql");
 const {
   calcularResumenFinancieroPeriodo
 } = require("../utils/kpisFinancierosOperativo.util");
+const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
+
+function parseFechaReferenciaLocal(fechaReferencia) {
+  const raw = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return hoy;
+  }
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+}
 
 /**
  * Obtiene el resumen del dashboard principal (inicio) con datos reales de la empresa.
@@ -20,8 +32,11 @@ exports.obtenerResumenDashboardRepo = async (
   fechaFin,
   fechaInicioAnterior,
   fechaFinAnterior,
-  configInventario = {}
+  configInventario = {},
+  fechaReferencia
 ) => {
+  const fechaRef = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const refHoy = parseFechaReferenciaLocal(fechaRef);
   const stockMinimoGeneral = configInventario.stockMinimoGeneral != null ? Number(configInventario.stockMinimoGeneral) : 10;
   const controlVencimiento = configInventario.controlVencimiento !== false;
   const req = pool
@@ -132,13 +147,14 @@ exports.obtenerResumenDashboardRepo = async (
   const ventasPorHora = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
       DATEPART(HOUR, v.fEmision) AS hora,
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND CONVERT(DATE, v.fEmision) = CONVERT(DATE, GETDATE())
+      AND CONVERT(DATE, v.fEmision) = @fechaReferencia
     GROUP BY DATEPART(HOUR, v.fEmision)
     ORDER BY hora
   `);
@@ -147,14 +163,15 @@ exports.obtenerResumenDashboardRepo = async (
   const ventasMesPorDia = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
       DAY(v.fEmision) AS dia,
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND YEAR(v.fEmision) = YEAR(GETDATE())
-      AND MONTH(v.fEmision) = MONTH(GETDATE())
+      AND YEAR(v.fEmision) = YEAR(@fechaReferencia)
+      AND MONTH(v.fEmision) = MONTH(@fechaReferencia)
     GROUP BY DAY(v.fEmision)
     ORDER BY dia
   `);
@@ -163,6 +180,7 @@ exports.obtenerResumenDashboardRepo = async (
   const ventas6Meses = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
       YEAR(v.fEmision) AS anio,
@@ -170,7 +188,7 @@ exports.obtenerResumenDashboardRepo = async (
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND v.fEmision >= DATEADD(MONTH, -6, GETDATE())
+      AND v.fEmision >= DATEADD(MONTH, -6, @fechaReferencia)
     GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
     ORDER BY anio, mes
   `);
@@ -179,6 +197,7 @@ exports.obtenerResumenDashboardRepo = async (
   const ventasMensuales = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+    .input("fechaReferencia", sql.Date, fechaRef)
     .query(`
     SELECT
       YEAR(v.fEmision) AS anio,
@@ -186,7 +205,7 @@ exports.obtenerResumenDashboardRepo = async (
       ISNULL(SUM(v.total), 0) AS total
     FROM Ventas v
     WHERE v.idEmpresa = @idEmpresa
-      AND v.fEmision >= DATEADD(MONTH, -12, GETDATE())
+      AND v.fEmision >= DATEADD(MONTH, -12, @fechaReferencia)
     GROUP BY YEAR(v.fEmision), MONTH(v.fEmision)
     ORDER BY anio, mes
   `);
@@ -279,7 +298,7 @@ exports.obtenerResumenDashboardRepo = async (
   });
   creditosPendientes.recordset.forEach((r) => {
     const fechaVenc = r.fechaVencimiento ? new Date(r.fechaVencimiento) : null;
-    const dias = fechaVenc ? Math.ceil((fechaVenc - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+    const dias = fechaVenc ? Math.ceil((fechaVenc - refHoy) / (1000 * 60 * 60 * 24)) : 0;
     const texto =
       dias < 0 ? "Vencida" : dias === 0 ? "Vence hoy" : `Vence en ${dias} días`;
     alertas.push({
@@ -297,6 +316,7 @@ exports.obtenerResumenDashboardRepo = async (
       lotesProximosVencer = await pool
         .request()
         .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
+        .input("fechaReferencia", sql.Date, fechaRef)
         .query(`
         SELECT TOP 10
           p.descripcion AS nombreProducto,
@@ -306,7 +326,7 @@ exports.obtenerResumenDashboardRepo = async (
         INNER JOIN Productos p ON l.idProducto = p.idProducto AND p.idEmpresa = l.idEmpresa
         WHERE l.idEmpresa = @idEmpresa
           AND l.fechaVencimiento IS NOT NULL
-          AND (l.fechaVencimiento <= DATEADD(DAY, 30, GETDATE()))
+          AND (l.fechaVencimiento <= DATEADD(DAY, 30, @fechaReferencia))
         ORDER BY l.fechaVencimiento ASC
         `);
     } catch (err) {
@@ -314,7 +334,7 @@ exports.obtenerResumenDashboardRepo = async (
     }
     (lotesProximosVencer.recordset || []).forEach((r) => {
       const fechaVenc = r.fechaVencimiento ? new Date(r.fechaVencimiento) : null;
-      const dias = fechaVenc ? Math.ceil((fechaVenc - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+      const dias = fechaVenc ? Math.ceil((fechaVenc - refHoy) / (1000 * 60 * 60 * 24)) : 0;
       const texto = dias < 0 ? "Vencido" : dias === 0 ? "Vence hoy" : `Vence en ${dias} días`;
       alertas.push({
         titulo: "Producto próximo a vencer",
@@ -330,7 +350,7 @@ exports.obtenerResumenDashboardRepo = async (
   const mesesMap = {};
   const mesesLabels = [];
   const nombresMes = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  const now = new Date();
+  const now = refHoy;
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

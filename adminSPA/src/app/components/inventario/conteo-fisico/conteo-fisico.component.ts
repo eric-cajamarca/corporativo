@@ -22,6 +22,7 @@ import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.com
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { StockActualItem } from '../../../models/stock-actual.model';
+import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import {
   ConteoFisicoPreviewFila,
@@ -910,13 +911,6 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Fecha/hora del equipo del usuario (sin Z); el backend la persiste tal cual en SQL. */
-  private fechaHoraLocalParaMovimiento(): string {
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-  }
-
   tieneStockSinUbicacion(p: StockActualItem): boolean {
     if (p.stockSinUbicacion == null) {
       return false;
@@ -945,7 +939,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
     }
     this.aplicando = true;
     this.conteoService
-      .aplicarMovimientos(this.idSesionEnCurso, { fechaMovimiento: this.fechaHoraLocalParaMovimiento() })
+      .aplicarMovimientos(this.idSesionEnCurso, { fechaMovimiento: fechaHoraVentaClienteAhora() })
       .subscribe({
       next: (r) => {
         this.aplicando = false;

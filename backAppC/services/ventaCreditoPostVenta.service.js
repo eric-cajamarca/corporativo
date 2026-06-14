@@ -4,7 +4,7 @@
  */
 const creditosRepository = require("../repositories/creditos.repository");
 const { repartirDetallePagoEntreComprobantes, round2 } = require("../utils/ventaAgrupadaPago.util");
-const { getFechaSoloSQLString } = require("../utils/fechaHoraLocal.util");
+const { getFechaSoloSQLString, getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
 const { normalizarDetallePagoIdMediosPago } = require("../utils/detallePagoNormalizar.util");
 
 async function idsMediosPagoCredito(transaction) {
@@ -63,7 +63,7 @@ exports.crearCreditosDesdeVentaAgrupada = async (transaction, opts) => {
   const reparto = repartirDetallePagoEntreComprobantes(lineasReparto, detalleNormalizado);
 
   const fvDefault =
-    getFechaSoloSQLString(fVencimientoCabecera) || new Date().toISOString().slice(0, 10);
+    getFechaSoloSQLString(fVencimientoCabecera) || getFechaHoyLocal();
 
   for (const linea of reparto) {
     const creditMonto = sumaCreditoEnDetalle(linea.detallePago, idsCredito);
@@ -117,6 +117,7 @@ exports.crearCreditosDesdeVentaAgrupada = async (transaction, opts) => {
       idUsuarioCredito: userSub,
       montoTotal: creditMonto,
       cuotas: cuotasLinea,
+      fechaCredito: meta.fEmision,
       observaciones: `Crédito venta ${linea.compVenta || linea.idVenta}`,
     });
   }

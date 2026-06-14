@@ -38,7 +38,8 @@ const crearDespacho = async (req, res) => {
       observaciones,
       detalles,
       idEmpresa,
-      mercaderiaPendienteDeCarga
+      mercaderiaPendienteDeCarga,
+      fechaDespacho
     } = req.body;
 
     // Validación básica
@@ -60,7 +61,8 @@ const crearDespacho = async (req, res) => {
         observaciones,
         detalles: Array.isArray(detalles) ? detalles : undefined,
         ...(idEmpresaOperativa ? { idEmpresa: idEmpresaOperativa } : {}),
-        ...(mercaderiaPendienteDeCarga === true ? { mercaderiaPendienteDeCarga: true } : {})
+        ...(mercaderiaPendienteDeCarga === true ? { mercaderiaPendienteDeCarga: true } : {}),
+        fechaDespacho
       })
     );
 
@@ -96,7 +98,7 @@ const crearDespacho = async (req, res) => {
 const actualizarCantidadDespachada = async (req, res) => {
   try {
     const { idDetalleDespacho } = req.params;
-    const { cantidadDespachada, ubicacionOrigen, ubicacionDestino } = req.body;
+    const { cantidadDespachada, ubicacionOrigen, ubicacionDestino, fechaDespacho } = req.body;
 
     // Validación básica
     if (cantidadDespachada === undefined || cantidadDespachada < 0) {
@@ -111,7 +113,8 @@ const actualizarCantidadDespachada = async (req, res) => {
         idDetalleDespacho,
         cantidadDespachada,
         ubicacionOrigen,
-        ubicacionDestino
+        ubicacionDestino,
+        fechaDespacho
       })
     );
 
@@ -147,7 +150,7 @@ const actualizarCantidadDespachada = async (req, res) => {
 const registrarCantidadesDespachoBatch = async (req, res) => {
   try {
     const { idDespacho } = req.params;
-    const { items } = req.body || {};
+    const { items, fechaDespacho } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).send({
         message: "Debe enviar al menos una línea con cantidades (items).",
@@ -156,7 +159,7 @@ const registrarCantidadesDespachoBatch = async (req, res) => {
     }
 
     const result = await withPool(async (pool) =>
-      DespachosServices.actualizarCantidadesDespachoBatchService(pool, req.user, idDespacho, items)
+      DespachosServices.actualizarCantidadesDespachoBatchService(pool, req.user, idDespacho, items, fechaDespacho)
     );
 
     res.status(200).send({

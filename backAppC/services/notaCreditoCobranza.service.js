@@ -7,6 +7,7 @@
 const sql = require("mssql");
 const CajaRepository = require("../repositories/caja.repository");
 const ventasRepository = require("../repositories/ventas.repository");
+const { resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 const { esNotaCreditoCodigoComprobante } = require("../utils/sunatCodigoComprobante.util");
 
 const MARCA_COBRANZA_OK = "[EFAF_NC_COBRANZA_OK]";
@@ -40,6 +41,7 @@ async function obtenerCabeceraNc(ctx, idComprobanteElectronico) {
     .query(`
       SELECT ce.idEmpresa, ce.tipoComprobante, v.idVenta, v.compVenta, v.compRelacionado,
              v.total, v.idSucursal, v.idUsuario, v.observaciones, v.idEstadoPago,
+             CONVERT(VARCHAR(23), v.fEmision, 121) AS fEmision,
              UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
       FROM ComprobantesElectronicos ce
       INNER JOIN Ventas v ON v.idVenta = ce.idVenta AND v.idEmpresa = ce.idEmpresa
@@ -114,7 +116,7 @@ async function obtenerCreditoPorVenta(ctx, idEmpresa, idVenta) {
   return r.recordset && r.recordset[0] ? r.recordset[0] : null;
 }
 
-async function abonarCuotasCredito(ctx, idEmpresa, idCredito, montoAbonar) {
+async function abonarCuotasCredito(ctx, idEmpresa, idCredito, montoAbonar, fechaPagoSql) {
   let restante = round2(montoAbonar);
   if (restante <= 0) return { abonado: 0 };
 
@@ -141,11 +143,12 @@ async function abonarCuotasCredito(ctx, idEmpresa, idCredito, montoAbonar) {
     const req = ctx.request();
     await req
       .input("idCuota", sql.UniqueIdentifier, cuota.idCuota)
-      .input("nuevoSaldo", sql.Decimal(18, 2), nuevoSaldo);
+      .input("nuevoSaldo", sql.Decimal(18, 2), nuevoSaldo)
+      .input("fechaPago", sql.VarChar(23), fechaPagoSql);
     if (nuevoSaldo <= 0.01) {
       await req.query(`
         UPDATE CuotasCredito
-        SET saldoPendiente = 0, estado = 'PAGADO', fechaPago = GETDATE()
+        SET saldoPendiente = 0, estado = 'PAGADO', fechaPago = TRY_CONVERT(DATETIME, @fechaPago, 120)
         WHERE idCuota = @idCuota
       `);
     } else {
@@ -216,6 +219,7 @@ async function registrarDevolucionCaja(ctx, opts) {
     montoDevolver,
     detallePagoOrigen,
     idVentaNc,
+    fechaMovimientoSql,
   } = opts;
 
   let apertura = idSucursal
@@ -271,6 +275,7 @@ async function registrarDevolucionCaja(ctx, opts) {
       idMoneda: 1,
       documentoRelacionado: docRel,
       observaciones: `idVentaNc:${idVentaNc}`,
+      fechaMovimiento: fechaMovimientoSql,
     });
   }
 
@@ -336,9 +341,10 @@ exports.aplicarCobranzaPorNotaCreditoSiCorresponde = async (
   let resultado;
 
   const compRel = cab.compRelacionado || origen.compVenta;
+  const fechaPagoSql = resolveFechaHoraClienteSql(cab.fEmision);
 
   if (credito) {
-    const { abonado } = await abonarCuotasCredito(ctx, idEmpresa, credito.idCredito, montoNc);
+    const { abonado } = await abonarCuotasCredito(ctx, idEmpresa, credito.idCredito, montoNc, fechaPagoSql);
     if (Number(origen.idEstadoPago) === 1) {
       const parcial = await aplicarReduccionPendienteOrigen(
         ctx,
@@ -365,6 +371,7 @@ exports.aplicarCobranzaPorNotaCreditoSiCorresponde = async (
       montoDevolver: montoNc,
       detallePagoOrigen: detalle,
       idVentaNc: cab.idVenta,
+      fechaMovimientoSql: fechaPagoSql,
     });
     if (!dev.ok) {
       await marcarObservacionesNc(

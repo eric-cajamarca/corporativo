@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs';
+import { getFechaHoyLocal } from '../utils/fecha-local.util';
 
 export interface GraficoVentasVista {
   etiquetas: string[];
@@ -45,14 +46,21 @@ export class DashboardService {
     this.url = global.url;
   }
 
+  private queryDashboard(periodo?: string): string {
+    const params = new URLSearchParams();
+    if (periodo) params.set('periodo', periodo);
+    params.set('fechaReferencia', getFechaHoyLocal());
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  }
+
   /**
    * Obtiene el resumen del dashboard con datos reales de la empresa.
    * @param periodo - 'Hoy' | 'Esta Semana' | 'Este Mes' | 'Este Año'
    */
   obtenerResumen(periodo?: string): Observable<{ data: ResumenDashboard }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    const params = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
-    return this._http.get<{ data: ResumenDashboard }>(this.url + 'dashboard/resumen' + params, {
+    return this._http.get<{ data: ResumenDashboard }>(this.url + 'dashboard/resumen' + this.queryDashboard(periodo), {
       headers,
       withCredentials: true
     });
@@ -63,8 +71,7 @@ export class DashboardService {
     data: { consolidado: ResumenDashboard; porEmpresa: { idEmpresa: string; razonSocial: string; resumen: ResumenDashboard }[] };
   }> {
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
-    const params = periodo ? `?periodo=${encodeURIComponent(periodo)}` : '';
-    return this._http.get(this.url + 'dashboard/resumen-consolidado' + params, {
+    return this._http.get(this.url + 'dashboard/resumen-consolidado' + this.queryDashboard(periodo), {
       headers,
       withCredentials: true
     }) as Observable<{

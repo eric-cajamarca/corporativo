@@ -1,15 +1,31 @@
 const DashboardRepository = require("../repositories/dashboard.repository");
 const gestoresRepository = require("../repositories/gestores.repository");
 const cache = require("../cache/redis.client");
+const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
+
+function toYmdLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function parseFechaReferenciaLocal(fechaReferencia) {
+  const raw = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return hoy;
+  }
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+}
 
 /**
  * Calcula fecha inicio y fin para el período y el período anterior (mismo tamaño).
  * @param {string} periodo - 'Hoy' | 'Esta Semana' | 'Este Mes' | 'Este Año'
+ * @param {string} [fechaReferencia] - YYYY-MM-DD en zona del cliente (navegador)
  * @returns {{ fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior }}
  */
-function obtenerRangoFechas(periodo) {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+function obtenerRangoFechas(periodo, fechaReferencia) {
+  const hoy = parseFechaReferenciaLocal(fechaReferencia);
   let fechaInicio, fechaFin;
 
   switch (periodo) {
@@ -53,7 +69,7 @@ function obtenerRangoFechas(periodo) {
   fechaInicioAnterior.setDate(fechaInicioAnterior.getDate() - dias + 1);
   fechaInicioAnterior.setHours(0, 0, 0, 0);
 
-  const toYMD = (d) => d.toISOString().split("T")[0];
+  const toYMD = toYmdLocal;
   return {
     fechaInicio: toYMD(fechaInicio),
     fechaFin: toYMD(fechaFin),
@@ -72,17 +88,18 @@ function normalizarPeriodo(periodo) {
   return match || "Este Mes";
 }
 
-exports.obtenerResumenDashboardService = async (pool, user, periodo) => {
+exports.obtenerResumenDashboardService = async (pool, user, periodo, fechaReferencia) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
   const idEmpresa = user.empresa;
   const periodoNorm = normalizarPeriodo(periodo);
-  const cacheKey = `dashboard:resumen:${idEmpresa}:${periodoNorm}`;
+  const fechaRef = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const cacheKey = `dashboard:resumen:${idEmpresa}:${periodoNorm}:${fechaRef}`;
   const ttlRaw = parseInt(process.env.REDIS_DASHBOARD_TTL_SECONDS || "180", 10);
   const ttlSeconds = Number.isNaN(ttlRaw) ? 180 : Math.max(60, ttlRaw);
 
   const fetchDashboard = async () => {
     const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
-      obtenerRangoFechas(periodoNorm);
+      obtenerRangoFechas(periodoNorm, fechaRef);
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(
       pool,
       idEmpresa
@@ -110,7 +127,8 @@ exports.obtenerResumenDashboardService = async (pool, user, periodo) => {
       fechaFin,
       fechaInicioAnterior,
       fechaFinAnterior,
-      configInventario
+      configInventario,
+      fechaRef
     );
   };
 
@@ -210,9 +228,10 @@ function mergeResumenDashboard(acumulado, siguiente) {
   return m;
 }
 
-async function obtenerResumenUnaEmpresa(pool, idEmpresa, periodoNorm) {
+async function obtenerResumenUnaEmpresa(pool, idEmpresa, periodoNorm, fechaReferencia) {
+  const fechaRef = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
   const { fechaInicio, fechaFin, fechaInicioAnterior, fechaFinAnterior } =
-    obtenerRangoFechas(periodoNorm);
+    obtenerRangoFechas(periodoNorm, fechaRef);
   const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
   const getConfig = (clave, def) => configRows.find((c) => c.clave === clave)?.valor ?? def;
   const configInventario = {
@@ -234,20 +253,22 @@ async function obtenerResumenUnaEmpresa(pool, idEmpresa, periodoNorm) {
     fechaFin,
     fechaInicioAnterior,
     fechaFinAnterior,
-    configInventario
+    configInventario,
+    fechaRef
   );
 }
 
 /**
  * Dashboard agregado: empresa gestora + cada gestionada. Solo si es gestora activa.
  */
-exports.obtenerResumenConsolidadoGestoraService = async (pool, user, periodo) => {
+exports.obtenerResumenConsolidadoGestoraService = async (pool, user, periodo, fechaReferencia) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
   const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
   if (!esGestora) throw new Error("NO_ES_GESTORA");
 
   const periodoNorm = normalizarPeriodo(periodo);
-  const cacheKey = `dashboard:consolidado:${user.empresa}:${periodoNorm}`;
+  const fechaRef = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
+  const cacheKey = `dashboard:consolidado:${user.empresa}:${periodoNorm}:${fechaRef}`;
   const ttlRaw = parseInt(process.env.REDIS_DASHBOARD_TTL_SECONDS || "180", 10);
   const ttlSeconds = Number.isNaN(ttlRaw) ? 180 : Math.max(60, ttlRaw);
 
@@ -271,7 +292,7 @@ exports.obtenerResumenConsolidadoGestoraService = async (pool, user, periodo) =>
     const porEmpresa = [];
     let consolidado = null;
     for (const row of filas) {
-      const resumen = await obtenerResumenUnaEmpresa(pool, row.idEmpresa, periodoNorm);
+      const resumen = await obtenerResumenUnaEmpresa(pool, row.idEmpresa, periodoNorm, fechaRef);
       porEmpresa.push({
         idEmpresa: row.idEmpresa,
         razonSocial: row.razonSocial,

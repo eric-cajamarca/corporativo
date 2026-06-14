@@ -17,6 +17,7 @@ import { WhatsappService } from '../../../services/whatsapp.service';
 import { Empresa as EmpresaModel } from '../../../models/empresa.model';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
+import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 @Component({
   selector: 'app-index-ventas',
@@ -181,7 +182,7 @@ export class IndexVentasComponent implements OnInit {
       let listVa = [...this.ventasConst];
 
       if (this.filtroFecha === 'today') {
-        const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+        const hoy = getFechaHoyLocal();
         listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
       } else if (this.filtroFecha === 'month') {
         const now = new Date();
@@ -203,7 +204,7 @@ export class IndexVentasComponent implements OnInit {
 
       let listComp = [...this.ventasEmpresaConst];
       if (this.filtroFecha === 'today') {
-        const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+        const hoy = getFechaHoyLocal();
         listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
       } else if (this.filtroFecha === 'month') {
         const now = new Date();
@@ -228,7 +229,7 @@ export class IndexVentasComponent implements OnInit {
     } else {
       let list = [...this.ventasEmpresaConst];
       if (this.filtroFecha === 'today') {
-        const hoy = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; })();
+        const hoy = getFechaHoyLocal();
         list = list.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
       } else if (this.filtroFecha === 'month') {
         const now = new Date();
@@ -1101,8 +1102,7 @@ export class IndexVentasComponent implements OnInit {
   private fechasReporteComunicacionesBaja(): { fechaDesde?: string; fechaHasta?: string } {
     if (this.filtroFecha === 'all') return {};
     if (this.filtroFecha === 'today') {
-      const n = new Date();
-      const hoy = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+      const hoy = getFechaHoyLocal();
       return { fechaDesde: hoy, fechaHasta: hoy };
     }
     if (this.filtroFecha === 'month') {

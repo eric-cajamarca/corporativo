@@ -17,6 +17,7 @@ import {
   FlujoCajaAnalisis,
   FlujoCajaSerieMensual
 } from '../../../interfaces/analisis-interface';
+import { formatFechaLocal } from '../../../utils/fecha-local.util';
 import { TopnavComponent } from '../../topnav/topnav.component';
 
 declare var iziToast: any;
@@ -386,7 +387,7 @@ export class DashboardAnalisisComponent implements OnInit {
     const hoy = new Date();
     const y = hoy.getFullYear();
     const m = hoy.getMonth();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const fmt = (d: Date) => formatFechaLocal(d);
     switch (this.filtros.periodo || 'MES_ACTUAL') {
       case 'MES_ANTERIOR': {
         const ini = new Date(y, m - 1, 1);

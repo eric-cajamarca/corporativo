@@ -56,7 +56,8 @@ const crearCredito = async (req, res) => {
       plazoDias,
       tasaInteres,
       fechaInicio,
-      observaciones
+      observaciones,
+      fechaCredito
     } = req.body;
 
     if (!idCliente || !montoTotal || montoTotal <= 0) {
@@ -74,7 +75,8 @@ const crearCredito = async (req, res) => {
         plazoDias: plazoDias || 30,
         tasaInteres,
         fechaInicio,
-        observaciones
+        observaciones,
+        fechaCredito
       })
     );
 
@@ -130,7 +132,8 @@ const pagarCuota = async (req, res) => {
       numeroRecibo,
       observaciones,
       idApertura,
-      idEmpresaOperacion
+      idEmpresaOperacion,
+      fechaPago
     } = req.body;
 
     if (!montoPagado || montoPagado <= 0) {
@@ -149,7 +152,8 @@ const pagarCuota = async (req, res) => {
         numeroRecibo,
         observaciones,
         idApertura,
-        idEmpresaOperacion
+        idEmpresaOperacion,
+        fechaPago
       })
     );
 

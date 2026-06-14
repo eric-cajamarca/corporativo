@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
+import { fechaHoraVentaClienteAhora } from '../utils/fecha-local.util';
 
 @Injectable({
   providedIn: 'root'
@@ -121,11 +122,16 @@ export class EnviosService {
     idEnvio: string;
     idEstadoEnvio: number;
     observaciones?: string;
+    evidenciaFoto?: string;
   }): Observable<any> {
+    const fechaCliente = fechaHoraVentaClienteAhora();
     let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.put(this.url+'envios/' + data.idEnvio + '/estado', {
       idEstadoEnvio: data.idEstadoEnvio,
-      observaciones: data.observaciones
+      observaciones: data.observaciones,
+      evidenciaFoto: data.evidenciaFoto,
+      fechaCambio: fechaCliente,
+      fechaEntrega: data.idEstadoEnvio === 4 ? fechaCliente : undefined
     }, {
       headers: headers,
       withCredentials: true

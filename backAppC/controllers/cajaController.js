@@ -89,7 +89,7 @@ const crearCaja = async (req, res, next) => {
 // Abrir caja
 const abrirCaja = async (req, res, next) => {
   try {
-    const { idCaja, montoInicial, observaciones } = req.body;
+    const { idCaja, montoInicial, observaciones, fechaApertura } = req.body;
 
     if (!idCaja || montoInicial === undefined || montoInicial < 0) {
       return res.status(400).send({
@@ -102,7 +102,8 @@ const abrirCaja = async (req, res, next) => {
       CajaServices.abrirCajaService(pool, req.user, {
         idCaja,
         montoInicial,
-        observaciones
+        observaciones,
+        fechaApertura
       })
     );
 
@@ -140,7 +141,7 @@ const abrirCaja = async (req, res, next) => {
 // Cerrar caja
 const cerrarCaja = async (req, res, next) => {
   try {
-    const { idApertura, montoFinal, observaciones } = req.body;
+    const { idApertura, montoFinal, observaciones, fechaCierre } = req.body;
 
     if (!idApertura) {
       return res.status(400).send({
@@ -159,7 +160,8 @@ const cerrarCaja = async (req, res, next) => {
       CajaServices.cerrarCajaService(pool, req.user, {
         idApertura,
         montoFinal,
-        observaciones
+        observaciones,
+        fechaCierre
       })
     );
 

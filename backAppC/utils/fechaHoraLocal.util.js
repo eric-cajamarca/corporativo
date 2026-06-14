@@ -161,6 +161,51 @@ function mergeFEmisionNvCtSiMedianocheInnecessario(fEmisionSql23, fEmisionExiste
   return fEmisionSql23;
 }
 
+/**
+ * Parte fecha YYYY-MM-DD desde entrada de venta (ISO UTC, solo fecha o Date).
+ * No usar slice(0,10) de ISO con Z: en UTC-5, después de las 19:00 local el día UTC ya es mañana.
+ * @param {string|Date|null|undefined} fEmision
+ * @returns {string|null}
+ */
+function parteFechaDesdeFEmisionInput(fEmision) {
+  if (fEmision == null) return null;
+  if (fEmision instanceof Date && !isNaN(fEmision.getTime())) {
+    const y = fEmision.getFullYear();
+    const mo = String(fEmision.getMonth() + 1).padStart(2, '0');
+    const d = String(fEmision.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${d}`;
+  }
+  const str = String(fEmision).trim();
+  if (!str) return null;
+  const solo = str.slice(0, 10);
+  const esSoloFecha = /^\d{4}-\d{2}-\d{2}$/.test(solo) && !/[Tt]/.test(str) && !str.endsWith('Z');
+  if (esSoloFecha) return solo;
+  if (/[Tt]/.test(str) || str.endsWith('Z')) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${day}`;
+    }
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(solo)) return solo;
+  return null;
+}
+
+/**
+ * Fecha/hora enviada por el cliente (navegador) → VARCHAR(23) SQL.
+ * Si no viene valor válido, usa hora del servidor como respaldo.
+ * @param {string|Date|null|undefined} valor
+ * @param {boolean} [usarServidorSiFalta=true]
+ * @returns {string|null}
+ */
+function resolveFechaHoraClienteSql(valor, usarServidorSiFalta = true) {
+  const parsed = parseFEmisionCabeceraSQL(valor);
+  if (parsed) return parsed;
+  return usarServidorSiFalta ? getNowLocalSQLString() : null;
+}
+
 module.exports = {
   getNowLocal,
   getNowLocalISOString,
@@ -170,5 +215,7 @@ module.exports = {
   getFechaHoyLocal,
   fEmisionRowALocalYmdHms,
   parseFEmisionCabeceraSQL,
-  mergeFEmisionNvCtSiMedianocheInnecessario
+  resolveFechaHoraClienteSql,
+  mergeFEmisionNvCtSiMedianocheInnecessario,
+  parteFechaDesdeFEmisionInput
 };

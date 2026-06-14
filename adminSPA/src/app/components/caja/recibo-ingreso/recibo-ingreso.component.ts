@@ -10,6 +10,7 @@ import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -471,7 +472,7 @@ export class ReciboIngresoComponent implements OnInit {
     this.cajaService.registrarMovimientoIngreso({
       idApertura: this.form.idApertura,
       idTipoMovimientoCaja: this.form.idTipoMovimientoCaja,
-      fechaMovimiento: this.form.fechaEmision || undefined,
+      fechaMovimiento: fechaEmisionVentaParaApi(this.form.fechaEmision),
       concepto: this.form.concepto,
       idConcepto: this.form.idConcepto || undefined,
       monto: this.form.importe,

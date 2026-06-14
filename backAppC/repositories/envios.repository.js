@@ -1,5 +1,5 @@
 const sql = require("mssql");
-const { getNowLocal, getNowLocalSQLString, getFechaSoloSQLString } = require("../utils/fechaHoraLocal.util");
+const { getNowLocal, resolveFechaHoraClienteSql, getFechaSoloSQLString } = require("../utils/fechaHoraLocal.util");
 
 /** Añade filtros opcionales (estado, fechas, RUC, cliente) al WHERE de envíos programados. */
 function appendFiltrosEnviosProgramadosWhere(request, filtros, whereClauses) {
@@ -558,8 +558,10 @@ exports.marcarEnviosPorDespachoAEstadoNombreRepo = async (
   idEmpresa,
   nombreEstadoObjetivo,
   idUsuarioUuid,
-  observacionesHistorial
+  observacionesHistorial,
+  fechaCambioCliente
 ) => {
+  const fechaCambioSql = resolveFechaHoraClienteSql(fechaCambioCliente);
   const idNuevoRes = await pool
     .request()
     .input("nombre", sql.VarChar(40), nombreEstadoObjetivo)
@@ -595,6 +597,7 @@ exports.marcarEnviosPorDespachoAEstadoNombreRepo = async (
       rq.input("idEstadoAnterior", sql.Int, row.idEstadoEnvio);
       rq.input("idUsuarioCambio", sql.UniqueIdentifier, idUsuarioUuid);
       rq.input("obs", sql.NVarChar(500), observacionesHistorial || null);
+      rq.input("fechaCambio", sql.VarChar(23), fechaCambioSql);
       await rq.query(`
         UPDATE Envios SET idEstadoEnvio = @idEstadoNuevo WHERE idEnvio = @idEnvio AND idEmpresa = @idEmpresa
       `);
@@ -602,7 +605,7 @@ exports.marcarEnviosPorDespachoAEstadoNombreRepo = async (
         INSERT INTO HistorialEstadosEnvio (
           idEnvio, idEstadoAnterior, idEstadoNuevo, idUsuarioCambio, fechaCambio, observaciones
         ) VALUES (
-          @idEnvio, @idEstadoAnterior, @idEstadoNuevo, @idUsuarioCambio, GETDATE(), @obs
+          @idEnvio, @idEstadoAnterior, @idEstadoNuevo, @idUsuarioCambio, TRY_CONVERT(DATETIME, @fechaCambio, 120), @obs
         )
       `);
     }
@@ -635,8 +638,10 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
     const estadoAnterior = estadoAnteriorResult.recordset[0].idEstadoEnvio;
     const idVenta = estadoAnteriorResult.recordset[0].idVenta;
 
-    // Actualizar estado del envío
-    const fechaEntrega = datos.idEstadoEnvio === 4 ? getNowLocalSQLString() : null; // 4 = ENTREGADO (hora local servidor)
+    const fechaCambioSql = resolveFechaHoraClienteSql(datos.fechaCambio || datos.fechaEntrega);
+    const fechaEntrega = datos.idEstadoEnvio === 4
+      ? resolveFechaHoraClienteSql(datos.fechaEntrega || datos.fechaCambio)
+      : null;
 
     await request
       .input("idEstadoEnvio", sql.Int, datos.idEstadoEnvio)
@@ -645,7 +650,7 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
       .query(`
         UPDATE Envios
         SET idEstadoEnvio = @idEstadoEnvio,
-            fechaEntrega = CASE WHEN @idEstadoEnvio = 4 THEN GETDATE() ELSE fechaEntrega END,
+            fechaEntrega = CASE WHEN @idEstadoEnvio = 4 THEN TRY_CONVERT(DATETIME, @fechaEntrega, 120) ELSE fechaEntrega END,
             evidenciaFoto = @evidenciaFoto
         WHERE idEnvio = @idEnvio AND idEmpresa = @idEmpresa
       `);
@@ -656,13 +661,14 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
       .input("idEstadoNuevo", sql.Int, datos.idEstadoEnvio)
       .input("idUsuarioCambio", sql.UniqueIdentifier, user.sub)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
+      .input("fechaCambio", sql.VarChar(23), fechaCambioSql)
       .query(`
         INSERT INTO HistorialEstadosEnvio (
           idEnvio, idEstadoAnterior, idEstadoNuevo, idUsuarioCambio,
           fechaCambio, observaciones
         ) VALUES (
           @idEnvio, @idEstadoAnterior, @idEstadoNuevo, @idUsuarioCambio,
-          GETDATE(), @observaciones
+          TRY_CONVERT(DATETIME, @fechaCambio, 120), @observaciones
         )
       `);
 
@@ -698,7 +704,12 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
       }
 
       const cantEntregadaNuevoSql = nombreEstadoNuevo === 'ENTREGADO' ? 'dv.cantidad' : 'CAST(0 AS DECIMAL(18,3))';
-      const fUltEntregaSql = nombreEstadoNuevo === 'ENTREGADO' ? 'GETDATE()' : 'NULL';
+      const fUltEntregaCase = nombreEstadoNuevo === 'ENTREGADO'
+        ? 'TRY_CONVERT(DATETIME, @fUltEntrega, 120)'
+        : 'NULL';
+      if (nombreEstadoNuevo === 'ENTREGADO') {
+        request.input('fUltEntrega', sql.VarChar(23), fechaCambioSql);
+      }
 
       request.input('idVenta', sql.Int, idVenta);
       request.input('idEstadoPedidoNuevo', sql.Int, idEstadoPedidoNuevo);
@@ -707,7 +718,7 @@ exports.actualizarEstadoEnvioRepo = async (pool, user, datos) => {
         UPDATE dv
         SET
           dv.cantEntregada = ${cantEntregadaNuevoSql},
-          dv.fUltEntrega = ${fUltEntregaSql},
+          dv.fUltEntrega = ${fUltEntregaCase},
           dv.idEstadoPedido = @idEstadoPedidoNuevo
         FROM DetalleVenta dv
         WHERE dv.idVenta = @idVenta

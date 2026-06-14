@@ -454,6 +454,29 @@ const ejecutar_backup_ahora = async function (req, res) {
     }
 };
 
+const obtener_descuento_venta_por_empresas = async function (req, res) {
+    try {
+        if (!req.user) {
+            return res.status(403).json({ message: 'No Access', data: undefined });
+        }
+
+        const resultado = await withPool(async (pool) =>
+            gestoresService.obtenerDescuentoVentaPorEmpresas(pool, req.user)
+        );
+
+        res.status(200).json({
+            message: 'Configuración de descuento por empresa obtenida correctamente',
+            data: resultado
+        });
+    } catch (error) {
+        console.error('Error en obtener_descuento_venta_por_empresas:', error.message);
+        res.status(500).json({
+            message: 'Error al obtener configuración de descuento por empresa',
+            data: undefined
+        });
+    }
+};
+
 module.exports = {
     obtener_empresas_gestionadas,
     obtener_todos_gestores,
@@ -465,5 +488,6 @@ module.exports = {
     obtener_configuracion,
     obtener_permisos_configuracion_sistema,
     guardar_configuracion,
-    ejecutar_backup_ahora
+    ejecutar_backup_ahora,
+    obtener_descuento_venta_por_empresas
 };

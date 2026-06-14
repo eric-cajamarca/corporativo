@@ -1,6 +1,6 @@
 const sql = require("mssql");
 const CajaRepository = require("./caja.repository");
-const { getNowLocal, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
+const { getNowLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 
 function normalizarIdsEmpresaCreditos(idEmpresas) {
   const arr = Array.isArray(idEmpresas) ? idEmpresas : idEmpresas ? [idEmpresas] : [];
@@ -141,12 +141,15 @@ exports.crearCreditoYCuotasExplicitasEnTransaccion = async (transaction, params)
     idUsuarioCredito,
     montoTotal,
     cuotas,
-    observaciones
+    observaciones,
+    fechaCredito
   } = params;
   if (!idEmpresa || idCliente == null || !idUsuarioCredito) return null;
   const mt = Number(montoTotal);
   if (!Number.isFinite(mt) || mt <= 0) return null;
   if (!cuotas || !Array.isArray(cuotas) || cuotas.length === 0) return null;
+
+  const fechaCreditoSql = resolveFechaHoraClienteSql(fechaCredito);
 
   const ins = await transaction
     .request()
@@ -158,6 +161,7 @@ exports.crearCreditoYCuotasExplicitasEnTransaccion = async (transaction, params)
     .input("plazoDias", sql.Int, 0)
     .input("tasaInteres", sql.Decimal(5, 2), 0)
     .input("observaciones", sql.VarChar(500), observaciones || null)
+    .input("fechaCredito", sql.VarChar(23), fechaCreditoSql)
     .query(`
       INSERT INTO CreditosClientes (
         idEmpresa, idCliente, idVenta, idUsuarioCredito, fechaCredito,
@@ -165,7 +169,7 @@ exports.crearCreditoYCuotasExplicitasEnTransaccion = async (transaction, params)
       )
       OUTPUT INSERTED.idCredito
       VALUES (
-        @idEmpresa, @idCliente, @idVenta, @idUsuarioCredito, GETDATE(),
+        @idEmpresa, @idCliente, @idVenta, @idUsuarioCredito, TRY_CONVERT(DATETIME, @fechaCredito, 120),
         @montoTotal, @plazoDias, @tasaInteres, 'ACTIVO', @observaciones
       )
     `);
@@ -209,6 +213,8 @@ exports.crearCreditoRepo = async (pool, user, datos) => {
     const request = transaction.request();
     const fechaInicio = datos.fechaInicio || new Date();
 
+    const fechaCreditoSql = resolveFechaHoraClienteSql(datos.fechaCredito);
+
     // Crear el crédito
     const creditoResult = await request
       .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
@@ -219,6 +225,7 @@ exports.crearCreditoRepo = async (pool, user, datos) => {
       .input("plazoDias", sql.Int, datos.plazoDias)
       .input("tasaInteres", sql.Decimal(5, 2), datos.tasaInteres || 0)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
+      .input("fechaCredito", sql.VarChar(23), fechaCreditoSql)
       .query(`
         INSERT INTO CreditosClientes (
           idEmpresa, idCliente, idVenta, idUsuarioCredito, fechaCredito,
@@ -226,7 +233,7 @@ exports.crearCreditoRepo = async (pool, user, datos) => {
         )
         OUTPUT INSERTED.idCredito
         VALUES (
-          @idEmpresa, @idCliente, @idVenta, @idUsuarioCredito, GETDATE(),
+          @idEmpresa, @idCliente, @idVenta, @idUsuarioCredito, TRY_CONVERT(DATETIME, @fechaCredito, 120),
           @montoTotal, @plazoDias, @tasaInteres, 'ACTIVO', @observaciones
         )
       `);
@@ -347,6 +354,7 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
 
     const cuota = cuotaResult.recordset[0];
     let numeroReciboCobranza = datos.numeroRecibo || null;
+    const fechaPagoSql = resolveFechaHoraClienteSql(datos.fechaPago);
 
     if (datos.idApertura && cuota) {
       const tipoIngreso = await request.query("SELECT TOP 1 idTipoMovimientoCaja FROM TiposMovimientoCaja WHERE tipo = 'I'");
@@ -366,7 +374,8 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
             monto: datos.montoPagado,
             idMediosPago: datos.idMediosPago || null,
             idMoneda: datos.idMoneda || 1,
-            documentoRelacionado
+            documentoRelacionado,
+            fechaMovimiento: fechaPagoSql
           });
           numeroReciboCobranza = documentoRelacionado;
         } catch (errMov) {
@@ -380,13 +389,13 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
 
     if (esPagoParcial) {
       // Pago parcial: registrar pago y generar nueva cuota (usa su propio request para no duplicar parámetros)
-      await procesarPagoParcial(transaction, cuota, datos, user);
+      await procesarPagoParcial(transaction, cuota, datos, user, fechaPagoSql);
     } else {
       // Pago total: marcar cuota como pagada (request nuevo para no duplicar idCuota del SELECT inicial)
       const reqUpdate = transaction.request();
       await reqUpdate
         .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
-        .input("fechaPago", sql.VarChar(23), getNowLocalSQLString())
+        .input("fechaPago", sql.VarChar(23), fechaPagoSql)
         .query(`
           UPDATE CuotasCredito
           SET estado = 'PAGADO', fechaPago = @fechaPago, saldoPendiente = 0
@@ -409,12 +418,13 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
       .input("idMoneda", sql.Int, datos.idMoneda || 1)
       .input("numeroRecibo", sql.VarChar, numeroReciboCobranza || datos.numeroRecibo || null)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
+      .input("fechaPago", sql.VarChar(23), fechaPagoSql)
       .query(`
         INSERT INTO PagosCuotas (
           idCuota, idEmpresa, idUsuarioPago, fechaPago, montoPagado,
           idMediosPago, idMoneda, numeroRecibo, observaciones
         ) VALUES (
-          @idCuota, @idEmpresa, @idUsuarioPago, GETDATE(), @montoPagado,
+          @idCuota, @idEmpresa, @idUsuarioPago, TRY_CONVERT(DATETIME, @fechaPago, 120), @montoPagado,
           @idMediosPago, @idMoneda, @numeroRecibo, @observaciones
         )
       `);
@@ -435,12 +445,12 @@ exports.pagarCuotaRepo = async (pool, user, datos) => {
 
 // Función auxiliar para procesar pagos parciales (usa request propio para no duplicar parámetros con el request del flujo principal)
 // La cuota actual se marca PAGADA (monto pagado = cancelado); solo el saldo restante genera una nueva cuota pendiente.
-async function procesarPagoParcial(transaction, cuota, datos, user) {
+async function procesarPagoParcial(transaction, cuota, datos, user, fechaPagoSql) {
   const req = transaction.request();
   // Marcar la cuota actual como PAGADA (el monto pagado queda cancelado; saldoPendiente en 0)
   await req
     .input("idCuota", sql.UniqueIdentifier, datos.idCuota)
-    .input("fechaPago", sql.VarChar(23), getNowLocalSQLString())
+    .input("fechaPago", sql.VarChar(23), fechaPagoSql)
     .query(`
       UPDATE CuotasCredito
       SET estado = 'PAGADO', fechaPago = @fechaPago, saldoPendiente = 0

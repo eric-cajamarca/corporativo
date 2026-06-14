@@ -11,6 +11,7 @@ import { AuthService } from '../../../services/auth.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 
@@ -471,7 +472,7 @@ export class ReciboEgresoComponent implements OnInit {
     this.cajaService.registrarMovimientoEgreso({
       idApertura: this.form.idApertura,
       idTipoMovimientoCaja: idTipoGuardar,
-      fechaMovimiento: this.form.fechaEmision || undefined,
+      fechaMovimiento: fechaEmisionVentaParaApi(this.form.fechaEmision),
       concepto: this.form.concepto,
       idConcepto: this.form.idConcepto || undefined,
       monto: this.form.importe,

@@ -12,6 +12,7 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoCompradoFila, ProductosCompradosTotales } from '../../../models/productos-comprados.model';
+import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare const iziToast: { success: (o: object) => void; error: (o: object) => void };
 
@@ -54,8 +55,7 @@ export class ProductosCompradosComponent implements OnInit {
   private buscarSubject = new Subject<string>();
 
   ngOnInit(): void {
-    const hoy = new Date();
-    const s = hoy.toISOString().slice(0, 10);
+    const s = getFechaHoyLocal();
     this.fechaDesde = s;
     this.fechaHasta = s;
     this.buscarSubject.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.cargar());
@@ -130,7 +130,7 @@ export class ProductosCompradosComponent implements OnInit {
   }
 
   limpiarFiltros(): void {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = getFechaHoyLocal();
     this.fechaDesde = hoy;
     this.fechaHasta = hoy;
     this.proveedorRuc = '';

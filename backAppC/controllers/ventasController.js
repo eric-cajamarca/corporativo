@@ -1,7 +1,7 @@
 const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const ventasOrquestacion = require('../services/ventasOrquestacion.service');
-const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 const { withPool } = require('../utils/dbPool.util');
 
 const crearVenta = async function (req, res) {
@@ -250,9 +250,7 @@ const crearDetalleVenta_DescontarStock = async function (req, res) {
     cantEntregada,
     idEstadoPedido
   } = req.body;
-  const hVentaSQL = hVenta
-    ? getFechaEmisionSQLString(String(hVenta).trim().slice(0, 10)) || getNowLocalSQLString()
-    : getNowLocalSQLString();
+  const hVentaSQL = resolveFechaHoraClienteSql(hVenta);
   if (req.user) {
     try {
       await withPool((pool) =>
@@ -531,7 +529,7 @@ const crearVentaDesdeVale = async (req, res) => {
   if (!req.user || !req.user.empresa || !req.user.sub) {
     return res.status(401).json({ message: 'No Access' });
   }
-  const { idValeDespacho, idComprobante } = req.body || {};
+  const { idValeDespacho, idComprobante, fEmision } = req.body || {};
   if (!idValeDespacho || idComprobante == null) {
     return res.status(400).json({ error: 'Se requieren idValeDespacho e idComprobante (Factura o Boleta).' });
   }
@@ -542,7 +540,8 @@ const crearVentaDesdeVale = async (req, res) => {
       try {
         const resultado = await ventasService.crearVentaDesdeVale(transaction, pool, req.user.empresa, req.user.sub, {
           idValeDespacho,
-          idComprobante: Number(idComprobante)
+          idComprobante: Number(idComprobante),
+          fEmision
         });
         await transaction.commit();
         res.status(201).json({ success: true, data: resultado });

@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 
 async function obtenerIdComprobanteVD(pool, idEmpresa) {
     const result = await pool.request()
@@ -72,7 +73,8 @@ async function obtenerPorId(pool, idValeDespacho, idEmpresa) {
 }
 
 async function insertarVale(transaction, datos, idEmpresa, idUsuario) {
-    const { idSucursal, idCliente, idComprobante, serie, numero, observaciones } = datos;
+    const { idSucursal, idCliente, idComprobante, serie, numero, observaciones, fEmision } = datos;
+    const fEmisionSql = resolveFechaHoraClienteSql(fEmision);
     const result = await transaction.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('idSucursal', sql.UniqueIdentifier, idSucursal)
@@ -82,10 +84,11 @@ async function insertarVale(transaction, datos, idEmpresa, idUsuario) {
         .input('numero', sql.VarChar(8), String(numero))
         .input('idUsuario', sql.UniqueIdentifier, idUsuario)
         .input('observaciones', sql.VarChar(255), observaciones || null)
+        .input('fEmision', sql.VarChar(23), fEmisionSql)
         .query(`
-            INSERT INTO ValesDespacho (idEmpresa, idSucursal, idCliente, idComprobante, serie, numero, idUsuario, observaciones)
+            INSERT INTO ValesDespacho (idEmpresa, idSucursal, idCliente, idComprobante, serie, numero, idUsuario, observaciones, fEmision)
             OUTPUT INSERTED.idValeDespacho
-            VALUES (@idEmpresa, @idSucursal, @idCliente, @idComprobante, @serie, @numero, @idUsuario, @observaciones)
+            VALUES (@idEmpresa, @idSucursal, @idCliente, @idComprobante, @serie, @numero, @idUsuario, @observaciones, TRY_CONVERT(DATETIME, @fEmision, 120))
         `);
     return result.recordset[0].idValeDespacho;
 }

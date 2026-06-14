@@ -51,6 +51,7 @@ export class CreditosService {
     interes: number;
     numeroCuotas: number;
     cuotaInicial?: number;
+    fechaCredito?: string;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'creditos/', data, {
@@ -77,6 +78,7 @@ export class CreditosService {
     referencia?: string;
     observaciones?: string;
     idEmpresaOperacion?: string | null;
+    fechaPago?: string;
   }): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.post(this.url+'creditos/cuotas/' + data.idCuota + '/pagar', data, {

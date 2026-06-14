@@ -13,6 +13,7 @@ import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
 import { productoActivoParaVenta } from '../../../utils/producto-busqueda.util';
 import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
+import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 type EstadoReserva = 'vigente' | 'sin_efecto';
 
@@ -156,7 +157,7 @@ export class VentasHotelesComponent implements OnInit {
   getEstadoHabitacion(hab: ProductoHabitacion): 'ocupada' | 'reservada' | 'disponible' {
     const reserva = this.getReservaVigentePorHabitacion(hab.idProducto);
     if (!reserva) return 'disponible';
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = getFechaHoyLocal();
     if (reserva.fechaEntrada <= hoy && reserva.fechaSalida >= hoy) return 'ocupada';
     if (reserva.fechaEntrada > hoy) return 'reservada';
     return 'disponible';

@@ -13,6 +13,7 @@ import { ComprobanteService } from '../../../services/comprobante.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
 import { ProductoCrearModalService, ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
+import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import {
   etiquetaTipoMovimiento,
@@ -389,7 +390,7 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     const body: MovimientoRequest = {
       tipoMovimiento: this.form.get('tipoMovimiento')?.value,
       idSucursal: this.form.get('idSucursal')?.value,
-      fechaMovimiento: this.form.get('fechaMovimiento')?.value || undefined,
+      fechaMovimiento: fechaEmisionVentaParaApi(this.form.get('fechaMovimiento')?.value) || undefined,
       idComprobante: this.form.get('idComprobante')?.value || undefined,
       docRelacionado: this.form.get('docRelacionado')?.value || undefined,
       observaciones: this.form.get('observaciones')?.value || undefined,

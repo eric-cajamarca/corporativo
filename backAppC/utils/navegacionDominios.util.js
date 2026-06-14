@@ -568,6 +568,7 @@ function construirNavegacionGestoraPorDominios(ctx) {
   }
 
   const subConfig = [
+    { nombre: 'General', ruta: '/configuracion', permiso: 'VER_CONFIGURACION', visible: can('VER_CONFIGURACION') },
     { nombre: 'Colaboradores', ruta: '/colaborador', permiso: 'VER_USUARIOS', visible: can('VER_USUARIOS') },
     { nombre: 'Roles', ruta: '/rol', permiso: 'GESTIONAR_ROLES', visible: can('GESTIONAR_ROLES') }
   ].filter((s) => s.visible);

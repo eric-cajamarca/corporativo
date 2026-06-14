@@ -4,7 +4,7 @@ const devolucionesDespachoService = require('../services/devolucionesDespacho.se
 const crearDevolucionDespacho = async (req, res) => {
   try {
     const { idDespacho } = req.params;
-    const { observaciones, items } = req.body;
+    const { observaciones, items, fechaCambio } = req.body;
     if (!idDespacho) {
       return res.status(400).send({ message: 'idDespacho es requerido', data: undefined });
     }
@@ -15,7 +15,8 @@ const crearDevolucionDespacho = async (req, res) => {
       devolucionesDespachoService.crearDevolucionDespachoService(pool, req.user, {
         idDespacho,
         observaciones,
-        items
+        items,
+        fechaCambio
       })
     );
     if (result?.ok === false) {

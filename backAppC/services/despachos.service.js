@@ -103,7 +103,8 @@ exports.actualizarCantidadDespachadaService = async (pool, user, datos) => {
         idEmp,
         "EN_PREPARACION",
         user.sub,
-        "Todas las líneas del despacho registradas en almacén"
+        "Todas las líneas del despacho registradas en almacén",
+        datos.fechaDespacho
       );
     } catch (err) {
       console.error("contexto: no se pudo marcar envío EN_PREPARACION tras completar despacho:", err);
@@ -112,7 +113,7 @@ exports.actualizarCantidadDespachadaService = async (pool, user, datos) => {
   return result;
 };
 
-exports.actualizarCantidadesDespachoBatchService = async (pool, user, idDespacho, items) => {
+exports.actualizarCantidadesDespachoBatchService = async (pool, user, idDespacho, items, fechaDespacho) => {
   if (!user) {
     throw new Error("NO_ACCESS");
   }
@@ -129,7 +130,7 @@ exports.actualizarCantidadesDespachoBatchService = async (pool, user, idDespacho
     throw new Error("DESPACHO_NO_ENCONTRADO");
   }
 
-  const result = await DespachosRepository.actualizarCantidadesDespachoBatchRepo(pool, user, idDespacho, items);
+  const result = await DespachosRepository.actualizarCantidadesDespachoBatchRepo(pool, user, idDespacho, items, fechaDespacho);
 
   if (result?.todosDetallesDespachados && result?.idDespacho && user.sub) {
     try {
@@ -139,7 +140,8 @@ exports.actualizarCantidadesDespachoBatchService = async (pool, user, idDespacho
         idEmp,
         "EN_PREPARACION",
         user.sub,
-        "Todas las líneas del despacho registradas en almacén"
+        "Todas las líneas del despacho registradas en almacén",
+        fechaDespacho
       );
     } catch (err) {
       console.error("contexto: no se pudo marcar envío EN_PREPARACION tras completar despacho:", err);

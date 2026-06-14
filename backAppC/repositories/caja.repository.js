@@ -1,5 +1,5 @@
 const sql = require("mssql");
-const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
+const { getFechaHoyLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
 
 function parseSqlSumImporte(val) {
   if (val == null) return 0;
@@ -125,6 +125,8 @@ exports.abrirCajaRepo = async (pool, user, datos) => {
       throw new Error("CAJA_SIN_SUCURSAL");
     }
 
+    const fechaAperturaSql = resolveFechaHoraClienteSql(datos.fechaApertura);
+
     // Insertar apertura de caja (nuevo request para no duplicar parámetros)
     const req2 = transaction.request();
     const result = await req2
@@ -134,6 +136,7 @@ exports.abrirCajaRepo = async (pool, user, datos) => {
       .input("idUsuario", sql.UniqueIdentifier, user.sub)
       .input("montoInicial", sql.Decimal(18, 2), datos.montoInicial)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
+      .input("fechaApertura", sql.VarChar(23), fechaAperturaSql)
       .query(`
         INSERT INTO AperturasCaja (
           idCaja, idEmpresa, idSucursal, idUsuario,
@@ -142,7 +145,7 @@ exports.abrirCajaRepo = async (pool, user, datos) => {
         OUTPUT INSERTED.idApertura
         VALUES (
           @idCaja, @idEmpresa, @idSucursal, @idUsuario,
-          GETDATE(), @montoInicial, @observaciones, 1
+          TRY_CONVERT(DATETIME, @fechaApertura, 120), @montoInicial, @observaciones, 1
         )
       `);
 
@@ -166,6 +169,7 @@ exports.abrirCajaRepo = async (pool, user, datos) => {
           .input("concepto", sql.VarChar(100), "Apertura de caja")
           .input("monto", sql.Decimal(18, 2), datos.montoInicial)
           .input("idMoneda", sql.Int, 1)
+          .input("fechaMovimiento", sql.VarChar(23), fechaAperturaSql)
           .query(`
             INSERT INTO MovimientosCaja (
               idApertura, idEmpresa, idSucursal, idUsuario, idTipoMovimientoCaja,
@@ -173,7 +177,7 @@ exports.abrirCajaRepo = async (pool, user, datos) => {
             )
             VALUES (
               @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
-              GETDATE(), @concepto, @monto, NULL, @idMoneda
+              TRY_CONVERT(DATETIME, @fechaMovimiento, 120), @concepto, @monto, NULL, @idMoneda
             )
           `);
       }
@@ -242,6 +246,8 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
 
     const apertura = aperturaResult.recordset[0];
 
+    const fechaCierreSql = resolveFechaHoraClienteSql(datos.fechaCierre);
+
     // Insertar cierre
     const req3 = transaction.request();
     const cierreResult = await req3
@@ -252,6 +258,7 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
       .input("montoFinal", sql.Decimal(18, 2), montoFinalDeclarado)
       .input("diferencia", sql.Decimal(18, 2), diferencia)
       .input("observaciones", sql.VarChar, datos.observaciones || null)
+      .input("fechaCierre", sql.VarChar(23), fechaCierreSql)
       .query(`
         INSERT INTO CierresCaja (
           idApertura, idEmpresa, idSucursal, idUsuarioCierre,
@@ -260,7 +267,7 @@ exports.cerrarCajaRepo = async (pool, user, datos) => {
         OUTPUT INSERTED.idCierre
         VALUES (
           @idApertura, @idEmpresa, @idSucursal, @idUsuarioCierre,
-          GETDATE(), @montoFinal, @diferencia, @observaciones
+          TRY_CONVERT(DATETIME, @fechaCierre, 120), @montoFinal, @diferencia, @observaciones
         )
       `);
 
@@ -375,14 +382,15 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
   if (!idSucursal) {
     throw new Error("No se pudo determinar la sucursal para el movimiento. Verifique la apertura de caja o el usuario.");
   }
-    const result = await poolOrTransaction
+  const fechaMovSql = resolveFechaHoraClienteSql(datos.fechaMovimiento);
+  const result = await poolOrTransaction
     .request()
     .input("idApertura", sql.UniqueIdentifier, datos.idApertura)
     .input("idEmpresa", sql.UniqueIdentifier, user.empresa)
     .input("idSucursal", sql.UniqueIdentifier, idSucursal)
     .input("idUsuario", sql.UniqueIdentifier, user.sub)
     .input("idTipoMovimientoCaja", sql.Int, datos.idTipoMovimientoCaja)
-    .input("fechaMovimiento", sql.DateTime, datos.fechaMovimiento || null)
+    .input("fechaMovimiento", sql.VarChar(23), fechaMovSql)
     .input("concepto", sql.VarChar, datos.concepto)
     .input("idConcepto", sql.UniqueIdentifier, datos.idConcepto || null)
     .input("monto", sql.Decimal(18, 2), datos.monto)
@@ -399,7 +407,7 @@ exports.registrarMovimientoRepo = async (poolOrTransaction, user, datos) => {
       OUTPUT INSERTED.idMovimientoCaja
       VALUES (
         @idApertura, @idEmpresa, @idSucursal, @idUsuario, @idTipoMovimientoCaja,
-        ISNULL(@fechaMovimiento, GETDATE()), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
+        TRY_CONVERT(DATETIME, @fechaMovimiento, 120), @concepto, @idConcepto, @monto, @idMediosPago, @idMoneda,
         @documentoRelacionado, @observaciones
       )
     `);

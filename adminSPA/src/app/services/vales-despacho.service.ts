@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { Observable } from 'rxjs';
+import { fechaHoraVentaClienteAhora } from '../utils/fecha-local.util';
 
 export interface ValeDespachoListItem {
   idValeDespacho: string;
@@ -44,8 +45,11 @@ export class ValesDespachoService {
     return this.http.get<{ data: ValeDespachoDetalle }>(this.url + 'vales-despacho/' + id, { withCredentials: true });
   }
 
-  crear(body: { idSucursal: string; idCliente: number; observaciones?: string; detalle: { idProducto: string; idPresentacion: number; cantidad: number; pUnitario: number; total: number }[] }): Observable<{ data: { idValeDespacho: string; serie: string; numero: string; compVale: string } }> {
-    return this.http.post<{ data: { idValeDespacho: string; serie: string; numero: string; compVale: string } }>(this.url + 'vales-despacho', body, { withCredentials: true });
+  crear(body: { idSucursal: string; idCliente: number; observaciones?: string; fEmision?: string; detalle: { idProducto: string; idPresentacion: number; cantidad: number; pUnitario: number; total: number }[] }): Observable<{ data: { idValeDespacho: string; serie: string; numero: string; compVale: string } }> {
+    return this.http.post<{ data: { idValeDespacho: string; serie: string; numero: string; compVale: string } }>(this.url + 'vales-despacho', {
+      ...body,
+      fEmision: body.fEmision || fechaHoraVentaClienteAhora()
+    }, { withCredentials: true });
   }
 
   anular(id: string): Observable<{ data: { ok: boolean } }> {
@@ -56,7 +60,7 @@ export class ValesDespachoService {
   liquidar(idValeDespacho: string, idComprobante: number): Observable<{ success: boolean; data: { idVenta: number; compVenta: string } }> {
     return this.http.post<{ success: boolean; data: { idVenta: number; compVenta: string } }>(
       this.url + 'ventas/desde-vale',
-      { idValeDespacho, idComprobante },
+      { idValeDespacho, idComprobante, fEmision: fechaHoraVentaClienteAhora() },
       { withCredentials: true }
     );
   }

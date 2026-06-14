@@ -208,6 +208,16 @@ export class GestoresService {
     }
 
     /**
+     * Mapa idEmpresa → VENTAS_USAR_DESCUENTO_EN_TOTAL (gestora + gestionadas).
+     */
+    obtenerDescuentoVentaPorEmpresas(): Observable<ApiResponse<Record<string, boolean>>> {
+        return this.http.get<ApiResponse<Record<string, boolean>>>(
+            `${this.url}gestores/configuracion/descuento-por-empresa`,
+            { withCredentials: true }
+        );
+    }
+
+    /**
      * Guarda la configuración de la empresa
      */
     guardarConfiguracion(configuraciones: ConfiguracionEmpresa[]): Observable<ApiResponse<any>> {

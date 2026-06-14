@@ -14,6 +14,7 @@ import { Cliente } from '../../../interfaces/cliente-interface';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
 
 declare var iziToast: any;
@@ -494,7 +495,8 @@ export class IndexCreditosComponent implements OnInit {
           idMediosPago: this.nuevaCobranza.idMediosPago ?? undefined,
           idApertura: this.nuevaCobranza.idApertura || undefined,
           observaciones: this.nuevaCobranza.observaciones || undefined,
-          idEmpresaOperacion: idEmpresaPago
+          idEmpresaOperacion: idEmpresaPago,
+          fechaPago: fechaHoraVentaClienteAhora()
         };
         return this.creditosService.obtenerCuotasCredito(item.idCredito, idEmpresaPago).pipe(
           switchMap((res: any) => {
@@ -577,7 +579,10 @@ export class IndexCreditosComponent implements OnInit {
     }
 
     this.loading = true;
-    this.creditosService.crearCredito(this.nuevoCredito).subscribe({
+    this.creditosService.crearCredito({
+      ...this.nuevoCredito,
+      fechaCredito: fechaHoraVentaClienteAhora()
+    }).subscribe({
       next: (response) => {
         iziToast.success({
           title: 'Éxito',
@@ -614,7 +619,8 @@ export class IndexCreditosComponent implements OnInit {
       montoPagado: this.pagoCuota.montoPagado,
       formaPago: this.pagoCuota.formaPago,
       referencia: this.pagoCuota.referencia,
-      observaciones: this.pagoCuota.observaciones
+      observaciones: this.pagoCuota.observaciones,
+      fechaPago: fechaHoraVentaClienteAhora()
     };
     if (this.pagoCuota.idMediosPago != null) payload.idMediosPago = this.pagoCuota.idMediosPago;
     if (this.pagoCuota.idApertura) payload.idApertura = this.pagoCuota.idApertura;

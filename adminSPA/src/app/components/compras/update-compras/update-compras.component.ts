@@ -19,6 +19,7 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
+import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -1109,7 +1110,7 @@ export class UpdateComprasComponent {
         compCompra: this.compras.compCompra,
         serie: this.compras.serie,
         numero: this.compras.numero,
-        fEmision: this.compras.fEmision,
+        fEmision: fechaEmisionVentaParaApi(this.compras.fEmision),
         fVencimiento: this.compras.fVencimiento,
         idProveedor: this.compras.idProveedor,
         idMoneda: this.compras.idMoneda,

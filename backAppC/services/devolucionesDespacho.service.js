@@ -15,7 +15,7 @@ exports.crearDevolucionDespachoService = async (pool, user, payload) => {
   if (!user || !user.empresa || !user.sub) throw new Error('NO_ACCESS');
   await assertAlgunoPermiso(pool, user, 'EDITAR_DESPACHOS', 'CREAR_DESPACHOS');
 
-  const { idDespacho, items } = payload;
+  const { idDespacho, items, fechaCambio } = payload;
   if (!idDespacho || !Array.isArray(items) || items.length === 0) {
     throw new Error('DATOS_INVALIDOS');
   }
@@ -52,7 +52,8 @@ exports.crearDevolucionDespachoService = async (pool, user, payload) => {
           idEmp,
           'AGENDADO',
           user.sub,
-          'Tras devolución total en despacho (cancelación de envío)'
+          'Tras devolución total en despacho (cancelación de envío)',
+          fechaCambio
         );
       }
     } catch (err) {

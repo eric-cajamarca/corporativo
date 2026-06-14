@@ -13,6 +13,7 @@ import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
+import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
 declare var bootstrap: any;
@@ -595,6 +596,7 @@ export class NotasCreditoDebitoComponent implements OnInit {
       idComprobanteElectronicoOrigen: this.origen.comprobanteOrigen.idComprobanteElectronico,
       tipoNota: this.tipoNota,
       codigoMotivoNotaCredito: this.tipoNota === '07' ? (this.codigoMotivoNotaCredito || '01') : undefined,
+      fEmision: fechaHoraVentaClienteAhora(),
       items: this.items
         .filter(it => (Number(it.cantidad) || 0) > 0)
         .map(it => ({
