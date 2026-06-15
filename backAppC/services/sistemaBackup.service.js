@@ -5,6 +5,7 @@ const sql = require('mssql');
 const dbConfig = require('../dbconfig');
 const suscripcionCatalogoAdminService = require('./suscripcionCatalogoAdmin.service');
 const gestoresRepository = require('../repositories/gestores.repository');
+const { getAhoraAppYmdHms } = require('../utils/fechaDisplay.util');
 
 const BACKUP_TIMEOUT_MS = Math.min(
   Math.max(parseInt(process.env.BACKUP_SCRIPT_TIMEOUT_MS, 10) || 1200000, 60000),
@@ -268,7 +269,7 @@ async function ejecutarBackupAhora(pool, user, overrides = {}) {
     throw new Error('BACKUP_DB_ENV_INCOMPLETA');
   }
 
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+  const stamp = getAhoraAppYmdHms().replace(/[-: ]/g, '').slice(0, 15);
   const safeDb = String(database).replace(/[^\w\-]/g, '_');
   const fileName = `${safeDb}_${stamp}.bak`;
   let backupFile = path.join(backupDir, fileName);

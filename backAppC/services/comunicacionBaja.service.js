@@ -11,6 +11,7 @@ const envioDirectoSunat = require("./envioDirectoSunat.service");
 const cifradoClaveCertificado = require("../utils/cifradoClaveCertificado.util");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 const saasContadorComprobantesSunatService = require("./saasContadorComprobantesSunat.service");
+const { getFechaHoyApp } = require("../utils/fechaDisplay.util");
 
 /**
  * Envía una comunicación de baja (RA) con los comprobantes indicados.
@@ -51,8 +52,8 @@ async function enviarComunicacionBajaService(pool, user, datos) {
   // - ID y nombre archivo: RA-{YYYYMMDD de COMUNICACIÓN}-{correlativo} (fecha de HOY)
   // - ReferenceDate: fecha de EMISIÓN de los comprobantes a anular
   // - IssueDate: fecha de COMUNICACIÓN (hoy)
-  // IMPORTANTE: Usar zona horaria de Perú (America/Lima, UTC-5) para la fecha
-  const fechaComunicacion = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }).replace(/\D/g, ""); // YYYYMMDD de hoy en Perú
+  // IssueDate: fecha de comunicación (hoy en APP_TIMEZONE)
+  const fechaComunicacion = getFechaHoyApp().replace(/-/g, "");
   
   // Obtener fecha de emisión de los comprobantes para ReferenceDate
   const fechasCp = comps.map((c) => (c.fechaEmision || "").slice(0, 10)).filter(Boolean);

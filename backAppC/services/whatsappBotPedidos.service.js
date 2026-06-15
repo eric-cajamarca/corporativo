@@ -5,6 +5,7 @@ const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
+const { getFechaHoyApp } = require('../utils/fechaDisplay.util');
 
 const PEDIDOS_TOP = 5;
 const PDF_MAX_DIA = parseInt(process.env.WHATSAPP_BOT_PEDIDO_PDF_MAX_DIA, 10) || 3;
@@ -19,7 +20,7 @@ function compPedido(p) {
 }
 
 function clavePdfDia(idEmpresa, telefonoLog) {
-  return `${String(idEmpresa).toLowerCase()}:${telefonoLog}:${new Date().toISOString().slice(0, 10)}`;
+  return `${String(idEmpresa).toLowerCase()}:${telefonoLog}:${getFechaHoyApp()}`;
 }
 
 function puedeEnviarPdfPedido(idEmpresa, telefonoLog) {

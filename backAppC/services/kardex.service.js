@@ -1,6 +1,7 @@
 // services/kardex.service.js
 const { withPool } = require('../utils/dbPool.util');
 const kardexRepository = require('../repositories/kardex.repository');
+const { getFechaHoyApp, partesAhoraApp } = require('../utils/fechaDisplay.util');
 
 /**
  * Obtiene el kardex de un producto en un rango de fechas.
@@ -13,10 +14,9 @@ exports.obtenerKardex = async (idEmpresa, idProducto, fechaDesde, fechaHasta) =>
   if (!idEmpresa || !idProducto) {
     throw new Error('idEmpresa e idProducto son obligatorios');
   }
-  const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  const desde = fechaDesde || inicioMes.toISOString().slice(0, 10);
-  const hasta = fechaHasta || hoy.toISOString().slice(0, 10);
+  const { y, m } = partesAhoraApp();
+  const desde = fechaDesde || `${y}-${m}-01`;
+  const hasta = fechaHasta || getFechaHoyApp();
   return withPool((pool) =>
     kardexRepository.obtenerKardex(pool, idEmpresa, idProducto, desde, hasta)
   );

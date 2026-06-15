@@ -3,6 +3,7 @@ const sql = require('mssql');
 const { withPool } = require('../utils/dbPool.util');
 const { v4: uuidv4 } = require('uuid');
 const { getFechaSoloSQLString, getNowLocalSQLString, parseFEmisionCabeceraSQL } = require('../utils/fechaHoraLocal.util');
+const { formatearFechaApp } = require('../utils/fechaDisplay.util');
 const comprasRepository = require('../repositories/compras.repository');
 const comprasDetalleReporteRepository = require('../repositories/comprasDetalleReporte.repository');
 const CajaRepository = require('../repositories/caja.repository');
@@ -19,10 +20,10 @@ function formatearFechasCompras(recordset) {
     const list = Array.isArray(recordset) ? recordset : [];
     list.forEach(row => {
         if (row.fEmision != null && typeof row.fEmision !== 'string') {
-            row.fEmision = row.fEmision.toISOString ? row.fEmision.toISOString().split('T')[0] : row.fEmision;
+            row.fEmision = formatearFechaApp(row.fEmision) || row.fEmision;
         }
         if (row.fVencimiento != null && typeof row.fVencimiento !== 'string') {
-            row.fVencimiento = row.fVencimiento.toISOString ? row.fVencimiento.toISOString().split('T')[0] : row.fVencimiento;
+            row.fVencimiento = formatearFechaApp(row.fVencimiento) || row.fVencimiento;
         }
     });
     return list;

@@ -2,7 +2,8 @@ const sql = require("mssql");
 const fs = require("fs");
 const path = require("path");
 const ventasRepository = require("../repositories/ventas.repository");
-const { getNowLocal, resolveFechaHoraClienteSql } = require("../utils/fechaHoraLocal.util");
+const { getNowLocal, resolveFechaHoraClienteSql, getNowLocalSQLString } = require("../utils/fechaHoraLocal.util");
+const { formatearFechaApp } = require("../utils/fechaDisplay.util");
 const debugSunatLog = require("../utils/debugSunatLog.util");
 const { formatearHoraEnvioParaInput } = require("../utils/limaSunat.util");
 const { escribirArchivosPlanos, escribirXmlFirma, nombreArchivoComprobante } = require("../utils/facturadorSunat.util");
@@ -2086,7 +2087,7 @@ async function generarXMLFactura(venta, serie, numero) {
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
   <cbc:ID>${serie}-${numero}</cbc:ID>
-  <cbc:IssueDate>${venta.fEmision.toISOString().split('T')[0]}</cbc:IssueDate>
+  <cbc:IssueDate>${formatearFechaApp(venta.fEmision) || ''}</cbc:IssueDate>
   <!-- XML simplificado para demostración -->
 </Invoice>`;
 

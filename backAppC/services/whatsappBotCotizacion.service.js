@@ -10,6 +10,7 @@ const pdfBackendClient = require('./pdfBackend.client');
 const { numeroALetras } = require('../utils/numeroALetras.util');
 const { formatearPrecio } = require('../utils/whatsappBotTexto.util');
 const copy = require('./whatsappBot.copy');
+const { getFechaHoyApp, formatearFechaApp } = require('../utils/fechaDisplay.util');
 
 const MEDIOS_PAGO = {
   1: 'Efectivo',
@@ -163,13 +164,13 @@ function resolverMedioPago(texto, nlu) {
 }
 
 function hoyIso() {
-  return new Date().toISOString().slice(0, 10);
+  return getFechaHoyApp();
 }
 
 function vencimientoIso(dias = 7) {
   const d = new Date();
   d.setDate(d.getDate() + dias);
-  return d.toISOString().slice(0, 10);
+  return formatearFechaApp(d);
 }
 
 async function mapPresentacionPorProductos(pool, idEmpresa, carrito) {

@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { partesAhoraApp, partesFechaHoraEnTz, getAppTimezone } = require('./fechaDisplay.util');
 
 /**
  * KPIs financieros operativos compartidos (Inicio /dashboard y Análisis /analisis).
@@ -6,23 +7,32 @@ const sql = require('mssql');
  * (evita doble conteo con egresos de caja que suelen duplicar gastos ya registrados).
  */
 
+function fmtYmd(d) {
+  const p = partesFechaHoraEnTz(d, getAppTimezone());
+  return `${p.y}-${p.m}-${p.d}`;
+}
+
 function periodoARango(periodo) {
   if (!periodo || periodo.length < 6) {
-    const d = new Date();
-    periodo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const { y, m } = partesAhoraApp();
+    periodo = `${y}-${m}`;
   }
   const [y, m] = periodo.split('-').map(Number);
   const inicio = new Date(y, m - 1, 1);
   const fin = new Date(y, m, 0);
-  const fmt = (x) => x.toISOString().slice(0, 10);
-  return { fechaInicio: fmt(inicio), fechaFin: fmt(fin) };
+  return { fechaInicio: fmtYmd(inicio), fechaFin: fmtYmd(fin) };
 }
 
 function rangoMesActualYAnterior() {
-  const ahora = new Date();
-  const mesActual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
-  const mesAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
-  const periodoAnterior = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
+  let yN = Number(partesAhoraApp().y);
+  let mN = Number(partesAhoraApp().m);
+  const mesActual = `${yN}-${String(mN).padStart(2, '0')}`;
+  mN -= 1;
+  if (mN < 1) {
+    mN = 12;
+    yN -= 1;
+  }
+  const periodoAnterior = `${yN}-${String(mN).padStart(2, '0')}`;
   const actual = periodoARango(mesActual);
   const anterior = periodoARango(periodoAnterior);
   return {

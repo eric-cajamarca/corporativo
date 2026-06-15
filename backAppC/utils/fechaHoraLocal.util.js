@@ -1,114 +1,77 @@
 /**
- * Fecha y hora según la configuración de la máquina donde corre el servidor.
- * Todo registro de fecha/hora debe usar esta utilidad o GETDATE() en SQL
- * para que sea consistente con la PC del servidor.
+ * Fecha y hora del servidor según APP_TIMEZONE (.env).
+ * Operaciones de negocio con usuario en pantalla deben preferir la hora enviada por el cliente.
  */
 
+const {
+  getAppTimezone,
+  getAhoraAppSqlString,
+  getAhoraAppIsoLocal,
+  getFechaHoyApp,
+  getFechaEmisionAppSqlString,
+  partesAhoraApp,
+  partesFechaHoraEnTz,
+  formatearFechaApp
+} = require('./fechaDisplay.util');
+
 /**
- * Devuelve la fecha y hora actual del servidor (configuración local de la máquina)
- * como objeto Date. Usar para pasar a sql.DateTime en repositorios.
+ * Devuelve un Date con componentes de APP_TIMEZONE (útil legacy con drivers SQL).
  * @returns {Date}
  */
 function getNowLocal() {
-  const now = new Date();
-  return new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    now.getHours(),
-    now.getMinutes(),
-    now.getSeconds(),
-    now.getMilliseconds()
-  );
+  const { y, m, d, h, min, s } = partesAhoraApp();
+  return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min), Number(s));
 }
 
-/**
- * Devuelve la fecha y hora actual en formato ISO local YYYY-MM-DDTHH:mm:ss
- * (sin Z, para que se interprete como hora local).
- * @returns {string}
- */
+/** YYYY-MM-DDTHH:mm:ss en APP_TIMEZONE */
 function getNowLocalISOString() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  const h = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  return `${y}-${m}-${d}T${h}:${min}:${s}`;
+  return getAhoraAppIsoLocal();
 }
 
-/**
- * Devuelve la fecha y hora actual en formato SQL VARCHAR(23): YYYY-MM-DD HH:mm:ss.sss
- * Para insertar en SQL Server sin que el driver convierta a UTC.
- * @returns {string}
- */
+/** YYYY-MM-DD HH:mm:ss.sss en APP_TIMEZONE */
 function getNowLocalSQLString() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  const h = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  const ms = String(now.getMilliseconds()).padStart(3, '0');
-  return `${y}-${m}-${d} ${h}:${min}:${s}.${ms}`;
+  return getAhoraAppSqlString();
 }
 
-/**
- * Devuelve fecha de emisión en formato SQL (YYYY-MM-DD HH:mm:ss.sss) usando la parte fecha dada
- * y la hora actual del servidor. Evita que el driver mssql convierta Date a UTC al guardar.
- * @param {string} parteFecha - "YYYY-MM-DD"
- * @returns {string}
- */
+/** Parte fecha + hora actual en APP_TIMEZONE */
 function getFechaEmisionSQLString(parteFecha) {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  const ms = String(now.getMilliseconds()).padStart(3, '0');
-  return `${parteFecha} ${h}:${min}:${s}.${ms}`;
+  return getFechaEmisionAppSqlString(parteFecha);
 }
 
 /**
- * Extrae la parte fecha (YYYY-MM-DD) de un valor ISO o string y devuelve formato SQL medianoche local.
- * @param {string|Date} valor - ISO string o Date
- * @returns {string|null} "YYYY-MM-DD 00:00:00.000" o null
+ * Medianoche en APP_TIMEZONE para la fecha indicada.
+ * @param {string|Date} valor
+ * @returns {string|null}
  */
 function getFechaSoloSQLString(valor) {
   if (valor == null) return null;
-  const str = typeof valor === 'string' ? valor.trim().slice(0, 10) : (valor instanceof Date ? valor.toISOString().slice(0, 10) : '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
-  return `${str} 00:00:00.000`;
+  if (typeof valor === 'string') {
+    const str = valor.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
+    return `${str} 00:00:00.000`;
+  }
+  if (valor instanceof Date && !isNaN(valor.getTime())) {
+    const { y, m, d } = partesFechaHoraEnTz(valor, getAppTimezone());
+    return `${y}-${m}-${d} 00:00:00.000`;
+  }
+  return null;
 }
 
-/**
- * Devuelve la fecha de hoy en zona local como YYYY-MM-DD (para filtros "hoy" sin usar UTC).
- * @returns {string}
- */
+/** Hoy en APP_TIMEZONE: YYYY-MM-DD */
 function getFechaHoyLocal() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return getFechaHoyApp();
 }
 
 /**
- * Convierte fEmision ya guardada (Date de mssql o string) a "YYYY-MM-DD HH:mm:ss" (19 chars, hora local).
+ * Convierte fEmision ya guardada (Date de mssql o string) a "YYYY-MM-DD HH:mm:ss".
  * @param {string|Date} valor
  * @returns {string}
  */
 function fEmisionRowALocalYmdHms(valor) {
   if (valor == null) return '';
   if (valor instanceof Date && !isNaN(valor.getTime())) {
-    const y = valor.getFullYear();
-    const mo = String(valor.getMonth() + 1).padStart(2, '0');
-    const d = String(valor.getDate()).padStart(2, '0');
-    const h = String(valor.getHours()).padStart(2, '0');
-    const mi = String(valor.getMinutes()).padStart(2, '0');
-    const s = String(valor.getSeconds()).padStart(2, '0');
-    return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+    const { y, m, d, h, min, s } = partesFechaHoraEnTz(valor, getAppTimezone());
+    return `${y}-${m}-${d} ${h}:${min}:${s}`;
   }
   const str = String(valor).trim().replace('T', ' ');
   const m = str.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})/);
@@ -120,8 +83,6 @@ function fEmisionRowALocalYmdHms(valor) {
 
 /**
  * Normaliza cabecera.fEmision a VARCHAR(23) "YYYY-MM-DD HH:mm:ss.000".
- * Si viene solo fecha (sin reloj), medianoche. Si viene con hora (T o espacio), la conserva.
- * Importante: no usar solo getFechaSoloSQLString cuando hay hora, porque anula la hora real.
  * @param {string|Date|null|undefined} valor
  * @returns {string|null}
  */
@@ -141,12 +102,6 @@ function parseFEmisionCabeceraSQL(valor) {
   return getFechaSoloSQLString(raw);
 }
 
-/**
- * NV/CT: si la edición envía la misma fecha con 00:00:00 y en BD había otra hora, conservar la hora de BD.
- * @param {string|null} fEmisionSql23
- * @param {string|Date|null|undefined} fEmisionExistente
- * @returns {string|null}
- */
 function mergeFEmisionNvCtSiMedianocheInnecessario(fEmisionSql23, fEmisionExistente) {
   if (!fEmisionSql23 || fEmisionExistente == null) return fEmisionSql23;
   const exStr = fEmisionRowALocalYmdHms(fEmisionExistente);
@@ -162,18 +117,14 @@ function mergeFEmisionNvCtSiMedianocheInnecessario(fEmisionSql23, fEmisionExiste
 }
 
 /**
- * Parte fecha YYYY-MM-DD desde entrada de venta (ISO UTC, solo fecha o Date).
- * No usar slice(0,10) de ISO con Z: en UTC-5, después de las 19:00 local el día UTC ya es mañana.
+ * Parte fecha YYYY-MM-DD desde entrada de venta.
  * @param {string|Date|null|undefined} fEmision
  * @returns {string|null}
  */
 function parteFechaDesdeFEmisionInput(fEmision) {
   if (fEmision == null) return null;
   if (fEmision instanceof Date && !isNaN(fEmision.getTime())) {
-    const y = fEmision.getFullYear();
-    const mo = String(fEmision.getMonth() + 1).padStart(2, '0');
-    const d = String(fEmision.getDate()).padStart(2, '0');
-    return `${y}-${mo}-${d}`;
+    return formatearFechaApp(fEmision);
   }
   const str = String(fEmision).trim();
   if (!str) return null;
@@ -183,10 +134,7 @@ function parteFechaDesdeFEmisionInput(fEmision) {
   if (/[Tt]/.test(str) || str.endsWith('Z')) {
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
-      const y = d.getFullYear();
-      const mo = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${mo}-${day}`;
+      return formatearFechaApp(d);
     }
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(solo)) return solo;
@@ -194,8 +142,7 @@ function parteFechaDesdeFEmisionInput(fEmision) {
 }
 
 /**
- * Fecha/hora enviada por el cliente (navegador) → VARCHAR(23) SQL.
- * Si no viene valor válido, usa hora del servidor como respaldo.
+ * Fecha/hora del cliente → SQL. Si falta, respaldo con APP_TIMEZONE.
  * @param {string|Date|null|undefined} valor
  * @param {boolean} [usarServidorSiFalta=true]
  * @returns {string|null}

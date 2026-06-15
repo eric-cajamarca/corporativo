@@ -1,11 +1,18 @@
 const sql = require('mssql');
+const { getFechaHoyApp } = require('../utils/fechaDisplay.util');
 
 const MESES_VENTAS = 6;
 
 function fechaDesdeVentas() {
-  const d = new Date();
-  d.setMonth(d.getMonth() - MESES_VENTAS);
-  return d.toISOString().slice(0, 10);
+  const hoy = getFechaHoyApp();
+  const [y, m] = hoy.split('-').map(Number);
+  let yN = y;
+  let mN = m - MESES_VENTAS;
+  while (mN < 1) {
+    mN += 12;
+    yN -= 1;
+  }
+  return `${yN}-${String(mN).padStart(2, '0')}-01`;
 }
 
 async function obtenerPerfilEmpresa(pool, idEmpresa) {

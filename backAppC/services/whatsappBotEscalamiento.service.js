@@ -17,8 +17,9 @@
  */
 
 const whatsappGatewayClient = require('./whatsappGateway.client');
+const { getAhoraAppIsoLocal } = require('../utils/fechaDisplay.util');
 
-function ahoraIso() { return new Date().toISOString(); }
+function ahoraIso() { return getAhoraAppIsoLocal(); }
 
 function ofuscarTel(tel) {
   const s = String(tel || '').replace(/\D/g, '');

@@ -1,9 +1,11 @@
 const GastosRepository = require('../repositories/gastos.repository');
+const { getFechaHoyApp, partesAhoraApp } = require('../utils/fechaDisplay.util');
 
 exports.listarPorPeriodo = async (pool, user, fechaDesde, fechaHasta) => {
   if (!user || !user.empresa) throw new Error('NO_ACCESS');
-  const fechaInicio = fechaDesde || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-  const fechaFin = fechaHasta || new Date().toISOString().slice(0, 10);
+  const { y, m } = partesAhoraApp();
+  const fechaInicio = fechaDesde || `${y}-${m}-01`;
+  const fechaFin = fechaHasta || getFechaHoyApp();
   return GastosRepository.listarPorEmpresaYPeriodo(pool, user.empresa, fechaInicio, fechaFin);
 };
 

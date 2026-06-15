@@ -1,4 +1,5 @@
 const transferenciaRepository = require('../repositories/transferencia.repository');
+const { getAhoraAppIsoLocal } = require('../utils/fechaDisplay.util');
 
 exports.crearTransferencia = async (pool, datos, usuarioAutenticado) => {
     const transaction = pool.transaction();
@@ -184,7 +185,7 @@ exports.crearTransferencia = async (pool, datos, usuarioAutenticado) => {
                 items: itemsProcesados,
                 sucursalOrigen: sucursalOrigen.nombre,
                 sucursalDestino: sucursalDestino.nombre,
-                fecha: new Date().toISOString()
+                fecha: getAhoraAppIsoLocal()
             },
             message: 'Transferencia realizada exitosamente',
             idMovimiento: idMovimientoSalida,

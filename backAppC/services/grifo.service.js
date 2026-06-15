@@ -1,5 +1,6 @@
 const { withPool } = require('../utils/dbPool.util');
 const grifoRepository = require('../repositories/grifo.repository');
+const { getFechaHoyApp, partesAhoraApp } = require('../utils/fechaDisplay.util');
 
 async function listarTanques(idEmpresa) {
   return withPool((pool) => grifoRepository.listarTanques(pool, idEmpresa));
@@ -21,11 +22,14 @@ async function resumenGrifo(idEmpresa, fechaDesde, fechaHasta) {
   let fDesde = fechaDesde;
   let fHasta = fechaHasta;
   if (!fDesde || !fHasta) {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const { y, m } = partesAhoraApp();
+    const yN = Number(y);
+    const mN = Number(m);
     if (!fDesde) fDesde = `${y}-${m}-01T00:00:00`;
-    if (!fHasta) fHasta = new Date(y, now.getMonth() + 1, 0).toISOString().slice(0, 10) + 'T23:59:59';
+    if (!fHasta) {
+      const ultimo = new Date(yN, mN, 0).getDate();
+      fHasta = `${y}-${m}-${String(ultimo).padStart(2, '0')}T23:59:59`;
+    }
   }
   return withPool((pool) => grifoRepository.resumenGrifo(pool, idEmpresa, fDesde, fHasta));
 }

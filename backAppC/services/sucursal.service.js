@@ -2,6 +2,7 @@ const sucursalRepository = require('../repositories/sucursal.repository');
 const empresaService = require('./empresa.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const { idsSucursalesFiltroCatalogo, assertSucursalPermitidaParaUsuario } = require('../utils/sucursalUsuarioScope.util');
+const { formatearFechaApp } = require('../utils/fechaDisplay.util');
 
 const E = {
   NO_ACCESS: 'NO_ACCESS',
@@ -44,7 +45,7 @@ function normalizarFechaRegistro(rows) {
   return rows.map((el) => {
     const copy = { ...el };
     if (copy.fregistro && copy.fregistro instanceof Date) {
-      copy.fregistro = copy.fregistro.toISOString().split('T')[0];
+      copy.fregistro = formatearFechaApp(copy.fregistro) || copy.fregistro;
     }
     return copy;
   });

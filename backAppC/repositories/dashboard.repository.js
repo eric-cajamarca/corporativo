@@ -3,6 +3,7 @@ const {
   calcularResumenFinancieroPeriodo
 } = require("../utils/kpisFinancierosOperativo.util");
 const { getFechaHoyLocal } = require("../utils/fechaHoraLocal.util");
+const { getAhoraAppYmdHms } = require("../utils/fechaDisplay.util");
 
 function parseFechaReferenciaLocal(fechaReferencia) {
   const raw = String(fechaReferencia || getFechaHoyLocal()).trim().slice(0, 10);
@@ -293,7 +294,7 @@ exports.obtenerResumenDashboardRepo = async (
       mensaje: `${r.nombreProducto} tiene ${Math.round(Number(r.cantidadDisponible))} unidades`,
       icono: "fa-exclamation-triangle",
       tipo: "warning",
-      tiempo: "Actual"
+      tiempo: getAhoraAppYmdHms()
     });
   });
   creditosPendientes.recordset.forEach((r) => {
@@ -306,7 +307,7 @@ exports.obtenerResumenDashboardRepo = async (
       mensaje: `${r.cliente} - ${r.comprobante || "N/C"} - S/ ${Number(r.monto || 0).toFixed(2)} - ${texto}`,
       icono: "fa-clock",
       tipo: "info",
-      tiempo: "Actual"
+      tiempo: getAhoraAppYmdHms()
     });
   });
 
@@ -341,7 +342,7 @@ exports.obtenerResumenDashboardRepo = async (
         mensaje: `${r.nombreProducto} - ${Math.round(Number(r.cantidadDisponible || 0))} uds. - ${texto}`,
         icono: "fa-calendar-times",
         tipo: "warning",
-        tiempo: "Actual"
+        tiempo: getAhoraAppYmdHms()
       });
     });
   }

@@ -1,9 +1,16 @@
 /**
- * Resuelve rangos de fechas para consultas de análisis financiero.
+ * Resuelve rangos de fechas para consultas de análisis financiero (APP_TIMEZONE).
  */
 
+const { getFechaHoyApp, partesAhoraApp, partesFechaHoraEnTz, getAppTimezone } = require('./fechaDisplay.util');
+
+function ultimoDiaMes(y, mo) {
+  return new Date(y, mo, 0).getDate();
+}
+
 function fmt(d) {
-  return d.toISOString().slice(0, 10);
+  const p = partesFechaHoraEnTz(d, getAppTimezone());
+  return `${p.y}-${p.m}-${p.d}`;
 }
 
 function resolverRangoConsultaAnalisis(opciones = {}) {
@@ -16,42 +23,51 @@ function resolverRangoConsultaAnalisis(opciones = {}) {
     };
   }
 
-  const hoy = new Date();
-  const y = hoy.getFullYear();
-  const m = hoy.getMonth();
+  let yN = Number(partesAhoraApp().y);
+  let mN = Number(partesAhoraApp().m);
 
   switch (String(periodo || 'MES_ACTUAL').toUpperCase()) {
     case 'MES_ANTERIOR': {
-      const ini = new Date(y, m - 1, 1);
-      const fin = new Date(y, m, 0);
-      const p = `${ini.getFullYear()}-${String(ini.getMonth() + 1).padStart(2, '0')}`;
-      return { fechaInicio: fmt(ini), fechaFin: fmt(fin), periodoEtiqueta: p };
+      mN -= 1;
+      if (mN < 1) {
+        mN = 12;
+        yN -= 1;
+      }
+      const ms = String(mN).padStart(2, '0');
+      const p = `${yN}-${ms}`;
+      return {
+        fechaInicio: `${p}-01`,
+        fechaFin: `${p}-${String(ultimoDiaMes(yN, mN)).padStart(2, '0')}`,
+        periodoEtiqueta: p
+      };
     }
     case 'TRIMESTRE': {
-      const trim = Math.floor(m / 3);
-      const ini = new Date(y, trim * 3, 1);
-      const fin = new Date(y, trim * 3 + 3, 0);
+      const trim = Math.floor((mN - 1) / 3);
+      const moIni = trim * 3 + 1;
+      const moFin = moIni + 2;
+      const msIni = String(moIni).padStart(2, '0');
+      const msFin = String(moFin).padStart(2, '0');
       return {
-        fechaInicio: fmt(ini),
-        fechaFin: fmt(fin),
-        periodoEtiqueta: `T${trim + 1}-${y}`
+        fechaInicio: `${yN}-${msIni}-01`,
+        fechaFin: `${yN}-${msFin}-${String(ultimoDiaMes(yN, moFin)).padStart(2, '0')}`,
+        periodoEtiqueta: `T${trim + 1}-${yN}`
       };
     }
-    case 'ANO_ACTUAL': {
-      const ini = new Date(y, 0, 1);
-      const fin = new Date(y, 11, 31);
+    case 'ANO_ACTUAL':
       return {
-        fechaInicio: fmt(ini),
-        fechaFin: fmt(fin),
-        periodoEtiqueta: String(y)
+        fechaInicio: `${yN}-01-01`,
+        fechaFin: `${yN}-12-31`,
+        periodoEtiqueta: String(yN)
       };
-    }
     case 'MES_ACTUAL':
     default: {
-      const ini = new Date(y, m, 1);
-      const fin = new Date(y, m + 1, 0);
-      const p = `${y}-${String(m + 1).padStart(2, '0')}`;
-      return { fechaInicio: fmt(ini), fechaFin: fmt(fin), periodoEtiqueta: p };
+      const ms = String(mN).padStart(2, '0');
+      const p = `${yN}-${ms}`;
+      return {
+        fechaInicio: `${p}-01`,
+        fechaFin: `${p}-${String(ultimoDiaMes(yN, mN)).padStart(2, '0')}`,
+        periodoEtiqueta: p
+      };
     }
   }
 }

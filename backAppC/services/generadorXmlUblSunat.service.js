@@ -7,6 +7,7 @@
 
 const { escribirXmlFirma } = require("../utils/facturadorSunat.util");
 const { numeroALetras } = require("../utils/numeroALetras.util");
+const { getFechaHoyApp } = require("../utils/fechaDisplay.util");
 
 const NS = {
   UBL: "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
@@ -294,7 +295,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
     ...venta,
     codigoComprobante: toStr(venta.codigoComprobante) || String(tipoComprobante || "01").trim()
   };
-  const pagoUbl = resolverPagoFacturaBoletaUbl(ventaParaPago, fecha || new Date().toISOString().slice(0, 10));
+  const pagoUbl = resolverPagoFacturaBoletaUbl(ventaParaPago, fecha || getFechaHoyApp());
   const dueDateInvoice = pagoUbl.dueDate || fecha;
   const dirEmisor = toStr(empresa.direccion) || "-";
   const dirCliente = toStr(cliente.direccion) || "-";

@@ -2,6 +2,7 @@ const factilizaRepository = require('../repositories/factiliza.repository');
 const empresaRepository = require('../repositories/empresa.repository');
 const whatsappFactilizaService = require('./whatsappFactiliza.service');
 const geoIpCliente = require('../utils/geoIpCliente.util');
+const { getAhoraAppYmdHms } = require('../utils/fechaDisplay.util');
 
 const NOMBRE_SERVICIO_WHATSAPP = 'Factiliza WHATSAPP';
 
@@ -617,7 +618,7 @@ exports.iniciarHealthCheckFactiliza = function iniciarHealthCheckFactiliza(deps)
 
   const ejecutarPing = async () => {
     try {
-      const ahora = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const ahora = getAhoraAppYmdHms();
       const r = await withPool(async (pool) => {
         const destino = await obtenerNumeroDev(pool);
         if (destino.length < 9) {

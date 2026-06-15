@@ -1,21 +1,23 @@
 /**
- * Fecha y hora en zona America/Lima (sin DST) para programación de envío SUNAT.
+ * Fecha y hora en APP_TIMEZONE para programación de envío SUNAT.
  */
 
-/** @returns {string} YYYY-MM-DD en Lima */
+const { getAppTimezone } = require("./fechaDisplay.util");
+
+/** @returns {string} YYYY-MM-DD en APP_TIMEZONE */
 exports.ymdLima = (d) =>
   new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Lima",
+    timeZone: getAppTimezone(),
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
   }).format(d instanceof Date ? d : new Date(d));
 
-/** Minutos desde medianoche (0–1439) en Lima */
+/** Minutos desde medianoche (0–1439) en APP_TIMEZONE */
 exports.minutosDesdeMedianocheLima = (d) => {
   const date = d instanceof Date ? d : new Date(d);
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "America/Lima",
+    timeZone: getAppTimezone(),
     hour: "2-digit",
     minute: "2-digit",
     hour12: false
