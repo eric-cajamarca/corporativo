@@ -701,7 +701,7 @@ export class ConteoFisicoComponent implements OnInit, OnDestroy {
   }
 
   columnasTablaBusqueda(): number {
-    let n = 6;
+    let n = 7;
     if (this.empresasGestionadas.length > 0) {
       n += 1;
     }

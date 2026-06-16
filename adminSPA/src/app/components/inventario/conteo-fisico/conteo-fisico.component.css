@@ -87,6 +87,21 @@
   vertical-align: middle;
 }
 
+.conteo-stock-table .conteo-col-marca {
+  width: 6.5rem;
+  max-width: 6.5rem;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.conteo-marca-valor {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
 .product-desc-clip {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -209,6 +224,15 @@
   }
 
   .conteo-stock-table-mobile .conteo-empresa-valor {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    text-align: right;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .conteo-stock-table-mobile .conteo-marca-valor {
     overflow: visible;
     text-overflow: unset;
     white-space: normal;

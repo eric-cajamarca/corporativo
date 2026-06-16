@@ -242,6 +242,7 @@
                     <tr>
                       <th class="conteo-col-codigo">Código</th>
                       <th class="conteo-col-producto">Producto</th>
+                      <th class="conteo-col-marca">Marca</th>
                       @if (empresasGestionadas.length > 0) {
                         <th class="text-start conteo-col-empresa">Empresa</th>
                       }
@@ -266,6 +267,9 @@
                           @if (productoCatalogoInactivo(p)) {
                             <span class="badge bg-secondary mt-1 align-middle">Inactivo</span>
                           }
+                        </td>
+                        <td class="align-middle conteo-col-marca" data-label="Marca">
+                          <span class="conteo-marca-valor" [title]="p.marca || ''">{{ p.marca || '—' }}</span>
                         </td>
                         @if (empresasGestionadas.length > 0) {
                           <td class="align-middle conteo-col-empresa text-start" data-label="Empresa">
