@@ -1,0 +1,26 @@
+-- Trazabilidad Fase 1: quién registró vs quién modificó (Ventas y Compras).
+-- idUsuario existente = usuario que registró (no se sobrescribe al editar).
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Ventas' AND COLUMN_NAME = 'idUsuarioModifica')
+BEGIN
+    ALTER TABLE Ventas ADD idUsuarioModifica UNIQUEIDENTIFIER NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Ventas' AND COLUMN_NAME = 'fModificacion')
+BEGIN
+    ALTER TABLE Ventas ADD fModificacion DATETIME NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Compras' AND COLUMN_NAME = 'idUsuarioModifica')
+BEGIN
+    ALTER TABLE Compras ADD idUsuarioModifica UNIQUEIDENTIFIER NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Compras' AND COLUMN_NAME = 'fModificacion')
+BEGIN
+    ALTER TABLE Compras ADD fModificacion DATETIME NULL;
+END
+GO
