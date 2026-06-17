@@ -79,6 +79,40 @@ export class ComprasService {
     });
   }
 
+  /** Listado paginado de compras (servidor). */
+  obtenerComprasPaginado(params: {
+    pagina?: number;
+    porPagina?: number;
+    buscar?: string;
+    ruc?: string;
+    proveedor?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    idEmpresaOperacion?: string;
+  }): Observable<{ data: unknown[]; total: number; pagina?: number; porPagina?: number }> {
+    const url = environment.API_URL + 'compras-por-empresa';
+    let q = new HttpParams();
+    if (params.pagina != null) q = q.set('pagina', String(params.pagina));
+    if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
+    if (params.buscar) q = q.set('buscar', params.buscar);
+    if (params.ruc) q = q.set('ruc', params.ruc);
+    if (params.proveedor) q = q.set('proveedor', params.proveedor);
+    if (params.fechaDesde) q = q.set('fechaDesde', params.fechaDesde);
+    if (params.fechaHasta) q = q.set('fechaHasta', params.fechaHasta);
+    if (params.idEmpresaOperacion) q = q.set('idEmpresaOperacion', params.idEmpresaOperacion);
+    return this._http.get<{ data: unknown[]; total: number }>(url, { withCredentials: true, params: q });
+  }
+
+  getBootstrapCompra(): Observable<{ data: Record<string, unknown> }> {
+    return this._http.get<{ data: Record<string, unknown> }>(this.url + 'compras/bootstrap', { withCredentials: true });
+  }
+
+  crear_compra_completa(payload: { compra: unknown; detalles: unknown[]; comprobanteSunat?: unknown }): Observable<{
+    data: { idCompra: string; detalles?: Array<{ idLote?: string; numeroLote?: string }> };
+  }> {
+    return this._http.post(this.url + 'compras/completa', payload, { withCredentials: true });
+  }
+
   crear_compra(compra: any): Observable<any> {
     let headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.post(this.url + 'compras', compra, { 

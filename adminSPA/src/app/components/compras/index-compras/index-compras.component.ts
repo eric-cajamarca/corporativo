@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { Router, RouterModule } from '@angular/router';
 import { ComprasService } from '../../../services/compras.service';
@@ -9,6 +9,8 @@ import { PresentacionService } from '../../../services/presentacion.service';
 import { variosService } from '../../../services/varios.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { Subject } from 'rxjs';
+import { debounceTime, takeUntil } from 'rxjs/operators';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { PdfService } from '../../../services/pdf.service';
@@ -92,7 +94,7 @@ export interface DatosPdf {
   templateUrl: './index-compras.component.html',
   styleUrl: './index-compras.component.css'
 })
-export class IndexComprasComponent {
+export class IndexComprasComponent implements OnInit, OnDestroy {
 
   empresa!: Empresa;
 
@@ -103,6 +105,7 @@ export class IndexComprasComponent {
   // Configuración de paginación
   public page = 1;
   public pageSize = 10;
+  totalCompras = 0;
   public maxSize = 10;
   public rotate = true;
   public boundaryLinks = true;
@@ -119,6 +122,9 @@ export class IndexComprasComponent {
   filtroProveedor = '';
   filtroTipoComprobante = '';
   public load_compras = true;
+
+  private readonly buscarSubject = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
   public detCompras: Array<any> = [];
   public marcas: any = [];
 
@@ -151,6 +157,7 @@ export class IndexComprasComponent {
   ) { }
 
   ngOnInit(): void {
+    this.buscarSubject.pipe(debounceTime(400), takeUntil(this.destroy$)).subscribe(() => this.aplicarFiltros());
 
     this.empresaService.getEmpresa$().subscribe(emp => {
       this.empresa = emp;
@@ -212,10 +219,24 @@ export class IndexComprasComponent {
 
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
-  /** Carga solo las compras de la empresa del usuario logueado (GET /api/compras-por-empresa). */
-  initData() {
-    this._comprasService.obtener_compras_todos_idEmpresa().subscribe({
+  onBusquedaInput(): void {
+    this.buscarSubject.next();
+  }
+
+  onFiltroCambio(): void {
+    this.aplicarFiltros();
+  }
+
+
+  /** Carga compras paginadas desde el servidor (GET /api/compras-por-empresa?pagina=...). */
+  initData(pagina = 1): void {
+    this.page = pagina;
+    this._comprasService.obtenerComprasPaginado(this.buildParamsListadoCompras(pagina)).subscribe({
       next: (response) => {
         if (response.data == undefined) {
           iziToast.show({
@@ -229,8 +250,8 @@ export class IndexComprasComponent {
           this._router.navigate(['/']);
         } else {
           this.compras = response.data;
-          this.compras_const = response.data;
-                  }
+          this.totalCompras = response.total ?? 0;
+        }
       },
       error: (err) => {
         console.error('initData compras:', err);
@@ -238,39 +259,42 @@ export class IndexComprasComponent {
     });
   }
 
-  aplicarFiltros(): void {
-    this.page = 1;
-    let list = [...this.compras_const];
-
+  private resolveFiltrosFechaApiCompras(): { fechaDesde?: string; fechaHasta?: string } {
     if (this.filtroFecha === 'today') {
       const hoy = getFechaHoyLocal();
-      list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) === hoy);
-    } else if (this.filtroFecha === 'month') {
-      const now = new Date();
-      const mes = String(now.getMonth() + 1).padStart(2, '0');
-      const anio = now.getFullYear();
-      list = list.filter((c: any) => {
-        const f = (c.fEmision || '').toString().slice(0, 10);
-        return f.startsWith(`${anio}-${mes}`);
-      });
-    } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
-      if (this.fechaDesde) list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) >= this.fechaDesde);
-      if (this.fechaHasta) list = list.filter((c: any) => (c.fEmision || '').toString().slice(0, 10) <= this.fechaHasta);
+      return { fechaDesde: hoy, fechaHasta: hoy };
     }
+    if (this.filtroFecha === 'month') {
+      const now = new Date();
+      const anio = now.getFullYear();
+      const mes = String(now.getMonth() + 1).padStart(2, '0');
+      const ultimoDia = new Date(anio, now.getMonth() + 1, 0).getDate();
+      return {
+        fechaDesde: `${anio}-${mes}-01`,
+        fechaHasta: `${anio}-${mes}-${String(ultimoDia).padStart(2, '0')}`
+      };
+    }
+    if (this.filtroFecha === 'range') {
+      return { fechaDesde: this.fechaDesde || undefined, fechaHasta: this.fechaHasta || undefined };
+    }
+    return {};
+  }
 
+  private buildParamsListadoCompras(pagina: number) {
+    const fechas = this.resolveFiltrosFechaApiCompras();
+    const params: Record<string, string | number> = { pagina, porPagina: this.pageSize, ...fechas };
     const num = (this.filtroNumero || '').trim();
-    if (num) list = list.filter((c: any) => (c.compCompra || '').toLowerCase().includes(num.toLowerCase()));
+    if (num) params['buscar'] = num;
+    const ruc = (this.filtroRuc || '').trim();
+    if (ruc) params['ruc'] = ruc;
+    const proveedor = (this.filtroProveedor || '').trim();
+    if (proveedor) params['proveedor'] = proveedor;
+    if ((this.filtroTipoComprobante || '').trim()) params['buscar'] = (params['buscar'] ? String(params['buscar']) + ' ' : '') + this.filtroTipoComprobante.trim();
+    return params;
+  }
 
-    const ruc = (this.filtroRuc || '').toLowerCase().trim();
-    if (ruc) list = list.filter((c: any) => (c.ruc || '').toLowerCase().includes(ruc));
-
-    const proveedor = (this.filtroProveedor || '').toLowerCase().trim();
-    if (proveedor) list = list.filter((c: any) => (c.rSocial || '').toLowerCase().includes(proveedor));
-
-    const tipo = (this.filtroTipoComprobante || '').trim();
-    if (tipo) list = list.filter((c: any) => (c.compCompra || '').toLowerCase().includes(tipo.toLowerCase()) || (c.serie || '').toLowerCase().includes(tipo.toLowerCase()));
-
-    this.compras = list;
+  aplicarFiltros(): void {
+    this.initData(1);
   }
 
   limpiarFiltros(): void {
@@ -282,7 +306,7 @@ export class IndexComprasComponent {
     this.filtroRuc = '';
     this.filtroProveedor = '';
     this.filtroTipoComprobante = '';
-    this.compras = [...this.compras_const];
+    this.aplicarFiltros();
   }
 
   consultaCompCompra(id: any) {
@@ -423,9 +447,7 @@ export class IndexComprasComponent {
   }
 
   onPageChange(newPage: number) {
-    this.page = newPage;
-    // Puedes agregar lógica adicional aquí si necesitas
-    // cargar más datos cuando cambia la página
+    this.initData(newPage);
   }
 
   /** Genera el PDF de la compra: primero consulta el detalle del comprobante y luego genera el PDF. */

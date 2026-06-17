@@ -105,6 +105,39 @@ export class VentasService {
     });
   }
 
+  /** Lista paginada de comprobantes de venta (servidor). */
+  listarVentasEmpresaPaginado(params: {
+    pagina?: number;
+    porPagina?: number;
+    buscar?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    tipoComprobante?: string;
+    idSucursal?: string;
+  }): Observable<{ data: VentaListado[]; total: number; pagina?: number; porPagina?: number }> {
+    let q = new HttpParams();
+    if (params.pagina != null) q = q.set('pagina', String(params.pagina));
+    if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
+    if (params.buscar != null && String(params.buscar).trim() !== '') q = q.set('buscar', String(params.buscar).trim());
+    if (params.fechaDesde) q = q.set('fechaDesde', params.fechaDesde);
+    if (params.fechaHasta) q = q.set('fechaHasta', params.fechaHasta);
+    if (params.tipoComprobante != null && String(params.tipoComprobante).trim() !== '') {
+      q = q.set('tipoComprobante', String(params.tipoComprobante).trim());
+    }
+    if (params.idSucursal != null && String(params.idSucursal).trim() !== '') {
+      q = q.set('idSucursal', String(params.idSucursal).trim());
+    }
+    return this._http.get<{ data: VentaListado[]; total: number; pagina?: number; porPagina?: number }>(
+      this.url + 'ventas/listar',
+      { withCredentials: true, params: q }
+    );
+  }
+
+  /** Datos iniciales para pantallas de venta (config, sucursales, tablas SUNAT, etc.). */
+  getBootstrapVenta(): Observable<{ data: Record<string, unknown> }> {
+    return this._http.get<{ data: Record<string, unknown> }>(this.url + 'ventas/bootstrap', { withCredentials: true });
+  }
+
   /** Notas de crédito y débito emitidas (paginado). Query: buscar, pagina, porPagina. */
   listarNotasCreditoDebito(params?: { buscar?: string; pagina?: number; porPagina?: number }): Observable<{ data: NotaCreditoDebitoListado[]; total: number }> {
     const q = new URLSearchParams();
@@ -432,6 +465,8 @@ export interface VentaAgrupadaListado {
   numero?: string;
   tipoComprobanteDestino?: string;
   observaciones?: string;
+  /** Usuario que registró el comprobante (trazabilidad). */
+  usuarioRegistro?: string | null;
 }
 
 export interface ComprobanteVAPdfData {
@@ -534,4 +569,6 @@ export interface VentaListado {
   idVentaAgrupada?: string | null;
   /** Serie-número del comprobante afectado (NC/ND), según Ventas.compRelacionado. */
   compRelacionado?: string | null;
+  /** Usuario que registró el comprobante (trazabilidad). */
+  usuarioRegistro?: string | null;
 }

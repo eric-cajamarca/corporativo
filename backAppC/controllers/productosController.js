@@ -7,6 +7,14 @@ const productosMutacionesService = require('../services/productosMutaciones.serv
 
 const obtener_productos_todos = async (req, res) => {
   try {
+    const { parsePaginacion } = require('../utils/paginacion.util');
+    const pag = parsePaginacion(req.query || {});
+    if (pag.activa) {
+      const result = await withPool(async (pool) =>
+        ProductosServices.listarProductosPaginadoService(pool, req.user, req.query)
+      );
+      return res.status(200).send({ data: result.rows, total: result.total, pagina: result.pagina, porPagina: result.porPagina });
+    }
 
     const productos = await withPool(async (pool) =>
       ProductosServices.obtenerProductosTodosService(pool, req.user)

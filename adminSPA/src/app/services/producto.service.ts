@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -172,6 +172,21 @@ export class ProductoService {
         }
       })
     );
+  }
+
+  obtenerProductosPaginado(params: {
+    pagina?: number;
+    porPagina?: number;
+    buscar?: string;
+  }): Observable<{ data: unknown[]; total: number; pagina?: number; porPagina?: number }> {
+    let q = new HttpParams();
+    if (params.pagina != null) q = q.set('pagina', String(params.pagina));
+    if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
+    if (params.buscar) q = q.set('buscar', params.buscar);
+    return this._http.get<{ data: unknown[]; total: number }>(this.url + 'productos', {
+      withCredentials: true,
+      params: q
+    });
   }
 
   /** Lista para modal de compras; `evitarCache` fuerza GET fresco (p. ej. producto recién creado). */

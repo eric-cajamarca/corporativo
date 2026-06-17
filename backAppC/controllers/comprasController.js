@@ -1,5 +1,8 @@
 const comprasService = require('../services/compras.service');
+const compraBootstrapService = require('../services/compraBootstrap.service');
 const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
+const { withPool } = require('../utils/dbPool.util');
+const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 
 const obtener_compras_todos = async (req, res, next) => {
     if (!req.user) {
@@ -65,6 +68,12 @@ const obtener_compras_todos_idEmpresa = async (req, res, next) => {
         return res.status(403).send({ message: 'Empresa no identificada en la sesión', data: undefined });
     }
     try {
+        const { parsePaginacion } = require('../utils/paginacion.util');
+        const pag = parsePaginacion(req.query || {});
+        if (pag.activa) {
+            const result = await comprasService.listarComprasPaginadoPorUsuario(req.user, req.query);
+            return res.status(200).send(result);
+        }
         const data = await comprasService.listarComprasCajaPorUsuario(req.user, req.query.idEmpresaOperacion);
         res.status(200).send({ data });
     } catch (error) {
@@ -260,9 +269,6 @@ const eliminar_borrador_compras_empresa = async (req, res, next) => {
 
 // --- Correlativos ---
 
-const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
-const { withPool } = require('../utils/dbPool.util');
-
 const obtener_correlativos_empresa = async (req, res, next) => {
     const idEmpresaJwt = req.user?.empresa;
     if (!idEmpresaJwt) {
@@ -323,6 +329,46 @@ const getReporteDetallado = async (req, res, next) => {
     }
 };
 
+const crear_compra_completa = async (req, res, next) => {
+    if (!req.user) {
+        return res.status(403).send({ message: 'No Access', data: undefined });
+    }
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'Almacenero') {
+        return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    const idEmpresa = req.user.empresa;
+    const idUsuario = req.user.sub || req.user.idUsuario;
+    try {
+        const resultado = await comprasService.crearCompraCompleta(idEmpresa, idUsuario, req.body);
+        auditoriaOperaciones.auditarCompra(
+            req,
+            'CREAR',
+            resultado.idCompra,
+            req.body?.compra?.compCompra || req.body?.compCompra || null
+        );
+        res.status(200).send({ data: resultado });
+    } catch (error) {
+        console.error('crear_compra_completa:', error);
+        if (error.number === 2627) {
+            return res.status(400).send({ message: 'Ya existe una compra con la misma serie y número para esta empresa.', data: undefined });
+        }
+        return res.status(400).send({ message: error.message || 'Error al registrar compra completa', data: undefined });
+    }
+};
+
+const getBootstrapCompra = async (req, res, next) => {
+    if (!req.user?.empresa) {
+        return res.status(401).send({ message: 'No Access', data: undefined });
+    }
+    try {
+        const data = await withPool((pool) => compraBootstrapService.obtenerBootstrapCompra(pool, req.user));
+        res.status(200).send({ data });
+    } catch (error) {
+        console.error('getBootstrapCompra:', error);
+        return next(error);
+    }
+};
+
 module.exports = {
     obtener_compras_todos,
     obtener_compras_id,
@@ -330,6 +376,8 @@ module.exports = {
     obtener_compras_todos_idEmpresa,
     getReporteDetallado,
     crear_compra,
+    crear_compra_completa,
+    getBootstrapCompra,
     editar_compra,
     eliminar_idcompra_empresa,
     obtener_borrador_compras_empresa,

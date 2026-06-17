@@ -1327,115 +1327,21 @@ export class CreateComprasComponent {
       fEmision: fechaEmisionVentaParaApi(this.compras.fEmision)
     };
     const snap = this.buildComprobanteSunatPayload();
-    if (snap) {
-      cuerpoCompra['comprobanteSunat'] = snap;
-    }
-    this._comprasService.crear_compra(cuerpoCompra).pipe(
-      switchMap((response) => {
-        if (response.data == null) {
-          return of(null);
-        }
-        this.idCompra = response.data;
-        const observables: Observable<any>[] = [];
-        for (const element of this.detalleCompras) {
-          const idSucursalDetalle = element.sucursal?.idSucursal ?? element.idSucursal ?? idSucursalCompra;
-          const idPresentacionDetalle = element.presentacion?.idPresentacion ?? element.idPresentacion;
-          const subtotalDetalle = element.subtotal ?? (Number(element.cantidad) * Number(element.cUnitario ?? element.pUnitario ?? 0));
-          const usarCorrelativoLinea = !!element.useCorrelativo;
-          const codigoLinea = usarCorrelativoLinea
-            ? ''
-            : String(element.codigo ?? element.Codigo ?? '').trim();
+    const compraPayload: Record<string, unknown> = { ...cuerpoCompra };
+    delete compraPayload['comprobanteSunat'];
+    const detalles = this.buildDetallesParaCompraCompleta(idSucursalCompra);
 
-          const nuevoProducto: ProductoCreate = {
-            ...(element.idProducto ? { idProducto: String(element.idProducto) } : {}),
-            Codigo: codigoLinea,
-            useCorrelativo: usarCorrelativoLinea,
-            idCategoria: Number(element.idCategoria ?? element.categoria?.idCategoria),
-            descripcion: element.descripcion,
-            idPresentacion: Number(idPresentacionDetalle),
-            cUnitario: Number(element.cUnitario ?? element.pUnitario ?? 0),
-            fProduccion: element.fProduccion ?? element.fproduccion,
-            fVencimiento: element.fVencimiento ?? element.fvencimiento,
-            idMarca: Number(element.idMarca ?? element.marca?.idMarca),
-          };
-
-          const nuevoDetalleCompra = {
-            idSucursal: idSucursalDetalle,
-            idCompra: this.idCompra,
-            cantidad: Number(element.cantidad),
-            idPresentacion: Number(idPresentacionDetalle) || 1,
-            pUnitario: parseFloat(String(element.cUnitario ?? element.pUnitario ?? 0)),
-            total: subtotalDetalle,
-            idProducto: element.idProducto || null,
-            ubicacion: element.ubicacion ?? null,
-            fechaVencimiento: element.fVencimiento || element.fvencimiento || null,
-            asignarPorDefecto: this.asignarUbicacionPorDefecto,
-          };
-
-          if (element.idProducto == null || element.idProducto === undefined || element.idProducto === '') {
-            observables.push(
-              this._productoService.crearProducto(nuevoProducto).pipe(
-                switchMap((pr) => {
-                  if (pr?.data != null) {
-                    nuevoDetalleCompra.idProducto = pr.data;
-                    return this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra);
-                  }
-                  return throwError(
-                    () => new Error('El servidor no devolvió el id del producto nuevo.')
-                  );
-                }),
-                catchError((err: unknown) => {
-                  console.error('Error creando producto:', err);
-                  const msg =
-                    (err as { error?: { message?: string } })?.error?.message ||
-                    (err as Error)?.message ||
-                    'No se pudo crear el producto.';
-                  iziToast.show({
-                    title: 'ERROR',
-                    titleColor: '#FF0000',
-                    color: '#FFF',
-                    position: 'topRight',
-                    message: msg,
-                  });
-                  return throwError(() => err);
-                })
-              )
-            );
-          } else {
-            const payloadActualizar: ProductoCreate = { ...nuevoProducto };
-            delete (payloadActualizar as { useCorrelativo?: boolean }).useCorrelativo;
-            observables.push(
-              this._productoService.actualizarProducto(element.idProducto, payloadActualizar).pipe(
-                switchMap(() => this._comprasService.crear_detalle_compras_idcompra(nuevoDetalleCompra)),
-                catchError((err: unknown) => {
-                  console.error('Error actualizando producto:', err);
-                  const msg =
-                    (err as { error?: { message?: string } })?.error?.message ||
-                    (err as Error)?.message ||
-                    'No se pudo actualizar el producto.';
-                  iziToast.show({
-                    title: 'ERROR',
-                    titleColor: '#FF0000',
-                    color: '#FFF',
-                    position: 'topRight',
-                    message: msg,
-                  });
-                  return throwError(() => err);
-                })
-              )
-            );
-          }
-        }
-        if (observables.length === 0) {
-          return of(null);
-        }
-        return forkJoin(observables);
-      }),
+    this._comprasService.crear_compra_completa({
+      compra: compraPayload,
+      detalles,
+      comprobanteSunat: snap ?? undefined
+    }).pipe(
       finalize(() => {
         this.loadButton = false;
       })
     ).subscribe({
-      next: (responses: any) => {
+      next: (response) => {
+        this.idCompra = response.data?.idCompra;
         this.editarCorrelativo();
         iziToast.show({
           title: 'SUCCESS',
@@ -1445,8 +1351,8 @@ export class CreateComprasComponent {
           position: 'topRight',
           message: 'Compra registrada correctamente.',
         });
-        const idLotes = Array.isArray(responses)
-          ? responses.map((r: any) => r?.idLote).filter(Boolean)
+        const idLotes = Array.isArray(response.data?.detalles)
+          ? response.data.detalles.map((r: { idLote?: string }) => r?.idLote).filter(Boolean)
           : [];
         this.afterCompraRegistrada(idLotes);
       },
@@ -1461,6 +1367,41 @@ export class CreateComprasComponent {
           message: e?.error?.message || e?.message || 'Error al registrar la compra.',
         });
       },
+    });
+  }
+
+  private buildDetallesParaCompraCompleta(idSucursalCompra: string): Array<Record<string, unknown>> {
+    return this.detalleCompras.map((element: any) => {
+      const idSucursalDetalle = element.sucursal?.idSucursal ?? element.idSucursal ?? idSucursalCompra;
+      const idPresentacionDetalle = element.presentacion?.idPresentacion ?? element.idPresentacion;
+      const subtotalDetalle = element.subtotal ?? (Number(element.cantidad) * Number(element.cUnitario ?? element.pUnitario ?? 0));
+      const usarCorrelativoLinea = !!element.useCorrelativo;
+      const codigoLinea = usarCorrelativoLinea ? '' : String(element.codigo ?? element.Codigo ?? '').trim();
+      const linea: Record<string, unknown> = {
+        idSucursal: idSucursalDetalle,
+        cantidad: Number(element.cantidad),
+        idPresentacion: Number(idPresentacionDetalle) || 1,
+        pUnitario: parseFloat(String(element.cUnitario ?? element.pUnitario ?? 0)),
+        total: subtotalDetalle,
+        fechaVencimiento: element.fVencimiento || element.fvencimiento || null,
+        asignarPorDefecto: this.asignarUbicacionPorDefecto,
+      };
+      if (element.idProducto != null && element.idProducto !== '') {
+        linea['idProducto'] = element.idProducto;
+      } else {
+        linea['nuevoProducto'] = {
+          Codigo: codigoLinea,
+          useCorrelativo: usarCorrelativoLinea,
+          idCategoria: Number(element.idCategoria ?? element.categoria?.idCategoria),
+          descripcion: element.descripcion,
+          idPresentacion: Number(idPresentacionDetalle),
+          cUnitario: Number(element.cUnitario ?? element.pUnitario ?? 0),
+          fProduccion: element.fProduccion ?? element.fproduccion,
+          fVencimiento: element.fVencimiento ?? element.fvencimiento,
+          idMarca: Number(element.idMarca ?? element.marca?.idMarca),
+        };
+      }
+      return linea;
     });
   }
 

@@ -30,6 +30,7 @@ export class IndexClientesComponent {
    // Configuración de paginación
   public page = 1;
   public pageSize = 10;
+  totalClientes = 0;
   public maxSize = 10;
   public rotate = true;
   public boundaryLinks = true;
@@ -59,11 +60,15 @@ export class IndexClientesComponent {
 
   }
 
-  init_data() {
+  init_data(pagina = 1) {
     this.load_estado = true;
-    this._clientesService.obtener_clientes().subscribe(
+    this.page = pagina;
+    this._clientesService.obtenerClientesPaginado({
+      pagina,
+      porPagina: this.pageSize,
+      buscar: (this.filtro || '').trim() || undefined
+    }).subscribe(
       response => {
-                
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -76,25 +81,22 @@ export class IndexClientesComponent {
           this.load_estado = false;
         } else {
           this.clientes = response.data;
-          this.clientes_const = response.data;
+          this.totalClientes = response.total ?? 0;
           this.load_estado = false;
-          }
+        }
       },
       error => {
-              }
+        this.load_estado = false;
+      }
     );
   }
 
-
   filtrar() {
-    if (this.filtro && this.filtro.trim()) {
-      const term = new RegExp(this.filtro.trim(), 'i');
-      this.clientes = this.clientes_const.filter(item =>
-        term.test(item.rSocial || '') || term.test(item.apellidos || '') || term.test(item.correo || '') || term.test(item.ruc || '')
-      );
-    } else {
-      this.clientes = this.clientes_const;
-    }
+    this.init_data(1);
+  }
+
+  onPageChange(pagina: number): void {
+    this.init_data(pagina);
   }
 
   //aqui se hace el cambio del estado habido y no habido
@@ -183,12 +185,6 @@ export class IndexClientesComponent {
 
 
 
-  }
-
-  onPageChange(newPage: number) {
-    this.page = newPage;
-    // Puedes agregar lógica adicional aquí si necesitas
-    // cargar más datos cuando cambia la página
   }
 
   elegir(cliente: any): void {

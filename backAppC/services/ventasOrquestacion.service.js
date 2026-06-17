@@ -77,6 +77,55 @@ exports.obtenerVentasListado = async (pool, idempresa, opts = {}) => {
   return list;
 };
 
+exports.obtenerVentasListadoPaginado = async (pool, idempresa, opts = {}) => {
+  let idsList = [idempresa];
+  try {
+    const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, idempresa);
+    if (esGestora) {
+      idsList = await idsEmpresaParaComprobanteVenta(pool, idempresa);
+    }
+  } catch (_) {
+    idsList = [idempresa];
+  }
+  const { rows, total, pagina, porPagina } = await ventasRepository.listarPorIdsEmpresasPaginado(pool, idsList, opts || {});
+  const config = await facturacionRepository.obtenerConfiguracionFacturacionRepo(pool, idempresa);
+  const rutaFacturador = config && config.rutaCarpetaFacturadorSunat ? String(config.rutaCarpetaFacturadorSunat).trim() : null;
+  let list = rows;
+  if (rutaFacturador) {
+    const rutaFirma = getRutaFirmaFacturador(rutaFacturador);
+    const rutaRpta = getRutaRptaFacturador(rutaFacturador);
+    list = list.map((r) => {
+      let tieneXml = false;
+      let tieneCdr = false;
+      if (r.idComprobanteElectronico && r.rucEmpresa && r.tipoComprobante != null) {
+        const nombreArchivo = nombreArchivoComprobante({
+          ruc: r.rucEmpresa,
+          tipoComprobante: r.tipoComprobante,
+          serie: r.serie,
+          numero: r.numero
+        });
+        const base = nombreArchivo.replace(/\.json$/i, '');
+        if (rutaFirma) {
+          const xmlPath = path.join(rutaFirma, `${base}.xml`);
+          try {
+            tieneXml = fs.existsSync(xmlPath);
+          } catch (_) {}
+        }
+        if (rutaRpta) {
+          const zipPath = path.join(rutaRpta, `R${base}.zip`);
+          try {
+            tieneCdr = fs.existsSync(zipPath);
+          } catch (_) {}
+        }
+      }
+      return { ...r, tieneXml, tieneCdr };
+    });
+  } else {
+    list = list.map((r) => ({ ...r, tieneXml: false, tieneCdr: false }));
+  }
+  return { rows: list, total, pagina, porPagina };
+};
+
 exports.listarVentasAgrupadas = async (pool, idEmpresa) => ventasRepository.listarVentasAgrupadas(pool, idEmpresa);
 
 exports.listarVentasEmpresa = async (pool, idEmpresa) => ventasRepository.listarVentasEmpresa(pool, idEmpresa);

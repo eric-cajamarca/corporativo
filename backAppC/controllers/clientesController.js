@@ -30,6 +30,12 @@ const listarClientes = async function (req, res) {
     return res.status(401).send({ message: 'No Access' });
   }
   try {
+    const { parsePaginacion } = require('../utils/paginacion.util');
+    const pag = parsePaginacion(req.query || {});
+    if (pag.activa) {
+      const result = await withPool((pool) => clientesService.listarClientesPaginado(pool, req.user, req.query));
+      return res.status(200).send({ data: result.rows, total: result.total, pagina: result.pagina, porPagina: result.porPagina });
+    }
     const data = await withPool((pool) => clientesService.listarClientes(pool, req.user));
     res.status(200).send({ message: 'Lista de clientes', data });
   } catch (err) {

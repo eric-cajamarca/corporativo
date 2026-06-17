@@ -14,6 +14,7 @@ router.put('/conteo-fisico/sesiones/:idSesion/lineas/:idProducto', inventarioCon
 router.get('/conteo-fisico/sesiones/:idSesion', inventarioController.conteoFisicoObtenerSesion);
 
 router.get('/stock-actual', inventarioController.stockActual);
+router.get('/costo-sugerido', inventarioController.costoSugerido);
 router.get('/productos-vendidos', inventarioController.productosVendidos);
 router.get('/productos-comprados', inventarioController.productosComprados);
 router.post('/movimientos', inventarioController.registrarMovimiento);

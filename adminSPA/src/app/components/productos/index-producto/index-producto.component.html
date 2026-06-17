@@ -89,7 +89,7 @@
                   </button>
                 </td>
               </tr>
-              <tr *ngFor="let item of productos | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize"
+              <tr *ngFor="let item of productos"
                 [class.producto-fila-inactiva]="!productoEstaActivo(item)">
                 <td>
     
@@ -570,7 +570,7 @@
           *ngIf="productos.length > 0"
           [(page)]="page"
           [pageSize]="pageSize"
-          [collectionSize]="productos.length"
+          [collectionSize]="totalProductos"
           [maxSize]="maxSize"
           [rotate]="rotate"
           [boundaryLinks]="boundaryLinks"

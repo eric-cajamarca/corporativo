@@ -19,6 +19,7 @@ api.get('/ventas/agrupadas/:idVentaAgrupada/detalle', auth.auth, ventasControlle
 api.get('/ventas/agrupadas/:idVentaAgrupada/comprobantes', auth.auth, ventasController.obtenerComprobantesVentaAgrupada);
 api.get('/ventas/empresa', auth.auth, ventasController.obtenerVentasEmpresa);
 api.get('/ventas/config-defaults', auth.auth, ventasController.getConfigDefaults);
+api.get('/ventas/bootstrap', auth.auth, ventasController.getBootstrapVenta);
 api.put('/ventas/config-defaults', auth.auth, ventasController.putConfigDefaults);
 api.get('/ventas/pendientes-pago', auth.auth, ventasController.getPendientesPago);
 api.get('/ventas/agrupadas/pendientes-pago', auth.auth, ventasController.getPendientesPagoAgrupadas);

@@ -323,6 +323,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   private buildSubmenuVentas(): SubMenuItem[] {
     return [
+      { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'VER_VENTAS', visible: true },
       { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
       {
         nombre: 'Reporte detallado',
@@ -544,7 +545,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   navigateTo(ruta: string | null): void {
     if (ruta) {
       const target = this.normalizarRuta(ruta);
-      if (target === '/ventas/create' || target === '/ventas/rapida') {
+      if (target === '/ventas/create') {
         const segments = target.split('/').filter(Boolean);
         const url = this.router.serializeUrl(this.router.createUrlTree(segments));
         window.open(url, '_blank');

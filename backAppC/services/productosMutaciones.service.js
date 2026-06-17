@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const ProductosRepository = require('../repositories/productos.repository');
 const preciosVRepository = require('../repositories/preciosV.repository');
+const inventarioRepository = require('../repositories/inventario.repository');
 
 async function resolverIdUsuarioParaProducto(pool, idEmpresa, subFromToken) {
   if (!subFromToken || !idEmpresa) return null;
@@ -202,7 +203,24 @@ async function crearProductoCompra(pool, datosProducto) {
 }
 
 async function actualizarProducto(pool, detalle) {
-  return ProductosRepository.actualizarProductoFlexible(pool, detalle);
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const result = await ProductosRepository.actualizarProductoFlexible(transaction, detalle);
+    if (detalle.cUnitario != null && !Number.isNaN(Number(detalle.cUnitario))) {
+      await inventarioRepository.actualizarCostoLoteRecienteSiCero(
+        transaction,
+        detalle.idEmpresa,
+        detalle.idProducto,
+        Number(detalle.cUnitario)
+      );
+    }
+    await transaction.commit();
+    return result;
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
 }
 
 /**

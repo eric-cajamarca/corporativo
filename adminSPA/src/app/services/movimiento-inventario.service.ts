@@ -236,6 +236,15 @@ export class MovimientoInventarioService {
     });
   }
 
+  /** Costo sugerido para entradas: último lote con stock, luego catálogo. */
+  obtenerCostoSugerido(idProducto: string, idSucursal: string): Observable<{ costoUnitario: number; origen?: string }> {
+    const params = new HttpParams().set('idProducto', idProducto).set('idSucursal', idSucursal);
+    return this.http.get<{ costoUnitario: number; origen?: string }>(this.baseUrl + 'costo-sugerido', {
+      params,
+      withCredentials: true
+    });
+  }
+
   /** Kardex: compras, ventas y movimientos de un producto en un rango de fechas */
   obtenerKardex(idProducto: string, fechaDesde: string, fechaHasta: string): Observable<KardexResponse> {
     let params = new HttpParams().set('idProducto', idProducto);

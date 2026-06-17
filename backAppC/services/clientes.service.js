@@ -54,6 +54,20 @@ async function listarClientes(pool, user) {
   return clientesRepository.listarPorEmpresa(pool, idEmpresa);
 }
 
+async function listarClientesPaginado(pool, user, query = {}) {
+  if (!user) throw new Error('NO_AUTH');
+  const idEmpresa = user.empresa || user.idEmpresa;
+  if (!idEmpresa) throw new Error('NO_EMPRESA');
+  await assertAlgunoPermiso(pool, user, 'VER_CLIENTES', 'CREAR_CLIENTES', 'EDITAR_CLIENTES');
+  const { parsePaginacion } = require('../utils/paginacion.util');
+  const pag = parsePaginacion(query);
+  return clientesRepository.listarPorEmpresaPaginado(pool, idEmpresa, {
+    pagina: pag.pagina,
+    porPagina: pag.porPagina,
+    buscar: query.buscar
+  });
+}
+
 async function listarPorRuc(pool, user, ruc) {
   if (!user) throw new Error('NO_AUTH');
   const idEmpresa = user.empresa || user.idEmpresa;
@@ -132,6 +146,7 @@ async function cambiarEstado(pool, user, idCliente, estadoBody) {
 module.exports = {
   crearCliente,
   listarClientes,
+  listarClientesPaginado,
   listarPorRuc,
   listarPorId,
   actualizarCliente,

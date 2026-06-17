@@ -74,8 +74,88 @@ exports.listarComprasPorIdEmpresa = async (pool, idEmpresa) => {
         .query(`
             ${QUERY_COMPRAS_JOIN}
             WHERE Compras.idEmpresa = @idEmpresa
+            ORDER BY Compras.fRegistro DESC
         `);
     return result.recordset || [];
+};
+
+/**
+ * Lista paginada de compras de una o varias empresas con filtros opcionales.
+ * @returns {Promise<{ rows: object[], total: number, pagina: number, porPagina: number }>}
+ */
+exports.listarComprasPorIdsEmpresaPaginado = async (pool, idsEmpresa, opts = {}) => {
+    const { parsePaginacion, likePattern } = require('../utils/paginacion.util');
+    const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+    if (ids.length === 0) return { rows: [], total: 0, pagina: 1, porPagina: 20 };
+
+    const pag = parsePaginacion(opts);
+    const pagina = pag.pagina;
+    const porPagina = pag.porPagina;
+    const offset = pag.offset;
+
+    const bindFilters = (req) => {
+        let whereExtra = '';
+        const fechaDesde = opts.fechaDesde && String(opts.fechaDesde).trim() ? String(opts.fechaDesde).trim().slice(0, 10) : null;
+        const fechaHasta = opts.fechaHasta && String(opts.fechaHasta).trim() ? String(opts.fechaHasta).trim().slice(0, 10) : null;
+        if (fechaDesde) {
+            req.input('fechaDesde', sql.Date, fechaDesde);
+            whereExtra += ' AND CAST(Compras.fEmision AS DATE) >= @fechaDesde';
+        }
+        if (fechaHasta) {
+            req.input('fechaHasta', sql.Date, fechaHasta);
+            whereExtra += ' AND CAST(Compras.fEmision AS DATE) <= @fechaHasta';
+        }
+        const buscarPat = likePattern(opts.buscar);
+        if (buscarPat) {
+            req.input('buscar', sql.NVarChar(200), buscarPat);
+            whereExtra += ` AND (
+                Compras.compCompra LIKE @buscar ESCAPE '\\'
+                OR Compras.serie LIKE @buscar ESCAPE '\\'
+                OR CAST(Compras.numero AS NVARCHAR(20)) LIKE @buscar ESCAPE '\\'
+                OR Proveedores.ruc LIKE @buscar ESCAPE '\\'
+                OR Proveedores.rSocial LIKE @buscar ESCAPE '\\'
+            )`;
+        }
+        const rucPat = likePattern(opts.ruc);
+        if (rucPat) {
+            req.input('ruc', sql.NVarChar(100), rucPat);
+            whereExtra += ` AND Proveedores.ruc LIKE @ruc ESCAPE '\\'`;
+        }
+        const proveedorPat = likePattern(opts.proveedor);
+        if (proveedorPat) {
+            req.input('proveedor', sql.NVarChar(200), proveedorPat);
+            whereExtra += ` AND Proveedores.rSocial LIKE @proveedor ESCAPE '\\'`;
+        }
+        return whereExtra;
+    };
+
+    const reqCount = pool.request();
+    ids.forEach((id, i) => reqCount.input(`e${i}`, sql.UniqueIdentifier, id));
+    const placeholders = ids.map((_, i) => `@e${i}`).join(', ');
+    const whereFilters = bindFilters(reqCount);
+    const countSql = `
+        SELECT COUNT(*) AS total
+        FROM Compras
+        INNER JOIN Proveedores ON Compras.idProveedor = Proveedores.idProveedor
+        INNER JOIN EstadoPago ON Compras.idEstadoPago = EstadoPago.idEstadoPago
+        WHERE Compras.idEmpresa IN (${placeholders})${whereFilters}
+    `;
+    const countRes = await reqCount.query(countSql);
+    const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+    const reqData = pool.request();
+    ids.forEach((id, i) => reqData.input(`e${i}`, sql.UniqueIdentifier, id));
+    const whereFiltersData = bindFilters(reqData);
+    reqData.input('offset', sql.Int, offset);
+    reqData.input('limite', sql.Int, porPagina);
+    const dataSql = `
+        ${QUERY_COMPRAS_JOIN}
+        WHERE Compras.idEmpresa IN (${placeholders})${whereFiltersData}
+        ORDER BY Compras.fRegistro DESC
+        OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+    `;
+    const dataRes = await reqData.query(dataSql);
+    return { rows: dataRes.recordset || [], total, pagina, porPagina };
 };
 
 /**

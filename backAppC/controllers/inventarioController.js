@@ -154,6 +154,28 @@ exports.kardex = async (req, res) => {
 };
 
 /**
+ * GET /api/inventario/costo-sugerido?idProducto=&idSucursal=
+ */
+exports.costoSugerido = async (req, res) => {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).json({ message: 'No autorizado' });
+    }
+    const idProducto = req.query.idProducto || null;
+    const idSucursal = req.query.idSucursal || null;
+    const data = await inventarioService.obtenerCostoSugerido(req.user.empresa, idProducto, idSucursal);
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('inventarioController costoSugerido:', error);
+    const msg = error.message || 'Error al obtener costo sugerido';
+    if (msg.includes('obligatorio')) {
+      return res.status(400).json({ message: msg });
+    }
+    return res.status(500).json({ message: msg });
+  }
+};
+
+/**
  * GET /api/inventario/stock-actual
  * Lista stock agregado por producto con filtros opcionales.
  */

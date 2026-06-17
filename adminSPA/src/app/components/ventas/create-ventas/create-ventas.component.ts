@@ -1340,8 +1340,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       const term = raw.toLowerCase();
       const fuenteMemoria = this.obtenerCatalogoProductosOperativo();
       if (fuenteMemoria.length > 0) {
-        this.aplicarResultadoBusquedaCodigo(this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw));
-        return;
+        const enMemoria = this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw);
+        if (enMemoria) {
+          this.aplicarResultadoBusquedaCodigo(enMemoria);
+          return;
+        }
       }
       this._productoService
         .buscarProductosVenta({

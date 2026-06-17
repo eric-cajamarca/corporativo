@@ -41,6 +41,32 @@ exports.obtenerProductosTodosService = async (pool, user) => {
   return productos;
 };
 
+exports.listarProductosPaginadoService = async (pool, user, query = {}) => {
+  if (!user) throw new Error('NO_ACCESS');
+  const esAdmin = user.rol === 'Administrador';
+  const puedeVerLista =
+    esAdmin ||
+    (await permisosService.verificarPermisoUsuario(pool, 'CREAR_VENTAS', user)) ||
+    (await permisosService.verificarPermisoUsuario(pool, 'VER_PRODUCTOS', user));
+  if (!puedeVerLista) throw new Error('NO_PERMISSIONS');
+
+  const esGestora = await gestoresRepository.esEmpresaGestoraActiva(pool, user.empresa);
+  let idsEmpresa;
+  if (esGestora) {
+    const empresasGestionadas = await gestoresRepository.obtenerEmpresasGestionadas(pool, user.empresa);
+    idsEmpresa = [user.empresa, ...(empresasGestionadas || []).map((e) => e.idEmpresa).filter(Boolean)];
+  } else {
+    idsEmpresa = [user.empresa];
+  }
+  const { parsePaginacion } = require('../utils/paginacion.util');
+  const pag = parsePaginacion(query);
+  return ProductosRepository.listarProductosPaginadoRepo(pool, idsEmpresa, {
+    pagina: pag.pagina,
+    porPagina: pag.porPagina,
+    buscar: query.buscar
+  });
+};
+
 /** Misma autorización y alcance multiempresa que el listado completo; búsqueda con límite para modal de ventas. */
 exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucursalVenta) => {
   if (!user) {

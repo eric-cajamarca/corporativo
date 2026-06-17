@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
-import { forkJoin } from 'rxjs';
+import { Subject } from 'rxjs';
+import { debounceTime, takeUntil } from 'rxjs/operators';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
@@ -19,6 +20,14 @@ import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
+declare const iziToast: {
+  success: (o: object) => void;
+  error: (o: object) => void;
+  info: (o: object) => void;
+  warning: (o: object) => void;
+  show: (o: object) => void;
+};
+
 @Component({
   selector: 'app-index-ventas',
   standalone: true,
@@ -26,7 +35,7 @@ import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
   templateUrl: './index-ventas.component.html',
   styleUrl: './index-ventas.component.css'
 })
-export class IndexVentasComponent implements OnInit {
+export class IndexVentasComponent implements OnInit, OnDestroy {
   /** Popper en modo fixed evita que el menú quede recortado por .table-responsive / overflow */
   readonly dropdownPopperConfig = JSON.stringify({ strategy: 'fixed' });
 
@@ -77,13 +86,18 @@ export class IndexVentasComponent implements OnInit {
   /** Paginación de la tabla de comprobantes cuando la sesión es gestora (tabla inferior). */
   pageCompGestora = 1;
   pageSize = 10;
+  totalVentasEmpresa = 0;
+  totalVentasEmpresaGestora = 0;
 
-  filtroFecha = 'all';
+  filtroFecha = 'today';
   fechaDesde = '';
   fechaHasta = '';
   /** Búsqueda única: comprobante, id venta, RUC, cliente o doc. relacionado (OR). */
   filtroBusqueda = '';
   filtroTipoComprobante = '';
+
+  private readonly buscarSubject = new Subject<void>();
+  private readonly destroy$ = new Subject<void>();
 
   comprobantesVenta: ComprobanteVentaAgrupada[] = [];
   ventaAgrupadaSeleccionada: VentaAgrupadaListado | null = null;
@@ -112,6 +126,7 @@ export class IndexVentasComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.buscarSubject.pipe(debounceTime(400), takeUntil(this.destroy$)).subscribe(() => this.aplicarFiltros());
     this.empresaService.getEmpresa$().subscribe((emp) => {
       this.empresa = emp;
     });
@@ -136,121 +151,148 @@ export class IndexVentasComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  onBusquedaInput(): void {
+    this.buscarSubject.next();
+  }
+
+  onFiltroCambio(): void {
+    this.cargarComprobantesPaginados(1);
+    if (this.esGestora) {
+      this.aplicarFiltrosAgrupadas();
+    }
+  }
+
+  private resolveFiltrosFechaApi(): { fechaDesde?: string; fechaHasta?: string } {
+    if (this.filtroFecha === 'today') {
+      const hoy = getFechaHoyLocal();
+      return { fechaDesde: hoy, fechaHasta: hoy };
+    }
+    if (this.filtroFecha === 'month') {
+      const now = new Date();
+      const anio = now.getFullYear();
+      const mes = String(now.getMonth() + 1).padStart(2, '0');
+      const ultimoDia = new Date(anio, now.getMonth() + 1, 0).getDate();
+      return {
+        fechaDesde: `${anio}-${mes}-01`,
+        fechaHasta: `${anio}-${mes}-${String(ultimoDia).padStart(2, '0')}`
+      };
+    }
+    if (this.filtroFecha === 'range') {
+      return {
+        fechaDesde: this.fechaDesde || undefined,
+        fechaHasta: this.fechaHasta || undefined
+      };
+    }
+    return {};
+  }
+
+  private buildParamsListadoComprobantes(pagina: number): {
+    pagina: number;
+    porPagina: number;
+    buscar?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    tipoComprobante?: string;
+  } {
+    const fechas = this.resolveFiltrosFechaApi();
+    const params: {
+      pagina: number;
+      porPagina: number;
+      buscar?: string;
+      fechaDesde?: string;
+      fechaHasta?: string;
+      tipoComprobante?: string;
+    } = { pagina, porPagina: this.pageSize, ...fechas };
+    const q = (this.filtroBusqueda || '').trim();
+    if (q) params.buscar = q;
+    const tipo = (this.filtroTipoComprobante || '').trim();
+    if (tipo) params.tipoComprobante = tipo;
+    return params;
+  }
+
   cargarVentas(): void {
     this.loading = true;
     if (this.esGestora) {
-      forkJoin({
-        agrupadas: this.ventasService.listarVentasAgrupadas(),
-        comprobantes: this.ventasService.listarVentasEmpresa()
-      }).subscribe({
-        next: ({ agrupadas, comprobantes }) => {
-          this.ventasConst = agrupadas.data ?? [];
-          this.ventasEmpresaConst = comprobantes.data ?? [];
+      this.ventasService.listarVentasAgrupadas().subscribe({
+        next: (res) => {
+          this.ventasConst = res.data ?? [];
           this.page = 1;
-          this.pageCompGestora = 1;
-          this.aplicarFiltros();
-          this.loading = false;
+          this.aplicarFiltrosAgrupadas();
+          this.cargarComprobantesPaginados(1, true);
         },
         error: () => {
           this.ventasConst = [];
           this.ventas = [];
-          this.ventasEmpresaConst = [];
           this.ventasEmpresa = [];
+          this.totalVentasEmpresaGestora = 0;
           this.loading = false;
         }
       });
     } else {
-      this.ventasService.listarVentasEmpresa().subscribe({
-        next: (res) => {
-          this.ventasEmpresaConst = res.data ?? [];
-          this.ventasEmpresa = [...this.ventasEmpresaConst];
-          this.loading = false;
-        },
-        error: () => {
-          this.ventasEmpresaConst = [];
-          this.ventasEmpresa = [];
-          this.loading = false;
-        }
-      });
+      this.page = 1;
+      this.cargarComprobantesPaginados(1);
     }
   }
 
-  aplicarFiltros(): void {
-    this.page = 1;
-    this.pageCompGestora = 1;
-    if (this.esGestora) {
-      let listVa = [...this.ventasConst];
-
-      if (this.filtroFecha === 'today') {
-        const hoy = getFechaHoyLocal();
-        listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
-      } else if (this.filtroFecha === 'month') {
-        const now = new Date();
-        const mes = String(now.getMonth() + 1).padStart(2, '0');
-        const anio = now.getFullYear();
-        listVa = listVa.filter((v) => {
-          const f = (v.fEmision || '').slice(0, 10);
-          return f.startsWith(`${anio}-${mes}`);
-        });
-      } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
-        if (this.fechaDesde) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
-        if (this.fechaHasta) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
-      }
-
-      const qVa = (this.filtroBusqueda || '').trim();
-      if (qVa) listVa = listVa.filter((v) => this.coincideBusquedaVentaAgrupada(v, qVa));
-
-      this.ventas = listVa;
-
-      let listComp = [...this.ventasEmpresaConst];
-      if (this.filtroFecha === 'today') {
-        const hoy = getFechaHoyLocal();
-        listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
-      } else if (this.filtroFecha === 'month') {
-        const now = new Date();
-        const mes = String(now.getMonth() + 1).padStart(2, '0');
-        const anio = now.getFullYear();
-        listComp = listComp.filter((v) => {
-          const f = (v.fEmision || '').slice(0, 10);
-          return f.startsWith(`${anio}-${mes}`);
-        });
-      } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
-        if (this.fechaDesde) listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
-        if (this.fechaHasta) listComp = listComp.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
-      }
-
-      const qComp = (this.filtroBusqueda || '').trim();
-      if (qComp) listComp = listComp.filter((v) => this.coincideBusquedaVentaListado(v, qComp));
-
-      const tipo = (this.filtroTipoComprobante || '').trim();
-      if (tipo) listComp = listComp.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
-
-      this.ventasEmpresa = listComp;
+  /** Carga comprobantes desde el servidor (paginación + filtros). */
+  cargarComprobantesPaginados(pagina: number, esGestora = this.esGestora): void {
+    this.loading = true;
+    if (esGestora) {
+      this.pageCompGestora = pagina;
     } else {
-      let list = [...this.ventasEmpresaConst];
-      if (this.filtroFecha === 'today') {
-        const hoy = getFechaHoyLocal();
-        list = list.filter((v) => (v.fEmision || '').slice(0, 10) === hoy);
-      } else if (this.filtroFecha === 'month') {
-        const now = new Date();
-        const mes = String(now.getMonth() + 1).padStart(2, '0');
-        const anio = now.getFullYear();
-        list = list.filter((v) => {
-          const f = (v.fEmision || '').slice(0, 10);
-          return f.startsWith(`${anio}-${mes}`);
-        });
-      } else if (this.filtroFecha === 'range' && (this.fechaDesde || this.fechaHasta)) {
-        if (this.fechaDesde) list = list.filter((v) => (v.fEmision || '').slice(0, 10) >= this.fechaDesde);
-        if (this.fechaHasta) list = list.filter((v) => (v.fEmision || '').slice(0, 10) <= this.fechaHasta);
+      this.page = pagina;
+    }
+    this.ventasService.listarVentasEmpresaPaginado(this.buildParamsListadoComprobantes(pagina)).subscribe({
+      next: (res) => {
+        this.ventasEmpresa = res.data ?? [];
+        const total = res.total ?? 0;
+        if (esGestora) {
+          this.totalVentasEmpresaGestora = total;
+        } else {
+          this.totalVentasEmpresa = total;
+        }
+        this.loading = false;
+      },
+      error: () => {
+        this.ventasEmpresa = [];
+        if (esGestora) {
+          this.totalVentasEmpresaGestora = 0;
+        } else {
+          this.totalVentasEmpresa = 0;
+        }
+        this.loading = false;
       }
+    });
+  }
 
-      const q = (this.filtroBusqueda || '').trim();
-      if (q) list = list.filter((v) => this.coincideBusquedaVentaListado(v, q));
+  onPageComprobantesChange(pagina: number): void {
+    this.cargarComprobantesPaginados(pagina, false);
+  }
 
-      const tipo = (this.filtroTipoComprobante || '').trim();
-      if (tipo) list = list.filter((v) => (v.nombreComprobante || '').toLowerCase().includes(tipo.toLowerCase()));
+  onPageComprobantesGestoraChange(pagina: number): void {
+    this.cargarComprobantesPaginados(pagina, true);
+  }
 
-      this.ventasEmpresa = list;
+  aplicarFiltrosAgrupadas(): void {
+    this.page = 1;
+    let listVa = [...this.ventasConst];
+    const fechas = this.resolveFiltrosFechaApi();
+    if (fechas.fechaDesde) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) >= fechas.fechaDesde!);
+    if (fechas.fechaHasta) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) <= fechas.fechaHasta!);
+    const qVa = (this.filtroBusqueda || '').trim();
+    if (qVa) listVa = listVa.filter((v) => this.coincideBusquedaVentaAgrupada(v, qVa));
+    this.ventas = listVa;
+  }
+
+  aplicarFiltros(): void {
+    this.cargarComprobantesPaginados(1);
+    if (this.esGestora) {
+      this.aplicarFiltrosAgrupadas();
     }
   }
 
@@ -284,20 +326,24 @@ export class IndexVentasComponent implements OnInit {
     return idVa.includes(n) || ruc.includes(n) || rs.includes(n) || comp.includes(n);
   }
 
+  get totalComprobantesListado(): number {
+    return this.esGestora ? this.totalVentasEmpresaGestora : this.totalVentasEmpresa;
+  }
+
+  rangoComprobantesFin(): number {
+    const p = this.esGestora ? this.pageCompGestora : this.page;
+    return Math.min(p * this.pageSize, this.totalComprobantesListado);
+  }
+
   limpiarFiltros(): void {
     this.page = 1;
     this.pageCompGestora = 1;
-    this.filtroFecha = 'all';
+    this.filtroFecha = 'today';
     this.fechaDesde = '';
     this.fechaHasta = '';
     this.filtroBusqueda = '';
     this.filtroTipoComprobante = '';
-    if (this.esGestora) {
-      this.ventas = [...this.ventasConst];
-      this.ventasEmpresa = [...this.ventasEmpresaConst];
-    } else {
-      this.ventasEmpresa = [...this.ventasEmpresaConst];
-    }
+    this.aplicarFiltros();
   }
   estadoPagoLabel(idEstadoPago: number | undefined): string {
     if (idEstadoPago == null) return 'Pendiente';
@@ -330,16 +376,16 @@ export class IndexVentasComponent implements OnInit {
       next: (res) => {
         this.imprimiendoVAId = null;
         if (!res?.data) {
-          alert('No se pudieron cargar los datos del comprobante VA.');
+          this.toastError('No se pudieron cargar los datos del comprobante VA.');
           return;
         }
         if (!openComprobanteVaTicket(res.data)) {
-          alert('Permita ventanas emergentes para ver e imprimir el ticket VA.');
+          this.toastWarning('Permita ventanas emergentes para ver e imprimir el ticket VA.');
         }
       },
       error: () => {
         this.imprimiendoVAId = null;
-        alert('No se pudo cargar el comprobante VA para impresión.');
+        this.toastError('No se pudo cargar el comprobante VA para impresión.');
       }
     });
   }
@@ -532,22 +578,24 @@ export class IndexVentasComponent implements OnInit {
       !this.esNotaVentaSinSunat(v) && !this.sunatEstadoAceptado(v)
         ? ' Este comprobante no fue aceptado por SUNAT; al anular se devuelve el stock y dejará de mostrarse “Enviar a SUNAT”.'
         : '';
-    if (!confirm(`¿Anular el comprobante ${v.compVenta || v.idVenta}? Se restaurará el stock y el registro quedará tachado en el historial.${extra}`)) {
-      return;
-    }
-    this.anulandoIdVenta = v.idVenta;
-    this.ventasService.anularVenta(v.idVenta).subscribe({
-      next: (res) => {
-        this.anulandoIdVenta = null;
-        alert(res.message || 'Comprobante anulado.');
-        this.cargarVentas();
-      },
-      error: (err) => {
-        this.anulandoIdVenta = null;
-        const msg = err?.error?.error || err?.error?.message || err?.message || 'No se pudo anular.';
-        alert(msg);
+    this.confirmarAccion(
+      `¿Anular el comprobante ${v.compVenta || v.idVenta}? Se restaurará el stock y el registro quedará tachado en el historial.${extra}`,
+      () => {
+        this.anulandoIdVenta = v.idVenta;
+        this.ventasService.anularVenta(v.idVenta).subscribe({
+          next: (res) => {
+            this.anulandoIdVenta = null;
+            this.toastExito(res.message || 'Comprobante anulado.');
+            this.cargarVentas();
+          },
+          error: (err) => {
+            this.anulandoIdVenta = null;
+            const msg = err?.error?.error || err?.error?.message || err?.message || 'No se pudo anular.';
+            this.toastError(msg);
+          }
+        });
       }
-    });
+    );
   }
 
   enviarASunat(v: VentaListado): void {
@@ -561,7 +609,7 @@ export class IndexVentasComponent implements OnInit {
         if (res?.data?.ok !== false) {
           this.cargarVentas();
         }
-        alert(msg);
+        this.toastInfo(msg);
       },
       error: (err) => {
         this.enviandoSunatId = null;
@@ -572,7 +620,7 @@ export class IndexVentasComponent implements OnInit {
         if (typeof body === 'string' && (body.includes('<') || body.includes('faultstring'))) {
           msg = 'SUNAT no pudo procesar el envío. Intente nuevamente o comuníquese con su Administrador.';
         }
-        alert(msg);
+        this.toastInfo(msg);
       }
     });
   }
@@ -587,11 +635,11 @@ export class IndexVentasComponent implements OnInit {
         this.cargarVentas();
         const msg = res?.message || 'Estado actualizado';
         const det = res?.data ? `\n${res.data.estadoSunat || ''}${res.data.codigoRespuesta ? ' - ' + res.data.codigoRespuesta : ''}` : '';
-        alert(msg + det);
+        this.toastInfo(msg + det);
       },
       error: (err) => {
         this.consultandoEstadoId = null;
-        alert(err?.error?.message || err?.message || 'Error al consultar estado');
+        this.toastError(err?.error?.message || err?.message || 'Error al consultar estado');
       }
     });
   }
@@ -605,11 +653,11 @@ export class IndexVentasComponent implements OnInit {
         this.consultandoValidezId = null;
         const d = res?.data;
         const msg = d?.valido ? `Válido: ${d.mensaje || 'Comprobante aceptado'}` : `No válido: ${d?.mensaje || d?.error || 'Verifique en SUNAT'}`;
-        alert(msg);
+        this.toastInfo(msg);
       },
       error: (err) => {
         this.consultandoValidezId = null;
-        alert(err?.error?.message || err?.message || 'Error al consultar validez');
+        this.toastError(err?.error?.message || err?.message || 'Error al consultar validez');
       }
     });
   }
@@ -985,7 +1033,7 @@ export class IndexVentasComponent implements OnInit {
             this.generandoPdf = false;
             const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
             console.error('Error generar PDF:', err);
-            alert(msg);
+            this.toastInfo(msg);
           }
         });
       },
@@ -993,7 +1041,7 @@ export class IndexVentasComponent implements OnInit {
         this.generandoPdf = false;
         const msg = err?.error?.error || err?.message || 'No se pudieron cargar los datos del comprobante.';
         console.error('Error comprobante PDF:', err);
-        alert(msg);
+        this.toastInfo(msg);
       }
     });
   }
@@ -1082,14 +1130,14 @@ export class IndexVentasComponent implements OnInit {
           error: () => {
             this.generandoPdf = false;
             this.comprobanteImprimiendoId = null;
-            alert('Error al generar el PDF.');
+            this.toastError('Error al generar el PDF.');
           }
         });
       },
       error: () => {
         this.generandoPdf = false;
         this.comprobanteImprimiendoId = null;
-        alert('No se pudieron cargar los datos del comprobante.');
+        this.toastError('No se pudieron cargar los datos del comprobante.');
       }
     });
   }
@@ -1255,7 +1303,7 @@ export class IndexVentasComponent implements OnInit {
         this.exportandoReporteContabilidad = false;
         const msg = (err as { error?: { error?: string } })?.error?.error || (err as Error)?.message || 'Error al generar el PDF.';
         console.error('Error reporte contabilidad PDF:', err);
-        alert(msg);
+        this.toastInfo(msg);
       }
     });
   }
@@ -1273,7 +1321,7 @@ export class IndexVentasComponent implements OnInit {
       (ras) => {
         if (comps.length === 0 && ras.length === 0) {
           this.exportandoReporteContabilidad = false;
-          alert('No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.');
+          this.toastWarning('No hay comprobantes SUNAT válidos ni comunicaciones de baja aceptadas en el criterio actual.');
           return;
         }
         const resumen = `${comps.length} comprobante(s) electrónico(s); ${ras.length} comunicación(es) de baja (RA).`;
@@ -1283,7 +1331,7 @@ export class IndexVentasComponent implements OnInit {
         console.error('Error al listar comunicaciones de baja para reporte:', err);
         if (comps.length === 0) {
           this.exportandoReporteContabilidad = false;
-          alert('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
+          this.toastError('No se pudieron cargar las comunicaciones de baja y no hay comprobantes válidos para el reporte.');
           return;
         }
         const resumen = `${comps.length} comprobante(s) electrónico(s); RA no incluida (error al cargar el historial).`;
@@ -1422,7 +1470,7 @@ export class IndexVentasComponent implements OnInit {
         this.exportandoLista = false;
         const msg = err?.error?.error || err?.message || 'Error al generar el PDF.';
         console.error('Error exportar lista PDF:', err);
-        alert(msg);
+        this.toastInfo(msg);
       }
     });
   }
@@ -1495,8 +1543,52 @@ export class IndexVentasComponent implements OnInit {
         this.exportandoLista = false;
         const msg = err?.error?.error || err?.message || 'Error al generar el Excel.';
         console.error('Error exportar lista Excel:', err);
-        alert(msg);
+        this.toastError(msg);
       }
+    });
+  }
+
+  private toastExito(message: string): void {
+    iziToast.success({ title: 'Éxito', message, position: 'topRight' });
+  }
+
+  private toastError(message: string): void {
+    iziToast.error({ title: 'Error', message, position: 'topRight' });
+  }
+
+  private toastInfo(message: string): void {
+    iziToast.info({ title: 'Información', message, position: 'topRight', timeout: 9000 });
+  }
+
+  private toastWarning(message: string): void {
+    iziToast.warning({ title: 'Aviso', message, position: 'topRight', timeout: 9000 });
+  }
+
+  private confirmarAccion(message: string, onConfirm: () => void): void {
+    iziToast.show({
+      title: 'Confirmar',
+      message,
+      position: 'center',
+      timeout: false,
+      close: true,
+      overlay: true,
+      overlayClose: true,
+      buttons: [
+        [
+          '<button>Sí, continuar</button>',
+          (instance: { hide: (opts: object, toast: unknown) => void }, toast: unknown) => {
+            instance.hide({ transitionOut: 'fadeOut' }, toast);
+            onConfirm();
+          },
+          true
+        ],
+        [
+          '<button>Cancelar</button>',
+          (instance: { hide: (opts: object, toast: unknown) => void }, toast: unknown) => {
+            instance.hide({ transitionOut: 'fadeOut' }, toast);
+          }
+        ]
+      ]
     });
   }
 }

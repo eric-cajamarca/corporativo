@@ -8,6 +8,8 @@ const comprasRepository = require('../repositories/compras.repository');
 const comprasDetalleReporteRepository = require('../repositories/comprasDetalleReporte.repository');
 const CajaRepository = require('../repositories/caja.repository');
 const comprobantesCompraSunatService = require('./comprobantesCompraSunat.service');
+const detalleComprasService = require('./detalleCompras.service');
+const productosMutacionesService = require('./productosMutaciones.service');
 const {
     obtenerEmpresasPermitidasOperacionCaja,
     resolverIdEmpresaOperacionCaja
@@ -61,6 +63,36 @@ exports.obtenerComprasPorIdCompraIdEmpresa = async (idEmpresa, idCompra) => {
  */
 exports.listarComprasPorIdEmpresa = async (idEmpresa) => {
     return withPool((pool) => comprasRepository.listarComprasPorIdEmpresa(pool, idEmpresa));
+};
+
+/**
+ * Listado paginado de compras para historial (empresa del token o idEmpresaOperacion).
+ */
+exports.listarComprasPaginadoPorUsuario = async (user, query = {}) => {
+    return withPool(async (pool) => {
+        const { parsePaginacion } = require('../utils/paginacion.util');
+        const pag = parsePaginacion(query);
+        const opts = {
+            pagina: pag.pagina,
+            porPagina: pag.porPagina,
+            buscar: query.buscar,
+            ruc: query.ruc,
+            proveedor: query.proveedor,
+            fechaDesde: query.fechaDesde,
+            fechaHasta: query.fechaHasta
+        };
+        let ids;
+        const idEmpresaOperacionRaw = query.idEmpresaOperacion;
+        if (idEmpresaOperacionRaw != null && String(idEmpresaOperacionRaw).trim() !== '') {
+            const idE = await resolverIdEmpresaOperacionCaja(pool, user, idEmpresaOperacionRaw);
+            ids = [idE];
+        } else {
+            const lista = await obtenerEmpresasPermitidasOperacionCaja(pool, user.empresa);
+            ids = lista.map((x) => x.idEmpresa).filter(Boolean);
+        }
+        const { rows, total, pagina, porPagina } = await comprasRepository.listarComprasPorIdsEmpresaPaginado(pool, ids, opts);
+        return { data: formatearFechasCompras(rows), total, pagina, porPagina };
+    });
 };
 
 /**
@@ -192,6 +224,50 @@ exports.crearCompra = async (idEmpresa, idUsuario, body) => {
 
         return { idCompra };
     });
+};
+
+/**
+ * Registra compra + detalles en una sola petición (reduce round-trips del frontend).
+ * Body: { compra: {...}, detalles: [...], comprobanteSunat?: {...} }
+ * Cada detalle puede incluir nuevoProducto para crear el producto antes del ingreso.
+ */
+exports.crearCompraCompleta = async (idEmpresa, idUsuario, body) => {
+    const compra = body?.compra || body;
+    const detalles = Array.isArray(body?.detalles) ? body.detalles : [];
+    if (detalles.length === 0) {
+        throw new Error('Debe incluir al menos un detalle de compra');
+    }
+    const comprobanteSunat = body?.comprobanteSunat ?? compra?.comprobanteSunat;
+    const { idCompra } = await exports.crearCompra(idEmpresa, idUsuario, { ...compra, comprobanteSunat });
+    const userMin = { empresa: idEmpresa, sub: idUsuario, idUsuario, rol: 'Administrador' };
+    const resultadosDetalle = [];
+    for (const linea of detalles) {
+        let idProducto = linea.idProducto;
+        if ((idProducto == null || idProducto === '') && linea.nuevoProducto) {
+            const np = { ...linea.nuevoProducto, idEmpresa };
+            await withPool((pool) => productosMutacionesService.crearProductoCompra(pool, np));
+            idProducto = np.idProducto;
+        }
+        if (!idProducto) {
+            throw new Error('Cada línea debe tener idProducto o nuevoProducto');
+        }
+        const detRes = await withPool((pool) =>
+            detalleComprasService.crearDetalleCompraCompleto(pool, userMin, {
+                idSucursal: linea.idSucursal,
+                idCompra,
+                cantidad: linea.cantidad,
+                idProducto,
+                idPresentacion: linea.idPresentacion,
+                pUnitario: linea.pUnitario,
+                total: linea.total,
+                fechaVencimiento: linea.fechaVencimiento,
+                asignarPorDefecto: linea.asignarPorDefecto,
+                idUbicacionDestino: linea.idUbicacionDestino ?? linea.idUbicacionCompra
+            })
+        );
+        resultadosDetalle.push(detRes);
+    }
+    return { idCompra, detalles: resultadosDetalle };
 };
 
 /**

@@ -762,3 +762,19 @@ exports.obtenerProductosComprados = async (user, query) => {
     });
   });
 };
+
+/**
+ * GET /api/inventario/costo-sugerido?idProducto=&idSucursal=
+ * Costo sugerido para líneas de entrada (último lote / catálogo).
+ */
+exports.obtenerCostoSugerido = async (idEmpresa, idProducto, idSucursal) => {
+  if (!idProducto) {
+    throw new Error('idProducto es obligatorio');
+  }
+  if (!idSucursal) {
+    throw new Error('idSucursal es obligatorio');
+  }
+  return withPool(async (pool) =>
+    inventarioRepository.obtenerCostoSugeridoProducto(pool, idEmpresa, idProducto, idSucursal)
+  );
+};

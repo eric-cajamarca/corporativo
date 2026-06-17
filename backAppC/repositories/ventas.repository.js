@@ -657,6 +657,149 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa, opts = {}) => {
   }));
 };
 
+function mapRowVentasListado(r) {
+  return {
+    ...r,
+    idEmpresa: r.idEmpresa != null ? String(r.idEmpresa) : null,
+    idSucursal: r.idSucursal != null ? String(r.idSucursal) : null,
+    nombreSucursal: r.nombreSucursal != null ? String(r.nombreSucursal).trim() : '',
+    idComprobanteElectronico: r.idComprobanteElectronico != null ? String(r.idComprobanteElectronico) : null,
+    tipoComprobante: r.tipoComprobante != null ? String(r.tipoComprobante).trim() : null,
+    rucEmpresa: r.rucEmpresa != null ? String(r.rucEmpresa).trim() : null,
+    razonSocialEmpresa: r.razonSocialEmpresa != null ? String(r.razonSocialEmpresa).trim() : '',
+    condicionPago: r.condicionPago != null ? String(r.condicionPago).trim() : (r.idMediosPago != null ? String(r.idMediosPago) : ''),
+    clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
+    clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : '',
+    eliminado: !!r.eliminado,
+    formaPago: r.formaPago != null ? String(r.formaPago).trim() : '{}',
+    codigoEstadoSunat: r.codigoEstadoSunat != null ? String(r.codigoEstadoSunat).trim() : null
+  };
+}
+
+function bindFiltrosVentasListado(req, opts = {}) {
+  const { likePattern } = require('../utils/paginacion.util');
+  let whereExtra = '';
+  const idSucursalFiltro = opts.idSucursal && String(opts.idSucursal).trim() ? String(opts.idSucursal).trim() : null;
+  if (idSucursalFiltro) {
+    req.input('idSucF', sql.UniqueIdentifier, idSucursalFiltro);
+    whereExtra += ' AND v.idSucursal = @idSucF';
+  }
+  const fechaDesde = opts.fechaDesde && String(opts.fechaDesde).trim() ? String(opts.fechaDesde).trim().slice(0, 10) : null;
+  const fechaHasta = opts.fechaHasta && String(opts.fechaHasta).trim() ? String(opts.fechaHasta).trim().slice(0, 10) : null;
+  if (fechaDesde) {
+    req.input('fechaDesde', sql.Date, fechaDesde);
+    whereExtra += ' AND CAST(v.fEmision AS DATE) >= @fechaDesde';
+  }
+  if (fechaHasta) {
+    req.input('fechaHasta', sql.Date, fechaHasta);
+    whereExtra += ' AND CAST(v.fEmision AS DATE) <= @fechaHasta';
+  }
+  const buscarPat = likePattern(opts.buscar);
+  if (buscarPat) {
+    req.input('buscar', sql.NVarChar(200), buscarPat);
+    whereExtra += ` AND (
+      v.compVenta LIKE @buscar ESCAPE '\\'
+      OR v.serie LIKE @buscar ESCAPE '\\'
+      OR CAST(v.numero AS NVARCHAR(20)) LIKE @buscar ESCAPE '\\'
+      OR cl.rSocial LIKE @buscar ESCAPE '\\'
+      OR cl.ruc LIKE @buscar ESCAPE '\\'
+      OR CAST(v.idVenta AS NVARCHAR(20)) LIKE @buscar ESCAPE '\\'
+      OR ISNULL(v.compRelacionado, '') LIKE @buscar ESCAPE '\\'
+    )`;
+  }
+  const tipoPat = likePattern(opts.tipoComprobante);
+  if (tipoPat) {
+    req.input('tipoComp', sql.NVarChar(100), tipoPat);
+    whereExtra += ` AND (c.nombre LIKE @tipoComp ESCAPE '\\' OR c.codigo LIKE @tipoComp ESCAPE '\\')`;
+  }
+  return whereExtra;
+}
+
+const SQL_VENTAS_LISTADO_SELECT = `
+  v.idEmpresa,
+  v.idVenta,
+  v.idSucursal,
+  ISNULL(s.nombre, '') AS nombreSucursal,
+  v.compVenta,
+  CONVERT(VARCHAR(19), v.fEmision, 120) AS fEmision,
+  v.total,
+  v.idEstadoSunat,
+  es.codigo AS codigoEstadoSunat,
+  v.serie,
+  v.numero,
+  v.idComprobante,
+  v.idCliente,
+  v.idMediosPago,
+  ISNULL(LTRIM(RTRIM(v.compRelacionado)), '') AS compRelacionado,
+  ISNULL(mp.descripcion, CAST(v.idMediosPago AS VARCHAR(20))) AS condicionPago,
+  c.nombre AS nombreComprobante,
+  c.codigo AS codigoComprobante,
+  COALESCE(LTRIM(RTRIM(cl.rSocial)), (SELECT TOP 1 LTRIM(RTRIM(c2.rSocial)) FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRazonSocial,
+  COALESCE(cl.ruc, (SELECT TOP 1 c2.ruc FROM Clientes c2 WHERE c2.idCliente = v.idCliente AND c2.idEmpresa = v.idEmpresa), '') AS clienteRuc,
+  ce.idComprobanteElectronico,
+  ce.tipoComprobante,
+  e.ruc AS rucEmpresa,
+  ISNULL(e.razon_Social, '') AS razonSocialEmpresa,
+  ISNULL(v.eliminado, 0) AS eliminado,
+  '' AS formaPago,
+  ${SQL_SELECT_USUARIO_VENTAS}
+`;
+
+const SQL_VENTAS_LISTADO_FROM = `
+  FROM Ventas v
+  LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
+  LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
+  LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
+  LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
+  LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
+  LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+  LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+  ${SQL_JOIN_USUARIO_VENTAS}
+`;
+
+/**
+ * Lista paginada de comprobantes de venta (gestora + gestionadas).
+ * @returns {Promise<{ rows: object[], total: number }>}
+ */
+exports.listarPorIdsEmpresasPaginado = async (pool, idsEmpresa, opts = {}) => {
+  const { parsePaginacion } = require('../utils/paginacion.util');
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0) return { rows: [], total: 0 };
+
+  const pag = parsePaginacion(opts);
+  const pagina = pag.pagina;
+  const porPagina = pag.porPagina;
+  const offset = pag.offset;
+
+  const reqCount = pool.request();
+  const inList = bindUniqueIdentifiersIn(reqCount, ids, 'empPag');
+  const whereExtra = bindFiltrosVentasListado(reqCount, opts);
+  const countSql = `
+    SELECT COUNT(*) AS total
+    ${SQL_VENTAS_LISTADO_FROM}
+    WHERE v.idEmpresa IN (${inList})${whereExtra}
+  `;
+  const countRes = await reqCount.query(countSql);
+  const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+  const reqData = pool.request();
+  const inListData = bindUniqueIdentifiersIn(reqData, ids, 'empPagD');
+  const whereExtraData = bindFiltrosVentasListado(reqData, opts);
+  reqData.input('offset', sql.Int, offset);
+  reqData.input('limite', sql.Int, porPagina);
+
+  const dataSql = `
+    SELECT ${SQL_VENTAS_LISTADO_SELECT}
+    ${SQL_VENTAS_LISTADO_FROM}
+    WHERE v.idEmpresa IN (${inListData})${whereExtraData}
+    ORDER BY v.fEmision DESC, v.idVenta DESC
+    OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+  `;
+  const dataRes = await reqData.query(dataSql);
+  const rows = (dataRes.recordset || []).map(mapRowVentasListado);
+  return { rows, total, pagina, porPagina };
+};
+
 /**
  * Lista paginada de ventas que son nota de crédito o débito (códigos F7/B7/F8/B8 o legado 07/08).
  * @param {import('mssql').ConnectionPool} pool

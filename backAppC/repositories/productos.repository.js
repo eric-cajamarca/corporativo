@@ -320,6 +320,74 @@ exports.obtenerProductosTodosMultiEmpresaRepo = async (pool, idsEmpresa, idsSucu
 };
 
 /**
+ * Listado paginado de productos (catálogo básico + stock total por empresa).
+ */
+exports.listarProductosPaginadoRepo = async (pool, idsEmpresa, opts = {}) => {
+  const ids = (idsEmpresa || []).filter(Boolean);
+  if (ids.length === 0) return { rows: [], total: 0, pagina: 1, porPagina: 20 };
+  const { parsePaginacion, likePattern } = require('../utils/paginacion.util');
+  const pag = parsePaginacion(opts);
+  const offset = pag.offset;
+  const porPagina = pag.porPagina;
+  const pagina = pag.pagina;
+
+  const reqCount = pool.request();
+  const inClause = construirInClause(reqCount, ids, 'idEmpresa');
+  let whereBuscar = '';
+  const buscarPat = likePattern(opts.buscar);
+  if (buscarPat) {
+    reqCount.input('buscar', sql.NVarChar(200), buscarPat);
+    whereBuscar = ` AND (p.codigo LIKE @buscar ESCAPE '\\' OR p.descripcion LIKE @buscar ESCAPE '\\')`;
+  }
+  const countRes = await reqCount.query(`
+    SELECT COUNT(*) AS total
+    FROM Productos p
+    WHERE p.idEmpresa IN (${inClause})${whereBuscar}
+  `);
+  const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+  const reqData = pool.request();
+  const inClauseData = construirInClause(reqData, ids, 'idEmpresa');
+  reqData.input('offset', sql.Int, offset);
+  reqData.input('limite', sql.Int, porPagina);
+  if (buscarPat) reqData.input('buscar', sql.NVarChar(200), buscarPat);
+  const dataRes = await reqData.query(`
+    SELECT
+      p.idProducto,
+      p.idEmpresa,
+      p.codigo,
+      p.descripcion,
+      p.idCategoria,
+      c.nombre AS categoria,
+      p.idMarca,
+      m.nombre AS marca,
+      p.idPresentacion,
+      pr.codigo AS codigoPresentacion,
+      pr.descripcion AS descripcionPres,
+      p.cUnitario,
+      p.tipoProducto,
+      p.estado,
+      ISNULL(st.stock, 0) AS stock,
+      ISNULL(e.alias, e.nombreComercial) AS aliasEmpresa
+    FROM Productos p
+    INNER JOIN Categorias c ON p.idCategoria = c.idCategoria
+    INNER JOIN Marcas m ON p.idMarca = m.idMarca
+    INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
+    INNER JOIN Empresas e ON p.idEmpresa = e.idEmpresa
+    LEFT JOIN (
+      SELECT idEmpresa, idProducto, SUM(cantidadDisponible) AS stock
+      FROM Lotes
+      GROUP BY idEmpresa, idProducto
+    ) st ON st.idProducto = p.idProducto AND st.idEmpresa = p.idEmpresa
+    WHERE p.idEmpresa IN (${inClauseData})${whereBuscar}
+    ORDER BY p.descripcion
+    OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+  `);
+  const rows = await combinarRecordsetConPrecios(pool, ids, dataRes.recordset || []);
+  return { rows, total, pagina, porPagina };
+};
+
+/**
  * Búsqueda rápida para ventas: primero filtra productos (TOP), luego stock solo de esos IDs.
  */
 exports.buscarProductosVentaRepo = async (
@@ -1180,8 +1248,8 @@ exports.actualizarEstadoProductoPorId = async (pool, idProducto, idEmpresa, esta
     );
 };
 
-exports.actualizarProductoFlexible = async (pool, detalle) => {
-  const request = pool
+exports.actualizarProductoFlexible = async (conn, detalle) => {
+  const request = conn
     .request()
     .input('idProducto', sql.UniqueIdentifier, detalle.idProducto)
     .input('idEmpresa', sql.UniqueIdentifier, detalle.idEmpresa)

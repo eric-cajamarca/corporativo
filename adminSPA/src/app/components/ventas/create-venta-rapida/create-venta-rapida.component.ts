@@ -1,8 +1,7 @@
-import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CategoriaService } from '../../../services/categoria.service';
 import { SucursalService } from '../../../services/sucursal.service';
@@ -44,8 +43,6 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { AuthService } from '../../../services/auth.service';
 import { RubrosService } from '../../../services/rubros.service';
 import { CajaService } from '../../../services/caja.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
@@ -72,11 +69,13 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-venta-rapida',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent],
   templateUrl: './create-venta-rapida.component.html',
   styleUrl: './create-venta-rapida.component.css'
 })
 export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDestroy {
+
+  @ViewChild('inputCodigoBarra') inputCodigoBarra?: ElementRef<HTMLInputElement>;
 
   readonly buscadorLimiteFilas = 80;
   public searchCodigo = '';
@@ -265,7 +264,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private ventaProvisionalUi: VentaProvisionalUiService,
     private ventaCotizacionUi: VentaCotizacionUiService,
     private creditosService: CreditosService,
-    public sidebarState: SidebarStateService,
     private gestoresService: GestoresService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
     private valesDespachoService: ValesDespachoService,
@@ -298,6 +296,11 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.pdfPostVentaModalEl?.addEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.modalEditarClienteEl = document.getElementById('modalEditarClienteVenta');
     this.modalEditarClienteEl?.addEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
+    this.enfocarEscanner();
+  }
+
+  enfocarEscanner(): void {
+    setTimeout(() => this.inputCodigoBarra?.nativeElement?.focus(), 0);
   }
 
   ngOnDestroy(): void {
@@ -543,6 +546,16 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     if (!this.tieneClienteParaVenta()) {
       iziToast.warning({ title: 'Advertencia', message: 'Complete o seleccione el cliente.' });
       return;
+    }
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    const esContadoDirecto = idEstadoPago === 2 && !this.cabeceraEsCreditoFinanciacion();
+    if (esContadoDirecto) {
+      this.detallePago = [];
+      this.aplicarDetallePagoEfectivoPorDefectoSiVacio();
+      if (this.detallePago.length > 0) {
+        this.registrarVenta();
+        return;
+      }
     }
     this.abrirModalPago();
     const modalEl = document.getElementById('modalPago');
@@ -1498,8 +1511,11 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       const term = raw.toLowerCase();
       const fuenteMemoria = this.obtenerCatalogoProductosOperativo();
       if (fuenteMemoria.length > 0) {
-        this.aplicarResultadoBusquedaCodigo(this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw));
-        return;
+        const enMemoria = this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw);
+        if (enMemoria) {
+          this.aplicarResultadoBusquedaCodigo(enMemoria);
+          return;
+        }
       }
       this._productoService
         .buscarProductosVenta({
@@ -3406,6 +3422,7 @@ abrirModalPrecios(item: any) {
 
     this.actualizaTotales();
     this._productoService.limpiarCacheListaProductos();
+    this.enfocarEscanner();
   }
 }
 

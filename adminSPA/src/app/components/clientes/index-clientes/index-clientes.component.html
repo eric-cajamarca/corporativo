@@ -55,7 +55,7 @@
             </tr>
           </thead>
           <tbody class="font-size-base">
-            <tr *ngFor="let item of clientes | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize"  style="cursor: pointer;"
+            <tr *ngFor="let item of clientes"  style="cursor: pointer;"
     (click)="elegir(item)">
               <td data-label="RUC / DNI">{{item.ruc}}</td>
               <td data-label="Razón social">{{item.rSocial}}</td>
@@ -185,7 +185,8 @@
           *ngIf="clientes.length > 0"
           [(page)]="page"
           [pageSize]="pageSize"
-          [collectionSize]="clientes.length"
+          [collectionSize]="totalClientes"
+          (pageChange)="onPageChange($event)"
           [maxSize]="maxSize"
           [rotate]="rotate"
           [boundaryLinks]="boundaryLinks"

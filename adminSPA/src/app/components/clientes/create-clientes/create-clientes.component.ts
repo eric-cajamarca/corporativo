@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -8,17 +8,20 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var iziToast: any;
 declare var $: any;
 
 @Component({
   selector: 'app-create-clientes',
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent],
+  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, SidebarComponent],
   templateUrl: './create-clientes.component.html',
   styleUrl: './create-clientes.component.css'
 })
 export class CreateClientesComponent implements OnInit, OnChanges {
+  public sidebarState = inject(SidebarStateService);
   /** Cuando se abre desde nueva venta: tipo de documento pre-seleccionado. */
   @Input() idDocumentoPre?: string;
   /** Cuando se abre desde nueva venta: RUC o DNI pre-cargado. */
@@ -753,5 +756,9 @@ private showError(message: string): void {
       // Realiza acciones cuando el checkbox está desmarcado
     }
     
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

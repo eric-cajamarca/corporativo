@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const ventasOrquestacion = require('../services/ventasOrquestacion.service');
+const ventaBootstrapService = require('../services/ventaBootstrap.service');
 const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 const { withPool } = require('../utils/dbPool.util');
@@ -66,8 +67,24 @@ const obtenerVentas = async function (req, res) {
       req.query?.idSucursal != null && String(req.query.idSucursal).trim() !== ''
         ? String(req.query.idSucursal).trim()
         : undefined;
+    const { parsePaginacion } = require('../utils/paginacion.util');
+    const pag = parsePaginacion(req.query || {});
     const optsListado = {};
     if (idSucursal) optsListado.idSucursal = idSucursal;
+    if (req.query?.buscar != null && String(req.query.buscar).trim() !== '') {
+      optsListado.buscar = String(req.query.buscar).trim();
+    }
+    if (req.query?.fechaDesde) optsListado.fechaDesde = String(req.query.fechaDesde).trim().slice(0, 10);
+    if (req.query?.fechaHasta) optsListado.fechaHasta = String(req.query.fechaHasta).trim().slice(0, 10);
+    if (req.query?.tipoComprobante != null && String(req.query.tipoComprobante).trim() !== '') {
+      optsListado.tipoComprobante = String(req.query.tipoComprobante).trim();
+    }
+    if (pag.activa) {
+      optsListado.pagina = pag.pagina;
+      optsListado.porPagina = pag.porPagina;
+      const result = await withPool((pool) => ventasOrquestacion.obtenerVentasListadoPaginado(pool, idempresa, optsListado));
+      return res.json({ data: result.rows, total: result.total, pagina: result.pagina, porPagina: result.porPagina });
+    }
     const list = await withPool((pool) => ventasOrquestacion.obtenerVentasListado(pool, idempresa, optsListado));
     res.json({ data: list });
   } catch (error) {
@@ -411,6 +428,19 @@ const getConfigDefaults = async (req, res) => {
   }
 };
 
+const getBootstrapVenta = async (req, res) => {
+  if (!req.user || !req.user.empresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const data = await withPool((pool) => ventaBootstrapService.obtenerBootstrapVenta(pool, req.user));
+    res.json({ data });
+  } catch (error) {
+    console.error('Error getBootstrapVenta:', error);
+    res.status(500).json({ error: error.message || 'Error al cargar datos de venta' });
+  }
+};
+
 const putConfigDefaults = async (req, res) => {
   if (!req.user || !req.user.empresa) {
     return res.status(401).json({ message: 'No Access' });
@@ -659,6 +689,7 @@ module.exports = {
   actualizarVenta,
   actualizarVentaEdicion,
   getConfigDefaults,
+  getBootstrapVenta,
   putConfigDefaults,
   getPendientesPago,
   getPendientesPagoAgrupadas,

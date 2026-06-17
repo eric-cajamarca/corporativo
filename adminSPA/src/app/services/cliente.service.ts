@@ -1,7 +1,8 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
-import { Observable } from 'rxjs/internal/Observable';
+import { Observable, of } from 'rxjs';
+import { shareReplay, tap } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -9,22 +10,53 @@ import { Observable } from 'rxjs/internal/Observable';
 export class ClienteService {
   public url: any;
   private _router: any;
-  public idUser:any;
-  
+  public idUser: any;
 
-  constructor(
-    private _http: HttpClient,
-  ) {
+  private clientesMemoria: { data: unknown[] } | null = null;
+  private clientesEnVuelo: Observable<{ data: unknown[] }> | null = null;
+
+  constructor(private _http: HttpClient) {
     this.url = global.url;
   }
 
+  invalidarCacheClientes(): void {
+    this.clientesMemoria = null;
+    this.clientesEnVuelo = null;
+  }
 
-  //Metodo para obtener todos los clientes
-  obtener_clientes():Observable<any>{
-    let headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get(this.url+'clientes',{
-      headers: headers,
-      withCredentials: true
+  obtener_clientes(opciones?: { evitarCache?: boolean }): Observable<any> {
+    if (!opciones?.evitarCache && this.clientesMemoria != null) {
+      return of(this.clientesMemoria);
+    }
+    if (!opciones?.evitarCache && this.clientesEnVuelo) {
+      return this.clientesEnVuelo;
+    }
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    const req$ = this._http.get<{ data: unknown[] }>(this.url + 'clientes', { headers, withCredentials: true }).pipe(
+      tap((res) => {
+        this.clientesMemoria = res;
+        this.clientesEnVuelo = null;
+      }),
+      shareReplay(1)
+    );
+    this.clientesEnVuelo = req$;
+    return req$;
+  }
+
+  obtenerClientesPaginado(params: {
+    pagina?: number;
+    porPagina?: number;
+    buscar?: string;
+  }): Observable<{ data: unknown[]; total: number }> {
+    let q = new HttpParams();
+    if (params.pagina != null) q = q.set('pagina', String(params.pagina));
+    if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
+    if (params.buscar) q = q.set('buscar', params.buscar);
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get<{ data: unknown[]; total: number }>(this.url + 'clientes', {
+      headers,
+      withCredentials: true,
+      params: q
     });
   }
 
@@ -53,7 +85,7 @@ export class ClienteService {
     return this._http.post(this.url + 'clientes', data,{
       headers: headers,
       withCredentials: true
-    });
+    }).pipe(tap(() => this.invalidarCacheClientes()));
     
   }
 
@@ -63,7 +95,7 @@ export class ClienteService {
     return this._http.put(this.url+'clientes/'+id,cliente,{
       headers: headers,
       withCredentials: true
-    });
+    }).pipe(tap(() => this.invalidarCacheClientes()));
   }
 
   //Metodo para eliminar un cliente
@@ -72,7 +104,7 @@ export class ClienteService {
     return this._http.delete(this.url+'clientes/'+id,{
       headers: headers,
       withCredentials: true
-    });
+    }).pipe(tap(() => this.invalidarCacheClientes()));
   }
 
 

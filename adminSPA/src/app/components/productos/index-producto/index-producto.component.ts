@@ -49,6 +49,7 @@ export class IndexProductoComponent {
   // Configuración de paginación
   public page = 1;
   public pageSize = 10;
+  totalProductos = 0;
   public maxSize = 10;
   public rotate = true;
   public boundaryLinks = true;
@@ -135,9 +136,14 @@ export class IndexProductoComponent {
     this._productoGaleriaModal.abrir(item.idProducto, etiqueta).catch(() => {});
   }
 
-  initData(evitarCache = false) {
+  initData(pagina = 1) {
     this.catalogoInicialCargado = false;
-    this._productoService.obtenerProductosTodos(evitarCache ? { evitarCache: true } : undefined).subscribe(
+    this.page = pagina;
+    this._productoService.obtenerProductosPaginado({
+      pagina,
+      porPagina: this.pageSize,
+      buscar: (this.filtro || '').trim() || undefined
+    }).subscribe(
       (response: any) => {
         if (response.data == undefined) {
           iziToast.show({
@@ -151,7 +157,7 @@ export class IndexProductoComponent {
           this._router.navigate(['/']);
         } else {
           this.productos = response.data;
-          this.productos_const = response.data;
+          this.totalProductos = response.total ?? 0;
         }
         this.catalogoInicialCargado = true;
       },
@@ -169,44 +175,14 @@ export class IndexProductoComponent {
     );
   }
 
-  /** Restaura el listado completo en memoria sin nueva petición (tras búsqueda sin resultados). */
   limpiarFiltroBusqueda(): void {
     this.filtro = '';
-    this.page = 1;
-    this.productos = [...this.productos_const];
+    this.initData(1);
   }
 
-  /**
-   * Buscar: con input vacío (o solo espacios) recarga todos los productos desde el servidor.
-   * Con texto, filtra en memoria por campos del producto (código, descripción, categoría, etc.).
-   */
+  /** Búsqueda paginada en servidor. */
   filtrar(): void {
-    const q = (this.filtro ?? '').trim();
-    this.page = 1;
-
-    if (!q) {
-      this.initData();
-      return;
-    }
-
-    const ql = q.toLowerCase();
-    const incluye = (v: unknown): boolean => {
-      if (v === null || v === undefined) return false;
-      return String(v).toLowerCase().includes(ql);
-    };
-
-    this.productos = this.productos_const.filter(
-      (item) =>
-        incluye(item.codigo) ||
-        incluye(item.descripcion) ||
-        incluye(item.categoria) ||
-        incluye(item.marca) ||
-        incluye(item.sucursal) ||
-        incluye(item.codigoPresentacion) ||
-        incluye(item.fProduccion) ||
-        incluye(item.fVencimiento) ||
-        incluye(item.tipoProducto)
-    );
+    this.initData(1);
   }
 
   abrirDetalleProducto(idProducto: string): void {
@@ -364,9 +340,7 @@ export class IndexProductoComponent {
   }
 
   onPageChange(newPage: number) {
-    this.page = newPage;
-    // Puedes agregar lógica adicional aquí si necesitas
-    // cargar más datos cuando cambia la página
+    this.initData(newPage);
   }
 
   // NUEVOS MÉTODOS PARA PRODUCTOS COMPUESTOS

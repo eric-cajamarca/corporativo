@@ -276,6 +276,8 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
       fila.cantidad = q;
       if (creado.costoUnitario != null && creado.costoUnitario > 0) {
         fila.costoUnitario = Number(creado.costoUnitario);
+      } else {
+        this.precargarCostoUnitarioEntrada(fila);
       }
       if (creado.fechaVencimiento) {
         fila.fechaVencimiento = String(creado.fechaVencimiento).slice(0, 10);
@@ -303,7 +305,45 @@ export abstract class MovimientoInventarioFormBase implements OnInit {
     if (!fila.cantidad || fila.cantidad <= 0) {
       fila.cantidad = 1;
     }
+    if (this.esEntrada()) {
+      this.precargarCostoUnitarioEntrada(fila, p);
+    }
     this.productoService.limpiarCacheListaProductos();
+  }
+
+  /** Precarga costo desde último lote (editable por el usuario). */
+  private precargarCostoUnitarioEntrada(fila: FilaDetalle, p?: ProductoSeleccionado): void {
+    const idSucursal = String(this.form.get('idSucursal')?.value || '').trim();
+    const idProducto = String(fila.idProducto || '').trim();
+    if (!idSucursal) {
+      const fallback = Number(p?.['cUnitario'] ?? 0);
+      if (fallback > 0) {
+        fila.costoUnitario = fallback;
+      }
+      return;
+    }
+    if (!idProducto) {
+      return;
+    }
+    this.movimientoService.obtenerCostoSugerido(idProducto, idSucursal).subscribe({
+      next: (res) => {
+        const sugerido = Number(res?.costoUnitario ?? 0);
+        if (sugerido > 0) {
+          fila.costoUnitario = sugerido;
+          return;
+        }
+        const catalogo = Number(p?.['cUnitario'] ?? 0);
+        if (catalogo > 0) {
+          fila.costoUnitario = catalogo;
+        }
+      },
+      error: () => {
+        const catalogo = Number(p?.['cUnitario'] ?? 0);
+        if (catalogo > 0) {
+          fila.costoUnitario = catalogo;
+        }
+      }
+    });
   }
 
   quitarFila(index: number): void {

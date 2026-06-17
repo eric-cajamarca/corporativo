@@ -71,6 +71,38 @@ async function listarPorEmpresa(pool, idEmpresa) {
   return r.recordset;
 }
 
+async function listarPorEmpresaPaginado(pool, idEmpresa, opts = {}) {
+  const { parsePaginacion, likePattern } = require('../utils/paginacion.util');
+  const pag = parsePaginacion(opts);
+  const offset = pag.offset;
+  const porPagina = pag.porPagina;
+  const pagina = pag.pagina;
+  let whereBuscar = '';
+  const reqCount = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+  const buscarPat = likePattern(opts.buscar);
+  if (buscarPat) {
+    reqCount.input('buscar', sql.NVarChar(200), buscarPat);
+    whereBuscar = ` AND (rSocial LIKE @buscar ESCAPE '\\' OR ruc LIKE @buscar ESCAPE '\\' OR correo LIKE @buscar ESCAPE '\\')`;
+  }
+  const countRes = await reqCount.query(
+    `SELECT COUNT(*) AS total FROM Clientes WHERE idEmpresa = @idEmpresa${whereBuscar}`
+  );
+  const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+  const reqData = pool.request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('offset', sql.Int, offset)
+    .input('limite', sql.Int, porPagina);
+  if (buscarPat) reqData.input('buscar', sql.NVarChar(200), buscarPat);
+  const dataRes = await reqData.query(`
+    SELECT * FROM Clientes
+    WHERE idEmpresa = @idEmpresa${whereBuscar}
+    ORDER BY rSocial
+    OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+  `);
+  return { rows: dataRes.recordset || [], total, pagina, porPagina };
+}
+
 async function listarPorRucEmpresas(pool, idEmpresas, ruc) {
   const rucNorm = normalizarDocumento(ruc);
   if (!rucNorm) return [];
@@ -148,6 +180,7 @@ module.exports = {
   insertar,
   obtenerPorRuc,
   listarPorEmpresa,
+  listarPorEmpresaPaginado,
   listarPorRucEmpresas,
   listarPorIdClienteEmpresas,
   actualizarEnEmpresas,

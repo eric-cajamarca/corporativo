@@ -48,7 +48,7 @@
         <!-- Fila de búsqueda y filtros (como en historial ventas) -->
         <div class="row g-2 align-items-end mb-3 compras-filtros-row">
           <div class="col-12 col-sm-6 col-lg-auto">
-            <select class="form-select form-select-sm w-100 compras-filtro-control" [(ngModel)]="filtroFecha">
+            <select class="form-select form-select-sm w-100 compras-filtro-control" [(ngModel)]="filtroFecha" (ngModelChange)="onFiltroCambio()">
               <option value="all">Todos</option>
               <option value="today">Hoy</option>
               <option value="month">Este mes</option>
@@ -56,22 +56,22 @@
             </select>
           </div>
           <div class="col-12 col-sm-6 col-lg-auto" *ngIf="filtroFecha === 'range'">
-            <input type="date" class="form-control form-control-sm w-100" [(ngModel)]="fechaDesde" title="Desde">
+            <input type="date" class="form-control form-control-sm w-100" [(ngModel)]="fechaDesde" (ngModelChange)="onFiltroCambio()" title="Desde">
           </div>
           <div class="col-12 col-sm-6 col-lg-auto" *ngIf="filtroFecha === 'range'">
-            <input type="date" class="form-control form-control-sm w-100" [(ngModel)]="fechaHasta" title="Hasta">
+            <input type="date" class="form-control form-control-sm w-100" [(ngModel)]="fechaHasta" (ngModelChange)="onFiltroCambio()" title="Hasta">
           </div>
           <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="text" class="form-control form-control-sm w-100 compras-filtro-control" [(ngModel)]="filtroNumero" placeholder="N° Comprobante">
+            <input type="text" class="form-control form-control-sm w-100 compras-filtro-control" [(ngModel)]="filtroNumero" (input)="onBusquedaInput()" placeholder="N° Comprobante">
           </div>
           <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="text" class="form-control form-control-sm w-100 compras-filtro-control" [(ngModel)]="filtroRuc" placeholder="RUC">
+            <input type="text" class="form-control form-control-sm w-100 compras-filtro-control" [(ngModel)]="filtroRuc" (input)="onBusquedaInput()" placeholder="RUC">
           </div>
           <div class="col-12 col-sm-6 col-lg-auto">
-            <input type="text" class="form-control form-control-sm w-100 compras-filtro-control" [(ngModel)]="filtroProveedor" placeholder="Proveedor">
+            <input type="text" class="form-control form-control-sm w-100 compras-filtro-control" [(ngModel)]="filtroProveedor" (input)="onBusquedaInput()" placeholder="Proveedor">
           </div>
           <div class="col-12 col-sm-6 col-lg-auto">
-            <select class="form-select form-select-sm w-100 compras-filtro-control" [(ngModel)]="filtroTipoComprobante">
+            <select class="form-select form-select-sm w-100 compras-filtro-control" [(ngModel)]="filtroTipoComprobante" (ngModelChange)="onFiltroCambio()">
               <option value="">Tipo</option>
               <option value="Factura">Factura</option>
               <option value="Boleta">Boleta</option>
@@ -81,7 +81,6 @@
           </div>
           <div class="col-12 col-lg-auto d-flex flex-wrap gap-1">
             <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1 flex-lg-grow-0" (click)="limpiarFiltros()">Limpiar</button>
-            <button type="button" class="btn btn-sm btn-primary flex-grow-1 flex-lg-grow-0" (click)="aplicarFiltros()"><i class="bi bi-search"></i> Buscar</button>
           </div>
         </div>
       </div>
@@ -102,7 +101,7 @@
             </thead>
             <tbody>
               
-                <tr *ngFor="let item of compras | slice: (page-1) * pageSize : page * pageSize">
+                <tr *ngFor="let item of compras">
                   <td class="fw-medium" data-label="Comprobante">{{item.compCompra}}</td>
                   <td data-label="F. emisión">{{item.fEmision}}</td>
                   <td data-label="Proveedor">
@@ -294,7 +293,7 @@
     <div class="card-footer bg-white" *ngIf="compras.length > 0">
       <ngb-pagination [(page)]="page"
                       [pageSize]="pageSize"
-                      [collectionSize]="compras.length"
+                      [collectionSize]="totalCompras"
                       [maxSize]="maxSize"
                       [rotate]="true"
                       [boundaryLinks]="true"

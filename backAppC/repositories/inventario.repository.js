@@ -721,6 +721,89 @@ exports.obtenerStockAgregadoProductoSucursalUbicacion = async (conn, idEmpresa, 
   return row ? Number(row.stock) || 0 : 0;
 };
 
+const FILTRO_LOTE_ACTIVO = ' AND ISNULL(activo, 1) = 1';
+const ORDER_LOTE_RECIENTE = 'fechaIngreso DESC, idLote DESC';
+
+/**
+ * Costo sugerido para entradas de inventario: último lote con stock en sucursal,
+ * luego último lote de la sucursal, luego Productos.cUnitario.
+ */
+exports.obtenerCostoSugeridoProducto = async (conn, idEmpresa, idProducto, idSucursal) => {
+  const leerCostoLote = async (whereExtra) => {
+    const r = await conn
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .input('idProducto', sql.UniqueIdentifier, idProducto)
+      .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+      .query(`
+        SELECT TOP 1 CAST(ISNULL(costoUnitario, 0) AS DECIMAL(18, 6)) AS costoUnitario
+        FROM Lotes
+        WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto AND idSucursal = @idSucursal
+          ${whereExtra}${FILTRO_LOTE_ACTIVO}
+        ORDER BY ${ORDER_LOTE_RECIENTE}
+      `);
+    const row = r.recordset && r.recordset[0];
+    return row ? Number(row.costoUnitario) || 0 : 0;
+  };
+
+  if (idSucursal) {
+    const conStock = await leerCostoLote('AND cantidadDisponible > 0');
+    if (conStock > 0) {
+      return { costoUnitario: conStock, origen: 'lote_con_stock' };
+    }
+    const ultimoLote = await leerCostoLote('');
+    if (ultimoLote > 0) {
+      return { costoUnitario: ultimoLote, origen: 'lote_reciente' };
+    }
+  }
+
+  const catalogo = await exports.obtenerCostoUnitarioProducto(conn, idEmpresa, idProducto);
+  return { costoUnitario: catalogo, origen: 'catalogo' };
+};
+
+/**
+ * Si el lote más reciente del producto tiene costo 0, actualiza su costo unitario.
+ * Usado al corregir cUnitario desde Precios.
+ */
+exports.actualizarCostoLoteRecienteSiCero = async (conn, idEmpresa, idProducto, nuevoCosto) => {
+  const costo = Number(nuevoCosto);
+  if (!Number.isFinite(costo) || costo < 0) {
+    return { actualizado: false };
+  }
+
+  const r = await conn
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT TOP 1 idLote, CAST(ISNULL(costoUnitario, 0) AS DECIMAL(18, 6)) AS costoUnitario
+      FROM Lotes
+      WHERE idEmpresa = @idEmpresa AND idProducto = @idProducto
+      ORDER BY ${ORDER_LOTE_RECIENTE}
+    `);
+  const row = r.recordset && r.recordset[0];
+  if (!row || !row.idLote) {
+    return { actualizado: false };
+  }
+  const costoActual = Number(row.costoUnitario) || 0;
+  if (Math.abs(costoActual) > 1e-9) {
+    return { actualizado: false };
+  }
+
+  await conn
+    .request()
+    .input('idLote', sql.UniqueIdentifier, row.idLote)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('costoUnitario', sql.Decimal(18, 6), costo)
+    .query(`
+      UPDATE Lotes
+      SET costoUnitario = @costoUnitario
+      WHERE idLote = @idLote AND idEmpresa = @idEmpresa
+    `);
+
+  return { actualizado: true, idLote: row.idLote };
+};
+
 /** Costo unitario del catálogo (para reajuste positivo). */
 exports.obtenerCostoUnitarioProducto = async (conn, idEmpresa, idProducto) => {
   const r = await conn.request()

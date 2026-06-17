@@ -21,6 +21,8 @@ api.get('/compras', auth.auth, comprasController.obtener_compras_todos);
 api.get('/compras/:id', auth.auth, comprasController.obtener_compras_id);
 
 api.post('/compras', auth.auth, comprasController.crear_compra);
+api.post('/compras/completa', auth.auth, comprasController.crear_compra_completa);
+api.get('/compras/bootstrap', auth.auth, comprasController.getBootstrapCompra);
 api.put('/compras/:id',auth.auth, comprasController.editar_compra);
 api.delete('/compras/:id',auth.auth, comprasController.eliminar_idcompra_empresa);
 
