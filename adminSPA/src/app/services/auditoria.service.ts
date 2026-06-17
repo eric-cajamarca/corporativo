@@ -6,6 +6,7 @@ import { environment } from '../../environments/environment';
 export interface AuditoriaFiltros {
   idUsuario?: string;
   accion?: string;
+  modulo?: string;
   fechaDesde?: string;
   fechaHasta?: string;
   pagina?: number;
@@ -19,6 +20,8 @@ export interface AuditoriaItem {
   accion: string;
   tablaAfectada: string | null;
   idRegistroAfectado: string | null;
+  referencia: string | null;
+  detalle: string | null;
   fechaAccion: string;
   ipAddress: string | null;
   userAgent: string | null;
@@ -38,6 +41,7 @@ export class AuditoriaService {
     const params: Record<string, string> = {};
     if (filtros['idUsuario']) params['idUsuario'] = filtros['idUsuario'];
     if (filtros['accion']) params['accion'] = filtros['accion'];
+    if (filtros['modulo']) params['modulo'] = filtros['modulo'];
     if (filtros['fechaDesde']) params['fechaDesde'] = filtros['fechaDesde'];
     if (filtros['fechaHasta']) params['fechaHasta'] = filtros['fechaHasta'];
     if (filtros['pagina'] != null) params['pagina'] = String(filtros['pagina']);

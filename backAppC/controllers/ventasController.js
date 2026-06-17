@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const ventasOrquestacion = require('../services/ventasOrquestacion.service');
+const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 const { withPool } = require('../utils/dbPool.util');
 
@@ -13,9 +14,12 @@ const crearVenta = async function (req, res) {
   }
 
   try {
-    await withPool((pool) =>
+    const idVenta = await withPool((pool) =>
       ventasService.crearVentaCabeceraConTransaccion(pool, datosVenta, req.user.empresa, idUsuario)
     );
+    if (idVenta != null) {
+      auditoriaOperaciones.auditarVenta(req, 'CREAR', idVenta, datosVenta?.compVenta || null);
+    }
     res.status(201).json({ message: 'Venta creada correctamente' });
   } catch (error) {
     console.error('Error al crear la venta:', error);
@@ -214,6 +218,7 @@ const crearVentaCompleta = async (req, res) => {
   }
   try {
     const resultado = await ventasService.crearVentaCorporativaCompleta(req.body, req.user);
+    auditoriaOperaciones.auditarVentasCreadas(req, resultado);
     res.json({
       success: true,
       idVentaAgrupada: resultado.idVentaAgrupada,
@@ -380,6 +385,12 @@ const actualizarVentaEdicion = async (req, res) => {
     if (!out.ok) {
       return res.status(out.status).json({ error: out.error });
     }
+    auditoriaOperaciones.auditarVenta(
+      req,
+      'EDITAR',
+      idVenta,
+      cabecera?.compVenta || null
+    );
     res.json({ message: 'Venta actualizada correctamente' });
   } catch (error) {
     console.error('Error al actualizar venta (edición):', error);
@@ -544,6 +555,13 @@ const crearVentaDesdeVale = async (req, res) => {
           fEmision
         });
         await transaction.commit();
+        auditoriaOperaciones.auditarVenta(
+          req,
+          'CREAR',
+          resultado?.idVenta,
+          resultado?.compVenta || null,
+          'Desde vale de despacho'
+        );
         res.status(201).json({ success: true, data: resultado });
       } catch (error) {
         await transaction.rollback();
@@ -596,6 +614,7 @@ const anularVenta = async (req, res) => {
     if (result.ok === false) {
       return res.status(400).json({ error: result.error || 'No se pudo anular' });
     }
+    auditoriaOperaciones.auditarVenta(req, 'ANULAR', idVenta, result.compVenta || null);
     res.json({ message: 'Comprobante anulado correctamente. El stock ha sido restaurado.' });
   } catch (error) {
     console.error('Error anularVenta:', error);

@@ -124,6 +124,12 @@ const createEmpresa = async function (req, res, next) {
             const hashedPassword = await bcrypt.hash(password, 8);
             const idEmpresa = uuidv4();
 
+            const idRubroResuelto = await empresaService.resolverIdRubroDesdeTexto(
+                pool,
+                rubro,
+                req.body.idRubro || null
+            );
+
             await empresasAdministracionService.insertarEmpresa(pool, {
                 idEmpresa,
                 idDocumento,
@@ -131,7 +137,7 @@ const createEmpresa = async function (req, res, next) {
                 razon_Social,
                 nombreComercial: nombre_Comercial,
                 rubro,
-                idRubro: req.body.idRubro || null,
+                idRubro: idRubroResuelto,
                 celular,
                 correo,
                 password: hashedPassword,

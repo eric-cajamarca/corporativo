@@ -1,4 +1,5 @@
 const comprasService = require('../services/compras.service');
+const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 
 const obtener_compras_todos = async (req, res, next) => {
     if (!req.user) {
@@ -89,6 +90,12 @@ const crear_compra = async (req, res, next) => {
     const idUsuario = req.user.sub || req.user.idUsuario;
     try {
         const resultado = await comprasService.crearCompra(idEmpresa, idUsuario, req.body);
+        auditoriaOperaciones.auditarCompra(
+            req,
+            'CREAR',
+            resultado.idCompra,
+            req.body?.compCompra || null
+        );
         res.status(200).send({ data: resultado.idCompra });
     } catch (error) {
         console.error('crear_compra:', error);
@@ -114,6 +121,12 @@ const editar_compra = async (req, res, next) => {
     const idUsuario = req.body.idUsuario || req.user.sub || req.user.idUsuario;
     try {
         const rowsAffected = await comprasService.editarCompra(idEmpresa, idUsuario, idCompra, req.body);
+        auditoriaOperaciones.auditarCompra(
+            req,
+            'EDITAR',
+            idCompra,
+            req.body?.compCompra || null
+        );
         res.status(200).send({ message: 'Compra editada correctamente', data: rowsAffected });
     } catch (error) {
         console.error('editar_compra:', error);

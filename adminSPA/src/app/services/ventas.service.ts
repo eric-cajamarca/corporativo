@@ -374,6 +374,9 @@ export interface ComprobantePdfData {
     tieneDespachos?: boolean;
     /** Si true, el backend no permite editar (hay NC/ND vinculadas). */
     tieneNotasCreditoDebito?: boolean;
+    usuarioRegistro?: string;
+    usuarioModifica?: string;
+    fModificacion?: string | null;
     cuotas?: Array<{ numeroCuota?: number; fechaPago?: string; total?: number }>;
   };
   empresa: {

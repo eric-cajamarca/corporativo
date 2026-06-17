@@ -1,34 +1,101 @@
 const { v4: uuidv4 } = require('uuid');
 const sql = require('mssql');
 const empresasAdministracionRepository = require('../repositories/empresasAdministracion.repository');
+const permisosRepository = require('../repositories/permisos.repository');
+const categoriaRepository = require('../repositories/categoria.repository');
+const clientesRepository = require('../repositories/clientes.repository');
+const marcaRepository = require('../repositories/marca.repository');
+const cajaRepository = require('../repositories/caja.repository');
+const rubrosRepository = require('../repositories/rubros.repository');
 const authService = require('./auth.service');
 
 /** Catálogo inicial de comprobantes por sucursal (alta empresa o al pasar a series propias). */
 const COMPROBANTES_PREDETERMINADOS = [
-  { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1 },
-  { codigo: '03', nombre: 'Boleta Electrónica', serie: 'B001', numero: 0, activo: 1 },
-  { codigo: 'F7', nombre: 'N.C. Electrónica (Factura)', serie: 'FC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-  { codigo: 'B7', nombre: 'N.C. Electrónica (Boleta)', serie: 'BC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-  { codigo: 'F8', nombre: 'N.D. Electrónica (Factura)', serie: 'FD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-  { codigo: 'B8', nombre: 'N.D. Electrónica (Boleta)', serie: 'BD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
-  { codigo: '09', nombre: 'Guía de Remisión Electrónica - Remitente', serie: 'T001', numero: 0, activo: 1 },
-  { codigo: '31', nombre: 'Guía de Remisión Electrónica - Transportista', serie: 'V001', numero: 0, activo: 1 },
-  { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1 },
-  { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1 },
-  { codigo: 'NV', nombre: 'Nota de venta', serie: 'NV01', numero: 0, activo: 1 },
-  { codigo: 'CT', nombre: 'Cotización', serie: 'CT01', numero: 0, activo: 1 },
-  { codigo: 'RE', nombre: 'Recibo de Egreso', serie: 'RE01', numero: 0, activo: 1 },
-  { codigo: 'RI', nombre: 'Recibo de Ingreso', serie: 'RI01', numero: 0, activo: 1 },
-  { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1 },
-  { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1 },
-  { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1 },
-  { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1 },
-  { codigo: 'II', nombre: 'Inventario Inicial', serie: 'II01', numero: 0, activo: 1 },
-  { codigo: 'IN', nombre: 'Ingreso', serie: 'IN01', numero: 0, activo: 1 },
-  { codigo: 'IV', nombre: 'Inventario', serie: 'IV01', numero: 0, activo: 1 },
-  { codigo: 'SA', nombre: 'Salida', serie: 'SA01', numero: 0, activo: 1 },
-  { codigo: 'TF', nombre: 'Transferencia', serie: 'TF01', numero: 0, activo: 1 }
+  { codigo: '01', nombre: 'Factura Electronica', serie: 'F001', numero: 0, activo: 1, usarEnVenta: true, usarEnCompra: true },
+  { codigo: '03', nombre: 'Boleta Electrónica', serie: 'B001', numero: 0, activo: 1, usarEnVenta: true, usarEnCompra: true },
+  { codigo: 'F7', nombre: 'N.C. Electrónica (Factura)', serie: 'FC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'B7', nombre: 'N.C. Electrónica (Boleta)', serie: 'BC01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'F8', nombre: 'N.D. Electrónica (Factura)', serie: 'FD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'B8', nombre: 'N.D. Electrónica (Boleta)', serie: 'BD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: '09', nombre: 'Guía de Remisión Electrónica - Remitente', serie: 'T001', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: true },
+  { codigo: '31', nombre: 'Guía de Remisión Electrónica - Transportista', serie: 'V001', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'RA', nombre: 'Comunicación de baja', serie: '-', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'RC', nombre: 'Resumen diario', serie: '-', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'NV', nombre: 'Nota de venta', serie: 'NV01', numero: 0, activo: 1, usarEnVenta: true, usarEnCompra: true },
+  { codigo: 'CT', nombre: 'Cotización', serie: 'CT01', numero: 0, activo: 1, usarEnVenta: true, usarEnCompra: false },
+  { codigo: 'RE', nombre: 'Recibo de Egreso', serie: 'RE01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'RI', nombre: 'Recibo de Ingreso', serie: 'RI01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'RP', nombre: 'Recibo de pago', serie: 'RP01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'TK', nombre: 'Ticket de despacho', serie: 'TK01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'NE', nombre: 'Nota de envío', serie: 'NE01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'VD', nombre: 'Vale Despacho', serie: 'VD01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'II', nombre: 'Inventario Inicial', serie: 'II01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'IN', nombre: 'Ingreso', serie: 'IN01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'IV', nombre: 'Inventario', serie: 'IV01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'SA', nombre: 'Salida', serie: 'SA01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false },
+  { codigo: 'TF', nombre: 'Transferencia', serie: 'TF01', numero: 0, activo: 1, usarEnVenta: false, usarEnCompra: false }
 ];
+
+/** Tributos mínimos para operar (Catálogo 05 SUNAT). */
+const IMPUESTOS_PREDETERMINADOS = [
+  { descripcion: 'Exonerado', codigoSunat: '9997', porcentaje: 0, pIncluyeIGV: false, estado: 1 },
+  { descripcion: 'IGV', codigoSunat: '1000', porcentaje: 18, pIncluyeIGV: true, estado: 0 }
+];
+
+/** Permisos iniciales por rol operativo (Administrador recibe todos en runtime). */
+const PERMISOS_PRESET_POR_ROL = {
+  Vendedor: [
+    'VER_VENTAS', 'CREAR_VENTAS', 'EDITAR_VENTAS',
+    'VER_CLIENTES', 'CREAR_CLIENTES', 'EDITAR_CLIENTES',
+    'VER_PRODUCTOS',
+    'VER_CAJA', 'ABRIR_CAJA', 'CERRAR_CAJA', 'REGISTRAR_MOVIMIENTOS',
+    'VER_CREDITOS', 'REGISTRAR_PAGOS',
+    'VER_DESPACHOS', 'CREAR_DESPACHOS'
+  ],
+  Almacenero: [
+    'VER_COMPRAS', 'CREAR_COMPRAS', 'EDITAR_COMPRAS', 'REPORTE_DETALLADO_COMPRAS',
+    'VER_INVENTARIO', 'GESTIONAR_LOTES', 'TRANSFERIR_STOCK',
+    'VER_PRODUCTOS', 'CREAR_PRODUCTOS', 'EDITAR_PRODUCTOS',
+    'VER_PROVEEDORES', 'CREAR_PROVEEDORES', 'EDITAR_PROVEEDORES',
+    'VER_DESPACHOS', 'CREAR_DESPACHOS', 'EDITAR_DESPACHOS',
+    'VER_ENVIOS', 'VER_ENVIOS_CHOFER'
+  ],
+  Contador: [
+    'VER_VENTAS', 'REPORTE_DETALLADO_VENTAS',
+    'VER_COMPRAS', 'REPORTE_DETALLADO_COMPRAS',
+    'VER_INVENTARIO',
+    'VER_ANALISIS', 'EXPORTAR_REPORTES',
+    'VER_REPORTES', 'GENERAR_REPORTES',
+    'VER_CAJA', 'VER_ARQUEO',
+    'VER_CREDITOS',
+    'VER_CLIENTES',
+    'VER_PROVEEDORES'
+  ]
+};
+
+/** Categorías base para el primer alta de productos. */
+const CATEGORIAS_PREDETERMINADAS = [
+  { nombre: 'General', descripcion: 'Productos de uso general', estado: 1 },
+  { nombre: 'Servicios', descripcion: 'Servicios prestados por la empresa', estado: 1 },
+  { nombre: 'Varios', descripcion: 'Productos sin categoría específica', estado: 1 }
+];
+
+/** Marca genérica para productos sin marca (importación y altas rápidas). */
+const MARCAS_PREDETERMINADAS = [
+  { nombre: 'SM', descripcion: 'Sin marca', contacto: '', paginaWeb: '' }
+];
+
+/** Cliente genérico para boletas / ventas sin identificar al comprador (DNI 00000000). */
+const CLIENTE_PUBLICO_GENERAL = {
+  idDocumento: '1',
+  ruc: '00000000',
+  rSocial: 'PUBLICO EN GENERAL',
+  correo: null,
+  celular: null,
+  condicion: null,
+  sujetoCredito: false,
+  lineaCredito: 0
+};
 
 /**
  * Obtiene datos de empresa/usuario para la respuesta de getEmpresa_login (verificación de token).
@@ -121,8 +188,8 @@ exports.crearComprobantesPredeterminados = async (pool, idEmpresa, idSucursal) =
     }
     try {
         for (const comp of COMPROBANTES_PREDETERMINADOS) {
-            const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
-            const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
+            const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : false;
+            const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : false;
             const result = await pool.request()
                 .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
                 .input('idSucursal', sql.UniqueIdentifier, idSucursal)
@@ -162,8 +229,8 @@ exports.asegurarComprobantesPredeterminadosPorSucursal = async (pool, idEmpresa,
   const insertados = [];
   try {
     for (const comp of COMPROBANTES_PREDETERMINADOS) {
-      const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : true;
-      const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : true;
+      const usarEnVenta = comp.usarEnVenta !== undefined ? !!comp.usarEnVenta : false;
+      const usarEnCompra = comp.usarEnCompra !== undefined ? !!comp.usarEnCompra : false;
       const result = await pool
         .request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -531,6 +598,12 @@ exports.verificarEmpresaPorCodigo = async (pool, idEmpresa, codigo) => {
             UPDATE Empresas SET estado = 1 WHERE idEmpresa = @idEmpresa
         `);
 
+    try {
+        await exports.asegurarDatosMaestrosEmpresa(pool, idEmpresa);
+    } catch (errMaestros) {
+        console.error('verificarEmpresaPorCodigo asegurarDatosMaestros:', errMaestros.message);
+    }
+
     return { ok: true };
 };
 
@@ -689,7 +762,9 @@ exports.crearConceptosPredeterminados = async (pool, idEmpresa, mapClasificacion
         { descripcion: 'Venta de activo', tipo: 'INGRESO', clasificacion: 'Otros ingresos', tipoMovNombre: 'INGRESOS' },
         { descripcion: 'Multa', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' },
         { descripcion: 'Pérdida', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' },
-        { descripcion: 'Retiro de socio', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' }
+        { descripcion: 'Retiro de socio', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Cierre de caja', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' },
+        { descripcion: 'Entrega de dinero', tipo: 'EGRESO', clasificacion: 'Otros egresos', tipoMovNombre: 'EGRESOS' }
     ];
 
     const conceptosCreados = [];
@@ -717,6 +792,377 @@ exports.crearConceptosPredeterminados = async (pool, idEmpresa, mapClasificacion
     }
 };
 
+/**
+ * Crea los tributos predeterminados (Exonerado e IGV) para una nueva empresa.
+ */
+exports.crearImpuestosPredeterminados = async (pool, idEmpresa) => {
+    const impuestosCreados = [];
+    try {
+        for (const imp of IMPUESTOS_PREDETERMINADOS) {
+            const result = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('descripcion', sql.VarChar(50), imp.descripcion)
+                .input('codigoSunat', sql.VarChar(4), imp.codigoSunat)
+                .input('estado', sql.Bit, imp.estado ? 1 : 0)
+                .input('porcentaje', sql.Decimal(5, 2), imp.porcentaje)
+                .input('pIncluyeIGV', sql.Bit, imp.pIncluyeIGV ? 1 : 0)
+                .query(`
+                    INSERT INTO Impuestos (idEmpresa, descripcion, codigoSunat, estado, porcentaje, pIncluyeIGV)
+                    OUTPUT INSERTED.idImpuesto, INSERTED.descripcion
+                    SELECT @idEmpresa, @descripcion, @codigoSunat, @estado, @porcentaje, @pIncluyeIGV
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM Impuestos i
+                        WHERE i.idEmpresa = @idEmpresa AND i.codigoSunat = @codigoSunat
+                    )
+                `);
+            if (result.recordset && result.recordset[0]) {
+                impuestosCreados.push(result.recordset[0]);
+            }
+        }
+        return impuestosCreados;
+    } catch (error) {
+        console.error('Error creando impuestos predeterminados:', error);
+        throw new Error('Error al crear impuestos predeterminados: ' + error.message);
+    }
+};
+
+/**
+ * Inicializa permisos y los asigna a roles predeterminados (Admin: todos; demás: preset).
+ */
+exports.inicializarPermisosPredeterminados = async (pool, idEmpresa, rolesCreados) => {
+    await permisosRepository.inicializarPermisosDefecto(pool, idEmpresa);
+    const permisos = await permisosRepository.obtenerPermisosPorEmpresa(pool, idEmpresa);
+    const resumen = {};
+
+    const rolAdmin = (rolesCreados || []).find((r) => r.descripcion === 'Administrador');
+    if (!rolAdmin || !rolAdmin.idRol) {
+        throw new Error('No se encontró el rol Administrador para asignar permisos');
+    }
+    for (const permiso of permisos) {
+        await permisosRepository.asignarPermisoARol(pool, rolAdmin.idRol, permiso.idPermiso);
+    }
+    resumen.Administrador = permisos.length;
+
+    for (const [nombreRol, nombresPermisos] of Object.entries(PERMISOS_PRESET_POR_ROL)) {
+        const rol = (rolesCreados || []).find((r) => r.descripcion === nombreRol);
+        if (!rol || !rol.idRol) continue;
+        const asignados = await permisosRepository.asignarPermisosPorNombresARol(
+            pool,
+            idEmpresa,
+            rol.idRol,
+            nombresPermisos
+        );
+        resumen[nombreRol] = asignados.count;
+    }
+
+    return resumen;
+};
+
+/** @deprecated Use inicializarPermisosPredeterminados */
+exports.inicializarPermisosAdministrador = exports.inicializarPermisosPredeterminados;
+
+/**
+ * Crea categorías base (General, Servicios) si no existen.
+ */
+exports.crearCategoriasPredeterminadas = async (pool, idEmpresa) => {
+    const categoriasCreadas = [];
+    try {
+        for (const cat of CATEGORIAS_PREDETERMINADAS) {
+            const existente = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('nombre', sql.VarChar(200), cat.nombre)
+                .query(`
+                    SELECT TOP 1 idCategoria, nombre
+                    FROM Categorias
+                    WHERE idEmpresa = @idEmpresa AND LTRIM(RTRIM(nombre)) = @nombre
+                `);
+            if (existente.recordset && existente.recordset[0]) {
+                categoriasCreadas.push(existente.recordset[0]);
+                continue;
+            }
+            const insertado = await categoriaRepository.insertar(pool, idEmpresa, cat);
+            if (insertado) {
+                categoriasCreadas.push({ idCategoria: insertado.idCategoria, nombre: cat.nombre });
+            }
+        }
+        return categoriasCreadas;
+    } catch (error) {
+        console.error('Error creando categorías predeterminadas:', error);
+        throw new Error('Error al crear categorías predeterminadas: ' + error.message);
+    }
+};
+
+/** Palabras clave del giro SUNAT/texto libre → código de rubro en catálogo Rubros. */
+const RUBRO_TEXTO_A_CODIGO = [
+    { codigo: 'GRF', patrones: ['grifo', 'combustible', 'gasolina', 'petroleo', 'petróleo', 'estacion de servicio', 'estación de servicio'] },
+    { codigo: 'FERR', patrones: ['ferreter', 'ferret'] },
+    { codigo: 'HOTEL', patrones: ['hotel', 'hospedaje', 'hostal'] },
+    { codigo: 'REST', patrones: ['restaur', 'comida', 'cafeteria', 'cafetería'] },
+    { codigo: 'ROPA', patrones: ['ropa', 'vestimenta', 'moda', 'calzado'] },
+    { codigo: 'RETAIL', patrones: ['retail', 'comercio', 'tienda', 'minimarket', 'bodega'] }
+];
+
+/**
+ * Resuelve idRubro a partir de texto libre (giro SUNAT) o idRubro explícito del body.
+ */
+exports.resolverIdRubroDesdeTexto = async (pool, rubroTexto, idRubroExplicito = null) => {
+    if (idRubroExplicito != null && idRubroExplicito !== '') {
+        const idNum = typeof idRubroExplicito === 'string' ? parseInt(idRubroExplicito, 10) : idRubroExplicito;
+        if (Number.isFinite(idNum) && idNum > 0) {
+            const rub = await rubrosRepository.obtenerPorId(pool, idNum);
+            if (rub) return idNum;
+        }
+    }
+    const texto = String(rubroTexto || '').trim().toLowerCase();
+    if (!texto) return null;
+    for (const regla of RUBRO_TEXTO_A_CODIGO) {
+        if (regla.patrones.some((p) => texto.includes(p))) {
+            const rub = await rubrosRepository.obtenerPorCodigo(pool, regla.codigo);
+            if (rub) return rub.idRubro;
+        }
+    }
+    try {
+        const rubros = await rubrosRepository.listar(pool, { activo: true });
+        const coincidencia = (rubros || []).find((r) => {
+            const nombre = String(r.nombre || '').trim().toLowerCase();
+            const codigo = String(r.codigo || '').trim().toLowerCase();
+            return texto === nombre || texto.includes(nombre) || nombre.includes(texto) || texto === codigo;
+        });
+        if (coincidencia) return coincidencia.idRubro;
+    } catch (_) {
+        /* ignore */
+    }
+    return null;
+};
+
+/**
+ * Asegura catálogos mínimos (categorías, marca SM, cliente público) y idRubro si falta.
+ * Idempotente: puede ejecutarse varias veces sin duplicar.
+ */
+exports.asegurarDatosMaestrosEmpresa = async (pool, idEmpresa) => {
+    const resultado = {
+        categorias: [],
+        marcas: [],
+        clientePublico: null,
+        idRubro: null
+    };
+    resultado.categorias = await exports.crearCategoriasPredeterminadas(pool, idEmpresa);
+    resultado.marcas = await exports.crearMarcasPredeterminadas(pool, idEmpresa);
+    resultado.clientePublico = await exports.crearClientePublicoGeneral(pool, idEmpresa);
+
+    const empRes = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query('SELECT rubro, idRubro FROM Empresas WHERE idEmpresa = @idEmpresa');
+    const emp = empRes.recordset && empRes.recordset[0] ? empRes.recordset[0] : null;
+    if (emp && (emp.idRubro == null || emp.idRubro === '')) {
+        const idRubro = await exports.resolverIdRubroDesdeTexto(pool, emp.rubro, null);
+        if (idRubro) {
+            await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('idRubro', sql.Int, idRubro)
+                .query('UPDATE Empresas SET idRubro = @idRubro WHERE idEmpresa = @idEmpresa');
+            resultado.idRubro = idRubro;
+        }
+    }
+    return resultado;
+};
+
+/**
+ * Indica si faltan datos maestros mínimos creados al registrar la empresa.
+ */
+async function empresaNecesitaDatosMaestros(pool, idEmpresa) {
+    const catsRes = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT LTRIM(RTRIM(nombre)) AS nombre
+            FROM Categorias
+            WHERE idEmpresa = @idEmpresa
+        `);
+    const nombresCat = new Set((catsRes.recordset || []).map((r) => String(r.nombre || '').trim()));
+    const faltanCategorias = CATEGORIAS_PREDETERMINADAS.some((c) => !nombresCat.has(c.nombre));
+
+    const marRes = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            SELECT COUNT(*) AS total
+            FROM Marcas
+            WHERE idEmpresa = @idEmpresa AND LTRIM(RTRIM(nombre)) = 'SM'
+        `);
+    const faltaMarca = (marRes.recordset[0]?.total || 0) < 1;
+
+    const clientePg = await clientesRepository.obtenerPorRuc(pool, idEmpresa, CLIENTE_PUBLICO_GENERAL.ruc);
+    const nombreClienteOk = clientePg
+        && String(clientePg.rSocial || '').trim().toUpperCase() === CLIENTE_PUBLICO_GENERAL.rSocial;
+    const faltaCliente = !clientePg || !nombreClienteOk;
+
+    const empRes = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query('SELECT rubro, idRubro FROM Empresas WHERE idEmpresa = @idEmpresa');
+    const emp = empRes.recordset && empRes.recordset[0] ? empRes.recordset[0] : null;
+    const faltaIdRubro = !!(emp && emp.rubro && (emp.idRubro == null || emp.idRubro === ''));
+
+    return faltanCategorias || faltaMarca || faltaCliente || faltaIdRubro;
+}
+
+/**
+ * Crea el cliente público general (DNI 00000000) para ventas sin identificar comprador.
+ */
+exports.crearClientePublicoGeneral = async (pool, idEmpresa) => {
+    try {
+        const existente = await clientesRepository.obtenerPorRuc(pool, idEmpresa, CLIENTE_PUBLICO_GENERAL.ruc);
+        if (existente) {
+            const nombreOk = String(existente.rSocial || '').trim().toUpperCase() === CLIENTE_PUBLICO_GENERAL.rSocial;
+            if (!nombreOk) {
+                await pool.request()
+                    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                    .input('idCliente', sql.Int, existente.idCliente)
+                    .input('rSocial', sql.VarChar, CLIENTE_PUBLICO_GENERAL.rSocial)
+                    .query(`
+                        UPDATE Clientes
+                        SET rSocial = @rSocial
+                        WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa
+                    `);
+                existente.rSocial = CLIENTE_PUBLICO_GENERAL.rSocial;
+            }
+            return { ...existente, existente: true, actualizado: !nombreOk };
+        }
+        await clientesRepository.insertar(pool, {
+            idEmpresa,
+            ...CLIENTE_PUBLICO_GENERAL
+        });
+        const creado = await clientesRepository.obtenerPorRuc(pool, idEmpresa, CLIENTE_PUBLICO_GENERAL.ruc);
+        return creado ? { ...creado, existente: false } : null;
+    } catch (error) {
+        console.error('Error creando cliente público general:', error);
+        throw new Error('Error al crear cliente público general: ' + error.message);
+    }
+};
+
+/**
+ * Crea marcas base (SM = sin marca) si no existen.
+ */
+exports.crearMarcasPredeterminadas = async (pool, idEmpresa) => {
+    const marcasCreadas = [];
+    try {
+        for (const marca of MARCAS_PREDETERMINADAS) {
+            const existente = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .input('nombre', sql.VarChar(50), marca.nombre)
+                .query(`
+                    SELECT TOP 1 idMarca, nombre
+                    FROM Marcas
+                    WHERE idEmpresa = @idEmpresa AND LTRIM(RTRIM(nombre)) = @nombre
+                `);
+            if (existente.recordset && existente.recordset[0]) {
+                marcasCreadas.push(existente.recordset[0]);
+                continue;
+            }
+            const insertado = await marcaRepository.insertar(pool, idEmpresa, marca);
+            if (insertado) {
+                marcasCreadas.push({ idMarca: insertado.idMarca, nombre: marca.nombre });
+            }
+        }
+        return marcasCreadas;
+    } catch (error) {
+        console.error('Error creando marcas predeterminadas:', error);
+        throw new Error('Error al crear marcas predeterminadas: ' + error.message);
+    }
+};
+
+/**
+ * Crea la caja principal de la sucursal principal si no existe.
+ */
+exports.crearCajaPrincipalPredeterminada = async (pool, idEmpresa, idSucursal) => {
+    if (!idSucursal) {
+        throw new Error('idSucursal es requerido para crear caja principal');
+    }
+    try {
+        const existente = await pool.request()
+            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+            .input('idSucursal', sql.UniqueIdentifier, idSucursal)
+            .query(`
+                SELECT TOP 1 idCaja, nombre
+                FROM Cajas
+                WHERE idEmpresa = @idEmpresa AND idSucursal = @idSucursal AND ISNULL(estado, 1) = 1
+                ORDER BY CASE WHEN nombre = 'Caja Principal' THEN 0 ELSE 1 END
+            `);
+        if (existente.recordset && existente.recordset[0]) {
+            return { ...existente.recordset[0], existente: true };
+        }
+        const creada = await cajaRepository.crearCajaRepo(pool, idEmpresa, {
+            idSucursal,
+            nombre: 'Caja Principal',
+            descripcion: 'Caja predeterminada de la sucursal principal'
+        });
+        return creada ? { idCaja: creada.idCaja, nombre: 'Caja Principal', existente: false } : null;
+    } catch (error) {
+        console.error('Error creando caja principal predeterminada:', error);
+        throw new Error('Error al crear caja principal predeterminada: ' + error.message);
+    }
+};
+
+/**
+ * Construye pasos del wizard de onboarding para el frontend.
+ */
+function construirPasosOnboarding(flags) {
+    return [
+        {
+            id: 'empresa',
+            orden: 1,
+            titulo: 'Datos de empresa',
+            descripcion: 'Sube el logo y completa rubro y celular',
+            completo: !!flags.empresaCompleta,
+            ruta: '/editar-empresa',
+            icono: 'bi-building'
+        },
+        {
+            id: 'colaborador',
+            orden: 2,
+            titulo: 'Primer usuario',
+            descripcion: 'Crea un colaborador (recomendado: rol Administrador)',
+            completo: !!flags.tieneColaboradores,
+            ruta: '/colaborador/create',
+            icono: 'bi-person-plus'
+        },
+        {
+            id: 'producto',
+            orden: 3,
+            titulo: 'Primer producto',
+            descripcion: 'Registra al menos un producto para vender',
+            completo: !!flags.tieneProductos,
+            ruta: '/productos/create',
+            icono: 'bi-box'
+        },
+        {
+            id: 'caja',
+            orden: 4,
+            titulo: 'Gestionar cajas',
+            descripcion: 'Verifica la Caja Principal o crea la que usarás',
+            completo: !!flags.tieneCajas,
+            ruta: '/caja',
+            icono: 'bi-cash-stack'
+        },
+        {
+            id: 'apertura',
+            orden: 5,
+            titulo: 'Abrir caja',
+            descripcion: 'Para abrir una caja, debes iniciar sesion con el colaborador administrador',
+            completo: !!flags.tieneCajaAbierta,
+            ruta: '/caja?onboarding=apertura',
+            icono: 'bi-unlock'
+        },
+        {
+            id: 'venta',
+            orden: 6,
+            titulo: 'Primera venta',
+            descripcion: 'Registra una venta de prueba (cliente Público en general)',
+            completo: !!flags.tieneVentas,
+            ruta: '/ventas/rapida',
+            icono: 'bi-lightning-charge'
+        }
+    ];
+}
+
 
 
 
@@ -741,6 +1187,12 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         listasPrecios: [],
         clasificacionesConcepto: null,
         conceptos: [],
+        impuestos: [],
+        permisos: null,
+        categorias: [],
+        marcas: [],
+        cajaPrincipal: null,
+        clientePublico: null,
         correlativo: null,
         errores: []
     };
@@ -760,6 +1212,20 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
         } catch (error) {
             console.error('⚠️ Error creando sucursal:', error.message);
             resultado.errores.push({ tipo: 'sucursal', mensaje: error.message });
+        }
+
+        // 2b. Caja principal en la sucursal
+        if (resultado.sucursal && resultado.sucursal.idSucursal) {
+            try {
+                resultado.cajaPrincipal = await exports.crearCajaPrincipalPredeterminada(
+                    pool,
+                    idEmpresa,
+                    resultado.sucursal.idSucursal
+                );
+            } catch (error) {
+                console.error('⚠️ Error creando caja principal:', error.message);
+                resultado.errores.push({ tipo: 'cajaPrincipal', mensaje: error.message });
+            }
         }
 
         // 3. Crear comprobantes en la sucursal principal
@@ -845,6 +1311,56 @@ exports.inicializarDatosEmpresa = async (pool, idEmpresa, datosEmpresa) => {
             resultado.errores.push({ tipo: 'conceptos', mensaje: error.message });
         }
 
+        // 10. Tributos predeterminados (Exonerado e IGV)
+        try {
+            resultado.impuestos = await exports.crearImpuestosPredeterminados(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando impuestos predeterminados:', error.message);
+            resultado.errores.push({ tipo: 'impuestos', mensaje: error.message });
+        }
+
+        // 11. Permisos del sistema asignados a roles predeterminados
+        try {
+            resultado.permisos = await exports.inicializarPermisosPredeterminados(pool, idEmpresa, resultado.roles);
+        } catch (error) {
+            console.error('⚠️ Error inicializando permisos:', error.message);
+            resultado.errores.push({ tipo: 'permisos', mensaje: error.message });
+        }
+
+        // 12. Categorías base de productos
+        try {
+            resultado.categorias = await exports.crearCategoriasPredeterminadas(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando categorías predeterminadas:', error.message);
+            resultado.errores.push({ tipo: 'categorias', mensaje: error.message });
+        }
+
+        // 13. Cliente público general (boletas / ventas sin DNI)
+        try {
+            resultado.clientePublico = await exports.crearClientePublicoGeneral(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando cliente público general:', error.message);
+            resultado.errores.push({ tipo: 'clientePublico', mensaje: error.message });
+        }
+
+        // 14. Marcas base (SM = sin marca)
+        try {
+            resultado.marcas = await exports.crearMarcasPredeterminadas(pool, idEmpresa);
+        } catch (error) {
+            console.error('⚠️ Error creando marcas predeterminadas:', error.message);
+            resultado.errores.push({ tipo: 'marcas', mensaje: error.message });
+        }
+
+        // 15. Reparación idempotente por si algún paso anterior falló parcialmente
+        try {
+            const reparacion = await exports.asegurarDatosMaestrosEmpresa(pool, idEmpresa);
+            if (reparacion.idRubro) {
+                resultado.idRubro = reparacion.idRubro;
+            }
+        } catch (error) {
+            console.error('⚠️ Error asegurando datos maestros:', error.message);
+            resultado.errores.push({ tipo: 'datosMaestros', mensaje: error.message });
+        }
 
         
         return resultado;
@@ -896,6 +1412,14 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
     const sql = require('mssql');
     
     try {
+        try {
+            if (await empresaNecesitaDatosMaestros(pool, idEmpresa)) {
+                await exports.asegurarDatosMaestrosEmpresa(pool, idEmpresa);
+            }
+        } catch (errMaestros) {
+            console.error('obtenerEstadoConfiguracion asegurarDatosMaestros:', errMaestros.message);
+        }
+
         // Verificar colaboradores
         const colaboradores = await pool.request()
             .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
@@ -951,10 +1475,80 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             // Columna puede no existir si no se aplicó la migración
         }
 
+        let tieneLogo = false;
+        let empresaCompleta = false;
+        try {
+            const emp = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query(`
+                    SELECT logo, rubro, celular
+                    FROM Empresas
+                    WHERE idEmpresa = @idEmpresa
+                `);
+            const row = emp.recordset && emp.recordset[0] ? emp.recordset[0] : null;
+            if (row) {
+                tieneLogo = row.logo != null && String(row.logo).trim() !== '';
+                const rubroOk = row.rubro != null && String(row.rubro).trim() !== '';
+                const celularOk = row.celular != null && String(row.celular).trim() !== '';
+                empresaCompleta = tieneLogo && rubroOk && celularOk;
+            }
+        } catch (_) {}
+
+        let cantidadCajas = 0;
+        let tieneCajaAbierta = false;
+        try {
+            const cajasRes = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query(`
+                    SELECT COUNT(*) AS total
+                    FROM Cajas
+                    WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1
+                `);
+            cantidadCajas = cajasRes.recordset[0]?.total || 0;
+        } catch (_) {}
+
+        try {
+            const aperturaRes = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query(`
+                    SELECT COUNT(*) AS total
+                    FROM AperturasCaja ac
+                    INNER JOIN Cajas c ON c.idCaja = ac.idCaja AND c.idEmpresa = @idEmpresa
+                    WHERE ac.estado = 1
+                `);
+            tieneCajaAbierta = (aperturaRes.recordset[0]?.total || 0) > 0;
+        } catch (_) {}
+
+        let cantidadVentas = 0;
+        try {
+            const ventasRes = await pool.request()
+                .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+                .query(`
+                    SELECT COUNT(*) AS total
+                    FROM Ventas
+                    WHERE idEmpresa = @idEmpresa
+                `);
+            cantidadVentas = ventasRes.recordset[0]?.total || 0;
+        } catch (_) {}
+
+        const flagsOnboarding = {
+            empresaCompleta,
+            tieneColaboradores: colaboradores.recordset[0].total > 0,
+            tieneProductos: productos.recordset[0].total > 0,
+            tieneCajas: cantidadCajas > 0,
+            tieneCajaAbierta,
+            tieneVentas: cantidadVentas > 0
+        };
+        const pasosOnboarding = construirPasosOnboarding(flagsOnboarding);
+        const pasosRequeridos = pasosOnboarding.length;
+        const pasosCompletados = pasosOnboarding.filter((p) => p.completo).length;
+        const onboardingCompleto = pasosCompletados >= pasosRequeridos;
+        const esGestoraFlag = gestionadas.recordset[0].total > 0;
+
         return {
             tieneColaboradores: colaboradores.recordset[0].total > 0,
             cantidadColaboradores: colaboradores.recordset[0].total,
-            esGestora: gestionadas.recordset[0].total > 0,
+            esGestora: esGestoraFlag,
             cantidadEmpresasGestionadas: gestionadas.recordset[0].total,
             esEmpresaGestionada: gestionadaPor.recordset[0].total > 0,
             tieneProductos: productos.recordset[0].total > 0,
@@ -963,12 +1557,20 @@ exports.obtenerEstadoConfiguracion = async (pool, idEmpresa) => {
             cantidadProveedores: proveedores.recordset[0].total,
             tieneClientes: clientes.recordset[0].total > 0,
             cantidadClientes: clientes.recordset[0].total,
+            tieneCajas: cantidadCajas > 0,
+            cantidadCajas,
+            tieneCajaAbierta,
+            tieneVentas: cantidadVentas > 0,
+            cantidadVentas,
+            tieneLogo,
+            empresaCompleta,
             habilitarGuiasElectronicas,
             permitirVentaMultiSucursal,
-            configuracionCompleta:
-                colaboradores.recordset[0].total > 0 &&
-                productos.recordset[0].total > 0 &&
-                proveedores.recordset[0].total > 0
+            pasosOnboarding,
+            onboardingProgreso: pasosRequeridos > 0 ? Math.round((pasosCompletados / pasosRequeridos) * 100) : 100,
+            onboardingCompleto,
+            mostrarOnboarding: !esGestoraFlag && !onboardingCompleto,
+            configuracionCompleta: onboardingCompleto
         };
 
     } catch (error) {

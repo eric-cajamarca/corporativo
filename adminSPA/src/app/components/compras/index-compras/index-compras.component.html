@@ -94,6 +94,7 @@
                 <th class="bg-primary text-white">Comprobante</th>
                 <th class="bg-primary text-white">F. Emisión</th>
                 <th class="bg-primary text-white">Proveedor</th>
+                <th class="bg-primary text-white">Registrado por</th>
                 <th class="bg-primary text-white">Estado</th>
                 <th class="bg-primary text-white text-end">Total</th>
                 <th class="bg-primary text-white text-end">Acciones</th>
@@ -113,6 +114,7 @@
                       </span>
                     </div>
                   </td>
+                  <td class="small" data-label="Registrado por">{{ item.usuarioRegistro?.trim() || '—' }}</td>
                   <td data-label="Estado">
                     <span class="badge" 
                           [ngClass]="{'bg-success': item.descripcion === 'Pagado', 

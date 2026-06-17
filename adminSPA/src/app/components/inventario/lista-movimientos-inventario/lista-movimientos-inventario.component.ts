@@ -171,7 +171,7 @@ export class ListaMovimientosInventarioComponent implements OnInit {
     if (c.codigoTipoMovimiento === 'TRANSFERENCIA') {
       return `${tipo} · ${doc} · ${fecha} · ${n} línea(s) — use las columnas «Sentido» y «Sucursal» (origen = salidas, destino = entradas).`;
     }
-    return `${tipo} · ${doc} · ${fecha} · ${(c.sucursal || '').trim() || '—'} · ${n} línea(s)`;
+    return `${tipo} · ${doc} · ${fecha} · ${(c.sucursal || '').trim() || '—'} · ${(c.usuario || '').trim() || '—'} · ${n} línea(s)`;
   }
 
   /**

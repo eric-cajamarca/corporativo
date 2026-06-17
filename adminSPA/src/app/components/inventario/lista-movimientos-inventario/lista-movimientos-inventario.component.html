@@ -88,6 +88,7 @@
               <th style="width: 11rem">Tipo</th>
               <th>Documento</th>
               <th style="width: 10rem">Sucursal</th>
+              <th style="width: 9rem">Registrado por</th>
               <th class="text-end" style="width: 7rem">Total</th>
               <th style="width: 9rem">Nota</th>
             </tr>
@@ -95,11 +96,11 @@
           <tbody>
             @if (cargando) {
               <tr>
-                <td colspan="7" class="text-center py-4 text-muted">Cargando…</td>
+                <td colspan="8" class="text-center py-4 text-muted">Cargando…</td>
               </tr>
             } @else if (!items.length) {
               <tr>
-                <td colspan="7" class="text-center py-4 text-muted">Sin movimientos en el periodo</td>
+                <td colspan="8" class="text-center py-4 text-muted">Sin movimientos en el periodo</td>
               </tr>
             } @else {
               @for (r of items; track r.idMovimiento) {
@@ -122,6 +123,7 @@
                   <td data-label="Tipo"><small>{{ etiquetaTipo(r) }}</small></td>
                   <td class="small" data-label="Documento">{{ textoDocumento(r) }}</td>
                   <td data-label="Sucursal"><small>{{ textoReferencia(r) }}</small></td>
+                  <td data-label="Registrado por"><small>{{ r.usuario?.trim() || '—' }}</small></td>
                   <td class="text-end fw-semibold" data-label="Total">{{ r.totalImporte | number: '1.2-2' }}</td>
                   <td data-label="Nota"><small class="text-muted">{{ textoCondicionPago(r) }}</small></td>
                 </tr>

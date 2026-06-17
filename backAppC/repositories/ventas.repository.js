@@ -10,6 +10,10 @@ const { appendAgentDebugNdjson } = require('../utils/debugAgentLog.util');
 const { extraerDireccionClienteDesdeXmlUbl } = require('../utils/extraerDireccionClienteXmlUbl.util');
 const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
 const { ventasTieneColumnaIdDireccionClientes } = require('../utils/ventasColumnaDireccion.util');
+const {
+  SQL_SELECT_USUARIO_VENTAS,
+  SQL_JOIN_USUARIO_VENTAS
+} = require('../utils/documentoTrazabilidad.util');
 const gestoresRepository = require('./gestores.repository');
 
 /** Normaliza RUC/DNI a solo dígitos para cruzar con Clientes. No registrar el valor en logs. */
@@ -424,7 +428,8 @@ exports.listarPorEmpresa = async (pool, idEmpresa, opts = {}) => {
           CASE
             WHEN aggfp.codigos IS NULL OR LTRIM(RTRIM(aggfp.codigos)) = '' THEN '{}'
             ELSE '{' + aggfp.codigos + '}'
-          END AS formaPago
+          END AS formaPago,
+          ${SQL_SELECT_USUARIO_VENTAS}
         FROM Ventas v
         LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
         LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
@@ -433,6 +438,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa, opts = {}) => {
         LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
         LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+        ${SQL_JOIN_USUARIO_VENTAS}
         OUTER APPLY (
           SELECT STUFF((
             SELECT ',' + d.sigla
@@ -477,7 +483,8 @@ exports.listarPorEmpresa = async (pool, idEmpresa, opts = {}) => {
             ce.tipoComprobante,
             e.ruc AS rucEmpresa,
             ISNULL(v.eliminado, 0) AS eliminado,
-            '' AS formaPago
+            '' AS formaPago,
+            ${SQL_SELECT_USUARIO_VENTAS}
           FROM Ventas v
           LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
           LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
@@ -485,6 +492,7 @@ exports.listarPorEmpresa = async (pool, idEmpresa, opts = {}) => {
           LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa = v.idEmpresa
           LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
           LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
+          ${SQL_JOIN_USUARIO_VENTAS}
           WHERE v.idEmpresa = @idEmpresa${whereSuc}
           ORDER BY v.fEmision DESC, v.idVenta DESC
         `);
@@ -557,7 +565,8 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa, opts = {}) => {
         CASE
           WHEN aggfp.codigos IS NULL OR LTRIM(RTRIM(aggfp.codigos)) = '' THEN '{}'
           ELSE '{' + aggfp.codigos + '}'
-        END AS formaPago
+        END AS formaPago,
+        ${SQL_SELECT_USUARIO_VENTAS}
       FROM Ventas v
       LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = v.idEmpresa
       LEFT JOIN EstadosSunat es ON es.idEstadoSunat = v.idEstadoSunat
@@ -566,6 +575,7 @@ exports.listarPorIdsEmpresas = async (pool, idsEmpresa, opts = {}) => {
       LEFT JOIN ComprobantesElectronicos ce ON ce.idVenta = v.idVenta AND ce.idEmpresa = v.idEmpresa
       LEFT JOIN Empresas e ON e.idEmpresa = v.idEmpresa
       LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
+      ${SQL_JOIN_USUARIO_VENTAS}
       OUTER APPLY (
         SELECT STUFF((
           SELECT ',' + d.sigla
@@ -785,12 +795,14 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
-          ${exprDirPdf} AS clienteDireccion
+          ${exprDirPdf} AS clienteDireccion,
+          ${SQL_SELECT_USUARIO_VENTAS}
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN FormasPago fp ON fp.idFormaPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN MediosPago mp ON mp.idMediosPago = TRY_CAST(v.idMediosPago AS INT)
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList})
+        ${SQL_JOIN_USUARIO_VENTAS}
         WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList})
       `);
   } catch (err) {
@@ -821,10 +833,12 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           cl.idCliente AS idCliente,
           cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
           ISNULL(cl.celular, '') AS clienteCelular,
-          ${exprDirPdf2} AS clienteDireccion
+          ${exprDirPdf2} AS clienteDireccion,
+          ${SQL_SELECT_USUARIO_VENTAS}
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
         LEFT JOIN Clientes cl ON cl.idCliente = v.idCliente AND cl.idEmpresa IN (${inList2})
+        ${SQL_JOIN_USUARIO_VENTAS}
         WHERE v.idVenta = @idVenta AND v.idEmpresa IN (${inList2})
       `);
     } else {
@@ -1342,7 +1356,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
             ? cab.idMediosPago
             : String(cab.idMediosPago).trim()
           : null,
-      idEstadoPago: cab.idEstadoPago != null ? Number(cab.idEstadoPago) : null
+      idEstadoPago: cab.idEstadoPago != null ? Number(cab.idEstadoPago) : null,
+      usuarioRegistro: cab.usuarioRegistro != null ? String(cab.usuarioRegistro).trim() : '',
+      usuarioModifica: cab.usuarioModifica != null ? String(cab.usuarioModifica).trim() : '',
+      fModificacion: cab.fModificacion != null ? String(cab.fModificacion).trim() : null
     },
     empresa: empresaPayload,
     cliente: {
@@ -1561,6 +1578,19 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
     await reqUp.query(
       `UPDATE Ventas SET ${setParts.join(', ')} WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa`
     );
+
+    if (idUsuarioEjecutor) {
+      await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idUsuarioModifica', sql.UniqueIdentifier, idUsuarioEjecutor)
+        .query(`
+          UPDATE Ventas
+          SET idUsuarioModifica = @idUsuarioModifica, fModificacion = GETDATE()
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
+        `);
+    }
 
     const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
     const getConfig = crearLectorConfiguracionEmpresa(configRows);

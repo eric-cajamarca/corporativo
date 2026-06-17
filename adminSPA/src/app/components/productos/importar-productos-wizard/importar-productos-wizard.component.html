@@ -1,0 +1,198 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="content-title mb-1">Importar productos</h1>
+        <p class="content-subtitle text-muted mb-0">Asistente con plantilla Excel, validación y vista previa de errores</p>
+      </div>
+      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="volverAListado()">
+        <i class="bi bi-arrow-left me-1"></i>Volver al listado
+      </button>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+      <div class="wizard-steps d-flex flex-wrap gap-2 mb-4">
+        <span class="wizard-step" [class.active]="paso >= 1" [class.current]="paso === 1">1. Plantilla</span>
+        <span class="wizard-step" [class.active]="paso >= 2" [class.current]="paso === 2">2. Archivo</span>
+        <span class="wizard-step" [class.active]="paso >= 3" [class.current]="paso === 3">3. Revisión</span>
+        <span class="wizard-step" [class.active]="paso >= 4" [class.current]="paso === 4">4. Resultado</span>
+      </div>
+      <div class="progress mb-4 import-progress">
+        <div class="progress-bar" [style.width.%]="progresoPct"></div>
+      </div>
+
+      @if (paso === 1) {
+        <section>
+          <h2 class="h5 mb-3">Paso 1 — Descargar plantilla Excel</h2>
+          <p class="text-muted small">
+            Complete la plantilla con sus productos. Máximo <strong>4000 filas</strong> y <strong>8 MB</strong>.
+            El stock inicial se registra en la <strong>sucursal principal</strong>.
+          </p>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered">
+              <thead><tr><th>Columna</th><th>Descripción</th></tr></thead>
+              <tbody>
+                @for (c of columnasPlantilla; track c.col) {
+                  <tr><td><code>{{ c.col }}</code></td><td>{{ c.desc }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="descargarPlantilla()" [disabled]="descargandoPlantilla">
+            <i class="fas fa-download me-1"></i>{{ descargandoPlantilla ? 'Descargando…' : 'Descargar plantilla .xlsx' }}
+          </button>
+          <div class="mt-4 d-flex justify-content-end">
+            <button type="button" class="btn btn-outline-primary" (click)="continuarDesdePlantilla()">
+              Ya tengo mi archivo — continuar
+            </button>
+          </div>
+        </section>
+      }
+
+      @if (paso === 2) {
+        <section>
+          <h2 class="h5 mb-3">Paso 2 — Subir archivo completado</h2>
+          <label class="form-label">Archivo Excel (.xlsx)</label>
+          <input
+            type="file"
+            class="form-control mb-2"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            (change)="onArchivoChange($event)"
+          />
+          @if (nombreArchivo) {
+            <p class="small text-muted mb-0">Seleccionado: <strong>{{ nombreArchivo }}</strong></p>
+          }
+          <div class="mt-4 d-flex justify-content-between">
+            <button type="button" class="btn btn-outline-secondary" (click)="irPaso(1)">Atrás</button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="validarYContinuar()"
+              [disabled]="!puedeAvanzarPaso2 || validando"
+            >
+              {{ validando ? 'Validando…' : 'Validar y revisar' }}
+            </button>
+          </div>
+        </section>
+      }
+
+      @if (paso === 3 && validacion) {
+        <section>
+          <h2 class="h5 mb-3">Paso 3 — Revisión antes de importar</h2>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="summary-box">
+                <div class="summary-label">Filas leídas</div>
+                <div class="summary-value">{{ validacion.totalLeidas }}</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="summary-box summary-ok">
+                <div class="summary-label">Válidas</div>
+                <div class="summary-value text-success">{{ validacion.validas }}</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="summary-box summary-error">
+                <div class="summary-label">Con error</div>
+                <div class="summary-value text-danger">{{ validacion.conError }}</div>
+              </div>
+            </div>
+          </div>
+
+          @if (validacion.errores.length) {
+            <div class="alert alert-warning py-2">
+              Corrija las filas con error en su Excel y vuelva a validar, o importe solo las filas válidas.
+            </div>
+            <h3 class="h6">Errores detectados</h3>
+            <div class="table-responsive preview-table mb-4">
+              <table class="table table-sm table-bordered">
+                <thead>
+                  <tr><th>Fila</th><th>Código</th><th>Detalle</th></tr>
+                </thead>
+                <tbody>
+                  @for (e of validacion.errores; track e.fila + '-' + e.codigo) {
+                    <tr class="table-danger-subtle">
+                      <td>{{ e.fila }}</td>
+                      <td>{{ e.codigo || '—' }}</td>
+                      <td>{{ e.mensajes.join('; ') }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (validacion.vistaPrevia.length) {
+            <h3 class="h6">Vista previa de filas válidas (máx. 30)</h3>
+            <div class="table-responsive preview-table mb-3">
+              <table class="table table-sm table-striped">
+                <thead>
+                  <tr>
+                    <th>Fila</th><th>Código</th><th>Descripción</th><th>Cant.</th>
+                    <th>Costo</th><th>P. normal</th><th>P. cliente</th><th>P. mayorista</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (v of validacion.vistaPrevia; track v.fila + v.codigo) {
+                    <tr>
+                      <td>{{ v.fila }}</td>
+                      <td>{{ v.codigo }}</td>
+                      <td>{{ v.descripcion }}</td>
+                      <td>{{ v.cantidadInicial }}</td>
+                      <td>{{ v.costoUnitario }}</td>
+                      <td>{{ v.precioNormal }}</td>
+                      <td>{{ v.precioCliente }}</td>
+                      <td>{{ v.precioMayorista }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          <div class="d-flex justify-content-between flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary" (click)="irPaso(2)">Cambiar archivo</button>
+            <button
+              type="button"
+              class="btn btn-success"
+              (click)="ejecutarImportacion()"
+              [disabled]="!puedeImportar"
+            >
+              {{ importando ? 'Importando…' : 'Importar ' + validacion.validas + ' producto(s)' }}
+            </button>
+          </div>
+        </section>
+      }
+
+      @if (paso === 4 && resultado) {
+        <section>
+          <h2 class="h5 mb-3">Paso 4 — Resultado</h2>
+          <div class="alert alert-success">
+            Se importaron <strong>{{ resultado.insertados }}</strong> producto(s) de
+            <strong>{{ resultado.total }}</strong> fila(s) leídas.
+          </div>
+          @if (resultado.noImportadosExcel?.total) {
+            <p class="small text-muted">
+              Se descargó un Excel con {{ resultado.noImportadosExcel?.total }} fila(s) no importadas.
+            </p>
+          }
+          @if (resultado.erroresEjecucion.length) {
+            <div class="alert alert-danger py-2 small">
+              Algunas filas válidas fallaron al guardar. Revise el Excel de no importados.
+            </div>
+          }
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-primary" (click)="volverAListado()">Ver productos</button>
+            <button type="button" class="btn btn-outline-primary" (click)="reiniciarWizard()">Importar otro archivo</button>
+          </div>
+        </section>
+      }
+    </div>
+  </div>
+</main>

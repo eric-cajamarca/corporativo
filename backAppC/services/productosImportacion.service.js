@@ -228,7 +228,7 @@ async function generarPlantillaBuffer() {
     'categoria',
     'marca'
   ];
-  const ejemplo = ['EJEMPLO001', 'Producto de demostración', 'NIU', 10, 5.5, 9.9, 8.99, 8.5, 'VARIOS', 'SM'];
+  const ejemplo = ['EJEMPLO001', 'Producto de demostración', 'NIU', 10, 5.5, 9.9, 8.99, 8.5, 'Varios', 'SM'];
   return pdfBackend.generarExcel({
     worksheetName: 'Productos',
     columns: headers,

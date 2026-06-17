@@ -10,6 +10,7 @@ exports.listarService = async (pool, user, query) => {
   const filtros = {
     idUsuario: query.idUsuario || null,
     accion: query.accion || null,
+    modulo: query.modulo || null,
     fechaDesde: query.fechaDesde || null,
     fechaHasta: query.fechaHasta || null,
     pagina: query.pagina || 1,

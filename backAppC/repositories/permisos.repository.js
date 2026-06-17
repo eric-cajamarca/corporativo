@@ -308,12 +308,33 @@ const inicializarPermisosDefecto = async (pool, idEmpresa) => {
     }
 };
 
+/**
+ * Asigna permisos a un rol por nombre de permiso (catálogo ya creado en la empresa).
+ */
+const asignarPermisosPorNombresARol = async (pool, idEmpresa, idRol, nombresPermisos) => {
+    if (!idRol || !Array.isArray(nombresPermisos) || nombresPermisos.length === 0) {
+        return { count: 0 };
+    }
+    const permisos = await obtenerPermisosPorEmpresa(pool, idEmpresa);
+    const mapa = new Map(permisos.map((p) => [p.nombre, p.idPermiso]));
+    let count = 0;
+    for (const nombre of nombresPermisos) {
+        const idPermiso = mapa.get(nombre);
+        if (idPermiso) {
+            await asignarPermisoARol(pool, idRol, idPermiso);
+            count += 1;
+        }
+    }
+    return { count };
+};
+
 module.exports = {
     obtenerPermisosPorEmpresa,
     obtenerPermisosPorRol,
     obtenerPermisosPorUsuario,
     crearPermiso,
     asignarPermisoARol,
+    asignarPermisosPorNombresARol,
     removerPermisoDeRol,
     actualizarPermisosDeRol,
     verificarPermiso,

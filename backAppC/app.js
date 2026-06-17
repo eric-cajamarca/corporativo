@@ -356,6 +356,12 @@ app.listen(PORT, () => {
     console.error('No se pudo iniciar job onboarding automation:', e.message);
   }
   try {
+    const auditoriaOperacionesJob = require('./jobs/auditoriaOperaciones.job');
+    auditoriaOperacionesJob.iniciar();
+  } catch (e) {
+    console.error('No se pudo iniciar job auditoría operaciones:', e.message);
+  }
+  try {
     const seguridadAlertasService = require('./services/seguridadAlertas.service');
     const { withPool } = require('./utils/dbPool.util');
     seguridadAlertasService.iniciarHealthCheckFactiliza({ withPool });

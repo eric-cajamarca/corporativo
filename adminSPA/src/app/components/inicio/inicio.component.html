@@ -54,6 +54,18 @@
     </div>
   </div>
 
+  @if (!esGestora) {
+    <div class="px-3">
+      <app-onboarding-wizard
+        [pasos]="pasosOnboarding"
+        [progreso]="onboardingProgreso"
+        [visible]="mostrarOnboarding"
+        [storageKey]="onboardingStorageKey"
+        (refrescar)="cargarEstadoOnboarding(false)"
+      ></app-onboarding-wizard>
+    </div>
+  }
+
   <!-- Accesos rápidos -->
   <div class="quick-actions mb-4">
     <button class="quick-action-btn" (click)="navigateTo('ventas-rapida')">

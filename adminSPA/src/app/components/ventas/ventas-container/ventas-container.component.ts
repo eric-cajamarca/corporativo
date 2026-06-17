@@ -24,6 +24,7 @@ import { VentasRestaurantesComponent } from '../ventas-restaurantes/ventas-resta
 })
 export class VentasContainerComponent implements OnInit {
   codigoRubro: string | null = null;
+  rubroEmpresa = '';
   loading = true;
 
   constructor(
@@ -48,11 +49,26 @@ export class VentasContainerComponent implements OnInit {
     this.empresaService.refreshEmpresaFromApi().subscribe({
       next: (emp) => {
         this.codigoRubro = emp?.codigoRubro ?? null;
+        this.rubroEmpresa = emp?.rubro ?? '';
         this.loading = false;
       },
       error: () => {
         this.loading = false;
       }
     });
+  }
+
+  /** Vista grifo: código GRF o giro SUNAT con combustible/grifo. */
+  esVistaGrifo(): boolean {
+    const codigo = String(this.codigoRubro || '').trim().toUpperCase();
+    if (codigo === 'GRF' || codigo === 'GRIFO') return true;
+    const rubro = String(this.rubroEmpresa || '').trim().toLowerCase();
+    return rubro === 'grifo' || rubro.includes('grifo') || rubro.includes('combustible');
+  }
+
+  /** Código efectivo para el switch de vistas por rubro. */
+  codigoVistaVentas(): string | null {
+    if (this.esVistaGrifo()) return 'GRF';
+    return this.codigoRubro;
   }
 }

@@ -2,6 +2,7 @@ const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
 const empresasAdministracionRepository = require('../repositories/empresasAdministracion.repository');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
+const empresaService = require('./empresa.service');
 
 async function listarTodas(pool) {
   return empresasAdministracionRepository.listarTodasEmpresas(pool);
@@ -102,10 +103,15 @@ async function actualizarEmpresaDatosContacto(pool, idEmpresa, body, logoFilenam
   const permitirResuelto = permitirEnBody === undefined
     ? !!actual.permitirVentaMultiSucursal
     : permitirEnBody;
+  const rubroTexto = tomarTexto('rubro');
+  let idRubroFinal = idRubroResuelto;
+  if ((idRubroFinal == null || idRubroFinal === '') && rubroTexto) {
+    idRubroFinal = await empresaService.resolverIdRubroDesdeTexto(pool, rubroTexto, null);
+  }
   const row = {
     idEmpresa,
-    rubro: tomarTexto('rubro'),
-    idRubro: idRubroResuelto,
+    rubro: rubroTexto,
+    idRubro: idRubroFinal,
     celular: tomarTexto('celular'),
     nombreComercial: tomarTexto('nombreComercial'),
     correo: tomarTexto('correo'),

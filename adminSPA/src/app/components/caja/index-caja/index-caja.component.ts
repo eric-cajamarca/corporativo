@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { CajaService } from '../../../services/caja.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { Caja, MovimientoCaja, TipoMovimientoCaja } from '../../../interfaces/caja-interface';
@@ -91,6 +91,7 @@ export class IndexCajaComponent implements OnInit {
   constructor(
     private cajaService: CajaService,
     private sucursalService: SucursalService,
+    private route: ActivatedRoute,
     public sidebarState: SidebarStateService
   ) {}
 
@@ -98,6 +99,12 @@ export class IndexCajaComponent implements OnInit {
     this.cargarCajas();
     this.cargarTiposMovimiento();
     this.cargarSucursales();
+    this.route.queryParamMap.subscribe((params) => {
+      const modo = params.get('onboarding');
+      if (modo === 'nueva') {
+        this.abrirModalNuevaCaja();
+      }
+    });
   }
 
   cargarSucursales() {
@@ -121,6 +128,7 @@ export class IndexCajaComponent implements OnInit {
         const data = response?.data ?? response;
         this.cajas = Array.isArray(data) ? data : [];
         this.loading = false;
+        this.aplicarOnboardingDesdeQuery();
       },
       error: (error) => {
         console.error('Error al cargar cajas:', error);
@@ -132,6 +140,15 @@ export class IndexCajaComponent implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  private aplicarOnboardingDesdeQuery(): void {
+    const modo = this.route.snapshot.queryParamMap.get('onboarding');
+    if (modo !== 'apertura') return;
+    const candidata = this.cajas.find((c) => !c.cajaAbierta) ?? this.cajas[0];
+    if (candidata) {
+      this.abrirModalApertura(candidata);
+    }
   }
 
   cargarTiposMovimiento() {

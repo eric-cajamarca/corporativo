@@ -12,6 +12,7 @@ import { CreateColaboradorComponent } from './components/colaboradores/create-co
 import { UpdateColaboradorComponent } from './components/colaboradores/update-colaborador/update-colaborador.component';
 import { IndexProductoComponent } from './components/productos/index-producto/index-producto.component';
 import { CreateProductoComponent } from './components/productos/create-producto/create-producto.component';
+import { ImportarProductosWizardComponent } from './components/productos/importar-productos-wizard/importar-productos-wizard.component';
 import { IndexCategoriaComponent } from './components/categorias/index-categoria/index-categoria.component';
 import { CreateCategoriaComponent } from './components/categorias/create-categoria/create-categoria.component';
 import { IndexMarcaComponent } from './components/marcas/index-marca/index-marca.component';
@@ -196,6 +197,12 @@ export const routes: Routes = [
       component: CreateProductoComponent,
       canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard],
       title: 'Crear Producto',
+     },
+     {
+      path: 'productos/importar',
+      component: ImportarProductosWizardComponent,
+      canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard],
+      title: 'Importar productos',
      },
      {
       path: 'categorias',

@@ -10,9 +10,20 @@
       </div>
       <div class="card-body">
         <div class="row g-2 mb-3">
-          <div class="col-md-3">
+          <div class="col-md-2">
+            <label class="form-label small">Módulo</label>
+            <select class="form-select form-select-sm" [(ngModel)]="filtros.modulo">
+              <option value="">Todos</option>
+              <option value="VENTAS">Ventas</option>
+              <option value="COMPRAS">Compras</option>
+              <option value="INVENTARIO">Inventario</option>
+              <option value="CAJA">Caja</option>
+              <option value="DESPACHOS">Despachos</option>
+            </select>
+          </div>
+          <div class="col-md-2">
             <label class="form-label small">Acción</label>
-            <input type="text" class="form-control form-control-sm" placeholder="Ej: LOGIN" [(ngModel)]="filtros.accion" (keyup.enter)="filtrar()" />
+            <input type="text" class="form-control form-control-sm" placeholder="Ej: CREAR" [(ngModel)]="filtros.accion" (keyup.enter)="filtrar()" />
           </div>
           <div class="col-md-2">
             <label class="form-label small">Desde</label>
@@ -33,8 +44,9 @@
               <tr>
                 <th>Fecha</th>
                 <th>Usuario</th>
+                <th>Módulo</th>
                 <th>Acción</th>
-                <th>Tabla</th>
+                <th>Referencia</th>
                 <th>IP</th>
               </tr>
             </thead>
@@ -42,8 +54,9 @@
               <tr *ngFor="let item of items">
                 <td>{{ formatearFecha(item.fechaAccion) }}</td>
                 <td>{{ item.usuarioNombre || '—' }}</td>
-                <td>{{ item.accion || '—' }}</td>
                 <td>{{ item.tablaAfectada || '—' }}</td>
+                <td>{{ item.accion || '—' }}</td>
+                <td>{{ item.referencia || item.idRegistroAfectado || '—' }}</td>
                 <td>{{ item.ipAddress || '—' }}</td>
               </tr>
             </tbody>

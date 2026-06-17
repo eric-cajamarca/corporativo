@@ -1,8 +1,7 @@
-import { Component, OnInit, signal, effect } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, signal, effect, OnDestroy } from '@angular/core';
+import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
 import { TopnavComponent } from '../topnav/topnav.component';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { SidebarStateService } from '../../services/sidebar-state.service';
@@ -11,18 +10,27 @@ import { PermisosService } from '../../services/permisos.service';
 import { DashboardService, ResumenDashboard } from '../../services/dashboard.service';
 import { EmpresaService } from '../../services/empresa.service';
 import { SaasSubscriptionService } from '../../services/saas-subscription.service';
+import { OnboardingWizardComponent } from '../onboarding/onboarding-wizard/onboarding-wizard.component';
+import { PasoOnboarding } from '../../interfaces/onboarding.interface';
 import { Chart } from 'chart.js/auto';
+import { filter, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [FormsModule, CommonModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, CommonModule, RouterModule, TopnavComponent, SidebarComponent, OnboardingWizardComponent],
   templateUrl: './inicio.component.html',
   styleUrl: './inicio.component.css'
 })
-export class InicioComponent implements OnInit {
+export class InicioComponent implements OnInit, OnDestroy {
 
-  // Información del usuario
+  private routerSub: Subscription | null = null;
+
+  // Onboarding
+  pasosOnboarding: PasoOnboarding[] = [];
+  onboardingProgreso = 0;
+  mostrarOnboarding = false;
+  onboardingStorageKey = 'onboarding_oculto';
   public userName: string = 'Usuario';
   public userRole: string = '';
 
@@ -89,6 +97,8 @@ export class InicioComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.onboardingStorageKey = `onboarding_oculto_${this.authService.userData()?.idEmpresa ?? 'empresa'}`;
+
     this.saasSubscriptionService.getMiEstado().subscribe({
       next: (r) => {
         if (r.deploymentMode === 'saas' && r.suscripcion?.estado === 'PENDIENTE_PAGO') {
@@ -98,21 +108,44 @@ export class InicioComponent implements OnInit {
       error: () => {}
     });
 
+    this.cargarEstadoOnboarding();
+
+    this.routerSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => {
+        if (e.urlAfterRedirects === '/home' || e.urlAfterRedirects.startsWith('/home?')) {
+          this.cargarEstadoOnboarding(false);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.routerSub?.unsubscribe();
+  }
+
+  cargarEstadoOnboarding(refrescarDashboard = true): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (res) => {
-        this.esGestora = !!res?.data?.esGestora;
-        this.initializeDashboard();
+        const data = res?.data;
+        this.esGestora = !!data?.esGestora;
+        this.pasosOnboarding = Array.isArray(data?.pasosOnboarding) ? data.pasosOnboarding : [];
+        this.onboardingProgreso = Number(data?.onboardingProgreso) || 0;
+        this.mostrarOnboarding = !!data?.mostrarOnboarding && !this.esGestora;
+        if (refrescarDashboard) {
+          this.initializeDashboard();
+        }
       },
       error: () => {
         this.esGestora = false;
-        this.initializeDashboard();
+        this.mostrarOnboarding = false;
+        if (refrescarDashboard) {
+          this.initializeDashboard();
+        }
       }
     });
   }
 
-  /**
-   * Inicializa el dashboard cargando datos
-   */
+  // Información del usuario
   private initializeDashboard(): void {
     this.cargandoDatos.set(true);
     

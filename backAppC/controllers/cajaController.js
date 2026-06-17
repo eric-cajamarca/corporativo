@@ -1,4 +1,5 @@
 const CajaServices = require('../services/caja.service');
+const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 const { resolverIdEmpresaOperacionCaja } = require('../utils/cajaOperacionEmpresa.util');
 const { withPool } = require('../utils/dbPool.util');
 
@@ -107,6 +108,14 @@ const abrirCaja = async (req, res, next) => {
       })
     );
 
+    auditoriaOperaciones.auditarCaja(
+      req,
+      'ABRIR',
+      result?.idApertura,
+      idCaja || null,
+      `Monto inicial: ${montoInicial}`
+    );
+
     res.status(200).send({
       message: 'Caja abierta exitosamente',
       data: result
@@ -163,6 +172,14 @@ const cerrarCaja = async (req, res, next) => {
         observaciones,
         fechaCierre
       })
+    );
+
+    auditoriaOperaciones.auditarCaja(
+      req,
+      'CERRAR',
+      result?.idCierre || idApertura,
+      null,
+      montoFinal != null ? `Monto final: ${montoFinal}` : null
     );
 
     res.status(200).send({
@@ -247,6 +264,14 @@ const registrarMovimiento = async (req, res, next) => {
         observaciones,
         idEmpresaOperacion: req.body.idEmpresaOperacion
       })
+    );
+
+    auditoriaOperaciones.auditarCaja(
+      req,
+      'MOVIMIENTO',
+      result?.idMovimientoCaja,
+      result?.documentoRelacionado || documentoRelacionado || null,
+      conceptoTxt || concepto || null
     );
 
     res.status(200).send({

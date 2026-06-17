@@ -33,6 +33,11 @@
               <p class="mb-1"><strong>Cliente:</strong> {{ data.cliente.razonSocial || data.cliente.rSocial || '—' }}</p>
               <p class="mb-1"><strong>RUC:</strong> {{ data.cliente.ruc || '—' }}</p>
               <p class="mb-1"><strong>Total:</strong> {{ formatearMoneda(data.venta.total) }}</p>
+              <p class="mb-1"><strong>Registrado por:</strong> {{ data.venta.usuarioRegistro?.trim() || '—' }}</p>
+              <p class="mb-1" *ngIf="data.venta.usuarioModifica?.trim()">
+                <strong>Última modificación:</strong> {{ data.venta.usuarioModifica?.trim() }}
+                <span class="text-muted small" *ngIf="data.venta.fModificacion">({{ formatearFecha(data.venta.fModificacion) }})</span>
+              </p>
             </div>
           </div>
           <h6 class="mt-3">Detalle</h6>

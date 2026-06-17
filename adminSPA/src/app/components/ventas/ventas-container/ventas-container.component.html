@@ -6,7 +6,7 @@
 } @else if (isChildRoute) {
   <router-outlet />
 } @else {
-  @switch (codigoRubro) {
+  @switch (codigoVistaVentas()) {
     @case ('GRF') {
       <app-ventas-grifo />
     }

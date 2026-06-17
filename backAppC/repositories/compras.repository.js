@@ -1,5 +1,9 @@
 // repositories/compras.repository.js
 const sql = require('mssql');
+const {
+  SQL_SELECT_USUARIO_COMPRAS,
+  SQL_JOIN_USUARIO_COMPRAS
+} = require('../utils/documentoTrazabilidad.util');
 
 const QUERY_COMPRAS_JOIN = `
     SELECT
@@ -12,12 +16,14 @@ const QUERY_COMPRAS_JOIN = `
         Compras.idMediosPago, Compras.compRelacionado, Compras.idUsuario,
         CONVERT(VARCHAR(19), Compras.fRegistro, 120) AS fRegistro,
         Compras.numeroLote,
+        ${SQL_SELECT_USUARIO_COMPRAS},
         Proveedores.ruc, Proveedores.rSocial, Proveedores.correo, Proveedores.celular, Proveedores.condicion, Proveedores.estado,
         CONVERT(VARCHAR(19), Proveedores.fCreacion, 120) AS fCreacion,
         EstadoPago.descripcion
     FROM Compras
     INNER JOIN Proveedores ON Compras.idProveedor = Proveedores.idProveedor
     INNER JOIN EstadoPago ON Compras.idEstadoPago = EstadoPago.idEstadoPago
+    ${SQL_JOIN_USUARIO_COMPRAS}
 `;
 
 /**
@@ -181,9 +187,9 @@ exports.actualizarCompra = async (pool, params) => {
         .input('total', sql.Decimal(18, 2), params.total ?? 0)
         .input('idMediosPago', sql.Int, params.idMediosPago ?? 1)
         .input('compRelacionado', sql.VarChar, params.compRelacionado ?? '')
-        .input('idUsuario', sql.UniqueIdentifier, params.idUsuario)
+        .input('idUsuarioModifica', sql.UniqueIdentifier, params.idUsuarioModifica)
         .query(`
-            UPDATE Compras SET compCompra=@compCompra, serie=@serie, numero=@numero, fEmision=ISNULL(@fEmision, fEmision), fVencimiento=@fVencimiento, idProveedor=@idProveedor, idMoneda=@idMoneda, idEstadoPago=@idEstadoPago, subTotal=@subTotal, igv=@igv, exonerado=@exonerado, gratuito=@gratuito, otrosCargos=@otrosCargos, descuentos=@descuentos, total=@total, idMediosPago=@idMediosPago, compRelacionado=@compRelacionado, idUsuario=@idUsuario
+            UPDATE Compras SET compCompra=@compCompra, serie=@serie, numero=@numero, fEmision=ISNULL(@fEmision, fEmision), fVencimiento=@fVencimiento, idProveedor=@idProveedor, idMoneda=@idMoneda, idEstadoPago=@idEstadoPago, subTotal=@subTotal, igv=@igv, exonerado=@exonerado, gratuito=@gratuito, otrosCargos=@otrosCargos, descuentos=@descuentos, total=@total, idMediosPago=@idMediosPago, compRelacionado=@compRelacionado, idUsuarioModifica=@idUsuarioModifica, fModificacion=GETDATE()
             WHERE idEmpresa=@idEmpresa AND idCompra=@idcompra
         `);
     return result.rowsAffected?.[0] ?? 0;

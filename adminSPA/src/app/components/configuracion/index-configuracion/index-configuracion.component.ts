@@ -61,6 +61,7 @@ export class IndexConfiguracionComponent implements OnInit {
     modoPrueba: true,
     tieneCertificado: false,
     envioDirectoSunat: false,
+    usarFacturadorSunat: false,
     useResumenDiarioBoletas: false,
     usaGuiasElectronicas: false,
     urlEnvio: '' as string,
@@ -128,7 +129,7 @@ export class IndexConfiguracionComponent implements OnInit {
   public sistemaGuardando = false;
   public backupEjecutando = false;
   public puedeEditarSistemaOperativo = false;
-  /** Pestaña Sistema: visible solo si empresa principal o usuario superAdmin. */
+  /** Pestaña Sistema: visible solo al superAdmin. */
   public mostrarTabSistema = false;
   /** Placeholder UNC para copia secundaria (evita escapado frágil en plantilla). */
   readonly ejemploUncBackupSecundario = '\\\\SERVIDOR\\Compartida\\sql_backups';
@@ -369,6 +370,9 @@ export class IndexConfiguracionComponent implements OnInit {
           this.facturacion.modoPrueba = c.modoPrueba !== false;
           this.facturacion.tieneCertificado = c.tieneCertificado === true;
           this.facturacion.envioDirectoSunat = c.envioDirectoSunat === true;
+          this.facturacion.usarFacturadorSunat =
+            !!(c.rutaCarpetaFacturadorSunat && String(c.rutaCarpetaFacturadorSunat).trim()) ||
+            !!(c.urlFacturadorSunat && String(c.urlFacturadorSunat).trim() && String(c.urlFacturadorSunat).trim() !== 'http://localhost:9000');
           this.facturacion.useResumenDiarioBoletas = c.useResumenDiarioBoletas === true;
           this.facturacion.usaGuiasElectronicas = c.usaGuiasElectronicas === true;
           this.facturacion.urlEnvio = c.urlEnvio ?? '';
@@ -391,8 +395,12 @@ export class IndexConfiguracionComponent implements OnInit {
       serieBoleta: this.facturacion.serieBoleta,
       serieNotaCredito: this.facturacion.serieNotaCredito,
       serieNotaDebito: this.facturacion.serieNotaDebito,
-      rutaCarpetaFacturadorSunat: this.facturacion.rutaCarpetaFacturadorSunat || undefined,
-      urlFacturadorSunat: this.facturacion.urlFacturadorSunat || undefined,
+      rutaCarpetaFacturadorSunat: this.facturacion.usarFacturadorSunat
+        ? (this.facturacion.rutaCarpetaFacturadorSunat || undefined)
+        : '',
+      urlFacturadorSunat: this.facturacion.usarFacturadorSunat
+        ? (this.facturacion.urlFacturadorSunat || undefined)
+        : '',
       urlEnvio: this.facturacion.urlEnvio || undefined,
       envioDirectoSunat: this.facturacion.envioDirectoSunat,
       useResumenDiarioBoletas: this.facturacion.useResumenDiarioBoletas,
@@ -788,7 +796,7 @@ export class IndexConfiguracionComponent implements OnInit {
         this.mostrarTabSistema =
           typeof d?.mostrarTabSistema === 'boolean'
             ? d.mostrarTabSistema
-            : !!(d?.esEmpresaPrincipal || d?.esSuperAdmin);
+            : !!d?.esSuperAdmin;
         if (!this.mostrarTabSistema) {
           return;
         }

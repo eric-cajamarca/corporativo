@@ -1,0 +1,57 @@
+.wizard-steps {
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 0.75rem;
+}
+
+.wizard-step {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #f1f3f5;
+  color: #6c757d;
+}
+
+.wizard-step.active {
+  background: #e7f1ff;
+  color: #0d6efd;
+}
+
+.wizard-step.current {
+  background: #0d6efd;
+  color: #fff;
+  font-weight: 600;
+}
+
+.import-progress {
+  height: 0.45rem;
+  border-radius: 999px;
+}
+
+.summary-box {
+  border: 1px solid #dee2e6;
+  border-radius: 0.65rem;
+  padding: 0.85rem 1rem;
+  background: #fff;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.preview-table {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.table-danger-subtle {
+  background-color: #fff5f5;
+}

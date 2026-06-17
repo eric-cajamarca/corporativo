@@ -126,8 +126,9 @@ exports.crearVentaCabeceraConTransaccion = async (pool, datosVenta, idEmpresa, i
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
-    await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
+    const ventaResult = await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
     await transaction.commit();
+    return ventaResult?.recordset?.[0]?.idVenta ?? null;
   } catch (err) {
     try {
       await transaction.rollback();

@@ -1,5 +1,6 @@
 const { withPool } = require('../utils/dbPool.util');
 const DespachosServices = require('../services/despachos.service');
+const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 
 // Obtener despachos por venta
 const obtenerDespachosVenta = async (req, res) => {
@@ -65,6 +66,8 @@ const crearDespacho = async (req, res) => {
         fechaDespacho
       })
     );
+
+    auditoriaOperaciones.auditarDespacho(req, result?.idDespacho, idVenta, null);
 
     res.status(200).send({
       message: "Despacho creado exitosamente",

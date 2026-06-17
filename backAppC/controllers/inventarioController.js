@@ -2,6 +2,7 @@
 const inventarioService = require('../services/inventario.service');
 const kardexService = require('../services/kardex.service');
 const conteoFisicoService = require('../services/conteoFisico.service');
+const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 
 /**
  * POST /api/inventario/movimientos
@@ -14,6 +15,14 @@ exports.registrarMovimiento = async (req, res) => {
     }
     const idUsuario = req.user.sub || req.user.idUsuario;
     const resultado = await inventarioService.procesarMovimiento(req.user.empresa, idUsuario, req.body);
+    const tipo = req.body?.tipoMovimiento || 'MOVIMIENTO';
+    auditoriaOperaciones.auditarInventario(
+      req,
+      tipo,
+      resultado?.idMovimiento,
+      req.body?.docRelacionado || null,
+      req.body?.observaciones || null
+    );
     return res.status(200).json(resultado);
   } catch (error) {
     console.error('inventarioController registrarMovimiento:', error);

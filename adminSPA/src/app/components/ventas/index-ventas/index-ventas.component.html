@@ -182,6 +182,7 @@
               <div class="ventas-m-kv"><span class="ventas-m-k">Tipo</span><span class="ventas-m-v">{{ etiquetaTipoComprobanteDestino(v.tipoComprobanteDestino) }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Emisión</span><span class="ventas-m-v">{{ formatearFecha(v.fEmision) }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Cliente</span><span class="ventas-m-v">{{ v.clienteRazonSocial || '—' }}</span></div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">Registrado por</span><span class="ventas-m-v">{{ v.usuarioRegistro?.trim() || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">RUC</span><span class="ventas-m-v">{{ v.clienteRuc || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Sucursal</span><span class="ventas-m-v">{{ v.sucursal || '—' }}</span></div>
               <div class="ventas-m-kv ventas-m-total"><span class="ventas-m-k">Total</span><span class="ventas-m-v fw-semibold">{{ formatearMoneda(v.total) }}</span></div>
@@ -223,6 +224,7 @@
                   <th class="small">Afecta</th>
                   <th>Cliente</th>
                   <th>Condición</th>
+                  <th>Registrado por</th>
                   <!-- <th>Forma pago</th> -->
                   <th class="text-end">Total</th>
                   <th>Est. SUNAT</th>
@@ -240,6 +242,7 @@
                     <span class="cliente-nombre" title="{{ v.clienteRuc || '' }}">{{ v.clienteRazonSocial || '—' }}</span>
                   </td>
                   <td>{{ v.condicionPago || '—' }} {{ etiquetaFormaPago(v) }}</td>
+                  <td class="small">{{ v.usuarioRegistro?.trim() || '—' }}</td>
                  <!-- <td class="small font-monospace">{{ etiquetaFormaPago(v) }}</td> -->
                   <td class="text-end fw-semibold">{{ formatearMoneda(v.total) }}</td>
                   <td>
@@ -378,6 +381,7 @@
                 <span class="ventas-m-k">Doc. afectado</span><span class="ventas-m-v small">{{ etiquetaDocAfectadoListado(v) }}</span>
               </div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Cliente</span><span class="ventas-m-v">{{ v.clienteRazonSocial || '—' }}</span></div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">Registrado por</span><span class="ventas-m-v">{{ v.usuarioRegistro?.trim() || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Condición</span><span class="ventas-m-v">{{ v.condicionPago || '—' }}</span></div>
               <div class="ventas-m-kv"><span class="ventas-m-k">Forma pago</span><span class="ventas-m-v small font-monospace">{{ etiquetaFormaPago(v) }}</span></div>
               <div class="ventas-m-kv ventas-m-total"><span class="ventas-m-k">Total</span><span class="ventas-m-v fw-semibold">{{ formatearMoneda(v.total) }}</span></div>

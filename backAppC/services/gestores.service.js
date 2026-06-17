@@ -211,8 +211,8 @@ const obtenerPermisosConfiguracionSistema = async (pool, user) => {
     const esEmpresaPrincipal = await suscripcionCatalogoAdminService.usuarioEsEmpresaPrincipal(pool, user);
     const esSuperAdminUsuario = suscripcionCatalogoAdminService.esSuperAdmin(user);
     const puedeEditarSistemaOperativo = await suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, user);
-    /** Pestaña Sistema visible si empresa principal o rol superAdmin (regla UI). */
-    const mostrarTabSistema = esEmpresaPrincipal || esSuperAdminUsuario;
+    /** Pestaña Sistema visible solo para rol superAdmin (operador de plataforma). */
+    const mostrarTabSistema = esSuperAdminUsuario;
     return {
         puedeEditarSistemaOperativo,
         mostrarTabSistema,

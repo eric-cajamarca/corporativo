@@ -226,7 +226,7 @@ exports.editarCompra = async (idEmpresa, idUsuario, idCompra, body) => {
         total: body.total ?? 0,
         idMediosPago: body.idMediosPago ?? 1,
         compRelacionado: body.compRelacionado ?? '',
-        idUsuario
+        idUsuarioModifica: idUsuario
     }));
 };
 

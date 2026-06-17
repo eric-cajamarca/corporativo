@@ -23,6 +23,7 @@ export class LogAuditoriaComponent implements OnInit {
   loading = false;
   filtros = {
     accion: '',
+    modulo: '',
     fechaDesde: '',
     fechaHasta: ''
   };
@@ -40,6 +41,7 @@ export class LogAuditoriaComponent implements OnInit {
     this.loading = true;
     const params: any = { pagina: this.page, porPagina: this.pageSize };
     if (this.filtros.accion?.trim()) params.accion = this.filtros.accion.trim();
+    if (this.filtros.modulo?.trim()) params.modulo = this.filtros.modulo.trim();
     if (this.filtros.fechaDesde) params.fechaDesde = this.filtros.fechaDesde;
     if (this.filtros.fechaHasta) params.fechaHasta = this.filtros.fechaHasta;
 

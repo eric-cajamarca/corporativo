@@ -159,22 +159,31 @@
                       </label>
                     </div>
                   </div>
-                  <div class="col-12">
-                    <label for="rutaCarpetaFacturadorSunat" class="form-label">Carpeta del Facturador SUNAT</label>
-                    <input type="text" class="form-control" id="rutaCarpetaFacturadorSunat" [(ngModel)]="facturacion.rutaCarpetaFacturadorSunat" name="rutaCarpetaFacturadorSunat" placeholder="Ej: D:\SFS_v1.2 o C:\Emp_A">
-                    <small class="form-text text-muted">Ruta de la carpeta padre donde está instalado el Facturador (contiene sunat_archivos). Los JSON se guardan en [ruta]\sunat_archivos\sfs\DATA\</small>
-                  </div>
-                  <div class="col-12">
-                    <label for="urlFacturadorSunat" class="form-label">URL del Facturador SUNAT</label>
-                    <input type="text" class="form-control" id="urlFacturadorSunat" [(ngModel)]="facturacion.urlFacturadorSunat" name="urlFacturadorSunat" placeholder="http://localhost:9000">
-                    <small class="form-text text-muted">URL base del Facturador (ej. http://localhost:9000). Respaldo cuando no usa envío directo.</small>
+                  <div class="col-12 mt-3 pt-3 border-top">
+                    <h6 class="text-muted mb-2">Facturador SUNAT (archivos planos)</h6>
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" id="usarFacturadorSunat" [(ngModel)]="facturacion.usarFacturadorSunat" name="usarFacturadorSunat">
+                      <label class="form-check-label" for="usarFacturadorSunat">Usar facturador. Si está desmarcado, no se envían comprobantes por archivos planos.</label>
+                    </div>
+                    <div class="row g-3" *ngIf="facturacion.usarFacturadorSunat">
+                      <div class="col-12">
+                        <label for="rutaCarpetaFacturadorSunat" class="form-label">Carpeta del Facturador SUNAT</label>
+                        <input type="text" class="form-control" id="rutaCarpetaFacturadorSunat" [(ngModel)]="facturacion.rutaCarpetaFacturadorSunat" name="rutaCarpetaFacturadorSunat" placeholder="Ej: D:\SFS_v1.2 o C:\Emp_A">
+                        <small class="form-text text-muted">Ruta de la carpeta padre donde está instalado el Facturador (contiene sunat_archivos). Los JSON se guardan en [ruta]\sunat_archivos\sfs\DATA\</small>
+                      </div>
+                      <div class="col-12">
+                        <label for="urlFacturadorSunat" class="form-label">URL del Facturador SUNAT</label>
+                        <input type="text" class="form-control" id="urlFacturadorSunat" [(ngModel)]="facturacion.urlFacturadorSunat" name="urlFacturadorSunat" placeholder="http://localhost:9000">
+                        <small class="form-text text-muted">URL base del Facturador (ej. http://localhost:9000). Respaldo cuando no usa envío directo.</small>
+                      </div>
+                    </div>
                   </div>
                   <!-- Envío directo a SUNAT (SOAP BillService): usuario secundario y contraseña del usuario secundario -->
                   <div class="col-12 mt-3 pt-3 border-top">
                     <h6 class="text-muted mb-2">Envío directo a SUNAT (usuario secundario)</h6>
                     <div class="form-check mb-2">
                       <input class="form-check-input" type="checkbox" id="envioDirectoSunat" [(ngModel)]="facturacion.envioDirectoSunat" name="envioDirectoSunat">
-                      <label class="form-check-label" for="envioDirectoSunat">Usar envío directo (SOAP BillService). Si está desmarcado, se usa el Facturador con archivos planos.</label>
+                      <label class="form-check-label" for="envioDirectoSunat">Usar envío directo (SOAP BillService). Si está desmarcado, puede usar el Facturador con archivos planos (sección anterior).</label>
                     </div>
                     <div class="row g-2" *ngIf="facturacion.envioDirectoSunat">
                       <div class="col-12">
