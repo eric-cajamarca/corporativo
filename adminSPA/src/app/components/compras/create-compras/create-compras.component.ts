@@ -1352,7 +1352,9 @@ export class CreateComprasComponent {
           message: 'Compra registrada correctamente.',
         });
         const idLotes = Array.isArray(response.data?.detalles)
-          ? response.data.detalles.map((r: { idLote?: string }) => r?.idLote).filter(Boolean)
+          ? response.data.detalles
+              .map((r) => r?.idLote)
+              .filter((id): id is string => !!id)
           : [];
         this.afterCompraRegistrada(idLotes);
       },

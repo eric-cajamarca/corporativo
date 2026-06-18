@@ -955,9 +955,6 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Precarga catálogo en memoria (sin bloquear UI) para búsquedas locales instantáneas. */
   private precargarCatalogoProductosEnSegundoPlano(): void {
-    if (!this.esGestora) {
-      return;
-    }
     if (this._productoService.tieneCatalogoEnMemoria()) {
       return;
     }
@@ -1117,22 +1114,41 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Búsqueda instantánea si el catálogo ya está en memoria (SPA u otra pantalla). */
   private buscarEnCatalogoLocal(term: string): any[] | null {
-    const mem = this._productoService.filtrarListaMemoriaVenta(term, 300);
-    let fuente: any[] | null = mem;
-    if (fuente === null && (this.stockSucursales_const?.length || 0) > 0) {
-      fuente = (this.stockSucursales_const || []).filter((item: any) =>
-        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term)
+    const termOk = String(term || '').trim();
+    if (termOk.length < 2) {
+      return [];
+    }
+
+    if (this._productoService.tieneCatalogoEnMemoria()) {
+      const mem = this._productoService.filtrarListaMemoriaVenta(termOk, 300);
+      if (mem !== null) {
+        return this.obtenerCatalogoProductosOperativo(mem).slice(0, this.buscadorLimiteFilas);
+      }
+    }
+
+    if ((this.stockSucursales_const?.length || 0) > 0) {
+      const parcial = (this.stockSucursales_const || []).filter((item: any) =>
+        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, termOk)
       );
+      return this.obtenerCatalogoProductosOperativo(parcial).slice(0, this.buscadorLimiteFilas);
     }
-    if (fuente === null) {
-      return null;
-    }
-    return this.obtenerCatalogoProductosOperativo(fuente).slice(0, this.buscadorLimiteFilas);
+
+    return null;
+  }
+
+  productoYaEnCarrito(producto: any): boolean {
+    return this.carrito.some(
+      (p) =>
+        String(p.idProducto) === String(producto?.idProducto) &&
+        String(p.idSucursal || '') === String(producto?.idSucursal || this.ventas.idSucursal || '') &&
+        String(p.idEmpresa || '') === String(producto?.idEmpresa || '')
+    );
   }
 
   abrirBuscadorProductos(): void {
     this.buscadorProductosModal.abrir({
       modo: 'venta',
+      conservarUltimaBusqueda: true,
       idSucursal: String(this.ventas.idSucursal || ''),
       venta: {
         idSucursalApi: this.idSucursalParaBusquedaApi(),
@@ -1140,7 +1156,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         idSucursalDefault: String(this.ventas.idSucursal || ''),
         buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
         filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
-        onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano()
+        onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano(),
+        estaEnDetalle: (p) => this.productoYaEnCarrito(p)
       }
     }).then((prod) => {
       if (!prod) return;

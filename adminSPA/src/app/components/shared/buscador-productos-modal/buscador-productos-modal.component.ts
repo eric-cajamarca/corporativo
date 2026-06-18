@@ -1,9 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, ElementRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { EMPTY, Subject, Subscription } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { ProductoService } from '../../../services/producto.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { EmpresaService } from '../../../services/empresa.service';
@@ -11,6 +9,7 @@ import { ProductosImagenService, ImagenProducto } from '../../../services/produc
 import {
   marcaProductoEnLista,
   productoActivoParaVenta,
+  productoCoincideBusquedaMultipalabra,
   productoSinStockEnBusqueda
 } from '../../../utils/producto-busqueda.util';
 import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
@@ -47,7 +46,7 @@ export interface ProductoSeleccionado {
   templateUrl: './buscador-productos-modal.component.html',
   styleUrl: './buscador-productos-modal.component.css'
 })
-export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
+export class BuscadorProductosModalComponent implements OnInit {
   @ViewChild('inputBuscar') inputBuscar?: ElementRef<HTMLInputElement>;
 
   modo: BuscadorProductosModo = 'catalogo';
@@ -81,8 +80,8 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
   idProductoCargandoImagenes: string | null = null;
   imagenPrincipalPorProducto: Record<string, string | null> = {};
   private idsSolicitadosImagen = new Set<string>();
-  private readonly busquedaProducto$ = new Subject<string>();
-  private busquedaProductoSub?: Subscription;
+  /** Catálogo en memoria para filtrar al escribir (modo venta). */
+  private catalogoVentaLocal: ProductoSeleccionado[] = [];
 
   readonly imagenPorDefecto = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>');
 
@@ -97,8 +96,9 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (this.modo === 'venta') {
-      this.buscadorMensaje = `Escriba al menos ${this.buscadorMinCaracteres} caracteres para buscar productos.`;
-      this.inicializarBusquedaVentaDebounced();
+      this.buscadorMensaje =
+        `Escriba al menos ${this.buscadorMinCaracteres} caracteres. Al escribir filtra el catálogo en memoria; use Buscar para consultar la base de datos.`;
+      this.cargarCatalogoVentaLocal();
     } else {
       this.cargarCatalogo();
     }
@@ -139,10 +139,6 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
-  }
-
-  ngOnDestroy(): void {
-    this.busquedaProductoSub?.unsubscribe();
   }
 
   private cargarCatalogo(opciones?: { evitarCache?: boolean }): void {
@@ -253,6 +249,11 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
     return productoSinStockEnBusqueda(p as Record<string, unknown>);
   }
 
+  estaEnDetalleVenta(p: ProductoSeleccionado): boolean {
+    const fn = this.ventaOpciones?.estaEnDetalle;
+    return fn ? fn(p) : false;
+  }
+
   muestraColumnaEmpresa(): boolean {
     if (this.modo === 'venta') {
       return !!this.ventaOpciones?.esGestora;
@@ -326,52 +327,48 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
     }
   }
 
-  private inicializarBusquedaVentaDebounced(): void {
-    this.busquedaProductoSub = this.busquedaProducto$
-      .pipe(
-        debounceTime(320),
-        distinctUntilChanged(),
-        switchMap((term) => {
-          const local = this.buscarVentaEnLocal(term);
-          if (local !== null) {
-            this.buscadorBuscando = false;
-            this.aplicarResultadosVenta(local);
-            return EMPTY;
-          }
-          this.buscadorBuscando = true;
-          this.cdr.detectChanges();
-          return this.productoService
-            .buscarProductosVenta({
-              q: term,
-              limit: this.buscadorLimiteFilas,
-              idSucursal: this.ventaOpciones?.idSucursalApi
-            })
-            .pipe(
-              tap({
-                error: () => {
-                  this.buscadorBuscando = false;
-                  this.cdr.detectChanges();
-                }
-              })
-            );
-        })
-      )
-      .subscribe({
-        next: (response) => {
-          if (!response) {
-            return;
-          }
-          this.buscadorBuscando = false;
-          const filas = Array.isArray(response?.data) ? response.data : [];
-          this.aplicarResultadosVenta(this.filasVentaActivasDesdeApi(filas));
-        },
-        error: (err) => {
-          this.buscadorBuscando = false;
-          this.productosFiltrados = [];
-          this.buscadorMensaje = err?.error?.message || 'Error al buscar productos.';
-          this.cdr.detectChanges();
+  private cargarCatalogoVentaLocal(): void {
+    this.ventaOpciones?.onPrecargarCatalogo?.();
+    this.productoService.obtenerProductosTodos().subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : [];
+        const activos = raw
+          .filter((item) => productoActivoParaVenta(item as unknown as Record<string, unknown>))
+          .map((item) => this.mapFilaVenta(item as unknown as Record<string, unknown>));
+        this.catalogoVentaLocal = this.filtrarFilasVenta(activos);
+        const term = this.searchTerm.trim();
+        if (term.length >= this.buscadorMinCaracteres) {
+          this.filtrarBusquedaVentaLocal(term);
         }
-      });
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
+  private filtrarBusquedaVentaLocal(term: string): void {
+    const filtrados = this.catalogoVentaLocal
+      .filter((item) =>
+        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term)
+      )
+      .slice(0, this.buscadorLimiteFilas);
+    this.aplicarResultadosVenta(filtrados);
+  }
+
+  private fusionarCatalogoVentaLocal(filas: ProductoSeleccionado[]): void {
+    if (!filas?.length) {
+      return;
+    }
+    const clave = (r: ProductoSeleccionado) =>
+      `${String(r.idProducto)}|${String(r.idSucursal || '')}|${String(r['idEmpresa'] || '')}`;
+    const map = new Map<string, ProductoSeleccionado>();
+    for (const r of this.catalogoVentaLocal) {
+      map.set(clave(r), r);
+    }
+    for (const r of filas) {
+      map.set(clave(r), r);
+    }
+    this.catalogoVentaLocal = [...map.values()];
   }
 
   private buscarVentaEnLocal(term: string): ProductoSeleccionado[] | null {
@@ -428,30 +425,31 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
       this.buscadorBuscando = false;
       this.buscadorMensaje =
         term.length === 0
-          ? `Escriba al menos ${this.buscadorMinCaracteres} caracteres para buscar productos.`
+          ? `Escriba al menos ${this.buscadorMinCaracteres} caracteres. Al escribir filtra el catálogo en memoria; use Buscar para consultar la base de datos.`
           : `Escriba al menos ${this.buscadorMinCaracteres} caracteres.`;
       this.cdr.detectChanges();
       return;
     }
-    const local = this.buscarVentaEnLocal(term);
-    if (local !== null) {
+    const localParent = this.buscarVentaEnLocal(term);
+    if (localParent !== null) {
       this.buscadorBuscando = false;
-      this.aplicarResultadosVenta(local);
+      this.aplicarResultadosVenta(localParent);
       return;
     }
+    if (this.catalogoVentaLocal.length === 0) {
+      this.productosFiltrados = [];
+      this.buscadorBuscando = false;
+      this.buscadorMensaje =
+        'Catálogo en carga. Pulse Buscar para consultar la base de datos ahora.';
+      this.cdr.detectChanges();
+      return;
+    }
+    this.buscadorBuscando = false;
     this.buscadorMensaje = '';
-    this.buscadorBuscando = true;
-    this.cdr.detectChanges();
-    this.busquedaProducto$.next(term);
+    this.filtrarBusquedaVentaLocal(term);
   }
 
   private ejecutarBusquedaVentaServidor(term: string, evitarCache = false): void {
-    const local = !evitarCache ? this.buscarVentaEnLocal(term) : null;
-    if (local !== null) {
-      this.buscadorBuscando = false;
-      this.aplicarResultadosVenta(local);
-      return;
-    }
     this.buscadorBuscando = true;
     this.cdr.detectChanges();
     this.productoService
@@ -465,7 +463,9 @@ export class BuscadorProductosModalComponent implements OnInit, OnDestroy {
         next: (response) => {
           this.buscadorBuscando = false;
           const filas = Array.isArray(response?.data) ? response.data : [];
-          this.aplicarResultadosVenta(this.filasVentaActivasDesdeApi(filas));
+          const activos = this.filasVentaActivasDesdeApi(filas);
+          this.fusionarCatalogoVentaLocal(activos);
+          this.aplicarResultadosVenta(activos);
         },
         error: (err) => {
           this.buscadorBuscando = false;

@@ -36,6 +36,31 @@
   }
 }
 
+.venta-rapida-busqueda-card .card-header {
+  border-radius: 0.75rem 0.75rem 0 0 !important;
+}
+
+.venta-rapida-busqueda-wrap {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.venta-rapida-busqueda-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8f9fa;
+}
+
+.venta-rapida-busqueda-table tbody tr {
+  cursor: pointer;
+}
+
+.venta-rapida-busqueda-row-en-carrito td {
+  background-color: #e9ecef !important;
+  color: #6c757d;
+}
+
 /* CARDS */
 .card {
     border: none;

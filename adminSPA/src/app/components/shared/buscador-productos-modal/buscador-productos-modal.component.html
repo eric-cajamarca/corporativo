@@ -13,11 +13,16 @@
         [placeholder]="modo === 'venta' ? 'Código, descripción, marca, categoría…' : 'Nombre o código...'"
         [(ngModel)]="searchTerm"
         (input)="onBusquedaInput()"
+        (keyup.enter)="recargarProductosDesdeServidor()"
         autocomplete="off"
       />
     </div>
     <div class="col-12 col-lg-4">
-      <button type="button" class="btn btn-outline-light w-100" (click)="recargarProductosDesdeServidor()" [disabled]="loading || buscadorBuscando">
+      <button
+        type="button"
+        class="btn btn-outline-light w-100"
+        (click)="recargarProductosDesdeServidor()"
+        [disabled]="loading || buscadorBuscando || (modo === 'venta' && searchTerm.trim().length < buscadorMinCaracteres)">
         <i class="bi bi-search"></i> Buscar
       </button>
     </div>
@@ -54,7 +59,8 @@
           *ngFor="let p of productosFiltrados; trackBy: trackByProducto"
           role="button"
           class="table-row-hover"
-          [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p)"
+          [class.efaf-buscador-row-en-detalle]="estaEnDetalleVenta(p)"
+          [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p) && !estaEnDetalleVenta(p)"
           (click)="seleccionar(p)"
         >
           <td *ngIf="productosConImagenes" class="align-middle p-1" (click)="$event.stopPropagation()">
@@ -95,7 +101,8 @@
     <div
       class="border rounded mb-2 p-3 buscador-compra-card bg-white"
       *ngFor="let p of productosFiltrados; trackBy: trackByProducto"
-      [class.efaf-buscador-card-sin-stock]="sinStockBusqueda(p)"
+      [class.efaf-buscador-card-en-detalle]="estaEnDetalleVenta(p)"
+      [class.efaf-buscador-card-sin-stock]="sinStockBusqueda(p) && !estaEnDetalleVenta(p)"
     >
       <div class="d-flex gap-2 align-items-start">
         <div *ngIf="productosConImagenes" class="flex-shrink-0" (click)="$event.stopPropagation()">

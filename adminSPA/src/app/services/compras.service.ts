@@ -110,7 +110,9 @@ export class ComprasService {
   crear_compra_completa(payload: { compra: unknown; detalles: unknown[]; comprobanteSunat?: unknown }): Observable<{
     data: { idCompra: string; detalles?: Array<{ idLote?: string; numeroLote?: string }> };
   }> {
-    return this._http.post(this.url + 'compras/completa', payload, { withCredentials: true });
+    return this._http.post<{
+      data: { idCompra: string; detalles?: Array<{ idLote?: string; numeroLote?: string }> };
+    }>(this.url + 'compras/completa', payload, { withCredentials: true });
   }
 
   crear_compra(compra: any): Observable<any> {

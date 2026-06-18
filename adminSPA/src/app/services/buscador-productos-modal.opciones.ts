@@ -15,6 +15,8 @@ export interface BuscadorProductosVentaOpciones {
   filtrarFila?: (row: Record<string, unknown>) => boolean;
   /** Precarga catálogo en segundo plano al abrir el modal (gestora). */
   onPrecargarCatalogo?: () => void;
+  /** Resalta filas ya presentes en el detalle de venta (gris). */
+  estaEnDetalle?: (row: ProductoSeleccionado) => boolean;
 }
 
 export interface BuscadorProductosModalOpciones {
@@ -23,4 +25,6 @@ export interface BuscadorProductosModalOpciones {
   venta?: BuscadorProductosVentaOpciones;
   /** Etiqueta columna precio (p. ej. "Precio ref." en compras). */
   etiquetaPrecio?: string;
+  /** Al cerrar, conserva término y resultados para la próxima apertura (p. ej. venta completa). */
+  conservarUltimaBusqueda?: boolean;
 }

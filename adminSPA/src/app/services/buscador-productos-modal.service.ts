@@ -5,6 +5,12 @@ import { BuscadorProductosModalComponent } from '../components/shared/buscador-p
 import { ProductoSeleccionado } from '../components/shared/buscador-productos-modal/buscador-productos-modal.component';
 import { BuscadorProductosModalOpciones } from './buscador-productos-modal.opciones';
 
+interface EstadoBusquedaPersistida {
+  searchTerm: string;
+  productosFiltrados: ProductoSeleccionado[];
+  buscadorMensaje: string;
+}
+
 /**
  * Servicio para abrir el modal de búsqueda de productos desde cualquier componente.
  * Uso: this.buscadorProductosModal.abrir({ modo: 'venta', venta: { ... } }).then(p => { ... });
@@ -13,6 +19,8 @@ import { BuscadorProductosModalOpciones } from './buscador-productos-modal.opcio
   providedIn: 'root'
 })
 export class BuscadorProductosModalService {
+
+  private estadoBusquedaVentaPersistida: EstadoBusquedaPersistida | null = null;
 
   constructor(private modalService: NgbModal) {}
 
@@ -24,6 +32,8 @@ export class BuscadorProductosModalService {
   abrir(opciones?: BuscadorProductosModalOpciones | string): Promise<ProductoSeleccionado | null> {
     const opts: BuscadorProductosModalOpciones =
       typeof opciones === 'string' ? { idSucursal: opciones } : (opciones ?? {});
+
+    const conservarBusqueda = opts.conservarUltimaBusqueda === true;
 
     const modalRef: NgbModalRef = this.modalService.open(BuscadorProductosModalComponent, {
       size: 'xl',
@@ -45,8 +55,23 @@ export class BuscadorProductosModalService {
     }
 
     modalRef.shown.pipe(take(1)).subscribe(() => {
+      if (conservarBusqueda && this.estadoBusquedaVentaPersistida) {
+        component.searchTerm = this.estadoBusquedaVentaPersistida.searchTerm;
+        component.productosFiltrados = [...this.estadoBusquedaVentaPersistida.productosFiltrados];
+        component.buscadorMensaje = this.estadoBusquedaVentaPersistida.buscadorMensaje;
+      }
       opts.venta?.onPrecargarCatalogo?.();
       component.enfocarCampoBusqueda();
+    });
+
+    modalRef.hidden.pipe(take(1)).subscribe(() => {
+      if (conservarBusqueda) {
+        this.estadoBusquedaVentaPersistida = {
+          searchTerm: component.searchTerm,
+          productosFiltrados: [...component.productosFiltrados],
+          buscadorMensaje: component.buscadorMensaje
+        };
+      }
     });
 
     return modalRef.result.catch(() => null);

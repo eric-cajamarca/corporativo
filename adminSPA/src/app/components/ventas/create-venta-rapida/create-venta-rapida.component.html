@@ -117,6 +117,78 @@
 
         <div class="col-12">
 
+          <!-- Búsqueda inline de productos -->
+          <section class="card mb-3 venta-rapida-busqueda-card shadow-sm">
+            <div class="card-header bg-primary text-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <h6 class="mb-0"><i class="bi bi-search me-1"></i> Buscar producto</h6>
+              <small class="opacity-75">Clic en fila para agregar al detalle</small>
+            </div>
+            <div class="card-body p-2">
+              <div class="input-group mb-2">
+                <input
+                  #inputBusquedaInline
+                  type="search"
+                  class="form-control"
+                  placeholder="Código, descripción, marca, categoría…"
+                  [(ngModel)]="searchTermInline"
+                  (input)="onBusquedaInlineInput()"
+                  (keyup.enter)="buscarProductosInlineDesdeBaseDatos()"
+                  autocomplete="off"
+                />
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  (click)="buscarProductosInlineDesdeBaseDatos()"
+                  [disabled]="buscadorInlineBuscando || searchTermInline.trim().length < buscadorInlineMinCaracteres">
+                  <i class="bi bi-search"></i> Buscar
+                </button>
+              </div>
+              
+              <p *ngIf="buscadorInlineMensaje" class="small text-muted mb-2">{{ buscadorInlineMensaje }}</p>
+              <div *ngIf="buscadorInlineBuscando" class="text-center py-2">
+                <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+                <span class="ms-2 small text-muted">Buscando…</span>
+              </div>
+              <div
+                *ngIf="!buscadorInlineBuscando && productosBusquedaInline.length > 0"
+                class="table-responsive venta-rapida-busqueda-wrap">
+                <table class="table table-sm table-hover align-middle mb-0 venta-rapida-busqueda-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th *ngIf="esGestora">Empresa</th>
+                      <th>Código</th>
+                      <th>Marca</th>
+                      <th>Producto</th>
+                      <th>U.M.</th>
+                      <th class="text-end">Precio</th>
+                      <th class="text-end">Stock</th>
+                      <th>Sucursal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let p of productosBusquedaInline; trackBy: trackByProductoInline"
+                      role="button"
+                      (click)="agregarProductoDesdeBusquedaInline(p)"
+                      [class.venta-rapida-busqueda-row-en-carrito]="yaEstaEnCarritoInline(p)"
+                      [class.efaf-buscador-row-sin-stock]="sinStockBusquedaInline(p) && !yaEstaEnCarritoInline(p)">
+                      <td *ngIf="esGestora">
+                        <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
+                      </td>
+                      <td>{{ p.codigo }}</td>
+                      <td>{{ marcaColumnaVentas(p) }}</td>
+                      <td>{{ p.descripcion }}</td>
+                      <td>{{ p.codigoPresentacion || '—' }}</td>
+                      <td class="text-end">S/ {{ p.pVenta | number:'1.2-2' }}</td>
+                      <td class="text-end">{{ p.stock }}</td>
+                      <td>{{ textoSucursalInline(p) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <!-- CARD: Detalle de Venta -->
           <section class="cart-section card">
             <div class="card-header bg-success text-white d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 py-2 py-lg-3">
@@ -125,9 +197,6 @@
               <div class="d-flex flex-wrap align-items-stretch align-items-lg-center gap-2 w-100 w-lg-auto justify-content-lg-end">
                 <input #inputCodigoBarra type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()"
                   placeholder="Código de barras / producto" (keyup.enter)="buscarCodigoProd()" autofocus>
-                <button type="button" class="btn btn-success btn-lg flex-grow-1 flex-lg-grow-0" (click)="abrirBuscadorProductos()">
-                  <i class="bi bi-search"></i> Buscar productos
-                </button>
                 <button type="button" class="btn btn-outline-light btn-sm create-ventas-icon-btn" data-bs-toggle="modal" data-bs-target="#modalCotizacion" (click)="abrirModalCotizacion()" title="Cargar desde cotización">
                   <i class="bi bi-file-text"></i>
                 </button>

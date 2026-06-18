@@ -121,7 +121,6 @@ export class CreateClientesComponent implements OnInit, OnChanges {
       }
     );
     this.aplicarPrecargaDesdeVentaInputs();
-    this.select_pais();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -539,18 +538,19 @@ private showError(message: string): void {
   }
 
   
+  private setSelectDisabled(elementId: string, disabled: boolean): void {
+    const el = document.getElementById(elementId) as HTMLSelectElement | null;
+    if (el) {
+      el.disabled = disabled;
+    }
+  }
+
   select_pais() {
-  const pais = 'Perú';
-  
   if (this.direccionClientes.codpais == 'PEN') {
-    // Habilitar select de región
-    const regionSelect = document.getElementById('sl-region') as HTMLSelectElement;
-    regionSelect.disabled = false;
+    this.setSelectDisabled('sl-region', false);
     
-    // Obtener regiones
     this._adminService.get_Regiones().subscribe(
       response => {
-                // Usar map en lugar de forEach + push (más eficiente)
         this.regiones = response.map((element: any) => ({
           id: element.id,
           name: element.name
@@ -558,16 +558,10 @@ private showError(message: string): void {
       }
     );
   } else {
-    // Deshabilitar todos los selects
-    const regionSelect = document.getElementById('sl-region') as HTMLSelectElement;
-    const provinciaSelect = document.getElementById('sl-provincia') as HTMLSelectElement;
-    const distritoSelect = document.getElementById('sl-distrito') as HTMLSelectElement;
+    this.setSelectDisabled('sl-region', true);
+    this.setSelectDisabled('sl-provincia', true);
+    this.setSelectDisabled('sl-distrito', true);
     
-    regionSelect.disabled = true;
-    provinciaSelect.disabled = true;
-    distritoSelect.disabled = true;
-    
-    // Limpiar arrays y modelos
     this.regiones = [];
     this.provincias = [];
     this.distritos = [];
@@ -579,23 +573,15 @@ private showError(message: string): void {
 
  
   select_region() {
-  // Limpiar arrays y valores
   this.provincias = [];
   this.direccionClientes.provincia = '';
   this.direccionClientes.distrito = '';
 
-  // Obtener elementos del DOM nativamente
-  const provinciaSelect = document.getElementById('sl-provincia') as HTMLSelectElement;
-  const distritoSelect = document.getElementById('sl-distrito') as HTMLSelectElement;
+  this.setSelectDisabled('sl-provincia', false);
+  this.setSelectDisabled('sl-distrito', true);
 
-  // Cambiar estados de los selects
-  provinciaSelect.disabled = false;
-  distritoSelect.disabled = true;
-
-  // Obtener provincias
   this._adminService.get_Procincias().subscribe(
     response => {
-      // Usar filter en lugar de forEach + if
       this.provincias = response.filter((element: any) => 
         element.department_id == this.direccionClientes.region
       );
@@ -606,15 +592,11 @@ private showError(message: string): void {
   
 
   select_provincia() {
-  // Limpiar distritos y valor actual
   this.distritos = [];
   this.direccionClientes.distrito = '';
 
-  // Habilitar select de distrito (versión nativa)
-  const distritoSelect = document.getElementById('sl-distrito') as HTMLSelectElement;
-  distritoSelect.disabled = false;
+  this.setSelectDisabled('sl-distrito', false);
 
-  // Obtener distritos
   this._adminService.get_Distritos().subscribe(
     response => {
       // Versión optimizada con filter

@@ -138,3 +138,12 @@ td.efaf-buscador-col-desc {
   background-color: #fff3cd !important;
   border-color: #ffc107 !important;
 }
+.efaf-buscador-row-en-detalle td {
+  background-color: #e9ecef !important;
+  color: #6c757d;
+}
+.efaf-buscador-card-en-detalle {
+  background-color: #e9ecef !important;
+  border-color: #ced4da !important;
+  color: #6c757d;
+}

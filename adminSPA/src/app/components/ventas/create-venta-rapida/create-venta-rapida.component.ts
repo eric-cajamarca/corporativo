@@ -20,7 +20,6 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
-import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
@@ -76,9 +75,17 @@ interface DocumentoResponse {
 export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('inputCodigoBarra') inputCodigoBarra?: ElementRef<HTMLInputElement>;
+  @ViewChild('inputBusquedaInline') inputBusquedaInline?: ElementRef<HTMLInputElement>;
 
   readonly buscadorLimiteFilas = 80;
+  readonly buscadorInlineMinCaracteres = 2;
   public searchCodigo = '';
+  public searchTermInline = '';
+  public productosBusquedaInline: any[] = [];
+  public buscadorInlineBuscando = false;
+  public buscadorInlineMensaje = 'Escriba al menos 2 caracteres. Al escribir filtra el catálogo en memoria; use Buscar para consultar la base de datos.';
+  /** Catálogo completo para filtrar al escribir (independiente del detalle de venta). */
+  private catalogoBusquedaInline: any[] = [];
   public categoria: any = [];
   public presentacion: Presentacion[] = [];
   public marcas: any = [];
@@ -255,7 +262,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private _tablasSunatService: TablasSunatService,
     private _documentosService: DocumentoService,
     private modalService: ModalService,
-    private buscadorProductosModal: BuscadorProductosModalService,
     private ventasService: VentasService,
     private cotizacionesService: CotizacionesService,
     private cajaService: CajaService,
@@ -312,6 +318,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   ngOnInit(): void {
     this.ventaProvisionalUi.configurarModo('rapida');
+    this.cargarCatalogoBusquedaInline();
     this.gestoresService.obtenerConfiguracion({ evitarCache: true }).subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
@@ -963,6 +970,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
             Array.isArray(response.data) ? response.data : []
           );
           this.stockSucursales_const = data;
+          this.catalogoBusquedaInline = this.obtenerCatalogoProductosOperativo(data);
         }
       },
       error: (err) => {
@@ -1124,25 +1132,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     return filas.filter((item) => this.productoPerteneceEmpresaOperativa(item));
   }
 
-  /** Precarga catálogo en memoria (sin bloquear UI) para búsquedas locales instantáneas. */
-  private precargarCatalogoProductosEnSegundoPlano(): void {
-    if (!this.esGestora) {
-      return;
-    }
-    if (this._productoService.tieneCatalogoEnMemoria()) {
-      return;
-    }
-    this._productoService.obtenerProductosTodos().subscribe({
-      next: (res) => {
-        const data = this.filtrarFilasCatalogoEmpresaOperativa(Array.isArray(res?.data) ? res.data : []);
-        if (data.length) {
-          this.fusionarFilasEnCatalogoMemoria(data);
-        }
-      },
-      error: () => {}
-    });
-  }
-
   private obtenerCatalogoProductosOperativo(fuente?: any[]): any[] {
     let activos = (fuente ?? this.stockSucursales_const ?? []).filter((item: any) =>
       productoActivoParaVenta(item as Record<string, unknown>)
@@ -1286,38 +1275,155 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
 
-  /** Búsqueda instantánea si el catálogo ya está en memoria (SPA u otra pantalla). */
-  private buscarEnCatalogoLocal(term: string): any[] | null {
-    const mem = this._productoService.filtrarListaMemoriaVenta(term, 300);
-    let fuente: any[] | null = mem;
-    if (fuente === null && (this.stockSucursales_const?.length || 0) > 0) {
-      fuente = (this.stockSucursales_const || []).filter((item: any) =>
-        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term)
-      );
-    }
-    if (fuente === null) {
-      return null;
-    }
-    return this.obtenerCatalogoProductosOperativo(fuente).slice(0, this.buscadorLimiteFilas);
+  /** Precarga catálogo en memoria para filtrar al escribir (sin parpadeos). */
+  private cargarCatalogoBusquedaInline(evitarCache = false): void {
+    this._productoService.obtenerProductosTodos(evitarCache ? { evitarCache: true } : undefined).subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : [];
+        const data = this.filtrarFilasCatalogoEmpresaOperativa(raw);
+        this.catalogoBusquedaInline = this.obtenerCatalogoProductosOperativo(data);
+        const term = this.searchTermInline.trim();
+        if (term.length >= this.buscadorInlineMinCaracteres) {
+          this.filtrarBusquedaInlineLocal(term);
+        }
+      },
+      error: () => {}
+    });
   }
 
-  abrirBuscadorProductos(): void {
-    this.buscadorProductosModal.abrir({
-      modo: 'venta',
-      idSucursal: String(this.ventas.idSucursal || ''),
-      venta: {
-        idSucursalApi: this.idSucursalParaBusquedaApi(),
-        esGestora: this.esGestora,
-        idSucursalDefault: String(this.ventas.idSucursal || ''),
-        buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
-        filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
-        onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano()
-      }
-    }).then((prod) => {
-      if (!prod) return;
-      this.fusionarFilasEnCatalogoMemoria([prod]);
-      this.agregarAlCarrito(prod);
-    });
+  private fusionarCatalogoBusquedaInline(filas: any[]): void {
+    const permitidas = (filas || []).filter((item) => this.productoPerteneceEmpresaOperativa(item));
+    if (!permitidas.length) {
+      return;
+    }
+    const clave = (r: any) =>
+      `${String(r.idProducto)}|${String(r.idSucursal || '')}|${String(r.idEmpresa || '')}`;
+    const map = new Map<string, any>();
+    for (const r of this.catalogoBusquedaInline) {
+      map.set(clave(r), r);
+    }
+    for (const r of permitidas) {
+      map.set(clave(r), r);
+    }
+    this.catalogoBusquedaInline = [...map.values()];
+  }
+
+  private filtrarBusquedaInlineLocal(term: string): void {
+    const filtrados = this.catalogoBusquedaInline
+      .filter((item) => productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term))
+      .slice(0, this.buscadorLimiteFilas);
+    this.aplicarResultadosBusquedaInline(filtrados);
+  }
+
+  onBusquedaInlineInput(): void {
+    const term = this.searchTermInline.trim();
+    if (term.length < this.buscadorInlineMinCaracteres) {
+      this.productosBusquedaInline = [];
+      this.buscadorInlineBuscando = false;
+      this.buscadorInlineMensaje =
+        term.length === 0
+          ? 'Escriba al menos 2 caracteres. Al escribir filtra el catálogo en memoria; use Buscar para consultar la base de datos.'
+          : `Escriba al menos ${this.buscadorInlineMinCaracteres} caracteres.`;
+      return;
+    }
+    if (this.catalogoBusquedaInline.length === 0) {
+      this.productosBusquedaInline = [];
+      this.buscadorInlineMensaje =
+        'Catálogo en carga. Pulse Buscar para consultar la base de datos ahora.';
+      return;
+    }
+    this.filtrarBusquedaInlineLocal(term);
+  }
+
+  /** Consulta productos en base de datos (botón Buscar / Enter). */
+  buscarProductosInlineDesdeBaseDatos(): void {
+    const term = this.searchTermInline.trim();
+    if (term.length < this.buscadorInlineMinCaracteres) {
+      this.productosBusquedaInline = [];
+      this.buscadorInlineMensaje = `Escriba al menos ${this.buscadorInlineMinCaracteres} caracteres para buscar.`;
+      return;
+    }
+    this.buscadorInlineMensaje = '';
+    this.buscadorInlineBuscando = true;
+    this._productoService
+      .buscarProductosVenta({
+        q: term,
+        limit: this.buscadorLimiteFilas,
+        idSucursal: this.idSucursalParaBusquedaApi(),
+        evitarCache: true
+      })
+      .subscribe({
+        next: (response) => this.procesarRespuestaBusquedaInline(response, true),
+        error: (err) => this.manejarErrorBusquedaInline(err)
+      });
+  }
+
+  private procesarRespuestaBusquedaInline(
+    response: { data?: unknown } | null | undefined,
+    fusionarEnCatalogo = false
+  ): void {
+    this.buscadorInlineBuscando = false;
+    if (!response) {
+      return;
+    }
+    const filas = Array.isArray(response.data) ? response.data : [];
+    const activos = filas.filter((item: unknown) =>
+      productoActivoParaVenta(item as Record<string, unknown>)
+    );
+    const permitidas = activos.filter((item) => this.productoPerteneceEmpresaOperativa(item));
+    if (fusionarEnCatalogo) {
+      this.fusionarCatalogoBusquedaInline(permitidas);
+    }
+    this.aplicarResultadosBusquedaInline(permitidas);
+  }
+
+  private manejarErrorBusquedaInline(err: { error?: { message?: string } }): void {
+    this.buscadorInlineBuscando = false;
+    this.productosBusquedaInline = [];
+    this.buscadorInlineMensaje = err?.error?.message || 'Error al buscar productos.';
+  }
+
+  private aplicarResultadosBusquedaInline(filas: any[]): void {
+    const permitidas = (filas || []).filter((item) => this.productoPerteneceEmpresaOperativa(item));
+    this.productosBusquedaInline = [...permitidas];
+    if (permitidas.length === 0) {
+      this.buscadorInlineMensaje = 'No se encontraron productos con ese criterio.';
+    } else if (permitidas.length >= this.buscadorLimiteFilas) {
+      this.buscadorInlineMensaje = `Mostrando los primeros ${this.buscadorLimiteFilas} resultados. Refine la búsqueda si no ve el producto.`;
+    } else {
+      this.buscadorInlineMensaje = '';
+    }
+  }
+
+  agregarProductoDesdeBusquedaInline(producto: any): void {
+    this.agregarAlCarrito(producto);
+    setTimeout(() => this.inputBusquedaInline?.nativeElement?.focus(), 0);
+  }
+
+  yaEstaEnCarritoInline(producto: any): boolean {
+    return this.carrito.some(
+      (p) =>
+        String(p.idProducto) === String(producto.idProducto) &&
+        String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
+        String(p.idEmpresa || '') === String(producto.idEmpresa || '')
+    );
+  }
+
+  sinStockBusquedaInline(producto: any): boolean {
+    return productoSinStockEnBusqueda(producto as Record<string, unknown>);
+  }
+
+  trackByProductoInline(_index: number, p: any): string {
+    return `${p.idProducto || ''}|${p.idSucursal || ''}|${p.idEmpresa || ''}`;
+  }
+
+  textoSucursalInline(producto: any): string {
+    if (this.esGestora) {
+      const alias = producto?.aliasEmpresa || '';
+      const suc = producto?.sucursal || '';
+      return alias ? `${alias} - ${suc}` : suc;
+    }
+    return String(producto?.sucursal ?? '');
   }
 
   private idSucursalParaBusquedaApi(): string | undefined {
