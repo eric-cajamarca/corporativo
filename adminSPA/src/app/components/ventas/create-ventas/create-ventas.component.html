@@ -6,11 +6,25 @@
     <div class="container-fluid py-3">
       <div
         *ngIf="alertaValidacionTemprana"
-        class="alert py-2 mb-2"
+        class="alert py-2 mb-2 d-flex flex-wrap justify-content-between align-items-center gap-2"
         [class.alert-success]="alertaValidacionTemprana.tipo === 'ok'"
         [class.alert-warning]="alertaValidacionTemprana.tipo === 'warning'"
         [class.alert-danger]="alertaValidacionTemprana.tipo === 'danger'">
         <span class="small mb-0">{{ alertaValidacionTemprana.mensaje }}</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="mostrarAyudaAtajosPos = !mostrarAyudaAtajosPos">
+          F1 Atajos
+        </button>
+      </div>
+      <div *ngIf="mostrarAyudaAtajosPos" class="alert alert-light border mb-2 py-2">
+        <div class="small fw-semibold mb-1">Atajos de teclado POS</div>
+        <div class="small text-muted d-flex flex-wrap gap-3">
+          <span><kbd>F2</kbd> Buscar productos (modal)</span>
+          <span><kbd>F3</kbd> Datos del comprobante</span>
+          <span><kbd>F4</kbd> Cobrar / forma de pago</span>
+          <span><kbd>F6</kbd> Modal cliente</span>
+          <span><kbd>Esc</kbd> Cerrar modal abierto</span>
+        </div>
+        <p class="small text-muted mb-0 mt-1">El campo «Buscar código» queda activo para el lector de barras tras cada lectura.</p>
       </div>
       <div class="row">
         <!-- Pasos: Comprobante → Cliente → Pago → Registrar -->
@@ -60,8 +74,8 @@
               <h5 class="mb-0 flex-shrink-0"><i class="bi bi-cart-check"></i> Detalle de Venta</h5>
 
               <div class="d-flex flex-wrap align-items-stretch align-items-lg-center gap-2 w-100 w-lg-auto justify-content-lg-end">
-                <input type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()"
-                  placeholder="Buscar Código">
+                <input #inputSearchCodigo type="text" class="form-control create-ventas-search-code" [(ngModel)]="searchCodigo" (input)="buscarCodigoProd()"
+                  placeholder="Buscar Código (escáner)" autocomplete="off">
                 <button type="button" class="btn btn-success btn-lg flex-grow-1 flex-lg-grow-0" (click)="abrirBuscadorProductos()">
                   <i class="bi bi-search"></i> Buscar
                 </button>

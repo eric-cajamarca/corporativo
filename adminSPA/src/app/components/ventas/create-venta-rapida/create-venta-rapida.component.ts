@@ -666,12 +666,17 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     const esContadoDirecto = idEstadoPago === 2 && !this.cabeceraEsCreditoFinanciacion();
     if (esContadoDirecto) {
       this.detallePago = [];
-      this.aplicarDetallePagoEfectivoPorDefectoSiVacio();
+      this.sincronizarPagoRapidoConTotal();
       if (this.detallePago.length > 0) {
         this.registrarVenta();
         return;
       }
     }
+    this.abrirModalPagoMixto();
+  }
+
+  /** Abre el modal de forma de pago (mixto, referencia, vuelto en efectivo). */
+  abrirModalPagoMixto(): void {
     this.abrirModalPago();
     const modalEl = document.getElementById('modalPago');
     if (modalEl && typeof bootstrap !== 'undefined') {
@@ -1897,6 +1902,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       .filter((i: { descripcion: string }) => (i.descripcion || '').toUpperCase().includes('ISC'))
       .reduce((s: number, i: { monto: number }) => s + i.monto, 0);
     this.ventas.total = Math.round((baseGravada + totalImpuestosASumar) * 100) / 100;
+    this.sincronizarPagoRapidoConTotal();
     this.guardarEstadoProvisional();
   }
 

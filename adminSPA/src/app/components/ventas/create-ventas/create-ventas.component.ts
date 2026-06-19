@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -67,6 +67,7 @@ import {
 } from '../../../utils/pos-validacion.util';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
+import { PosKeyboardService } from '../../../services/pos-keyboard.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -86,6 +87,8 @@ interface DocumentoResponse {
 export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly buscadorLimiteFilas = 80;
+  @ViewChild('inputSearchCodigo') inputSearchCodigo?: ElementRef<HTMLInputElement>;
+  mostrarAyudaAtajosPos = false;
   public searchCodigo = '';
   public categoria: any = [];
   public presentacion: Presentacion[] = [];
@@ -282,7 +285,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     private usuarioSucursalService: UsuarioSucursalService,
     private ngZone: NgZone,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private posKeyboard: PosKeyboardService
   ) {}
 
 
@@ -297,19 +301,30 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.idClienteParaEditarModal = null;
     });
   };
+  private modalComprobanteEl: HTMLElement | null = null;
+  private readonly onModalComprobanteHiddenBound = (): void => {
+    this.ngZone.run(() => this.enfocarEscannerCodigo());
+  };
 
   ngAfterViewInit(): void {
+    this.configurarAtajosPos();
+    this.enfocarEscannerCodigo();
     this.pdfPostVentaModalEl = document.getElementById('pdfModalPostVenta');
     this.pdfPostVentaModalEl?.addEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.modalEditarClienteEl = document.getElementById('modalEditarClienteVenta');
     this.modalEditarClienteEl?.addEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
+    this.modalComprobanteEl = document.getElementById('modalComprobante');
+    this.modalComprobanteEl?.addEventListener('hidden.bs.modal', this.onModalComprobanteHiddenBound);
   }
 
   ngOnDestroy(): void {
+    this.posKeyboard.desactivar();
     this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.pdfPostVentaModalEl = null;
     this.modalEditarClienteEl?.removeEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
     this.modalEditarClienteEl = null;
+    this.modalComprobanteEl?.removeEventListener('hidden.bs.modal', this.onModalComprobanteHiddenBound);
+    this.modalComprobanteEl = null;
   }
 
   ngOnInit(): void {
@@ -1183,9 +1198,13 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         estaEnDetalle: (p) => this.productoYaEnCarrito(p)
       }
     }).then((prod) => {
-      if (!prod) return;
+      if (!prod) {
+        this.enfocarEscannerCodigo();
+        return;
+      }
       this.fusionarFilasEnCatalogoMemoria([prod]);
       this.agregarAlCarrito(prod);
+      this.enfocarEscannerCodigo();
     });
   }
 
@@ -1426,6 +1445,89 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     return true;
   }
 
+  private configurarAtajosPos(): void {
+    this.posKeyboard.activar(
+      {
+        buscar: () => this.abrirBuscadorProductos(),
+        comprobante: () => this.abrirModalComprobanteAtajo(),
+        cobrar: () => this.cobrarAtajoPos(),
+        cliente: () => this.abrirModalClienteAtajo(),
+        cerrarModal: () => {
+          if (this.posKeyboard.cerrarModalesVisibles()) {
+            this.enfocarEscannerCodigo();
+            return;
+          }
+          if (this.mostrarAyudaAtajosPos) {
+            this.mostrarAyudaAtajosPos = false;
+          } else {
+            this.enfocarEscannerCodigo();
+          }
+        },
+        ayuda: () => {
+          this.mostrarAyudaAtajosPos = !this.mostrarAyudaAtajosPos;
+        }
+      },
+      {
+        teclas: { cliente: 'F6', cerrarModal: 'Escape', limpiarBusqueda: null }
+      }
+    );
+  }
+
+  /** Campo escáner: foco listo para el siguiente código de barras. */
+  enfocarEscannerCodigo(): void {
+    setTimeout(() => {
+      const el = this.inputSearchCodigo?.nativeElement;
+      if (!el) {
+        return;
+      }
+      el.focus();
+      el.select();
+    }, 0);
+  }
+
+  abrirModalComprobanteAtajo(): void {
+    const modalEl = document.getElementById('modalComprobante');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  abrirModalClienteAtajo(): void {
+    if (!this.ventas?.idComprobante) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'Seleccione primero el tipo de comprobante.',
+        position: 'topRight'
+      });
+      return;
+    }
+    const modalEl = document.getElementById('modalCliente');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  /** F4: abre forma de pago (contado) o registra directo (pendiente/crédito). */
+  cobrarAtajoPos(): void {
+    if (!this.validarAntesDeCobrar()) {
+      return;
+    }
+    if (this.carrito.length === 0) {
+      iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
+      return;
+    }
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    if (idEstadoPago !== 1) {
+      this.abrirModalPago();
+      const modalEl = document.getElementById('modalPago');
+      if (modalEl && typeof bootstrap !== 'undefined') {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+      return;
+    }
+    this.registrarVenta();
+  }
+
   private validarStockAgregarAlCarrito(
     producto: any,
     cantidadNueva: number
@@ -1515,6 +1617,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       if (encontrado) {
         this.agregarAlCarrito(encontrado);
         this.searchCodigo = '';
+        this.enfocarEscannerCodigo();
       } else {
         iziToast.show({
           title: 'ERROR',
@@ -1524,6 +1627,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           position: 'topRight',
           message: 'El código no existe.'
         });
+        this.searchCodigo = '';
+        this.enfocarEscannerCodigo();
       }
   }
 

@@ -108,6 +108,12 @@
                     <option *ngFor="let e of estadoPago" [value]="e.idEstadoPago">{{ e.descripcion }}</option>
                   </select>
                 </div>
+                <div class="col-6 col-md-3 col-lg-2" *ngIf="formasPago.length">
+                  <label class="form-label small mb-1">Forma de pago</label>
+                  <select class="form-select form-select-sm" [(ngModel)]="formaPagoRapidaId" (ngModelChange)="onFormaPagoRapidaChange()">
+                    <option *ngFor="let f of formasPago" [ngValue]="f.idFormaPago">{{ f.descripcion }}</option>
+                  </select>
+                </div>
               </div>
               <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-2 border-top">
                 <div class="venta-rapida-total">
@@ -124,6 +130,10 @@
                   <button type="button" class="btn btn-outline-danger btn-sm" (click)="anularVenta()"
                     [disabled]="carrito.length === 0 && !ventas.idComprobante">
                     <i class="bi bi-x-circle me-1"></i>Anular
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalPagoMixto()"
+                    title="Varias formas de pago o referencia de operación">
+                    <i class="bi bi-wallet2 me-1"></i>Pagos mixtos
                   </button>
                   <button type="button" class="btn btn-success btn-lg px-4" (click)="cobrarVentaRapida()"
                     [disabled]="loading || carrito.length === 0">
