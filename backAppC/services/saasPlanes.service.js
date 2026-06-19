@@ -1,60 +1,14 @@
 /**
- * Catálogo comercial de planes (montos en PEN). Ajustar según mercado.
+ * Catálogo comercial de planes (montos en PEN, **sin IGV**). Ajustar según mercado.
  * Si existe la tabla SaasPlan (migración saas_planes_catalogo.sql), listados y montos pueden leerse desde BD.
+ *
+ * Catálogo público SaaS: básico, emprendedor, profesional.
+ * demo: prueba 14 días. enterprise: on-prem / clientes grandes (sin checkout público).
+ * empresarial: legado (suscriptores existentes); oculto del catálogo.
  */
 const saasPlanRepository = require('../repositories/saasPlan.repository');
 
 const PLANES = {
-  emprendedor: {
-    codigo: 'emprendedor',
-    nombre: 'Emprendedor',
-    descripcionCorta: 'Compras, ventas e inventario para empezar.',
-    mensualPen: 59,
-    anualPen: 590,
-    maxUsuarios: 4,
-    maxSucursales: 1,
-    maxComprobantesSunatAceptados: 500,
-    beneficios: [
-      'Hasta 4 usuarios y 1 sucursal',
-      'Productos (categorías, marcas, impuestos), clientes y proveedores',
-      'Compras, ventas e inventario con lotes',
-      'Reportes esenciales de operación'
-    ]
-  },
-  profesional: {
-    codigo: 'profesional',
-    nombre: 'Profesional',
-    descripcionCorta: 'Caja, créditos, análisis y reportes.',
-    mensualPen: 149,
-    anualPen: 1490,
-    maxUsuarios: 11,
-    maxSucursales: 3,
-    maxComprobantesSunatAceptados: 2000,
-    beneficios: [
-      'Todo lo que tiene el plan emprendedor',
-      'Hasta 11 usuarios y hasta 3 sucursales',
-      'Caja, créditos y cuotas',
-      'Análisis financiero y reportes avanzados',
-      'Listas de precio y escenarios comerciales'
-    ]
-  },
-  empresarial: {
-    codigo: 'empresarial',
-    nombre: 'Empresarial',
-    descripcionCorta: 'Escala, sucursales y multi-empresa.',
-    mensualPen: 399,
-    anualPen: 3990,
-    maxUsuarios: 35,
-    maxSucursales: 99,
-    maxComprobantesSunatAceptados: 10000,
-    beneficios: [
-      'Todo lo que tiene el plan Profesional',
-      'Hasta 35 usuarios y hasta 99 sucursales',
-      'Multi-empresa y gestores (varias razones sociales)',
-      'Prioridad de soporte y opciones de escala (según contrato)',
-      'Integraciones y operación avanzada (según contrato)'
-    ]
-  },
   demo: {
     codigo: 'demo',
     nombre: 'Demo',
@@ -64,24 +18,99 @@ const PLANES = {
     maxUsuarios: 1,
     maxSucursales: 1,
     maxComprobantesSunatAceptados: 50,
+    beneficios: [
+      '14 días sin costo',
+      '1 usuario y 1 sucursal',
+      'Operación comercial e inventario (con límites de demo)',
+      'Hasta 50 comprobantes SUNAT aceptados'
+    ]
+  },
+  basico: {
+    codigo: 'basico',
+    nombre: 'Básico',
+    descripcionCorta: 'Operación esencial: ventas, compras e inventario con FE.',
+    mensualPen: 49,
+    anualPen: 490,
+    maxUsuarios: 2,
+    maxSucursales: 1,
+    maxComprobantesSunatAceptados: 150,
+    beneficios: [
+      'Hasta 2 usuarios y 1 sucursal',
+      'Ventas, compras, inventario, productos y clientes',
+      'Cotizaciones comerciales',
+      'Facturación electrónica SUNAT',
+      'Hasta 150 comprobantes SUNAT aceptados',
+      'Sin WhatsApp vinculado, caja ni créditos'
+    ]
+  },
+  emprendedor: {
+    codigo: 'emprendedor',
+    nombre: 'Emprendedor',
+    descripcionCorta: 'Caja, créditos, WhatsApp y operación completa para PYME.',
+    mensualPen: 89,
+    anualPen: 890,
+    maxUsuarios: 4,
+    maxSucursales: 1,
+    maxComprobantesSunatAceptados: 500,
+    beneficios: [
+      'Todo lo del plan Básico',
+      'Hasta 4 usuarios y 1 sucursal',
+      'WhatsApp vinculado: envío de comprobantes y bot de atención',
+      'Caja, créditos y catálogos',
+      'Compras SUNAT (comprobantes de proveedor)',
+      'Hasta 500 comprobantes SUNAT aceptados'
+    ]
+  },
+  profesional: {
+    codigo: 'profesional',
+    nombre: 'Profesional',
+    descripcionCorta: 'Despachos, reportes, análisis y escala comercial.',
+    mensualPen: 169,
+    anualPen: 1690,
+    maxUsuarios: 11,
+    maxSucursales: 3,
+    maxComprobantesSunatAceptados: 2000,
+    beneficios: [
+      'Todo lo del plan Emprendedor',
+      'Hasta 11 usuarios y 3 sucursales',
+      'WhatsApp vinculado y bot con límites ampliados',
+      'Despachos, análisis financiero y reportes',
+      'Consultas placa/SOAT y utilidades de margen',
+      'Hasta 2 000 comprobantes SUNAT aceptados'
+    ]
+  },
+  empresarial: {
+    codigo: 'empresarial',
+    nombre: 'Empresarial (legado)',
+    descripcionCorta: 'Plan anterior; contacte soporte para migrar a Profesional.',
+    mensualPen: 399,
+    anualPen: 3990,
+    maxUsuarios: 35,
+    maxSucursales: 99,
+    maxComprobantesSunatAceptados: 10000,
     beneficios: []
   },
   enterprise: {
     codigo: 'enterprise',
     nombre: 'Enterprise',
-    descripcionCorta: 'Licencia on-premise / corporativa.',
+    descripcionCorta: 'Licencia on-premise / servidor propio. Gestores multi-empresa (desde S/ 350/mes, cotización).',
     mensualPen: 0,
     anualPen: 0,
     maxUsuarios: 99999,
     maxSucursales: 99999,
     maxComprobantesSunatAceptados: 0,
-    beneficios: []
+    beneficios: [
+      'Despliegue en servidores del cliente o dedicados',
+      'Multi-empresa con gestores (varias razones sociales)',
+      'Sin límite de comprobantes SUNAT en catálogo',
+      'Soporte e implementación según contrato'
+    ]
   }
 };
 
-/** Solo planes de pago para la página pública (sin card demo). El plan demo sigue disponible por checkout. */
+/** Planes de pago visibles en /public/planes (sin demo ni enterprise). */
 function listarPlanesCatalogo() {
-  return ['emprendedor', 'profesional', 'empresarial'].map((key) => {
+  return ['basico', 'emprendedor', 'profesional'].map((key) => {
     const p = PLANES[key];
     return {
       planCode: p.codigo,

@@ -5,11 +5,22 @@ const documentoService = require('./documento.service');
 const tablassunatService = require('./tablassunat.service');
 const ventasOrquestacion = require('./ventasOrquestacion.service');
 const { idsSucursalesFiltroCatalogo } = require('../utils/sucursalUsuarioScope.util');
+const cache = require('../cache/redis.client');
+const { parseTtlSeconds } = require('../utils/cacheSkip.util');
 
-/**
- * Datos iniciales para pantallas de venta (completa / rápida) en una sola petición.
- */
-exports.obtenerBootstrapVenta = async (pool, user) => {
+function bootstrapCacheKey(user) {
+  const emp = String(user?.empresa || '').trim().toLowerCase();
+  const uid = String(user?.idUsuario || user?.id || '').trim().toLowerCase();
+  const rol = String(user?.rol || '').trim().toLowerCase();
+  return `venta:bootstrap:v1:${emp}:${uid}:${rol}`;
+}
+
+async function obtenerCajasAbiertas(pool, idEmpresa) {
+  const cajasRaw = await CajaRepository.obtenerCajasRepo(pool, idEmpresa).catch(() => []);
+  return (cajasRaw || []).filter((c) => c && Number(c.cajaAbierta) === 1);
+}
+
+async function obtenerBootstrapVentaSinCajas(pool, user) {
   if (!user?.empresa) throw new Error('NO_EMPRESA');
   const idEmpresa = user.empresa;
   const esAdmin = user.rol === 'Administrador' || user.rol === 'superAdmin';
@@ -31,7 +42,6 @@ exports.obtenerBootstrapVenta = async (pool, user) => {
     configuracion,
     sucursales,
     documentos,
-    cajasRaw,
     monedas,
     estadosPago,
     estadosPedido,
@@ -42,7 +52,6 @@ exports.obtenerBootstrapVenta = async (pool, user) => {
     gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa),
     sucursalRepository.listarTodosPorEmpresa(pool, idEmpresa, true, idsSucUsuario),
     documentoService.listarDocumentos(pool, user).catch(() => []),
-    CajaRepository.obtenerCajasRepo(pool, idEmpresa).catch(() => []),
     tablassunatService.obtenerMoneda(pool).catch(() => []),
     tablassunatService.obtenerEstadoPago(pool).catch(() => []),
     tablassunatService.obtenerEstadosPedidos(pool).catch(() => []),
@@ -51,13 +60,10 @@ exports.obtenerBootstrapVenta = async (pool, user) => {
     ventasOrquestacion.getConfigDefaults(pool, idEmpresa)
   ]);
 
-  const cajas = (cajasRaw || []).filter((c) => c && (Number(c.cajaAbierta) === 1));
-
   return {
     configuracion: configuracion || [],
     sucursales: sucursales || [],
     documentos: documentos || [],
-    cajas,
     monedas: monedas || [],
     estadosPago: estadosPago || [],
     estadosPedido: estadosPedido || [],
@@ -66,5 +72,34 @@ exports.obtenerBootstrapVenta = async (pool, user) => {
     configDefaults: configDefaults || {},
     esGestora,
     esEmpresaGestionada
+  };
+}
+
+/**
+ * Datos iniciales para pantallas de venta (completa / rápida) en una sola petición.
+ * Catálogos estables en Redis; cajas siempre frescas (apertura/cierre).
+ */
+exports.obtenerBootstrapVenta = async (pool, user, options = {}) => {
+  if (!user?.empresa) throw new Error('NO_EMPRESA');
+  const idEmpresa = user.empresa;
+  const skipCache = options.skipCache === true;
+  const ttlSeconds = parseTtlSeconds('REDIS_BOOTSTRAP_TTL_SECONDS', 90, 30);
+
+  let base;
+  if (skipCache) {
+    base = await obtenerBootstrapVentaSinCajas(pool, user);
+  } else {
+    const cacheKey = bootstrapCacheKey(user);
+    base = await cache.getCached(
+      cacheKey,
+      () => obtenerBootstrapVentaSinCajas(pool, user),
+      ttlSeconds
+    );
+  }
+
+  const cajas = await obtenerCajasAbiertas(pool, idEmpresa);
+  return {
+    ...base,
+    cajas
   };
 };

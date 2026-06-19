@@ -23,13 +23,14 @@ BEGIN
     UPDATE dbo.SaasPlan
     SET maxComprobantesSunatAceptados = CASE planCode
         WHEN N'demo' THEN 50
+        WHEN N'basico' THEN 150
         WHEN N'emprendedor' THEN 500
         WHEN N'profesional' THEN 2000
         WHEN N'empresarial' THEN 10000
         WHEN N'enterprise' THEN 0
         ELSE maxComprobantesSunatAceptados
     END
-    WHERE planCode IN (N'demo', N'emprendedor', N'profesional', N'empresarial', N'enterprise')
+    WHERE planCode IN (N'demo', N'basico', N'emprendedor', N'profesional', N'empresarial', N'enterprise')
       AND maxComprobantesSunatAceptados = 0;
 END
 GO

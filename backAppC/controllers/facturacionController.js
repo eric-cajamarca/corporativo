@@ -804,10 +804,16 @@ const crearNotaCreditoDebito = async (req, res, next) => {
 // ---------- Comunicación de baja (RA) ----------
 const listarComprobantesParaBaja = async (req, res, next) => {
   try {
-    const data = await withPool(async (pool) => FacturacionServices.listarComprobantesAceptadosParaBajaService(pool, req.user));
-    res.status(200).send({ data: data || [] });
+    const result = await withPool(async (pool) =>
+      FacturacionServices.listarComprobantesAceptadosParaBajaService(pool, req.user, {
+        pagina: req.query.pagina,
+        porPagina: req.query.porPagina,
+        buscar: req.query.buscar
+      })
+    );
+    res.status(200).send({ data: result?.rows || [], total: result?.total ?? 0 });
   } catch (error) {
-    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [] });
+    if (error.message === "NO_ACCESS") return res.status(401).send({ message: "No autorizado", data: [], total: 0 });
     console.error("Error listar comprobantes para baja:", error);
     return next(error);
   }

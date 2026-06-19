@@ -5,16 +5,16 @@ const { limpiarGruposVacios } = require('../utils/navegacionDominios.util');
 
 /**
  * Plan efectivo para límites de menú y APIs.
- * Sin suscripción activa/demo: se asume empresarial (compatibilidad instalaciones previas).
+ * Sin suscripción activa/demo: se asume profesional (compatibilidad instalaciones previas).
  */
 async function obtenerPlanCodeActivo(pool, idEmpresa) {
-  if (!isSaas()) return 'empresarial';
+  if (!isSaas()) return 'profesional';
   const row = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
-  if (!row) return 'empresarial';
+  if (!row) return 'profesional';
   const st = String(row.estado || '')
     .trim()
     .toUpperCase();
-  if (st !== 'ACTIVA' && st !== 'DEMO') return 'empresarial';
+  if (st !== 'ACTIVA' && st !== 'DEMO') return 'profesional';
   return String(row.planCode || 'demo')
     .trim()
     .toLowerCase();
@@ -27,18 +27,20 @@ async function planPermiteFactilizaNombre(pool, idEmpresa, nombreServicio) {
 
 function nivelPlan(planCode) {
   const p = (planCode || '').toLowerCase();
-  const orden = { demo: 1, emprendedor: 2, profesional: 3, empresarial: 4, enterprise: 5 };
+  const orden = { demo: 1, basico: 2, emprendedor: 3, profesional: 4, empresarial: 5, enterprise: 6 };
   return orden[p] || 2;
+}
+
+const NIVEL_MIN_EMPRENDEDOR = 3;
+
+function planPermiteWhatsApp(planCode) {
+  return nivelPlan(planCode) >= NIVEL_MIN_EMPRENDEDOR;
 }
 
 function filtrarLinksModulo(modulo, links, planCode, nv) {
   let sub = links.map((s) => ({ ...s }));
   const mod = (modulo || '').toString().trim().toUpperCase();
   const pc = (planCode || '').toLowerCase();
-
-  if (mod === 'VENTAS' && nv < 2) {
-    sub = sub.filter((s) => (s.ruta || '').toString() !== '/cotizaciones');
-  }
 
   if (mod === 'CAJA' && pc === 'demo') {
     const ruta = (s) => (s.ruta || '').toString();
@@ -54,8 +56,12 @@ function filtrarLinksModulo(modulo, links, planCode, nv) {
       if (r === '/sucursal' || r.startsWith('/sucursal/')) return false;
       if (r === '/rol' || r.startsWith('/rol/')) return false;
       if (r === '/auditoria' || r.startsWith('/auditoria/')) return false;
+      if (r.startsWith('/configuracion/whatsapp')) return false;
       return true;
     });
+  } else if (mod === 'CONFIGURACION' && !planPermiteWhatsApp(pc)) {
+    const ruta = (s) => (s.ruta || '').toString();
+    sub = sub.filter((s) => !ruta(s).startsWith('/configuracion/whatsapp'));
   }
 
   return sub.filter((s) => s.visible !== false);

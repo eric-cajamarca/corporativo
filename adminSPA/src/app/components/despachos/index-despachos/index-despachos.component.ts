@@ -1049,7 +1049,7 @@ export class IndexDespachosComponent implements OnInit {
           cliente,
           items,
           despacho,
-          titulo: 'Ticket de despacho',
+          titulo: 'Comprobante de despacho',
           columnas: ['Código', 'Descripción', 'Despachado', 'Ubicación']
         };
         const nombreArchivo = `ticket-despacho-${(r.venta.compVenta || 'venta').replace(/-/g, '_')}.pdf`;

@@ -105,6 +105,7 @@ export class IndexCreditosComponent implements OnInit {
 
   public loading = false;
   public mostrarVerCuotas = false;
+  cuotasSeleccionadasMasivo = new Set<string>();
 
   empresasOperacion: EmpresaCajaOperacion[] = [];
   idEmpresaOperacionSel = '';
@@ -330,6 +331,70 @@ export class IndexCreditosComponent implements OnInit {
     this.mostrarVerCuotas = false;
     this.creditoSeleccionado = null;
     this.cuotas = [];
+    this.cuotasSeleccionadasMasivo.clear();
+  }
+
+  toggleCuotaMasivo(idCuota: string, checked: boolean): void {
+    if (checked) {
+      this.cuotasSeleccionadasMasivo.add(idCuota);
+    } else {
+      this.cuotasSeleccionadasMasivo.delete(idCuota);
+    }
+  }
+
+  cuotaSeleccionadaMasivo(idCuota: string): boolean {
+    return this.cuotasSeleccionadasMasivo.has(idCuota);
+  }
+
+  cobrarCuotasSeleccionadasMasivo(): void {
+    const pendientes = (this.cuotas || []).filter(
+      (c) =>
+        this.cuotasSeleccionadasMasivo.has(c.idCuota) &&
+        c.estado !== 'PAGADO'
+    );
+    if (!pendientes.length) {
+      iziToast.warning({ title: 'Aviso', message: 'Seleccione cuotas pendientes para cobrar.' });
+      return;
+    }
+    if (this.pagoCuota.idMediosPago == null && this.mediosPago.length > 0) {
+      this.pagoCuota.idMediosPago = this.mediosPago[0].idMediosPago;
+    }
+    this.loading = true;
+    this.creditosService
+      .pagarCuotasMasivo({
+        pagos: pendientes.map((c) => ({
+          idCuota: c.idCuota,
+          montoPagado: Number(c.saldoPendiente) || Number(c.montoCuota) || 0,
+          idEmpresaOperacion: this.idEmpresaOperacionSel || undefined
+        })),
+        idMediosPago: this.pagoCuota.idMediosPago ?? undefined,
+        idApertura: this.cajas.length ? this.cajas[0].idApertura : undefined,
+        idEmpresaOperacion: this.idEmpresaOperacionSel || undefined,
+        observaciones: 'Cobranza masiva',
+        fechaPago: fechaHoraVentaClienteAhora()
+      })
+      .subscribe({
+        next: () => {
+          this.loading = false;
+          iziToast.success({
+            title: 'Éxito',
+            message: `Se registraron ${pendientes.length} pago(s) en lote.`
+          });
+          this.cuotasSeleccionadasMasivo.clear();
+          if (this.creditoSeleccionado) {
+            this.editar(this.creditoSeleccionado);
+          }
+          this.cargarCreditos();
+          this.cargarResumenCreditos();
+        },
+        error: (err) => {
+          this.loading = false;
+          iziToast.error({
+            title: 'Error',
+            message: err?.error?.message || 'No se pudo completar la cobranza masiva.'
+          });
+        }
+      });
   }
 
   abrirModalNuevoCredito() {

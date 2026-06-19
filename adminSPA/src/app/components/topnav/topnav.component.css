@@ -76,67 +76,6 @@
 }
 
 /* =============================================
-   CENTRO - BÚSQUEDA
-   ============================================= */
-
-.topnav-center {
-  flex: 1;
-  max-width: 500px;
-  margin: 0 24px;
-}
-
-.search-container {
-  position: relative;
-  width: 100%;
-}
-
-.search-icon {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #adb5bd;
-  font-size: 0.9rem;
-}
-
-.search-input {
-  width: 100%;
-  padding: 10px 40px 10px 44px;
-  border: 1px solid #e9ecef;
-  border-radius: 25px;
-  font-size: 0.9rem;
-  background: #f8f9fa;
-  transition: all 0.2s ease;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #667eea;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.search-input::placeholder {
-  color: #adb5bd;
-}
-
-.search-clear {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #adb5bd;
-  cursor: pointer;
-  padding: 4px 8px;
-}
-
-.search-clear:hover {
-  color: #6c757d;
-}
-
-/* =============================================
    LADO DERECHO
    ============================================= */
 

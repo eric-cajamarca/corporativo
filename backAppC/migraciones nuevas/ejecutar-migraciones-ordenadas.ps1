@@ -47,6 +47,7 @@ $relativos = @(
   "saas_plan_comprobantes_sunat_cuota.sql",
   "saas_plan_demo_limites_1_usuario_1_sucursal.sql",
   "saas_plan_demo_sin_catalogos.sql",
+  "saas_planes_reestructura_v2.sql",
   "saas_onboarding_operativo_fase4.sql",
   "nuevas\add_index_suscripcion_checkout_cliente_fcreacion.sql",
   "comprobantes_compra_sunat.sql",

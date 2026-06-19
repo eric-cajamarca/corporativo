@@ -138,7 +138,7 @@ async function getServiciosFactiliza(pool) {
  * si no, se usa EmpresaFactiliza.puedeUsar (retrocompatibilidad).
  */
 async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
-  let planCode = 'empresarial';
+  let planCode = 'profesional';
   if (isSaas()) {
     const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
     if (sub) {

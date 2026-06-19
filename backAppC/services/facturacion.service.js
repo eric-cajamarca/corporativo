@@ -429,9 +429,9 @@ exports.crearNotaCreditoDebitoService = async (pool, user, datos) => {
 };
 
 /** Lista comprobantes Factura/NC/ND aceptados para comunicación de baja. */
-exports.listarComprobantesAceptadosParaBajaService = async (pool, user) => {
+exports.listarComprobantesAceptadosParaBajaService = async (pool, user, filtros = {}) => {
   if (!user || !user.empresa) throw new Error("NO_ACCESS");
-  return FacturacionRepository.listarComprobantesAceptadosParaBajaRepo(pool, user.empresa);
+  return FacturacionRepository.listarComprobantesAceptadosParaBajaRepo(pool, user.empresa, filtros);
 };
 
 /** Lista motivos de baja (catálogo global). */

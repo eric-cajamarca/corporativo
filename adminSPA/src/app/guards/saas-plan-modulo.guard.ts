@@ -2,16 +2,11 @@ import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 import { map, catchError, of, type Observable } from 'rxjs';
 import { moduloMenuRequeridoParaUrl } from '../config/ruta-plan-modulo.map';
-import { nivelPlan, normalizarRutaAbsoluta } from '../config/saas-plan-reglas.util';
+import { NIVEL_MIN_EMPRENDEDOR, nivelPlan, normalizarRutaAbsoluta, planPermiteWhatsAppVinculado } from '../config/saas-plan-reglas.util';
 import { PermisosService } from '../services/permisos.service';
 
 function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosService): boolean | UrlTree {
   const abs = normalizarRutaAbsoluta(url.split('?')[0] || '/');
-
-  if (abs === '/inventario/conteo-fisico') {
-    return true;
-  }
-
 
   if (permisos.deploymentMode() !== 'saas') {
     return true;
@@ -31,16 +26,15 @@ function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosServic
     return router.createUrlTree(['/home']);
   }
 
-  const nv = nivelPlan(permisos.planCodeEfectivo());
-  if (abs.startsWith('/cotizaciones')) {
-    if (nv < 2) {
+  const planRaw = permisos.planCodeEfectivo();
+  if (abs.startsWith('/compras/comprobantes-sunat')) {
+    if (!planRaw || nivelPlan(planRaw) < NIVEL_MIN_EMPRENDEDOR) {
       return router.createUrlTree(['/home']);
     }
   }
 
-  const planRaw = permisos.planCodeEfectivo();
-  if (abs.startsWith('/compras/comprobantes-sunat')) {
-    if (!planRaw || nivelPlan(planRaw) < 2) {
+  if (abs.startsWith('/configuracion/whatsapp')) {
+    if (!planPermiteWhatsAppVinculado(permisos.planCodeEfectivo())) {
       return router.createUrlTree(['/home']);
     }
   }

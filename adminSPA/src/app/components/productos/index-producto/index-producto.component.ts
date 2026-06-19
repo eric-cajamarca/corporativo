@@ -34,7 +34,6 @@ export class IndexProductoComponent {
   @ViewChild('modalGestionarVariantes') modalGestionarVariantes!: ElementRef;
   
   public productos: Array<any> = [];
-  public productos_const: Array<any> = [];
   /** Evita mostrar "sin productos" antes de la primera respuesta del API. */
   public catalogoInicialCargado = false;
   public token: any = "";
@@ -347,31 +346,40 @@ export class IndexProductoComponent {
   
   
   abrirModalConvertirCompuesto(producto: any): void {
-    // VERIFICAR que el modal esté inicializado
     if (!this.modalCompuestoInstance) {
       this.inicializarModalCompuesto();
     }
-    
+
     this.productoSeleccionado = producto;
     this.componentesKit = [];
     this.stockKitCalculado = null;
-    
-    // Filtrar productos disponibles
-    this.productosDisponibles = this.productos_const.filter(p => 
-      p.idProducto !== producto.idProducto && 
-      p.tipoProducto === 'S'
-    );
-    
-    this.agregarComponente();
-    
-    // Verificar nuevamente antes de mostrar
-    if (this.modalCompuestoInstance) {
-      this.modalCompuestoInstance.show();
-    } else {
-      console.error('Modal no inicializado');
-      // Fallback: mostrar alerta o alternativa
-      alert('Por favor, recarga la página o contacta al administrador');
-    }
+
+    this._productoService.obtenerProductosTodos().subscribe({
+      next: (response: any) => {
+        const lista = Array.isArray(response?.data) ? response.data : [];
+        this.productosDisponibles = lista.filter(
+          (p: { idProducto?: string; tipoProducto?: string }) =>
+            p.idProducto !== producto.idProducto && p.tipoProducto === 'S'
+        );
+        this.agregarComponente();
+        if (this.modalCompuestoInstance) {
+          this.modalCompuestoInstance.show();
+        } else {
+          console.error('Modal no inicializado');
+          alert('Por favor, recarga la página o contacta al administrador');
+        }
+      },
+      error: (error: any) => {
+        console.error('Error al cargar productos para kit:', error);
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: 'No se pudo cargar el catálogo para armar el kit.',
+            position: 'topRight'
+          });
+        }
+      }
+    });
   }
   
   // Método para inicializar el modal si no está listo

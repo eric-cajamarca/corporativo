@@ -112,7 +112,6 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
 
 
   public compras: Array<any> = [];
-  public compras_const: Array<any> = [];
 
   filtroFecha = 'all';
   fechaDesde = '';
@@ -121,7 +120,7 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
   filtroRuc = '';
   filtroProveedor = '';
   filtroTipoComprobante = '';
-  public load_compras = true;
+  public load_compras = false;
 
   private readonly buscarSubject = new Subject<void>();
   private readonly destroy$ = new Subject<void>();
@@ -236,6 +235,7 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
   /** Carga compras paginadas desde el servidor (GET /api/compras-por-empresa?pagina=...). */
   initData(pagina = 1): void {
     this.page = pagina;
+    this.load_compras = true;
     this._comprasService.obtenerComprasPaginado(this.buildParamsListadoCompras(pagina)).subscribe({
       next: (response) => {
         if (response.data == undefined) {
@@ -252,9 +252,11 @@ export class IndexComprasComponent implements OnInit, OnDestroy {
           this.compras = response.data;
           this.totalCompras = response.total ?? 0;
         }
+        this.load_compras = false;
       },
       error: (err) => {
         console.error('initData compras:', err);
+        this.load_compras = false;
       }
     });
   }

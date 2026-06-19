@@ -83,6 +83,50 @@ exports.pagarCuotaService = async (pool, user, datos) => {
   return result;
 };
 
+exports.pagarCuotasMasivoService = async (pool, user, datos) => {
+  if (!user) {
+    throw new Error('NO_ACCESS');
+  }
+
+  await assertAlgunoPermiso(pool, user, 'REGISTRAR_PAGOS', 'CREAR_CREDITOS');
+
+  const pagos = Array.isArray(datos?.pagos) ? datos.pagos : [];
+  if (!pagos.length) {
+    throw new Error('PAGOS_VACIOS');
+  }
+
+  const resultados = [];
+  for (const pago of pagos) {
+    const monto = Number(pago.montoPagado);
+    if (!pago.idCuota || !(monto > 0)) {
+      throw new Error('PAGO_INVALIDO');
+    }
+    const idE = await resolverIdEmpresaOperacionCaja(
+      pool,
+      user,
+      pago.idEmpresaOperacion || datos.idEmpresaOperacion
+    );
+    const userOp = { ...user, empresa: idE };
+    const cuotaValida = await CreditosRepository.validarCuotaPendienteRepo(pool, pago.idCuota, idE);
+    if (!cuotaValida) {
+      throw new Error('CUOTA_NO_ENCONTRADA');
+    }
+    const result = await CreditosRepository.pagarCuotaRepo(pool, userOp, {
+      idCuota: pago.idCuota,
+      montoPagado: monto,
+      idMediosPago: pago.idMediosPago ?? datos.idMediosPago,
+      idMoneda: pago.idMoneda ?? datos.idMoneda,
+      numeroRecibo: pago.numeroRecibo ?? datos.numeroRecibo,
+      observaciones: pago.observaciones ?? datos.observaciones,
+      idApertura: pago.idApertura ?? datos.idApertura,
+      fechaPago: pago.fechaPago ?? datos.fechaPago
+    });
+    resultados.push(result);
+  }
+
+  return { procesados: resultados.length, resultados };
+};
+
 exports.obtenerResumenCreditosService = async (pool, user, idEmpresaOperacion) => {
   if (!user) {
     throw new Error("NO_ACCESS");

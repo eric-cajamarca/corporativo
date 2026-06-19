@@ -50,6 +50,7 @@ const lotesUbicacionRoutes = require('./routes/lotesUbicacion');
 const ubicacionesPrioridadRoutes = require('./routes/ubicacionesPrioridad');
 const cajaRoutes = require('./routes/caja');
 const creditosRoutes = require('./routes/creditos');
+const busquedaGlobalRoutes = require('./routes/busquedaGlobal');
 const despachosRoutes = require('./routes/despachos');
 const enviosRoutes = require('./routes/envios');
 const choferesRoutes = require('./routes/choferes');
@@ -261,6 +262,7 @@ app.use('/api', lotesUbicacionRoutes);
 app.use('/api', ubicacionesPrioridadRoutes);
 app.use('/api/caja', cajaRoutes);
 app.use('/api/creditos', creditosRoutes);
+app.use('/api/busqueda-global', busquedaGlobalRoutes);
 app.use('/api/despachos', despachosRoutes);
 app.use('/api/envios', enviosRoutes);
 // Nota: renviosRouters contiene rutas legacy con /envios/:id y puede interceptar /api/envios/*

@@ -1,0 +1,1 @@
+-- Obsoleto: use saas_planes_precios_comercial_v3.sql (precios 49/89/169, cotizaciones en Básico).

@@ -26,6 +26,10 @@ export class ComunicacionBajaComponent implements OnInit {
 
   sidebarState = inject(SidebarStateService);
   comprobantes: ComprobanteParaBaja[] = [];
+  totalComprobantes = 0;
+  paginaComprobantes = 1;
+  readonly porPaginaComprobantes = 10;
+  filtroComprobante = '';
   motivos: MotivoBaja[] = [];
   /** IDs seleccionados para dar de baja */
   seleccionados: Set<string> = new Set();
@@ -84,21 +88,42 @@ export class ComunicacionBajaComponent implements OnInit {
     this.fechaHasta = getFechaHoyLocal();
   }
 
-  cargarComprobantes(): void {
+  cargarComprobantes(pagina = this.paginaComprobantes): void {
+    this.paginaComprobantes = pagina;
     this.loadingComprobantes = true;
-    this._facturacionService.listarComprobantesParaBaja().subscribe({
+    this._facturacionService.listarComprobantesParaBaja({
+      pagina,
+      porPagina: this.porPaginaComprobantes,
+      buscar: (this.filtroComprobante || '').trim() || undefined
+    }).subscribe({
       next: (res) => {
         this.comprobantes = res?.data ?? [];
+        this.totalComprobantes = res?.total ?? 0;
         this.loadingComprobantes = false;
       },
       error: () => {
         this.loadingComprobantes = false;
         this.comprobantes = [];
+        this.totalComprobantes = 0;
         if (typeof iziToast !== 'undefined') {
           iziToast.error({ title: 'Error', message: 'No se pudieron cargar los comprobantes.' });
         }
       }
     });
+  }
+
+  buscarComprobantes(): void {
+    this.paginaComprobantes = 1;
+    this.cargarComprobantes(1);
+  }
+
+  limpiarFiltroComprobante(): void {
+    this.filtroComprobante = '';
+    this.buscarComprobantes();
+  }
+
+  onPaginaComprobantesChange(pagina: number): void {
+    this.cargarComprobantes(pagina);
   }
 
   cargarMotivos(): void {

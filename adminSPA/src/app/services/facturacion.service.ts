@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { global } from './global';
 import { Observable } from 'rxjs/internal/Observable';
@@ -308,11 +308,26 @@ export class FacturacionService {
 
   /** Crear nota de crédito (07) o débito (08). codigoMotivoNotaCredito solo para 07 (catálogo 09). */
   /** Comunicación de baja (RA): listar comprobantes aceptados (01/07/08) para dar de baja. */
-  listarComprobantesParaBaja(): Observable<{ data: ComprobanteParaBaja[] }> {
+  listarComprobantesParaBaja(params?: {
+    pagina?: number;
+    porPagina?: number;
+    buscar?: string;
+  }): Observable<{ data: ComprobanteParaBaja[]; total: number }> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
-    return this._http.get<{ data: ComprobanteParaBaja[] }>(
+    let httpParams = new HttpParams();
+    if (params?.pagina != null) {
+      httpParams = httpParams.set('pagina', String(params.pagina));
+    }
+    if (params?.porPagina != null) {
+      httpParams = httpParams.set('porPagina', String(params.porPagina));
+    }
+    const buscar = (params?.buscar ?? '').trim();
+    if (buscar) {
+      httpParams = httpParams.set('buscar', buscar);
+    }
+    return this._http.get<{ data: ComprobanteParaBaja[]; total: number }>(
       this.url + 'facturacion/comunicacion-baja/comprobantes',
-      { headers, withCredentials: true }
+      { headers, params: httpParams, withCredentials: true }
     );
   }
 

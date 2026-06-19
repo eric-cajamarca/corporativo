@@ -326,6 +326,7 @@
           <table class="table table-hover table-sm">
             <thead class="table-light">
               <tr>
+                <th style="width:2rem"></th>
                 <th>N°</th>
                 <th>Vencimiento</th>
                 <th class="text-end">Monto</th>
@@ -337,6 +338,14 @@
             </thead>
             <tbody>
               <tr *ngFor="let cuota of cuotas">
+                <td class="text-center">
+                  <input
+                    *ngIf="cuota.estado !== 'PAGADO'"
+                    type="checkbox"
+                    class="form-check-input"
+                    [checked]="cuotaSeleccionadaMasivo(cuota.idCuota)"
+                    (change)="toggleCuotaMasivo(cuota.idCuota, $any($event.target).checked)" />
+                </td>
                 <td class="text-center">{{ cuota.numeroCuota }}</td>
                 <td>{{ cuota.fechaVencimiento | date:'dd/MM/yyyy' }}</td>
                 <td class="text-end">S/ {{ cuota.montoCuota | number:'1.2-2' }}</td>
@@ -360,6 +369,9 @@
         </ng-template>
       </div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-success" (click)="cobrarCuotasSeleccionadasMasivo()" [disabled]="loading || cuotasSeleccionadasMasivo.size === 0">
+          Cobrar seleccionadas ({{ cuotasSeleccionadasMasivo.size }})
+        </button>
         <button type="button" class="btn btn-secondary" (click)="cerrarModalVerCuotas()">Cerrar</button>
       </div>
     </div>

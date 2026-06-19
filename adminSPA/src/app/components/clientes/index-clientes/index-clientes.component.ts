@@ -23,8 +23,6 @@ export class IndexClientesComponent {
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
 
   public clientes: Array<any> = [];
-  public clienteSearch: Array<any> = [];
-  public clientes_const: Array<any> = [];
   public token: any = "";
 
    // Configuración de paginación

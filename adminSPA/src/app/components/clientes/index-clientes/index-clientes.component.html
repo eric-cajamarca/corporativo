@@ -16,19 +16,24 @@
         </div>
       </ng-container>
 
-      <ng-container *ngIf="clientes_const.length === 0">
+      <div *ngIf="load_estado" class="text-center py-3 text-muted">
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        Cargando clientes…
+      </div>
+
+      <ng-container *ngIf="!load_estado && totalClientes === 0">
         <div class="row">
           <div class="col-12">
-            <div class="alert alert-danger" role="alert">
+            <div class="alert alert-warning mb-0" role="alert">
               <div class="alert-text">
-                <p>No tienes clientes registrados</p>
+                <p class="mb-0">No hay clientes que coincidan con la búsqueda.</p>
               </div>
             </div>
           </div>
         </div>
       </ng-container>
 
-      <ng-container *ngIf="clientes_const.length > 0">
+      <ng-container *ngIf="!load_estado && totalClientes > 0">
         
         <div class="row">
           <div class="col-12">
@@ -181,8 +186,8 @@
 
 
     </div>
-    <ngb-pagination 
-          *ngIf="clientes.length > 0"
+    <ngb-pagination
+          *ngIf="!load_estado && totalClientes > pageSize"
           [(page)]="page"
           [pageSize]="pageSize"
           [collectionSize]="totalClientes"

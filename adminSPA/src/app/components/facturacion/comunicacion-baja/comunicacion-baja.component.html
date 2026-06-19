@@ -14,7 +14,7 @@
       </div>
       <div class="card-body">
         <p class="small text-muted mb-2">Seleccione los comprobantes y el motivo; luego pulse "Enviar comunicación de baja".</p>
-        <div class="row mb-3">
+        <div class="row mb-3 g-2 align-items-end">
           <div class="col-md-4">
             <label class="form-label small">Motivo por defecto</label>
             <select class="form-select form-select-sm" [(ngModel)]="motivoDefault">
@@ -23,16 +23,37 @@
               }
             </select>
           </div>
+          <div class="col-md-4">
+            <label class="form-label small">Buscar comprobante</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control" placeholder="Serie-número, ej. F001-00000038"
+                     [(ngModel)]="filtroComprobante" (keyup.enter)="buscarComprobantes()">
+              <button type="button" class="btn btn-primary" (click)="buscarComprobantes()" [disabled]="loadingComprobantes">
+                <i class="bi bi-search"></i>
+              </button>
+              @if (filtroComprobante.trim()) {
+                <button type="button" class="btn btn-outline-secondary" (click)="limpiarFiltroComprobante()" [disabled]="loadingComprobantes" title="Limpiar búsqueda">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              }
+            </div>
+          </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarComprobantes()" [disabled]="loadingComprobantes">
+            <button type="button" class="btn btn-outline-secondary btn-sm w-100" (click)="cargarComprobantes()" [disabled]="loadingComprobantes">
               <i class="bi bi-arrow-clockwise"></i> Actualizar
             </button>
           </div>
         </div>
         @if (loadingComprobantes) {
           <p class="small text-muted"><i class="bi bi-hourglass-split"></i> Cargando comprobantes...</p>
-        } @else if (comprobantes.length === 0) {
-          <p class="small text-muted">No hay facturas o notas (01/07/08) en estado Aceptado para dar de baja.</p>
+        } @else if (totalComprobantes === 0) {
+          <p class="small text-muted">
+            @if (filtroComprobante.trim()) {
+              No hay comprobantes que coincidan con «{{ filtroComprobante.trim() }}».
+            } @else {
+              No hay facturas o notas (01/07/08) en estado Aceptado para dar de baja.
+            }
+          </p>
         } @else {
           <div class="table-responsive">
             <table class="table table-sm table-hover table-bordered">
@@ -73,7 +94,26 @@
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-primary" (click)="enviarBaja()" [disabled]="enviando || seleccionados.size === 0">
+          @if (totalComprobantes > porPaginaComprobantes) {
+            <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+              <span class="text-muted small">
+                Mostrando {{ (paginaComprobantes - 1) * porPaginaComprobantes + 1 }} – {{ min(paginaComprobantes * porPaginaComprobantes, totalComprobantes) }} de {{ totalComprobantes }}
+              </span>
+              <ngb-pagination
+                [(page)]="paginaComprobantes"
+                [pageSize]="porPaginaComprobantes"
+                [collectionSize]="totalComprobantes"
+                [maxSize]="5"
+                [rotate]="true"
+                [boundaryLinks]="true"
+                class="mb-0"
+                (pageChange)="onPaginaComprobantesChange($event)">
+              </ngb-pagination>
+            </div>
+          }
+        }
+        @if (!loadingComprobantes && seleccionados.size > 0) {
+          <button type="button" class="btn btn-primary mt-3" (click)="enviarBaja()" [disabled]="enviando">
             @if (enviando) { Enviando... } @else { Enviar comunicación de baja ({{ seleccionados.size }} comprobante(s)) }
           </button>
         }

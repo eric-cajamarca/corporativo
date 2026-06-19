@@ -17,32 +17,8 @@
       </div>
     </div>
 
-    <!-- Centro - Barra de búsqueda 
-    <div class="topnav-center d-none d-lg-flex">
-      <div class="search-container">
-        <i class="fas fa-search search-icon"></i>
-        <input 
-          type="text" 
-          class="search-input" 
-          placeholder="Buscar productos, clientes, ventas..."
-          [(ngModel)]="searchQuery"
-          (keyup.enter)="onSearch()">
-        <button 
-          class="search-clear" 
-          *ngIf="searchQuery" 
-          (click)="closeSearchResults()">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-    </div>
-    -->
     <!-- Lado derecho -->
     <div class="topnav-right">
-      <!-- Búsqueda móvil -->
-      <button class="topnav-btn d-lg-none">
-        <i class="bi bi-search"></i>
-      </button>
-
       <!-- Tipo de cambio (solo si empresa autorizada) -->
       <div class="dropdown topnav-dropdown" *ngIf="tipoCambio" [class.show]="showTipoCambioDropdown">
         <button

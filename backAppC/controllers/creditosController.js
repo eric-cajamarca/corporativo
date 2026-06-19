@@ -235,12 +235,41 @@ const obtenerEficienciaCobros = async (req, res) => {
   }
 };
 
+const pagarCuotasMasivo = async (req, res) => {
+  try {
+    const result = await withPool((pool) =>
+      CreditosServices.pagarCuotasMasivoService(pool, req.user, req.body)
+    );
+    res.status(200).send({
+      message: `Cobranza masiva registrada (${result.procesados} pago(s)).`,
+      data: result
+    });
+  } catch (error) {
+    if (handleEmpresaOpError(res, error)) return;
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).send({ message: 'No autorizado', data: undefined });
+    }
+    if (error.message === 'NO_PERMISSIONS') {
+      return res.status(403).send({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    if (error.message === 'PAGOS_VACIOS' || error.message === 'PAGO_INVALIDO') {
+      return res.status(400).send({ message: 'Datos de cobranza masiva inválidos', data: undefined });
+    }
+    if (error.message === 'CUOTA_NO_ENCONTRADA') {
+      return res.status(404).send({ message: 'Cuota no encontrada o ya pagada', data: undefined });
+    }
+    console.error('Error cobranza masiva créditos:', error);
+    res.status(500).send({ message: 'Error al procesar cobranza masiva', data: undefined });
+  }
+};
+
 module.exports = {
   obtenerCreditosClienteTodos,
   obtenerCreditosCliente,
   crearCredito,
   obtenerCuotasCredito,
   pagarCuota,
+  pagarCuotasMasivo,
   obtenerResumenCreditos,
   obtenerCuotasPendientes,
   obtenerEficienciaCobros

@@ -2,7 +2,7 @@
   <div class="container" style="max-width: 1100px;">
     <div class="text-center mb-4">
       <h1 class="h2 mb-2">Planes</h1>
-      <p class="text-muted mb-0">Elige mensual o anual y continúa con el pago.</p>
+      <p class="text-muted mb-0">Elige mensual o anual y continúa con el pago. Precios en soles <strong>sin IGV</strong>.</p>
     </div>
 
     @if (modoEnterprise()) {
@@ -132,7 +132,7 @@
                     }
                   </ul>
                   <div class="border-top pt-3 mt-auto">
-                    <p class="display-6 mb-1">S/ {{ precio(p) | number : '1.0-0' }}</p>
+                    <p class="display-6 mb-0">S/ {{ precio(p) | number : '1.0-0' }} <span class="fs-6 fw-normal text-muted">+ IGV</span></p>
                     <p class="text-muted small mb-3">por {{ etiquetaCiclo() }}</p>
                     <button type="button" class="btn btn-primary w-100" (click)="elegirPlan(p.planCode)">
                       Elegir
@@ -150,6 +150,9 @@
           <span class="text-muted mx-2">·</span>
           <a routerLink="/login-empresa">Ya tengo cuenta</a>
         </div>
+        <p class="text-center text-muted small mt-3 mb-0">
+          ¿Cliente grande o servidor propio? Plan <strong>Enterprise</strong> con gestores multi-empresa — cotización comercial.
+        </p>
       }
     }
   </div>

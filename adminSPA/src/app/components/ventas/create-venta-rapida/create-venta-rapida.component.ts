@@ -56,6 +56,14 @@ import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
+import {
+  PosAlertaTemprana,
+  codigoComprobanteDesdeLista,
+  construirAlertaValidacionTemprana,
+  validarClienteSunatParaComprobante,
+  validarStockLinea
+} from '../../../utils/pos-validacion.util';
+import { PosKeyboardService } from '../../../services/pos-keyboard.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -210,6 +218,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Config inventario: permitir vender con stock 0 o negativo. */
   permitirVentasNegativas = false;
+  alertaValidacionTemprana: PosAlertaTemprana | null = null;
+  mostrarAyudaAtajosPos = false;
 
   /** Modal Cargar desde cotización */
   cotizacionesParaCargar: CotizacionListado[] = [];
@@ -281,7 +291,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private usuarioSucursalService: UsuarioSucursalService,
     private ngZone: NgZone,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private posKeyboard: PosKeyboardService
   ) {}
 
 
@@ -303,6 +314,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.modalEditarClienteEl = document.getElementById('modalEditarClienteVenta');
     this.modalEditarClienteEl?.addEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
     this.enfocarEscanner();
+    this.configurarAtajosPos();
   }
 
   enfocarEscanner(): void {
@@ -310,6 +322,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
   ngOnDestroy(): void {
+    this.posKeyboard.desactivar();
     this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.pdfPostVentaModalEl = null;
     this.modalEditarClienteEl?.removeEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
@@ -377,6 +390,24 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         this.aplicarSucursalConCajaAbiertaPreferida();
         this.resolverSucursalesPermitidasVenta();
         this.cargarComprobantesVentaInicial();
+        this.actualizarValidacionTemprana();
+      },
+      error: () => {}
+    });
+    this.ventasService.getBootstrapVenta().subscribe({
+      next: (res) => {
+        const d = res?.data as {
+          cajas?: unknown[];
+          sucursales?: Sucursal[];
+        };
+        if (Array.isArray(d?.cajas)) {
+          this.cajas = d.cajas.filter((c: any) => this.esCajaConAperturaActiva(c));
+          this.aplicarSucursalConCajaAbiertaPreferida();
+        }
+        if (Array.isArray(d?.sucursales) && d.sucursales.length) {
+          this.sucursales = d.sucursales;
+        }
+        this.actualizarValidacionTemprana();
       },
       error: () => {}
     });
@@ -539,9 +570,86 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   onSucursalRapidaChange(): void {
     this.cargarComprobantesVentaInicial();
     this.aplicarDefaultsVentaRapida();
+    this.actualizarValidacionTemprana();
+  }
+
+  actualizarValidacionTemprana(): void {
+    const abiertas = (this.cajas || [])
+      .filter((c) => this.esCajaConAperturaActiva(c))
+      .map((c) => (c.sucursal || c.nombre || '').trim())
+      .filter(Boolean);
+    this.alertaValidacionTemprana = construirAlertaValidacionTemprana({
+      esCotizacion: this.esCotizacion(),
+      bloqueoSucursal: this.bloqueoPorSucursalUsuario,
+      idSucursal: this.ventas.idSucursal,
+      tieneCajaAbierta: this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal),
+      nombresCajasAbiertas: [...new Set(abiertas)]
+    });
+  }
+
+  private validarAntesDeCobrar(): boolean {
+    this.actualizarValidacionTemprana();
+    if (this.alertaValidacionTemprana?.tipo === 'danger') {
+      iziToast.warning({
+        title: 'No se puede cobrar',
+        message: this.alertaValidacionTemprana.mensaje,
+        position: 'topRight'
+      });
+      return false;
+    }
+    const codComp = codigoComprobanteDesdeLista(this.comprobantes, this.ventas.idComprobante);
+    const sunat = validarClienteSunatParaComprobante({
+      codigoComprobante: codComp,
+      idDocumento: this.ventas.idDocumento,
+      numeroDocumento: this.cliente?.ruc,
+      razonSocial: this.cliente?.rSocial
+    });
+    if (!sunat.valido) {
+      iziToast.warning({
+        title: 'Validación SUNAT',
+        message: sunat.mensaje || 'Datos del cliente inválidos.',
+        position: 'topRight'
+      });
+      return false;
+    }
+    if (!this.permitirVentasNegativas) {
+      const lineaSinStock = this.carrito.find((item) => this.lineaCarritoStockInsuficiente(item));
+      if (lineaSinStock) {
+        iziToast.warning({
+          title: 'Stock insuficiente',
+          message: `Revise cantidades: ${lineaSinStock.descripcion || lineaSinStock.codigo}.`,
+          position: 'topRight'
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private configurarAtajosPos(): void {
+    this.posKeyboard.activar({
+      buscar: () => {
+        this.inputBusquedaInline?.nativeElement?.focus();
+        this.enfocarEscanner();
+      },
+      cobrar: () => this.cobrarVentaRapida(),
+      cliente: () => this.buscarORegistrarCliente(),
+      limpiarBusqueda: () => {
+        this.searchTermInline = '';
+        this.searchCodigo = '';
+        this.productosBusquedaInline = [];
+        this.onBusquedaInlineInput();
+      },
+      ayuda: () => {
+        this.mostrarAyudaAtajosPos = !this.mostrarAyudaAtajosPos;
+      }
+    });
   }
 
   cobrarVentaRapida(): void {
+    if (!this.validarAntesDeCobrar()) {
+      return;
+    }
     if (this.carrito.length === 0) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
       return;
@@ -1583,9 +1691,26 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       String(p.idEmpresa || '') === String(producto.idEmpresa || '')
     );
     if (existe) {
-      existe.cantidad += 1;
+      const cantNueva = (Number(existe.cantidad) || 0) + 1;
+      const stockVal = this.validarStockAgregarAlCarrito(existe, cantNueva);
+      if (!stockVal.valido) {
+        iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
+        return;
+      }
+      if (stockVal.advertencia) {
+        iziToast.info({ title: 'Stock', message: stockVal.advertencia, position: 'topRight' });
+      }
+      existe.cantidad = cantNueva;
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
+      const stockVal = this.validarStockAgregarAlCarrito(producto, 1);
+      if (!stockVal.valido) {
+        iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
+        return;
+      }
+      if (stockVal.advertencia) {
+        iziToast.info({ title: 'Stock', message: stockVal.advertencia, position: 'topRight' });
+      }
       const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
         ...producto,
@@ -1597,6 +1722,19 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.enriquecerLineaCarritoDesdeCatalogo(agregado);
             }
     this.actualizaTotales();
+  }
+
+  private validarStockAgregarAlCarrito(
+    producto: any,
+    cantidadNueva: number
+  ): { valido: boolean; mensaje?: string; advertencia?: string } {
+    const stock = this.obtenerStockDisponibleParaLineaCarrito(producto);
+    return validarStockLinea({
+      cantidadNueva,
+      stockDisponible: stock,
+      permitirVentasNegativas: this.permitirVentasNegativas,
+      nombreProducto: producto?.descripcion || producto?.codigo
+    });
   }
 
   

@@ -2,6 +2,7 @@ const sql = require('mssql');
 const ventasService = require('../services/ventas.service');
 const ventasOrquestacion = require('../services/ventasOrquestacion.service');
 const ventaBootstrapService = require('../services/ventaBootstrap.service');
+const { shouldSkipRedisCache } = require('../utils/cacheSkip.util');
 const auditoriaOperaciones = require('../services/auditoriaOperaciones.service');
 const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 const { withPool } = require('../utils/dbPool.util');
@@ -433,7 +434,11 @@ const getBootstrapVenta = async (req, res) => {
     return res.status(401).json({ message: 'No Access' });
   }
   try {
-    const data = await withPool((pool) => ventaBootstrapService.obtenerBootstrapVenta(pool, req.user));
+    const data = await withPool((pool) =>
+      ventaBootstrapService.obtenerBootstrapVenta(pool, req.user, {
+        skipCache: shouldSkipRedisCache(req.query)
+      })
+    );
     res.json({ data });
   } catch (error) {
     console.error('Error getBootstrapVenta:', error);

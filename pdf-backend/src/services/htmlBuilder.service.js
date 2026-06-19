@@ -335,27 +335,16 @@ class HtmlBuilderService {
 
   /**
    * Ticket de despacho: estilo cotización, solo negro sobre blanco, sin cajas grises/azules.
-   * Encabezado con logo de empresa (data URI). Texto base 11px.
+   * Sin logo ni datos de empresa: inicia en el título del documento.
    */
   async construirHtmlDespachoTicketCotizacionBn(params) {
     const titulo = this._escapeHtml(String(params.titulo || 'Ticket de despacho'));
     const datos = params.datos && typeof params.datos === 'object' ? params.datos : {};
-    const empresa = datos.empresa && typeof datos.empresa === 'object' ? datos.empresa : {};
     const venta = datos.venta && typeof datos.venta === 'object' ? datos.venta : {};
     const cliente = datos.cliente && typeof datos.cliente === 'object' ? datos.cliente : {};
     const dsp = datos.despacho && typeof datos.despacho === 'object' ? datos.despacho : null;
     const columnas = Array.isArray(params.columnas) ? params.columnas : [];
     const filas = Array.isArray(params.filas) ? params.filas : [];
-
-    const logoSrc = await this._resolveLogoToDataUri(empresa.logo || '');
-    const nombreEmp = this._escapeHtml(String(empresa.nombre || '').trim());
-    const rucEmp = this._escapeHtml(String(empresa.ruc || '').trim());
-    const dirEmp = this._escapeHtml(String(empresa.direccion || '').trim());
-    const telEmp = this._escapeHtml(String(empresa.telefono || '').trim());
-
-    const metaLines = [rucEmp ? `RUC: ${rucEmp}` : '', dirEmp ? `Dirección: ${dirEmp}` : '', telEmp ? `Tel.: ${telEmp}` : '']
-      .filter(Boolean)
-      .join('<br>');
 
     const bloqueDespacho = dsp
       ? `<div class="seccion">
@@ -400,11 +389,7 @@ class HtmlBuilderService {
   <title>${titulo}</title>
   <style>
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; background: #fff; margin: 0; padding: 10px 8px; }
-    .hdr-logo { text-align: center; margin-bottom: 6px; }
-    .hdr-logo img { max-width: 160px; max-height: 72px; object-fit: contain; display: inline-block; vertical-align: middle; }
-    .empresa-nombre { text-align: center; font-weight: bold; font-size: 11px; margin: 4px 0 2px; color: #000; }
-    .empresa-meta { text-align: center; font-size: 10px; line-height: 1.35; color: #000; margin-bottom: 10px; }
-    .titulo-doc { font-weight: bold; font-size: 12px; text-align: center; text-transform: uppercase; letter-spacing: 0.02em; margin: 10px 0 4px; padding-bottom: 4px; border-bottom: 1px solid #000; color: #000; }
+    .titulo-doc { font-weight: bold; font-size: 12px; text-align: center; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4px; padding-bottom: 4px; border-bottom: 1px solid #000; color: #000; }
     .fecha-doc { font-size: 10px; text-align: center; margin-bottom: 12px; color: #000; }
     .seccion { margin-bottom: 10px; padding: 8px 10px; border: 1px solid #000; background: #fff; }
     .seccion-tit { font-weight: bold; font-size: 11px; margin: 0 0 6px; padding-bottom: 3px; border-bottom: 1px solid #000; color: #000; }
@@ -417,9 +402,6 @@ class HtmlBuilderService {
   </style>
 </head>
 <body>
-  <div class="hdr-logo"><img src="${logoSrc}" alt=""></div>
-  ${nombreEmp ? `<div class="empresa-nombre">${nombreEmp}</div>` : ''}
-  ${metaLines ? `<div class="empresa-meta">${metaLines}</div>` : ''}
   <div class="titulo-doc">${titulo}</div>
   <div class="fecha-doc">Impreso: ${fechaRep}</div>
   ${bloqueDespacho}

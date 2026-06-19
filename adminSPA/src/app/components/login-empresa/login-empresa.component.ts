@@ -82,6 +82,7 @@ export class LoginEmpresaComponent implements OnInit {
   loadEmpresaRecordada(): void {
     // Cargar empresa recordada del localStorage
     const empresaRecordadaStr = localStorage.getItem('empresaRecordada');
+    const ultimoPosStr = localStorage.getItem('ultimoAccesoPos');
     if (empresaRecordadaStr) {
       try {
         this.empresaRecordada = JSON.parse(empresaRecordadaStr);
@@ -90,6 +91,14 @@ export class LoginEmpresaComponent implements OnInit {
       } catch (error) {
         console.error('Error parsing empresa recordada:', error);
         localStorage.removeItem('empresaRecordada');
+      }
+    } else if (ultimoPosStr) {
+      try {
+        const ultimo = JSON.parse(ultimoPosStr);
+        this.user.ruc = ultimo.ruc || '';
+        this.user.email = ultimo.email || '';
+      } catch {
+        localStorage.removeItem('ultimoAccesoPos');
       }
     }
   }
@@ -305,6 +314,11 @@ export class LoginEmpresaComponent implements OnInit {
   }
 
   private handleLoginSuccess(userData: AdminLoginUserData): void {
+    localStorage.setItem(
+      'ultimoAccesoPos',
+      JSON.stringify({ ruc: this.user.ruc, email: this.user.email, ts: Date.now() })
+    );
+
     // Guardar empresa recordada si está marcado el checkbox
     const rememberCheckbox = document.getElementById('remember') as HTMLInputElement;
     if (rememberCheckbox?.checked) {
@@ -326,8 +340,31 @@ export class LoginEmpresaComponent implements OnInit {
         void this._router.navigate(['/cuenta', 'suscripcion'], { queryParams: { checkout: chk } });
         return;
       }
+      const modoPos =
+        this.route.snapshot.queryParamMap.get('modo') === 'pos' ||
+        localStorage.getItem('redirectPosTrasLogin') === '1';
+      if (modoPos) {
+        localStorage.removeItem('redirectPosTrasLogin');
+        void this._router.navigate(['/ventas/rapida']);
+        return;
+      }
       void this._router.navigate(['/home']);
     }, 0);
+  }
+
+  /** Acceso rápido: salta al paso de contraseña con RUC/email recordados. */
+  irAccesoRapidoPos(): void {
+    if (!this.user.ruc || !this.user.email) {
+      iziToast.info({
+        title: 'Acceso rápido',
+        message: 'Complete RUC y usuario al menos una vez para usar acceso rápido POS.',
+        position: 'topRight'
+      });
+      return;
+    }
+    localStorage.setItem('redirectPosTrasLogin', '1');
+    this.currentStep = 3;
+    this.maxStepReached = 3;
   }
 
   // Método público para acceso desde template

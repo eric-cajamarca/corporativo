@@ -1203,20 +1203,46 @@ exports.obtenerComprobantesParaBajaPorIdsRepo = async (pool, idEmpresa, idsCompr
 };
 
 /** Lista comprobantes Factura (01), NC (07), ND (08) en estado Aceptado (1,2,3) para seleccionar y dar de baja. */
-exports.listarComprobantesAceptadosParaBajaRepo = async (pool, idEmpresa) => {
-  const r = await pool
+exports.listarComprobantesAceptadosParaBajaRepo = async (pool, idEmpresa, opts = {}) => {
+  const { parsePaginacion, likePattern } = require("../utils/paginacion.util");
+  const pag = parsePaginacion(opts);
+  let whereBuscar = "";
+  const reqCount = pool.request().input("idEmpresa", sql.UniqueIdentifier, idEmpresa);
+  const buscarPat = likePattern(opts.buscar);
+  if (buscarPat) {
+    reqCount.input("buscar", sql.NVarChar(200), buscarPat);
+    whereBuscar = ` AND (
+      ce.serie LIKE @buscar ESCAPE '\\'
+      OR ce.numero LIKE @buscar ESCAPE '\\'
+      OR (ce.serie + '-' + ce.numero) LIKE @buscar ESCAPE '\\'
+    )`;
+  }
+  const baseWhere = `
+    ce.idEmpresa = @idEmpresa
+    AND ce.tipoComprobante IN ('01','07','08')
+    AND ce.idEstadoSunat IN (1, 2, 3)
+  `;
+  const countRes = await reqCount.query(`
+    SELECT COUNT(*) AS total FROM ComprobantesElectronicos ce
+    WHERE ${baseWhere}${whereBuscar}
+  `);
+  const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+  const reqData = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
-    .query(`
-      SELECT ce.idComprobanteElectronico, ce.tipoComprobante, ce.serie, ce.numero,
-             CONVERT(VARCHAR(19), ce.fechaEmision, 120) AS fechaEmision
-      FROM ComprobantesElectronicos ce
-      WHERE ce.idEmpresa = @idEmpresa
-        AND ce.tipoComprobante IN ('01','07','08')
-        AND ce.idEstadoSunat IN (1, 2, 3)
-      ORDER BY ce.fechaEmision DESC, ce.serie, ce.numero
-    `);
-  return r.recordset || [];
+    .input("offset", sql.Int, pag.offset)
+    .input("limite", sql.Int, pag.porPagina);
+  if (buscarPat) reqData.input("buscar", sql.NVarChar(200), buscarPat);
+  const dataRes = await reqData.query(`
+    SELECT ce.idComprobanteElectronico, ce.tipoComprobante, ce.serie, ce.numero,
+           CONVERT(VARCHAR(19), ce.fechaEmision, 120) AS fechaEmision
+    FROM ComprobantesElectronicos ce
+    WHERE ${baseWhere}${whereBuscar}
+    ORDER BY ce.fechaEmision DESC, ce.serie, ce.numero
+    OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+  `);
+  return { rows: dataRes.recordset || [], total, pagina: pag.pagina, porPagina: pag.porPagina };
 };
 
 /** Siguiente correlativo de comunicación de baja para empresa y fecha (máx 5 dígitos). */

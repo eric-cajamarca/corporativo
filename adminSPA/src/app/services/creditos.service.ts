@@ -87,6 +87,21 @@ export class CreditosService {
     });
   }
 
+  pagarCuotasMasivo(payload: {
+    pagos: Array<{ idCuota: string; montoPagado: number; idEmpresaOperacion?: string }>;
+    idMediosPago?: number | null;
+    idApertura?: string;
+    observaciones?: string;
+    idEmpresaOperacion?: string | null;
+    fechaPago?: string;
+  }): Observable<any> {
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', Authorization: '' });
+    return this._http.post(this.url + 'creditos/cobranza-masiva', payload, {
+      headers,
+      withCredentials: true
+    });
+  }
+
   obtenerResumenCreditos(idEmpresaOperacion?: string | null): Observable<any> {
     const headers = new HttpHeaders({'Content-Type':'application/json','Authorization':''});
     return this._http.get(this.url+'creditos/resumen', {

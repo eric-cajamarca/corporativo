@@ -39,7 +39,7 @@
         </div>
       </ng-container>
         
-      <ng-container *ngIf="catalogoInicialCargado && productos_const.length === 0">
+      <ng-container *ngIf="catalogoInicialCargado && totalProductos === 0">
         <div class="row">
           <div class="col-12">
             <div class="alert alert-danger" role="alert">
@@ -51,7 +51,7 @@
         </div>
       </ng-container>
 
-      <ng-container *ngIf="catalogoInicialCargado && productos_const.length > 0">
+      <ng-container *ngIf="catalogoInicialCargado && totalProductos > 0">
         <div class="card-body card-body-busqueda-productos py-2 px-3">
           <div class="input-group input-group-merge">
             <input type="text" class="form-control form-control-appended" placeholder="Buscador general" name="filtro"
@@ -567,7 +567,7 @@
       </ng-container>
 
     <ngb-pagination 
-          *ngIf="productos.length > 0"
+          *ngIf="catalogoInicialCargado && totalProductos > pageSize"
           [(page)]="page"
           [pageSize]="pageSize"
           [collectionSize]="totalProductos"

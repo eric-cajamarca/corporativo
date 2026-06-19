@@ -25,18 +25,20 @@ IF EXISTS (SELECT * FROM sys.tables WHERE name = 'SaasPlan')
 BEGIN
     MERGE dbo.SaasPlan AS t
     USING (VALUES
-        (N'emprendedor', N'Emprendedor', N'Compras, ventas e inventario para empezar.',
-         N'["Hasta 4 usuarios y 1 sucursal","Productos (categorías, marcas, impuestos), clientes y proveedores","Compras, ventas e inventario con lotes","Reportes esenciales de operación"]',
-         59.00, 590.00, 4, 1, 1, 1, 10),
-        (N'profesional', N'Profesional', N'Caja, créditos, análisis y reportes.',
-         N'["Todo lo que tiene el plan emprendedor","Hasta 11 usuarios y hasta 3 sucursales","Caja, créditos y cuotas","Análisis financiero y reportes avanzados","Listas de precio y escenarios comerciales"]',
-         149.00, 1490.00, 11, 3, 1, 1, 20),
-        (N'empresarial', N'Empresarial', N'Escala, sucursales y multi-empresa.',
-         N'["Todo lo que tiene el plan Profesional","Hasta 35 usuarios y hasta 99 sucursales","Multi-empresa y gestores (varias razones sociales)","Prioridad de soporte y opciones de escala (según contrato)","Integraciones y operación avanzada (según contrato)"]',
-         399.00, 3990.00, 35, 99, 1, 1, 30),
+        (N'basico', N'Básico', N'Operación esencial: ventas, compras e inventario con FE.',
+         N'["Hasta 2 usuarios y 1 sucursal","Ventas, compras, inventario, productos y clientes","Cotizaciones comerciales","Facturación electrónica SUNAT","Hasta 150 comprobantes SUNAT aceptados","Sin WhatsApp vinculado, caja ni créditos"]',
+         49.00, 490.00, 2, 1, 1, 1, 15),
+        (N'emprendedor', N'Emprendedor', N'Caja, créditos, WhatsApp y operación completa para PYME.',
+         N'["Todo lo del plan Básico","Hasta 4 usuarios y 1 sucursal","WhatsApp vinculado: envío de comprobantes y bot de atención","Caja, créditos y catálogos","Compras SUNAT (comprobantes de proveedor)","Hasta 500 comprobantes SUNAT aceptados"]',
+         89.00, 890.00, 4, 1, 1, 1, 20),
+        (N'profesional', N'Profesional', N'Despachos, reportes, análisis y escala comercial.',
+         N'["Todo lo del plan Emprendedor","Hasta 11 usuarios y 3 sucursales","WhatsApp vinculado y bot con límites ampliados","Despachos, análisis financiero y reportes","Consultas placa/SOAT y utilidades de margen","Hasta 2 000 comprobantes SUNAT aceptados"]',
+         169.00, 1690.00, 11, 3, 1, 1, 30),
+        (N'empresarial', N'Empresarial (legado)', N'Plan legado; contacte soporte para migrar a Profesional.',
+         N'[]', 399.00, 3990.00, 35, 99, 1, 0, 90),
         (N'demo', N'Demo', N'Prueba el sistema 14 días.',
          N'[]', 0.00, 0.00, 1, 1, 1, 0, 5),
-        (N'enterprise', N'Enterprise', N'Licencia on-premise / corporativa.',
+        (N'enterprise', N'Enterprise', N'Licencia on-premise / servidor propio. Gestores multi-empresa.',
          N'[]', 0.00, 0.00, 99999, 99999, 1, 0, 0)
     ) AS s (planCode, nombre, descripcionCorta, beneficiosJson, precioMensualPen, precioAnualPen, maxUsuarios, maxSucursales, activo, visibleEnCatalogoPublico, orden)
     ON t.planCode = s.planCode

@@ -58,6 +58,13 @@ import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
+import {
+  PosAlertaTemprana,
+  codigoComprobanteDesdeLista,
+  construirAlertaValidacionTemprana,
+  validarClienteSunatParaComprobante,
+  validarStockLinea
+} from '../../../utils/pos-validacion.util';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 
@@ -201,6 +208,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Config inventario: permitir vender con stock 0 o negativo. */
   permitirVentasNegativas = false;
+  alertaValidacionTemprana: PosAlertaTemprana | null = null;
 
   /** Modal Cargar desde cotización */
   cotizacionesParaCargar: CotizacionListado[] = [];
@@ -364,6 +372,21 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.aplicarSucursalConCajaAbiertaPreferida();
         this.resolverSucursalesPermitidasVenta();
         this.cargarComprobantesVentaInicial();
+        this.actualizarValidacionTemprana();
+      },
+      error: () => {}
+    });
+    this.ventasService.getBootstrapVenta().subscribe({
+      next: (res) => {
+        const d = res?.data as { cajas?: unknown[]; sucursales?: Sucursal[] };
+        if (Array.isArray(d?.cajas)) {
+          this.cajas = d.cajas.filter((c: any) => this.esCajaConAperturaActiva(c));
+          this.aplicarSucursalConCajaAbiertaPreferida();
+        }
+        if (Array.isArray(d?.sucursales) && d.sucursales.length) {
+          this.sucursales = d.sucursales;
+        }
+        this.actualizarValidacionTemprana();
       },
       error: () => {}
     });
@@ -1323,9 +1346,20 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       String(p.idEmpresa || '') === String(producto.idEmpresa || '')
     );
     if (existe) {
-      existe.cantidad += 1;
+      const cantNueva = (Number(existe.cantidad) || 0) + 1;
+      const stockVal = this.validarStockAgregarAlCarrito(existe, cantNueva);
+      if (!stockVal.valido) {
+        iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
+        return;
+      }
+      existe.cantidad = cantNueva;
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
+      const stockVal = this.validarStockAgregarAlCarrito(producto, 1);
+      if (!stockVal.valido) {
+        iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
+        return;
+      }
       const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
         ...producto,
@@ -1337,6 +1371,72 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.enriquecerLineaCarritoDesdeCatalogo(agregado);
             }
     this.actualizaTotales();
+  }
+
+  actualizarValidacionTemprana(): void {
+    const abiertas = (this.cajas || [])
+      .filter((c) => this.esCajaConAperturaActiva(c))
+      .map((c) => (c.sucursal || c.nombre || '').trim())
+      .filter(Boolean);
+    this.alertaValidacionTemprana = construirAlertaValidacionTemprana({
+      esCotizacion: this.esCotizacion(),
+      bloqueoSucursal: this.bloqueoPorSucursalUsuario,
+      idSucursal: this.ventas.idSucursal,
+      tieneCajaAbierta: this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal),
+      nombresCajasAbiertas: [...new Set(abiertas)]
+    });
+  }
+
+  private validarAntesDeCobrar(validarCarrito = true): boolean {
+    this.actualizarValidacionTemprana();
+    if (this.alertaValidacionTemprana?.tipo === 'danger') {
+      iziToast.warning({
+        title: 'No se puede registrar',
+        message: this.alertaValidacionTemprana.mensaje,
+        position: 'topRight'
+      });
+      return false;
+    }
+    const codComp = codigoComprobanteDesdeLista(this.comprobantes, this.ventas.idComprobante);
+    const sunat = validarClienteSunatParaComprobante({
+      codigoComprobante: codComp,
+      idDocumento: this.ventas.idDocumento,
+      numeroDocumento: this.cliente?.ruc,
+      razonSocial: this.cliente?.rSocial
+    });
+    if (!sunat.valido) {
+      iziToast.warning({
+        title: 'Validación SUNAT',
+        message: sunat.mensaje || 'Datos del cliente inválidos.',
+        position: 'topRight'
+      });
+      return false;
+    }
+    if (validarCarrito && !this.permitirVentasNegativas) {
+      const lineaSinStock = this.carrito.find((item) => this.lineaCarritoStockInsuficiente(item));
+      if (lineaSinStock) {
+        iziToast.warning({
+          title: 'Stock insuficiente',
+          message: `Revise cantidades: ${lineaSinStock.descripcion || lineaSinStock.codigo}.`,
+          position: 'topRight'
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private validarStockAgregarAlCarrito(
+    producto: any,
+    cantidadNueva: number
+  ): { valido: boolean; mensaje?: string; advertencia?: string } {
+    const stock = this.obtenerStockDisponibleParaLineaCarrito(producto);
+    return validarStockLinea({
+      cantidadNueva,
+      stockDisponible: stock,
+      permitirVentasNegativas: this.permitirVentasNegativas,
+      nombreProducto: producto?.descripcion || producto?.codigo
+    });
   }
 
   
@@ -2126,6 +2226,9 @@ abrirModalPrecios(item: any) {
 
   /** Al abrir el modal Forma de pago: selecciona Efectivo, fila por defecto con el total (si aplica) y sincroniza resumen. */
   abrirModalPago(): void {
+    if (!this.validarAntesDeCobrar()) {
+      return;
+    }
     const efectivo = this.formasPago.find(
       (f: FormaPago) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
     );
@@ -2210,6 +2313,9 @@ abrirModalPrecios(item: any) {
 
   /** Registra la venta completa. Si el cliente no tiene idCliente, lo crea antes en BD. */
   registrarVenta(): void {
+    if (!this.validarAntesDeCobrar()) {
+      return;
+    }
     if (this.carrito.length === 0) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
       return;

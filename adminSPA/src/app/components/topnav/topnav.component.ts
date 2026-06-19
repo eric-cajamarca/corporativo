@@ -1,7 +1,6 @@
 import { Component, OnInit, OnDestroy, effect, Output, EventEmitter, Input, ChangeDetectorRef } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { Subscription, filter, throttleTime, asyncScheduler } from 'rxjs';
-import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
@@ -29,7 +28,6 @@ declare const iziToast: any;
   selector: 'app-topnav',
   standalone: true,
   imports: [
-    FormsModule,
     RouterModule,
     CommonModule,
     ConsultarPlacaModalComponent,
@@ -61,10 +59,6 @@ export class TopnavComponent implements OnInit, OnDestroy {
   // Eventos
   @Output() toggleSidebar = new EventEmitter<void>();
   @Input() sidebarCollapsed: boolean = false;
-
-  // Búsqueda
-  public searchQuery: string = '';
-  public showSearchResults: boolean = false;
 
   // Modales de consultas Factiliza
   public mostrarModalPlaca = false;
@@ -323,24 +317,6 @@ export class TopnavComponent implements OnInit, OnDestroy {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return this.userName.substring(0, 2).toUpperCase();
-  }
-
-  /**
-   * Realiza búsqueda global
-   */
-  onSearch(): void {
-    if (this.searchQuery.trim()) {
-            // Implementar búsqueda global aquí
-      this.showSearchResults = true;
-    }
-  }
-
-  /**
-   * Cierra los resultados de búsqueda
-   */
-  closeSearchResults(): void {
-    this.showSearchResults = false;
-    this.searchQuery = '';
   }
 
   /**

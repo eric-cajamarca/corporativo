@@ -20,20 +20,25 @@
       </button>
     </div>
 
+    <div *ngIf="load_compras" class="card-body text-center py-4 text-muted">
+      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      Cargando compras…
+    </div>
+
     <!-- Mensaje cuando no hay compras -->
-    <ng-container *ngIf="compras_const.length === 0">
+    <ng-container *ngIf="!load_compras && totalCompras === 0">
       <div class="card-body">
         <div class="alert alert-warning d-flex align-items-center mb-0">
           <i class="bi bi-exclamation-triangle-fill me-3 fs-5"></i>
           <div>
-            <p class="mb-0 fw-medium">No tienes compras realizadas</p>
+            <p class="mb-0 fw-medium">No hay compras que coincidan con los filtros.</p>
           </div>
         </div>
       </div>
     </ng-container>
 
     <!-- Contenido cuando hay compras -->
-    <ng-container *ngIf="compras_const.length > 0">
+    <ng-container *ngIf="!load_compras && totalCompras > 0">
       <div class="card-body border-bottom">
         <div class="row align-items-end mb-2">
           <div class="col-12 d-flex flex-wrap gap-2">
@@ -290,7 +295,7 @@
     </ng-container>
 
     <!-- Paginación -->
-    <div class="card-footer bg-white" *ngIf="compras.length > 0">
+    <div class="card-footer bg-white" *ngIf="!load_compras && totalCompras > pageSize">
       <ngb-pagination [(page)]="page"
                       [pageSize]="pageSize"
                       [collectionSize]="totalCompras"

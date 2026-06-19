@@ -123,8 +123,8 @@ function ensamblarSecciones(secciones) {
 function planPermiteComprasSunatMenu(deploymentMode, planCodeEfectivo) {
   if (deploymentMode !== 'saas') return true;
   const p = String(planCodeEfectivo || '').toLowerCase().trim();
-  const orden = { demo: 1, emprendedor: 2, profesional: 3, empresarial: 4, enterprise: 5 };
-  return (orden[p] || 1) >= 2;
+  const orden = { demo: 1, basico: 2, emprendedor: 3, profesional: 4, empresarial: 5, enterprise: 6 };
+  return (orden[p] || 1) >= 3;
 }
 
 /** Rubro Grifo en BD: código `GRF` (tabla Rubros). */

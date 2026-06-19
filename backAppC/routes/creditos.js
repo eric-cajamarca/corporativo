@@ -13,6 +13,7 @@ router.get('/todos', creditosController.obtenerCreditosClienteTodos);  // GET /a
 router.get('/cliente', creditosController.obtenerCreditosClienteTodos);
 router.get('/cliente/:idCliente', creditosController.obtenerCreditosCliente);
 router.post('/', creditosController.crearCredito);
+router.post('/cobranza-masiva', creditosController.pagarCuotasMasivo);
 
 // Rutas para cuotas
 router.get('/:idCredito/cuotas', creditosController.obtenerCuotasCredito);

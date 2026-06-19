@@ -5,6 +5,18 @@ const sucursalRepository = require('../repositories/sucursal.repository');
 const permisosService = require('./permisos.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 const { idsSucursalesFiltroCatalogo } = require('../utils/sucursalUsuarioScope.util');
+const cache = require('../cache/redis.client');
+const { parseTtlSeconds } = require('../utils/cacheSkip.util');
+
+function buscarVentaCacheKey(user, term, limite, idSucursalVenta) {
+  const emp = String(user?.empresa || '').trim().toLowerCase();
+  const uid = String(user?.idUsuario || user?.id || '').trim().toLowerCase();
+  const rol = String(user?.rol || '').trim().toLowerCase();
+  const q = String(term || '').trim().toLowerCase();
+  const lim = Math.min(100, Math.max(1, parseInt(limite, 10) || 80));
+  const suc = idSucursalVenta ? String(idSucursalVenta).trim().toLowerCase() : 'all';
+  return `productos:buscar-venta:v1:${emp}:${uid}:${rol}:${q}:${lim}:${suc}`;
+}
 
 exports.obtenerProductosTodosService = async (pool, user) => {
   if (!user) {
@@ -68,7 +80,7 @@ exports.listarProductosPaginadoService = async (pool, user, query = {}) => {
 };
 
 /** Misma autorización y alcance multiempresa que el listado completo; búsqueda con límite para modal de ventas. */
-exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucursalVenta) => {
+exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucursalVenta, options = {}) => {
   if (!user) {
     throw new Error('NO_ACCESS');
   }
@@ -120,14 +132,25 @@ exports.buscarProductosVentaService = async (pool, user, termino, limite, idSucu
   }
 
   const lim = Math.min(100, Math.max(1, parseInt(limite, 10) || 80));
-  return ProductosRepository.buscarProductosVentaRepo(
-    pool,
-    idsEmpresa,
-    idsSucFiltro,
-    tokens,
-    lim,
-    idSucursalFiltro
-  );
+  const skipCache = options.skipCache === true;
+  const ttlSeconds = parseTtlSeconds('REDIS_BUSCAR_VENTA_TTL_SECONDS', 120, 30);
+
+  const fetchFn = () =>
+    ProductosRepository.buscarProductosVentaRepo(
+      pool,
+      idsEmpresa,
+      idsSucFiltro,
+      tokens,
+      lim,
+      idSucursalFiltro
+    );
+
+  if (skipCache) {
+    return fetchFn();
+  }
+
+  const cacheKey = buscarVentaCacheKey(user, term, lim, idSucursalFiltro);
+  return cache.getCached(cacheKey, fetchFn, ttlSeconds);
 };
 
 exports.obtenerProductosComprasService = async (pool, user) => {

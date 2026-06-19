@@ -43,13 +43,15 @@ DECLARE @m TABLE (planCode VARCHAR(30), modulo VARCHAR(64));
 INSERT INTO @m VALUES
 -- demo: sin Catálogos; Caja reducida en código (gestión + arqueo); sin despachos ni análisis
 ('demo','DASHBOARD'),('demo','EMPRESA'),('demo','VENTAS'),('demo','COMPRAS'),('demo','INVENTARIO'),('demo','PRODUCTOS'),('demo','CLIENTES'),('demo','FACTURACION'),('demo','CONFIGURACION'),('demo','CAJA'),
--- emprendedor: + caja (submenús se filtran en código), sin despachos/análisis/reportes/utilidades
+-- basico: operación esencial sin caja ni catálogos
+('basico','DASHBOARD'),('basico','EMPRESA'),('basico','VENTAS'),('basico','COMPRAS'),('basico','INVENTARIO'),('basico','PRODUCTOS'),('basico','CLIENTES'),('basico','FACTURACION'),('basico','CONFIGURACION'),
+-- emprendedor: + caja y catálogos; sin despachos/análisis/reportes/utilidades
 ('emprendedor','DASHBOARD'),('emprendedor','EMPRESA'),('emprendedor','VENTAS'),('emprendedor','COMPRAS'),('emprendedor','INVENTARIO'),('emprendedor','PRODUCTOS'),('emprendedor','CLIENTES'),('emprendedor','FACTURACION'),('emprendedor','CONFIGURACION'),('emprendedor','CATALOGOS'),('emprendedor','CAJA'),
--- profesional: + despachos, análisis, reportes
-('profesional','DASHBOARD'),('profesional','EMPRESA'),('profesional','VENTAS'),('profesional','COMPRAS'),('profesional','INVENTARIO'),('profesional','PRODUCTOS'),('profesional','CLIENTES'),('profesional','FACTURACION'),('profesional','CONFIGURACION'),('profesional','CATALOGOS'),('profesional','CAJA'),('profesional','DESPACHOS'),('profesional','ANALISIS'),('profesional','REPORTES'),
--- empresarial: + utilidades
+-- profesional: + despachos, análisis, reportes, utilidades
+('profesional','DASHBOARD'),('profesional','EMPRESA'),('profesional','VENTAS'),('profesional','COMPRAS'),('profesional','INVENTARIO'),('profesional','PRODUCTOS'),('profesional','CLIENTES'),('profesional','FACTURACION'),('profesional','CONFIGURACION'),('profesional','CATALOGOS'),('profesional','CAJA'),('profesional','DESPACHOS'),('profesional','ANALISIS'),('profesional','REPORTES'),('profesional','UTILIDADES'),
+-- empresarial (legado): mismo conjunto que profesional
 ('empresarial','DASHBOARD'),('empresarial','EMPRESA'),('empresarial','VENTAS'),('empresarial','COMPRAS'),('empresarial','INVENTARIO'),('empresarial','PRODUCTOS'),('empresarial','CLIENTES'),('empresarial','FACTURACION'),('empresarial','CONFIGURACION'),('empresarial','CATALOGOS'),('empresarial','CAJA'),('empresarial','DESPACHOS'),('empresarial','ANALISIS'),('empresarial','REPORTES'),('empresarial','UTILIDADES'),
--- enterprise: mismo conjunto que empresarial (el código trata enterprise como “todo” en Factiliza)
+-- enterprise: on-prem; gestores multi-empresa en código
 ('enterprise','DASHBOARD'),('enterprise','EMPRESA'),('enterprise','VENTAS'),('enterprise','COMPRAS'),('enterprise','INVENTARIO'),('enterprise','PRODUCTOS'),('enterprise','CLIENTES'),('enterprise','FACTURACION'),('enterprise','CONFIGURACION'),('enterprise','CATALOGOS'),('enterprise','CAJA'),('enterprise','DESPACHOS'),('enterprise','ANALISIS'),('enterprise','REPORTES'),('enterprise','UTILIDADES');
 
 MERGE dbo.SaasPlanModulo AS t
@@ -61,6 +63,7 @@ GO
 DECLARE @f TABLE (planCode VARCHAR(30), nombreServicio NVARCHAR(100));
 -- Todos los planes: SUNAT
 INSERT INTO @f SELECT 'demo', nombre FROM dbo.FactilizaConfig WHERE nombre = N'Factiliza SUNAT' AND estado = 1;
+INSERT INTO @f SELECT 'basico', nombre FROM dbo.FactilizaConfig WHERE nombre = N'Factiliza SUNAT' AND estado = 1;
 INSERT INTO @f SELECT 'emprendedor', nombre FROM dbo.FactilizaConfig WHERE nombre = N'Factiliza SUNAT' AND estado = 1;
 INSERT INTO @f SELECT 'profesional', nombre FROM dbo.FactilizaConfig WHERE nombre = N'Factiliza SUNAT' AND estado = 1;
 INSERT INTO @f SELECT 'empresarial', nombre FROM dbo.FactilizaConfig WHERE nombre = N'Factiliza SUNAT' AND estado = 1;

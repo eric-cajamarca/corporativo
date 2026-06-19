@@ -4,6 +4,7 @@ const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 const ProductosServices = require('../services/productos.service');
 const ProductosRepository = require('../repositories/productos.repository');
 const productosMutacionesService = require('../services/productosMutaciones.service');
+const { shouldSkipRedisCache } = require('../utils/cacheSkip.util');
 
 const obtener_productos_todos = async (req, res) => {
   try {
@@ -47,7 +48,14 @@ const buscar_productos_venta = async (req, res) => {
     const idSucursal = req.query && req.query.idSucursal != null ? String(req.query.idSucursal).trim() : null;
 
     const productos = await withPool(async (pool) =>
-      ProductosServices.buscarProductosVentaService(pool, req.user, q, limit, idSucursal)
+      ProductosServices.buscarProductosVentaService(
+        pool,
+        req.user,
+        q,
+        limit,
+        idSucursal,
+        { skipCache: shouldSkipRedisCache(req.query) }
+      )
     );
 
     res.status(200).send({ data: productos });
