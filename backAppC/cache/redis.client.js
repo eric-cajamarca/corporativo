@@ -90,10 +90,20 @@ async function getCached(key, fetchFn, ttlSeconds) {
   return value;
 }
 
+async function del(key) {
+  if (!client) return;
+  try {
+    await client.del(key);
+  } catch (err) {
+    console.error("Redis del:", err.message);
+  }
+}
+
 module.exports = {
   get,
   set,
   getCached,
+  del,
   get client() {
     return client;
   }

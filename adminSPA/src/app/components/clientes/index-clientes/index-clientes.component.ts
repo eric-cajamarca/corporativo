@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, Output } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { ClienteService } from '../../../services/cliente.service';
 import { ClienteEditarModalService } from '../../../services/cliente-editar-modal.service';
@@ -9,8 +9,12 @@ import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
+import { filtrarClientesCatalogo } from '../../../utils/cliente-busqueda.util';
 
 declare var iziToast: any;
+
+type ModoBusquedaClientes = 'inicial' | 'redis' | 'sql';
+
 @Component({
   selector: 'app-index-clientes',
   standalone: true,
@@ -18,14 +22,15 @@ declare var iziToast: any;
   templateUrl: './index-clientes.component.html',
   styleUrl: './index-clientes.component.css'
 })
-export class IndexClientesComponent {
-  @Input() modoSelector = false;   // true  → dentro de modal (sin sidebar)
+export class IndexClientesComponent implements OnDestroy {
+  @Input() modoSelector = false;
   @Output() clienteElegido: EventEmitter<any> = new EventEmitter<any>();
 
   public clientes: Array<any> = [];
-  public token: any = "";
+  /** Catálogo completo cargado desde índice Redis (GET /clientes). */
+  private clientesCatalogo: Array<any> = [];
+  public token: any = '';
 
-   // Configuración de paginación
   public page = 1;
   public pageSize = 10;
   totalClientes = 0;
@@ -34,7 +39,13 @@ export class IndexClientesComponent {
   public boundaryLinks = true;
 
   public filtro = '';
- public load_estado = false;
+  public load_estado = false;
+  public cargandoCatalogo = false;
+  public modoBusqueda: ModoBusquedaClientes = 'inicial';
+
+  private readonly minCharsRedis = 3;
+  private filtroDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private cargaSeq = 0;
 
   constructor(
     private _adminService: AdminService,
@@ -44,29 +55,94 @@ export class IndexClientesComponent {
   ) {}
 
   abrirEditarClienteModal(idCliente: string | number): void {
-    this.clienteEditarModal.abrir(idCliente).then(() => this.init_data());
+    this.clienteEditarModal.abrir(idCliente).then(() => this.recargarListado());
   }
-
-
-
 
   ngOnInit(): void {
-
-    this.init_data();
-
-
-
+    this.cargarCatalogoRedis(() => {
+      const term = (this.filtro || '').trim();
+      if (term.length >= this.minCharsRedis) {
+        return;
+      }
+      if (this.modoSelector) {
+        this.mostrarVistaInicialCatalogo();
+      } else {
+        this.init_data(1);
+      }
+    });
   }
 
-  init_data(pagina = 1) {
+  ngOnDestroy(): void {
+    if (this.filtroDebounceTimer != null) {
+      clearTimeout(this.filtroDebounceTimer);
+    }
+  }
+
+  private recargarListado(): void {
+    this._clientesService.invalidarCacheClientes();
+    this.cargarCatalogoRedis(() => {
+      const term = (this.filtro || '').trim();
+      if (term.length >= this.minCharsRedis && this.modoBusqueda === 'redis') {
+        this.aplicarFiltroRedis(term);
+      } else if (this.modoBusqueda === 'sql') {
+        this.init_data(this.page, { evitarCache: true, forzar: true });
+      } else if (this.modoSelector) {
+        this.mostrarVistaInicialCatalogo();
+      } else {
+        this.init_data(this.page);
+      }
+    });
+  }
+
+  /** Carga índice completo de clientes (backend Redis → SQL si miss). */
+  private cargarCatalogoRedis(alFinalizar?: () => void): void {
+    this.cargandoCatalogo = true;
+    this._clientesService.obtener_clientes().subscribe({
+      next: (response) => {
+        this.clientesCatalogo = Array.isArray(response?.data) ? response.data : [];
+        this.cargandoCatalogo = false;
+        const term = (this.filtro || '').trim();
+        if (term.length >= this.minCharsRedis) {
+          this.aplicarFiltroRedis(term);
+        }
+        alFinalizar?.();
+      },
+      error: () => {
+        this.clientesCatalogo = [];
+        this.cargandoCatalogo = false;
+        alFinalizar?.();
+      }
+    });
+  }
+
+  private mostrarVistaInicialCatalogo(): void {
+    this.modoBusqueda = 'inicial';
+    this.page = 1;
+    this.clientes = this.clientesCatalogo.slice(0, this.pageSize);
+    this.totalClientes = this.clientesCatalogo.length;
+  }
+
+  /** Carga paginada directa en SQL Server (botón Buscar o paginación). */
+  init_data(pagina = 1, opciones?: { evitarCache?: boolean; forzar?: boolean }) {
+    const term = (this.filtro || '').trim();
+    if (!opciones?.forzar && term.length >= this.minCharsRedis && this.modoBusqueda === 'redis') {
+      return;
+    }
+
+    const seq = ++this.cargaSeq;
     this.load_estado = true;
+    this.modoBusqueda = 'sql';
     this.page = pagina;
     this._clientesService.obtenerClientesPaginado({
       pagina,
       porPagina: this.pageSize,
-      buscar: (this.filtro || '').trim() || undefined
-    }).subscribe(
-      response => {
+      buscar: term || undefined,
+      evitarCache: opciones?.evitarCache === true
+    }).subscribe({
+      next: (response) => {
+        if (seq !== this.cargaSeq) {
+          return;
+        }
         if (response.data == undefined) {
           iziToast.show({
             title: 'ERROR',
@@ -83,79 +159,99 @@ export class IndexClientesComponent {
           this.load_estado = false;
         }
       },
-      error => {
-        this.load_estado = false;
+      error: () => {
+        if (seq === this.cargaSeq) {
+          this.load_estado = false;
+        }
       }
-    );
+    });
   }
 
-  filtrar() {
-    this.init_data(1);
+  /** Botón Buscar: consulta SQL Server (sin caché Redis). */
+  filtrar(): void {
+    this.cargaSeq++;
+    this.init_data(1, { evitarCache: true, forzar: true });
+  }
+
+  /** Al escribir: desde la 3.ª letra filtra el catálogo Redis en memoria. */
+  onFiltroInput(): void {
+    if (this.filtroDebounceTimer != null) {
+      clearTimeout(this.filtroDebounceTimer);
+    }
+    const term = (this.filtro || '').trim();
+    if (term.length < this.minCharsRedis) {
+      if (!term) {
+        this.cargaSeq++;
+        if (this.modoSelector) {
+          this.mostrarVistaInicialCatalogo();
+        } else {
+          this.init_data(1);
+        }
+      }
+      return;
+    }
+    this.filtroDebounceTimer = setTimeout(() => this.aplicarFiltroRedis(term), 250);
+  }
+
+  private aplicarFiltroRedis(term: string): void {
+    this.cargaSeq++;
+    this.modoBusqueda = 'redis';
+    this.page = 1;
+    const filtrados = filtrarClientesCatalogo(this.clientesCatalogo, term, 50) as Array<any>;
+    this.clientes = filtrados;
+    this.totalClientes = filtrados.length;
   }
 
   onPageChange(pagina: number): void {
-    this.init_data(pagina);
+    if (this.modoBusqueda === 'sql') {
+      this.init_data(pagina, { evitarCache: true, forzar: true });
+    }
   }
 
-  //aqui se hace el cambio del estado habido y no habido
-  // set_state(id: any, condicion: any) {
-  //   console.log($);
-  //   console.log('id', id);
-  //   console.log('condicion', condicion);
-  //   this.load_estado = true;
-  //   this._clientesService.cambiar_estado_clientes(id, { condicion: condicion }, ).subscribe(
-  //     response => {
-  //       this.load_estado = false;
-  //       //quiero cerrar el modal usando jquery sabiendo que el id="delete-{{item.id}}"
+  get mostrarPaginacion(): boolean {
+    return this.modoBusqueda === 'sql' && this.totalClientes > this.pageSize;
+  }
 
-  //       $('body').removeClass('modal-open');
-  //       $('.modal-backdrop').remove();
-  //       //habilitar el scroll en el body en el componente
-  //       $('body').css('overflow-y', 'auto');
+  get mostrarAvisoRedis(): boolean {
+    const term = (this.filtro || '').trim();
+    return term.length > 0 && term.length < this.minCharsRedis;
+  }
 
+  get mostrarSinResultadosRedis(): boolean {
+    const term = (this.filtro || '').trim();
+    return (
+      this.modoBusqueda === 'redis' &&
+      term.length >= this.minCharsRedis &&
+      !this.cargandoCatalogo &&
+      this.clientes.length === 0
+    );
+  }
 
-  //        this.init_data();
-  //     }
-  //   );
+  get tablaConOpacidad(): boolean {
+    return this.load_estado || this.cargandoCatalogo;
+  }
 
-
-  //aqui hago el cambio de estado de activo o inactivo
   set_state(id: any, estado: any) {
-
-            this.load_estado = true;
-    this._clientesService.cambiar_estado_clientes(id, { estado: estado } ).subscribe(
-      response => {
+    this.load_estado = true;
+    this._clientesService.cambiar_estado_clientes(id, { estado: estado }).subscribe({
+      next: (response) => {
         if (response.data != undefined) {
           this.load_estado = false;
-
-          this.init_data();
-          //quiero cerrar el modal usando jquery sabiendo que el id="delete-{{item.id}}"
-
-          // $('body').removeClass('modal-open');
-          // $('.modal-backdrop').remove();
-          // //habilitar el scroll en el body en el componente
-          // $('body').css('overflow-y', 'auto');
+          this.recargarListado();
         }
-        
       },
-      error=>{
-              }
-    );
-    
-
+      error: () => {}
+    });
   }
 
   eliminar(id: any) {
-
-    
     this.load_estado = true;
-    this._clientesService.eliminar_direccionCliente(id).subscribe(
-      response => {
-              }
-    )
+    this._clientesService.eliminar_direccionCliente(id).subscribe({
+      next: () => {}
+    });
 
-    this._clientesService.eliminar_cliente(id).subscribe(
-      response => {
+    this._clientesService.eliminar_cliente(id).subscribe({
+      next: (response) => {
         this.load_estado = false;
         if (response.data != undefined) {
           iziToast.show({
@@ -166,26 +262,13 @@ export class IndexClientesComponent {
             position: 'topRight',
             message: 'Cliente eliminado correctamente'
           });
-
-          // $('body').removeClass('modal-open');
-          // $('.modal-backdrop').remove();
-          // //habilitar el scroll en el body en el componente
-          // $('body').css('overflow-y', 'auto');
-
-
-          this.init_data();
+          this.recargarListado();
         }
-        //quiero cerrar el modal usando jquery sabiendo que el id="delete-{{item.id}}"
-
-
       }
-    );
-
-
-
+    });
   }
 
   elegir(cliente: any): void {
     this.clienteElegido.emit(cliente);
-      }
+  }
 }

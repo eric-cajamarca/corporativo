@@ -47,16 +47,30 @@ export class ClienteService {
     pagina?: number;
     porPagina?: number;
     buscar?: string;
+    evitarCache?: boolean;
   }): Observable<{ data: unknown[]; total: number }> {
     let q = new HttpParams();
     if (params.pagina != null) q = q.set('pagina', String(params.pagina));
     if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
     if (params.buscar) q = q.set('buscar', params.buscar);
+    if (params.evitarCache) q = q.set('evitarCache', '1');
     const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
     return this._http.get<{ data: unknown[]; total: number }>(this.url + 'clientes', {
       headers,
       withCredentials: true,
       params: q
+    });
+  }
+
+  /** Búsqueda rápida en índice Redis (mínimo 3 caracteres). */
+  buscarClientesRapido(q: string, limit = 50): Observable<{ data: unknown[]; total: number }> {
+    const term = String(q || '').trim();
+    let params = new HttpParams().set('q', term).set('limit', String(limit));
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json', 'Authorization': '' });
+    return this._http.get<{ data: unknown[]; total: number }>(this.url + 'clientes/buscar', {
+      headers,
+      withCredentials: true,
+      params
     });
   }
 

@@ -4,6 +4,7 @@ var clientesController = require('../controllers/clientesController');
 var auth  = require('../middlewares/autenticate');
 
 // Rutas para el CRUD de clientes
+api.get('/clientes/buscar', auth.auth, clientesController.buscarClientesRapido);
 api.get('/clientes',auth.auth, clientesController.listarClientes);
 api.get('/clientesruc/:id',auth.auth, clientesController.listarClientes_ruc);
 api.get('/clientes/:id',auth.auth, clientesController.listarClientes_id);

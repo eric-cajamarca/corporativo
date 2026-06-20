@@ -16,12 +16,40 @@
         </div>
       </ng-container>
 
-      <div *ngIf="load_estado" class="text-center py-3 text-muted">
+      <div class="row mb-3">
+        <div class="col-12">
+          <div class="input-group">
+            <input type="text" class="form-control" placeholder="Buscador general" name="filtroClientes"
+              [(ngModel)]="filtro" (input)="onFiltroInput()">
+            <button type="button" class="btn btn-primary" (click)="filtrar()" [disabled]="load_estado">
+              <span *ngIf="load_estado" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+              Buscar
+            </button>
+          </div>
+          <small class="text-muted" *ngIf="mostrarAvisoRedis">
+            Ingrese al menos 3 caracteres para búsqueda rápida. Si no aparece, use <strong>Buscar</strong> para consultar en SQL Server.
+          </small>
+        </div>
+      </div>
+
+      <div *ngIf="(load_estado || cargandoCatalogo) && clientes.length === 0" class="text-center py-3 text-muted">
         <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
         Cargando clientes…
       </div>
 
-      <ng-container *ngIf="!load_estado && totalClientes === 0">
+      <ng-container *ngIf="mostrarSinResultadosRedis">
+        <div class="row">
+          <div class="col-12">
+            <div class="alert alert-warning mb-0" role="alert">
+              <div class="alert-text">
+                <p class="mb-0">No hay coincidencias en caché. Pulse <strong>Buscar</strong> para consultar en SQL Server.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="!load_estado && !mostrarSinResultadosRedis && totalClientes === 0 && clientes.length === 0 && !mostrarAvisoRedis">
         <div class="row">
           <div class="col-12">
             <div class="alert alert-warning mb-0" role="alert">
@@ -33,21 +61,8 @@
         </div>
       </ng-container>
 
-      <ng-container *ngIf="!load_estado && totalClientes > 0">
-        
-        <div class="row">
-          <div class="col-12">
-            <div class="input-group">
-              <input type="text" class="form-control" placeholder="Buscador general" name="filtro"
-                [(ngModel)]="filtro" (input)="filtrar()">
-              <button type="button" class="btn btn-primary" (click)="filtrar()">
-                Buscar
-              </button>
-            </div>
-          </div>
-        </div>
-        <hr>
-        <div class="table-responsive">
+      <ng-container *ngIf="clientes.length > 0">
+        <div class="table-responsive" [class.opacity-50]="tablaConOpacidad">
         <table class="table table-hover table-clientes-responsive">
           <thead>
             <tr>
@@ -73,32 +88,6 @@
                 <span class="badge bg-danger" *ngIf="item.estado === false">Inactivo</span>
               </td>
               <td data-label="Acciones" (click)="$event.stopPropagation()" *ngIf="!modoSelector">
-                <!-- <a class="btn btn-outline-primary btn-sm" routerLink="/clientes/editar">Editar</a>
-                            <a class="btn btn-outline-danger btn-sm" style="margin-left: 10px;">Eliminar</a> -->
-
-                <!-- <div class="btn-group">
-                  <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown"
-                    aria-expanded="false">
-                    Opciones
-                  </button>
-                  <ul class="dropdown-menu">
-                    <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.estado === true"
-                      data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idCliente">
-                      <i class="icon-1x text-dark-50 flaticon2-cross"></i> &nbsp; Desactivar
-                    </a>
-                    <a style="cursor: pointer;" class="dropdown-item" *ngIf="item.estado === false"
-                      data-bs-toggle="modal" [attr.data-bs-target]="'#update-'+item.idCliente">
-                      <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Activar
-                    </a>
-                    <a class="dropdown-item" [routerLink]="['/cliente',item.idCliente]">
-                      <i class="icon-1x text-dark-50 flaticon-edit"></i> &nbsp; Editar
-                    </a>
-                    <a style="cursor: pointer;" class="dropdown-item" data-bs-toggle="modal"
-                      [attr.data-bs-target]="'#delete-'+item.idCliente">
-                      <i class="icon-1x text-dark-50 flaticon2-check-mark"></i> &nbsp; Eliminar
-                    </a>
-                  </ul>
-                </div> -->
                 
                 <div class="btn-group" >
                   <button type="button" class="btn btn-primary btn-sm dropdown-toggle"
@@ -113,10 +102,6 @@
                           [attr.data-bs-target]="'#delete-'+item.idCliente">Eliminar</a></li>
                   </ul>
                 </div>
-
-                
-
-
 
                 <div class="modal fade" id="update-{{item.idCliente}}" tabindex="-1" role="dialog"
                   aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -187,7 +172,7 @@
 
     </div>
     <ngb-pagination
-          *ngIf="!load_estado && totalClientes > pageSize"
+          *ngIf="mostrarPaginacion"
           [(page)]="page"
           [pageSize]="pageSize"
           [collectionSize]="totalClientes"
@@ -195,7 +180,6 @@
           [maxSize]="maxSize"
           [rotate]="rotate"
           [boundaryLinks]="boundaryLinks"
-          (pageChange)="onPageChange($event)"
           aria-label="Paginación de clientes"
           class="d-flex justify-content-center my-4">
         </ngb-pagination>

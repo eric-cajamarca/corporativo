@@ -2221,60 +2221,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
               dv.cantEntregada, dv.idEstadoPedido, dv.costoUnitario, dv.costoTotal
             FROM DetalleVenta dv WHERE dv.idVenta = @idVenta
           `);
-        const agg = await transaction
-          .request()
-          .input('idVA', sql.UniqueIdentifier, idVA)
-          .query(`
-            SELECT
-              ISNULL(SUM(subtotal), 0) AS sSub,
-              ISNULL(SUM(igv), 0) AS sIgv,
-              ISNULL(SUM(descuentos), 0) AS sDesc,
-              ISNULL(SUM(total), 0) AS sTot
-            FROM VentaEmpresa
-            WHERE idVentaAgrupada = @idVA AND ISNULL(eliminado, 0) = 0
-          `);
-        const ar = agg.recordset && agg.recordset[0];
-        if (ar) {
-          await transaction
-            .request()
-            .input('idVA', sql.UniqueIdentifier, idVA)
-            .input('subtotal', sql.Decimal(18, 2), Number(ar.sSub) || 0)
-            .input('igv', sql.Decimal(18, 2), Number(ar.sIgv) || 0)
-            .input('descuentos', sql.Decimal(18, 2), Number(ar.sDesc) || 0)
-            .input('total', sql.Decimal(18, 2), Number(ar.sTot) || 0)
-            .query(`
-              UPDATE VentaAgrupada SET subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total
-              WHERE idVentaAgrupada = @idVA
-            `);
-        }
-        await transaction
-          .request()
-          .input('idVA', sql.UniqueIdentifier, idVA)
-          .query(`DELETE FROM DetalleVentaAgrupada WHERE idVentaAgrupada = @idVA`);
-        await transaction
-          .request()
-          .input('idVA', sql.UniqueIdentifier, idVA)
-          .query(`
-            INSERT INTO DetalleVentaAgrupada (
-              idVentaAgrupada, idProducto, idEmpresaProducto, aliasEmpresa, sucursal,
-              cantidad, pVenta, descuento, subtotal, igv, total, descripcionProducto, codigoProducto
-            )
-            SELECT
-              @idVA,
-              dv.idProducto,
-              ve.idEmpresa,
-              NULL,
-              ISNULL(LTRIM(RTRIM(s.nombre)), ''),
-              dv.cantidad, dv.pVenta, ISNULL(dv.descuento, 0), dv.subtotal, dv.igv, dv.total,
-              p.descripcion,
-              p.codigo
-            FROM VentaEmpresa ve
-            INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
-            INNER JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
-            INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = ve.idEmpresa
-            LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = ve.idEmpresa
-            WHERE ve.idVentaAgrupada = @idVA AND ISNULL(ve.eliminado, 0) = 0
-          `);
+        await recalcularVentaAgrupadaDesdeHijas(transaction, idVA);
       }
     }
 
@@ -2480,7 +2427,7 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresaOLista, idUsuarioEjecut
     const inEmp = bindUniqueIdentifiersIn(reqV, idsEmpresa, 'anuEmp');
     const ventaRow = await reqV.query(`
         SELECT v.idEmpresa, v.idVenta, v.idEstadoSunat, v.idSucursal, v.compVenta, v.idComprobante, v.idUsuario,
-          ISNULL(v.eliminado, 0) AS eliminado,
+          ISNULL(v.eliminado, 0) AS eliminado, v.idVentaAgrupada,
           UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) AS codigoComprobante
         FROM Ventas v
         LEFT JOIN Comprobantes c ON c.idComprobante = v.idComprobante AND c.idEmpresa = v.idEmpresa
@@ -2549,13 +2496,158 @@ exports.anularVentaRepo = async (pool, idVenta, idEmpresaOLista, idUsuarioEjecut
         DELETE FROM DetallePagoVenta WHERE idVenta = @idVenta;
         UPDATE Ventas SET eliminado = 1 WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa
       `);
+
+    const idVentaAgrupada = venta.idVentaAgrupada;
+    if (idVentaAgrupada) {
+      await transaction
+        .request()
+        .input('idVenta', sql.Int, idVenta)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          UPDATE VentaEmpresa SET eliminado = 1
+          WHERE idVenta = @idVenta AND idEmpresa = @idEmpresa AND ISNULL(eliminado, 0) = 0
+        `);
+      const syncVa = await recalcularVentaAgrupadaDesdeHijas(transaction, idVentaAgrupada);
+      const idUsuarioLog = venta.idUsuario || idUsuarioEjecutor;
+      if (idUsuarioLog) {
+        await exports.insertarVentaAgrupadaLog(transaction, {
+          idVentaAgrupada,
+          evento: syncVa.eliminada ? 'ANULACION_VA' : 'ANULACION_HIJA',
+          compVA: syncVa.compVA,
+          totalVA: syncVa.totalVA,
+          sumaVentasHijas: syncVa.sumaVentasHijas,
+          idUsuario: idUsuarioLog,
+          detalle: syncVa.eliminada
+            ? `Venta agrupada anulada tras anular comprobante ${venta.compVenta || idVenta}`
+            : `Comprobante anulado: ${venta.compVenta || idVenta}`
+        });
+      }
+    }
+
     await transaction.commit();
-    return { ok: true };
+    return { ok: true, compVenta: venta.compVenta || null, idVentaAgrupada: idVentaAgrupada || null };
   } catch (err) {
     await transaction.rollback();
     throw err;
   }
 };
+
+/**
+ * Recalcula totales y detalle de VentaAgrupada desde VentaEmpresa activas.
+ * Si no quedan hijas activas, marca la VA como eliminada.
+ * @returns {{ eliminada: boolean, compVA?: string, totalVA?: number, sumaVentasHijas?: number }}
+ */
+async function recalcularVentaAgrupadaDesdeHijas(transaction, idVentaAgrupada) {
+  const idVA = idVentaAgrupada;
+  const vaRow = await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVA)
+    .query(`
+      SELECT ISNULL(compVenta, '') AS compVA, ISNULL(total, 0) AS totalVA
+      FROM VentaAgrupada WHERE idVentaAgrupada = @idVA
+    `);
+  const vaInfo = vaRow.recordset && vaRow.recordset[0];
+
+  const countRs = await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVA)
+    .query(`
+      SELECT COUNT(*) AS n FROM VentaEmpresa
+      WHERE idVentaAgrupada = @idVA AND ISNULL(eliminado, 0) = 0
+    `);
+  const activas = Number((countRs.recordset[0] || {}).n) || 0;
+
+  if (activas === 0) {
+    await transaction
+      .request()
+      .input('idVA', sql.UniqueIdentifier, idVA)
+      .query(`
+        UPDATE VentaAgrupada
+        SET eliminado = 1, subtotal = 0, igv = 0, descuentos = 0, total = 0
+        WHERE idVentaAgrupada = @idVA
+      `);
+    await transaction
+      .request()
+      .input('idVA', sql.UniqueIdentifier, idVA)
+      .query(`DELETE FROM DetalleVentaAgrupada WHERE idVentaAgrupada = @idVA`);
+    return {
+      eliminada: true,
+      compVA: vaInfo ? String(vaInfo.compVA || '').trim() : '',
+      totalVA: 0,
+      sumaVentasHijas: 0
+    };
+  }
+
+  const agg = await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVA)
+    .query(`
+      SELECT
+        ISNULL(SUM(subtotal), 0) AS sSub,
+        ISNULL(SUM(igv), 0) AS sIgv,
+        ISNULL(SUM(descuentos), 0) AS sDesc,
+        ISNULL(SUM(total), 0) AS sTot
+      FROM VentaEmpresa
+      WHERE idVentaAgrupada = @idVA AND ISNULL(eliminado, 0) = 0
+    `);
+  const ar = agg.recordset && agg.recordset[0];
+  const sSub = Number(ar?.sSub) || 0;
+  const sIgv = Number(ar?.sIgv) || 0;
+  const sDesc = Number(ar?.sDesc) || 0;
+  const sTot = Number(ar?.sTot) || 0;
+
+  await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVA)
+    .input('subtotal', sql.Decimal(18, 2), sSub)
+    .input('igv', sql.Decimal(18, 2), sIgv)
+    .input('descuentos', sql.Decimal(18, 2), sDesc)
+    .input('total', sql.Decimal(18, 2), sTot)
+    .query(`
+      UPDATE VentaAgrupada
+      SET subtotal = @subtotal, igv = @igv, descuentos = @descuentos, total = @total, eliminado = 0
+      WHERE idVentaAgrupada = @idVA
+    `);
+
+  await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVA)
+    .query(`DELETE FROM DetalleVentaAgrupada WHERE idVentaAgrupada = @idVA`);
+
+  await transaction
+    .request()
+    .input('idVA', sql.UniqueIdentifier, idVA)
+    .query(`
+      INSERT INTO DetalleVentaAgrupada (
+        idVentaAgrupada, idProducto, idEmpresaProducto, aliasEmpresa, sucursal,
+        cantidad, pVenta, descuento, subtotal, igv, total, descripcionProducto, codigoProducto
+      )
+      SELECT
+        @idVA,
+        dv.idProducto,
+        ve.idEmpresa,
+        NULL,
+        ISNULL(LTRIM(RTRIM(s.nombre)), ''),
+        dv.cantidad, dv.pVenta, ISNULL(dv.descuento, 0), dv.subtotal, dv.igv, dv.total,
+        p.descripcion,
+        p.codigo
+      FROM VentaEmpresa ve
+      INNER JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
+      INNER JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
+      INNER JOIN Productos p ON p.idProducto = dv.idProducto AND p.idEmpresa = ve.idEmpresa
+      LEFT JOIN Sucursal s ON s.idSucursal = v.idSucursal AND s.idEmpresa = ve.idEmpresa
+      WHERE ve.idVentaAgrupada = @idVA
+        AND ISNULL(ve.eliminado, 0) = 0
+        AND ISNULL(v.eliminado, 0) = 0
+    `);
+
+  return {
+    eliminada: false,
+    compVA: vaInfo ? String(vaInfo.compVA || '').trim() : '',
+    totalVA: sTot,
+    sumaVentasHijas: sTot
+  };
+}
 
 /** Actualiza estado de pago de una venta (ej: 2 = Pagado). */
 exports.actualizarEstadoPagoVenta = async (transaction, idVenta, idEmpresa, idEstadoPago) => {
@@ -2982,6 +3074,8 @@ exports.listarVentasEmpresaPorAgrupada = async (transaction, idVentaAgrupada) =>
       LEFT JOIN Ventas v ON v.idVenta = ve.idVenta AND v.idEmpresa = ve.idEmpresa
       LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
       WHERE ve.idVentaAgrupada = @idVentaAgrupada
+        AND ISNULL(ve.eliminado, 0) = 0
+        AND ISNULL(v.eliminado, 0) = 0
       ORDER BY ve.fEmision ASC, ve.idVenta ASC
     `);
   return result.recordset || [];
@@ -3011,6 +3105,8 @@ exports.listarComprobantesPorAgrupada = async (pool, idEmpresaCobradora, idVenta
       LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
       WHERE ve.idVentaAgrupada = @idVentaAgrupada
         AND va.idEmpresaCobradora = @idEmpresaCobradora
+        AND ISNULL(ve.eliminado, 0) = 0
+        AND ISNULL(va.eliminado, 0) = 0
       ORDER BY ve.fEmision ASC
     `);
   return result.recordset || [];

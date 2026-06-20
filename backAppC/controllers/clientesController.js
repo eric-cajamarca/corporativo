@@ -47,6 +47,25 @@ const listarClientes = async function (req, res) {
   }
 };
 
+const buscarClientesRapido = async function (req, res) {
+  if (!req.user) {
+    return res.status(401).send({ message: 'No Access' });
+  }
+  try {
+    const result = await withPool((pool) => clientesService.buscarClientesRapido(pool, req.user, req.query || {}));
+    return res.status(200).send({ data: result.rows, total: result.total, origen: 'redis' });
+  } catch (err) {
+    if (err.code === 'TERMINO_CORTO') {
+      return res.status(400).send({ message: 'Ingrese al menos 3 caracteres para la búsqueda rápida', data: undefined });
+    }
+    if ((err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS') || err.message === 'NO_EMPRESA') {
+      return res.status(403).send({ message: (err.message === 'NO_PERM' || err.message === 'NO_PERMISSIONS') ? 'No tiene permisos para realizar esta acción' : 'No autorizado: falta empresa en token' });
+    }
+    console.error('buscarClientesRapido:', err);
+    res.status(500).send({ message: err.message, data: undefined });
+  }
+};
+
 const listarClientes_ruc = async function (req, res) {
   const ruc = req.params.id;
   if (!req.user || !(req.user.empresa || req.user.idEmpresa)) {
@@ -139,6 +158,7 @@ const cambiarEstadoCliente = async function (req, res) {
 module.exports = {
   crearCliente,
   listarClientes,
+  buscarClientesRapido,
   actualizarCliente,
   eliminarCliente,
   listarClientes_ruc,
