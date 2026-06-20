@@ -45,7 +45,7 @@
             <div class="card-body">
               <h2 class="h5 card-title">Uso del plan</h2>
               <p class="small text-muted mb-2">
-                Usuarios, sucursales, direcciones y —en modo SaaS— comprobantes SUNAT aceptados frente a los límites del plan.
+                Mismo sistema en todos los planes; aquí ve el consumo frente a los límites de su contrato.
               </p>
               <div class="mb-3">
                 <div class="d-flex justify-content-between small">
@@ -55,13 +55,15 @@
                 <div class="progress" style="height: 8px">
                   <div
                     class="progress-bar"
-                    [class.bg-danger]="lim.excedeUsuarios"
+                    [ngClass]="claseBarraUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios, lim.excedeUsuarios)"
                     role="progressbar"
                     [style.width.%]="pctUso(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)"
                   ></div>
                 </div>
                 @if (lim.excedeUsuarios) {
                   <div class="text-danger small mt-1">Supera el límite de usuarios del plan.</div>
+                } @else if (avisoUso80(lim.usuariosOcupados ?? lim.usuariosActivos, lim.maxUsuarios)) {
+                  <div class="text-warning small mt-1">Ha consumido más del 80% de usuarios del plan.</div>
                 }
               </div>
               <div class="mb-3">
@@ -72,15 +74,38 @@
                 <div class="progress" style="height: 8px">
                   <div
                     class="progress-bar"
-                    [class.bg-danger]="lim.excedeSucursales"
+                    [ngClass]="claseBarraUso(lim.sucursales, lim.maxSucursales, lim.excedeSucursales)"
                     role="progressbar"
                     [style.width.%]="pctUso(lim.sucursales, lim.maxSucursales)"
                   ></div>
                 </div>
                 @if (lim.excedeSucursales) {
                   <div class="text-danger small mt-1">Supera el límite de sucursales del plan.</div>
+                } @else if (avisoUso80(lim.sucursales, lim.maxSucursales)) {
+                  <div class="text-warning small mt-1">Ha consumido más del 80% de sucursales del plan.</div>
                 }
               </div>
+              @if (maxProductos(lim) > 0) {
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between small">
+                    <span>Productos activos</span>
+                    <span>{{ usadoProductos(lim) | number: '1.0-0' }} / {{ maxProductos(lim) | number: '1.0-0' }}</span>
+                  </div>
+                  <div class="progress" style="height: 8px">
+                    <div
+                      class="progress-bar"
+                      [ngClass]="claseBarraUso(usadoProductos(lim), maxProductos(lim), lim.excedeProductos)"
+                      role="progressbar"
+                      [style.width.%]="pctUso(usadoProductos(lim), maxProductos(lim))"
+                    ></div>
+                  </div>
+                  @if (lim.excedeProductos) {
+                    <div class="text-danger small mt-1">Supera el límite de productos del plan.</div>
+                  } @else if (avisoUso80(usadoProductos(lim), maxProductos(lim))) {
+                    <div class="text-warning small mt-1">Ha consumido más del 80% del catálogo de productos.</div>
+                  }
+                </div>
+              }
               <div>
                 <div class="d-flex justify-content-between small">
                   <span>Direcciones empresa</span>
@@ -89,7 +114,7 @@
                 <div class="progress" style="height: 8px">
                   <div
                     class="progress-bar"
-                    [class.bg-danger]="lim.excedeDirecciones"
+                    [ngClass]="claseBarraUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales, lim.excedeDirecciones)"
                     role="progressbar"
                     [style.width.%]="pctUso(lim.direccionesEmpresa ?? 0, lim.maxDireccionesEmpresa ?? lim.maxSucursales)"
                   ></div>
@@ -115,15 +140,13 @@
                     <div class="progress mt-1" style="height: 8px">
                       <div
                         class="progress-bar"
-                        [class.bg-danger]="lim.excedeComprobantesSunat"
+                        [ngClass]="claseBarraUso(usadoComprobantesSunat(lim), maxComprobantesSunat(lim), lim.excedeComprobantesSunat)"
                         role="progressbar"
                         [style.width.%]="pctUso(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))"
                       ></div>
                     </div>
                   }
-                  <p class="small text-muted mt-2 mb-2">
-                  </p>
-                  <div class="small mb-2">
+                  <div class="small mb-2 mt-2">
                     <span class="text-muted">Ventas con comprobante:</span>
                     @if (lim.puedeCrearVentaPorCuotaSunat !== false) {
                       <span class="text-success"> permitidas</span>
@@ -133,11 +156,10 @@
                   </div>
                   @if (lim.excedeComprobantesSunat) {
                     <div class="text-danger small mb-0">Supera el tope de comprobantes SUNAT del plan.</div>
-                  } @else if (maxComprobantesSunat(lim) > 0 && !lim.excedeComprobantesSunat) {
-                    @let restSunat = maxComprobantesSunat(lim) - usadoComprobantesSunat(lim);
-                    @if (restSunat > 0 && restSunat <= 10) {
-                      <div class="text-warning small mb-0">Quedan pocos cupos SUNAT ({{ restSunat | number: '1.0-0' }} restantes).</div>
-                    }
+                  } @else if (avisoUso80(usadoComprobantesSunat(lim), maxComprobantesSunat(lim))) {
+                    <div class="text-warning small mb-0">
+                      Ha consumido más del 80% de comprobantes SUNAT ({{ usadoComprobantesSunat(lim) }}/{{ maxComprobantesSunat(lim) }}).
+                    </div>
                   }
                 </div>
               }

@@ -1,5 +1,7 @@
 import { SuscripcionEmpresaRow } from './saas-public.model';
 
+import { AlertaPlanUso } from './alerta-plan.model';
+
 export interface PlanSuscripcionResumen {
   planCode: string;
   nombre: string;
@@ -11,6 +13,8 @@ export interface PlanSuscripcionResumen {
   maxSucursales: number;
   /** 0 = sin límite de comprobantes SUNAT aceptados por plan. */
   maxComprobantesSunatAceptados?: number;
+  maxProductosActivos?: number;
+  maxBotConversacionesSimultaneas?: number;
 }
 
 export interface LimitesUsoSuscripcion {
@@ -18,7 +22,11 @@ export interface LimitesUsoSuscripcion {
   maxSucursales: number;
   maxDireccionesEmpresa?: number;
   maxComprobantesSunatAceptados?: number;
+  maxProductosActivos?: number;
+  maxBotConversacionesSimultaneas?: number;
   comprobantesSunatAceptados?: number;
+  productosActivos?: number;
+  botConversacionesActivas?: number;
   usuariosActivos: number;
   /** Plazas de usuario (incluye colaboradores pendientes de activación). */
   usuariosOcupados?: number;
@@ -28,10 +36,14 @@ export interface LimitesUsoSuscripcion {
   excedeSucursales: boolean;
   excedeDirecciones?: boolean;
   excedeComprobantesSunat?: boolean;
+  excedeProductos?: boolean;
+  excedeBotConversaciones?: boolean;
   puedeCrearUsuario?: boolean;
   puedeCrearSucursal?: boolean;
   puedeAgregarDireccionEmpresa?: boolean;
+  puedeCrearProducto?: boolean;
   puedeCrearVentaPorCuotaSunat?: boolean;
+  alertasPlan?: AlertaPlanUso[];
 }
 
 /** Fila de SuscripcionCheckoutPendiente asociada a la empresa (cualquier plan: demo, emprendedor, etc.). */

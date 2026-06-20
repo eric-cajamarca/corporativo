@@ -54,7 +54,7 @@ export class AppBannerService {
           severity: 'info',
           message:
             'Está en plan demo: algunas funciones están limitadas. Puede actualizar su plan cuando lo necesite.',
-          link: '/cuenta/mi-suscripcion',
+          link: '/cuenta/suscripcion',
           linkLabel: 'Ver suscripción',
           dismissible: true,
           dismissKey: 'saas-plan-demo'
@@ -67,10 +67,37 @@ export class AppBannerService {
           severity: 'warning',
           message:
             'Ha alcanzado el tope de comprobantes SUNAT de su plan. Revise ventas no enviadas o considere ampliar el plan.',
-          link: '/cuenta/mi-suscripcion',
+          link: '/cuenta/suscripcion',
           linkLabel: 'Revisar plan',
           dismissible: true,
           dismissKey: 'tope-sunat-plan'
+        });
+      }
+
+      const alertas = estado?.limitesUso?.alertasPlan ?? [];
+      for (const a of alertas) {
+        if (a.nivel !== 'aviso') continue;
+        auto.push({
+          id: `plan-aviso-${a.clave}`,
+          severity: 'warning',
+          message: `Ha consumido el ${a.porcentaje}% de ${a.etiqueta} (${a.usado}/${a.maximo}). Considere actualizar su plan.`,
+          link: '/cuenta/suscripcion',
+          linkLabel: 'Ver uso',
+          dismissible: true,
+          dismissKey: `plan-aviso-${a.clave}`
+        });
+      }
+      for (const a of alertas) {
+        if (a.nivel !== 'critico') continue;
+        if (a.clave === 'sunat' && estado?.limitesUso?.excedeComprobantesSunat) continue;
+        auto.push({
+          id: `plan-critico-${a.clave}`,
+          severity: 'danger',
+          message: `Límite alcanzado: ${a.etiqueta} (${a.usado}/${a.maximo}). Actualice su plan para continuar.`,
+          link: '/cuenta/suscripcion',
+          linkLabel: 'Actualizar plan',
+          dismissible: true,
+          dismissKey: `plan-critico-${a.clave}`
         });
       }
 
@@ -82,7 +109,7 @@ export class AppBannerService {
           id: 'checkout-plan-pendiente',
           severity: 'warning',
           message: 'Tiene un pago de suscripción pendiente de confirmación.',
-          link: '/cuenta/mi-suscripcion',
+          link: '/cuenta/suscripcion',
           linkLabel: 'Ver estado',
           dismissible: true,
           dismissKey: `checkout-${ordenPendiente.orderNumber}`
@@ -99,7 +126,7 @@ export class AppBannerService {
               id: 'suscripcion-por-vencer',
               severity: 'warning',
               message: `Su suscripción vence en ${dias} día(s) (${this.formatoCorto(fin)}). Renueve para no perder servicio.`,
-              link: '/cuenta/mi-suscripcion',
+              link: '/cuenta/suscripcion',
               linkLabel: 'Renovar',
               dismissible: true,
               dismissKey: 'suscripcion-por-vencer'

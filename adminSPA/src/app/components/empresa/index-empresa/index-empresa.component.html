@@ -517,7 +517,10 @@
               <p class="mt-2 mb-0 text-muted">Cargando servicios y empresas...</p>
             </div>
           } @else if (serviciosApiData) {
-            <p class="text-muted small mb-3">Asigne qué servicios API (Factiliza) puede usar cada empresa. Solo el <strong>superAdmin de la plataforma</strong> (empresa principal) puede modificar esto.</p>
+            <p class="text-muted small mb-3">
+              Asigne qué servicios API (Factiliza) puede usar cada empresa. Solo el <strong>superAdmin de la plataforma</strong> (empresa principal) puede modificar esto.
+              En modo <strong>SaaS</strong>, los servicios se habilitan según el plan de cada empresa (<code>SaasPlanFactilizaServicio</code>); esta grilla aplica solo a despliegues <strong>enterprise</strong> o legado.
+            </p>
             <div class="table-responsive">
               <table class="table table-sm table-bordered">
                 <thead class="table-light">

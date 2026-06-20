@@ -9,6 +9,8 @@ export interface PlanCatalogoItem {
   maxUsuarios: number;
   maxSucursales: number;
   maxComprobantesSunatAceptados?: number;
+  maxProductosActivos?: number;
+  maxBotConversacionesSimultaneas?: number;
 }
 
 export interface CheckoutIniciado {

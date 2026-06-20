@@ -15,13 +15,20 @@ export function nivelPlan(planCode: string | null | undefined): number {
   return orden[p] ?? 2;
 }
 
-/** Mínimo plan Emprendedor para caja completa, compras SUNAT y WhatsApp vinculado. */
+/** Mínimo plan Básico para WhatsApp vinculado (envío manual ilimitado). */
+export const NIVEL_MIN_BASICO = 2;
+
+/** Mínimo plan Emprendedor para bot de pedidos WhatsApp. */
 export const NIVEL_MIN_EMPRENDEDOR = 3;
 
-/** Mínimo plan Profesional para placa/SOAT y utilidades. */
+/** Mínimo plan Profesional para placa/SOAT en tarjeta de perfil (legacy UI). */
 export const NIVEL_MIN_PROFESIONAL = 4;
 
 export function planPermiteWhatsAppVinculado(planCode: string | null | undefined): boolean {
+  return nivelPlan(planCode) >= NIVEL_MIN_BASICO;
+}
+
+export function planPermiteWhatsAppBot(planCode: string | null | undefined): boolean {
   return nivelPlan(planCode) >= NIVEL_MIN_EMPRENDEDOR;
 }
 

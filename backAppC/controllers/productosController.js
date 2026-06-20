@@ -401,6 +401,12 @@ const crear_producto = async (req, res) => {
       (msg.includes('código') && msg.includes('su empresa')) ||
       msg.includes('CODIGO_PRODUCTO_DUPLICADO') ||
       (error && error.number === 2627);
+    if (msg === 'PLAN_LIMITE_PRODUCTOS') {
+      return res.status(403).send({
+        message: 'Alcanzó el límite de productos activos de su plan. Actualice su plan para agregar más.',
+        data: undefined
+      });
+    }
     res.status(esConflictoCodigo ? 409 : 500).send({
       message: msg || (esConflictoCodigo ? 'Código de producto duplicado.' : 'Error al crear los productos'),
       data: undefined,

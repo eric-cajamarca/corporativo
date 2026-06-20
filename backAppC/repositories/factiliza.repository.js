@@ -134,8 +134,9 @@ async function getServiciosFactiliza(pool) {
 }
 
 /**
- * Indica si una empresa puede usar un servicio. Si existe fila en empresaFaciliza se usa;
- * si no, se usa EmpresaFactiliza.puedeUsar (retrocompatibilidad).
+ * Indica si una empresa puede usar un servicio.
+ * SaaS: solo importa si el plan incluye el servicio (SaasPlanFactilizaServicio); no usa empresaFaciliza.
+ * Enterprise / legado: empresaFaciliza o EmpresaFactiliza.puedeUsar.
  */
 async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
   let planCode = 'profesional';
@@ -157,6 +158,10 @@ async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
     return false;
   }
 
+  if (isSaas()) {
+    return true;
+  }
+
   const row = await pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('nombreServicio', sql.VarChar(100), nombreServicio)
@@ -167,6 +172,7 @@ async function puedeUsarServicio(pool, idEmpresa, nombreServicio) {
   if (row.recordset && row.recordset.length > 0) {
     return !!row.recordset[0].puedeUsar;
   }
+
   const ef = await getEmpresaFactiliza(pool, idEmpresa, { sinteticoDesdePermisos: false });
   return !!(ef && ef.puedeUsar);
 }

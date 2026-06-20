@@ -31,10 +31,11 @@ function nivelPlan(planCode) {
   return orden[p] || 2;
 }
 
+const NIVEL_MIN_BASICO = 2;
 const NIVEL_MIN_EMPRENDEDOR = 3;
 
 function planPermiteWhatsApp(planCode) {
-  return nivelPlan(planCode) >= NIVEL_MIN_EMPRENDEDOR;
+  return nivelPlan(planCode) >= NIVEL_MIN_BASICO;
 }
 
 function filtrarLinksModulo(modulo, links, planCode, nv) {
@@ -59,9 +60,13 @@ function filtrarLinksModulo(modulo, links, planCode, nv) {
       if (r.startsWith('/configuracion/whatsapp')) return false;
       return true;
     });
-  } else if (mod === 'CONFIGURACION' && !planPermiteWhatsApp(pc)) {
+  } else if (mod === 'CONFIGURACION') {
     const ruta = (s) => (s.ruta || '').toString();
-    sub = sub.filter((s) => !ruta(s).startsWith('/configuracion/whatsapp'));
+    if (!planPermiteWhatsApp(pc)) {
+      sub = sub.filter((s) => !ruta(s).startsWith('/configuracion/whatsapp'));
+    } else if (nv < NIVEL_MIN_EMPRENDEDOR) {
+      sub = sub.filter((s) => !ruta(s).startsWith('/configuracion/whatsapp-bot'));
+    }
   }
 
   return sub.filter((s) => s.visible !== false);

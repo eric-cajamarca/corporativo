@@ -1,6 +1,8 @@
 // SIEMPRE declara interfaces/models para todos los datos de APIs (regla 2.1)
 // SIEMPRE usa PascalCase para interfaces/models en TypeScript (regla 6.1)
 
+import { AlertaPlanUso } from '../models/alerta-plan.model';
+
 export interface Permiso {
     idPermiso: string;
     nombre: string;
@@ -14,20 +16,32 @@ export interface PermisosPorModulo {
 
 /** SaaS + suscripción ACTIVA/DEMO: límites del plan y si puede crear recursos. */
 export interface LimitesPlanAcciones {
-    planCode?: string;
-    maxUsuarios: number;
-    maxSucursales: number;
-    maxDireccionesEmpresa: number;
-    usuariosActivos: number;
-    usuariosOcupados: number;
-    sucursales: number;
-    direccionesEmpresa: number;
-    puedeCrearUsuario: boolean;
-    puedeCrearSucursal: boolean;
-    puedeAgregarDireccionEmpresa: boolean;
-    excedeUsuarios: boolean;
-    excedeSucursales: boolean;
-    excedeDirecciones: boolean;
+  planCode?: string;
+  maxUsuarios: number;
+  maxSucursales: number;
+  maxDireccionesEmpresa: number;
+  maxComprobantesSunatAceptados?: number;
+  maxProductosActivos?: number;
+  maxBotConversacionesSimultaneas?: number;
+  comprobantesSunatAceptados?: number;
+  productosActivos?: number;
+  botConversacionesActivas?: number;
+  usuariosActivos: number;
+  usuariosOcupados: number;
+  sucursales: number;
+  direccionesEmpresa: number;
+  puedeCrearUsuario: boolean;
+  puedeCrearSucursal: boolean;
+  puedeAgregarDireccionEmpresa: boolean;
+  puedeCrearProducto?: boolean;
+  puedeCrearVentaPorCuotaSunat?: boolean;
+  excedeUsuarios: boolean;
+  excedeSucursales: boolean;
+  excedeDirecciones: boolean;
+  excedeComprobantesSunat?: boolean;
+  excedeProductos?: boolean;
+  excedeBotConversaciones?: boolean;
+  alertasPlan?: AlertaPlanUso[];
 }
 
 export interface PermisosUsuario {

@@ -7,6 +7,7 @@ const whatsappBotCatalogo = require('./whatsappBotCatalogo.service');
 const whatsappBotSinonimoRepository = require('../repositories/whatsappBotSinonimo.repository');
 const whatsappBotInboundContext = require('./whatsappBotInboundContext.service');
 const whatsappBotConversacionRepository = require('../repositories/whatsappBotConversacion.repository');
+const saasPlanLimitesService = require('./saasPlanLimites.service');
 const factilizaRepository = require('../repositories/factiliza.repository');
 const { normalizarTelefonoWhatsApp } = require('../utils/telefonoWhatsApp.util');
 const copy = require('./whatsappBot.copy');
@@ -252,6 +253,37 @@ async function procesarInbound(payload) {
   }
   if (!precarga.config.activoBot) {
     throw new Error('Bot WhatsApp desactivado para esta empresa');
+  }
+
+  if (precarga.convNueva) {
+    try {
+      await withPool((pool) =>
+        saasPlanLimitesService.assertPuedeAbrirConversacionBot(pool, idEmpresa, tel.logId)
+      );
+    } catch (errLim) {
+      const cod = errLim && errLim.message ? String(errLim.message) : '';
+      if (cod === 'PLAN_LIMITE_BOT_CONVERSACIONES' || cod === 'PLAN_BOT_NO_DISPONIBLE') {
+        const aviso =
+          cod === 'PLAN_LIMITE_BOT_CONVERSACIONES'
+            ? 'Estamos atendiendo muchos chats a la vez. Por favor intente en unos minutos.'
+            : 'El bot de pedidos no está incluido en su plan actual.';
+        await enviarRespuestaConTyping(idEmpresa, tel.destino, aviso, {
+          usarTyping: precarga.config?.humanizar !== false
+        });
+        return {
+          ok: true,
+          idEmpresa,
+          from: tel.destino,
+          messageId: messageId || null,
+          respuesta: aviso,
+          burbujas: 1,
+          pdfEnviado: false,
+          limitePlan: cod,
+          elapsedMs: Date.now() - t0
+        };
+      }
+      throw errLim;
+    }
   }
 
   if (!precarga.catStats?.total || Number(precarga.catStats.total) === 0) {

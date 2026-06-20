@@ -20,3 +20,11 @@
 .planes-footer-links a:hover {
   text-decoration: underline;
 }
+
+.planes-comparativa .planes-tabla-comparativa td:first-child {
+  font-weight: 500;
+}
+
+.planes-pricing-card.border-primary {
+  border-width: 2px;
+}

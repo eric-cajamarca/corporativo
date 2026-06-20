@@ -110,6 +110,29 @@ export class MiSuscripcionComponent implements OnInit {
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   }
 
+  maxProductos(lim: LimitesUsoSuscripcion | null | undefined): number {
+    const n = Number(lim?.maxProductosActivos);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  usadoProductos(lim: LimitesUsoSuscripcion | null | undefined): number {
+    const n = Number(lim?.productosActivos);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  }
+
+  claseBarraUso(actual: number, maximo: number, excede?: boolean): string {
+    if (excede) return 'bg-danger';
+    if (!maximo || maximo <= 0) return 'bg-primary';
+    const pct = (100 * actual) / maximo;
+    if (pct >= 80) return 'bg-warning';
+    return 'bg-primary';
+  }
+
+  avisoUso80(actual: number, maximo: number): boolean {
+    if (!maximo || maximo <= 0) return false;
+    return actual / maximo >= 0.8 && actual < maximo;
+  }
+
   vincular(): void {
     const on = this.orderNumber.trim();
     if (!on) {

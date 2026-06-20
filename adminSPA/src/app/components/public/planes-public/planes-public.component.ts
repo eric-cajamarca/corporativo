@@ -171,4 +171,19 @@ export class PlanesPublicComponent implements OnInit {
   etiquetaCiclo(): string {
     return this.ciclo() === 'yearly' ? 'año' : 'mes';
   }
+
+  /** Formato de límites numéricos (ej. 3 000). */
+  formatLimite(val: number | undefined | null): string {
+    const n = Math.floor(Number(val));
+    if (!Number.isFinite(n) || n <= 0) return '—';
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  }
+
+  planTieneBot(p: PlanCatalogoItem): boolean {
+    return (p.maxBotConversacionesSimultaneas ?? 0) > 0;
+  }
+
+  celdaBotConv(p: PlanCatalogoItem): string {
+    return this.planTieneBot(p) ? this.formatLimite(p.maxBotConversacionesSimultaneas) : '—';
+  }
 }

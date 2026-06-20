@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type UrlTree } from '@angular/router';
 import { map, catchError, of, type Observable } from 'rxjs';
 import { moduloMenuRequeridoParaUrl } from '../config/ruta-plan-modulo.map';
-import { NIVEL_MIN_EMPRENDEDOR, nivelPlan, normalizarRutaAbsoluta, planPermiteWhatsAppVinculado } from '../config/saas-plan-reglas.util';
+import { normalizarRutaAbsoluta, planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../config/saas-plan-reglas.util';
 import { PermisosService } from '../services/permisos.service';
 
 function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosService): boolean | UrlTree {
@@ -27,19 +27,18 @@ function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosServic
   }
 
   const planRaw = permisos.planCodeEfectivo();
-  if (abs.startsWith('/compras/comprobantes-sunat')) {
-    if (!planRaw || nivelPlan(planRaw) < NIVEL_MIN_EMPRENDEDOR) {
+
+  if (abs.startsWith('/configuracion/whatsapp-bot')) {
+    if (!planPermiteWhatsAppBot(planRaw)) {
+      return router.createUrlTree(['/home']);
+    }
+  } else if (abs.startsWith('/configuracion/whatsapp')) {
+    if (!planPermiteWhatsAppVinculado(planRaw)) {
       return router.createUrlTree(['/home']);
     }
   }
 
-  if (abs.startsWith('/configuracion/whatsapp')) {
-    if (!planPermiteWhatsAppVinculado(permisos.planCodeEfectivo())) {
-      return router.createUrlTree(['/home']);
-    }
-  }
-
-  const plan = (permisos.planCodeEfectivo() || '').toLowerCase();
+  const plan = (planRaw || '').toLowerCase();
   if (plan === 'demo') {
     if (abs === '/caja' || abs.startsWith('/caja/') || abs === '/creditos' || abs.startsWith('/creditos/')) {
       const okCajaDemo =

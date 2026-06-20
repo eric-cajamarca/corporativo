@@ -49,14 +49,33 @@ async function contarDireccionesEmpresa(pool, idEmpresa) {
   return Number(r.recordset[0]?.total || 0);
 }
 
+async function contarProductosActivos(pool, idEmpresa) {
+  try {
+    const r = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT COUNT(*) AS total
+        FROM dbo.Productos
+        WHERE idEmpresa = @idEmpresa AND ISNULL(estado, 1) = 1
+      `);
+    return Number(r.recordset[0]?.total || 0);
+  } catch (err) {
+    console.error('contexto: contarProductosActivos', err);
+    return 0;
+  }
+}
+
 async function contarUso(pool, idEmpresa) {
-  const [usuariosActivos, usuariosPlazas, sucursales, direccionesEmpresa] = await Promise.all([
-    contarUsuariosActivos(pool, idEmpresa),
-    contarUsuariosPlazas(pool, idEmpresa),
-    contarSucursales(pool, idEmpresa),
-    contarDireccionesEmpresa(pool, idEmpresa)
-  ]);
-  return { usuariosActivos, usuariosPlazas, sucursales, direccionesEmpresa };
+  const [usuariosActivos, usuariosPlazas, sucursales, direccionesEmpresa, productosActivos] =
+    await Promise.all([
+      contarUsuariosActivos(pool, idEmpresa),
+      contarUsuariosPlazas(pool, idEmpresa),
+      contarSucursales(pool, idEmpresa),
+      contarDireccionesEmpresa(pool, idEmpresa),
+      contarProductosActivos(pool, idEmpresa)
+    ]);
+  return { usuariosActivos, usuariosPlazas, sucursales, direccionesEmpresa, productosActivos };
 }
 
 /**
@@ -135,6 +154,7 @@ module.exports = {
   contarUsuariosPlazas,
   contarSucursales,
   contarDireccionesEmpresa,
+  contarProductosActivos,
   contarUso,
   contarComprobantesSunatDesdeTablas,
   obtenerMetricasOnboarding

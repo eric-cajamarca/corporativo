@@ -17,6 +17,8 @@ async function listarCatalogoPublico(pool) {
       maxUsuarios,
       maxSucursales,
       ISNULL(maxComprobantesSunatAceptados, 0) AS maxComprobantesSunatAceptados,
+      ISNULL(maxProductosActivos, 0) AS maxProductosActivos,
+      ISNULL(maxBotConversacionesSimultaneas, 0) AS maxBotConversacionesSimultaneas,
       orden
     FROM dbo.SaasPlan
     WHERE activo = 1 AND visibleEnCatalogoPublico = 1
@@ -48,6 +50,8 @@ async function obtenerPorPlanCode(pool, planCode) {
         maxUsuarios,
         maxSucursales,
         ISNULL(maxComprobantesSunatAceptados, 0) AS maxComprobantesSunatAceptados,
+        ISNULL(maxProductosActivos, 0) AS maxProductosActivos,
+        ISNULL(maxBotConversacionesSimultaneas, 0) AS maxBotConversacionesSimultaneas,
         activo,
         visibleEnCatalogoPublico,
         orden

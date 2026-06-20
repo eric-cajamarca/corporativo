@@ -60,6 +60,8 @@ async function obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpres
  */
 async function crearProductoConTransaccion(pool, params) {
   const { datosProducto, usarCorrelativo, lote, precioVenta, idListaPrecio, idEmpresa, preciosPorLista } = params;
+  const saasPlanLimitesService = require('./saasPlanLimites.service');
+  await saasPlanLimitesService.assertPuedeCrearProducto(pool, idEmpresa);
   const maxIntentosCodigo = 12;
   let committed = false;
   let lastDupErr = null;

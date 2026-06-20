@@ -85,6 +85,24 @@ async function listarEscaladas(pool, idEmpresa) {
   }
 }
 
+/** Sesiones bot no expiradas (una por teléfono cliente). */
+async function contarActivas(pool, idEmpresa) {
+  try {
+    const r = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT COUNT(*) AS total
+        FROM WhatsAppBotConversacion
+        WHERE idEmpresa = @idEmpresa AND fExpira > GETDATE()
+      `);
+    return Number(r.recordset[0]?.total || 0);
+  } catch (e) {
+    if (e && e.number === 208) return 0;
+    throw e;
+  }
+}
+
 async function eliminar(pool, idEmpresa, telefonoCliente) {
   try {
     await pool
@@ -101,4 +119,4 @@ async function eliminar(pool, idEmpresa, telefonoCliente) {
   }
 }
 
-module.exports = { obtener, guardar, reiniciar, eliminar, listarEscaladas };
+module.exports = { obtener, guardar, reiniciar, eliminar, listarEscaladas, contarActivas };

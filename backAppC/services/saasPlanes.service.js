@@ -18,6 +18,8 @@ const PLANES = {
     maxUsuarios: 1,
     maxSucursales: 1,
     maxComprobantesSunatAceptados: 50,
+    maxProductosActivos: 500,
+    maxBotConversacionesSimultaneas: 0,
     beneficios: [
       '14 días sin costo',
       '1 usuario y 1 sucursal',
@@ -28,55 +30,61 @@ const PLANES = {
   basico: {
     codigo: 'basico',
     nombre: 'Básico',
-    descripcionCorta: 'Operación esencial: ventas, compras e inventario con FE.',
+    descripcionCorta: 'Todo el sistema para 1 local: facturación SUNAT, inventario y WhatsApp ilimitado.',
     mensualPen: 49,
     anualPen: 490,
     maxUsuarios: 2,
     maxSucursales: 1,
-    maxComprobantesSunatAceptados: 150,
+    maxComprobantesSunatAceptados: 200,
+    maxProductosActivos: 2000,
+    maxBotConversacionesSimultaneas: 0,
     beneficios: [
-      'Hasta 2 usuarios y 1 sucursal',
-      'Ventas, compras, inventario, productos y clientes',
-      'Cotizaciones comerciales',
-      'Facturación electrónica SUNAT',
-      'Hasta 150 comprobantes SUNAT aceptados',
-      'Sin WhatsApp vinculado, caja ni créditos'
+      'Todo el sistema: ventas, compras, inventario, caja, créditos y despachos',
+      'Hasta 200 comprobantes SUNAT aceptados al mes',
+      'Hasta 2 usuarios, 1 sucursal y 2 000 productos',
+      'WhatsApp vinculado ilimitado (envío de comprobantes)',
+      'Cotizaciones, compras y clientes sin límite',
+      'Sin bot de pedidos WhatsApp'
     ]
   },
   emprendedor: {
     codigo: 'emprendedor',
     nombre: 'Emprendedor',
-    descripcionCorta: 'Caja, créditos, WhatsApp y operación completa para PYME.',
+    descripcionCorta: 'Escala tu PYME: más volumen SUNAT, equipo y bot de pedidos WhatsApp.',
     mensualPen: 89,
     anualPen: 890,
-    maxUsuarios: 4,
-    maxSucursales: 1,
-    maxComprobantesSunatAceptados: 500,
+    maxUsuarios: 6,
+    maxSucursales: 3,
+    maxComprobantesSunatAceptados: 800,
+    maxProductosActivos: 4000,
+    maxBotConversacionesSimultaneas: 5,
     beneficios: [
-      'Todo lo del plan Básico',
-      'Hasta 4 usuarios y 1 sucursal',
-      'WhatsApp vinculado: envío de comprobantes y bot de atención',
-      'Caja, créditos y catálogos',
-      'Compras SUNAT (comprobantes de proveedor)',
-      'Hasta 500 comprobantes SUNAT aceptados'
+      'Todo lo del plan Básico con más capacidad',
+      'Hasta 800 comprobantes SUNAT aceptados al mes',
+      'Hasta 6 usuarios, 3 sucursales y 4 000 productos',
+      'WhatsApp ilimitado + bot de pedidos',
+      'Hasta 5 conversaciones bot simultáneas',
+      'Cotizaciones, compras y clientes sin límite'
     ]
   },
   profesional: {
     codigo: 'profesional',
     nombre: 'Profesional',
-    descripcionCorta: 'Despachos, reportes, análisis y escala comercial.',
+    descripcionCorta: 'Alto volumen: varias sucursales, catálogo grande y bot con más concurrencia.',
     mensualPen: 169,
     anualPen: 1690,
-    maxUsuarios: 11,
-    maxSucursales: 3,
-    maxComprobantesSunatAceptados: 2000,
+    maxUsuarios: 20,
+    maxSucursales: 8,
+    maxComprobantesSunatAceptados: 3000,
+    maxProductosActivos: 8000,
+    maxBotConversacionesSimultaneas: 20,
     beneficios: [
-      'Todo lo del plan Emprendedor',
-      'Hasta 11 usuarios y 3 sucursales',
-      'WhatsApp vinculado y bot con límites ampliados',
-      'Despachos, análisis financiero y reportes',
-      'Consultas placa/SOAT y utilidades de margen',
-      'Hasta 2 000 comprobantes SUNAT aceptados'
+      'Todo lo del plan Emprendedor para operación exigente',
+      'Hasta 3 000 comprobantes SUNAT aceptados al mes',
+      'Hasta 20 usuarios, 8 sucursales y 8 000 productos',
+      'WhatsApp ilimitado + bot de pedidos',
+      'Hasta 20 conversaciones bot simultáneas',
+      'Soporte prioritario'
     ]
   },
   empresarial: {
@@ -121,7 +129,9 @@ function listarPlanesCatalogo() {
       precioAnualPen: p.anualPen,
       maxUsuarios: p.maxUsuarios,
       maxSucursales: p.maxSucursales,
-      maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0
+      maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0,
+      maxProductosActivos: p.maxProductosActivos ?? 0,
+      maxBotConversacionesSimultaneas: p.maxBotConversacionesSimultaneas ?? 0
     };
   });
 }
@@ -152,6 +162,8 @@ function filaBdAPlanInterno(row) {
     maxUsuarios: Number(row.maxUsuarios),
     maxSucursales: Number(row.maxSucursales),
     maxComprobantesSunatAceptados: Number(row.maxComprobantesSunatAceptados ?? 0),
+    maxProductosActivos: Number(row.maxProductosActivos ?? 0),
+    maxBotConversacionesSimultaneas: Number(row.maxBotConversacionesSimultaneas ?? 0),
     beneficios: parseBeneficiosJson(row.beneficiosJson)
   };
 }
@@ -168,7 +180,9 @@ function filaBdACatalogoItem(row) {
     precioAnualPen: p.anualPen,
     maxUsuarios: p.maxUsuarios,
     maxSucursales: p.maxSucursales,
-    maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0
+    maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0,
+    maxProductosActivos: p.maxProductosActivos ?? 0,
+    maxBotConversacionesSimultaneas: p.maxBotConversacionesSimultaneas ?? 0
   };
 }
 
@@ -196,7 +210,9 @@ async function obtenerResumenPlanAsync(pool, planCode) {
     precioAnualPen: p.anualPen,
     maxUsuarios: p.maxUsuarios,
     maxSucursales: p.maxSucursales,
-    maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0
+    maxComprobantesSunatAceptados: p.maxComprobantesSunatAceptados ?? 0,
+    maxProductosActivos: p.maxProductosActivos ?? 0,
+    maxBotConversacionesSimultaneas: p.maxBotConversacionesSimultaneas ?? 0
   };
 }
 
