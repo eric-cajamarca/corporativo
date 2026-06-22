@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewCh
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TopnavComponent } from '../../topnav/topnav.component';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CategoriaService } from '../../../services/categoria.service';
 import { SucursalService } from '../../../services/sucursal.service';
@@ -20,6 +21,7 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
+import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
@@ -42,6 +44,8 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { AuthService } from '../../../services/auth.service';
 import { RubrosService } from '../../../services/rubros.service';
 import { CajaService } from '../../../services/caja.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
@@ -78,7 +82,7 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-venta-rapida',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent, TopnavComponent, SidebarComponent],
   templateUrl: './create-venta-rapida.component.html',
   styleUrl: './create-venta-rapida.component.css'
 })
@@ -277,6 +281,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private _tablasSunatService: TablasSunatService,
     private _documentosService: DocumentoService,
     private modalService: ModalService,
+    private buscadorProductosModal: BuscadorProductosModalService,
     private ventasService: VentasService,
     private cotizacionesService: CotizacionesService,
     private cajaService: CajaService,
@@ -286,6 +291,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private ventaCotizacionUi: VentaCotizacionUiService,
     private creditosService: CreditosService,
     private gestoresService: GestoresService,
+    public sidebarState: SidebarStateService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
     private hotelService: HotelService,
     private valesDespachoService: ValesDespachoService,
@@ -1635,6 +1641,57 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       return alias ? `${alias} - ${suc}` : suc;
     }
     return String(producto?.sucursal ?? '');
+  }
+
+  private precargarCatalogoProductosEnSegundoPlano(): void {
+    if (!this.esGestora) {
+      return;
+    }
+    if (this._productoService.tieneCatalogoEnMemoria()) {
+      return;
+    }
+    this._productoService.obtenerProductosTodos().subscribe({
+      next: (res) => {
+        const data = this.filtrarFilasCatalogoEmpresaOperativa(Array.isArray(res?.data) ? res.data : []);
+        if (data.length) {
+          this.fusionarFilasEnCatalogoMemoria(data);
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  private buscarEnCatalogoLocal(term: string): any[] | null {
+    const mem = this._productoService.filtrarListaMemoriaVenta(term, 300);
+    let fuente: any[] | null = mem;
+    if (fuente === null && (this.stockSucursales_const?.length || 0) > 0) {
+      fuente = (this.stockSucursales_const || []).filter((item: any) =>
+        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term)
+      );
+    }
+    if (fuente === null) {
+      return null;
+    }
+    return this.obtenerCatalogoProductosOperativo(fuente).slice(0, this.buscadorLimiteFilas);
+  }
+
+  abrirBuscadorProductos(): void {
+    this.buscadorProductosModal.abrir({
+      modo: 'venta',
+      idSucursal: String(this.ventas.idSucursal || ''),
+      venta: {
+        idSucursalApi: this.idSucursalParaBusquedaApi(),
+        esGestora: this.esGestora,
+        idSucursalDefault: String(this.ventas.idSucursal || ''),
+        buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
+        filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
+        onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano()
+      }
+    }).then((prod) => {
+      if (!prod) return;
+      this.fusionarFilasEnCatalogoMemoria([prod]);
+      this.agregarAlCarrito(prod);
+    });
   }
 
   private idSucursalParaBusquedaApi(): string | undefined {

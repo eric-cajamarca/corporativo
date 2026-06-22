@@ -105,6 +105,11 @@ export class VentasService {
     });
   }
 
+  /** Datos iniciales para pantalla de venta (comprobantes, sucursales, etc.). */
+  getBootstrapVenta(): Observable<{ data: Record<string, unknown> }> {
+    return this._http.get<{ data: Record<string, unknown> }>(this.url + 'ventas/bootstrap', { withCredentials: true });
+  }
+
   /** Notas de crédito y débito emitidas (paginado). Query: buscar, pagina, porPagina. */
   listarNotasCreditoDebito(params?: { buscar?: string; pagina?: number; porPagina?: number }): Observable<{ data: NotaCreditoDebitoListado[]; total: number }> {
     const q = new URLSearchParams();
