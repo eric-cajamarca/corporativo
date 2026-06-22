@@ -1,8 +1,7 @@
-import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CategoriaService } from '../../../services/categoria.service';
 import { SucursalService } from '../../../services/sucursal.service';
@@ -21,7 +20,6 @@ import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
 import { ModalService } from '../../../services/modal.service';
-import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import {
@@ -44,21 +42,30 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { AuthService } from '../../../services/auth.service';
 import { RubrosService } from '../../../services/rubros.service';
 import { CajaService } from '../../../services/caja.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
+import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
+import { HotelService } from '../../../services/hotel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
+import {
+  PosAlertaTemprana,
+  codigoComprobanteDesdeLista,
+  construirAlertaValidacionTemprana,
+  validarClienteSunatParaComprobante,
+  validarStockLinea
+} from '../../../utils/pos-validacion.util';
+import { esProductoServicio } from '../../../utils/producto-servicio.util';
+import { PosKeyboardService } from '../../../services/pos-keyboard.service';
 
 declare var bootstrap: any;
 declare var iziToast: any;
@@ -71,14 +78,24 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-venta-rapida',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent],
   templateUrl: './create-venta-rapida.component.html',
   styleUrl: './create-venta-rapida.component.css'
 })
 export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDestroy {
 
+  @ViewChild('inputCodigoBarra') inputCodigoBarra?: ElementRef<HTMLInputElement>;
+  @ViewChild('inputBusquedaInline') inputBusquedaInline?: ElementRef<HTMLInputElement>;
+
   readonly buscadorLimiteFilas = 80;
+  readonly buscadorInlineMinCaracteres = 2;
   public searchCodigo = '';
+  public searchTermInline = '';
+  public productosBusquedaInline: any[] = [];
+  public buscadorInlineBuscando = false;
+  public buscadorInlineMensaje = 'Escriba al menos 2 caracteres. Al escribir filtra el catálogo en memoria; use Buscar para consultar la base de datos.';
+  /** Catálogo completo para filtrar al escribir (independiente del detalle de venta). */
+  private catalogoBusquedaInline: any[] = [];
   public categoria: any = [];
   public presentacion: Presentacion[] = [];
   public marcas: any = [];
@@ -171,6 +188,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   /** Hasta que llegue gestores/config, no aplicar descuento lista vs vendido (evita total erróneo con default true). */
   private descuentoEnTotalConfigListo = false;
 
+  /** Gestora: descuento en total por empresa del producto (idEmpresa en minúsculas). */
+  private descuentoPorEmpresa = new Map<string, boolean>();
+
   /** Config > Ventas: mostrar modal PDF/WhatsApp al registrar venta (por defecto activo). */
   mostrarModalPdfTrasRegistrarVenta = true;
 
@@ -200,6 +220,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Config inventario: permitir vender con stock 0 o negativo. */
   permitirVentasNegativas = false;
+  alertaValidacionTemprana: PosAlertaTemprana | null = null;
+  mostrarAyudaAtajosPos = false;
 
   /** Modal Cargar desde cotización */
   cotizacionesParaCargar: CotizacionListado[] = [];
@@ -232,6 +254,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   loadingVales = false;
   loadingLiquidar = false;
 
+  /** Check-out hotel pendiente de confirmar al registrar la venta. */
+  private hotelCheckoutIdEstancia: string | null = null;
+
   /** Comprobantes Factura (01) y Boleta (03) para elegir al liquidar vale */
   get comprobantesFacturaBoleta(): any[] {
     const list = this.comprobantes || [];
@@ -252,7 +277,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private _tablasSunatService: TablasSunatService,
     private _documentosService: DocumentoService,
     private modalService: ModalService,
-    private buscadorProductosModal: BuscadorProductosModalService,
     private ventasService: VentasService,
     private cotizacionesService: CotizacionesService,
     private cajaService: CajaService,
@@ -261,9 +285,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private ventaProvisionalUi: VentaProvisionalUiService,
     private ventaCotizacionUi: VentaCotizacionUiService,
     private creditosService: CreditosService,
-    public sidebarState: SidebarStateService,
     private gestoresService: GestoresService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
+    private hotelService: HotelService,
     private valesDespachoService: ValesDespachoService,
     private empresaService: EmpresaService,
     private auth: AuthService,
@@ -273,7 +297,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private usuarioSucursalService: UsuarioSucursalService,
     private ngZone: NgZone,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private posKeyboard: PosKeyboardService
   ) {}
 
 
@@ -294,9 +319,16 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.pdfPostVentaModalEl?.addEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.modalEditarClienteEl = document.getElementById('modalEditarClienteVenta');
     this.modalEditarClienteEl?.addEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
+    this.enfocarEscanner();
+    this.configurarAtajosPos();
+  }
+
+  enfocarEscanner(): void {
+    setTimeout(() => this.inputCodigoBarra?.nativeElement?.focus(), 0);
   }
 
   ngOnDestroy(): void {
+    this.posKeyboard.desactivar();
     this.pdfPostVentaModalEl?.removeEventListener('hidden.bs.modal', this.onPdfPostVentaModalHiddenBound);
     this.pdfPostVentaModalEl = null;
     this.modalEditarClienteEl?.removeEventListener('hidden.bs.modal', this.onModalEditarClienteHiddenBound);
@@ -305,7 +337,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   ngOnInit(): void {
     this.ventaProvisionalUi.configurarModo('rapida');
-    this.gestoresService.obtenerConfiguracion().subscribe({
+    this.cargarCatalogoBusquedaInline();
+    this.gestoresService.obtenerConfiguracion({ evitarCache: true }).subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
         const normClave = (c: { clave?: string; Clave?: string }) =>
@@ -363,12 +396,28 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         this.aplicarSucursalConCajaAbiertaPreferida();
         this.resolverSucursalesPermitidasVenta();
         this.cargarComprobantesVentaInicial();
+        this.actualizarValidacionTemprana();
       },
       error: () => {}
     });
-    const now = new Date();
-    const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0'), d = String(now.getDate()).padStart(2, '0');
-    const hoy = `${y}-${m}-${d}`;
+    this.ventasService.getBootstrapVenta().subscribe({
+      next: (res) => {
+        const d = res?.data as {
+          cajas?: unknown[];
+          sucursales?: Sucursal[];
+        };
+        if (Array.isArray(d?.cajas)) {
+          this.cajas = d.cajas.filter((c: any) => this.esCajaConAperturaActiva(c));
+          this.aplicarSucursalConCajaAbiertaPreferida();
+        }
+        if (Array.isArray(d?.sucursales) && d.sucursales.length) {
+          this.sucursales = d.sucursales;
+        }
+        this.actualizarValidacionTemprana();
+      },
+      error: () => {}
+    });
+    const hoy = getFechaHoyLocal();
     if (!this.ventas.fEmision) this.ventas.fEmision = hoy;
     //if (!this.ventas.fVencimiento) this.ventas.fVencimiento=hoy;
     // fVencimiento no es obligatorio; no se asigna por defecto
@@ -379,6 +428,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         const estado = res?.data;
         this.esGestora = !!estado?.esGestora;
         this.esEmpresaGestionada = !!(estado as { esEmpresaGestionada?: boolean })?.esEmpresaGestionada;
+        if (this.esGestora) {
+          this.cargarDescuentoPorEmpresaGestora();
+        }
         if (!this.esGestora) {
           this._productoService.limpiarCacheListaProductos();
           this.stockSucursales_const = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const);
@@ -457,11 +509,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.aplicarClienteVariosPorDefecto();
     }
     if (!this.ventas.fEmision) {
-      const hoy = new Date();
-      const y = hoy.getFullYear();
-      const m = String(hoy.getMonth() + 1).padStart(2, '0');
-      const d = String(hoy.getDate()).padStart(2, '0');
-      this.ventas.fEmision = `${y}-${m}-${d}`;
+      this.ventas.fEmision = getFechaHoyLocal();
     }
   }
 
@@ -528,9 +576,86 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   onSucursalRapidaChange(): void {
     this.cargarComprobantesVentaInicial();
     this.aplicarDefaultsVentaRapida();
+    this.actualizarValidacionTemprana();
+  }
+
+  actualizarValidacionTemprana(): void {
+    const abiertas = (this.cajas || [])
+      .filter((c) => this.esCajaConAperturaActiva(c))
+      .map((c) => (c.sucursal || c.nombre || '').trim())
+      .filter(Boolean);
+    this.alertaValidacionTemprana = construirAlertaValidacionTemprana({
+      esCotizacion: this.esCotizacion(),
+      bloqueoSucursal: this.bloqueoPorSucursalUsuario,
+      idSucursal: this.ventas.idSucursal,
+      tieneCajaAbierta: this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal),
+      nombresCajasAbiertas: [...new Set(abiertas)]
+    });
+  }
+
+  private validarAntesDeCobrar(): boolean {
+    this.actualizarValidacionTemprana();
+    if (this.alertaValidacionTemprana?.tipo === 'danger') {
+      iziToast.warning({
+        title: 'No se puede cobrar',
+        message: this.alertaValidacionTemprana.mensaje,
+        position: 'topRight'
+      });
+      return false;
+    }
+    const codComp = codigoComprobanteDesdeLista(this.comprobantes, this.ventas.idComprobante);
+    const sunat = validarClienteSunatParaComprobante({
+      codigoComprobante: codComp,
+      idDocumento: this.ventas.idDocumento,
+      numeroDocumento: this.cliente?.ruc,
+      razonSocial: this.cliente?.rSocial
+    });
+    if (!sunat.valido) {
+      iziToast.warning({
+        title: 'Validación SUNAT',
+        message: sunat.mensaje || 'Datos del cliente inválidos.',
+        position: 'topRight'
+      });
+      return false;
+    }
+    if (!this.permitirVentasNegativas) {
+      const lineaSinStock = this.carrito.find((item) => this.lineaCarritoStockInsuficiente(item));
+      if (lineaSinStock) {
+        iziToast.warning({
+          title: 'Stock insuficiente',
+          message: `Revise cantidades: ${lineaSinStock.descripcion || lineaSinStock.codigo}.`,
+          position: 'topRight'
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private configurarAtajosPos(): void {
+    this.posKeyboard.activar({
+      buscar: () => {
+        this.inputBusquedaInline?.nativeElement?.focus();
+        this.enfocarEscanner();
+      },
+      cobrar: () => this.cobrarVentaRapida(),
+      cliente: () => this.buscarORegistrarCliente(),
+      limpiarBusqueda: () => {
+        this.searchTermInline = '';
+        this.searchCodigo = '';
+        this.productosBusquedaInline = [];
+        this.onBusquedaInlineInput();
+      },
+      ayuda: () => {
+        this.mostrarAyudaAtajosPos = !this.mostrarAyudaAtajosPos;
+      }
+    });
   }
 
   cobrarVentaRapida(): void {
+    if (!this.validarAntesDeCobrar()) {
+      return;
+    }
     if (this.carrito.length === 0) {
       iziToast.warning({ title: 'Advertencia', message: 'Agregue al menos un producto al carrito.' });
       return;
@@ -543,6 +668,21 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       iziToast.warning({ title: 'Advertencia', message: 'Complete o seleccione el cliente.' });
       return;
     }
+    const idEstadoPago = Number(this.ventas.idEstadoPago) || 2;
+    const esContadoDirecto = idEstadoPago === 2 && !this.cabeceraEsCreditoFinanciacion();
+    if (esContadoDirecto) {
+      this.detallePago = [];
+      this.sincronizarPagoRapidoConTotal();
+      if (this.detallePago.length > 0) {
+        this.registrarVenta();
+        return;
+      }
+    }
+    this.abrirModalPagoMixto();
+  }
+
+  /** Abre el modal de forma de pago (mixto, referencia, vuelto en efectivo). */
+  abrirModalPagoMixto(): void {
     this.abrirModalPago();
     const modalEl = document.getElementById('modalPago');
     if (modalEl && typeof bootstrap !== 'undefined') {
@@ -591,8 +731,10 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   aplicarPreloadDesdeHabitacion(): void {
     const preload = this.hotelPreloadVentaService.getAndClearPreload();
     if (!preload?.lineas?.length) return;
-    this.carrito = preload.lineas.map((lin: { idProducto: string; codigo: string; descripcion: string; codigoPresentacion?: string; cantidad: number; pVenta: number; permiteDescripcionEnVenta?: boolean }) => {
+    this.hotelCheckoutIdEstancia = preload.idEstancia ?? null;
+    this.carrito = preload.lineas.map((lin) => {
       const desc = (lin.descripcion ?? '').toString().trim();
+      const marca = (lin as { marca?: string }).marca ?? '';
       return {
         idProducto: lin.idProducto,
         codigo: lin.codigo,
@@ -600,11 +742,94 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         descripcionOriginal: desc,
         permiteDescripcionEnVenta: !!(lin as { permiteDescripcionEnVenta?: boolean }).permiteDescripcionEnVenta,
         codigoPresentacion: lin.codigoPresentacion ?? '',
+        nombreMarca: marca,
+        marca,
         cantidad: lin.cantidad,
         pVenta: lin.pVenta
       };
     });
-    this.actualizaTotales();
+    this.cargarClienteDesdePreloadHotel(preload);
+    this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+      next: (pr: any) => {
+        if (pr?.data) {
+          this.stockSucursales_const = pr.data;
+        }
+        this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
+        this.actualizaTotales();
+        this.guardarEstadoProvisional();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Check-out',
+            message: 'Carrito cargado desde la estancia. Revise cliente y comprobante.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: () => {
+        this.actualizaTotales();
+        this.guardarEstadoProvisional();
+      }
+    });
+  }
+
+  /** Cliente de la estancia al llegar desde check-out hotel. */
+  private cargarClienteDesdePreloadHotel(preload: {
+    idCliente?: number | null;
+    nombreHuesped?: string;
+  }): void {
+    const idCliente = preload.idCliente != null ? Number(preload.idCliente) : null;
+    if (idCliente != null && idCliente > 0) {
+      this._clienteService.obtener_cliente_id(idCliente).subscribe({
+        next: (res: { data?: Record<string, unknown> | Record<string, unknown>[] }) => {
+          const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+          if (!row) {
+            this.aplicarNombreHuespedSinCliente(preload.nombreHuesped);
+            return;
+          }
+          this.cliente = {
+            idCliente: row['idCliente'],
+            idDocumento: row['idDocumento'],
+            ruc: row['ruc'],
+            rSocial: (row['rSocial'] ?? row['r_Social'] ?? row['rsocial'] ?? row['razonSocial'] ?? row['RazonSocial'] ?? '').toString().trim(),
+            direccion: (row['direccion'] ?? '').toString(),
+            correo: row['correo'] ?? '',
+            celular: row['celular'] ?? '',
+            condicion: row['condicion'] ?? 'ACTIVO',
+            sujetoCredito: row['sujetoCredito'] === true || row['sujetoCredito'] === 1,
+            lineaCredito: row['lineaCredito'] != null && !isNaN(Number(row['lineaCredito'])) ? Number(row['lineaCredito']) : undefined
+          };
+          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+            next: (dirRes) => this.aplicarPrimeraDireccionClienteAlContexto(dirRes),
+            error: () => {}
+          });
+        },
+        error: () => this.aplicarNombreHuespedSinCliente(preload.nombreHuesped)
+      });
+      return;
+    }
+    this.aplicarNombreHuespedSinCliente(preload.nombreHuesped);
+  }
+
+  private aplicarNombreHuespedSinCliente(nombreHuesped?: string): void {
+    const nombre = (nombreHuesped ?? '').trim();
+    if (!nombre) return;
+    this.cliente.rSocial = nombre;
+  }
+
+  /** Cierra estancia y marca consumos facturados solo tras venta exitosa. */
+  private confirmarCheckoutHotelSiCorresponde(idVenta: number | null): void {
+    if (!this.hotelCheckoutIdEstancia || !idVenta) return;
+    const idEstancia = this.hotelCheckoutIdEstancia;
+    this.hotelCheckoutIdEstancia = null;
+    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta).subscribe({
+      error: (err) => {
+        iziToast.warning({
+          title: 'Hotel',
+          message: err?.error?.message || 'Venta registrada, pero no se pudo cerrar la estancia en hotel.',
+          position: 'topRight'
+        });
+      }
+    });
   }
 
   /** Quitar query `duplicarDesdeVenta` de la URL tras procesar. */
@@ -800,6 +1025,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     }
     if (!match) return;
     linea.stock = match.stock;
+    if (linea.idSucursal == null && match.idSucursal != null) {
+      linea.idSucursal = match.idSucursal;
+    }
     if (!linea.codigoPresentacion) linea.codigoPresentacion = match.codigoPresentacion ?? '';
     if (!linea.sucursal) linea.sucursal = match.sucursal ?? '';
     if (match.idEmpresa != null) {
@@ -844,6 +1072,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Carrito: cantidad supera stock conocido o stock 0 (solo aviso visual si no está permitido vender sin stock). */
   lineaCarritoStockInsuficiente(item: any): boolean {
+    if (esProductoServicio(item?.codigoPresentacion)) return false;
     if (this.permitirVentasNegativas) return false;
     const cant = Number(item?.cantidad) || 0;
     const disp = this.obtenerStockDisponibleParaLineaCarrito(item);
@@ -949,6 +1178,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
             Array.isArray(response.data) ? response.data : []
           );
           this.stockSucursales_const = data;
+          this.catalogoBusquedaInline = this.obtenerCatalogoProductosOperativo(data);
         }
       },
       error: (err) => {
@@ -988,6 +1218,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       next: (res) => {
         const list: Impuesto[] = res.data || [];
         this.impuestosActivosEmpresa = list.filter((i: Impuesto) => this.impuestoEstaActivo(i));
+        if (this.carrito.length > 0) {
+          this.actualizaTotales();
+        }
       },
       error: () => {}
     });
@@ -1108,25 +1341,6 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       return filas || [];
     }
     return filas.filter((item) => this.productoPerteneceEmpresaOperativa(item));
-  }
-
-  /** Precarga catálogo en memoria (sin bloquear UI) para búsquedas locales instantáneas. */
-  private precargarCatalogoProductosEnSegundoPlano(): void {
-    if (!this.esGestora) {
-      return;
-    }
-    if (this._productoService.tieneCatalogoEnMemoria()) {
-      return;
-    }
-    this._productoService.obtenerProductosTodos().subscribe({
-      next: (res) => {
-        const data = this.filtrarFilasCatalogoEmpresaOperativa(Array.isArray(res?.data) ? res.data : []);
-        if (data.length) {
-          this.fusionarFilasEnCatalogoMemoria(data);
-        }
-      },
-      error: () => {}
-    });
   }
 
   private obtenerCatalogoProductosOperativo(fuente?: any[]): any[] {
@@ -1272,38 +1486,155 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   }
 
 
-  /** Búsqueda instantánea si el catálogo ya está en memoria (SPA u otra pantalla). */
-  private buscarEnCatalogoLocal(term: string): any[] | null {
-    const mem = this._productoService.filtrarListaMemoriaVenta(term, 300);
-    let fuente: any[] | null = mem;
-    if (fuente === null && (this.stockSucursales_const?.length || 0) > 0) {
-      fuente = (this.stockSucursales_const || []).filter((item: any) =>
-        productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term)
-      );
-    }
-    if (fuente === null) {
-      return null;
-    }
-    return this.obtenerCatalogoProductosOperativo(fuente).slice(0, this.buscadorLimiteFilas);
+  /** Precarga catálogo en memoria para filtrar al escribir (sin parpadeos). */
+  private cargarCatalogoBusquedaInline(evitarCache = false): void {
+    this._productoService.obtenerProductosTodos(evitarCache ? { evitarCache: true } : undefined).subscribe({
+      next: (res) => {
+        const raw = Array.isArray(res?.data) ? res.data : [];
+        const data = this.filtrarFilasCatalogoEmpresaOperativa(raw);
+        this.catalogoBusquedaInline = this.obtenerCatalogoProductosOperativo(data);
+        const term = this.searchTermInline.trim();
+        if (term.length >= this.buscadorInlineMinCaracteres) {
+          this.filtrarBusquedaInlineLocal(term);
+        }
+      },
+      error: () => {}
+    });
   }
 
-  abrirBuscadorProductos(): void {
-    this.buscadorProductosModal.abrir({
-      modo: 'venta',
-      idSucursal: String(this.ventas.idSucursal || ''),
-      venta: {
-        idSucursalApi: this.idSucursalParaBusquedaApi(),
-        esGestora: this.esGestora,
-        idSucursalDefault: String(this.ventas.idSucursal || ''),
-        buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
-        filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
-        onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano()
-      }
-    }).then((prod) => {
-      if (!prod) return;
-      this.fusionarFilasEnCatalogoMemoria([prod]);
-      this.agregarAlCarrito(prod);
-    });
+  private fusionarCatalogoBusquedaInline(filas: any[]): void {
+    const permitidas = (filas || []).filter((item) => this.productoPerteneceEmpresaOperativa(item));
+    if (!permitidas.length) {
+      return;
+    }
+    const clave = (r: any) =>
+      `${String(r.idProducto)}|${String(r.idSucursal || '')}|${String(r.idEmpresa || '')}`;
+    const map = new Map<string, any>();
+    for (const r of this.catalogoBusquedaInline) {
+      map.set(clave(r), r);
+    }
+    for (const r of permitidas) {
+      map.set(clave(r), r);
+    }
+    this.catalogoBusquedaInline = [...map.values()];
+  }
+
+  private filtrarBusquedaInlineLocal(term: string): void {
+    const filtrados = this.catalogoBusquedaInline
+      .filter((item) => productoCoincideBusquedaMultipalabra(item as Record<string, unknown>, term))
+      .slice(0, this.buscadorLimiteFilas);
+    this.aplicarResultadosBusquedaInline(filtrados);
+  }
+
+  onBusquedaInlineInput(): void {
+    const term = this.searchTermInline.trim();
+    if (term.length < this.buscadorInlineMinCaracteres) {
+      this.productosBusquedaInline = [];
+      this.buscadorInlineBuscando = false;
+      this.buscadorInlineMensaje =
+        term.length === 0
+          ? 'Escriba al menos 2 caracteres. Al escribir filtra el catálogo en memoria; use Buscar para consultar la base de datos.'
+          : `Escriba al menos ${this.buscadorInlineMinCaracteres} caracteres.`;
+      return;
+    }
+    if (this.catalogoBusquedaInline.length === 0) {
+      this.productosBusquedaInline = [];
+      this.buscadorInlineMensaje =
+        'Catálogo en carga. Pulse Buscar para consultar la base de datos ahora.';
+      return;
+    }
+    this.filtrarBusquedaInlineLocal(term);
+  }
+
+  /** Consulta productos en base de datos (botón Buscar / Enter). */
+  buscarProductosInlineDesdeBaseDatos(): void {
+    const term = this.searchTermInline.trim();
+    if (term.length < this.buscadorInlineMinCaracteres) {
+      this.productosBusquedaInline = [];
+      this.buscadorInlineMensaje = `Escriba al menos ${this.buscadorInlineMinCaracteres} caracteres para buscar.`;
+      return;
+    }
+    this.buscadorInlineMensaje = '';
+    this.buscadorInlineBuscando = true;
+    this._productoService
+      .buscarProductosVenta({
+        q: term,
+        limit: this.buscadorLimiteFilas,
+        idSucursal: this.idSucursalParaBusquedaApi(),
+        evitarCache: true
+      })
+      .subscribe({
+        next: (response) => this.procesarRespuestaBusquedaInline(response, true),
+        error: (err) => this.manejarErrorBusquedaInline(err)
+      });
+  }
+
+  private procesarRespuestaBusquedaInline(
+    response: { data?: unknown } | null | undefined,
+    fusionarEnCatalogo = false
+  ): void {
+    this.buscadorInlineBuscando = false;
+    if (!response) {
+      return;
+    }
+    const filas = Array.isArray(response.data) ? response.data : [];
+    const activos = filas.filter((item: unknown) =>
+      productoActivoParaVenta(item as Record<string, unknown>)
+    );
+    const permitidas = activos.filter((item) => this.productoPerteneceEmpresaOperativa(item));
+    if (fusionarEnCatalogo) {
+      this.fusionarCatalogoBusquedaInline(permitidas);
+    }
+    this.aplicarResultadosBusquedaInline(permitidas);
+  }
+
+  private manejarErrorBusquedaInline(err: { error?: { message?: string } }): void {
+    this.buscadorInlineBuscando = false;
+    this.productosBusquedaInline = [];
+    this.buscadorInlineMensaje = err?.error?.message || 'Error al buscar productos.';
+  }
+
+  private aplicarResultadosBusquedaInline(filas: any[]): void {
+    const permitidas = (filas || []).filter((item) => this.productoPerteneceEmpresaOperativa(item));
+    this.productosBusquedaInline = [...permitidas];
+    if (permitidas.length === 0) {
+      this.buscadorInlineMensaje = 'No se encontraron productos con ese criterio.';
+    } else if (permitidas.length >= this.buscadorLimiteFilas) {
+      this.buscadorInlineMensaje = `Mostrando los primeros ${this.buscadorLimiteFilas} resultados. Refine la búsqueda si no ve el producto.`;
+    } else {
+      this.buscadorInlineMensaje = '';
+    }
+  }
+
+  agregarProductoDesdeBusquedaInline(producto: any): void {
+    this.agregarAlCarrito(producto);
+    setTimeout(() => this.inputBusquedaInline?.nativeElement?.focus(), 0);
+  }
+
+  yaEstaEnCarritoInline(producto: any): boolean {
+    return this.carrito.some(
+      (p) =>
+        String(p.idProducto) === String(producto.idProducto) &&
+        String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
+        String(p.idEmpresa || '') === String(producto.idEmpresa || '')
+    );
+  }
+
+  sinStockBusquedaInline(producto: any): boolean {
+    return productoSinStockEnBusqueda(producto as Record<string, unknown>);
+  }
+
+  trackByProductoInline(_index: number, p: any): string {
+    return `${p.idProducto || ''}|${p.idSucursal || ''}|${p.idEmpresa || ''}`;
+  }
+
+  textoSucursalInline(producto: any): string {
+    if (this.esGestora) {
+      const alias = producto?.aliasEmpresa || '';
+      const suc = producto?.sucursal || '';
+      return alias ? `${alias} - ${suc}` : suc;
+    }
+    return String(producto?.sucursal ?? '');
   }
 
   private idSucursalParaBusquedaApi(): string | undefined {
@@ -1463,9 +1794,26 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       String(p.idEmpresa || '') === String(producto.idEmpresa || '')
     );
     if (existe) {
-      existe.cantidad += 1;
+      const cantNueva = (Number(existe.cantidad) || 0) + 1;
+      const stockVal = this.validarStockAgregarAlCarrito(existe, cantNueva);
+      if (!stockVal.valido) {
+        iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
+        return;
+      }
+      if (stockVal.advertencia) {
+        iziToast.info({ title: 'Stock', message: stockVal.advertencia, position: 'topRight' });
+      }
+      existe.cantidad = cantNueva;
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
+      const stockVal = this.validarStockAgregarAlCarrito(producto, 1);
+      if (!stockVal.valido) {
+        iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
+        return;
+      }
+      if (stockVal.advertencia) {
+        iziToast.info({ title: 'Stock', message: stockVal.advertencia, position: 'topRight' });
+      }
       const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
         ...producto,
@@ -1477,6 +1825,20 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       this.enriquecerLineaCarritoDesdeCatalogo(agregado);
             }
     this.actualizaTotales();
+  }
+
+  private validarStockAgregarAlCarrito(
+    producto: any,
+    cantidadNueva: number
+  ): { valido: boolean; mensaje?: string; advertencia?: string } {
+    const stock = this.obtenerStockDisponibleParaLineaCarrito(producto);
+    return validarStockLinea({
+      cantidadNueva,
+      stockDisponible: stock,
+      permitirVentasNegativas: this.permitirVentasNegativas,
+      nombreProducto: producto?.descripcion || producto?.codigo,
+      esServicio: esProductoServicio(producto?.codigoPresentacion)
+    });
   }
 
   
@@ -1497,8 +1859,11 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       const term = raw.toLowerCase();
       const fuenteMemoria = this.obtenerCatalogoProductosOperativo();
       if (fuenteMemoria.length > 0) {
-        this.aplicarResultadoBusquedaCodigo(this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw));
-        return;
+        const enMemoria = this.resolverProductoPorCodigoEnLista(fuenteMemoria, term, raw);
+        if (enMemoria) {
+          this.aplicarResultadoBusquedaCodigo(enMemoria);
+          return;
+        }
       }
       this._productoService
         .buscarProductosVenta({
@@ -1577,25 +1942,25 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     this.ventas.igvMonto = 0;
     this.ventas.total = 0;
 
-    const aplicarDescuentoLista = this.descuentoEnTotalConfigListo && this.usarDescuentoEnTotal;
-
     this.carrito.forEach(item => {
       const cant = Number(item.cantidad) || 0;
       const pVenta = Number(item.pVenta) || 0;
-      const subtotalItem = Math.round(pVenta * cant * 100) / 100;
-      this.ventas.subTotal += subtotalItem;
-      if (aplicarDescuentoLista) {
+      const aplicarDescuentoLinea = this.aplicaDescuentoEnTotalLinea(item);
+
+      if (aplicarDescuentoLinea) {
         const precioPrincipal = this.obtenerPrecioPrincipal(item);
+        const subtotalItem = Math.round(precioPrincipal * cant * 100) / 100;
+        this.ventas.subTotal += subtotalItem;
         if (precioPrincipal > pVenta) {
           this.ventas.descuentos += Math.round((precioPrincipal - pVenta) * cant * 100) / 100;
         }
+      } else {
+        const subtotalItem = Math.round(pVenta * cant * 100) / 100;
+        this.ventas.subTotal += subtotalItem;
       }
     });
 
     this.ventas.subTotal = Math.round(this.ventas.subTotal * 100) / 100;
-    if (!aplicarDescuentoLista) {
-      this.ventas.descuentos = 0;
-    }
     this.ventas.descuentos = Math.round(this.ventas.descuentos * 100) / 100;
     const neto = Math.round((this.ventas.subTotal - this.ventas.descuentos) * 100) / 100;
 
@@ -1636,6 +2001,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       .filter((i: { descripcion: string }) => (i.descripcion || '').toUpperCase().includes('ISC'))
       .reduce((s: number, i: { monto: number }) => s + i.monto, 0);
     this.ventas.total = Math.round((baseGravada + totalImpuestosASumar) * 100) / 100;
+    this.sincronizarPagoRapidoConTotal();
     this.guardarEstadoProvisional();
   }
 
@@ -1663,16 +2029,43 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
  obtenerPrecioPrincipal(item: any): number {
   if (!item.precios || typeof item.precios !== 'object') {
-    return item.precio || 0;
+    return Number(item.precio ?? item.pVenta) || 0;
   }
 
   const listaPrincipal = Object.values(item.precios).find(
-    (p: any) => p.principal === true
+    (p: any) => p.principal === true || p.principal === 1
   );
 
-  //return listaPrincipal ? listaPrincipal.precio : item.precio || 0;
-  return listaPrincipal ? (listaPrincipal as any).precio : item.pVenta || 0;
+  return listaPrincipal ? (listaPrincipal as any).precio : Number(item.pVenta ?? item.precio) || 0;
 }
+
+  private aplicaDescuentoEnTotalLinea(item: { idEmpresa?: string | null }): boolean {
+    if (!this.descuentoEnTotalConfigListo) return false;
+    if (!this.esGestora) return this.usarDescuentoEnTotal;
+    const idJwt = this.idEmpresaOperacionJwt().toLowerCase();
+    const idEmp =
+      item?.idEmpresa != null && String(item.idEmpresa).trim() !== ''
+        ? String(item.idEmpresa).trim().toLowerCase()
+        : idJwt;
+    if (this.descuentoPorEmpresa.has(idEmp)) {
+      return this.descuentoPorEmpresa.get(idEmp)!;
+    }
+    return this.usarDescuentoEnTotal;
+  }
+
+  private cargarDescuentoPorEmpresaGestora(): void {
+    this.gestoresService.obtenerDescuentoVentaPorEmpresas().subscribe({
+      next: (res) => {
+        const data = res?.data ?? {};
+        this.descuentoPorEmpresa.clear();
+        for (const [idEmpresa, activo] of Object.entries(data)) {
+          this.descuentoPorEmpresa.set(String(idEmpresa).trim().toLowerCase(), !!activo);
+        }
+        this.actualizaTotales();
+      },
+      error: () => {}
+    });
+  }
 
 /**
  * Abre el modal de selección de precios
@@ -2848,8 +3241,8 @@ abrirModalPrecios(item: any) {
       numero: String(this.ventas.numero || '00000000').substring(0, 8),
       compVenta: this.ventas.compVenta || this.ventas.serie + '-' + this.ventas.numero,
       idComprobante: Number(this.ventas.idComprobante),
-      fEmision: this.ventas.fEmision ? new Date(this.ventas.fEmision).toISOString() : new Date().toISOString(),
-      fVencimiento: this.ventas.fVencimiento ? new Date(this.ventas.fVencimiento).toISOString() : null,
+      fEmision: fechaEmisionVentaParaApi(this.ventas.fEmision),
+      fVencimiento: fechaVentaOpcionalParaApi(this.ventas.fVencimiento),
       idCliente,
       idMoneda: Number(this.ventas.idMoneda) || 1,
       tCambio: 1,
@@ -2893,7 +3286,7 @@ abrirModalPrecios(item: any) {
         igv: 0,
         isc: 0,
         total: subtotal,
-        hVenta: new Date().toISOString(),
+        hVenta: fechaEmisionVentaParaApi(this.ventas.fEmision),
         cantEntregada: esEstadoPendiente ? 0 : cant,
         idEstadoPedido: idEstadoPedidoVenta,
         idSucursalEmpresa: item.idSucursal || undefined,
@@ -2945,6 +3338,7 @@ abrirModalPrecios(item: any) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
+        this.confirmarCheckoutHotelSiCorresponde(idVentaPdf);
         const abrirPdf =
           this.mostrarModalPdfTrasRegistrarVenta && idVentaPdf != null;
         if (abrirPdf) {
@@ -3336,7 +3730,7 @@ abrirModalPrecios(item: any) {
       idEstadoPedido: this.configDefaults.idEstadoPedidoPorDefecto,
       idEstadoPago: this.configDefaults.idEstadoPagoPorDefecto,
       idMediosPago: this.getIdMediosPagoContado(),
-      fEmision: '',
+      fEmision: getFechaHoyLocal(),
       fechaPago: '',
       fVencimiento: '',
       observacion: '',
@@ -3377,6 +3771,7 @@ abrirModalPrecios(item: any) {
 
     this.actualizaTotales();
     this._productoService.limpiarCacheListaProductos();
+    this.enfocarEscanner();
   }
 }
 

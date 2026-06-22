@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const ProductosRepository = require('../repositories/productos.repository');
 const preciosVRepository = require('../repositories/preciosV.repository');
+const inventarioRepository = require('../repositories/inventario.repository');
 
 async function resolverIdUsuarioParaProducto(pool, idEmpresa, subFromToken) {
   if (!subFromToken || !idEmpresa) return null;
@@ -59,6 +60,9 @@ async function obtenerSiguienteCodigoCorrelativoDisponible(transaction, idEmpres
  */
 async function crearProductoConTransaccion(pool, params) {
   const { datosProducto, usarCorrelativo, lote, precioVenta, idListaPrecio, idEmpresa, preciosPorLista } = params;
+  const saasPlanLimitesService = require('./saasPlanLimites.service');
+  await saasPlanLimitesService.assertPuedeCrearProducto(pool, idEmpresa);
+  const productoInventarioMetaService = require('./productoInventarioMeta.service');
   const maxIntentosCodigo = 12;
   let committed = false;
   let lastDupErr = null;
@@ -81,7 +85,16 @@ async function crearProductoConTransaccion(pool, params) {
 
       await ProductosRepository.insertarProducto(transaction, datosProducto);
 
-      if (lote && lote.idSucursal && (lote.cantidadIngresada > 0 || lote.costoUnitario != null)) {
+      const controlaInventario = await productoInventarioMetaService.controlaInventarioPorIdPresentacion(
+        transaction,
+        datosProducto.idPresentacion
+      );
+      if (
+        controlaInventario &&
+        lote &&
+        lote.idSucursal &&
+        (lote.cantidadIngresada > 0 || lote.costoUnitario != null)
+      ) {
         const cantidad = Math.max(0, parseInt(lote.cantidadIngresada, 10) || 0);
         const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
         await ProductosRepository.insertarLoteInicial(transaction, {
@@ -202,7 +215,24 @@ async function crearProductoCompra(pool, datosProducto) {
 }
 
 async function actualizarProducto(pool, detalle) {
-  return ProductosRepository.actualizarProductoFlexible(pool, detalle);
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin();
+  try {
+    const result = await ProductosRepository.actualizarProductoFlexible(transaction, detalle);
+    if (detalle.cUnitario != null && !Number.isNaN(Number(detalle.cUnitario))) {
+      await inventarioRepository.actualizarCostoLoteRecienteSiCero(
+        transaction,
+        detalle.idEmpresa,
+        detalle.idProducto,
+        Number(detalle.cUnitario)
+      );
+    }
+    await transaction.commit();
+    return result;
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
 }
 
 /**

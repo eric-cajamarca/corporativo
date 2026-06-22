@@ -70,6 +70,7 @@ const externalRoutes = require('./routes/external');
 const inventarioRoutes = require('./routes/inventario');
 const reservasRoutes = require('./routes/reservas');
 const consumoHabitacionRoutes = require('./routes/consumoHabitacion');
+const hotelRoutes = require('./routes/hotel');
 const webhooksRoutes = require('./routes/webhooks');
 const {
   pasarelaWebhookRawBody,
@@ -284,6 +285,7 @@ app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api', reservasRoutes);
 app.use('/api', consumoHabitacionRoutes);
+app.use('/api', hotelRoutes);
 app.use('/api', suscripcionRoutes);
 const grifoRoutes = require('./routes/grifo');
 app.use('/api', grifoRoutes);

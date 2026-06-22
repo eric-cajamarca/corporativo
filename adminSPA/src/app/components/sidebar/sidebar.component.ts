@@ -33,6 +33,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   // Estado de configuración de la empresa
   estadoConfiguracion = signal<any>(null);
+  /** Código rubro sistema (HOTEL, GRF, etc.) para etiquetas del menú. */
+  codigoRubroEmpresa = signal<string | null>(null);
 
   // Eventos
   @Output() sidebarToggle = new EventEmitter<boolean>();
@@ -75,6 +77,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.cargarEstadoConfiguracion();
+    this.cargarRubroEmpresa();
     this.cargarNavegacion();
 
     // Abrir el submenú que contiene la ruta actual al navegar (conserva flechas y estado)
@@ -103,11 +106,62 @@ export class SidebarComponent implements OnInit, OnDestroy {
   /**
    * Carga el estado de configuración de la empresa
    */
+  private cargarRubroEmpresa(): void {
+    const actual = this.empresaService.getEmpresaActual()?.codigoRubro;
+    if (actual) {
+      this.codigoRubroEmpresa.set(String(actual).trim().toUpperCase());
+      return;
+    }
+    this.empresaService.refreshEmpresaFromApi().subscribe({
+      next: (emp) => {
+        const cod = emp?.codigoRubro != null ? String(emp.codigoRubro).trim().toUpperCase() : '';
+        this.codigoRubroEmpresa.set(cod || null);
+        this.refrescarEtiquetaHistorialVentas();
+      },
+      error: () => {}
+    });
+  }
+
+  private esRubroHotel(): boolean {
+    const cod = String(this.codigoRubroEmpresa() || '').trim().toUpperCase();
+    return cod === 'HOTEL' || cod === 'HTL';
+  }
+
+  private etiquetaHistorialVentas(): string {
+    return this.esRubroHotel() ? 'Recepción' : 'Historial';
+  }
+
+  /** Renombra «Historial» → «Recepción» en submenús de ventas cuando el rubro es hotel. */
+  private parchearSubmenuVentas(submenu: SubMenuItem[]): SubMenuItem[] {
+    if (!this.esRubroHotel()) return submenu;
+    const label = this.etiquetaHistorialVentas();
+    return submenu.map((s) => {
+      if (s.ruta === '/ventas' && (s.nombre === 'Historial' || s.nombre === 'Recepción')) {
+        return { ...s, nombre: label };
+      }
+      if (s.submenu?.length) {
+        return { ...s, submenu: this.parchearSubmenuVentas(s.submenu) };
+      }
+      return s;
+    });
+  }
+
+  private refrescarEtiquetaHistorialVentas(): void {
+    const estado = this.estadoConfiguracion();
+    if (estado) {
+      this.actualizarNavegacionSegunEstado(estado);
+      return;
+    }
+    const nav = this.permisosService.navegacion();
+    if (nav?.length) {
+      this.menuItems.set(nav.map((i) => this.patchItemNavegacion(i, {})));
+    }
+  }
+
   private cargarEstadoConfiguracion(): void {
     this.empresaService.getEstadoConfiguracion().subscribe({
       next: (response) => {
-                this.estadoConfiguracion.set(response.data);
-        // Actualizar navegación según el estado
+        this.estadoConfiguracion.set(response.data);
         this.actualizarNavegacionSegunEstado(response.data);
       },
       error: (error) => {
@@ -145,6 +199,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
         submenu: this.buildSubmenuVentas()
       };
     }
+    if (item.submenu?.length && mod === 'ventas') {
+      return { ...item, submenu: this.parchearSubmenuVentas(item.submenu) };
+    }
     if (item.submenu?.length && mod === 'compras') {
       return { ...item, submenu: this.mergeSubmenuComprasSunat(item.submenu, item.visible !== false) };
     }
@@ -157,6 +214,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private patchSubmenuDominio(sub: SubMenuItem, estado: any): SubMenuItem {
     if (sub.tipo === 'modulo' && sub.modulo) {
       const mod = sub.modulo.toString().toLowerCase();
+      if (mod === 'ventas' && sub.submenu) {
+        return { ...sub, submenu: this.parchearSubmenuVentas(sub.submenu) };
+      }
       if (mod === 'compras' && sub.submenu) {
         return { ...sub, submenu: this.mergeSubmenuComprasSunat(sub.submenu, true) };
       }
@@ -322,8 +382,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private buildSubmenuVentas(): SubMenuItem[] {
+    const labelHistorial = this.etiquetaHistorialVentas();
     return [
-      { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
+      { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'VER_VENTAS', visible: true },
+      { nombre: labelHistorial, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
       {
         nombre: 'Reporte detallado',
         ruta: '/ventas/reporte-detallado',
@@ -544,7 +606,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   navigateTo(ruta: string | null): void {
     if (ruta) {
       const target = this.normalizarRuta(ruta);
-      if (target === '/ventas/create' || target === '/ventas/rapida') {
+      if (target === '/ventas/create') {
         const segments = target.split('/').filter(Boolean);
         const url = this.router.serializeUrl(this.router.createUrlTree(segments));
         window.open(url, '_blank');

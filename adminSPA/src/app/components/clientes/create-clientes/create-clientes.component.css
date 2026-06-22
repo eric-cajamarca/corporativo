@@ -4,6 +4,11 @@
     min-height: 100vh;
     background: #f5f7fa;
   }
+
+  :host.create-cliente-host-embed {
+    min-height: auto;
+    background: transparent;
+  }
   
   .main-content {
     margin-left: 260px;
@@ -31,6 +36,47 @@
     max-width: 640px;
     min-width: 0;
     margin: 0 auto;
+  }
+
+  /* Vista embebida en modal (ventas / hotel) */
+  .create-cliente-embed {
+    margin: 0;
+    padding: 0;
+    min-height: auto;
+    display: block;
+    background: transparent;
+  }
+
+  .create-cliente-form {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .create-cliente-form .card {
+    border: none;
+    box-shadow: none;
+    margin-bottom: 0.5rem;
+  }
+
+  .create-cliente-form .card-header {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .create-cliente-form .form-group.row {
+    margin-bottom: 0.5rem !important;
+  }
+
+  .create-cliente-form .form-label {
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .create-cliente-form .input-group {
+    margin-bottom: 0;
   }
   
 

@@ -5,6 +5,7 @@ const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const consumoHabitacionController = require('../controllers/consumoHabitacionController');
 
 api.use(auth.auth);
+api.use(requireRubro('HOTEL'));
 
 api.get('/consumo-habitacion', consumoHabitacionController.listar);
 api.post('/consumo-habitacion', requireRubro('HOTEL'), consumoHabitacionController.agregar);

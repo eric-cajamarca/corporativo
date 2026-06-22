@@ -1420,6 +1420,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
   const stockRepository = require('./stock.repository');
   const inventarioRepository = require('./inventario.repository');
   const stockService = require('../services/stock.service');
+  const productoInventarioMetaService = require('../services/productoInventarioMeta.service');
   const gestoresRepository = require('./gestores.repository');
 
   const transaction = new sql.Transaction(pool);
@@ -1573,6 +1574,12 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       if (!sincronizarStockEdicion) return;
       const cant = parseFloat(cantRestore) || 0;
       if (cant <= 0 || !idProductoRestore) return;
+      const meta = await productoInventarioMetaService.obtenerMeta(
+        transaction,
+        idEmpresa,
+        idProductoRestore
+      );
+      if (!meta.controlaInventario) return;
       await stockRepository.restaurarStockEnLotes(transaction, {
         idEmpresa,
         idSucursal,
@@ -1606,6 +1613,17 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
       if (!sincronizarStockEdicion) return descuentoVacioRet(costoFallback);
       const cantPed = parseFloat(cantPedida) || 0;
       if (cantPed <= 0 || !idProductoDesc) return descuentoVacioRet(costoFallback);
+
+      const meta = await productoInventarioMetaService.obtenerMeta(transaction, idEmpresa, idProductoDesc);
+      if (!meta.controlaInventario) {
+        const costoU = meta.cUnitario;
+        return {
+          costoTotalDescontado: cantPed * costoU,
+          cantidadDescontada: 0,
+          costoUnitarioProm: costoU
+        };
+      }
+
       const stockDisponible = await stockService.obtenerStockDisponible(transaction, idEmpresa, idProductoDesc, idSucursal);
       if (!permitirVentasNegativas && stockDisponible + EPS_Q < cantPed) {
         throw new Error(
@@ -1786,6 +1804,11 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
         costoTotal = (Number(oldRowFull.costoTotal) || 0) * ratio;
         costoUnitario = cantidad > EPS_Q ? costoTotal / cantidad : 0;
       } else if (sincronizarStockEdicion && costoTotal === 0 && cantidad > 0) {
+        const metaCosto = await productoInventarioMetaService.obtenerMeta(transaction, idEmpresa, idProducto);
+        if (!metaCosto.controlaInventario) {
+          costoUnitario = metaCosto.cUnitario;
+          costoTotal = cantidad * costoUnitario;
+        } else {
         const rLote = await transaction.request()
           .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
           .input('idProducto', sql.UniqueIdentifier, idProducto)
@@ -1797,6 +1820,7 @@ exports.actualizarVentaCompleta = async (pool, idVenta, idEmpresa, cabecera, det
           `);
         costoUnitario = Number((rLote.recordset[0] || {}).costoUnitario || 0);
         costoTotal = cantidad * costoUnitario;
+        }
       } else if (costoTotal > 0 && costoUnitario === 0 && cantidad > 0) {
         costoUnitario = costoTotal / cantidad;
       }

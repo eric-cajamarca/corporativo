@@ -7,6 +7,7 @@ async function listar(pool, idEmpresa, filtros = {}) {
     const { estado, idProductoHabitacion } = filtros;
     let query = `
         SELECT r.idReserva, r.idEmpresa, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+               r.idEstancia,
                CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                r.estado, r.total, r.observaciones,
@@ -37,6 +38,7 @@ async function obtenerPorId(pool, idReserva, idEmpresa) {
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .query(`
             SELECT r.idReserva, r.idEmpresa, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   r.idEstancia,
                    CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                    CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                    r.estado, r.total, r.observaciones,
@@ -77,7 +79,7 @@ async function crear(pool, idEmpresa, payload, idUsuario = null) {
         .input('nombreHuesped', sql.VarChar(200), nombreHuesped)
         .input('fechaEntrada', sql.Date, fechaEntrada)
         .input('fechaSalida', sql.Date, fechaSalida)
-        .input('estado', sql.VarChar(20), estado || 'vigente')
+        .input('estado', sql.VarChar(20), estado || 'confirmada')
         .input('total', sql.Decimal(18, 2), total ?? 0)
         .input('observaciones', sql.VarChar(500), observaciones || null)
         .input('idUsuario', sql.UniqueIdentifier, idUsuario)
@@ -123,67 +125,49 @@ async function eliminar(pool, idReserva, idEmpresa) {
     return result.rowsAffected[0];
 }
 
-/**
- * Detecta solapamiento de fechas con otra reserva vigente en la misma habitación.
- */
-async function existeSolapamiento(pool, idEmpresa, idProductoHabitacion, fechaEntrada, fechaSalida, excluirIdReserva = null) {
-    let query = `
-        SELECT TOP 1 r.idReserva
-        FROM Reservas r
-        WHERE r.idEmpresa = @idEmpresa
-          AND r.idProductoHabitacion = @idProductoHabitacion
-          AND r.estado = 'vigente'
-          AND r.fechaEntrada < @fechaSalida
-          AND r.fechaSalida > @fechaEntrada
-    `;
-    const req = pool.request()
+async function vincularEstancia(pool, idReserva, idEmpresa, idEstancia, estado = 'convertida') {
+    await pool.request()
+        .input('idReserva', sql.UniqueIdentifier, idReserva)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
-        .input('fechaEntrada', sql.Date, fechaEntrada)
-        .input('fechaSalida', sql.Date, fechaSalida);
-    if (excluirIdReserva) {
-        query += ' AND r.idReserva <> @excluirIdReserva';
-        req.input('excluirIdReserva', sql.UniqueIdentifier, excluirIdReserva);
-    }
-    const result = await req.query(query);
-    return !!(result.recordset && result.recordset[0]);
+        .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+        .input('estado', sql.VarChar(20), estado)
+        .query(`
+            UPDATE Reservas SET idEstancia = @idEstancia, estado = @estado
+            WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa
+        `);
 }
 
-async function cerrarPostVenta(pool, idEmpresa, { idProductoHabitacion, idVenta, idReserva = null }) {
-    if (!idProductoHabitacion) throw new Error('Habitación requerida');
-    if (!idVenta) throw new Error('idVenta requerido');
-
+async function cancelar(pool, idReserva, idEmpresa) {
     await pool.request()
+        .input('idReserva', sql.UniqueIdentifier, idReserva)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-        .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
         .query(`
-            DELETE FROM ConsumoHabitacion
-            WHERE idEmpresa = @idEmpresa AND idProductoHabitacion = @idProductoHabitacion
+            UPDATE Reservas SET estado = 'cancelada'
+            WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa AND estado = 'confirmada'
         `);
+}
 
-    if (idReserva) {
-        await pool.request()
-            .input('idReserva', sql.UniqueIdentifier, idReserva)
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('idVenta', sql.Int, idVenta)
-            .query(`
-                UPDATE Reservas
-                SET estado = 'sin_efecto', idVenta = @idVenta
-                WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa
-            `);
-    } else {
-        await pool.request()
-            .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-            .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
-            .input('idVenta', sql.Int, idVenta)
-            .query(`
-                UPDATE Reservas
-                SET estado = 'sin_efecto', idVenta = @idVenta
-                WHERE idEmpresa = @idEmpresa
-                  AND idProductoHabitacion = @idProductoHabitacion
-                  AND estado = 'vigente'
-            `);
-    }
+/** Reservas confirmadas que intersectan un rango de fechas calendario (DATE). */
+async function listarConfirmadasEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('fechaDesde', sql.Date, fechaDesde)
+        .input('fechaHasta', sql.Date, fechaHasta)
+        .query(`
+            SELECT r.idReserva, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
+                   CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
+                   r.estado, r.total,
+                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
+            FROM Reservas r
+            INNER JOIN Productos p ON r.idProductoHabitacion = p.idProducto
+            WHERE r.idEmpresa = @idEmpresa
+              AND r.estado = 'confirmada'
+              AND r.fechaEntrada < @fechaHasta
+              AND r.fechaSalida > @fechaDesde
+            ORDER BY r.fechaEntrada, p.codigo
+        `);
+    return result.recordset;
 }
 
 module.exports = {
@@ -193,6 +177,7 @@ module.exports = {
     crear,
     actualizar,
     eliminar,
-    existeSolapamiento,
-    cerrarPostVenta
+    vincularEstancia,
+    cancelar,
+    listarConfirmadasEnRango
 };

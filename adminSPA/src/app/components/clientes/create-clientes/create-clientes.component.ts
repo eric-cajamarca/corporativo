@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges, inject, HostBinding } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -8,17 +8,25 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { SidebarStateService } from '../../../services/sidebar-state.service';
+import { SidebarComponent } from '../../sidebar/sidebar.component';
 
 declare var iziToast: any;
 declare var $: any;
 
 @Component({
   selector: 'app-create-clientes',
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent],
+  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, SidebarComponent],
   templateUrl: './create-clientes.component.html',
   styleUrl: './create-clientes.component.css'
 })
 export class CreateClientesComponent implements OnInit, OnChanges {
+  public sidebarState = inject(SidebarStateService);
+
+  @HostBinding('class.create-cliente-host-embed')
+  get hostEmbedModal(): boolean {
+    return this.desdeVenta;
+  }
   /** Cuando se abre desde nueva venta: tipo de documento pre-seleccionado. */
   @Input() idDocumentoPre?: string;
   /** Cuando se abre desde nueva venta: RUC o DNI pre-cargado. */
@@ -64,6 +72,7 @@ export class CreateClientesComponent implements OnInit, OnChanges {
     principal: true,
     codLocal: '0000',
     urbanizacion: '',
+    direccion: '',
   };
   public data: any = {};
   /** Establecimientos RUC (Factiliza): lista mostrada en modal */
@@ -118,7 +127,6 @@ export class CreateClientesComponent implements OnInit, OnChanges {
       }
     );
     this.aplicarPrecargaDesdeVentaInputs();
-    this.select_pais();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -135,9 +143,29 @@ export class CreateClientesComponent implements OnInit, OnChanges {
     const r = this.rucPre;
     if (id != null && String(id).trim() !== '') {
       this.clientes.idDocumento = String(id).trim();
+      this.onCambioTipoDocumento(this.clientes.idDocumento);
     }
     if (r != null && String(r).trim() !== '') {
       this.clientes.ruc = String(r).trim();
+    }
+  }
+
+  get esDni(): boolean {
+    return String(this.clientes.idDocumento) === '1';
+  }
+
+  /** DNI: dirección por defecto "-" para permitir guardar sin completar el campo. */
+  onCambioTipoDocumento(idDocumento: string): void {
+    if (String(idDocumento) === '1') {
+      this.aplicarDireccionPorDefectoDni();
+    }
+  }
+
+  private aplicarDireccionPorDefectoDni(): void {
+    if (!this.esDni) return;
+    const dir = (this.direccionClientes.direccion ?? '').toString().trim();
+    if (!dir) {
+      this.direccionClientes.direccion = '-';
     }
   }
 
@@ -342,6 +370,7 @@ private async handleDniSearch(): Promise<void> {
     const nom = (data.nombres ?? '').trim();
     const partes = [ap, am, nom].filter(Boolean);
     this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
+    this.direccionClientes.direccion = '-';
   } catch (error) {
     console.error('Error en búsqueda DNI:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
@@ -513,6 +542,9 @@ private showError(message: string): void {
   private prepararPrimeraDireccionAltaCliente(): void {
     this.direccionClientes.principal = true;
     this.direccionClientes.codLocal = '0000';
+    if (this.esDni) {
+      this.aplicarDireccionPorDefectoDni();
+    }
   }
 
   /** Construye payload para POST direccionClientes a partir de un establecimiento normalizado (region/provincia/distrito como IDs). */
@@ -536,18 +568,19 @@ private showError(message: string): void {
   }
 
   
+  private setSelectDisabled(elementId: string, disabled: boolean): void {
+    const el = document.getElementById(elementId) as HTMLSelectElement | null;
+    if (el) {
+      el.disabled = disabled;
+    }
+  }
+
   select_pais() {
-  const pais = 'Perú';
-  
   if (this.direccionClientes.codpais == 'PEN') {
-    // Habilitar select de región
-    const regionSelect = document.getElementById('sl-region') as HTMLSelectElement;
-    regionSelect.disabled = false;
+    this.setSelectDisabled('sl-region', false);
     
-    // Obtener regiones
     this._adminService.get_Regiones().subscribe(
       response => {
-                // Usar map en lugar de forEach + push (más eficiente)
         this.regiones = response.map((element: any) => ({
           id: element.id,
           name: element.name
@@ -555,16 +588,10 @@ private showError(message: string): void {
       }
     );
   } else {
-    // Deshabilitar todos los selects
-    const regionSelect = document.getElementById('sl-region') as HTMLSelectElement;
-    const provinciaSelect = document.getElementById('sl-provincia') as HTMLSelectElement;
-    const distritoSelect = document.getElementById('sl-distrito') as HTMLSelectElement;
+    this.setSelectDisabled('sl-region', true);
+    this.setSelectDisabled('sl-provincia', true);
+    this.setSelectDisabled('sl-distrito', true);
     
-    regionSelect.disabled = true;
-    provinciaSelect.disabled = true;
-    distritoSelect.disabled = true;
-    
-    // Limpiar arrays y modelos
     this.regiones = [];
     this.provincias = [];
     this.distritos = [];
@@ -576,23 +603,15 @@ private showError(message: string): void {
 
  
   select_region() {
-  // Limpiar arrays y valores
   this.provincias = [];
   this.direccionClientes.provincia = '';
   this.direccionClientes.distrito = '';
 
-  // Obtener elementos del DOM nativamente
-  const provinciaSelect = document.getElementById('sl-provincia') as HTMLSelectElement;
-  const distritoSelect = document.getElementById('sl-distrito') as HTMLSelectElement;
+  this.setSelectDisabled('sl-provincia', false);
+  this.setSelectDisabled('sl-distrito', true);
 
-  // Cambiar estados de los selects
-  provinciaSelect.disabled = false;
-  distritoSelect.disabled = true;
-
-  // Obtener provincias
   this._adminService.get_Procincias().subscribe(
     response => {
-      // Usar filter en lugar de forEach + if
       this.provincias = response.filter((element: any) => 
         element.department_id == this.direccionClientes.region
       );
@@ -603,15 +622,11 @@ private showError(message: string): void {
   
 
   select_provincia() {
-  // Limpiar distritos y valor actual
   this.distritos = [];
   this.direccionClientes.distrito = '';
 
-  // Habilitar select de distrito (versión nativa)
-  const distritoSelect = document.getElementById('sl-distrito') as HTMLSelectElement;
-  distritoSelect.disabled = false;
+  this.setSelectDisabled('sl-distrito', false);
 
-  // Obtener distritos
   this._adminService.get_Distritos().subscribe(
     response => {
       // Versión optimizada con filter
@@ -631,6 +646,9 @@ private showError(message: string): void {
 
         
     // if (registroForm.valid) {
+      if (this.esDni) {
+        this.aplicarDireccionPorDefectoDni();
+      }
       this.btn_registrar = true;
       this.data = this.clientes;
             //convertir array this.clientes a un objeto para pasarlo a mi servicio
@@ -753,5 +771,9 @@ private showError(message: string): void {
       // Realiza acciones cuando el checkbox está desmarcado
     }
     
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

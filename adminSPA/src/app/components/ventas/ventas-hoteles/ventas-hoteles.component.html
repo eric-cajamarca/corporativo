@@ -4,29 +4,46 @@
 <main class="main-content hotel-main" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <!-- Cabecera módulo hotelería -->
   <header class="hotel-header">
-    <div class="hotel-header-inner">
+        <div class="hotel-header-inner">
       <div class="hotel-header-brand">
         <span class="hotel-icon" aria-hidden="true"></span>
         <div>
           <h1 class="hotel-title">Módulo de Hotelería</h1>
-          <p class="hotel-subtitle">Reservas, habitaciones y consumo</p>
+          <p class="hotel-subtitle">Reservas, estancias y consumo</p>
         </div>
       </div>
+      <div class="d-flex align-items-center gap-2">
       <div class="hotel-header-stats">
         <div class="hotel-stat">
           <span class="hotel-stat-value">{{ reservas.length }}</span>
           <span class="hotel-stat-label">Reservas</span>
         </div>
         <div class="hotel-stat">
-          <span class="hotel-stat-value">{{ vigentesCount }}</span>
-          <span class="hotel-stat-label">Vigentes</span>
+          <span class="hotel-stat-value">{{ confirmadasCount }}</span>
+          <span class="hotel-stat-label">Confirmadas</span>
         </div>
+        <div class="hotel-stat">
+          <span class="hotel-stat-value">{{ estanciasActivasCount }}</span>
+          <span class="hotel-stat-label">In-house</span>
+        </div>
+      </div>
+      <a routerLink="/hotel/configuracion" class="btn btn-outline-light btn-sm">
+        <i class="fas fa-cog me-1"></i> Configuración
+      </a>
       </div>
     </div>
   </header>
 
   <!-- Pestañas -->
   <nav class="hotel-tabs">
+    <button
+      type="button"
+      class="hotel-tab"
+      [class.hotel-tab-active]="activeTab() === 'calendario'"
+      (click)="setTab('calendario')">
+      <i class="fas fa-calendar-alt me-2"></i>
+      Calendario
+    </button>
     <button
       type="button"
       class="hotel-tab"
@@ -51,9 +68,95 @@
       <i class="fas fa-receipt me-2"></i>
       Consumo / Ventas
     </button>
+    <button
+      type="button"
+      class="hotel-tab"
+      [class.hotel-tab-active]="activeTab() === 'housekeeping'"
+      (click)="setTab('housekeeping')">
+      <i class="fas fa-broom me-2"></i>
+      Housekeeping
+    </button>
+    <button
+      type="button"
+      class="hotel-tab"
+      [class.hotel-tab-active]="activeTab() === 'reportes'"
+      (click)="setTab('reportes')">
+      <i class="fas fa-chart-bar me-2"></i>
+      Reportes
+    </button>
   </nav>
 
   <div class="hotel-content">
+    <!-- Tab Calendario (tape chart) -->
+    @if (activeTab() === 'calendario') {
+      <section class="hotel-section">
+        <div class="hotel-section-header flex-wrap gap-2">
+          <h2 class="hotel-section-title mb-0">Calendario de ocupación</h2>
+          <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="calendarioSemanaAnterior()">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="calendarioIrHoy()">Hoy</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" (click)="calendarioSemanaSiguiente()">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+            <span class="small text-muted">{{ calendarioDesde }} → {{ calendarioHasta }}</span>
+            <button type="button" class="btn btn-hotel-primary btn-sm" (click)="abrirModalBloqueo()">
+              <i class="fas fa-ban me-1"></i> Bloquear habitación
+            </button>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-3 mb-3 small">
+          <span><span class="tape-legend tape-bar-estancia"></span> In-house</span>
+          <span><span class="tape-legend tape-bar-reserva"></span> Reserva confirmada</span>
+          <span><span class="tape-legend tape-bar-bloqueo"></span> Bloqueo</span>
+          <span class="text-muted ms-2">Arrastre una barra de reserva para cambiar fechas</span>
+        </div>
+        @if (errorMessage()) {
+          <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
+        }
+        @if (calendarioLoading()) {
+          <p class="text-muted">Cargando calendario…</p>
+        } @else {
+          <div class="hotel-tape-chart">
+            <div class="tape-header-row">
+              <div class="tape-room-col tape-header-cell">Habitación</div>
+              <div class="tape-days-header">
+                @for (d of getDiasCalendario(); track d) {
+                  <div class="tape-day-header">{{ formatoDiaCalendario(d) }}</div>
+                }
+              </div>
+            </div>
+            @for (hab of (calendarioData?.habitaciones ?? productosHabitacion); track hab.idProducto) {
+              <div class="tape-row">
+                <div class="tape-room-col" [title]="hab.descripcion">
+                  <strong>{{ hab.codigo }}</strong>
+                  <div class="small text-muted text-truncate">{{ hab.descripcion }}</div>
+                </div>
+                <div class="tape-track">
+                  @for (d of getDiasCalendario(); track d) {
+                    <div class="tape-day-cell"></div>
+                  }
+                  @for (ev of getEventosHabitacion(hab.idProducto); track ev.idReserva || ev.idEstancia || ev.idBloqueo) {
+                    <button type="button" class="tape-bar" [ngClass]="claseBarraEvento(ev)" [ngStyle]="barStyleEvento(ev)"
+                      (mousedown)="ev.tipo === 'reserva' ? iniciarDragReserva(ev, $event) : null"
+                      (click)="onClickEventoCalendario(ev, hab)" [title]="labelEventoCalendario(ev)">
+                      {{ labelEventoCalendario(ev) }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+          @if ((calendarioData?.habitaciones ?? productosHabitacion).length === 0) {
+            <div class="hotel-empty mt-3">
+              <p class="mb-0 text-muted">No hay habitaciones (productos ZZ) para mostrar.</p>
+            </div>
+          }
+        }
+      </section>
+    }
+
     <!-- Tab Reservas -->
     @if (activeTab() === 'reservas') {
       <section class="hotel-section">
@@ -82,7 +185,7 @@
                     <th>Salida</th>
                     <th>Estado</th>
                     <th class="text-end">Total</th>
-                    <th class="text-end">Acciones</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -95,18 +198,16 @@
                       <td>{{ r.fechaSalida }}</td>
                       <td>
                         <span class="hotel-badge" [ngClass]="estadoReservaClass(r.estado)">
-                          {{ estadoReservaLabels[r.estado] }}
+                          {{ labelEstadoReserva(r.estado) }}
                         </span>
                       </td>
                       <td class="text-end fw-semibold">{{ formatearMoneda(r.total) }}</td>
-                      <td class="text-end">
-                        <div class="d-flex justify-content-end gap-1 flex-wrap">
-                          <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalEditarReserva(r)">Editar</button>
-                          @if (r.estado === 'vigente') {
-                            <button type="button" class="btn btn-sm btn-outline-warning" (click)="anularReserva(r)">Anular</button>
-                          }
-                          <button type="button" class="btn btn-sm btn-outline-danger" (click)="eliminarReserva(r)">Eliminar</button>
-                        </div>
+                      <td class="text-end text-nowrap">
+                        @if (reservaEsConfirmada(r)) {
+                          <button type="button" class="btn btn-sm btn-success me-1" (click)="abrirModalCheckInDesdeReserva(r)">Check-in</button>
+                          <button type="button" class="btn btn-sm btn-outline-primary me-1" (click)="abrirModalAnticipo(r)">Anticipo</button>
+                          <button type="button" class="btn btn-sm btn-outline-danger" (click)="cancelarReserva(r)">Cancelar</button>
+                        }
                       </td>
                     </tr>
                   }
@@ -130,29 +231,88 @@
         <div class="hotel-section-header">
           <h2 class="hotel-section-title">Estado de habitaciones</h2>
         </div>
-        <p class="text-muted small mb-3">Verde: disponible · Amarillo: reservada · Rojo: ocupada. Use "Ver detalles" para consumo y venta.</p>
+        <p class="text-muted small mb-3">
+          Verde: libre · Amarillo: reserva con llegada hoy · Rojo: huésped in-house · Gris: bloqueada o fuera de servicio.
+          Check-in solo si está <strong>limpia</strong> o <strong>en limpieza</strong> (no sucia ni fuera de servicio).
+        </p>
         @if (errorMessage()) {
           <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
         }
+        <div class="hotel-habitaciones-toolbar mb-3">
+          <div class="hotel-habitaciones-filtro-wrap">
+            <i class="fas fa-search hotel-habitaciones-filtro-icon" aria-hidden="true"></i>
+            <input
+              type="search"
+              class="form-control hotel-habitaciones-filtro-input"
+              [(ngModel)]="filtroHabitaciones"
+              placeholder="Buscar por nº habitación, estado o huésped…"
+              autocomplete="off"
+              aria-label="Filtrar habitaciones" />
+            @if (filtroHabitaciones.trim()) {
+              <button type="button" class="btn btn-sm btn-link hotel-habitaciones-filtro-clear" (click)="limpiarFiltroHabitaciones()" title="Limpiar búsqueda">
+                <i class="fas fa-times"></i>
+              </button>
+            }
+          </div>
+          <span class="hotel-habitaciones-filtro-count small text-muted">
+            {{ habitacionesFiltradas.length }} / {{ productosHabitacion.length }} habitaciones
+          </span>
+        </div>
         <div class="hotel-rooms-grid-compact">
-          @for (hab of productosHabitacion; track hab.idProducto) {
-            @let reserva = getReservaVigentePorHabitacion(hab.idProducto);
+          @for (hab of habitacionesFiltradas; track hab.idProducto) {
+            @let est = getEstanciaActiva(hab.idProducto);
+            @let proxRes = getProximaReservaConfirmada(hab.idProducto);
             @let estado = getEstadoHabitacion(hab);
-            <div class="hotel-room-card-compact" [class.hotel-card-ocupada]="estado === 'ocupada'" [class.hotel-card-reservada]="estado === 'reservada'" [class.hotel-card-disponible]="estado === 'disponible'">
+            <div class="hotel-room-card-compact"
+              [class.hotel-card-ocupada]="estado === 'ocupada'"
+              [class.hotel-card-reservada]="estado === 'reservada'"
+              [class.hotel-card-disponible]="estado === 'disponible'"
+              [class.hotel-card-bloqueada]="estado === 'bloqueada'">
               <div class="hotel-card-compact-numero">{{ hab.codigo }}</div>
+              @if (!getEstanciaActiva(hab.idProducto)) {
+                @let limp = getEstadoLimpieza(hab.idProducto);
+                @if (limp !== 'limpia') {
+                  <span class="hotel-badge small mb-1" [class.hotel-badge-sucia]="limp === 'sucia'" [class.hotel-badge-limpieza]="limp === 'en_limpieza'" [class.hotel-badge-fuera]="limp === 'fuera_servicio'">
+                    {{ labelEstadoLimpieza(limp) }}
+                  </span>
+                }
+              }
+              @if (estado === 'bloqueada') {
+                <div class="hotel-card-compact-huesped small text-muted">{{ motivoNoCheckIn(hab) || 'No disponible' }}</div>
+              } @else if (est) {
+                <div class="hotel-card-compact-huesped small text-truncate" [title]="est.nombreHuesped">{{ est.nombreHuesped }}</div>
+              } @else if (proxRes) {
+                <div class="hotel-card-compact-huesped small text-muted">Reserva {{ proxRes.fechaEntrada }}</div>
+              }
               <div class="hotel-card-compact-fechas">
-                @if (reserva) {
-                  <span>Ing: {{ reserva.fechaEntrada }}</span>
-                  <span>Sal: {{ reserva.fechaSalida }}</span>
+                @if (est) {
+                  <span>In: {{ est.checkIn | slice:0:10 }}</span>
+                  <span class="hotel-card-compact-hora">Registro: {{ formatHoraRegistroHuesped(est.checkIn) }}</span>
+                  <span>Sal: {{ est.checkOutPrevisto | slice:0:10 }}</span>
+                } @else if (proxRes) {
+                  <span>Próx: {{ proxRes.fechaEntrada }}</span>
                 } @else {
-                  <span class="text-muted">—</span>
+                  <span class="text-muted">Libre</span>
                 }
               </div>
               <div class="hotel-card-compact-total">{{ formatearMoneda(getTotalHabitacion(hab)) }}</div>
+              <div class="hotel-mini-cal mb-2" title="Próximos 7 días">
+                @for (d of getDiasCalendario().length ? getDiasCalendario() : []; track d) {
+                  <span class="hotel-mini-day" [ngClass]="miniDiaClase(hab, d)"></span>
+                }
+              </div>
               <div class="hotel-card-compact-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="limpiarTarjeta(hab)" title="Limpiar consumo">Limpiar</button>
-                @if (reserva) {
-                  <button type="button" class="btn btn-sm btn-outline-warning" (click)="anularHuesped(reserva)" title="Anular huésped">Anular</button>
+                @if (puedeRegistrarHuesped(hab) && (estado === 'disponible' || estado === 'reservada')) {
+                  <button type="button" class="btn btn-sm btn-success" (click)="abrirModalCheckInWalkIn(hab)" title="Walk-in">Check-in</button>
+                } @else if (!est && !puedeRegistrarHuesped(hab) && motivoNoCheckIn(hab)) {
+                  <span class="hotel-card-no-checkin small" [title]="motivoNoCheckIn(hab)">{{ motivoNoCheckIn(hab) }}</span>
+                }
+                @if (estado === 'bloqueada' && tieneBloqueoActivo(hab.idProducto)) {
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="abrirModalBloqueo(hab)" title="Ver bloqueo">Bloqueo</button>
+                }
+                @if (estado === 'ocupada') {
+                  <button type="button" class="btn btn-sm btn-warning" (click)="generarVenta(hab)" title="Check-out y venta">Check-out</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalAgregarConsumo(hab)">Consumo</button>
                 }
                 <button type="button" class="btn btn-sm btn-hotel-primary" (click)="abrirModalDetalle(hab)" title="Ver detalles">Detalles</button>
               </div>
@@ -161,7 +321,12 @@
         </div>
         @if (productosHabitacion.length === 0) {
           <div class="hotel-empty">
-            <p class="mb-0 text-muted">No hay productos habitación (presentación Servicios ZZ). Cree productos en el catálogo.</p>
+            <p class="mb-0 text-muted">No hay habitaciones. Cree productos con categoría <strong>Habitación</strong> y presentación Servicios (ZZ).</p>
+          </div>
+        } @else if (habitacionesFiltradas.length === 0) {
+          <div class="hotel-empty">
+            <p class="mb-0 text-muted">Ninguna habitación coincide con «{{ filtroHabitaciones }}».</p>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" (click)="limpiarFiltroHabitaciones()">Limpiar filtro</button>
           </div>
         }
       </section>
@@ -180,7 +345,270 @@
         <app-index-ventas [noShell]="true"></app-index-ventas>
       </section>
     }
+
+    @if (activeTab() === 'housekeeping') {
+      <section class="hotel-section">
+        <div class="hotel-section-header">
+          <h2 class="hotel-section-title">Housekeeping</h2>
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargarHousekeeping()">Actualizar</button>
+        </div>
+        @if (housekeepingLoading()) {
+          <p class="text-muted">Cargando…</p>
+        } @else {
+          <div class="hotel-rooms-grid-housekeeping">
+            @for (hab of productosHabitacion; track hab.idProducto) {
+              @let limpieza = getEstadoLimpieza(hab.idProducto);
+              <div class="hk-room-card">
+                <div class="hk-room-header">
+                  <span class="hk-room-code">{{ hab.codigo }}</span>
+                  <span class="hotel-badge hk-room-badge" [class.hotel-badge-sucia]="limpieza === 'sucia'"
+                    [class.hotel-badge-limpieza]="limpieza === 'en_limpieza'"
+                    [class.hotel-badge-limpia]="limpieza === 'limpia'"
+                    [class.hotel-badge-fuera]="limpieza === 'fuera_servicio'">
+                    {{ labelEstadoLimpieza(limpieza) }}
+                  </span>
+                </div>
+                <p class="hk-room-desc" [title]="hab.descripcion">{{ hab.descripcion }}</p>
+                <div class="hk-room-actions">
+                  @for (st of estadosLimpieza; track st.value) {
+                    <button type="button" class="hk-action-btn"
+                      [class.active]="limpieza === st.value"
+                      [title]="st.label"
+                      (click)="cambiarEstadoLimpieza(hab, st.value)">{{ st.labelCorto }}</button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+
+    @if (activeTab() === 'reportes') {
+      <section class="hotel-section">
+        <div class="hotel-section-header flex-wrap gap-2">
+          <h2 class="hotel-section-title mb-0">Reportes hotel</h2>
+          <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="reporteDesde" />
+            <span class="text-muted">→</span>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="reporteHasta" />
+            <button type="button" class="btn btn-hotel-primary btn-sm" (click)="cargarReporte()">Generar</button>
+          </div>
+        </div>
+        @if (reporteLoading()) {
+          <p class="text-muted">Calculando…</p>
+        } @else if (reporteData) {
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ reporteData.ocupacion.ocupacionPct }}%</div>
+                <div class="hotel-stat-label">Ocupación</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ formatearMoneda(reporteData.ocupacion.ingresoHabitacion) }}</div>
+                <div class="hotel-stat-label">Ingreso habitación</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ formatearMoneda(reporteData.consumo.ingresoConsumo) }}</div>
+                <div class="hotel-stat-label">Ingreso consumo</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="hotel-stat-card">
+                <div class="hotel-stat-value">{{ formatearMoneda(reporteData.ingresoTotal) }}</div>
+                <div class="hotel-stat-label">Total período</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="hotel-card p-3">
+                <strong>Reservas en el período</strong>
+                <div class="small text-muted mt-1">
+                  Confirmadas: {{ reporteData.reservas.confirmadas }} ·
+                  Convertidas: {{ reporteData.reservas.convertidas }} ·
+                  Canceladas: {{ reporteData.reservas.cancelaciones }} ·
+                  No show: {{ reporteData.reservas.noShow }}
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <hr class="my-4" />
+
+        <div class="hotel-section-header flex-wrap gap-2 mb-3">
+          <h3 class="hotel-section-title mb-0 h5">Historial por habitación</h3>
+          <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <select class="form-select form-select-sm" style="min-width: 180px;" [(ngModel)]="historialHabitacionId">
+              <option value="">Habitación</option>
+              @for (p of productosHabitacion; track p.idProducto) {
+                <option [value]="p.idProducto">{{ p.codigo }} — {{ p.descripcion }}</option>
+              }
+            </select>
+            <input type="month" class="form-control form-control-sm" [(ngModel)]="historialMes" />
+            <button type="button" class="btn btn-hotel-primary btn-sm" (click)="cargarHistorialHabitacion()">Consultar</button>
+          </div>
+        </div>
+
+        @if (historialLoading()) {
+          <p class="text-muted">Cargando historial…</p>
+        } @else if (historialData) {
+          <div class="row g-3">
+            <div class="col-lg-4">
+              <div class="hotel-card p-3 historial-mes-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <strong>{{ labelMesHistorial() }}</strong>
+                  <span class="badge bg-secondary">{{ historialData.habitacionCodigo }}</span>
+                </div>
+                <div class="historial-mes-grid">
+                  @for (ds of historialDiasSemana(); track ds) {
+                    <div class="historial-mes-dow">{{ ds }}</div>
+                  }
+                  @for (cel of historialCeldasMes(); track $index) {
+                    <div class="historial-mes-dia"
+                      [class.historial-mes-vacio]="!cel.dia"
+                      [class.historial-mes-ocupado]="cel.ocupado">
+                      {{ cel.dia ?? '' }}
+                    </div>
+                  }
+                </div>
+                <div class="small text-muted mt-2 d-flex gap-3 flex-wrap">
+                  <span><span class="historial-leyenda-dot ocupado"></span> Ocupado</span>
+                  <span><span class="historial-leyenda-dot libre"></span> Libre</span>
+                </div>
+                <p class="mb-0 mt-2 small">
+                  <strong>{{ historialData.totalEstancias }}</strong>
+                  {{ historialData.totalEstancias === 1 ? 'estancia' : 'estancias' }} este mes ·
+                  <strong>{{ historialData.diasOcupados }}</strong>
+                  {{ historialData.diasOcupados === 1 ? 'día ocupado' : 'días ocupados' }}
+                </p>
+              </div>
+            </div>
+            <div class="col-lg-8">
+              @if (historialData.estancias.length === 0) {
+                <p class="text-muted mb-0">No hay estancias registradas en este mes para esta habitación.</p>
+              } @else {
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Huésped</th>
+                        <th>Check-in</th>
+                        <th>Salida prevista</th>
+                        <th>Salida real</th>
+                        <th>Estado</th>
+                        <th class="text-end">Habitación</th>
+                        <th class="text-end">Consumo</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (est of historialData.estancias; track est.idEstancia) {
+                        <tr>
+                          <td>{{ est.nombreHuesped }}</td>
+                          <td class="small">{{ formatearFechaHora(est.checkIn) }}</td>
+                          <td class="small">{{ formatearFechaHora(est.checkOutPrevisto) }}</td>
+                          <td class="small">{{ formatearFechaHora(est.checkOutReal) }}</td>
+                          <td>
+                            <span class="badge" [class.bg-success]="est.estadoEstancia === 'activa'" [class.bg-secondary]="est.estadoEstancia === 'checkout'">
+                              {{ est.estadoEstancia === 'activa' ? 'Activa' : 'Check-out' }}
+                            </span>
+                          </td>
+                          <td class="text-end">{{ formatearMoneda(est.totalHabitacion) }}</td>
+                          <td class="text-end">{{ formatearMoneda(est.totalConsumo) }}</td>
+                          <td class="text-end">
+                            <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirDetalleHistorialEstancia(est)">Ver</button>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </section>
+    }
   </div>
+
+  <!-- Modal detalle historial estancia -->
+  @if (showModalHistorialEstancia()) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalHistorialEstancia()"></div>
+    <div class="hotel-modal hotel-modal-lg" role="dialog" aria-labelledby="modalHistorialTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalHistorialTitle" class="hotel-modal-title">Detalle de estancia</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalHistorialEstancia()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          @if (historialDetalleLoading()) {
+            <p class="text-muted mb-0">Cargando detalle…</p>
+          } @else if (historialDetalle) {
+            @let est = historialDetalle.estancia;
+            <div class="row g-2 mb-3">
+              <div class="col-md-6"><strong>Huésped:</strong> {{ est.nombreHuesped }}</div>
+              <div class="col-md-6"><strong>Habitación:</strong> {{ est.habitacionCodigo }} — {{ est.habitacionDescripcion }}</div>
+              <div class="col-md-6"><strong>Check-in:</strong> {{ formatearFechaHora(est.checkIn) }}</div>
+              <div class="col-md-6"><strong>Salida prevista:</strong> {{ formatearFechaHora(est.checkOutPrevisto) }}</div>
+              <div class="col-md-6"><strong>Salida real:</strong> {{ formatearFechaHora(est.checkOutReal) }}</div>
+              <div class="col-md-6"><strong>Estado:</strong> {{ est.estadoEstancia === 'activa' ? 'Activa' : 'Check-out' }}</div>
+              <div class="col-md-6"><strong>Total habitación:</strong> {{ formatearMoneda(est.totalHabitacion) }}</div>
+              <div class="col-md-6"><strong>Venta:</strong>
+                @if (est.idVenta) {
+                  <span>#{{ est.idVenta }}</span>
+                } @else {
+                  <span class="text-muted">Sin venta registrada</span>
+                }
+              </div>
+            </div>
+            <h4 class="h6">Consumo</h4>
+            @if (historialDetalle.consumos.length === 0) {
+              <p class="text-muted small mb-0">Sin consumos registrados.</p>
+            } @else {
+              <div class="table-responsive">
+                <table class="table table-sm mb-2">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th class="text-end">Cant.</th>
+                      <th class="text-end">P. unit.</th>
+                      <th class="text-end">Subtotal</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (c of historialDetalle.consumos; track c.idConsumo) {
+                      <tr>
+                        <td>{{ c.productoCodigo }} — {{ c.productoDescripcion }}</td>
+                        <td class="text-end">{{ c.cantidad }}</td>
+                        <td class="text-end">{{ formatearMoneda(c.pUnitario) }}</td>
+                        <td class="text-end">{{ formatearMoneda(c.cantidad * c.pUnitario) }}</td>
+                        <td><span class="badge bg-light text-dark">{{ c.estadoConsumo || 'pendiente' }}</span></td>
+                      </tr>
+                    }
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <th colspan="3" class="text-end">Total consumo</th>
+                      <th class="text-end">{{ formatearMoneda(historialDetalle.totalConsumo) }}</th>
+                      <th></th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            }
+          }
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModalHistorialEstancia()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  }
 
   <!-- Modal nueva reserva -->
   @if (showModalReserva()) {
@@ -188,7 +616,7 @@
     <div class="hotel-modal" role="dialog" aria-labelledby="modalReservaTitle">
       <div class="hotel-modal-content">
         <div class="hotel-modal-header">
-          <h3 id="modalReservaTitle" class="hotel-modal-title">{{ reservaEditando ? 'Editar reserva' : 'Nueva reserva' }}</h3>
+          <h3 id="modalReservaTitle" class="hotel-modal-title">Nueva reserva</h3>
           <button type="button" class="hotel-modal-close" (click)="cerrarModalReserva()" aria-label="Cerrar">&times;</button>
         </div>
         <div class="hotel-modal-body">
@@ -201,42 +629,151 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Habitación (producto) <span class="text-danger">*</span></label>
-            <select class="form-select" [(ngModel)]="formReserva.idProductoHabitacion" required>
+            <select class="form-select" [(ngModel)]="formReserva.idProductoHabitacion" (ngModelChange)="onCambioDatosReserva()" required>
               <option value="">Seleccione habitación</option>
               @for (p of productosHabitacion; track p.idProducto) {
-                <option [value]="p.idProducto">{{ p.codigo }} — {{ p.descripcion }}</option>
+                <option [value]="p.idProducto">
+                  {{ p.codigo }} — {{ p.descripcion }}@if ((p.pVenta ?? 0) > 0) { (S/ {{ p.pVenta | number:'1.2-2' }}/noche) }
+                </option>
               }
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Nombre del huésped <span class="text-danger">*</span></label>
-            <div class="d-flex gap-2 align-items-center flex-wrap">
-              <input type="text" class="form-control flex-grow-1" [(ngModel)]="formReserva.nombreHuesped" placeholder="Apellidos y nombres" style="max-width: 280px;" />
-              <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirModalCliente()" title="Elegir cliente del catálogo">
-                <i class="fas fa-user me-1"></i>Elegir cliente
-              </button>
+            <label class="form-label">Huésped / Cliente <span class="text-danger">*</span></label>
+            <div class="row g-2 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label small mb-1">Tipo documento</label>
+                <select class="form-select form-select-sm" [(ngModel)]="idDocumentoHuesped">
+                  @for (d of documentos; track d.idDocumento) {
+                    <option [value]="d.idDocumento">{{ d.nombre }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small mb-1">Número</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="numeroDocumentoHuesped"
+                  placeholder="DNI o RUC" maxlength="11" inputmode="numeric" />
+              </div>
+              <div class="col-md-2">
+                <button type="button" class="btn btn-outline-primary btn-sm w-100" (click)="buscarORegistrarClienteReserva()" [disabled]="clienteBuscando">
+                  <i class="bi bi-search me-1"></i>{{ clienteBuscando ? '...' : 'Buscar' }}
+                </button>
+              </div>
+              <div class="col-md-3">
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100" (click)="abrirModalCliente()" title="Elegir del listado">
+                  <i class="fas fa-user me-1"></i>Elegir cliente
+                </button>
+              </div>
             </div>
-            <small class="text-muted">Al elegir un cliente se completan nombre y se asocia a la reserva para la venta.</small>
+            <div class="mt-2">
+              <label class="form-label small mb-1">Nombre del huésped</label>
+              <input type="text" class="form-control" [(ngModel)]="formReserva.nombreHuesped" placeholder="Apellidos y nombres" />
+            </div>
+            <small class="text-muted d-block mt-1">
+              Busque por documento: si no está registrado se abrirá el formulario para crearlo (igual que en Nueva venta).
+            </small>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
               <label class="form-label">Entrada <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" [(ngModel)]="formReserva.fechaEntrada" />
+              <input type="date" class="form-control" [(ngModel)]="formReserva.fechaEntrada" (ngModelChange)="onCambioDatosReserva()" />
             </div>
             <div class="col-6">
               <label class="form-label">Salida <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" [(ngModel)]="formReserva.fechaSalida" />
+              <input type="date" class="form-control" [(ngModel)]="formReserva.fechaSalida" (ngModelChange)="onCambioDatosReserva()" />
             </div>
           </div>
           <div class="mb-3">
             <label class="form-label">Total estimado (S/)</label>
-            <input type="number" class="form-control" [(ngModel)]="formReserva.total" min="0" step="0.01" />
+            <input type="number" class="form-control" [(ngModel)]="formReserva.total" (ngModelChange)="onTotalReservaManual()" min="0" step="0.01" />
+            <small class="text-muted d-block mt-1">{{ detalleCalculoTotalReserva }}</small>
           </div>
         </div>
         <div class="hotel-modal-footer">
           <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalReserva()">Cancelar</button>
           <button type="button" class="btn btn-hotel-primary" (click)="guardarReserva()" [disabled]="guardandoReserva">
-            {{ guardandoReserva ? 'Guardando…' : (reservaEditando ? 'Actualizar reserva' : 'Guardar reserva') }}
+            {{ guardandoReserva ? 'Guardando…' : 'Guardar reserva' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal check-in (walk-in o desde reserva) -->
+  @if (showModalCheckIn()) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalCheckIn()"></div>
+    <div class="hotel-modal" role="dialog" aria-labelledby="modalCheckInTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalCheckInTitle" class="hotel-modal-title">
+            @if (reservaCheckInSeleccionada) {
+              Check-in reserva {{ reservaCheckInSeleccionada.codigo }}
+            } @else {
+              Check-in walk-in
+            }
+          </h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalCheckIn()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger mb-2">{{ errorMessage() }}</div>
+          }
+          @if (!reservaCheckInSeleccionada) {
+            <div class="mb-3">
+              <label class="form-label">Huésped / Cliente <span class="text-danger">*</span></label>
+              <div class="row g-2 align-items-end mb-2">
+                <div class="col-md-3">
+                  <select class="form-select form-select-sm" [(ngModel)]="idDocumentoHuesped">
+                    @for (d of documentos; track d.idDocumento) {
+                      <option [value]="d.idDocumento">{{ d.nombre }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" [(ngModel)]="numeroDocumentoHuesped"
+                    placeholder="DNI o RUC" maxlength="11" inputmode="numeric" />
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm w-100" (click)="buscarORegistrarClienteReserva()" [disabled]="clienteBuscando">
+                    <i class="bi bi-search me-1"></i>{{ clienteBuscando ? '...' : 'Buscar' }}
+                  </button>
+                </div>
+                <div class="col-md-3">
+                  <button type="button" class="btn btn-outline-secondary btn-sm w-100" (click)="abrirModalCliente()" title="Elegir del listado">
+                    <i class="fas fa-user me-1"></i>Elegir cliente
+                  </button>
+                </div>
+              </div>
+              <input type="text" class="form-control" [(ngModel)]="formCheckIn.nombreHuesped" placeholder="Nombre completo" />
+              <small class="text-muted d-block mt-1">
+                Busque por documento o elija del listado; si no está registrado se abrirá el formulario para crearlo.
+              </small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tarifa por noche (S/)</label>
+              <input type="number" class="form-control" [(ngModel)]="formCheckIn.tarifaNoche" (ngModelChange)="recalcularTotalCheckIn()" min="0" step="0.01" />
+            </div>
+          } @else {
+            <div class="mb-3">
+              <label class="form-label">Huésped</label>
+              <input type="text" class="form-control" [ngModel]="formCheckIn.nombreHuesped" readonly />
+            </div>
+          }
+          <div class="mb-3">
+            <label class="form-label">Fecha salida <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" [(ngModel)]="formCheckIn.fechaSalida" (ngModelChange)="recalcularTotalCheckIn()" />
+          </div>
+          @if (!reservaCheckInSeleccionada) {
+            <div class="mb-3">
+              <label class="form-label">Total habitación (S/)</label>
+              <input type="number" class="form-control" [(ngModel)]="formCheckIn.totalHabitacion" min="0" step="0.01" />
+            </div>
+          }
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalCheckIn()">Cancelar</button>
+          <button type="button" class="btn btn-success" (click)="ejecutarCheckIn()" [disabled]="guardandoCheckIn">
+            {{ guardandoCheckIn ? 'Procesando…' : 'Confirmar check-in' }}
           </button>
         </div>
       </div>
@@ -258,11 +795,19 @@
           @if (errorMessage()) {
             <div class="alert alert-danger mb-3">{{ errorMessage() }}</div>
           }
-          @let reservaDet = getReservaVigentePorHabitacion(habitacionDetalleSeleccionada.idProducto);
-          @if (reservaDet) {
+          @let estDet = getEstanciaActiva(habitacionDetalleSeleccionada.idProducto);
+          @let proxDet = getProximaReservaConfirmada(habitacionDetalleSeleccionada.idProducto);
+          @if (estDet) {
             <div class="hotel-detalle-huesped mb-3 p-3 rounded bg-light">
-              <strong>Huésped:</strong> {{ reservaDet.nombreHuesped }} · Ing: {{ reservaDet.fechaEntrada }} · Sal: {{ reservaDet.fechaSalida }} · Est: {{ reservaDet.total | number:'1.2-2' }}
+              <strong>In-house:</strong> {{ estDet.nombreHuesped }} · Check-in: {{ estDet.checkIn | slice:0:16 }} · Salida prev.: {{ estDet.checkOutPrevisto | slice:0:10 }} · Total hab.: {{ estDet.totalHabitacion | number:'1.2-2' }}
             </div>
+          } @else if (proxDet) {
+            <div class="hotel-detalle-huesped mb-3 p-3 rounded bg-warning-subtle">
+              <strong>Próxima reserva:</strong> {{ proxDet.codigo }} — {{ proxDet.nombreHuesped }} ({{ proxDet.fechaEntrada }} → {{ proxDet.fechaSalida }})
+              <button type="button" class="btn btn-sm btn-success ms-2" (click)="abrirModalCheckInDesdeReserva(proxDet)">Check-in</button>
+            </div>
+          } @else {
+            <p class="text-muted small mb-3">Habitación libre. Use Check-in para walk-in o cree una reserva futura.</p>
           }
           <h6 class="mb-2">Consumo</h6>
           <div class="table-responsive mb-3">
@@ -282,7 +827,7 @@
                     @if (editandoConsumo?.idConsumo === lin.idConsumo) {
                       <td colspan="5" class="bg-light p-2">
                         <div class="d-flex gap-2 align-items-center flex-wrap">
-                          <input type="number" class="form-control form-control-sm" style="width:80px" [(ngModel)]="formEditConsumo.cantidad" min="0.001" step="0.001" />
+                          <input type="number" class="form-control form-control-sm" style="width:80px" [(ngModel)]="formEditConsumo.cantidad" min="1" step="1" />
                           <input type="number" class="form-control form-control-sm" style="width:90px" [(ngModel)]="formEditConsumo.pUnitario" min="0" step="0.01" />
                           <button type="button" class="btn btn-success btn-sm" (click)="guardarEditarConsumo()" [disabled]="guardandoEditConsumo">Guardar</button>
                           <button type="button" class="btn btn-secondary btn-sm" (click)="cancelarEditarConsumo()">Cancelar</button>
@@ -307,18 +852,18 @@
           @if (getConsumoDeHabitacion(habitacionDetalleSeleccionada.idProducto).length === 0) {
             <p class="text-muted small mb-3">Sin consumo. Use "Agregar consumo" para añadir productos.</p>
           }
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <button type="button" class="btn btn-outline-primary btn-sm" (click)="agregarConsumoDesdeDetalle()">
-              <i class="fas fa-plus me-1"></i>Agregar consumo
-            </button>
-            <strong>Total habitación + consumo: {{ formatearMoneda(getTotalHabitacion(habitacionDetalleSeleccionada)) }}</strong>
-          </div>
           <div class="hotel-modal-footer d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-danger btn-sm" (click)="limpiarTarjeta(habitacionDetalleSeleccionada)">Limpiar tarjeta</button>
-            @if (reservaDet) {
-              <button type="button" class="btn btn-outline-warning btn-sm" (click)="anularHuesped(reservaDet)">Anular huésped</button>
+            @if (estDet) {
+              <button type="button" class="btn btn-outline-primary btn-sm" (click)="agregarConsumoDesdeDetalle()">
+                <i class="fas fa-plus me-1"></i>Agregar consumo
+              </button>
+              <button type="button" class="btn btn-warning btn-sm" (click)="generarVenta(habitacionDetalleSeleccionada); cerrarModalDetalle()">Check-out / Venta</button>
+            } @else {
+              <button type="button" class="btn btn-success btn-sm" (click)="abrirModalCheckInWalkIn(habitacionDetalleSeleccionada); cerrarModalDetalle()">Check-in walk-in</button>
             }
-            <button type="button" class="btn btn-hotel-primary" (click)="generarVenta(habitacionDetalleSeleccionada); cerrarModalDetalle()">Generar venta</button>
+            @if (proxDet && !estDet) {
+              <button type="button" class="btn btn-outline-danger btn-sm" (click)="cancelarReserva(proxDet)">Cancelar reserva</button>
+            }
             <button type="button" class="btn btn-secondary" (click)="cerrarModalDetalle()">Cerrar</button>
           </div>
         </div>
@@ -357,7 +902,7 @@
           <div class="row g-2 mb-3">
             <div class="col-6">
               <label class="form-label">Cantidad <span class="text-danger">*</span></label>
-              <input type="number" class="form-control" [(ngModel)]="formConsumo.cantidad" min="0.001" step="0.001" />
+              <input type="number" class="form-control" [(ngModel)]="formConsumo.cantidad" min="1" step="1" />
             </div>
             <div class="col-6">
               <label class="form-label">P. unitario (S/)</label>
@@ -375,13 +920,126 @@
     </div>
   }
 
-  <!-- Modal elegir cliente (mismo flujo que crear nueva venta) -->
+  <!-- Modal bloqueo habitación -->
+  @if (showModalBloqueo()) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalBloqueo()"></div>
+    <div class="hotel-modal" role="dialog" aria-labelledby="modalBloqueoTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalBloqueoTitle" class="hotel-modal-title">Bloquear habitación</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalBloqueo()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          @if (errorMessage()) {
+            <div class="alert alert-danger mb-2">{{ errorMessage() }}</div>
+          }
+          <div class="mb-3">
+            <label class="form-label">Habitación <span class="text-danger">*</span></label>
+            <select class="form-select" [(ngModel)]="formBloqueo.idProductoHabitacion" required>
+              <option value="">Seleccione</option>
+              @for (p of productosHabitacion; track p.idProducto) {
+                <option [value]="p.idProducto">{{ p.codigo }} — {{ p.descripcion }}</option>
+              }
+            </select>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Desde <span class="text-danger">*</span></label>
+              <input type="datetime-local" class="form-control" [(ngModel)]="formBloqueo.fechaDesde" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Hasta <span class="text-danger">*</span></label>
+              <input type="datetime-local" class="form-control" [(ngModel)]="formBloqueo.fechaHasta" />
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Motivo</label>
+            <select class="form-select" [(ngModel)]="formBloqueo.motivo">
+              @for (m of motivosBloqueo; track m.value) {
+                <option [value]="m.value">{{ m.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Observaciones</label>
+            <textarea class="form-control" rows="2" [(ngModel)]="formBloqueo.observaciones" maxlength="500"></textarea>
+          </div>
+          <p class="text-muted small mb-0">El bloqueo impide reservas, walk-in y check-in en ese intervalo.</p>
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalBloqueo()">Cancelar</button>
+          <button type="button" class="btn btn-hotel-primary" (click)="guardarBloqueo()" [disabled]="guardandoBloqueo">
+            {{ guardandoBloqueo ? 'Guardando…' : 'Guardar bloqueo' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal buscar producto (dentro de Agregar consumo) -->
+  @if (showModalBuscarProducto()) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalBuscarProductoConsumo()"></div>
+    <div class="hotel-modal hotel-modal-xl" role="dialog" aria-labelledby="modalBuscarProductoTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header bg-primary text-white">
+          <h3 id="modalBuscarProductoTitle" class="hotel-modal-title">Buscar productos</h3>
+          <button type="button" class="hotel-modal-close btn-close btn-close-white" (click)="cerrarModalBuscarProductoConsumo()" aria-label="Cerrar"></button>
+        </div>
+        <div class="hotel-modal-body">
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <input type="search" class="form-control" placeholder="Nombre, código o categoría..." [(ngModel)]="searchTermProducto"
+                (input)="buscarProductosConsumo()">
+            </div>
+            <div class="col-md-4">
+              <button type="button" class="btn btn-outline-success w-100" (click)="recargarProductosConsumoDesdeServidor()">
+                <i class="bi bi-search"></i> Buscar
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive" style="max-height: 300px;">
+            <table class="table table-hover align-middle">
+              <thead style="background-color: #20c997; color: white;">
+                <tr>
+                  <th>Código</th>
+                  <th>Categoría</th>
+                  <th>Producto</th>
+                  <th>U.Medida</th>
+                  <th>Precio</th>
+                  <th>Sucursal</th>
+                  <th>Stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of productosFiltradosBusqueda; track p.idProducto) {
+                  <tr role="button" class="table-row-hover" (click)="seleccionarProductoConsumo(p)">
+                    <td>{{ p.codigo }}</td>
+                    <td>{{ p.categoria }}</td>
+                    <td>{{ p.descripcion }}</td>
+                    <td>{{ uMedidaColumnaConsumo(p) }}</td>
+                    <td>S/ {{ (p.pVenta ?? 0) | number:'1.2-2' }}</td>
+                    <td>{{ p.sucursal }}</td>
+                    <td>{{ p.stock }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="cerrarModalBuscarProductoConsumo()">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal elegir cliente (listado) -->
   @if (showModalCliente()) {
     <div class="hotel-modal-backdrop" (click)="cerrarModalCliente()"></div>
     <div class="hotel-modal hotel-modal-lg" role="dialog" aria-labelledby="modalClienteTitle">
       <div class="hotel-modal-content">
         <div class="hotel-modal-header">
-          <h3 id="modalClienteTitle" class="hotel-modal-title">Información del cliente</h3>
+          <h3 id="modalClienteTitle" class="hotel-modal-title">Seleccionar cliente</h3>
           <button type="button" class="hotel-modal-close" (click)="cerrarModalCliente()" aria-label="Cerrar">&times;</button>
         </div>
         <div class="hotel-modal-body p-0">
@@ -389,6 +1047,78 @@
             [modoSelector]="true"
             (clienteElegido)="onClienteElegidoReserva($event)">
           </app-index-clientes>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Modal registrar cliente (si no existe en BD al buscar) -->
+  @if (showModalCrearCliente()) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalCrearCliente()"></div>
+    <div class="hotel-modal hotel-modal-lg" role="dialog" aria-labelledby="modalCrearClienteTitle">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 id="modalCrearClienteTitle" class="hotel-modal-title">
+            <i class="bi bi-person-plus me-2"></i>Registrar nuevo cliente
+          </h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalCrearCliente()" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="hotel-modal-body p-0">
+          <app-create-clientes
+            [idDocumentoPre]="idDocumentoHuesped"
+            [rucPre]="numeroDocumentoHuesped"
+            [preCargarSerial]="crearClientePreSerial"
+            [desdeVenta]="true"
+            (clienteCreado)="onClienteCreadoDesdeModalReserva($event)">
+          </app-create-clientes>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (showModalAnticipo()) {
+    <div class="hotel-modal-backdrop" (click)="cerrarModalAnticipo()"></div>
+    <div class="hotel-modal" role="dialog">
+      <div class="hotel-modal-content">
+        <div class="hotel-modal-header">
+          <h3 class="hotel-modal-title">Anticipo — {{ reservaAnticipoSeleccionada?.codigo }}</h3>
+          <button type="button" class="hotel-modal-close" (click)="cerrarModalAnticipo()">&times;</button>
+        </div>
+        <div class="hotel-modal-body">
+          <div class="mb-3">
+            <label class="form-label">Monto (S/)</label>
+            <input type="number" class="form-control" [(ngModel)]="formAnticipo.monto" min="0.01" step="0.01" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Concepto</label>
+            <input type="text" class="form-control" [(ngModel)]="formAnticipo.concepto" />
+          </div>
+          @if (anticiposReserva.length) {
+            <table class="table table-sm">
+              <thead><tr><th>Fecha</th><th>Concepto</th><th class="text-end">Monto</th><th>Estado</th><th></th></tr></thead>
+              <tbody>
+                @for (a of anticiposReserva; track a.idAnticipo) {
+                  <tr>
+                    <td>{{ a.fRegistro }}</td>
+                    <td>{{ a.concepto }}</td>
+                    <td class="text-end">{{ formatearMoneda(a.monto) }}</td>
+                    <td>{{ a.estado }}</td>
+                    <td>
+                      @if (a.estado === 'pendiente') {
+                        <button type="button" class="btn btn-link btn-sm text-danger p-0" (click)="anularAnticipoLista(a)">Anular</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+        <div class="hotel-modal-footer">
+          <button type="button" class="btn btn-outline-secondary" (click)="cerrarModalAnticipo()">Cerrar</button>
+          <button type="button" class="btn btn-hotel-primary" (click)="guardarAnticipo()" [disabled]="guardandoAnticipo">
+            {{ guardandoAnticipo ? 'Guardando…' : 'Registrar anticipo' }}
+          </button>
         </div>
       </div>
     </div>

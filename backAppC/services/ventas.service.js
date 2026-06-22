@@ -9,7 +9,13 @@ const facturacionRepository = require('../repositories/facturacion.repository');
 const gestoresRepository = require('../repositories/gestores.repository');
 const stockService = require('./stock.service');
 const inventarioRepository = require('../repositories/inventario.repository');
-const { getNowLocalSQLString, getFechaEmisionSQLString, getFechaSoloSQLString } = require('../utils/fechaHoraLocal.util');
+const {
+  getNowLocalSQLString,
+  getFechaSoloSQLString,
+  parseFEmisionCabeceraSQL,
+  resolveFechaHoraClienteSql,
+  parteFechaDesdeFEmisionInput
+} = require('../utils/fechaHoraLocal.util');
 const {
   interpretarBooleanoConfig,
   leerPermitirVentasNegativas,
@@ -17,6 +23,7 @@ const {
 } = require('../utils/configBoolean.util');
 const sunatPostPagoService = require('./sunatPostPago.service');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
+const ventaLineaInventarioService = require('./ventaLineaInventario.service');
 const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const ventasDetalleReporteRepository = require('../repositories/ventasDetalleReporte.repository');
@@ -53,6 +60,29 @@ async function cargarFlagsInventarioPorEmpresas(pool, idsEmpresa) {
     });
   }
   return cache;
+}
+
+/** VENTAS_USAR_DESCUENTO_EN_TOTAL por empresa; clave = idEmpresa en minúsculas. */
+async function cargarDescuentoVentaPorEmpresas(pool, idsEmpresa) {
+  const cache = new Map();
+  const unicos = [...new Set((idsEmpresa || []).filter(Boolean).map(String))];
+  for (const idEmpresa of unicos) {
+    const key = idEmpresa.toLowerCase();
+    if (cache.has(key)) continue;
+    const configRows = await gestoresRepository.obtenerConfiguracionEmpresa(pool, idEmpresa);
+    const getConfig = crearLectorConfiguracionEmpresa(configRows);
+    cache.set(
+      key,
+      interpretarBooleanoConfig(getConfig('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true)
+    );
+  }
+  return cache;
+}
+
+function descuentoVentaEmpresa(cache, idEmpresa, predeterminado = true) {
+  if (idEmpresa == null || String(idEmpresa).trim() === '') return predeterminado;
+  const val = cache.get(String(idEmpresa).toLowerCase());
+  return typeof val === 'boolean' ? val : predeterminado;
 }
 
 function flagsInventarioEmpresa(cache, idEmpresa) {
@@ -97,8 +127,9 @@ exports.crearVentaCabeceraConTransaccion = async (pool, datosVenta, idEmpresa, i
   const transaction = new sql.Transaction(pool);
   await transaction.begin();
   try {
-    await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
+    const ventaResult = await ventasRepository.insertar(transaction, datosVenta, idEmpresa, idUsuario);
     await transaction.commit();
+    return ventaResult?.recordset?.[0]?.idVenta ?? null;
   } catch (err) {
     try {
       await transaction.rollback();
@@ -147,14 +178,25 @@ exports.obtenerVentaParaCobroPendiente = async (pool, idVenta, idEmpresa) => {
   return ventasRepository.obtenerVentaParaCobroPendiente(pool, idVenta, idEmpresa);
 };
 
+/**
+ * Normaliza fEmision para guardar en BD.
+ * Prioridad: fecha+hora enviada por el cliente (navegador del cajero); no reemplazar la hora por la del servidor.
+ */
 function fechaEmisionConHoraActual(fEmision) {
-  if (!fEmision) return getNowLocalSQLString();
-  const str = typeof fEmision === 'string'
-    ? fEmision.trim()
-    : (fEmision instanceof Date ? fEmision.toISOString().slice(0, 19).replace('T', ' ') : '');
-  const parteFecha = str.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(parteFecha)) return getNowLocalSQLString();
-  return getFechaEmisionSQLString(parteFecha);
+  const raw = fEmision != null ? String(fEmision).trim() : '';
+  if (raw && /[T ]\d{2}:\d{2}:\d{2}/.test(raw)) {
+    const sql = parseFEmisionCabeceraSQL(fEmision);
+    if (sql) return sql;
+  }
+  if (raw) {
+    const sqlSoloFecha = parseFEmisionCabeceraSQL(fEmision);
+    if (sqlSoloFecha) return sqlSoloFecha;
+  }
+  const parteFecha = parteFechaDesdeFEmisionInput(fEmision);
+  if (parteFecha) {
+    return getFechaSoloSQLString(parteFecha);
+  }
+  return getNowLocalSQLString();
 }
 
 const asegurarUsuarioEmpresaDestino = async (transaction, idEmpresaDestino, idEmpresaGestora, vendedor) => {
@@ -653,84 +695,53 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const idVenta = ventaResult.recordset[0].idVenta;
 
     const avisoStockInsuficiente = [];
+    const metaInventarioCache = new Map();
 
     for (const det of dets) {
       const cantPedida = parseFloat(det.cantidad) || 0;
       const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
 
-      const stockDisponible = await stockService.obtenerStockDisponible(transaction, user.empresa, det.idProducto, idSucursalLinea);
-      if (stockDisponible < cantPedida) {
-        if (!permitirVentasNegativas) {
-          throw new Error(`Stock insuficiente para "${det.descripcion || det.idProducto}". Disponible: ${stockDisponible}, solicitado: ${cantPedida}.`);
-        }
-        avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
+      const salida = await ventaLineaInventarioService.procesarSalidaInventarioVentaLinea({
+        transaction,
+        idEmpresa: user.empresa,
+        idSucursal: idSucursalLinea,
+        idProducto: det.idProducto,
+        cantPedida,
+        descripcion: det.descripcion,
+        permitirVentasNegativas,
+        controlUbicaciones,
+        cache: metaInventarioCache
+      });
+      if (salida.avisoStock) {
+        avisoStockInsuficiente.push(salida.avisoStock);
       }
-
-      const cantidadADescontar = cantPedida;
-      let consumosPorLote = [];
-      if (cantidadADescontar > 0) {
-        const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
-          idEmpresa: user.empresa,
-          idSucursal: idSucursalLinea,
-          idProducto: det.idProducto,
-          cantidad: cantidadADescontar
-        }, { controlUbicaciones, permitirVentasNegativas });
-        consumosPorLote = resultadoDescuento?.consumosPorLote || [];
-      }
-
-      const costoTotalLinea = Array.isArray(consumosPorLote)
-        ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
-        : 0;
-      const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
 
       await detalleVentaService.crearDetalle(transaction, {
         ...det,
         idVenta,
         cantEntregada,
         idEstadoPedido: idEstadoPedidoVenta,
-        hVenta: getNowLocalSQLString(),
-        costoUnitario: costoUnitarioProm,
-        costoTotal: costoTotalLinea
+        hVenta: fechaEmisionConHora,
+        costoUnitario: salida.costoUnitarioProm,
+        costoTotal: salida.costoTotalLinea
       });
-      det._costoUnitario = costoUnitarioProm;
-      det._costoTotal = costoTotalLinea;
+      det._costoUnitario = salida.costoUnitarioProm;
+      det._costoTotal = salida.costoTotalLinea;
       det._cantEntregada = cantEntregada;
 
-      if (cantidadADescontar > 0) {
-        if (Array.isArray(consumosPorLote) && consumosPorLote.length > 0) {
-          for (const c of consumosPorLote) {
-            const cantTomada = Number(c.cantidadTomada) || 0;
-            if (cantTomada <= 0) continue;
-            await inventarioRepository.insertarFilaMovimiento(transaction, {
-              idEmpresa: user.empresa,
-              idSucursal: idSucursalLinea,
-              idProducto: det.idProducto,
-              tipoMovimiento: 'SA',
-              cantidad: cantTomada,
-              docRelacionado: compVenta,
-              idComprobante: idComprobanteDestino,
-              idUsuario: idUsuarioEmpresa,
-              observaciones: 'Venta',
-              costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
-              idLote: c.idLote || null
-            });
-          }
-        } else {
-          await inventarioRepository.insertarFilaMovimiento(transaction, {
-            idEmpresa: user.empresa,
-            idSucursal: idSucursalLinea,
-            idProducto: det.idProducto,
-            tipoMovimiento: 'SA',
-            cantidad: cantidadADescontar,
-            docRelacionado: compVenta,
-            idComprobante: idComprobanteDestino,
-            idUsuario: idUsuarioEmpresa,
-            observaciones: 'Venta',
-            costoUnitario: costoUnitarioProm,
-            idLote: null
-          });
-        }
-      }
+      await ventaLineaInventarioService.registrarMovimientosSalidaVenta({
+        transaction,
+        idEmpresa: user.empresa,
+        idSucursal: idSucursalLinea,
+        idProducto: det.idProducto,
+        idUsuario: idUsuarioEmpresa,
+        compVenta,
+        idComprobante: idComprobanteDestino,
+        controlaInventario: salida.controlaInventario,
+        cantidadADescontar: salida.cantidadADescontar,
+        consumosPorLote: salida.consumosPorLote,
+        costoUnitarioProm: salida.costoUnitarioProm
+      });
     }
 
     if (!esNotaVenta) {
@@ -825,7 +836,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
   try {
     const configRowsGestora = await gestoresRepository.obtenerConfiguracionEmpresa(pool, user.empresa);
     const getConfigGestora = crearLectorConfiguracionEmpresa(configRowsGestora);
-    const usarDescuentoEnTotal = interpretarBooleanoConfig(getConfigGestora('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'), true);
+    const usarDescuentoEnTotalGestora = interpretarBooleanoConfig(
+      getConfigGestora('VENTAS_USAR_DESCUENTO_EN_TOTAL', 'true'),
+      true
+    );
 
     let idSucursalCobradora = venta.idSucursal || null;
     if (!idSucursalCobradora) {
@@ -890,6 +904,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       user.empresa,
       ...Array.from(detallesPorEmpresa.keys())
     ]);
+    const descuentoVentaCache = await cargarDescuentoVentaPorEmpresas(pool, [
+      user.empresa,
+      ...Array.from(detallesPorEmpresa.keys())
+    ]);
 
     const clienteSeleccionado = await ventasRepository.obtenerClientePorIdEnEmpresas(
       transaction,
@@ -928,10 +946,10 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
     const montosCabAgr = resolverMontosCabeceraImpuestos(ventaConHora, totalesAgrupados);
     const descuentosClienteAgr = Number(venta.descuentos);
     let descuentosCabeceraVA = totalesAgrupados.descuentos;
-    if (!usarDescuentoEnTotal) {
-      descuentosCabeceraVA = 0;
-    } else if (Number.isFinite(descuentosClienteAgr) && descuentosClienteAgr >= 0) {
+    if (Number.isFinite(descuentosClienteAgr) && descuentosClienteAgr >= 0) {
       descuentosCabeceraVA = Math.round(descuentosClienteAgr * 100) / 100;
+    } else if (!usarDescuentoEnTotalGestora) {
+      descuentosCabeceraVA = 0;
     }
     const ventaAgrupada = await ventasRepository.insertarVentaAgrupada(transaction, {
       idEmpresaCobradora: user.empresa,
@@ -1038,7 +1056,12 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const exoneradoHija = redondear2((montosCabAgr.exonerado || 0) * propSub);
       const gratuitoHija = redondear2((montosCabAgr.gratuito || 0) * propSub);
       const otrosCargosHija = redondear2((montosCabAgr.otrosCargos || 0) * propSub);
-      if (!usarDescuentoEnTotal) {
+      const usarDescuentoEmpresa = descuentoVentaEmpresa(
+        descuentoVentaCache,
+        idEmpresaProducto,
+        usarDescuentoEnTotalGestora
+      );
+      if (!usarDescuentoEmpresa) {
         descuentosHija = 0;
       } else if (
         Number.isFinite(descuentosClienteAgr) &&
@@ -1089,6 +1112,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const ventaResult = await ventasRepository.insertar(transaction, ventaDatos, idEmpresaProducto, idUsuarioEmpresa);
       const idVenta = ventaResult.recordset[0].idVenta;
 
+      const metaInventarioCachePart = new Map();
+
       for (const det of detsPart) {
         const cantPedida = parseFloat(det.cantidad) || 0;
         const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
@@ -1100,82 +1125,47 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           idEmpresaProducto
         );
 
-        const stockDisponible = await stockService.obtenerStockDisponible(transaction, idEmpresaProducto, det.idProducto, idSucursalEmpresa);
-        if (stockDisponible < cantPedida) {
-          if (!permitirNegativoLinea) {
-            throw new Error(`Stock insuficiente para "${det.descripcion || det.idProducto}" en empresa ${det.aliasEmpresa || idEmpresaProducto}. Disponible: ${stockDisponible}, solicitado: ${cantPedida}.`);
-          }
-          avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
+        const salida = await ventaLineaInventarioService.procesarSalidaInventarioVentaLinea({
+          transaction,
+          idEmpresa: idEmpresaProducto,
+          idSucursal: idSucursalEmpresa,
+          idProducto: det.idProducto,
+          cantPedida,
+          descripcion: det.descripcion || det.aliasEmpresa,
+          permitirVentasNegativas: permitirNegativoLinea,
+          controlUbicaciones: flagsInvProducto.controlUbicaciones,
+          cache: metaInventarioCachePart
+        });
+        if (salida.avisoStock) {
+          avisoStockInsuficiente.push(salida.avisoStock);
         }
-
-        const cantidadADescontar = cantPedida;
-        let consumosPorLote = [];
-        if (cantidadADescontar > 0) {
-          const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
-            idEmpresa: idEmpresaProducto,
-            idSucursal: idSucursalEmpresa,
-            idProducto: det.idProducto,
-            cantidad: cantidadADescontar
-          }, {
-            controlUbicaciones: flagsInvProducto.controlUbicaciones,
-            permitirVentasNegativas: permitirNegativoLinea
-          });
-          consumosPorLote = resultadoDescuento?.consumosPorLote || [];
-        }
-
-        const costoTotalLinea = Array.isArray(consumosPorLote)
-          ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
-          : 0;
-        const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
 
         await detalleVentaService.crearDetalle(transaction, {
           ...det,
           idVenta,
           cantEntregada,
           idEstadoPedido: idEstadoPedidoVenta,
-          hVenta: getNowLocalSQLString(),
-          costoUnitario: costoUnitarioProm,
-          costoTotal: costoTotalLinea
+          hVenta: fechaEmisionConHora,
+          costoUnitario: salida.costoUnitarioProm,
+          costoTotal: salida.costoTotalLinea
         });
-        det._costoUnitario = costoUnitarioProm;
-        det._costoTotal = costoTotalLinea;
+        det._costoUnitario = salida.costoUnitarioProm;
+        det._costoTotal = salida.costoTotalLinea;
         det._cantEntregada = cantEntregada;
 
-        if (cantidadADescontar > 0) {
-          if (Array.isArray(consumosPorLote) && consumosPorLote.length > 0) {
-            for (const c of consumosPorLote) {
-              const cantTomada = Number(c.cantidadTomada) || 0;
-              if (cantTomada <= 0) continue;
-              await inventarioRepository.insertarFilaMovimiento(transaction, {
-                idEmpresa: idEmpresaProducto,
-                idSucursal: idSucursalEmpresa,
-                idProducto: det.idProducto,
-                tipoMovimiento: 'SA',
-                cantidad: cantTomada,
-                docRelacionado: compVenta,
-                idComprobante: idComprobanteDestino,
-                idUsuario: idUsuarioEmpresa,
-                observaciones: 'Venta',
-                costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
-                idLote: c.idLote || null
-              });
-            }
-          } else {
-            await inventarioRepository.insertarFilaMovimiento(transaction, {
-              idEmpresa: idEmpresaProducto,
-              idSucursal: idSucursalEmpresa,
-              idProducto: det.idProducto,
-              tipoMovimiento: 'SA',
-              cantidad: cantidadADescontar,
-              docRelacionado: compVenta,
-              idComprobante: idComprobanteDestino,
-              idUsuario: idUsuarioEmpresa,
-              observaciones: 'Venta',
-              costoUnitario: costoUnitarioProm,
-              idLote: null
-            });
-          }
-        }
+        await ventaLineaInventarioService.registrarMovimientosSalidaVenta({
+          transaction,
+          idEmpresa: idEmpresaProducto,
+          idSucursal: idSucursalEmpresa,
+          idProducto: det.idProducto,
+          idUsuario: idUsuarioEmpresa,
+          compVenta,
+          idComprobante: idComprobanteDestino,
+          controlaInventario: salida.controlaInventario,
+          cantidadADescontar: salida.cantidadADescontar,
+          consumosPorLote: salida.consumosPorLote,
+          costoUnitarioProm: salida.costoUnitarioProm
+        });
       }
 
       if (!esNotaVenta) {
@@ -1326,7 +1316,7 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
  * @returns {{ idVenta: number, compVenta: string }}
  */
 exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, payload) => {
-  const { idValeDespacho, idComprobante } = payload;
+  const { idValeDespacho, idComprobante, fEmision: fEmisionCliente } = payload;
   if (!idValeDespacho || idComprobante == null) {
     throw new Error('Faltan idValeDespacho o idComprobante (Factura/Boleta).');
   }
@@ -1365,7 +1355,7 @@ exports.crearVentaDesdeVale = async (transaction, pool, idEmpresa, idUsuario, pa
   );
   const compVenta = serie + '-' + numero;
   const totalVenta = detalleVale.reduce((sum, d) => sum + (Number(d.total) || 0), 0);
-  const fEmision = getNowLocalSQLString();
+  const fEmision = resolveFechaHoraClienteSql(fEmisionCliente);
 
   const datosVenta = {
     idSucursal: vale.idSucursal,

@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const productosImportacionRepository = require('../repositories/productosImportacion.repository');
+const { esCodigoPresentacionServicio } = require('../utils/productoInventariable.util');
 const productosMutacionesService = require('./productosMutaciones.service');
 const pdfBackend = require('./pdfBackend.client');
 
@@ -363,6 +364,7 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
       codigo: f.codigo.trim(),
       descripcion: f.descripcion.trim(),
       idPresentacion,
+      presentacionCodigo: f.presentacionCodigo,
       idCategoria,
       idMarca,
       cUnitario: costo,
@@ -468,8 +470,9 @@ async function ejecutarImportacion(pool, user, buffer) {
       permiteDescripcionEnVenta: 0
     };
 
+    const esServicio = esCodigoPresentacionServicio(r.presentacionCodigo);
     const lote =
-      r.cantidadInicial > 0
+      !esServicio && r.cantidadInicial > 0
         ? {
             idSucursal: r.idSucursal,
             cantidadIngresada: r.cantidadInicial,

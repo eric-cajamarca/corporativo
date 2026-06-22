@@ -319,6 +319,57 @@
   gap: 0.1rem;
   margin-bottom: 0.25rem;
 }
+.hotel-card-compact-hora {
+  font-weight: 600;
+  color: #334155;
+}
+.hotel-card-no-checkin {
+  display: block;
+  width: 100%;
+  color: #b45309;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.15rem 0;
+}
+
+.hotel-habitaciones-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.hotel-habitaciones-filtro-wrap {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+.hotel-habitaciones-filtro-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  font-size: 0.85rem;
+}
+.hotel-habitaciones-filtro-input {
+  padding-left: 2.1rem;
+  padding-right: 2rem;
+  border-radius: 8px;
+}
+.hotel-habitaciones-filtro-clear {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  text-decoration: none;
+  line-height: 1;
+  padding: 0.15rem 0.35rem;
+}
+.hotel-habitaciones-filtro-count {
+  white-space: nowrap;
+}
 .hotel-card-compact-total {
   font-size: 0.8rem;
   font-weight: 600;
@@ -611,3 +662,253 @@
 .table-row-hover:hover {
   background-color: rgba(32, 201, 151, 0.12);
 }
+
+/* Fase 2: tape chart calendario */
+.hotel-tape-chart {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+.tape-header-row,
+.tape-row {
+  display: flex;
+  min-width: 720px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tape-header-row {
+  background: #f8fafc;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.tape-room-col {
+  width: 140px;
+  min-width: 140px;
+  padding: 0.5rem 0.75rem;
+  border-right: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.tape-days-header,
+.tape-track {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  position: relative;
+  min-height: 44px;
+}
+.tape-day-header,
+.tape-day-cell {
+  border-right: 1px solid #f1f5f9;
+  padding: 0.35rem;
+  text-align: center;
+  font-size: 0.75rem;
+}
+.tape-bar {
+  position: absolute;
+  top: 6px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: #fff;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  z-index: 2;
+}
+.tape-bar-estancia { background: #16a34a; }
+.tape-bar-reserva { background: #2563eb; }
+.tape-bar-bloqueo { background: #64748b; }
+.tape-legend {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.hotel-card-bloqueada {
+  border-color: #94a3b8 !important;
+  background: #f1f5f9 !important;
+}
+.hotel-mini-cal {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+}
+.hotel-mini-day {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.mini-dia-libre { background: #86efac; }
+.mini-dia-reserva { background: #93c5fd; }
+.mini-dia-ocupada { background: #f87171; }
+.mini-dia-bloqueo { background: #94a3b8; }
+
+.hotel-stat-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+.hotel-badge-sucia { background: #fecaca; color: #991b1b; }
+.hotel-badge-limpieza { background: #fde68a; color: #92400e; }
+.hotel-badge-limpia { background: #d1fae5; color: #047857; }
+.hotel-badge-fuera { background: #e2e8f0; color: #475569; }
+
+/* Housekeeping: tarjetas más anchas, texto contenido dentro del card */
+.hotel-rooms-grid-housekeeping {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 0.75rem;
+}
+
+.hk-room-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.65rem 0.55rem 0.55rem;
+  border: 2px solid #e2e8f0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.hk-room-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.hk-room-code {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.1;
+}
+
+.hk-room-badge {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  padding: 0.2rem 0.45rem;
+  text-align: center;
+}
+
+.hk-room-desc {
+  font-size: 0.68rem;
+  color: #64748b;
+  margin: 0;
+  text-align: center;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  min-height: 2.5em;
+}
+
+.hk-room-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  width: 100%;
+}
+
+.hk-action-btn {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 0.35rem 0.15rem;
+  line-height: 1.15;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  white-space: normal;
+  word-break: break-word;
+  hyphens: auto;
+  min-height: 2.1rem;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.hk-action-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.hk-action-btn:hover:not(.active) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.tape-bar { cursor: grab; }
+.tape-bar:active { cursor: grabbing; }
+
+.historial-mes-card {
+  max-width: 320px;
+}
+
+.historial-mes-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.historial-mes-dow {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  padding: 2px 0;
+}
+
+.historial-mes-dia {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.historial-mes-dia.historial-mes-vacio {
+  background: transparent;
+}
+
+.historial-mes-dia.historial-mes-ocupado {
+  background: #fecaca;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.historial-leyenda-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.historial-leyenda-dot.ocupado { background: #fecaca; }
+.historial-leyenda-dot.libre { background: #f1f5f9; border: 1px solid #cbd5e1; }

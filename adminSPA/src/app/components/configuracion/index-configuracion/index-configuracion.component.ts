@@ -16,6 +16,8 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { GestoresService, ConfiguracionEmpresa } from '../../../services/gestores.service';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
+import { PermisosService } from '../../../services/permisos.service';
+import { planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../../../config/saas-plan-reglas.util';
 
 declare var iziToast: any;
 
@@ -178,10 +180,25 @@ export class IndexConfiguracionComponent implements OnInit {
     private _ventasService: VentasService,
     private _gestoresService: GestoresService,
     private _router: Router,
-    public sidebarState: SidebarStateService
+    public sidebarState: SidebarStateService,
+    private permisos: PermisosService
   ) {}
 
+  /** SaaS: según plan; enterprise: siempre visible. */
+  mostrarVincularWhatsApp(): boolean {
+    if (this.permisos.deploymentMode() !== 'saas') return true;
+    return planPermiteWhatsAppVinculado(this.permisos.planCodeEfectivo());
+  }
+
+  mostrarBotWhatsApp(): boolean {
+    if (this.permisos.deploymentMode() !== 'saas') return true;
+    return planPermiteWhatsAppBot(this.permisos.planCodeEfectivo());
+  }
+
   ngOnInit(): void {
+    if (!this.permisos.contextoPlanCargado()) {
+      this.permisos.cargarPermisosUsuario().subscribe({ error: () => {} });
+    }
     this.cargarConfiguracion();
   }
 

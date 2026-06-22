@@ -135,6 +135,18 @@ function esRubroGrifo(ctx) {
   return rubroTexto === 'grifo' || rubroTexto.includes('grifo');
 }
 
+/** Rubro Hotel en BD: código `HOTEL` o `HTL`. */
+function esRubroHotel(ctx) {
+  const codigo = String(ctx?.codigoRubro || '').trim().toUpperCase();
+  if (codigo === 'HOTEL' || codigo === 'HTL') return true;
+  const rubroTexto = String(ctx?.rubro || '').trim().toLowerCase();
+  return rubroTexto === 'hotel' || rubroTexto.includes('hotel');
+}
+
+function etiquetaHistorialVentas(ctx) {
+  return esRubroHotel(ctx) ? 'Recepción' : 'Historial';
+}
+
 /**
  * Menú completo por dominios (empresa operativa estándar).
  */
@@ -142,6 +154,7 @@ function construirNavegacionPorDominios(ctx) {
   const { esAdmin, permisos, permisosData, tieneVerEnviosChofer, codigoRubro, rubro } = ctx;
   const can = (p) => esAdmin || permisos.includes(p);
   const rubroGrifo = esRubroGrifo({ codigoRubro, rubro });
+  const labelHistorialVentas = etiquetaHistorialVentas({ codigoRubro, rubro });
   const dm = permisosData.deploymentMode;
   const planCode = permisosData.planCodeEfectivo;
   const sunatCompras = planPermiteComprasSunatMenu(dm, planCode);
@@ -167,7 +180,7 @@ function construirNavegacionPorDominios(ctx) {
     const subVentas = [
       { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
       { nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: can('CREAR_VENTAS') },
-      { nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
+      { nombre: labelHistorialVentas, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
       { nombre: 'Reporte detallado', ruta: '/ventas/reporte-detallado', permiso: 'REPORTE_DETALLADO_VENTAS', visible: can('REPORTE_DETALLADO_VENTAS') },
       { nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true }
     ].filter((s) => s.visible);
@@ -433,8 +446,9 @@ function construirNavegacionPorDominios(ctx) {
  * Menú reducido empresa gestora, con mismos dominios.
  */
 function construirNavegacionGestoraPorDominios(ctx) {
-  const { esAdmin, permisos, tieneVerEnviosChofer } = ctx;
+  const { esAdmin, permisos, tieneVerEnviosChofer, codigoRubro, rubro } = ctx;
   const can = (p) => esAdmin || permisos.includes(p);
+  const labelHistorialVentas = etiquetaHistorialVentas({ codigoRubro, rubro });
   const secciones = [];
 
   const inicio = [];
@@ -467,7 +481,7 @@ function construirNavegacionGestoraPorDominios(ctx) {
     subVentas.push({ nombre: 'Nueva Venta', ruta: '/ventas/create', permiso: 'CREAR_VENTAS', visible: true });
   }
   if (can('VER_VENTAS')) {
-    subVentas.push({ nombre: 'Historial', ruta: '/ventas', permiso: 'VER_VENTAS', visible: true });
+    subVentas.push({ nombre: labelHistorialVentas, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true });
     subVentas.push({ nombre: 'Cotizaciones', ruta: '/cotizaciones', permiso: 'VER_VENTAS', visible: true });
   }
   if (can('REPORTE_DETALLADO_VENTAS')) {

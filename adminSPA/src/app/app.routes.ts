@@ -38,6 +38,7 @@ import { IndexProgramacionComponent } from './components/programaciones/index-pr
 import { CreateProgramacionComponent } from './components/programaciones/create-programacion/create-programacion.component';
 import { UpdateProgramacionComponent } from './components/programaciones/update-programacion/update-programacion.component';
 import { VentasContainerComponent } from './components/ventas/ventas-container/ventas-container.component';
+import { HotelConfiguracionComponent } from './components/hotel/hotel-configuracion/hotel-configuracion.component';
 import { IndexVentasComponent } from './components/ventas/index-ventas/index-ventas.component';
 import { CreateVentasComponent } from './components/ventas/create-ventas/create-ventas.component';
 import { CreateVentaRapidaComponent } from './components/ventas/create-venta-rapida/create-venta-rapida.component';
@@ -266,6 +267,8 @@ export const routes: Routes = [
         { path: 'reporte-detallado', component: ReporteVentasDetalladoComponent, title: 'Reporte detallado de ventas' },
       ]
     },
+
+     { path: 'hotel/configuracion', component: HotelConfiguracionComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Configuración Hotel' },
 
      { path: 'cotizaciones', component: IndexCotizacionesComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Cotizaciones' },
      { path: 'cotizaciones/editar/:id', component: UpdateCotizacionComponent, canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard], title: 'Editar cotización' },

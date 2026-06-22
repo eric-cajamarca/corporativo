@@ -5,12 +5,14 @@ const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const reservasController = require('../controllers/reservasController');
 
 api.use(auth.auth);
+api.use(requireRubro('HOTEL'));
 
 api.get('/reservas', reservasController.listar);
 api.get('/reservas/siguiente-codigo', reservasController.siguienteCodigo);
 api.get('/reservas/:id', reservasController.obtenerPorId);
-api.post('/reservas', requireRubro('HOTEL'), reservasController.crear);
-api.put('/reservas/:id', requireRubro('HOTEL'), reservasController.actualizar);
-api.delete('/reservas/:id', requireRubro('HOTEL'), reservasController.eliminar);
+api.post('/reservas', reservasController.crear);
+api.put('/reservas/:id/cancelar', reservasController.cancelar);
+api.put('/reservas/:id', reservasController.actualizar);
+api.delete('/reservas/:id', reservasController.eliminar);
 
 module.exports = api;
