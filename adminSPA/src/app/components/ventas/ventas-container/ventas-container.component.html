@@ -5,16 +5,15 @@
   </div>
 } @else if (isChildRoute) {
   <router-outlet />
-} @else {
-  @switch (codigoRubro) {
-    @case ('GRF') {
-      <app-ventas-grifo />
-    }
-    @case ('HOTEL') {
-      <app-ventas-hoteles />
-    }
-    @default {
-      <router-outlet />
-    }
+} @else if (usaModuloRubroLazy) {
+  @if (cargandoRubro()) {
+    <div class="d-flex justify-content-center align-items-center py-5">
+      <span class="spinner-border text-primary"></span>
+      <span class="ms-2">Cargando módulo…</span>
+    </div>
+  } @else if (rubroComponent()) {
+    <ng-container *ngComponentOutlet="rubroComponent()!" />
   }
+} @else {
+  <router-outlet />
 }

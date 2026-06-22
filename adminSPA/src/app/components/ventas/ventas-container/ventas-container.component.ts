@@ -1,9 +1,7 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, Type, signal } from '@angular/core';
+import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 import { EmpresaService } from '../../../services/empresa.service';
-import { VentasGrifoComponent } from '../ventas-grifo/ventas-grifo.component';
-import { VentasHotelesComponent } from '../ventas-hoteles/ventas-hoteles.component';
 
 /** Rubros con pantalla vertical dedicada en /ventas (histórico). El resto usa POS estándar. */
 const RUBROS_LEGACY_VERTICAL = new Set(['ROPA', 'REST', 'FERR', 'RETAIL']);
@@ -11,18 +9,15 @@ const RUBROS_LEGACY_VERTICAL = new Set(['ROPA', 'REST', 'FERR', 'RETAIL']);
 @Component({
   selector: 'app-ventas-container',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterOutlet,
-    VentasGrifoComponent,
-    VentasHotelesComponent
-  ],
+  imports: [CommonModule, RouterOutlet, NgComponentOutlet],
   templateUrl: './ventas-container.component.html',
   styleUrl: './ventas-container.component.css'
 })
 export class VentasContainerComponent implements OnInit {
   codigoRubro: string | null = null;
   loading = true;
+  rubroComponent = signal<Type<unknown> | null>(null);
+  cargandoRubro = signal(false);
 
   constructor(
     private empresaService: EmpresaService,
@@ -41,16 +36,41 @@ export class VentasContainerComponent implements OnInit {
     );
   }
 
+  get usaModuloRubroLazy(): boolean {
+    return this.codigoRubro === 'GRF' || this.codigoRubro === 'HOTEL';
+  }
+
   ngOnInit(): void {
     this.empresaService.refreshEmpresaFromApi().subscribe({
       next: (emp) => {
         this.codigoRubro = this.normalizarCodigoRubro(emp?.codigoRubro ?? null);
-        this.loading = false;
+        void this.cargarComponenteRubro(this.codigoRubro).finally(() => {
+          this.loading = false;
+        });
       },
       error: () => {
         this.loading = false;
       }
     });
+  }
+
+  private async cargarComponenteRubro(codigo: string | null): Promise<void> {
+    this.rubroComponent.set(null);
+    if (codigo !== 'GRF' && codigo !== 'HOTEL') {
+      return;
+    }
+    this.cargandoRubro.set(true);
+    try {
+      if (codigo === 'GRF') {
+        const mod = await import('../ventas-grifo/ventas-grifo.component');
+        this.rubroComponent.set(mod.VentasGrifoComponent);
+      } else {
+        const mod = await import('../ventas-hoteles/ventas-hoteles.component');
+        this.rubroComponent.set(mod.VentasHotelesComponent);
+      }
+    } finally {
+      this.cargandoRubro.set(false);
+    }
   }
 
   /** GEN/FERR/RETAIL/null → POS estándar; GRF/HOTEL → módulo vertical. */
