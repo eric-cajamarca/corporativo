@@ -38,7 +38,8 @@
           </div>
         </div>
         <div *ngIf="loading" class="text-center py-4"><span class="spinner-border"></span></div>
-        <div class="table-responsive" *ngIf="!loading && items.length > 0">
+        <div *ngIf="!loading && errorCarga" class="alert alert-danger mb-3">{{ errorCarga }}</div>
+        <div class="table-responsive" *ngIf="!loading && !errorCarga && items.length > 0">
           <table class="table table-sm table-striped table-hover">
             <thead class="table-light">
               <tr>
@@ -62,7 +63,10 @@
             </tbody>
           </table>
         </div>
-        <div *ngIf="!loading && items.length === 0" class="alert alert-info mb-0">No hay registros de auditoría.</div>
+        <div *ngIf="!loading && !errorCarga && items.length === 0" class="alert alert-info mb-0">
+          No hay registros de auditoría para los filtros seleccionados.
+          Los eventos se registran al crear, editar o anular ventas/compras y otras operaciones desde que está activa la tabla <code>AuditoriaOperaciones</code>.
+        </div>
         <ngb-pagination
           *ngIf="!loading && total > pageSize"
           [(page)]="page"

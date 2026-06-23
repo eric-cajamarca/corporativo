@@ -613,29 +613,15 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           return;
         }
         this.limpiarVenta();
-        this.aplicarCotizacionEnCarrito(data, false);
-        this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
-          next: (pr: any) => {
-            if (pr?.data) {
-              this.stockSucursales_const = pr.data;
-            }
-            this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
-            this.actualizaTotales();
-            this.guardarEstadoProvisional();
-            if (typeof iziToast !== 'undefined') {
-              iziToast.success({
-                title: 'Duplicado',
-                message: 'Carrito cargado desde la cotización. Elija tipo de comprobante y forma de pago.',
-                position: 'topRight'
-              });
-            }
-            this.limpiarQueryDuplicarDesdeCotizacion();
-          },
-          error: () => {
-            this.actualizaTotales();
-            this.guardarEstadoProvisional();
-            this.limpiarQueryDuplicarDesdeCotizacion();
+        this.aplicarCotizacionEnCarrito(data, false, () => {
+          if (typeof iziToast !== 'undefined') {
+            iziToast.success({
+              title: 'Duplicado',
+              message: 'Carrito cargado desde la cotización. Elija tipo de comprobante y forma de pago.',
+              position: 'topRight'
+            });
           }
+          this.limpiarQueryDuplicarDesdeCotizacion();
         });
       },
       error: () => {
@@ -651,7 +637,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private aplicarCotizacionEnCarrito(data: Parameters<typeof mapearCotizacionACarrito>[0], cerrarModal: boolean): void {
+  private aplicarCotizacionEnCarrito(
+    data: Parameters<typeof mapearCotizacionACarrito>[0],
+    cerrarModal: boolean,
+    onListo?: () => void
+  ): void {
     const mapped = mapearCotizacionACarrito(data);
     this.carrito = mapped.carrito as typeof this.carrito;
     if (mapped.idSucursal) {
@@ -662,9 +652,31 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       this.cliente.rSocial = mapped.cliente.rSocial ?? '';
       this.cliente.ruc = mapped.cliente.ruc ?? '';
     }
-    this.actualizaTotales();
-    cerrarModalCotizacionSiCorresponde(cerrarModal);
-    notificarCotizacionCargada(cerrarModal);
+
+    const finalizar = () => {
+      this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
+      this.actualizaTotales();
+      this.guardarEstadoProvisional();
+      cerrarModalCotizacionSiCorresponde(cerrarModal);
+      notificarCotizacionCargada(cerrarModal);
+      onListo?.();
+    };
+
+    const catalogo = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const || []);
+    if (catalogo.length > 0) {
+      finalizar();
+      return;
+    }
+
+    this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+      next: (pr: any) => {
+        if (pr?.data) {
+          this.stockSucursales_const = pr.data;
+        }
+        finalizar();
+      },
+      error: () => finalizar()
+    });
   }
 
   /**
@@ -791,10 +803,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const marcaCat = marcaProductoEnLista(match as Record<string, unknown>);
     if (marcaCat) {
-      (linea as Record<string, unknown>)['nombreMarca'] =
-        (match as Record<string, unknown>)['nombreMarca'] ??
-        (match as Record<string, unknown>)['marca'] ??
-        marcaCat;
+      const ln = linea as Record<string, unknown>;
+      if (!String(ln['marca'] ?? '').trim()) ln['marca'] = marcaCat;
+      if (!String(ln['nombreMarca'] ?? '').trim()) {
+        ln['nombreMarca'] =
+          (match as Record<string, unknown>)['nombreMarca'] ??
+          (match as Record<string, unknown>)['marca'] ??
+          marcaCat;
+      }
     }
   }
 
@@ -3459,7 +3475,6 @@ abrirModalPrecios(item: any) {
           return;
         }
         this.aplicarCotizacionEnCarrito(data, true);
-        this.guardarEstadoProvisional();
       }
     });
   }

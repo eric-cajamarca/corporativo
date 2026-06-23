@@ -22,6 +22,7 @@ export class LogAuditoriaComponent implements OnInit {
   pageSize = 25;
   maxSize = 5;
   loading = false;
+  errorCarga = '';
   filtros = {
     accion: '',
     modulo: '',
@@ -40,11 +41,12 @@ export class LogAuditoriaComponent implements OnInit {
 
   cargar(): void {
     this.loading = true;
-    const params: any = { pagina: this.page, porPagina: this.pageSize };
-    if (this.filtros.accion?.trim()) params.accion = this.filtros.accion.trim();
-    if (this.filtros.modulo?.trim()) params.modulo = this.filtros.modulo.trim();
-    if (this.filtros.fechaDesde) params.fechaDesde = this.filtros.fechaDesde;
-    if (this.filtros.fechaHasta) params.fechaHasta = this.filtros.fechaHasta;
+    this.errorCarga = '';
+    const params: Record<string, string | number> = { pagina: this.page, porPagina: this.pageSize };
+    if (this.filtros.accion?.trim()) params['accion'] = this.filtros.accion.trim();
+    if (this.filtros.modulo?.trim()) params['modulo'] = this.filtros.modulo.trim();
+    if (this.filtros.fechaDesde) params['fechaDesde'] = this.filtros.fechaDesde;
+    if (this.filtros.fechaHasta) params['fechaHasta'] = this.filtros.fechaHasta;
 
     this.auditoriaService.listar(params).subscribe({
       next: (res) => {
@@ -52,9 +54,13 @@ export class LogAuditoriaComponent implements OnInit {
         this.total = res.total ?? 0;
         this.loading = false;
       },
-      error: () => {
+      error: (err) => {
         this.loading = false;
         this.items = [];
+        this.total = 0;
+        this.errorCarga =
+          err?.error?.message ||
+          'No se pudo cargar el log de auditoría. Verifique que el backend esté activo y que exista la tabla AuditoriaOperaciones.';
       }
     });
   }

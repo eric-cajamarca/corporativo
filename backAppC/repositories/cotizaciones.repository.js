@@ -312,7 +312,8 @@ exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
              ISNULL(d.aliasEmpresa, '') AS aliasEmpresa,
              ISNULL(s.nombre, '') AS nombreSucursal,
              COALESCE(pPorId.idProducto, pPorCodigoEmp.idProducto, pPorCodigo.idProducto, codigoEnRed.idProductoMatch, d.idProducto) AS idProducto,
-             ISNULL(pr.codigo, '') AS codigoPresentacion
+             ISNULL(pr.codigo, '') AS codigoPresentacion,
+             ISNULL(mRes.nombre, '') AS marca
       FROM DetalleCotizacion d
       LEFT JOIN Sucursal s ON s.idSucursal = d.idSucursal
       LEFT JOIN Productos pPorId ON pPorId.idProducto = d.idProducto
@@ -334,6 +335,10 @@ exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
         ORDER BY p.idProducto
       ) codigoEnRed
       LEFT JOIN Presentacion pr ON pr.idPresentacion = d.idPresentacion
+      LEFT JOIN Productos prodRes ON prodRes.idProducto = COALESCE(
+        pPorId.idProducto, pPorCodigoEmp.idProducto, pPorCodigo.idProducto, codigoEnRed.idProductoMatch, d.idProducto
+      )
+      LEFT JOIN Marcas mRes ON mRes.idMarca = prodRes.idMarca
       WHERE d.idCotizacion = @idCotizacion
       ORDER BY d.idDetalleCotizacion
     `);
@@ -353,7 +358,8 @@ exports.obtenerParaVenta = async (pool, idCotizacion, idEmpresa) => {
     ISC: row.ISC,
     total: row.total,
     idSucursal: row.idSucursal,
-    nombreSucursal: row.nombreSucursal != null ? String(row.nombreSucursal).trim() : ''
+    nombreSucursal: row.nombreSucursal != null ? String(row.nombreSucursal).trim() : '',
+    marca: row.marca != null ? String(row.marca).trim() : ''
   }));
   return { cabecera, detalles };
 };

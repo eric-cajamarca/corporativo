@@ -116,6 +116,7 @@ export interface CotizacionParaVentaResponse {
     pVenta: number;
     idSucursal?: string;
     nombreSucursal?: string;
+    marca?: string;
   }>;
 }
 

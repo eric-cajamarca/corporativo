@@ -15,6 +15,8 @@ export interface LineaCarritoDesdeCotizacion {
   idSucursal?: string;
   sucursal?: string;
   aliasEmpresa?: string;
+  marca?: string;
+  nombreMarca?: string;
 }
 
 export interface CotizacionCarritoMapeado {
@@ -56,22 +58,28 @@ export function mapearCotizacionACarrito(data: CotizacionParaVentaResponse): Cot
     pVenta: number;
     idSucursal?: string;
     nombreSucursal?: string;
+    marca?: string;
   }>;
 
-  const carrito: LineaCarritoDesdeCotizacion[] = lineas.map((d) => ({
-    idProducto: d.idProducto,
-    idEmpresa: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : undefined,
-    codigo: d.codigo,
-    descripcion: d.descripcion,
-    descripcionOriginal: (d.descripcion ?? '').toString().trim(),
-    permiteDescripcionEnVenta: false,
-    codigoPresentacion: d.codigoPresentacion ?? '',
-    cantidad: Number(d.cantidad) || 0,
-    pVenta: Number(d.pVenta) || 0,
-    idSucursal: d.idSucursal,
-    sucursal: (d.nombreSucursal ?? '').trim() || undefined,
-    aliasEmpresa: (d.aliasEmpresa ?? '').trim() || undefined
-  }));
+  const carrito: LineaCarritoDesdeCotizacion[] = lineas.map((d) => {
+    const marca = (d.marca ?? '').toString().trim();
+    return {
+      idProducto: d.idProducto,
+      idEmpresa: d.idEmpresaProducto != null ? String(d.idEmpresaProducto) : undefined,
+      codigo: d.codigo,
+      descripcion: d.descripcion,
+      descripcionOriginal: (d.descripcion ?? '').toString().trim(),
+      permiteDescripcionEnVenta: false,
+      codigoPresentacion: d.codigoPresentacion ?? '',
+      cantidad: Number(d.cantidad) || 0,
+      pVenta: Number(d.pVenta) || 0,
+      idSucursal: d.idSucursal,
+      sucursal: (d.nombreSucursal ?? '').trim() || undefined,
+      aliasEmpresa: (d.aliasEmpresa ?? '').trim() || undefined,
+      marca: marca || undefined,
+      nombreMarca: marca || undefined
+    };
+  });
 
   const cab = data.cabecera;
   const cliente: CotizacionCarritoMapeado['cliente'] = {};

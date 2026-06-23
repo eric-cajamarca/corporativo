@@ -47,7 +47,7 @@ exports.listarRepo = async (pool, idEmpresa, filtros = {}) => {
       uw.nombres + ' ' + ISNULL(uw.apellidos, '') AS usuarioNombre,
       COUNT(*) OVER() AS total
     FROM AuditoriaOperaciones ao
-    LEFT JOIN UsuarioWeb uw ON ao.idUsuario = uw.idUsuario
+    LEFT JOIN UsuarioWeb uw ON ao.idUsuario = uw.idUsuario AND uw.idEmpresa = ao.idEmpresa
     ${whereClause}
     ORDER BY ao.fecha DESC
     OFFSET @offset ROWS FETCH NEXT @porPagina ROWS ONLY
