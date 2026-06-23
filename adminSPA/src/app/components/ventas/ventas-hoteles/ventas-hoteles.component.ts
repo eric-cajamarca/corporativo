@@ -17,7 +17,7 @@ import { ProductoService } from '../../../services/producto.service';
 import { Router } from '@angular/router';
 import { productoActivoParaVenta } from '../../../utils/producto-busqueda.util';
 import { descripcionUnidadMedidaProducto } from '../../../utils/producto-presentacion.util';
-import { getFechaHoyLocal, calcularNochesEstadia } from '../../../utils/fecha-local.util';
+import { getFechaHoyLocal, calcularNochesEstadia, fechaHoraClienteAhora } from '../../../utils/fecha-local.util';
 
 declare var iziToast: { warning: (o: object) => void; success: (o: object) => void; error: (o: object) => void; info?: (o: object) => void };
 
@@ -751,7 +751,8 @@ export class VentasHotelesComponent implements OnInit {
       idProductoHabitacion: this.habitacionConsumoSeleccionada.idProducto,
       idProducto: this.formConsumo.idProducto,
       cantidad: this.formConsumo.cantidad,
-      pUnitario
+      pUnitario,
+      fechaHoraCliente: fechaHoraClienteAhora()
     }).subscribe({
       next: () => {
         this.cargarConsumo();
@@ -966,14 +967,16 @@ export class VentasHotelesComponent implements OnInit {
     this.reservaCheckInSeleccionada = null;
     this.habitacionCheckInSeleccionada = hab;
     const tarifa = this.getPrecioNocheHabitacion(hab.idProducto);
+    const salidaMinima = this.sumarDiasLocal(getFechaHoyLocal(), 1);
     this.formCheckIn = {
       idProductoHabitacion: hab.idProducto,
       idCliente: null,
       nombreHuesped: '',
-      fechaSalida: '',
+      fechaSalida: salidaMinima,
       tarifaNoche: tarifa,
       totalHabitacion: 0
     };
+    this.recalcularTotalCheckIn();
     this.idDocumentoHuesped = this.ID_DOC_DNI;
     this.numeroDocumentoHuesped = '';
     this.errorMessage.set(null);
@@ -1022,10 +1025,31 @@ export class VentasHotelesComponent implements OnInit {
     }
   }
 
+  /** Walk-in: ingreso hoy; salida mínima mañana (1 noche). */
+  fechaHoyCheckInWalkIn(): string {
+    return getFechaHoyLocal();
+  }
+
+  fechaSalidaMinWalkIn(): string {
+    return this.sumarDiasLocal(getFechaHoyLocal(), 1);
+  }
+
+  nochesEstadiaCheckIn(): number {
+    if (!this.formCheckIn.fechaSalida) return 0;
+    return calcularNochesEstadia(getFechaHoyLocal(), this.formCheckIn.fechaSalida);
+  }
+
   ejecutarCheckIn(): void {
     if (!this.formCheckIn.nombreHuesped?.trim() || !this.formCheckIn.fechaSalida) {
       this.errorMessage.set('Complete huésped y fecha de salida.');
       return;
+    }
+    if (!this.reservaCheckInSeleccionada) {
+      const noches = this.nochesEstadiaCheckIn();
+      if (noches < 1) {
+        this.errorMessage.set('La salida debe ser al menos mañana (1 noche: ingreso hoy).');
+        return;
+      }
     }
     if (this.reservaCheckInSeleccionada) {
       this.recalcularTotalCheckIn();
@@ -1035,8 +1059,12 @@ export class VentasHotelesComponent implements OnInit {
     this.guardandoCheckIn = true;
     this.errorMessage.set(null);
 
+    const horaCliente = fechaHoraClienteAhora();
+
     if (this.reservaCheckInSeleccionada) {
-      this.hotelService.checkInDesdeReserva(this.reservaCheckInSeleccionada.idReserva).subscribe({
+      this.hotelService.checkInDesdeReserva(this.reservaCheckInSeleccionada.idReserva, {
+        fechaHoraCliente: horaCliente
+      }).subscribe({
         next: () => {
           this.guardandoCheckIn = false;
           this.cerrarModalCheckIn();
@@ -1059,7 +1087,8 @@ export class VentasHotelesComponent implements OnInit {
       fechaSalida: this.formCheckIn.fechaSalida,
       tarifaNoche: this.formCheckIn.tarifaNoche,
       totalHabitacion: this.formCheckIn.totalHabitacion,
-      pVenta: this.formCheckIn.tarifaNoche
+      pVenta: this.formCheckIn.tarifaNoche,
+      fechaHoraCliente: horaCliente
     }).subscribe({
       next: () => {
         this.guardandoCheckIn = false;
@@ -1233,7 +1262,8 @@ export class VentasHotelesComponent implements OnInit {
       fechaSalida: this.formReserva.fechaSalida,
       codigo: this.formReserva.codigo || undefined,
       total: this.formReserva.total ?? 0,
-      estado: 'confirmada'
+      estado: 'confirmada',
+      fechaHoraCliente: fechaHoraClienteAhora()
     }).subscribe({
       next: () => {
         this.cerrarModalReserva();

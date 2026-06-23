@@ -59,6 +59,17 @@ function calcularNochesCalendario(fechaEntrada, fechaSalida) {
   return diff > 0 ? diff : 0;
 }
 
+function combinarFechaHoraSQL(fecha, hora) {
+  const d = String(fecha || '').slice(0, 10);
+  if (!d || d.length < 10) return null;
+  return `${d} ${normalizarHora(hora)}.000`;
+}
+
+function checkOutPrevistoSqlDesdeFechaSalida(fechaSalida, config = {}) {
+  const cfg = { ...DEFAULT_CONFIG, ...config };
+  return combinarFechaHoraSQL(fechaSalida, cfg.horaCheckOut);
+}
+
 function checkOutPrevistoDesdeFechaSalida(fechaSalida, config = {}) {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   return combinarFechaHora(fechaSalida, cfg.horaCheckOut);
@@ -83,5 +94,7 @@ module.exports = {
   intervaloDesdeBloqueo,
   intervalosSeSolapan,
   calcularNochesCalendario,
+  combinarFechaHoraSQL,
+  checkOutPrevistoSqlDesdeFechaSalida,
   checkOutPrevistoDesdeFechaSalida
 };

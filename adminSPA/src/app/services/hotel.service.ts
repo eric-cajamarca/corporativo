@@ -49,6 +49,8 @@ export interface ReservaCrearPayload {
   estado?: string;
   total?: number;
   observaciones?: string | null;
+  fechaHoraCliente?: string;
+  fRegistro?: string;
 }
 
 export interface ConfiguracionHotel {
@@ -90,6 +92,8 @@ export interface CheckInWalkInPayload {
   tarifaNoche?: number;
   totalHabitacion?: number;
   pVenta?: number;
+  checkIn?: string;
+  fechaHoraCliente?: string;
 }
 
 export interface CheckOutPreloadLinea {
@@ -267,7 +271,10 @@ export class HotelService {
     return this.http.post<{ data: Estancia }>(this.url + 'hotel/estancias/check-in', body, { withCredentials: true });
   }
 
-  checkInDesdeReserva(idReserva: string, body?: { tarifaNoche?: number }): Observable<{ data: Estancia }> {
+  checkInDesdeReserva(
+    idReserva: string,
+    body?: { tarifaNoche?: number; checkIn?: string; fechaHoraCliente?: string }
+  ): Observable<{ data: Estancia }> {
     return this.http.post<{ data: Estancia }>(
       this.url + 'hotel/reservas/' + encodeURIComponent(idReserva) + '/check-in',
       body ?? {},
@@ -283,10 +290,14 @@ export class HotelService {
     );
   }
 
-  confirmarCheckoutPostVenta(idEstancia: string, idVenta: number): Observable<{ data: { ok: boolean } }> {
+  confirmarCheckoutPostVenta(
+    idEstancia: string,
+    idVenta: number,
+    fechaHoraCliente?: string
+  ): Observable<{ data: { ok: boolean } }> {
     return this.http.post<{ data: { ok: boolean } }>(
       this.url + 'hotel/estancias/' + encodeURIComponent(idEstancia) + '/check-out/confirmar',
-      { idVenta },
+      { idVenta, checkOutReal: fechaHoraCliente },
       { withCredentials: true }
     );
   }
@@ -382,6 +393,8 @@ export class HotelService {
     cantidad: number;
     pUnitario?: number;
     idEstancia?: string;
+    fechaHoraCliente?: string;
+    fRegistro?: string;
   }): Observable<{ data: { idConsumo: string } }> {
     return this.http.post<{ data: { idConsumo: string } }>(this.url + 'consumo-habitacion', body, { withCredentials: true });
   }

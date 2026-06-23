@@ -67,8 +67,12 @@ export function fechaVentaOpcionalParaApi(valor: string | null | undefined): str
   return null;
 }
 
+/** Hora actual del navegador para operaciones hotel (reservas, check-in, consumo). */
+export function fechaHoraClienteAhora(): string {
+  return fechaHoraVentaClienteAhora();
+}
+
 /**
- * Noches de estadía hotel: salida − entrada (días calendario).
  * Ej.: entrada 21/06, salida 23/06 → 2 noches.
  */
 export function calcularNochesEstadia(fechaEntrada: string | null | undefined, fechaSalida: string | null | undefined): number {

@@ -50,7 +50,7 @@ import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
-import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal } from '../../../utils/fecha-local.util';
+import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal, fechaHoraClienteAhora } from '../../../utils/fecha-local.util';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
@@ -827,7 +827,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     if (!this.hotelCheckoutIdEstancia || !idVenta) return;
     const idEstancia = this.hotelCheckoutIdEstancia;
     this.hotelCheckoutIdEstancia = null;
-    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta).subscribe({
+    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora()).subscribe({
       error: (err) => {
         iziToast.warning({
           title: 'Hotel',

@@ -88,7 +88,13 @@ async function confirmarCheckoutPostVenta(req, res) {
     const idVenta = Number(req.body?.idVenta);
     if (!idVenta) return res.status(400).json({ message: 'idVenta requerido' });
     const data = await withPool((pool) =>
-      hotelService.confirmarCheckoutPostVenta(pool, req.user.empresa, req.params.idEstancia, idVenta)
+      hotelService.confirmarCheckoutPostVenta(
+        pool,
+        req.user.empresa,
+        req.params.idEstancia,
+        idVenta,
+        req.body?.checkOutReal || req.body?.fechaHoraCliente
+      )
     );
     res.status(200).json({ data });
   } catch (error) {

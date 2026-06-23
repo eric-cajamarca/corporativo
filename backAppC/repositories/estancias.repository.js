@@ -52,8 +52,8 @@ async function insertar(pool, idEmpresa, payload, idUsuario) {
     .input('idReserva', sql.UniqueIdentifier, payload.idReserva || null)
     .input('idCliente', sql.Int, payload.idCliente || null)
     .input('nombreHuesped', sql.VarChar(200), payload.nombreHuesped)
-    .input('checkIn', sql.DateTime, payload.checkIn)
-    .input('checkOutPrevisto', sql.DateTime, payload.checkOutPrevisto)
+    .input('checkIn', sql.VarChar(23), payload.checkIn)
+    .input('checkOutPrevisto', sql.VarChar(23), payload.checkOutPrevisto)
     .input('tarifaNoche', sql.Decimal(18, 6), payload.tarifaNoche ?? 0)
     .input('totalHabitacion', sql.Decimal(18, 2), payload.totalHabitacion ?? 0)
     .input('idUsuario', sql.UniqueIdentifier, idUsuario || null)
@@ -62,23 +62,36 @@ async function insertar(pool, idEmpresa, payload, idUsuario) {
         (idEmpresa, idProductoHabitacion, idReserva, idCliente, nombreHuesped, checkIn, checkOutPrevisto, tarifaNoche, totalHabitacion, idUsuario)
       OUTPUT INSERTED.idEstancia
       VALUES
-        (@idEmpresa, @idProductoHabitacion, @idReserva, @idCliente, @nombreHuesped, @checkIn, @checkOutPrevisto, @tarifaNoche, @totalHabitacion, @idUsuario)
+        (@idEmpresa, @idProductoHabitacion, @idReserva, @idCliente, @nombreHuesped,
+         CAST(@checkIn AS DATETIME), CAST(@checkOutPrevisto AS DATETIME),
+         @tarifaNoche, @totalHabitacion, @idUsuario)
     `);
   return result.recordset[0]?.idEstancia;
 }
 
-async function cerrarCheckout(pool, idEstancia, idEmpresa, idVenta = null) {
-  await pool.request()
+async function cerrarCheckout(pool, idEstancia, idEmpresa, idVenta = null, checkOutReal = null) {
+  const req = pool.request()
     .input('idEstancia', sql.UniqueIdentifier, idEstancia)
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .input('idVenta', sql.Int, idVenta)
-    .query(`
+    .input('idVenta', sql.Int, idVenta);
+  if (checkOutReal) {
+    req.input('checkOutReal', sql.VarChar(23), checkOutReal);
+    await req.query(`
       UPDATE Estancias SET
         estadoEstancia = 'checkout',
-        checkOutReal = GETDATE(),
+        checkOutReal = CAST(@checkOutReal AS DATETIME),
         idVenta = COALESCE(@idVenta, idVenta)
       WHERE idEstancia = @idEstancia AND idEmpresa = @idEmpresa AND estadoEstancia = 'activa'
     `);
+    return;
+  }
+  await req.query(`
+    UPDATE Estancias SET
+      estadoEstancia = 'checkout',
+      checkOutReal = GETDATE(),
+      idVenta = COALESCE(@idVenta, idVenta)
+    WHERE idEstancia = @idEstancia AND idEmpresa = @idEmpresa AND estadoEstancia = 'activa'
+  `);
 }
 
 async function listarReservasConfirmadasHabitacion(pool, idEmpresa, idProductoHabitacion, excluirIdReserva = null) {

@@ -8,13 +8,14 @@ const hotelHousekeepingRepository = require('../repositories/hotelHousekeeping.r
 const hotelAnticiposRepository = require('../repositories/hotelAnticipos.repository');
 const hotelReportesRepository = require('../repositories/hotelReportes.repository');
 const productosRepository = require('../repositories/productos.repository');
+const { fechaLocalDesdeDate, parseFechaHoraClienteASQL, sql23ADate } = require('../utils/fechaHoraLocal.util');
 const {
   intervaloDesdeReserva,
   intervaloDesdeEstancia,
   intervaloDesdeBloqueo,
   intervalosSeSolapan,
   calcularNochesCalendario,
-  checkOutPrevistoDesdeFechaSalida,
+  checkOutPrevistoSqlDesdeFechaSalida,
   combinarFechaHora,
   DEFAULT_CONFIG
 } = require('../utils/hotelIntervalo.util');
@@ -124,17 +125,19 @@ async function checkInWalkIn(pool, idEmpresa, body, idUsuario) {
   const activa = await estanciasRepository.obtenerActivaPorHabitacion(pool, idEmpresa, body.idProductoHabitacion);
   if (activa) throw new Error('La habitación ya tiene una estancia activa');
 
-  const checkIn = body.checkIn ? new Date(body.checkIn) : new Date();
-  const checkOutPrevisto = checkOutPrevistoDesdeFechaSalida(body.fechaSalida, cfg);
-  if (!checkOutPrevisto || checkOutPrevisto <= checkIn) {
-    throw new Error('La fecha de salida debe ser posterior al check-in');
+  const checkInSql = parseFechaHoraClienteASQL(body.checkIn || body.fechaHoraCliente);
+  const checkOutPrevistoSql = checkOutPrevistoSqlDesdeFechaSalida(body.fechaSalida, cfg);
+  const checkIn = sql23ADate(checkInSql);
+  const checkOutPrevisto = sql23ADate(checkOutPrevistoSql);
+  if (!checkOutPrevistoSql || !checkOutPrevisto || checkOutPrevisto <= checkIn) {
+    throw new Error('La fecha de salida debe ser posterior al check-in (mínimo 1 noche: salida al día siguiente)');
   }
 
   const intervalo = intervaloDesdeEstancia(checkIn, checkOutPrevisto, cfg);
   await validarDisponibilidadIntervalo(pool, idEmpresa, body.idProductoHabitacion, intervalo);
 
   const noches = calcularNochesCalendario(
-    checkIn.toISOString().slice(0, 10),
+    fechaLocalDesdeDate(checkIn),
     String(body.fechaSalida).slice(0, 10)
   );
   if (noches < (Number(cfg.nochesMinimasWalkIn) || 1)) {
@@ -151,8 +154,8 @@ async function checkInWalkIn(pool, idEmpresa, body, idUsuario) {
     idReserva: null,
     idCliente: body.idCliente || null,
     nombreHuesped: body.nombreHuesped.trim(),
-    checkIn,
-    checkOutPrevisto,
+    checkIn: checkInSql,
+    checkOutPrevisto: checkOutPrevistoSql,
     tarifaNoche,
     totalHabitacion
   }, idUsuario);
@@ -174,8 +177,10 @@ async function checkInDesdeReserva(pool, idEmpresa, idReserva, body, idUsuario) 
   await validarProductoEsHabitacion(pool, idEmpresa, reserva.idProductoHabitacion);
   await validarHousekeepingParaCheckIn(pool, idEmpresa, reserva.idProductoHabitacion);
 
-  const checkIn = body?.checkIn ? new Date(body.checkIn) : new Date();
-  const checkOutPrevisto = checkOutPrevistoDesdeFechaSalida(reserva.fechaSalida, cfg);
+  const checkInSql = parseFechaHoraClienteASQL(body?.checkIn || body?.fechaHoraCliente);
+  const checkOutPrevistoSql = checkOutPrevistoSqlDesdeFechaSalida(reserva.fechaSalida, cfg);
+  const checkIn = sql23ADate(checkInSql);
+  const checkOutPrevisto = sql23ADate(checkOutPrevistoSql);
   const intervalo = intervaloDesdeEstancia(checkIn, checkOutPrevisto, cfg);
   await validarDisponibilidadIntervalo(pool, idEmpresa, reserva.idProductoHabitacion, intervalo, {
     excluirIdReserva: idReserva
@@ -189,8 +194,8 @@ async function checkInDesdeReserva(pool, idEmpresa, idReserva, body, idUsuario) 
     idReserva,
     idCliente: reserva.idCliente || body?.idCliente || null,
     nombreHuesped: reserva.nombreHuesped,
-    checkIn,
-    checkOutPrevisto,
+    checkIn: checkInSql,
+    checkOutPrevisto: checkOutPrevistoSql,
     tarifaNoche,
     totalHabitacion
   }, idUsuario);
@@ -347,7 +352,7 @@ async function checkOutPreload(pool, idEmpresa, idEstancia) {
   };
 }
 
-async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta) {
+async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta, fechaHoraCliente) {
   if (!idVenta) throw new Error('idVenta requerido para confirmar check-out');
   const estancia = await estanciasRepository.obtenerPorId(pool, idEstancia, idEmpresa);
   if (!estancia) throw new Error('Estancia no encontrada');
@@ -355,7 +360,8 @@ async function confirmarCheckoutPostVenta(pool, idEmpresa, idEstancia, idVenta) 
     throw new Error('La estancia ya no está activa');
   }
 
-  await estanciasRepository.cerrarCheckout(pool, idEstancia, idEmpresa, idVenta);
+  const checkOutRealSql = parseFechaHoraClienteASQL(fechaHoraCliente);
+  await estanciasRepository.cerrarCheckout(pool, idEstancia, idEmpresa, idVenta, checkOutRealSql);
   await consumoHabitacionRepository.marcarFacturadosCheckout(
     pool,
     idEmpresa,

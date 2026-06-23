@@ -1,6 +1,7 @@
 const reservasRepository = require('../repositories/reservas.repository');
 const hotelService = require('./hotel.service');
 const { intervaloDesdeReserva } = require('../utils/hotelIntervalo.util');
+const { parseFechaHoraClienteASQL } = require('../utils/fechaHoraLocal.util');
 
 const ESTADOS_VALIDOS = ['confirmada', 'cancelada', 'no_show', 'convertida'];
 
@@ -67,7 +68,8 @@ async function crear(pool, idEmpresa, body, idUsuario = null) {
         fechaSalida: body.fechaSalida,
         estado: 'confirmada',
         total,
-        observaciones: body.observaciones?.trim() || null
+        observaciones: body.observaciones?.trim() || null,
+        fRegistro: parseFechaHoraClienteASQL(body.fRegistro || body.fechaHoraCliente)
     }, idUsuario);
 }
 

@@ -750,8 +750,9 @@
               </small>
             </div>
             <div class="mb-3">
-              <label class="form-label">Tarifa por noche (S/)</label>
+              <label class="form-label">Precio por noche (S/) <span class="text-muted fw-normal">opcional</span></label>
               <input type="number" class="form-control" [(ngModel)]="formCheckIn.tarifaNoche" (ngModelChange)="recalcularTotalCheckIn()" min="0" step="0.01" />
+              <small class="text-muted">Si el producto habitación tiene precio, se precarga aquí para calcular el total. Puede ignorarlo y poner solo el total abajo.</small>
             </div>
           } @else {
             <div class="mb-3">
@@ -759,9 +760,20 @@
               <input type="text" class="form-control" [ngModel]="formCheckIn.nombreHuesped" readonly />
             </div>
           }
+          @if (!reservaCheckInSeleccionada) {
+            <div class="mb-3">
+              <label class="form-label">Fecha ingreso</label>
+              <input type="date" class="form-control" [ngModel]="fechaHoyCheckInWalkIn()" readonly />
+              <small class="text-muted">Check-in walk-in: ingreso hoy a la hora actual.</small>
+            </div>
+          }
           <div class="mb-3">
             <label class="form-label">Fecha salida <span class="text-danger">*</span></label>
-            <input type="date" class="form-control" [(ngModel)]="formCheckIn.fechaSalida" (ngModelChange)="recalcularTotalCheckIn()" />
+            <input type="date" class="form-control" [(ngModel)]="formCheckIn.fechaSalida" (ngModelChange)="recalcularTotalCheckIn()"
+              [min]="reservaCheckInSeleccionada ? null : fechaSalidaMinWalkIn()" />
+            @if (!reservaCheckInSeleccionada && nochesEstadiaCheckIn() > 0) {
+              <small class="text-muted">{{ nochesEstadiaCheckIn() }} noche(s) de estadía.</small>
+            }
           </div>
           @if (!reservaCheckInSeleccionada) {
             <div class="mb-3">

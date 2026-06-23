@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
@@ -15,6 +15,7 @@ import { AuditoriaService, AuditoriaItem } from '../../../services/auditoria.ser
   styleUrl: './log-auditoria.component.css'
 })
 export class LogAuditoriaComponent implements OnInit {
+  public sidebarState = inject(SidebarStateService);
   items: AuditoriaItem[] = [];
   total = 0;
   page = 1;
@@ -29,7 +30,7 @@ export class LogAuditoriaComponent implements OnInit {
 
   constructor(
     private auditoriaService: AuditoriaService,
-    public sidebarState: SidebarStateService
+    //public sidebarState: SidebarStateService
   ) {}
 
   ngOnInit(): void {
@@ -69,5 +70,9 @@ export class LogAuditoriaComponent implements OnInit {
   formatearFecha(f: string | null | undefined): string {
     if (!f) return '—';
     return String(f).slice(0, 19).replace('T', ' ');
+  }
+
+  onSidebarToggle(collapsed: boolean): void {
+    this.sidebarState.setCollapsed(collapsed);
   }
 }

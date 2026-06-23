@@ -1,5 +1,6 @@
 const consumoHabitacionRepository = require('../repositories/consumoHabitacion.repository');
 const estanciasRepository = require('../repositories/estancias.repository');
+const { parseFechaHoraClienteASQL } = require('../utils/fechaHoraLocal.util');
 
 async function listarPorHabitacion(pool, idEmpresa, idProductoHabitacion) {
   return consumoHabitacionRepository.listarPorHabitacion(pool, idEmpresa, idProductoHabitacion);
@@ -30,7 +31,8 @@ async function agregar(pool, idEmpresa, body, idUsuario) {
     idEstancia,
     idProducto: body.idProducto,
     cantidad,
-    pUnitario
+    pUnitario,
+    fRegistro: parseFechaHoraClienteASQL(body.fRegistro || body.fechaHoraCliente)
   }, idUsuario);
 }
 

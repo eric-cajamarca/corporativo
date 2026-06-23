@@ -69,9 +69,9 @@ async function siguienteCodigo(pool, idEmpresa) {
 async function crear(pool, idEmpresa, payload, idUsuario = null) {
     const {
         idProductoHabitacion, idCliente, codigo, nombreHuesped,
-        fechaEntrada, fechaSalida, estado, total, observaciones
+        fechaEntrada, fechaSalida, estado, total, observaciones, fRegistro
     } = payload;
-    const result = await pool.request()
+    const req = pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
         .input('idCliente', sql.Int, idCliente || null)
@@ -82,11 +82,18 @@ async function crear(pool, idEmpresa, payload, idUsuario = null) {
         .input('estado', sql.VarChar(20), estado || 'confirmada')
         .input('total', sql.Decimal(18, 2), total ?? 0)
         .input('observaciones', sql.VarChar(500), observaciones || null)
-        .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-        .query(`
-            INSERT INTO Reservas (idEmpresa, idProductoHabitacion, idCliente, codigo, nombreHuesped, fechaEntrada, fechaSalida, estado, total, observaciones, idUsuario)
+        .input('idUsuario', sql.UniqueIdentifier, idUsuario);
+    let colRegistro = '';
+    let valRegistro = '';
+    if (fRegistro) {
+        req.input('fRegistro', sql.VarChar(23), fRegistro);
+        colRegistro = ', fRegistro';
+        valRegistro = ', CAST(@fRegistro AS DATETIME)';
+    }
+    const result = await req.query(`
+            INSERT INTO Reservas (idEmpresa, idProductoHabitacion, idCliente, codigo, nombreHuesped, fechaEntrada, fechaSalida, estado, total, observaciones, idUsuario${colRegistro})
             OUTPUT INSERTED.idReserva, INSERTED.codigo
-            VALUES (@idEmpresa, @idProductoHabitacion, @idCliente, @codigo, @nombreHuesped, @fechaEntrada, @fechaSalida, @estado, @total, @observaciones, @idUsuario)
+            VALUES (@idEmpresa, @idProductoHabitacion, @idCliente, @codigo, @nombreHuesped, @fechaEntrada, @fechaSalida, @estado, @total, @observaciones, @idUsuario${valRegistro})
         `);
     return result.recordset[0];
 }

@@ -76,19 +76,26 @@ async function listarPendientesParaCheckout(pool, idEmpresa, idEstancia, idProdu
 }
 
 async function agregar(pool, idEmpresa, payload, idUsuario) {
-  const { idProductoHabitacion, idEstancia, idProducto, cantidad, pUnitario } = payload;
-  const result = await pool.request()
+  const { idProductoHabitacion, idEstancia, idProducto, cantidad, pUnitario, fRegistro } = payload;
+  const req = pool.request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
     .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
     .input('idEstancia', sql.UniqueIdentifier, idEstancia)
     .input('idProducto', sql.UniqueIdentifier, idProducto)
     .input('cantidad', sql.Decimal(18, 3), cantidad)
     .input('pUnitario', sql.Decimal(18, 6), pUnitario ?? 0)
-    .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-    .query(`
-      INSERT INTO ConsumoHabitacion (idEmpresa, idProductoHabitacion, idEstancia, idProducto, cantidad, pUnitario, idUsuario, estadoConsumo)
+    .input('idUsuario', sql.UniqueIdentifier, idUsuario);
+  let colReg = '';
+  let valReg = '';
+  if (fRegistro) {
+    req.input('fRegistro', sql.VarChar(23), fRegistro);
+    colReg = ', fRegistro';
+    valReg = ', CAST(@fRegistro AS DATETIME)';
+  }
+  const result = await req.query(`
+      INSERT INTO ConsumoHabitacion (idEmpresa, idProductoHabitacion, idEstancia, idProducto, cantidad, pUnitario, idUsuario, estadoConsumo${colReg})
       OUTPUT INSERTED.idConsumo, INSERTED.cantidad, INSERTED.pUnitario
-      VALUES (@idEmpresa, @idProductoHabitacion, @idEstancia, @idProducto, @cantidad, @pUnitario, @idUsuario, 'pendiente')
+      VALUES (@idEmpresa, @idProductoHabitacion, @idEstancia, @idProducto, @cantidad, @pUnitario, @idUsuario, 'pendiente'${valReg})
     `);
   return result.recordset[0];
 }
