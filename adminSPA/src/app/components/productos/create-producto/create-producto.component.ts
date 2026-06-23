@@ -18,6 +18,7 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
+import { esProductoServicio } from '../../../utils/producto-servicio.util';
 
 declare var iziToast: any;
 
@@ -155,6 +156,11 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
     this.productoForm.get('useCorrelativo')?.valueChanges.subscribe(() => {
       this.onCheckboxChangeCorrelativo();
     });
+    this.productoForm.get('idPresentacion')?.valueChanges.subscribe(() => {
+      if (this.esPresentacionServicioSeleccionada()) {
+        this.modoLote.set(false);
+      }
+    });
     this.gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const item = (res?.data ?? []).find((c: { clave: string }) => c.clave === 'PRODUCTOS_CON_IMAGENES');
@@ -162,6 +168,13 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+  }
+
+  esPresentacionServicioSeleccionada(): boolean {
+    const id = this.productoForm?.get('idPresentacion')?.value;
+    if (id == null || id === '') return false;
+    const pres = this.presentaciones.find((p) => String(p.idPresentacion) === String(id));
+    return esProductoServicio(pres?.codigo);
   }
 
   private initForm(): void {
@@ -458,7 +471,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       alertaMaximo: v.alertaMaximo != null ? Number(v.alertaMaximo) : 100,
       estado: !!v.estado,
       tipoProducto: (v.tipoProducto === 'C' || v.tipoProducto === 'S') ? v.tipoProducto : 'S',
-      lote: this.modoLote() && this.loteData.idSucursal ? {
+      lote: !this.esPresentacionServicioSeleccionada() && this.modoLote() && this.loteData.idSucursal ? {
         idSucursal: this.loteData.idSucursal,
         costoUnitario: this.loteData.costoUnitario,
         cantidadIngresada: this.loteData.cantidadIngresada,

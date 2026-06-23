@@ -46,11 +46,12 @@ import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
-import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal } from '../../../utils/fecha-local.util';
+import { fechaEmisionVentaParaApi, fechaVentaOpcionalParaApi, getFechaHoyLocal, fechaHoraClienteAhora } from '../../../utils/fecha-local.util';
 import { VentaSesion } from '../../../interfaces/venta-sesion.interface';
 import { CreditosService } from '../../../services/creditos.service';
 import { GestoresService } from '../../../services/gestores.service';
 import { HotelPreloadVentaService } from '../../../services/hotel-preload-venta.service';
+import { HotelService } from '../../../services/hotel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { UsuarioSucursalService, SucursalUsuario } from '../../../services/usuario-sucursal.service';
@@ -63,6 +64,7 @@ import {
   validarClienteSunatParaComprobante,
   validarStockLinea
 } from '../../../utils/pos-validacion.util';
+import { esProductoServicio } from '../../../utils/producto-servicio.util';
 import { PosKeyboardService } from '../../../services/pos-keyboard.service';
 
 declare var bootstrap: any;
@@ -252,6 +254,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   loadingVales = false;
   loadingLiquidar = false;
 
+  /** Check-out hotel pendiente de confirmar al registrar la venta. */
+  private hotelCheckoutIdEstancia: string | null = null;
+
   /** Comprobantes Factura (01) y Boleta (03) para elegir al liquidar vale */
   get comprobantesFacturaBoleta(): any[] {
     const list = this.comprobantes || [];
@@ -282,6 +287,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     private creditosService: CreditosService,
     private gestoresService: GestoresService,
     private hotelPreloadVentaService: HotelPreloadVentaService,
+    private hotelService: HotelService,
     private valesDespachoService: ValesDespachoService,
     private empresaService: EmpresaService,
     private auth: AuthService,
@@ -725,8 +731,10 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
   aplicarPreloadDesdeHabitacion(): void {
     const preload = this.hotelPreloadVentaService.getAndClearPreload();
     if (!preload?.lineas?.length) return;
-    this.carrito = preload.lineas.map((lin: { idProducto: string; codigo: string; descripcion: string; codigoPresentacion?: string; cantidad: number; pVenta: number; permiteDescripcionEnVenta?: boolean }) => {
+    this.hotelCheckoutIdEstancia = preload.idEstancia ?? null;
+    this.carrito = preload.lineas.map((lin) => {
       const desc = (lin.descripcion ?? '').toString().trim();
+      const marca = (lin as { marca?: string }).marca ?? '';
       return {
         idProducto: lin.idProducto,
         codigo: lin.codigo,
@@ -734,11 +742,94 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
         descripcionOriginal: desc,
         permiteDescripcionEnVenta: !!(lin as { permiteDescripcionEnVenta?: boolean }).permiteDescripcionEnVenta,
         codigoPresentacion: lin.codigoPresentacion ?? '',
+        nombreMarca: marca,
+        marca,
         cantidad: lin.cantidad,
         pVenta: lin.pVenta
       };
     });
-    this.actualizaTotales();
+    this.cargarClienteDesdePreloadHotel(preload);
+    this._productoService.obtenerProductosTodos({ evitarCache: true }).subscribe({
+      next: (pr: any) => {
+        if (pr?.data) {
+          this.stockSucursales_const = pr.data;
+        }
+        this.carrito.forEach((ln) => this.enriquecerLineaCarritoDesdeCatalogo(ln));
+        this.actualizaTotales();
+        this.guardarEstadoProvisional();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Check-out',
+            message: 'Carrito cargado desde la estancia. Revise cliente y comprobante.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: () => {
+        this.actualizaTotales();
+        this.guardarEstadoProvisional();
+      }
+    });
+  }
+
+  /** Cliente de la estancia al llegar desde check-out hotel. */
+  private cargarClienteDesdePreloadHotel(preload: {
+    idCliente?: number | null;
+    nombreHuesped?: string;
+  }): void {
+    const idCliente = preload.idCliente != null ? Number(preload.idCliente) : null;
+    if (idCliente != null && idCliente > 0) {
+      this._clienteService.obtener_cliente_id(idCliente).subscribe({
+        next: (res: { data?: Record<string, unknown> | Record<string, unknown>[] }) => {
+          const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+          if (!row) {
+            this.aplicarNombreHuespedSinCliente(preload.nombreHuesped);
+            return;
+          }
+          this.cliente = {
+            idCliente: row['idCliente'],
+            idDocumento: row['idDocumento'],
+            ruc: row['ruc'],
+            rSocial: (row['rSocial'] ?? row['r_Social'] ?? row['rsocial'] ?? row['razonSocial'] ?? row['RazonSocial'] ?? '').toString().trim(),
+            direccion: (row['direccion'] ?? '').toString(),
+            correo: row['correo'] ?? '',
+            celular: row['celular'] ?? '',
+            condicion: row['condicion'] ?? 'ACTIVO',
+            sujetoCredito: row['sujetoCredito'] === true || row['sujetoCredito'] === 1,
+            lineaCredito: row['lineaCredito'] != null && !isNaN(Number(row['lineaCredito'])) ? Number(row['lineaCredito']) : undefined
+          };
+          this._clienteService.obtener_direccionesCliente_idCliente(this.cliente.idCliente).subscribe({
+            next: (dirRes) => this.aplicarPrimeraDireccionClienteAlContexto(dirRes),
+            error: () => {}
+          });
+        },
+        error: () => this.aplicarNombreHuespedSinCliente(preload.nombreHuesped)
+      });
+      return;
+    }
+    this.aplicarNombreHuespedSinCliente(preload.nombreHuesped);
+  }
+
+  private aplicarNombreHuespedSinCliente(nombreHuesped?: string): void {
+    const nombre = (nombreHuesped ?? '').trim();
+    if (!nombre) return;
+    this.cliente.rSocial = nombre;
+  }
+
+  /** Cierra estancia y marca consumos facturados solo tras venta exitosa. */
+  private confirmarCheckoutHotelSiCorresponde(idVenta: number | null): void {
+    if (!this.hotelCheckoutIdEstancia || !idVenta) return;
+    const idEstancia = this.hotelCheckoutIdEstancia;
+    this.hotelCheckoutIdEstancia = null;
+    this.hotelService.confirmarCheckoutPostVenta(idEstancia, idVenta, fechaHoraClienteAhora()).subscribe({
+      error: (err) => {
+        iziToast.warning({
+          title: 'Hotel',
+          message: err?.error?.message || 'Venta registrada, pero no se pudo cerrar la estancia en hotel.',
+          position: 'topRight'
+        });
+      }
+    });
   }
 
   /** Quitar query `duplicarDesdeVenta` de la URL tras procesar. */
@@ -934,6 +1025,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
     }
     if (!match) return;
     linea.stock = match.stock;
+    if (linea.idSucursal == null && match.idSucursal != null) {
+      linea.idSucursal = match.idSucursal;
+    }
     if (!linea.codigoPresentacion) linea.codigoPresentacion = match.codigoPresentacion ?? '';
     if (!linea.sucursal) linea.sucursal = match.sucursal ?? '';
     if (match.idEmpresa != null) {
@@ -978,6 +1072,7 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
   /** Carrito: cantidad supera stock conocido o stock 0 (solo aviso visual si no está permitido vender sin stock). */
   lineaCarritoStockInsuficiente(item: any): boolean {
+    if (esProductoServicio(item?.codigoPresentacion)) return false;
     if (this.permitirVentasNegativas) return false;
     const cant = Number(item?.cantidad) || 0;
     const disp = this.obtenerStockDisponibleParaLineaCarrito(item);
@@ -1123,6 +1218,9 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       next: (res) => {
         const list: Impuesto[] = res.data || [];
         this.impuestosActivosEmpresa = list.filter((i: Impuesto) => this.impuestoEstaActivo(i));
+        if (this.carrito.length > 0) {
+          this.actualizaTotales();
+        }
       },
       error: () => {}
     });
@@ -1738,7 +1836,8 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
       cantidadNueva,
       stockDisponible: stock,
       permitirVentasNegativas: this.permitirVentasNegativas,
-      nombreProducto: producto?.descripcion || producto?.codigo
+      nombreProducto: producto?.descripcion || producto?.codigo,
+      esServicio: esProductoServicio(producto?.codigoPresentacion)
     });
   }
 
@@ -1930,15 +2029,14 @@ export class CreateVentaRapidaComponent implements OnInit, AfterViewInit, OnDest
 
  obtenerPrecioPrincipal(item: any): number {
   if (!item.precios || typeof item.precios !== 'object') {
-    return item.precio || 0;
+    return Number(item.precio ?? item.pVenta) || 0;
   }
 
   const listaPrincipal = Object.values(item.precios).find(
-    (p: any) => p.principal === true
+    (p: any) => p.principal === true || p.principal === 1
   );
 
-  //return listaPrincipal ? listaPrincipal.precio : item.precio || 0;
-  return listaPrincipal ? (listaPrincipal as any).precio : item.pVenta || 0;
+  return listaPrincipal ? (listaPrincipal as any).precio : Number(item.pVenta ?? item.precio) || 0;
 }
 
   private aplicaDescuentoEnTotalLinea(item: { idEmpresa?: string | null }): boolean {
@@ -3240,6 +3338,7 @@ abrirModalPrecios(item: any) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
+        this.confirmarCheckoutHotelSiCorresponde(idVentaPdf);
         const abrirPdf =
           this.mostrarModalPdfTrasRegistrarVenta && idVentaPdf != null;
         if (abrirPdf) {

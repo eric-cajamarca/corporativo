@@ -7,6 +7,7 @@ const inventarioService = require('./inventario.service');
 const gestoresRepository = require('../repositories/gestores.repository');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const productosRepository = require('../repositories/productos.repository');
+const productoInventarioMetaService = require('./productoInventarioMeta.service');
 const cotizacionesRepository = require('../repositories/cotizaciones.repository');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
@@ -512,6 +513,21 @@ exports.aplicarMovimientos = async (idEmpresa, idUsuario, idSesion, body) => {
         }
 
         const ctx = await resolverContextoLineaStock(transaction, sesion, l.idProducto, idEmpresa);
+        const metaInv = await productoInventarioMetaService.obtenerMeta(transaction, ctx.idEmpresa, l.idProducto);
+        if (!metaInv.controlaInventario) {
+          detalle.push({
+            idProducto: l.idProducto,
+            idEmpresaDestino: ctx.idEmpresa,
+            idSucursalDestino: ctx.idSucursal,
+            productoCodigo: l.productoCodigo,
+            stockActual: null,
+            stockReal,
+            delta: 0,
+            omitidoInventario: true
+          });
+          continue;
+        }
+
         const stockActual = await obtenerStockLinea(transaction, ctx, l.idProducto);
         const delta = stockReal - stockActual;
         detalle.push({

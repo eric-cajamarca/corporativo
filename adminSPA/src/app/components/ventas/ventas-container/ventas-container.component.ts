@@ -1,24 +1,17 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, Type, signal } from '@angular/core';
+import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 import { EmpresaService } from '../../../services/empresa.service';
-import { Empresa } from '../../../models/empresa.model';
-import { VentasGrifoComponent } from '../ventas-grifo/ventas-grifo.component';
-import { VentasHotelesComponent } from '../ventas-hoteles/ventas-hoteles.component';
 import { VentasRopaComponent } from '../ventas-ropa/ventas-ropa.component';
 import { VentasRestaurantesComponent } from '../ventas-restaurantes/ventas-restaurantes.component';
+
+/** Rubros con pantalla vertical dedicada en /ventas (histórico). El resto usa POS estándar. */
+const RUBROS_LEGACY_VERTICAL = new Set(['ROPA', 'REST', 'FERR', 'RETAIL']);
 
 @Component({
   selector: 'app-ventas-container',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterOutlet,
-    VentasGrifoComponent,
-    VentasHotelesComponent,
-    VentasRopaComponent,
-    VentasRestaurantesComponent
-  ],
+  imports: [CommonModule, RouterOutlet, NgComponentOutlet, VentasRopaComponent, VentasRestaurantesComponent],
   templateUrl: './ventas-container.component.html',
   styleUrl: './ventas-container.component.css'
 })
@@ -26,6 +19,8 @@ export class VentasContainerComponent implements OnInit {
   codigoRubro: string | null = null;
   rubroEmpresa = '';
   loading = true;
+  rubroComponent = signal<Type<unknown> | null>(null);
+  cargandoRubro = signal(false);
 
   constructor(
     private empresaService: EmpresaService,
@@ -44,13 +39,19 @@ export class VentasContainerComponent implements OnInit {
     );
   }
 
+  get usaModuloRubroLazy(): boolean {
+    const cod = this.codigoVistaVentas();
+    return cod === 'GRF' || cod === 'HOTEL';
+  }
+
   ngOnInit(): void {
-    // Cargar empresa desde la API para tener codigoRubro actualizado (evita ver listado habitual si el rubro es Hotel/Grifo/etc.)
     this.empresaService.refreshEmpresaFromApi().subscribe({
       next: (emp) => {
-        this.codigoRubro = emp?.codigoRubro ?? null;
+        this.codigoRubro = this.normalizarCodigoRubro(emp?.codigoRubro ?? null);
         this.rubroEmpresa = emp?.rubro ?? '';
-        this.loading = false;
+        void this.cargarComponenteRubro(this.codigoVistaVentas()).finally(() => {
+          this.loading = false;
+        });
       },
       error: () => {
         this.loading = false;
@@ -70,5 +71,32 @@ export class VentasContainerComponent implements OnInit {
   codigoVistaVentas(): string | null {
     if (this.esVistaGrifo()) return 'GRF';
     return this.codigoRubro;
+  }
+
+  private async cargarComponenteRubro(codigo: string | null): Promise<void> {
+    this.rubroComponent.set(null);
+    if (codigo !== 'GRF' && codigo !== 'HOTEL') {
+      return;
+    }
+    this.cargandoRubro.set(true);
+    try {
+      if (codigo === 'GRF') {
+        const mod = await import('../ventas-grifo/ventas-grifo.component');
+        this.rubroComponent.set(mod.VentasGrifoComponent);
+      } else {
+        const mod = await import('../ventas-hoteles/ventas-hoteles.component');
+        this.rubroComponent.set(mod.VentasHotelesComponent);
+      }
+    } finally {
+      this.cargandoRubro.set(false);
+    }
+  }
+
+  /** GEN/FERR/RETAIL/null → POS estándar; GRF/HOTEL → módulo vertical. */
+  private normalizarCodigoRubro(codigo: string | null): string | null {
+    const c = (codigo ?? '').trim().toUpperCase();
+    if (!c || c === 'GEN' || RUBROS_LEGACY_VERTICAL.has(c)) return null;
+    if (c === 'GRIFO') return 'GRF';
+    return c;
   }
 }

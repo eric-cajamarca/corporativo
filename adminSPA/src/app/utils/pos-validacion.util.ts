@@ -97,7 +97,12 @@ export function validarStockLinea(params: {
   stockDisponible: number | null;
   permitirVentasNegativas: boolean;
   nombreProducto?: string;
+  /** Presentación ZZ (servicio): no valida stock. */
+  esServicio?: boolean;
 }): { valido: boolean; mensaje?: string; advertencia?: string } {
+  if (params.esServicio) {
+    return { valido: true };
+  }
   const nombre = params.nombreProducto || 'el producto';
   if (params.permitirVentasNegativas) {
     if (params.stockDisponible != null && params.stockDisponible <= 0) {

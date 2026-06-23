@@ -62,6 +62,7 @@ async function crearProductoConTransaccion(pool, params) {
   const { datosProducto, usarCorrelativo, lote, precioVenta, idListaPrecio, idEmpresa, preciosPorLista } = params;
   const saasPlanLimitesService = require('./saasPlanLimites.service');
   await saasPlanLimitesService.assertPuedeCrearProducto(pool, idEmpresa);
+  const productoInventarioMetaService = require('./productoInventarioMeta.service');
   const maxIntentosCodigo = 12;
   let committed = false;
   let lastDupErr = null;
@@ -84,7 +85,16 @@ async function crearProductoConTransaccion(pool, params) {
 
       await ProductosRepository.insertarProducto(transaction, datosProducto);
 
-      if (lote && lote.idSucursal && (lote.cantidadIngresada > 0 || lote.costoUnitario != null)) {
+      const controlaInventario = await productoInventarioMetaService.controlaInventarioPorIdPresentacion(
+        transaction,
+        datosProducto.idPresentacion
+      );
+      if (
+        controlaInventario &&
+        lote &&
+        lote.idSucursal &&
+        (lote.cantidadIngresada > 0 || lote.costoUnitario != null)
+      ) {
         const cantidad = Math.max(0, parseInt(lote.cantidadIngresada, 10) || 0);
         const costoLote = lote.costoUnitario != null ? parseFloat(lote.costoUnitario) : datosProducto.cUnitario;
         await ProductosRepository.insertarLoteInicial(transaction, {

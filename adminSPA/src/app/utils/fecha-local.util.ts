@@ -66,3 +66,24 @@ export function fechaVentaOpcionalParaApi(valor: string | null | undefined): str
   }
   return null;
 }
+
+/** Hora actual del navegador para operaciones hotel (reservas, check-in, consumo). */
+export function fechaHoraClienteAhora(): string {
+  return fechaHoraVentaClienteAhora();
+}
+
+/**
+ * Noches de estadía hotel: salida − entrada (días calendario).
+ * Ej.: entrada 21/06, salida 23/06 → 2 noches.
+ */
+export function calcularNochesEstadia(fechaEntrada: string | null | undefined, fechaSalida: string | null | undefined): number {
+  const e = fechaEntrada != null ? String(fechaEntrada).trim().slice(0, 10) : '';
+  const s = fechaSalida != null ? String(fechaSalida).trim().slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e) || !/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return 0;
+  }
+  const dEntrada = new Date(`${e}T12:00:00`);
+  const dSalida = new Date(`${s}T12:00:00`);
+  const diff = Math.round((dSalida.getTime() - dEntrada.getTime()) / 86400000);
+  return diff > 0 ? diff : 0;
+}

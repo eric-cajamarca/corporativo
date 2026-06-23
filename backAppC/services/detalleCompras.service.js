@@ -2,6 +2,7 @@ const sql = require('mssql');
 const detalleComprasRepository = require('../repositories/detalleCompras.repository');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const conteoFisicoRepository = require('../repositories/conteoFisico.repository');
+const productoInventarioMetaService = require('./productoInventarioMeta.service');
 const { assertAlgunoPermiso } = require('../utils/autorizacionPermisos.util');
 
 async function obtenerDetallePorCompra(pool, user, idCompra) {
@@ -54,52 +55,68 @@ async function crearDetalleCompraCompleto(pool, user, body) {
       total: totalVal,
       idUsuario
     });
-    let numeroLote = null;
-    try {
-      numeroLote = await detalleComprasRepository.obtenerNumeroLoteCompra(transaction, idCompra);
-    } catch (_) {
-      numeroLote = null;
-    }
-    if (numeroLote == null) {
-      numeroLote = await detalleComprasRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
-      try {
-        await detalleComprasRepository.actualizarNumeroLoteCompra(transaction, idCompra, numeroLote);
-      } catch (_) {}
+
+    let ingresaStock;
+    if (idPresentacion != null && idPresentacion !== '') {
+      ingresaStock = await productoInventarioMetaService.controlaInventarioPorIdPresentacion(
+        transaction,
+        idPresentacion
+      );
     } else {
-      numeroLote = String(numeroLote);
+      const metaProd = await productoInventarioMetaService.obtenerMeta(transaction, idEmpresa, idProducto);
+      ingresaStock = metaProd.controlaInventario;
     }
-    const idLote = await detalleComprasRepository.insertarLote(transaction, {
-      idEmpresa,
-      idProducto,
-      idSucursal,
-      costoUnitario: pUnitarioFormateado,
-      cantidadIngresada: cantidadVal,
-      cantidadDisponible: cantidadVal,
-      fechaVencimiento: fechaVencimientoVal,
-      numeroLote
-    });
+
+    let numeroLote = null;
+    let idLote = null;
     let idUbParaLote = null;
-    if (tieneUbicacionExplicita) {
-      const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(
-        transaction,
-        idSucursal,
-        idUbExplicita
-      );
-      if (!okUb) {
-        throw new Error('La ubicación de ingreso no pertenece a la sucursal del detalle');
+    if (ingresaStock) {
+      try {
+        numeroLote = await detalleComprasRepository.obtenerNumeroLoteCompra(transaction, idCompra);
+      } catch (_) {
+        numeroLote = null;
       }
-      idUbParaLote = idUbExplicita;
-    } else if (asignarUbicacionDefecto && idUbicacionDefault) {
-      idUbParaLote = idUbicacionDefault;
+      if (numeroLote == null) {
+        numeroLote = await detalleComprasRepository.obtenerSiguienteNumeroLote(transaction, idEmpresa);
+        try {
+          await detalleComprasRepository.actualizarNumeroLoteCompra(transaction, idCompra, numeroLote);
+        } catch (_) {}
+      } else {
+        numeroLote = String(numeroLote);
+      }
+      idLote = await detalleComprasRepository.insertarLote(transaction, {
+        idEmpresa,
+        idProducto,
+        idSucursal,
+        costoUnitario: pUnitarioFormateado,
+        cantidadIngresada: cantidadVal,
+        cantidadDisponible: cantidadVal,
+        fechaVencimiento: fechaVencimientoVal,
+        numeroLote
+      });
+      if (tieneUbicacionExplicita) {
+        const okUb = await conteoFisicoRepository.validarUbicacionPerteneceSucursal(
+          transaction,
+          idSucursal,
+          idUbExplicita
+        );
+        if (!okUb) {
+          throw new Error('La ubicación de ingreso no pertenece a la sucursal del detalle');
+        }
+        idUbParaLote = idUbExplicita;
+      } else if (asignarUbicacionDefecto && idUbicacionDefault) {
+        idUbParaLote = idUbicacionDefault;
+      }
+      if (idLote && idUbParaLote != null) {
+        await detalleComprasRepository.insertarLoteUbicacion(
+          transaction,
+          idLote,
+          idUbParaLote,
+          Math.round(cantidadVal)
+        );
+      }
     }
-    if (idLote && idUbParaLote != null) {
-      await detalleComprasRepository.insertarLoteUbicacion(
-        transaction,
-        idLote,
-        idUbParaLote,
-        Math.round(cantidadVal)
-      );
-    }
+
     await transaction.commit();
     const viaPrioridad1 = asignarUbicacionDefecto && !tieneUbicacionExplicita && idUbParaLote != null;
     return {

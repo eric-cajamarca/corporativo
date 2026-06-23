@@ -23,6 +23,7 @@ const {
 } = require('../utils/configBoolean.util');
 const sunatPostPagoService = require('./sunatPostPago.service');
 const saasPlanLimitesService = require('./saasPlanLimites.service');
+const ventaLineaInventarioService = require('./ventaLineaInventario.service');
 const { resolverIdComprobanteParaSucursal, idSucursalComprobantesEfectiva } = require('../utils/sucursalComprobantes.util');
 const comprobantesRepository = require('../repositories/comprobantes.repository');
 const ventasDetalleReporteRepository = require('../repositories/ventasDetalleReporte.repository');
@@ -694,35 +695,26 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
     const idVenta = ventaResult.recordset[0].idVenta;
 
     const avisoStockInsuficiente = [];
+    const metaInventarioCache = new Map();
 
     for (const det of dets) {
       const cantPedida = parseFloat(det.cantidad) || 0;
       const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
 
-      const stockDisponible = await stockService.obtenerStockDisponible(transaction, user.empresa, det.idProducto, idSucursalLinea);
-      if (stockDisponible < cantPedida) {
-        if (!permitirVentasNegativas) {
-          throw new Error(`Stock insuficiente para "${det.descripcion || det.idProducto}". Disponible: ${stockDisponible}, solicitado: ${cantPedida}.`);
-        }
-        avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
+      const salida = await ventaLineaInventarioService.procesarSalidaInventarioVentaLinea({
+        transaction,
+        idEmpresa: user.empresa,
+        idSucursal: idSucursalLinea,
+        idProducto: det.idProducto,
+        cantPedida,
+        descripcion: det.descripcion,
+        permitirVentasNegativas,
+        controlUbicaciones,
+        cache: metaInventarioCache
+      });
+      if (salida.avisoStock) {
+        avisoStockInsuficiente.push(salida.avisoStock);
       }
-
-      const cantidadADescontar = cantPedida;
-      let consumosPorLote = [];
-      if (cantidadADescontar > 0) {
-        const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
-          idEmpresa: user.empresa,
-          idSucursal: idSucursalLinea,
-          idProducto: det.idProducto,
-          cantidad: cantidadADescontar
-        }, { controlUbicaciones, permitirVentasNegativas });
-        consumosPorLote = resultadoDescuento?.consumosPorLote || [];
-      }
-
-      const costoTotalLinea = Array.isArray(consumosPorLote)
-        ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
-        : 0;
-      const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
 
       await detalleVentaService.crearDetalle(transaction, {
         ...det,
@@ -730,48 +722,26 @@ async function crearVentaSimpleCompletaWithPool(payload, user, pool) {
         cantEntregada,
         idEstadoPedido: idEstadoPedidoVenta,
         hVenta: fechaEmisionConHora,
-        costoUnitario: costoUnitarioProm,
-        costoTotal: costoTotalLinea
+        costoUnitario: salida.costoUnitarioProm,
+        costoTotal: salida.costoTotalLinea
       });
-      det._costoUnitario = costoUnitarioProm;
-      det._costoTotal = costoTotalLinea;
+      det._costoUnitario = salida.costoUnitarioProm;
+      det._costoTotal = salida.costoTotalLinea;
       det._cantEntregada = cantEntregada;
 
-      if (cantidadADescontar > 0) {
-        if (Array.isArray(consumosPorLote) && consumosPorLote.length > 0) {
-          for (const c of consumosPorLote) {
-            const cantTomada = Number(c.cantidadTomada) || 0;
-            if (cantTomada <= 0) continue;
-            await inventarioRepository.insertarFilaMovimiento(transaction, {
-              idEmpresa: user.empresa,
-              idSucursal: idSucursalLinea,
-              idProducto: det.idProducto,
-              tipoMovimiento: 'SA',
-              cantidad: cantTomada,
-              docRelacionado: compVenta,
-              idComprobante: idComprobanteDestino,
-              idUsuario: idUsuarioEmpresa,
-              observaciones: 'Venta',
-              costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
-              idLote: c.idLote || null
-            });
-          }
-        } else {
-          await inventarioRepository.insertarFilaMovimiento(transaction, {
-            idEmpresa: user.empresa,
-            idSucursal: idSucursalLinea,
-            idProducto: det.idProducto,
-            tipoMovimiento: 'SA',
-            cantidad: cantidadADescontar,
-            docRelacionado: compVenta,
-            idComprobante: idComprobanteDestino,
-            idUsuario: idUsuarioEmpresa,
-            observaciones: 'Venta',
-            costoUnitario: costoUnitarioProm,
-            idLote: null
-          });
-        }
-      }
+      await ventaLineaInventarioService.registrarMovimientosSalidaVenta({
+        transaction,
+        idEmpresa: user.empresa,
+        idSucursal: idSucursalLinea,
+        idProducto: det.idProducto,
+        idUsuario: idUsuarioEmpresa,
+        compVenta,
+        idComprobante: idComprobanteDestino,
+        controlaInventario: salida.controlaInventario,
+        cantidadADescontar: salida.cantidadADescontar,
+        consumosPorLote: salida.consumosPorLote,
+        costoUnitarioProm: salida.costoUnitarioProm
+      });
     }
 
     if (!esNotaVenta) {
@@ -1142,6 +1112,8 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
       const ventaResult = await ventasRepository.insertar(transaction, ventaDatos, idEmpresaProducto, idUsuarioEmpresa);
       const idVenta = ventaResult.recordset[0].idVenta;
 
+      const metaInventarioCachePart = new Map();
+
       for (const det of detsPart) {
         const cantPedida = parseFloat(det.cantidad) || 0;
         const cantEntregada = esEstadoPendiente ? 0 : (det.cantEntregada != null ? Number(det.cantEntregada) : det.cantidad);
@@ -1153,33 +1125,20 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           idEmpresaProducto
         );
 
-        const stockDisponible = await stockService.obtenerStockDisponible(transaction, idEmpresaProducto, det.idProducto, idSucursalEmpresa);
-        if (stockDisponible < cantPedida) {
-          if (!permitirNegativoLinea) {
-            throw new Error(`Stock insuficiente para "${det.descripcion || det.idProducto}" en empresa ${det.aliasEmpresa || idEmpresaProducto}. Disponible: ${stockDisponible}, solicitado: ${cantPedida}.`);
-          }
-          avisoStockInsuficiente.push({ idProducto: det.idProducto, cantidadSolicitada: cantPedida, cantidadDisponible: stockDisponible });
+        const salida = await ventaLineaInventarioService.procesarSalidaInventarioVentaLinea({
+          transaction,
+          idEmpresa: idEmpresaProducto,
+          idSucursal: idSucursalEmpresa,
+          idProducto: det.idProducto,
+          cantPedida,
+          descripcion: det.descripcion || det.aliasEmpresa,
+          permitirVentasNegativas: permitirNegativoLinea,
+          controlUbicaciones: flagsInvProducto.controlUbicaciones,
+          cache: metaInventarioCachePart
+        });
+        if (salida.avisoStock) {
+          avisoStockInsuficiente.push(salida.avisoStock);
         }
-
-        const cantidadADescontar = cantPedida;
-        let consumosPorLote = [];
-        if (cantidadADescontar > 0) {
-          const resultadoDescuento = await stockService.descontarDesdeLotes(transaction, {
-            idEmpresa: idEmpresaProducto,
-            idSucursal: idSucursalEmpresa,
-            idProducto: det.idProducto,
-            cantidad: cantidadADescontar
-          }, {
-            controlUbicaciones: flagsInvProducto.controlUbicaciones,
-            permitirVentasNegativas: permitirNegativoLinea
-          });
-          consumosPorLote = resultadoDescuento?.consumosPorLote || [];
-        }
-
-        const costoTotalLinea = Array.isArray(consumosPorLote)
-          ? consumosPorLote.reduce((acc, c) => acc + (Number(c.cantidadTomada) || 0) * (Number(c.costoUnitario) || 0), 0)
-          : 0;
-        const costoUnitarioProm = cantPedida > 0 ? (costoTotalLinea / cantPedida) : 0;
 
         await detalleVentaService.crearDetalle(transaction, {
           ...det,
@@ -1187,48 +1146,26 @@ exports.crearVentaCorporativaCompleta = async (payload, user) => {
           cantEntregada,
           idEstadoPedido: idEstadoPedidoVenta,
           hVenta: fechaEmisionConHora,
-          costoUnitario: costoUnitarioProm,
-          costoTotal: costoTotalLinea
+          costoUnitario: salida.costoUnitarioProm,
+          costoTotal: salida.costoTotalLinea
         });
-        det._costoUnitario = costoUnitarioProm;
-        det._costoTotal = costoTotalLinea;
+        det._costoUnitario = salida.costoUnitarioProm;
+        det._costoTotal = salida.costoTotalLinea;
         det._cantEntregada = cantEntregada;
 
-        if (cantidadADescontar > 0) {
-          if (Array.isArray(consumosPorLote) && consumosPorLote.length > 0) {
-            for (const c of consumosPorLote) {
-              const cantTomada = Number(c.cantidadTomada) || 0;
-              if (cantTomada <= 0) continue;
-              await inventarioRepository.insertarFilaMovimiento(transaction, {
-                idEmpresa: idEmpresaProducto,
-                idSucursal: idSucursalEmpresa,
-                idProducto: det.idProducto,
-                tipoMovimiento: 'SA',
-                cantidad: cantTomada,
-                docRelacionado: compVenta,
-                idComprobante: idComprobanteDestino,
-                idUsuario: idUsuarioEmpresa,
-                observaciones: 'Venta',
-                costoUnitario: c.costoUnitario != null ? Number(c.costoUnitario) : costoUnitarioProm,
-                idLote: c.idLote || null
-              });
-            }
-          } else {
-            await inventarioRepository.insertarFilaMovimiento(transaction, {
-              idEmpresa: idEmpresaProducto,
-              idSucursal: idSucursalEmpresa,
-              idProducto: det.idProducto,
-              tipoMovimiento: 'SA',
-              cantidad: cantidadADescontar,
-              docRelacionado: compVenta,
-              idComprobante: idComprobanteDestino,
-              idUsuario: idUsuarioEmpresa,
-              observaciones: 'Venta',
-              costoUnitario: costoUnitarioProm,
-              idLote: null
-            });
-          }
-        }
+        await ventaLineaInventarioService.registrarMovimientosSalidaVenta({
+          transaction,
+          idEmpresa: idEmpresaProducto,
+          idSucursal: idSucursalEmpresa,
+          idProducto: det.idProducto,
+          idUsuario: idUsuarioEmpresa,
+          compVenta,
+          idComprobante: idComprobanteDestino,
+          controlaInventario: salida.controlaInventario,
+          cantidadADescontar: salida.cantidadADescontar,
+          consumosPorLote: salida.consumosPorLote,
+          costoUnitarioProm: salida.costoUnitarioProm
+        });
       }
 
       if (!esNotaVenta) {

@@ -71,12 +71,27 @@ const construirFiltroTokensBusqueda = (request, tokens, aliasMarca, aliasCategor
 /** SQL Server limita ~2100 parámetros por petición; evitar IN con miles de idProducto. */
 const MAX_IN_PRODUCTOS_PRECIO = 500;
 
+const idProductoMapKey = (idProducto) =>
+  idProducto != null ? String(idProducto).trim().toLowerCase() : '';
+
+const esListaPrecioPrincipal = (principal) =>
+  principal === true || principal === 1 || principal === '1';
+
+const resolverPrecioVentaDesdeMapa = (preciosProducto) => {
+  const valores = Object.values(preciosProducto || {});
+  if (!valores.length) return 0;
+  const principal = valores.find((p) => esListaPrecioPrincipal(p.principal));
+  if (principal) return Number(principal.precio) || 0;
+  return Number(valores[0].precio) || 0;
+};
+
 const agregarPrecioAMapa = (preciosMap, precio) => {
   if (!precio?.idProducto) return;
-  if (!preciosMap[precio.idProducto]) {
-    preciosMap[precio.idProducto] = {};
+  const key = idProductoMapKey(precio.idProducto);
+  if (!preciosMap[key]) {
+    preciosMap[key] = {};
   }
-  preciosMap[precio.idProducto][precio.idLista] = {
+  preciosMap[key][precio.idLista] = {
     precio: precio.precio,
     idPrecio: precio.idPrecio,
     nombreLista: precio.nombreLista,
@@ -165,8 +180,11 @@ const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProdu
   const preciosMap = await cargarPreciosMapProductos(pool, ids, idsProdUnicos);
 
   return (recordset || []).map((producto) => {
-    const preciosProducto = preciosMap[producto.idProducto] || {};
-    const precioPrincipal = Object.values(preciosProducto).find((p) => p.principal === true);
+    const preciosProducto =
+      preciosMap[idProductoMapKey(producto.idProducto)] ||
+      preciosMap[producto.idProducto] ||
+      {};
+    const pVenta = resolverPrecioVentaDesdeMapa(preciosProducto);
     return {
       idProducto: producto.idProducto,
       idEmpresa: producto.idEmpresa,
@@ -183,7 +201,7 @@ const combinarRecordsetConPrecios = async (pool, idsEmpresa, recordset, idsProdu
       idSucursal: producto.idSucursal,
       sucursal: producto.sucursal,
       cUnitario: producto.cUnitario,
-      pVenta: precioPrincipal ? precioPrincipal.precio : 0,
+      pVenta,
       stock: producto.stock,
       tipoProducto: producto.tipoProducto,
       fProduccion: producto.fProduccion,
@@ -802,13 +820,11 @@ exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = 
 
      // Combinar productos con precios
     const productos = result.recordset.map((producto) => {
-      // Obtener precios del producto actual
-      const preciosProducto = preciosMap[producto.idProducto] || {};
-      
-      // Buscar el precio principal (donde principal = true)
-      const precioPrincipal = Object.values(preciosProducto).find(
-        (p) => p.principal === true
-      );
+      const preciosProducto =
+        preciosMap[idProductoMapKey(producto.idProducto)] ||
+        preciosMap[producto.idProducto] ||
+        {};
+      const pVenta = resolverPrecioVentaDesdeMapa(preciosProducto);
 
       return {
         idProducto: producto.idProducto,
@@ -824,7 +840,7 @@ exports.obtenerProductosCompras = async (pool, idEmpresa, idsSucursalesFiltro = 
         idSucursal: producto.idSucursal,
         sucursal: producto.sucursal,
         cUnitario: producto.cUnitario,
-        pVenta: precioPrincipal ? precioPrincipal.precio:0, // ← AQUÍ ESTÁ LA CORRECCIÓN
+        pVenta,
         stock: producto.stock,
         tipoProducto: producto.tipoProducto,
         fProduccion: producto.fProduccion,
@@ -921,20 +937,75 @@ exports.obtenerProductosPorDescripcionRepo = async (pool, idEmpresa) => {
   return result.recordset || [];
 };
 
-/** Productos con presentación Servicios código ZZ (habitaciones para hotel). */
+/** Presentación + costo unitario para reglas de inventario (ZZ = servicio). */
+exports.obtenerMetaInventarioProducto = async (executor, idEmpresa, idProducto) => {
+  const r = await executor
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .query(`
+      SELECT TOP 1
+        ISNULL(p.cUnitario, 0) AS cUnitario,
+        pr.codigo AS codigoPresentacion
+      FROM Productos p
+      LEFT JOIN Presentacion pr ON pr.idPresentacion = p.idPresentacion
+      WHERE p.idEmpresa = @idEmpresa AND p.idProducto = @idProducto
+    `);
+  return r.recordset?.[0] || null;
+};
+
+exports.obtenerCodigoPresentacionPorId = async (executor, idPresentacion) => {
+  const id = parseInt(idPresentacion, 10);
+  if (!Number.isFinite(id) || id <= 0) return '';
+  const r = await executor
+    .request()
+    .input('idPresentacion', sql.Int, id)
+    .query(`
+      SELECT TOP 1 codigo FROM Presentacion WHERE idPresentacion = @idPresentacion
+    `);
+  return r.recordset?.[0]?.codigo || '';
+};
+
+/** Productos categoría Habitación + presentación Servicios (ZZ). */
 exports.obtenerProductosHabitacionRepo = async (pool, idEmpresa) => {
   const result = await pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("codigoPresentacion", sql.VarChar(10), "ZZ")
     .query(`
-      SELECT p.idProducto, p.codigo, p.descripcion, pr.codigo AS codigoPresentacion
+      SELECT
+        p.idProducto,
+        p.codigo,
+        p.descripcion,
+        pr.codigo AS codigoPresentacion,
+        cat.nombre AS categoria,
+        ISNULL((
+          SELECT TOP 1 pp.precio
+          FROM PreciosProducto pp
+          INNER JOIN ListasPrecio lp ON pp.idLista = lp.idLista AND lp.idEmpresa = p.idEmpresa
+          WHERE pp.idProducto = p.idProducto
+            AND ISNULL(lp.activo, 1) = 1
+          ORDER BY
+            CASE WHEN ISNULL(lp.principal, 0) = 1 THEN 0 ELSE 1 END,
+            pp.precio DESC
+        ), 0) AS pVenta
       FROM Productos p
       INNER JOIN Presentacion pr ON p.idPresentacion = pr.idPresentacion
-      WHERE p.idEmpresa = @idEmpresa AND pr.codigo = @codigoPresentacion
+      INNER JOIN Categorias cat ON p.idCategoria = cat.idCategoria
+      WHERE p.idEmpresa = @idEmpresa
+        AND pr.codigo = @codigoPresentacion
+        AND ISNULL(p.estado, 1) = 1
+        AND LOWER(LTRIM(RTRIM(REPLACE(REPLACE(cat.nombre, N'ó', N'o'), N'Ó', N'o')))) LIKE N'habitaci%'
       ORDER BY p.codigo
     `);
-  return result.recordset || [];
+  return (result.recordset || []).map((r) => ({
+    idProducto: r.idProducto,
+    codigo: r.codigo,
+    descripcion: r.descripcion,
+    codigoPresentacion: r.codigoPresentacion,
+    categoria: r.categoria,
+    pVenta: Number(r.pVenta) || 0
+  }));
 };
 
 exports.buscarIdUsuarioEnEmpresa = async (pool, idUsuario, idEmpresa) => {

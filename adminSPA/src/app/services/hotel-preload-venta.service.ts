@@ -6,14 +6,19 @@ export interface PreloadItemVenta {
   codigo: string;
   descripcion: string;
   codigoPresentacion?: string;
+  marca?: string;
   cantidad: number;
   pVenta: number;
 }
 
 export interface PreloadFromHabitacion {
+  idEstancia?: string;
   idProductoHabitacion: string;
   habitacionCodigo: string;
   habitacionDescripcion: string;
+  idCliente?: number | null;
+  nombreHuesped?: string;
+  idReserva?: string | null;
   /** Primera línea = habitación (1 ud), resto = consumo */
   lineas: PreloadItemVenta[];
 }

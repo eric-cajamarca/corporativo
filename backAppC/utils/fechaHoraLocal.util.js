@@ -62,6 +62,67 @@ function getFechaHoyLocal() {
   return getFechaHoyApp();
 }
 
+/** YYYY-MM-DD en zona local desde Date (evita toISOString/UTC). */
+function fechaLocalDesdeDate(valor) {
+  const d = valor instanceof Date ? valor : new Date(valor);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Ahora en APP_TIMEZONE como YYYY-MM-DD HH:mm:ss (fallback sin hora del cliente). */
+function getAhoraAppTimezoneSQL() {
+  const TZ = process.env.APP_TIMEZONE || 'America/Lima';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value || '00';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
+function dateDesdeSqlLocal(ymdHms) {
+  const m = String(ymdHms).match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return getNowLocal();
+  return new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6])
+  );
+}
+
+/**
+ * Fecha/hora de operación enviada por el navegador (YYYY-MM-DDTHH:mm:ss).
+ * Si no viene, usa APP_TIMEZONE. No convierte zonas: guarda el reloj enviado.
+ */
+function parseFechaHoraClienteADate(valor) {
+  return sql23ADate(parseFechaHoraClienteASQL(valor));
+}
+
+/** VARCHAR(23) para CAST AS DATETIME sin conversión UTC del driver mssql. */
+function parseFechaHoraClienteASQL(valor) {
+  const sql23 = parseFEmisionCabeceraSQL(valor);
+  if (sql23) return sql23;
+  return `${getAhoraAppTimezoneSQL()}.000`;
+}
+
+/** Interpreta "YYYY-MM-DD HH:mm:ss[.000]" como componentes de reloj (sin zona). */
+function sql23ADate(sql23) {
+  const base = String(sql23 || '').replace('.000', '').trim();
+  return dateDesdeSqlLocal(base);
+}
+
 /**
  * Convierte fEmision ya guardada (Date de mssql o string) a "YYYY-MM-DD HH:mm:ss".
  * @param {string|Date} valor
@@ -160,6 +221,11 @@ module.exports = {
   getFechaEmisionSQLString,
   getFechaSoloSQLString,
   getFechaHoyLocal,
+  fechaLocalDesdeDate,
+  getAhoraAppTimezoneSQL,
+  parseFechaHoraClienteADate,
+  parseFechaHoraClienteASQL,
+  sql23ADate,
   fEmisionRowALocalYmdHms,
   parseFEmisionCabeceraSQL,
   resolveFechaHoraClienteSql,

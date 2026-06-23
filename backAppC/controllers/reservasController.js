@@ -82,11 +82,25 @@ async function eliminar(req, res) {
     }
 }
 
+async function cancelar(req, res) {
+    if (!req.user || !req.user.empresa) return res.status(401).json({ message: 'No autorizado' });
+    try {
+        await withPool(async (pool) =>
+            reservasService.cancelar(pool, req.params.id, req.user.empresa)
+        );
+        res.status(200).json({ data: { ok: true } });
+    } catch (error) {
+        console.error('reservas.cancelar:', error);
+        res.status(400).json({ message: error.message || 'Error al cancelar' });
+    }
+}
+
 module.exports = {
     listar,
     obtenerPorId,
     siguienteCodigo,
     crear,
     actualizar,
+    cancelar,
     eliminar
 };

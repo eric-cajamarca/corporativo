@@ -195,6 +195,13 @@
       }
       @if (activeTab() === 'inventario') {
         <div class="row">
+          @if (esPresentacionServicioSeleccionada()) {
+            <div class="col-12 mb-3">
+              <div class="alert alert-info mb-0">
+                Unidad <strong>ZZ (servicio)</strong>: no controla stock ni lotes. Indique el <strong>costo unitario</strong> en la pestaña Precios para el costo de venta.
+              </div>
+            </div>
+          } @else {
           <div class="col-12 mb-3">
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="modoLote" [checked]="modoLote()" (change)="modoLote.set(!modoLote())">
@@ -235,6 +242,7 @@
               <small class="text-muted">Pasillo-Estante-Nivel</small>
             </div>
           }
+          }
         </div>
         @if (esModal) {
           <div class="d-flex justify-content-end mt-3 pt-3 border-top">
@@ -250,9 +258,9 @@
             <label class="form-label">Costo Unitario</label>
             <div class="input-group">
               <span class="input-group-text">S/</span>
-              <input type="number" class="form-control" [(ngModel)]="loteData.costoUnitario" [ngModelOptions]="{standalone: true}" (ngModelChange)="calcularPrecioVenta()" step="0.01" readonly>
+              <input type="number" class="form-control" [(ngModel)]="loteData.costoUnitario" [ngModelOptions]="{standalone: true}" (ngModelChange)="calcularPrecioVenta()" step="0.01" [readonly]="!esPresentacionServicioSeleccionada()" [attr.min]="esPresentacionServicioSeleccionada() ? 0 : null">
             </div>
-            <small class="text-muted">Definido en la pestaña Inventario</small>
+            <small class="text-muted">{{ esPresentacionServicioSeleccionada() ? 'Costo de referencia para costo de venta (servicio)' : 'Definido en la pestaña Inventario' }}</small>
           </div>
           <div class="col-md-4 mb-3">
             <label class="form-label">Lista de precios</label>

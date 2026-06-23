@@ -7,6 +7,7 @@ async function listar(pool, idEmpresa, filtros = {}) {
     const { estado, idProductoHabitacion } = filtros;
     let query = `
         SELECT r.idReserva, r.idEmpresa, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+               r.idEstancia,
                CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                r.estado, r.total, r.observaciones,
@@ -37,6 +38,7 @@ async function obtenerPorId(pool, idReserva, idEmpresa) {
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .query(`
             SELECT r.idReserva, r.idEmpresa, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   r.idEstancia,
                    CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
                    CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
                    r.estado, r.total, r.observaciones,
@@ -67,9 +69,9 @@ async function siguienteCodigo(pool, idEmpresa) {
 async function crear(pool, idEmpresa, payload, idUsuario = null) {
     const {
         idProductoHabitacion, idCliente, codigo, nombreHuesped,
-        fechaEntrada, fechaSalida, estado, total, observaciones
+        fechaEntrada, fechaSalida, estado, total, observaciones, fRegistro
     } = payload;
-    const result = await pool.request()
+    const req = pool.request()
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
         .input('idProductoHabitacion', sql.UniqueIdentifier, idProductoHabitacion)
         .input('idCliente', sql.Int, idCliente || null)
@@ -77,14 +79,21 @@ async function crear(pool, idEmpresa, payload, idUsuario = null) {
         .input('nombreHuesped', sql.VarChar(200), nombreHuesped)
         .input('fechaEntrada', sql.Date, fechaEntrada)
         .input('fechaSalida', sql.Date, fechaSalida)
-        .input('estado', sql.VarChar(20), estado || 'vigente')
+        .input('estado', sql.VarChar(20), estado || 'confirmada')
         .input('total', sql.Decimal(18, 2), total ?? 0)
         .input('observaciones', sql.VarChar(500), observaciones || null)
-        .input('idUsuario', sql.UniqueIdentifier, idUsuario)
-        .query(`
-            INSERT INTO Reservas (idEmpresa, idProductoHabitacion, idCliente, codigo, nombreHuesped, fechaEntrada, fechaSalida, estado, total, observaciones, idUsuario)
+        .input('idUsuario', sql.UniqueIdentifier, idUsuario);
+    let colRegistro = '';
+    let valRegistro = '';
+    if (fRegistro) {
+        req.input('fRegistro', sql.VarChar(23), fRegistro);
+        colRegistro = ', fRegistro';
+        valRegistro = ', CAST(@fRegistro AS DATETIME)';
+    }
+    const result = await req.query(`
+            INSERT INTO Reservas (idEmpresa, idProductoHabitacion, idCliente, codigo, nombreHuesped, fechaEntrada, fechaSalida, estado, total, observaciones, idUsuario${colRegistro})
             OUTPUT INSERTED.idReserva, INSERTED.codigo
-            VALUES (@idEmpresa, @idProductoHabitacion, @idCliente, @codigo, @nombreHuesped, @fechaEntrada, @fechaSalida, @estado, @total, @observaciones, @idUsuario)
+            VALUES (@idEmpresa, @idProductoHabitacion, @idCliente, @codigo, @nombreHuesped, @fechaEntrada, @fechaSalida, @estado, @total, @observaciones, @idUsuario${valRegistro})
         `);
     return result.recordset[0];
 }
@@ -123,11 +132,59 @@ async function eliminar(pool, idReserva, idEmpresa) {
     return result.rowsAffected[0];
 }
 
+async function vincularEstancia(pool, idReserva, idEmpresa, idEstancia, estado = 'convertida') {
+    await pool.request()
+        .input('idReserva', sql.UniqueIdentifier, idReserva)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('idEstancia', sql.UniqueIdentifier, idEstancia)
+        .input('estado', sql.VarChar(20), estado)
+        .query(`
+            UPDATE Reservas SET idEstancia = @idEstancia, estado = @estado
+            WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa
+        `);
+}
+
+async function cancelar(pool, idReserva, idEmpresa) {
+    await pool.request()
+        .input('idReserva', sql.UniqueIdentifier, idReserva)
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+            UPDATE Reservas SET estado = 'cancelada'
+            WHERE idReserva = @idReserva AND idEmpresa = @idEmpresa AND estado = 'confirmada'
+        `);
+}
+
+/** Reservas confirmadas que intersectan un rango de fechas calendario (DATE). */
+async function listarConfirmadasEnRango(pool, idEmpresa, fechaDesde, fechaHasta) {
+    const result = await pool.request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .input('fechaDesde', sql.Date, fechaDesde)
+        .input('fechaHasta', sql.Date, fechaHasta)
+        .query(`
+            SELECT r.idReserva, r.idProductoHabitacion, r.idCliente, r.codigo, r.nombreHuesped,
+                   CONVERT(VARCHAR(10), r.fechaEntrada, 120) AS fechaEntrada,
+                   CONVERT(VARCHAR(10), r.fechaSalida, 120) AS fechaSalida,
+                   r.estado, r.total,
+                   p.codigo AS habitacionCodigo, p.descripcion AS habitacionDescripcion
+            FROM Reservas r
+            INNER JOIN Productos p ON r.idProductoHabitacion = p.idProducto
+            WHERE r.idEmpresa = @idEmpresa
+              AND r.estado = 'confirmada'
+              AND r.fechaEntrada < @fechaHasta
+              AND r.fechaSalida > @fechaDesde
+            ORDER BY r.fechaEntrada, p.codigo
+        `);
+    return result.recordset;
+}
+
 module.exports = {
     listar,
     obtenerPorId,
     siguienteCodigo,
     crear,
     actualizar,
-    eliminar
+    eliminar,
+    vincularEstancia,
+    cancelar,
+    listarConfirmadasEnRango
 };

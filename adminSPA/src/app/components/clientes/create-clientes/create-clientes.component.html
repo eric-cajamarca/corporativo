@@ -1,14 +1,14 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-sidebar *ngIf="!desdeVenta" (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
 
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+<app-topnav *ngIf="!desdeVenta" [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
 
-    <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
-        <div class="content-wrap">
+    <main [ngClass]="desdeVenta ? 'create-cliente-embed' : 'main-content'" [class.sidebar-collapsed]="!desdeVenta && sidebarState.sidebarCollapsed()">
+        <div [ngClass]="desdeVenta ? 'create-cliente-form' : 'content-wrap'">
 
-            <div class="container">
+            <div class="container-fluid px-0">
                 
-        <div class="card" style="margin-top: 20px;">
-            <div class="card-header">
+        <div class="card" [style.margin-top.px]="desdeVenta ? 0 : 20">
+            <div class="card-header" *ngIf="!desdeVenta">
 
                 <!-- Title -->
                 <h4 class="card-header-title">
@@ -17,12 +17,13 @@
 
             </div>
 
-            <div class="card-body">
+            <div class="card-body" [class.py-2]="desdeVenta" [class.px-3]="desdeVenta">
                 <div class="col-sm-6 col-log-3 col-md-12">
-                    <div class="form-group row" style="margin-bottom: 20px;">
+                    <div class="form-group row" [style.margin-bottom.px]="desdeVenta ? 10 : 20">
                         <label class="col-xl-3 col-lg-3 col-form-label">Tipo de documento</label>
                         <div class="col-lg-9 col-xl-9">
-                            <select required name="idDocumento" [(ngModel)]="clientes.idDocumento" class="form-control">
+                            <select required name="idDocumento" [(ngModel)]="clientes.idDocumento"
+                                (ngModelChange)="onCambioTipoDocumento($event)" class="form-control">
                                 <option value="" selected disabled>Seleccionar documento...</option>
                                 <option *ngFor="let item of documento" [value]="item.idDocumento">{{ item.nombre }}
                                 </option>
@@ -161,14 +162,117 @@
                 </div>
             </ng-container>
 
-            <ng-container *ngIf="clientes.idDocumento == 1 || clientes.idDocumento == 4">
+            <ng-container *ngIf="clientes.idDocumento == 1">
+                <div class="card" [style.margin-bottom.px]="desdeVenta ? 8 : 20">
+
+                    <div class="card-body" [class.py-2]="desdeVenta" [class.px-3]="desdeVenta">
+                        <div class="mb-2">
+                            <label for="rSocial" class="form-label">Razón Social</label>
+                            <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
+                                placeholder="Ingrese la razón social">
+                        </div>
+
+                        <div class="mb-2">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" name="correo" [(ngModel)]="clientes.correo"
+                                placeholder="Ingrese el email (opcional)">
+                        </div>
+                        <div class="mb-2">
+                            <label for="celular" class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" name="celular" [(ngModel)]="clientes.celular"
+                                placeholder="Ingrese el teléfono (opcional)">
+                        </div>
+
+                        <div *ngIf="!mostrarDireccion" class="pt-1">
+                            <button *ngIf="!btn_registrar" type="submit" class="btn btn-success">Registrar</button>
+                            <button *ngIf="btn_registrar" type="button" class="btn btn-success" disabled>
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                Registrando...
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="form-group mb-2">
+                    <label style="color: #742f0f;">
+                        <input type="checkbox" name="mostrarDireccion" [(ngModel)]="mostrarDireccion"
+                            (change)="onCheckboxChange()"> Registrar dirección (opcional)
+                    </label>
+                </div>
+
+                <ng-container *ngIf="mostrarDireccion">
+                    <div class="card">
+                        <div class="card-header py-2" *ngIf="!desdeVenta">
+                            <h4 class="card-header-title mb-0">Registrar dirección</h4>
+                        </div>
+
+                        <div class="card-body" [class.py-2]="desdeVenta" [class.px-3]="desdeVenta">
+                            <ng-container>
+                                <div class="col-sm-6 form-group">
+                                    <label for="ac-fn">Región (opcional)</label>
+                                    <select id="sl-region" name="region" [(ngModel)]="direccionClientes.region"
+                                        class="form-control" (change)="select_region()">
+                                        <option value="" selected disabled>Seleccionar</option>
+                                        <option value="{{item.id}}" *ngFor="let item of regiones">{{item.name}}</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-6 form-group">
+                                    <label for="ac-fn">Provincia (opcional)</label>
+                                    <select id="sl-provincia" name="provincia" [(ngModel)]="direccionClientes.provincia"
+                                        class="form-control" disabled (change)="select_provincia()">
+                                        <option value="" selected disabled>Seleccionar</option>
+                                        <option value="{{item.id}}" *ngFor="let item of provincias">{{item.name}}</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-6 form-group">
+                                    <label for="ac-fn">Distrito (opcional)</label>
+                                    <select id="sl-distrito" name="distrito" [(ngModel)]="direccionClientes.distrito"
+                                        class="form-control" disabled (change)="select_distrito($event)">
+                                        <option value="" selected disabled>Seleccionar</option>
+                                        <option value="{{item.id}}" *ngFor="let item of distritos">{{item.name}}</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="ubigeo" class="form-label">Ubigeo</label>
+                                    <input type="text" class="form-control" name="ubigeo"
+                                        [(ngModel)]="direccionClientes.ubigeo" placeholder="Ingrese el ubigeo (opcional)">
+                                </div>
+                            </ng-container>
+
+                            <div class="mb-2">
+                                <label for="direccion" class="form-label">Dirección</label>
+                                <input type="text" class="form-control" name="direccion"
+                                    [(ngModel)]="direccionClientes.direccion" placeholder="Opcional (por defecto: -)">
+                            </div>
+                            <div class="mb-2">
+                                <label for="referencia" class="form-label">Referencia</label>
+                                <input type="text" class="form-control" name="referencia"
+                                    [(ngModel)]="direccionClientes.referencia"
+                                    placeholder="Ingrese la referencia (opcional)">
+                            </div>
+
+                            <div>
+                                <button *ngIf="!btn_registrar" type="submit" class="btn btn-success">Registrar</button>
+                                <button *ngIf="btn_registrar" type="button" class="btn btn-success" disabled>
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    Registrando...
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </ng-container>
+            </ng-container>
+
+            <ng-container *ngIf="clientes.idDocumento == 4">
                 <div class="card" style="margin-bottom: 20px;">
 
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="rSocial" class="form-label">{{ clientes.idDocumento == 4 ? 'Apellidos y nombres' : 'Razón Social' }}</label>
+                            <label for="rSocial" class="form-label">Apellidos y nombres</label>
                             <input type="text" class="form-control" name="rSocial" [(ngModel)]="clientes.rSocial"
-                                [placeholder]="clientes.idDocumento == 4 ? 'Ingrese apellidos y nombres' : 'Ingrese la razón social'">
+                                placeholder="Ingrese apellidos y nombres">
                         </div>
 
                         <div class="mb-3">

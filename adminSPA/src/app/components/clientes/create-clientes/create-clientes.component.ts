@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges, inject, HostBinding } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -22,6 +22,11 @@ declare var $: any;
 })
 export class CreateClientesComponent implements OnInit, OnChanges {
   public sidebarState = inject(SidebarStateService);
+
+  @HostBinding('class.create-cliente-host-embed')
+  get hostEmbedModal(): boolean {
+    return this.desdeVenta;
+  }
   /** Cuando se abre desde nueva venta: tipo de documento pre-seleccionado. */
   @Input() idDocumentoPre?: string;
   /** Cuando se abre desde nueva venta: RUC o DNI pre-cargado. */
@@ -67,6 +72,7 @@ export class CreateClientesComponent implements OnInit, OnChanges {
     principal: true,
     codLocal: '0000',
     urbanizacion: '',
+    direccion: '',
   };
   public data: any = {};
   /** Establecimientos RUC (Factiliza): lista mostrada en modal */
@@ -137,9 +143,29 @@ export class CreateClientesComponent implements OnInit, OnChanges {
     const r = this.rucPre;
     if (id != null && String(id).trim() !== '') {
       this.clientes.idDocumento = String(id).trim();
+      this.onCambioTipoDocumento(this.clientes.idDocumento);
     }
     if (r != null && String(r).trim() !== '') {
       this.clientes.ruc = String(r).trim();
+    }
+  }
+
+  get esDni(): boolean {
+    return String(this.clientes.idDocumento) === '1';
+  }
+
+  /** DNI: dirección por defecto "-" para permitir guardar sin completar el campo. */
+  onCambioTipoDocumento(idDocumento: string): void {
+    if (String(idDocumento) === '1') {
+      this.aplicarDireccionPorDefectoDni();
+    }
+  }
+
+  private aplicarDireccionPorDefectoDni(): void {
+    if (!this.esDni) return;
+    const dir = (this.direccionClientes.direccion ?? '').toString().trim();
+    if (!dir) {
+      this.direccionClientes.direccion = '-';
     }
   }
 
@@ -344,6 +370,7 @@ private async handleDniSearch(): Promise<void> {
     const nom = (data.nombres ?? '').trim();
     const partes = [ap, am, nom].filter(Boolean);
     this.clientes.rSocial = partes.length ? partes.join(' ').replace(/\s+/g, ' ') : ((data.nombreCompleto ?? '').trim() || '');
+    this.direccionClientes.direccion = '-';
   } catch (error) {
     console.error('Error en búsqueda DNI:', error);
     this.showError(error instanceof Error ? error.message : 'Error al consultar DNI');
@@ -515,6 +542,9 @@ private showError(message: string): void {
   private prepararPrimeraDireccionAltaCliente(): void {
     this.direccionClientes.principal = true;
     this.direccionClientes.codLocal = '0000';
+    if (this.esDni) {
+      this.aplicarDireccionPorDefectoDni();
+    }
   }
 
   /** Construye payload para POST direccionClientes a partir de un establecimiento normalizado (region/provincia/distrito como IDs). */
@@ -616,6 +646,9 @@ private showError(message: string): void {
 
         
     // if (registroForm.valid) {
+      if (this.esDni) {
+        this.aplicarDireccionPorDefectoDni();
+      }
       this.btn_registrar = true;
       this.data = this.clientes;
             //convertir array this.clientes a un objeto para pasarlo a mi servicio
