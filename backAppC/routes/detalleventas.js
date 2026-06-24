@@ -15,6 +15,7 @@ api.get('/ventas/reporte-detallado', auth.auth, ventasController.getReporteDetal
 api.get('/ventas/listar', auth.auth, ventasController.obtenerVentas);
 api.get('/ventas/listar-notas', auth.auth, ventasController.listarNotasCreditoDebito);
 api.get('/ventas/agrupadas', auth.auth, ventasController.obtenerVentasAgrupadas);
+api.get('/ventas/agrupadas/comprobantes', auth.auth, ventasController.listarComprobantesVentasAgrupadas);
 api.get('/ventas/agrupadas/:idVentaAgrupada/detalle', auth.auth, ventasController.obtenerDetalleVentaAgrupada);
 api.get('/ventas/agrupadas/:idVentaAgrupada/comprobantes', auth.auth, ventasController.obtenerComprobantesVentaAgrupada);
 api.get('/ventas/empresa', auth.auth, ventasController.obtenerVentasEmpresa);

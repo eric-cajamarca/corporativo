@@ -715,6 +715,46 @@ function bindFiltrosVentasListado(req, opts = {}) {
   return whereExtra;
 }
 
+function bindFiltrosVentasAgrupadasListado(req, opts = {}) {
+  const { likePattern } = require('../utils/paginacion.util');
+  let whereExtra = '';
+  const fechaDesde = opts.fechaDesde && String(opts.fechaDesde).trim()
+    ? String(opts.fechaDesde).trim().slice(0, 10)
+    : null;
+  const fechaHasta = opts.fechaHasta && String(opts.fechaHasta).trim()
+    ? String(opts.fechaHasta).trim().slice(0, 10)
+    : null;
+  if (fechaDesde) {
+    req.input('fechaDesde', sql.Date, fechaDesde);
+    whereExtra += ' AND TRY_CONVERT(DATE, ve.fEmision) >= @fechaDesde';
+  }
+  if (fechaHasta) {
+    req.input('fechaHasta', sql.Date, fechaHasta);
+    whereExtra += ' AND TRY_CONVERT(DATE, ve.fEmision) <= @fechaHasta';
+  }
+  const buscarPat = likePattern(opts.buscar);
+  if (buscarPat) {
+    req.input('buscar', sql.NVarChar(200), buscarPat);
+    whereExtra += ` AND (
+      ve.compVenta LIKE @buscar ESCAPE '\\'
+      OR ve.serie LIKE @buscar ESCAPE '\\'
+      OR CAST(ve.numero AS NVARCHAR(20)) LIKE @buscar ESCAPE '\\'
+      OR cl.rSocial LIKE @buscar ESCAPE '\\'
+      OR cl.ruc LIKE @buscar ESCAPE '\\'
+      OR CAST(ve.idVenta AS NVARCHAR(20)) LIKE @buscar ESCAPE '\\'
+      OR CAST(ve.idVentaAgrupada AS NVARCHAR(36)) LIKE @buscar ESCAPE '\\'
+      OR va.compVenta LIKE @buscar ESCAPE '\\'
+      OR e.razon_Social LIKE @buscar ESCAPE '\\'
+    )`;
+  }
+  const tipoPat = likePattern(opts.tipoComprobante);
+  if (tipoPat) {
+    req.input('tipoComp', sql.NVarChar(100), tipoPat);
+    whereExtra += ` AND (c.nombre LIKE @tipoComp ESCAPE '\\' OR c.codigo LIKE @tipoComp ESCAPE '\\')`;
+  }
+  return whereExtra;
+}
+
 const SQL_VENTAS_LISTADO_SELECT = `
   v.idEmpresa,
   v.idVenta,
@@ -797,6 +837,90 @@ exports.listarPorIdsEmpresasPaginado = async (pool, idsEmpresa, opts = {}) => {
   `;
   const dataRes = await reqData.query(dataSql);
   const rows = (dataRes.recordset || []).map(mapRowVentasListado);
+  return { rows, total, pagina, porPagina };
+};
+
+/**
+ * Lista paginada de comprobantes de ventas agrupadas (VentaEmpresa).
+ * @returns {Promise<{ rows: object[], total: number, pagina: number, porPagina: number }>}
+ */
+exports.listarComprobantesVentasAgrupadasPaginado = async (pool, idEmpresaCobradora, opts = {}) => {
+  const { parsePaginacion } = require('../utils/paginacion.util');
+  const pag = parsePaginacion(opts);
+  const pagina = pag.pagina;
+  const porPagina = pag.porPagina;
+  const offset = pag.offset;
+
+  const reqCount = pool.request().input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora);
+  const whereExtra = bindFiltrosVentasAgrupadasListado(reqCount, opts);
+  const countSql = `
+    SELECT COUNT(*) AS total
+    FROM VentaEmpresa ve
+    INNER JOIN VentaAgrupada va ON va.idVentaAgrupada = ve.idVentaAgrupada
+    INNER JOIN Empresas e ON e.idEmpresa = ve.idEmpresa
+    LEFT JOIN Clientes cl ON cl.idCliente = ve.idCliente AND cl.idEmpresa = ve.idEmpresa
+    LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
+    WHERE va.idEmpresaCobradora = @idEmpresaCobradora
+    ${whereExtra}
+  `;
+  const countRes = await reqCount.query(countSql);
+  const total = countRes.recordset?.[0] ? Number(countRes.recordset[0].total) || 0 : 0;
+
+  const reqData = pool.request()
+    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
+    .input('offset', sql.Int, offset)
+    .input('limite', sql.Int, porPagina);
+  const whereExtraData = bindFiltrosVentasAgrupadasListado(reqData, opts);
+  const dataSql = `
+    SELECT
+      ve.idVentaAgrupada,
+      ve.idVenta,
+      ve.compVenta,
+      ve.serie,
+      ve.numero,
+      ve.idComprobante,
+      c.nombre AS nombreComprobante,
+      c.codigo AS codigoComprobante,
+      CONVERT(VARCHAR(19), ve.fEmision, 120) AS fEmision,
+      ve.total,
+      ve.idEstadoSunat,
+      es.codigo AS codigoEstadoSunat,
+      ISNULL(e.razon_Social, '') AS empresaRazonSocial,
+      ISNULL(e.ruc, '') AS empresaRuc,
+      COALESCE(LTRIM(RTRIM(cl.rSocial)), '') AS clienteRazonSocial,
+      COALESCE(cl.ruc, '') AS clienteRuc,
+      ISNULL(ve.eliminado, 0) AS eliminado
+    FROM VentaEmpresa ve
+    INNER JOIN VentaAgrupada va ON va.idVentaAgrupada = ve.idVentaAgrupada
+    INNER JOIN Empresas e ON e.idEmpresa = ve.idEmpresa
+    LEFT JOIN Clientes cl ON cl.idCliente = ve.idCliente AND cl.idEmpresa = ve.idEmpresa
+    LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
+    LEFT JOIN EstadosSunat es ON es.idEstadoSunat = ve.idEstadoSunat
+    WHERE va.idEmpresaCobradora = @idEmpresaCobradora
+    ${whereExtraData}
+    ORDER BY ve.fEmision DESC, ve.idVenta DESC
+    OFFSET @offset ROWS FETCH NEXT @limite ROWS ONLY
+  `;
+  const dataRes = await reqData.query(dataSql);
+  const rows = (dataRes.recordset || []).map((r) => ({
+    idVentaAgrupada: r.idVentaAgrupada != null ? String(r.idVentaAgrupada).trim() : '',
+    idVenta: r.idVenta,
+    compVenta: r.compVenta != null ? String(r.compVenta).trim() : '',
+    serie: r.serie != null ? String(r.serie).trim() : '',
+    numero: r.numero != null ? String(r.numero).trim() : '',
+    idComprobante: r.idComprobante != null ? Number(r.idComprobante) : null,
+    nombreComprobante: r.nombreComprobante != null ? String(r.nombreComprobante).trim() : '',
+    codigoComprobante: r.codigoComprobante != null ? String(r.codigoComprobante).trim() : '',
+    fEmision: r.fEmision != null ? String(r.fEmision).trim() : '',
+    total: r.total != null ? Number(r.total) : 0,
+    idEstadoSunat: r.idEstadoSunat != null ? Number(r.idEstadoSunat) : null,
+    codigoEstadoSunat: r.codigoEstadoSunat != null ? String(r.codigoEstadoSunat).trim() : null,
+    empresaRazonSocial: r.empresaRazonSocial != null ? String(r.empresaRazonSocial).trim() : '',
+    empresaRuc: r.empresaRuc != null ? String(r.empresaRuc).trim() : '',
+    clienteRazonSocial: r.clienteRazonSocial != null ? String(r.clienteRazonSocial).trim() : '',
+    clienteRuc: r.clienteRuc != null ? String(r.clienteRuc).trim() : '',
+    eliminado: !!r.eliminado
+  }));
   return { rows, total, pagina, porPagina };
 };
 
@@ -3004,11 +3128,37 @@ exports.crearClienteEnEmpresa = async (transaction, idEmpresa, clienteBase) => {
   return result.recordset && result.recordset[0];
 };
 
+function bindFiltrosVentaAgrupadaListado(req, opts = {}) {
+  const { likePattern } = require('../utils/paginacion.util');
+  let whereExtra = '';
+  const fechaDesde = opts.fechaDesde && String(opts.fechaDesde).trim() ? String(opts.fechaDesde).trim().slice(0, 10) : null;
+  const fechaHasta = opts.fechaHasta && String(opts.fechaHasta).trim() ? String(opts.fechaHasta).trim().slice(0, 10) : null;
+  if (fechaDesde) {
+    req.input('fechaDesdeVA', sql.Date, fechaDesde);
+    whereExtra += ' AND CAST(va.fEmision AS DATE) >= @fechaDesdeVA';
+  }
+  if (fechaHasta) {
+    req.input('fechaHastaVA', sql.Date, fechaHasta);
+    whereExtra += ' AND CAST(va.fEmision AS DATE) <= @fechaHastaVA';
+  }
+  const buscarPat = likePattern(opts.buscar);
+  if (buscarPat) {
+    req.input('buscarVA', sql.NVarChar(200), buscarPat);
+    whereExtra += ` AND (
+      CAST(va.idVentaAgrupada AS VARCHAR(36)) LIKE @buscarVA ESCAPE '\\'
+      OR ISNULL(va.compVenta, '') LIKE @buscarVA ESCAPE '\\'
+      OR ISNULL(cl.rSocial, '') LIKE @buscarVA ESCAPE '\\'
+      OR ISNULL(cl.ruc, '') LIKE @buscarVA ESCAPE '\\'
+    )`;
+  }
+  return whereExtra;
+}
+
 /** Lista ventas agrupadas por empresa cobradora con datos del comprobante VA. */
-exports.listarVentasAgrupadas = async (pool, idEmpresaCobradora) => {
-  const result = await pool.request()
-    .input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora)
-    .query(`
+exports.listarVentasAgrupadas = async (pool, idEmpresaCobradora, opts = {}) => {
+  const req = pool.request().input('idEmpresaCobradora', sql.UniqueIdentifier, idEmpresaCobradora);
+  const whereExtra = bindFiltrosVentaAgrupadaListado(req, opts);
+  const result = await req.query(`
       SELECT
         va.idVentaAgrupada,
         CONVERT(VARCHAR(19), va.fEmision, 120) AS fEmision,
@@ -3023,11 +3173,13 @@ exports.listarVentasAgrupadas = async (pool, idEmpresaCobradora) => {
         va.numero,
         va.compVenta,
         ISNULL(va.tipoComprobanteDestino, 'NV') AS tipoComprobanteDestino,
-        va.observaciones
+        va.observaciones,
+        ISNULL(va.eliminado, 0) AS eliminado
       FROM VentaAgrupada va
       LEFT JOIN Sucursal s ON s.idSucursal = va.idSucursal
       LEFT JOIN Clientes cl ON cl.idCliente = va.idCliente AND cl.idEmpresa = va.idEmpresaCobradora
-      WHERE va.idEmpresaCobradora = @idEmpresaCobradora AND ISNULL(va.eliminado, 0) = 0
+      WHERE va.idEmpresaCobradora = @idEmpresaCobradora
+      ${whereExtra}
       ORDER BY va.fEmision DESC
     `);
   return result.recordset || [];
@@ -3122,15 +3274,14 @@ exports.listarComprobantesPorAgrupada = async (pool, idEmpresaCobradora, idVenta
         e.razon_Social AS empresaRazonSocial,
         e.ruc AS empresaRuc,
         CONVERT(VARCHAR(19), ve.fEmision, 120) AS fEmision,
-        ve.total
+        ve.total,
+        ISNULL(ve.eliminado, 0) AS eliminado
       FROM VentaEmpresa ve
       INNER JOIN VentaAgrupada va ON va.idVentaAgrupada = ve.idVentaAgrupada
       INNER JOIN Empresas e ON e.idEmpresa = ve.idEmpresa
       LEFT JOIN Comprobantes c ON c.idComprobante = ve.idComprobante AND c.idEmpresa = ve.idEmpresa
       WHERE ve.idVentaAgrupada = @idVentaAgrupada
         AND va.idEmpresaCobradora = @idEmpresaCobradora
-        AND ISNULL(ve.eliminado, 0) = 0
-        AND ISNULL(va.eliminado, 0) = 0
       ORDER BY ve.fEmision ASC
     `);
   return result.recordset || [];

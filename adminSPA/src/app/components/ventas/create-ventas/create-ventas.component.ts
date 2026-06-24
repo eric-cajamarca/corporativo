@@ -66,6 +66,18 @@ import {
   validarClienteSunatParaComprobante,
   validarStockLinea
 } from '../../../utils/pos-validacion.util';
+import {
+  COMPROBANTES_DESTINO_GESTORA,
+  aplicaDescuentoEnTotalLineaGestora,
+  cotizacionDebeMarcarseAgrupadaGestora,
+  esFacturaOBoletaGestora,
+  esNotaVentaGestora,
+  filtrarFilasCatalogoGestora,
+  productoPermitidoEnCarritoGestora,
+  sincronizarTipoComprobanteDestinoGestora,
+  textoSucursalLineaGestora
+} from '../../../utils/gestora-venta.util';
+import { validarAntesDeCobrarGestora } from '../../../utils/gestora-venta-validacion.util';
 import { esProductoServicio } from '../../../utils/producto-servicio.util';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
@@ -229,11 +241,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   bloqueoPorSucursalUsuario = false;
   private ultimaSucursalSeleccionada = '';
   tipoComprobanteDestino = 'NV';
-  comprobantesDestinoOpciones = [
-    { codigo: 'NV', nombre: 'Nota de Venta' },
-    { codigo: '03', nombre: 'Boleta' },
-    { codigo: '01', nombre: 'Factura' }
-  ];
+  readonly comprobantesDestinoOpciones = [...COMPROBANTES_DESTINO_GESTORA];
 
   /** Cuotas explícitas para factura/boleta a crédito (SUNAT / PDF). En NV el crédito va solo por formas de pago (una cuota en servidor). */
   cuotasCreditoPlano: { monto: number; fechaVencimiento: string }[] = [];
@@ -431,6 +439,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           this.carrito = this.carrito.filter((ln) => this.productoPerteneceEmpresaOperativa(ln));
         }
         this.cargarPermitirVentaMultiSucursal();
+        this.inicializarCarritoSegunContexto();
       },
       error: () => {
         this.esGestora = false;
@@ -438,23 +447,30 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this._productoService.limpiarCacheListaProductos();
         this.stockSucursales_const = this.filtrarFilasCatalogoEmpresaOperativa(this.stockSucursales_const);
         this.cargarPermitirVentaMultiSucursal();
+        this.inicializarCarritoSegunContexto();
       }
     });
     this.cargarSucursalesUsuario();
     this.cargarDatosAuxiliaresVenta();
     this.cargarConfigDefaultsVenta();
+    this.cargarUsaValeDespacho();
+  }
+
+  /**
+   * Tras conocer si la sesión es gestora: hotel solo aplica a comercio/rubro hotel, no a gestora.
+   */
+  private inicializarCarritoSegunContexto(): void {
     const duplicarDesdeCot = this.route.snapshot.queryParamMap.get('duplicarDesdeCotizacion');
     const duplicarDesde = this.route.snapshot.queryParamMap.get('duplicarDesdeVenta');
     if (duplicarDesdeCot) {
       this.procesarDuplicarDesdeCotizacionSiCorresponde(duplicarDesdeCot);
     } else if (duplicarDesde) {
       this.procesarDuplicarDesdeVentaSiCorresponde(duplicarDesde);
-    } else if (this.hotelPreloadVentaService.hasPreload()) {
+    } else if (!this.esGestora && this.hotelPreloadVentaService.hasPreload()) {
       this.aplicarPreloadDesdeHabitacion();
     } else {
       this.revisarVentasProvisionales();
     }
-    this.cargarUsaValeDespacho();
   }
 
   /** Determina si la empresa tiene habilitado vales de despacho (config del rubro usaValeDespacho = true). */
@@ -1087,7 +1103,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private productoPerteneceEmpresaOperativa(item: { idEmpresa?: string | null } | null | undefined): boolean {
-    if (this.esGestora || !item) {
+    if (this.esGestora) {
+      return productoPermitidoEnCarritoGestora();
+    }
+    if (!item) {
       return true;
     }
     const idJwt = this.idEmpresaOperacionJwt().toLowerCase();
@@ -1099,8 +1118,11 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private filtrarFilasCatalogoEmpresaOperativa(filas: any[]): any[] {
-    if (!filas?.length || this.esGestora) {
-      return filas || [];
+    if (this.esGestora) {
+      return filtrarFilasCatalogoGestora(filas);
+    }
+    if (!filas?.length) {
+      return [];
     }
     return filas.filter((item) => this.productoPerteneceEmpresaOperativa(item));
   }
@@ -1254,13 +1276,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
    * mezcla productos de más de una empresa. Evita marcar agrupada en gestionadas (todas las líneas llevan idEmpresa propio).
    */
   private cotizacionDebeMarcarseAgrupada(): boolean {
-    if (!this.esGestora || !this.carrito?.length) return false;
-    const ids = new Set<string>();
-    for (const item of this.carrito) {
-      const id = item?.idEmpresa != null && String(item.idEmpresa).trim() !== '' ? String(item.idEmpresa) : null;
-      if (id) ids.add(id);
-    }
-    return ids.size > 1;
+    return cotizacionDebeMarcarseAgrupadaGestora(this.esGestora, this.carrito);
   }
 
 
@@ -1369,9 +1385,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
    */
   private sincronizarTipoComprobanteDestinoDesdeCodigo(codigo: string | undefined | null): void {
     if (!this.esGestora) return;
-    const c = String(codigo ?? '').trim();
-    const permitidos = new Set(this.comprobantesDestinoOpciones.map((o) => o.codigo));
-    this.tipoComprobanteDestino = permitidos.has(c) ? c : 'NV';
+    this.tipoComprobanteDestino = sincronizarTipoComprobanteDestinoGestora(codigo, this.tipoComprobanteDestino);
     if (this.tipoComprobanteDestino !== '01' && this.tipoComprobanteDestino !== '03') {
       this.cuotasCreditoPlano = [];
     }
@@ -1521,6 +1535,40 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private validarAntesDeCobrar(validarCarrito = true): boolean {
+    const abiertas = (this.cajas || [])
+      .filter((c) => this.esCajaConAperturaActiva(c))
+      .map((c) => (c.sucursal || c.nombre || '').trim())
+      .filter(Boolean);
+
+    if (this.esGestora) {
+      const lineaSinStock =
+        validarCarrito && !this.permitirVentasNegativas
+          ? this.carrito.find((item) => this.lineaCarritoStockInsuficiente(item))
+          : undefined;
+      const gestora = validarAntesDeCobrarGestora({
+        esCotizacion: this.esCotizacion(),
+        bloqueoSucursal: this.bloqueoPorSucursalUsuario,
+        idSucursal: this.ventas.idSucursal,
+        tieneCajaAbierta: this.tieneCajaAbiertaEnSucursal(this.ventas.idSucursal),
+        nombresCajasAbiertas: [...new Set(abiertas)],
+        tipoComprobanteDestino: this.tipoComprobanteDestino,
+        idDocumento: this.ventas.idDocumento,
+        numeroDocumento: this.cliente?.ruc,
+        razonSocial: this.cliente?.rSocial,
+        permitirVentasNegativas: this.permitirVentasNegativas,
+        lineaSinStock
+      });
+      if (!gestora.valido) {
+        iziToast.warning({
+          title: gestora.titulo || 'No se puede registrar',
+          message: gestora.mensaje || 'Revise los datos de la venta.',
+          position: 'topRight'
+        });
+        return false;
+      }
+      return true;
+    }
+
     this.actualizarValidacionTemprana();
     if (this.alertaValidacionTemprana?.tipo === 'danger') {
       iziToast.warning({
@@ -1857,16 +1905,16 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 }
 
   private aplicaDescuentoEnTotalLinea(item: { idEmpresa?: string | null }): boolean {
-    if (!this.descuentoEnTotalConfigListo) return false;
-    if (!this.esGestora) return this.usarDescuentoEnTotal;
-    const idJwt = this.idEmpresaOperacionJwt().toLowerCase();
-    const idEmp =
-      item?.idEmpresa != null && String(item.idEmpresa).trim() !== ''
-        ? String(item.idEmpresa).trim().toLowerCase()
-        : idJwt;
-    if (this.descuentoPorEmpresa.has(idEmp)) {
-      return this.descuentoPorEmpresa.get(idEmp)!;
+    if (this.esGestora) {
+      return aplicaDescuentoEnTotalLineaGestora({
+        descuentoEnTotalConfigListo: this.descuentoEnTotalConfigListo,
+        usarDescuentoEnTotal: this.usarDescuentoEnTotal,
+        idEmpresaJwt: this.idEmpresaOperacionJwt(),
+        idEmpresaLinea: item?.idEmpresa,
+        descuentoPorEmpresa: this.descuentoPorEmpresa
+      });
     }
+    if (!this.descuentoEnTotalConfigListo) return false;
     return this.usarDescuentoEnTotal;
   }
 
@@ -2699,7 +2747,7 @@ abrirModalPrecios(item: any) {
   /** Nota de venta efectiva (gestora: tipo destino NV; si no, código NV). */
   esNotaVentaVenta(): boolean {
     if (this.esGestora) {
-      return String(this.tipoComprobanteDestino || '').trim().toUpperCase() === 'NV';
+      return esNotaVentaGestora(this.tipoComprobanteDestino);
     }
     return this.codigoComprobanteVentaSeleccionado() === 'NV';
   }
@@ -2714,8 +2762,7 @@ abrirModalPrecios(item: any) {
   /** Factura o boleta efectiva (gestora: comprobante destino; resto: tipo seleccionado). */
   esFacturaOBoletaVenta(): boolean {
     if (this.esGestora) {
-      const c = String(this.tipoComprobanteDestino || '').trim().toUpperCase();
-      return c === '01' || c === '03';
+      return esFacturaOBoletaGestora(this.tipoComprobanteDestino);
     }
     const c = this.codigoComprobanteVentaSeleccionado();
     return c === '01' || c === '03';
@@ -3161,7 +3208,9 @@ abrirModalPrecios(item: any) {
           this.imprimirComprobanteVA(res.idVentaAgrupada);
         }
         const idVentaPdf = this.obtenerIdVentaTrasRegistro(res);
-        this.confirmarCheckoutHotelSiCorresponde(idVentaPdf);
+        if (!this.esGestora) {
+          this.confirmarCheckoutHotelSiCorresponde(idVentaPdf);
+        }
         const abrirPdf =
           this.mostrarModalPdfTrasRegistrarVenta && idVentaPdf != null;
         if (abrirPdf) {

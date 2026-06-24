@@ -68,7 +68,7 @@
 
   <!-- Accesos rápidos -->
   <div class="quick-actions mb-4">
-    <button class="quick-action-btn" (click)="navigateTo('ventas-rapida')">
+    <button class="quick-action-btn" *ngIf="!esGestora" (click)="navigateTo('ventas-rapida')">
       <i class="bi bi-lightning-charge"></i>
       <span>Venta rápida</span>
     </button>

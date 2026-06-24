@@ -126,7 +126,8 @@ exports.obtenerVentasListadoPaginado = async (pool, idempresa, opts = {}) => {
   return { rows: list, total, pagina, porPagina };
 };
 
-exports.listarVentasAgrupadas = async (pool, idEmpresa) => ventasRepository.listarVentasAgrupadas(pool, idEmpresa);
+exports.listarVentasAgrupadas = async (pool, idEmpresa, opts = {}) =>
+  ventasRepository.listarVentasAgrupadas(pool, idEmpresa, opts || {});
 
 exports.listarVentasEmpresa = async (pool, idEmpresa) => ventasRepository.listarVentasEmpresa(pool, idEmpresa);
 
@@ -135,6 +136,9 @@ exports.obtenerDetalleVentaAgrupada = async (pool, idEmpresa, idVentaAgrupada) =
 
 exports.listarComprobantesPorAgrupada = async (pool, idEmpresa, idVentaAgrupada) =>
   ventasRepository.listarComprobantesPorAgrupada(pool, idEmpresa, idVentaAgrupada);
+
+exports.listarComprobantesVentasAgrupadasPaginado = async (pool, idEmpresa, opts = {}) =>
+  ventasRepository.listarComprobantesVentasAgrupadasPaginado(pool, idEmpresa, opts || {});
 
 exports.obtenerComprobanteParaPdf = async (pool, idEmpresa, idVenta, baseUrl) => {
   const idsEmpresa = await idsEmpresaParaComprobanteVenta(pool, idEmpresa);

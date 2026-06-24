@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { CommonModule } from '@angular/common';
+import { EmpresaService } from '../../services/empresa.service';
 
 declare var iziToast: any;
 
@@ -46,7 +47,8 @@ export class LoginEmpresaComponent implements OnInit {
     private _adminService: AdminService,
     private _router: Router,
     private route: ActivatedRoute,
-    private authService: AuthService
+    private authService: AuthService,
+    private empresaService: EmpresaService
   ) {}
 
   ngOnInit(): void {
@@ -345,7 +347,15 @@ export class LoginEmpresaComponent implements OnInit {
         localStorage.getItem('redirectPosTrasLogin') === '1';
       if (modoPos) {
         localStorage.removeItem('redirectPosTrasLogin');
-        void this._router.navigate(['/ventas/rapida']);
+        this.empresaService.getEstadoConfiguracion().subscribe({
+          next: (res) => {
+            const esGestora = res?.data?.esGestora === true;
+            void this._router.navigate([esGestora ? '/ventas' : '/ventas/rapida']);
+          },
+          error: () => {
+            void this._router.navigate(['/ventas/rapida']);
+          }
+        });
         return;
       }
       void this._router.navigate(['/home']);

@@ -128,7 +128,7 @@
         <div class="dropdown-menu dropdown-menu-end quick-access-dropdown">
           <div class="dropdown-header">Accesos Rápidos</div>
           <div class="quick-access-grid">
-            <a class="quick-access-item" [routerLink]="['/ventas/rapida']">
+            <a class="quick-access-item" *ngIf="!esGestora" [routerLink]="['/ventas/rapida']">
               <i class="fas fa-bolt text-warning"></i>
               <span>Venta rápida</span>
             </a>

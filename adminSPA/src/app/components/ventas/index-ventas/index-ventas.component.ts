@@ -8,7 +8,7 @@ import { debounceTime, takeUntil } from 'rxjs/operators';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { VentasService, VentaAgrupadaListado, ComprobanteVentaAgrupada, VentaListado } from '../../../services/ventas.service';
+import { VentasService, VentaAgrupadaListado, VentaAgrupadaComprobanteListado, ComprobanteVentaAgrupada, VentaListado } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
 import { FacturacionService, ComunicacionBajaHistorialItem } from '../../../services/facturacion.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -19,6 +19,7 @@ import { Empresa as EmpresaModel } from '../../../models/empresa.model';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { Empresa } from '../../../interfaces/pdf-interface';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
+import { coincideBusquedaVentaAgrupadaGestora } from '../../../utils/gestora-ventas-historial.util';
 
 declare const iziToast: {
   success: (o: object) => void;
@@ -46,6 +47,11 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   ventasConst: VentaAgrupadaListado[] = [];
   ventasEmpresa: VentaListado[] = [];
   ventasEmpresaConst: VentaListado[] = [];
+  comprobantesAgrupadas: VentaAgrupadaComprobanteListado[] = [];
+  totalComprobantesAgrupadas = 0;
+  loadingComprobantesAgrupadas = false;
+  errorComprobantesAgrupadas = '';
+  mostrarVentasAgrupadas = false;
   loading = true;
   ventaSeleccionada: VentaListado | null = null;
   exportandoLista = false;
@@ -85,11 +91,12 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   page = 1;
   /** Paginación de la tabla de comprobantes cuando la sesión es gestora (tabla inferior). */
   pageCompGestora = 1;
+  pageComprobantesAgrupadas = 1;
   pageSize = 10;
   totalVentasEmpresa = 0;
   totalVentasEmpresaGestora = 0;
 
-  filtroFecha = 'today';
+  filtroFecha = 'all';
   fechaDesde = '';
   fechaHasta = '';
   /** Búsqueda única: comprobante, id venta, RUC, cliente o doc. relacionado (OR). */
@@ -161,10 +168,42 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   }
 
   onFiltroCambio(): void {
-    this.cargarComprobantesPaginados(1);
     if (this.esGestora) {
-      this.aplicarFiltrosAgrupadas();
+      this.cargarVentasAgrupadasGestora();
+      this.cargarComprobantesAgrupadasPaginados(1);
     }
+    this.cargarComprobantesPaginados(1);
+  }
+
+  private buildParamsFiltrosAgrupadasGestora(): {
+    buscar?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  } {
+    const fechas = this.resolveFiltrosFechaApi();
+    const params: { buscar?: string; fechaDesde?: string; fechaHasta?: string } = { ...fechas };
+    const q = (this.filtroBusqueda || '').trim();
+    if (q) {
+      params.buscar = q;
+    }
+    return params;
+  }
+
+  /** Carga VA desde API con los mismos filtros de fecha/búsqueda que los comprobantes hijos. */
+  private cargarVentasAgrupadasGestora(): void {
+    this.ventasService.listarVentasAgrupadas(this.buildParamsFiltrosAgrupadasGestora()).subscribe({
+      next: (res) => {
+        this.ventasConst = res.data ?? [];
+        this.ventas = [...this.ventasConst];
+        this.page = 1;
+        this.mostrarVentasAgrupadas = this.esGestora || this.ventas.length > 0;
+      },
+      error: () => {
+        this.ventasConst = [];
+        this.ventas = [];
+        this.mostrarVentasAgrupadas = this.esGestora;
+      }
+    });
   }
 
   private resolveFiltrosFechaApi(): { fechaDesde?: string; fechaHasta?: string } {
@@ -215,24 +254,36 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     return params;
   }
 
+  private buildParamsListadoComprobantesAgrupadas(pagina: number): {
+    pagina: number;
+    porPagina: number;
+    buscar?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    tipoComprobante?: string;
+  } {
+    const fechas = this.resolveFiltrosFechaApi();
+    const params: {
+      pagina: number;
+      porPagina: number;
+      buscar?: string;
+      fechaDesde?: string;
+      fechaHasta?: string;
+      tipoComprobante?: string;
+    } = { pagina, porPagina: this.pageSize, ...fechas };
+    const q = (this.filtroBusqueda || '').trim();
+    if (q) params.buscar = q;
+    const tipo = (this.filtroTipoComprobante || '').trim();
+    if (tipo) params.tipoComprobante = tipo;
+    return params;
+  }
+
   cargarVentas(): void {
     this.loading = true;
+    this.cargarVentasAgrupadasGestora();
     if (this.esGestora) {
-      this.ventasService.listarVentasAgrupadas().subscribe({
-        next: (res) => {
-          this.ventasConst = res.data ?? [];
-          this.page = 1;
-          this.aplicarFiltrosAgrupadas();
-          this.cargarComprobantesPaginados(1, true);
-        },
-        error: () => {
-          this.ventasConst = [];
-          this.ventas = [];
-          this.ventasEmpresa = [];
-          this.totalVentasEmpresaGestora = 0;
-          this.loading = false;
-        }
-      });
+      this.cargarComprobantesAgrupadasPaginados(1);
+      this.cargarComprobantesPaginados(1, true);
     } else {
       this.page = 1;
       this.cargarComprobantesPaginados(1);
@@ -270,6 +321,29 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Carga comprobantes pertenecientes a ventas agrupadas (paginación + filtros). */
+  cargarComprobantesAgrupadasPaginados(pagina: number): void {
+    if (!this.esGestora) return;
+    this.loadingComprobantesAgrupadas = true;
+    this.errorComprobantesAgrupadas = '';
+    this.pageComprobantesAgrupadas = pagina;
+    this.ventasService
+      .listarComprobantesVentasAgrupadasPaginado(this.buildParamsListadoComprobantesAgrupadas(pagina))
+      .subscribe({
+        next: (res) => {
+          this.comprobantesAgrupadas = res.data ?? [];
+          this.totalComprobantesAgrupadas = res.total ?? 0;
+          this.loadingComprobantesAgrupadas = false;
+        },
+        error: () => {
+          this.comprobantesAgrupadas = [];
+          this.totalComprobantesAgrupadas = 0;
+          this.loadingComprobantesAgrupadas = false;
+          this.errorComprobantesAgrupadas = 'No se pudieron cargar los comprobantes.';
+        }
+      });
+  }
+
   onPageComprobantesChange(pagina: number): void {
     this.cargarComprobantesPaginados(pagina, false);
   }
@@ -278,22 +352,16 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     this.cargarComprobantesPaginados(pagina, true);
   }
 
-  aplicarFiltrosAgrupadas(): void {
-    this.page = 1;
-    let listVa = [...this.ventasConst];
-    const fechas = this.resolveFiltrosFechaApi();
-    if (fechas.fechaDesde) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) >= fechas.fechaDesde!);
-    if (fechas.fechaHasta) listVa = listVa.filter((v) => (v.fEmision || '').slice(0, 10) <= fechas.fechaHasta!);
-    const qVa = (this.filtroBusqueda || '').trim();
-    if (qVa) listVa = listVa.filter((v) => this.coincideBusquedaVentaAgrupada(v, qVa));
-    this.ventas = listVa;
+  onPageComprobantesAgrupadasChange(pagina: number): void {
+    this.cargarComprobantesAgrupadasPaginados(pagina);
   }
 
   aplicarFiltros(): void {
-    this.cargarComprobantesPaginados(1);
     if (this.esGestora) {
-      this.aplicarFiltrosAgrupadas();
+      this.cargarVentasAgrupadasGestora();
+      this.cargarComprobantesAgrupadasPaginados(1);
     }
+    this.cargarComprobantesPaginados(1);
   }
 
   /** Coincidencia en cualquiera de los campos habituales de búsqueda (OR). */
@@ -316,14 +384,7 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   }
 
   private coincideBusquedaVentaAgrupada(v: VentaAgrupadaListado, texto: string): boolean {
-    const raw = texto.trim();
-    if (!raw) return true;
-    const n = raw.toLowerCase();
-    const idVa = (v.idVentaAgrupada || '').toLowerCase();
-    const ruc = (v.clienteRuc || '').toLowerCase();
-    const rs = (v.clienteRazonSocial || '').toLowerCase();
-    const comp = (v.compVenta || '').toLowerCase();
-    return idVa.includes(n) || ruc.includes(n) || rs.includes(n) || comp.includes(n);
+    return coincideBusquedaVentaAgrupadaGestora(v, texto);
   }
 
   get totalComprobantesListado(): number {
@@ -338,7 +399,8 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
   limpiarFiltros(): void {
     this.page = 1;
     this.pageCompGestora = 1;
-    this.filtroFecha = 'today';
+    this.pageComprobantesAgrupadas = 1;
+    this.filtroFecha = 'all';
     this.fechaDesde = '';
     this.fechaHasta = '';
     this.filtroBusqueda = '';
@@ -418,6 +480,18 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
     if (idEstadoSunat === 6) return 'Error envío';
     if (idEstadoSunat === 4) return 'Rechazado';
     return 'Otro estado';
+  }
+
+  etiquetaEstadoSunatAgrupada(c: VentaAgrupadaComprobanteListado): string {
+    const cod = (c.codigoEstadoSunat || '').trim();
+    if (cod === '08') return 'Anulado (SUNAT)';
+    return this.estadoSunatLabel(c.idEstadoSunat ?? undefined);
+  }
+
+  estadoSunatClassAgrupada(c: VentaAgrupadaComprobanteListado): string {
+    const cod = (c.codigoEstadoSunat || '').trim();
+    if (cod === '08') return 'bg-dark';
+    return this.estadoSunatClass(c.idEstadoSunat ?? undefined);
   }
 
   /** Id del comprobante electrónico como string (para comparaciones y API). */

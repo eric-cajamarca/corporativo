@@ -10,7 +10,7 @@
           <i class="bi bi-table"></i> {{ esGestora ? 'Ventas (agrupadas y por empresa)' : 'Comprobantes de Ventas' }}
         </h5>
         <div class="d-none d-lg-flex align-items-center gap-2 flex-shrink-0">
-          <a routerLink="/ventas/rapida" class="btn btn-success btn-sm" title="Punto de venta rápido">
+          <a *ngIf="!esGestora" routerLink="/ventas/rapida" class="btn btn-success btn-sm" title="Punto de venta rápido">
             <i class="bi bi-lightning-charge-fill"></i> Venta rápida
           </a>
           <button
@@ -37,7 +37,7 @@
             <i class="bi bi-three-dots-vertical"></i> Acciones
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li>
+            <li *ngIf="!esGestora">
               <a class="dropdown-item" routerLink="/ventas/rapida">
                 <i class="bi bi-lightning-charge-fill me-2 text-success"></i> Venta rápida
               </a>
@@ -120,7 +120,12 @@
             <i class="bi bi-inbox me-2"></i>No hay ventas para mostrar.
           </div>
         </ng-container>
-        <ng-container *ngIf="!loading && esGestora && ventas.length > 0">
+        <ng-container *ngIf="!loading && mostrarVentasAgrupadas && ventas.length === 0 && ventasEmpresa.length > 0">
+          <div class="alert alert-info mb-3 py-2 small">
+            <i class="bi bi-info-circle me-2"></i>No hay ventas agrupadas (VA) con los filtros actuales. Pruebe <strong>Todos</strong> en el filtro de fecha o registre una venta corporativa desde la gestora.
+          </div>
+        </ng-container>
+        <ng-container *ngIf="!loading && mostrarVentasAgrupadas && ventas.length > 0">
           <div class="d-none d-lg-block table-responsive ventas-table-wrap">
             <h6 class="small text-muted mb-2 fw-semibold">Ventas agrupadas (VA)</h6>
             <table class="table table-ventas mb-0">
@@ -139,7 +144,9 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize" class="table-ventas-row">
+                <tr *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize" class="table-ventas-row"
+                    [class.text-decoration-line-through]="v.eliminado"
+                    [class.text-muted]="v.eliminado">
                   <td class="fw-medium">{{ v.idVentaAgrupada }}</td>
                   <td>{{ v.compVenta || '—' }}</td>
                   <td>{{ etiquetaTipoComprobanteDestino(v.tipoComprobanteDestino) }}</td>
@@ -156,11 +163,11 @@
                     </span>
                   </td>
                   <td class="text-center">
-                    <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="Ticket VA — imprimir" (click)="imprimirVA(v.idVentaAgrupada)" [disabled]="imprimiendoVAId === v.idVentaAgrupada">
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="Ticket VA — imprimir" (click)="imprimirVA(v.idVentaAgrupada)" [disabled]="imprimiendoVAId === v.idVentaAgrupada || v.eliminado">
                       <span *ngIf="imprimiendoVAId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
                       <span *ngIf="imprimiendoVAId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#comprobantesModal" (click)="abrirModalComprobantes(v)">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#comprobantesModal" (click)="abrirModalComprobantes(v)" [disabled]="v.eliminado">
                       <i class="bi bi-receipt"></i> Ver
                     </button>
                   </td>
@@ -182,7 +189,9 @@
           </div>
           <div class="d-lg-none ventas-card-list">
             <h6 class="small text-muted mb-2 fw-semibold">Ventas agrupadas (VA)</h6>
-            <div class="ventas-m-card" *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize">
+            <div class="ventas-m-card" *ngFor="let v of ventas | slice: (page - 1) * pageSize : page * pageSize"
+                 [class.text-decoration-line-through]="v.eliminado"
+                 [class.text-muted]="v.eliminado">
               <div class="ventas-m-card-head d-flex justify-content-between align-items-start gap-2">
                 <span class="fw-semibold">VA {{ v.idVentaAgrupada }}</span>
                 <span class="badge" [class.bg-success]="v.idEstadoPago === 2" [class.bg-warning]="v.idEstadoPago !== 2">{{ estadoPagoLabel(v.idEstadoPago) }}</span>
@@ -196,12 +205,12 @@
               <div class="ventas-m-kv"><span class="ventas-m-k">Sucursal</span><span class="ventas-m-v">{{ v.sucursal || '—' }}</span></div>
               <div class="ventas-m-kv ventas-m-total"><span class="ventas-m-k">Total</span><span class="ventas-m-v fw-semibold">{{ formatearMoneda(v.total) }}</span></div>
               <div class="d-flex flex-wrap gap-2 mt-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="imprimirVA(v.idVentaAgrupada)" [disabled]="imprimiendoVAId === v.idVentaAgrupada">
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="imprimirVA(v.idVentaAgrupada)" [disabled]="imprimiendoVAId === v.idVentaAgrupada || v.eliminado">
                   <span *ngIf="imprimiendoVAId === v.idVentaAgrupada"><i class="bi bi-hourglass-split"></i></span>
                   <span *ngIf="imprimiendoVAId !== v.idVentaAgrupada"><i class="bi bi-printer"></i></span>
                   Ticket VA
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#comprobantesModal" (click)="abrirModalComprobantes(v)">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#comprobantesModal" (click)="abrirModalComprobantes(v)" [disabled]="v.eliminado">
                   <i class="bi bi-receipt"></i> Comprobantes
                 </button>
               </div>
@@ -212,6 +221,112 @@
                 [(page)]="page"
                 [pageSize]="pageSize"
                 [collectionSize]="ventas.length"
+                [maxSize]="5"
+                [rotate]="true"
+                [boundaryLinks]="true"
+                class="mb-0 d-flex justify-content-center">
+              </ngb-pagination>
+            </div>
+          </div>
+        </ng-container>
+        <ng-container *ngIf="!loading && esGestora">
+          <div *ngIf="loadingComprobantesAgrupadas" class="text-muted mb-2">
+            <i class="bi bi-hourglass-split"></i> Cargando comprobantes de ventas agrupadas...
+          </div>
+          <div *ngIf="!loadingComprobantesAgrupadas && errorComprobantesAgrupadas" class="text-danger mb-2">
+            {{ errorComprobantesAgrupadas }}
+          </div>
+          <div *ngIf="!loadingComprobantesAgrupadas && !errorComprobantesAgrupadas && comprobantesAgrupadas.length === 0" class="alert alert-info mb-3 py-2 small">
+            <i class="bi bi-info-circle me-2"></i>No hay comprobantes de ventas agrupadas con los filtros actuales.
+          </div>
+          <!--
+          <div *ngIf="!loadingComprobantesAgrupadas && comprobantesAgrupadas.length > 0" class="d-none d-lg-block table-responsive ventas-table-wrap mt-3">
+            <h6 class="small text-muted mb-2 fw-semibold">Comprobantes de ventas agrupadas</h6>
+            <table class="table table-ventas mb-0 table-hover">
+              <thead class="table-ventas-thead">
+                <tr>
+                  <th>Empresa</th>
+                  <th>ID VA</th>
+                  <th>ID</th>
+                  <th>F. Emisión</th>
+                  <th>Comprobante</th>
+                  <th>Tipo</th>
+                  <th>Cliente</th>
+                  <th class="text-end">Total</th>
+                  <th>Est. SUNAT</th>
+                  <th class="text-center">PDF</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let c of comprobantesAgrupadas"
+                    [class.text-decoration-line-through]="c.eliminado"
+                    [class.text-danger]="c.eliminado">
+                  <td class="small">{{ c.empresaRazonSocial || '—' }}</td>
+                  <td class="fw-medium">{{ c.idVentaAgrupada }}</td>
+                  <td>{{ c.idVenta }}</td>
+                  <td class="text-nowrap">{{ formatearFecha(c.fEmision) }}</td>
+                  <td>{{ c.compVenta || '—' }}</td>
+                  <td>{{ c.nombreComprobante || c.codigoComprobante || '—' }}</td>
+                  <td>
+                    <span class="cliente-nombre" title="{{ c.clienteRuc || '' }}">{{ c.clienteRazonSocial || '—' }}</span>
+                  </td>
+                  <td class="text-end fw-semibold">{{ formatearMoneda(c.total) }}</td>
+                  <td>
+                    <span class="badge badge-estado-sunat" [ngClass]="estadoSunatClassAgrupada(c)">
+                      {{ etiquetaEstadoSunatAgrupada(c) }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-primary" title="PDF" (click)="abrirModalPdfComprobanteHijo(c.idVenta)" [disabled]="c.eliminado">
+                      <i class="bi bi-file-pdf"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2 pagination-wrap">
+              <span class="text-muted small">Mostrando {{ (pageComprobantesAgrupadas - 1) * pageSize + 1 }} - {{ min((pageComprobantesAgrupadas) * pageSize, totalComprobantesAgrupadas) }} de {{ totalComprobantesAgrupadas }}</span>
+              <ngb-pagination
+                [(page)]="pageComprobantesAgrupadas"
+                [pageSize]="pageSize"
+                [collectionSize]="totalComprobantesAgrupadas"
+                (pageChange)="onPageComprobantesAgrupadasChange($event)"
+                [maxSize]="5"
+                [rotate]="true"
+                [boundaryLinks]="true"
+                class="mb-0">
+              </ngb-pagination>
+            </div>
+          </div>
+        -->
+          <div *ngIf="!loadingComprobantesAgrupadas && comprobantesAgrupadas.length > 0" class="d-lg-none ventas-card-list mt-3">
+            <h6 class="small text-muted mb-2 fw-semibold">Comprobantes de ventas agrupadas</h6>
+            <div class="ventas-m-card" *ngFor="let c of comprobantesAgrupadas"
+                 [class.text-decoration-line-through]="c.eliminado"
+                 [class.text-danger]="c.eliminado">
+              <div class="ventas-m-card-head d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                <span class="fw-semibold">#{{ c.idVenta }} · {{ c.compVenta || '—' }}</span>
+                <span class="badge badge-estado-sunat" [ngClass]="estadoSunatClassAgrupada(c)">{{ etiquetaEstadoSunatAgrupada(c) }}</span>
+              </div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">Empresa</span><span class="ventas-m-v small">{{ c.empresaRazonSocial || '—' }}</span></div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">ID VA</span><span class="ventas-m-v">{{ c.idVentaAgrupada }}</span></div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">Emisión</span><span class="ventas-m-v">{{ formatearFecha(c.fEmision) }}</span></div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">Cliente</span><span class="ventas-m-v">{{ c.clienteRazonSocial || '—' }}</span></div>
+              <div class="ventas-m-kv"><span class="ventas-m-k">Tipo</span><span class="ventas-m-v">{{ c.nombreComprobante || c.codigoComprobante || '—' }}</span></div>
+              <div class="ventas-m-kv ventas-m-total"><span class="ventas-m-k">Total</span><span class="ventas-m-v fw-semibold">{{ formatearMoneda(c.total) }}</span></div>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirModalPdfComprobanteHijo(c.idVenta)" [disabled]="c.eliminado">
+                  <i class="bi bi-file-pdf"></i> PDF
+                </button>
+              </div>
+            </div>
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center mt-2 flex-wrap gap-2 pagination-wrap">
+              <span class="text-muted small text-center text-sm-start">Mostrando {{ (pageComprobantesAgrupadas - 1) * pageSize + 1 }} - {{ min((pageComprobantesAgrupadas) * pageSize, totalComprobantesAgrupadas) }} de {{ totalComprobantesAgrupadas }}</span>
+              <ngb-pagination
+                [(page)]="pageComprobantesAgrupadas"
+                [pageSize]="pageSize"
+                [collectionSize]="totalComprobantesAgrupadas"
+                (pageChange)="onPageComprobantesAgrupadasChange($event)"
                 [maxSize]="5"
                 [rotate]="true"
                 [boundaryLinks]="true"
@@ -544,7 +659,9 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let c of comprobantesVenta">
+                <tr *ngFor="let c of comprobantesVenta"
+                    [class.text-decoration-line-through]="c.eliminado"
+                    [class.text-danger]="c.eliminado">
                   <td>{{ c.empresaRazonSocial || '—' }}</td>
                   <td>{{ c.compVenta }}</td>
                   <td>{{ c.nombreComprobante || c.codigoComprobante || '—' }}</td>
@@ -552,13 +669,20 @@
                   <td class="text-end">S/ {{ c.total | number:'1.2-2' }}</td>
                   <td class="text-center">
                     <button type="button" class="btn btn-outline-primary btn-sm" title="Generar PDF"
-                            [disabled]="generandoPdf && comprobanteImprimiendoId === c.idVenta"
-                            (click)="abrirModalPdfComprobanteHijo(c.idVenta)">
+                            (click)="abrirModalPdfComprobanteHijo(c.idVenta)"
+                            [disabled]="c.eliminado || (generandoPdf && comprobanteImprimiendoId === c.idVenta)">
                       <i class="bi bi-file-earmark-pdf"></i> PDF
                     </button>
                   </td>
                   <td class="text-center">
-                    <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/ventas/create']" [queryParams]="{ duplicarDesdeVenta: c.idVenta }" data-bs-dismiss="modal" title="Nueva venta con el mismo detalle">
+                    <a class="btn btn-outline-secondary btn-sm"
+                       [routerLink]="['/ventas/create']"
+                       [queryParams]="{ duplicarDesdeVenta: c.idVenta }"
+                       data-bs-dismiss="modal"
+                       title="Nueva venta con el mismo detalle"
+                       [class.disabled]="c.eliminado"
+                       [attr.aria-disabled]="c.eliminado"
+                       [attr.tabindex]="c.eliminado ? -1 : 0">
                       <i class="bi bi-files"></i>
                     </a>
                   </td>

@@ -21,6 +21,7 @@ import { ConsultarPlacaModalOpenerService } from '../../services/consultar-placa
 import { SidebarStateService } from '../../services/sidebar-state.service';
 import { NotificacionesService } from '../../services/notificaciones.service';
 import { NotificacionItem } from '../../models/notificacion.model';
+import { EmpresaService } from '../../services/empresa.service';
 
 declare const iziToast: any;
 
@@ -74,6 +75,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
   private planSuscripcionCode: string | null = null;
   private ultimaEmpresaMiEstado: string | null = null;
   private miEstadoSuscripcionEnVuelo = false;
+  public esGestora = false;
   private bannerNavSub?: Subscription;
   private placaModalOpenSub?: Subscription;
 
@@ -89,7 +91,8 @@ export class TopnavComponent implements OnInit, OnDestroy {
     private appBanner: AppBannerService,
     private consultarPlacaOpener: ConsultarPlacaModalOpenerService,
     private sidebarState: SidebarStateService,
-    public notificacionesService: NotificacionesService
+    public notificacionesService: NotificacionesService,
+    private empresaService: EmpresaService
   ) {
     // Efecto para actualizar datos del usuario cuando cambien
     effect(() => {
@@ -99,6 +102,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
         this.empresaNombre = userData.razonSocial || '';
         this.isAuthenticated = true;
         this.cargarTipoCambio();
+        this.cargarEstadoConfiguracion();
         this.cargarSoatVencidoCount(true);
         this.appBanner.refrescar();
         this.notificacionesService.refrescar();
@@ -106,6 +110,7 @@ export class TopnavComponent implements OnInit, OnDestroy {
         this.userName = '';
         this.empresaNombre = '';
         this.isAuthenticated = false;
+        this.esGestora = false;
         this.appBanner.limpiar();
         this.notificacionesService.limpiar();
         this.syncNotificacionesUi();
@@ -222,6 +227,19 @@ export class TopnavComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.bannerNavSub?.unsubscribe();
     this.placaModalOpenSub?.unsubscribe();
+  }
+
+  private cargarEstadoConfiguracion(): void {
+    this.empresaService.getEstadoConfiguracion().subscribe({
+      next: (res) => {
+        this.esGestora = res?.data?.esGestora === true;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.esGestora = false;
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   private cargarSoatVencidoCount(mostrarToast = false): void {

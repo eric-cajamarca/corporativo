@@ -497,17 +497,6 @@
             </select>
           </div>
 
-          <!-- Tipo de comprobante destino (solo empresa gestora) -->
-          <div class="col-md-4" *ngIf="esGestora">
-            <label class="form-label fw-bold text-primary">
-              <i class="bi bi-building me-1"></i>Comprobante destino
-            </label>
-            <select class="form-select border-primary" [(ngModel)]="tipoComprobanteDestino" (ngModelChange)="onTipoComprobanteDestinoChanged()">
-              <option *ngFor="let opt of comprobantesDestinoOpciones" [value]="opt.codigo">{{ opt.nombre }}</option>
-            </select>
-            <small class="text-muted">Tipo de comprobante que se emitirá en cada empresa gestionada</small>
-          </div>
-
           <!-- Observación -->
           <div class="col-12">
             <label class="form-label">Observación</label>

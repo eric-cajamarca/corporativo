@@ -13,6 +13,7 @@ function esRutaPermitidaGestora(path: string): boolean {
   if (path === 'editar-empresa') return true;
   if (path === 'empresa') return true;
   if (path === 'analisis') return true;
+  if (path.startsWith('ventas/rapida')) return false;
   if (path.startsWith('ventas')) return true;
   if (path.startsWith('cotizaciones')) return true;
   if (path === 'caja' || path.startsWith('caja/')) {

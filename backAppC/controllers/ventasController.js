@@ -100,11 +100,46 @@ const obtenerVentasAgrupadas = async function (req, res) {
     return res.status(401).json({ message: 'No Access' });
   }
   try {
-    const list = await withPool((pool) => ventasOrquestacion.listarVentasAgrupadas(pool, idEmpresa));
+    const opts = {
+      fechaDesde: req.query.fechaDesde,
+      fechaHasta: req.query.fechaHasta,
+      buscar: req.query.buscar
+    };
+    const list = await withPool((pool) => ventasOrquestacion.listarVentasAgrupadas(pool, idEmpresa, opts));
+    console.error('listarVentasAgrupadas: idEmpresa=%s total=%s filtros=%o', idEmpresa, list?.length ?? 0, opts);
     res.json({ data: list });
   } catch (error) {
     console.error('Error al obtener ventas agrupadas:', error);
     res.status(500).json({ error: 'Error al obtener ventas agrupadas' });
+  }
+};
+
+const listarComprobantesVentasAgrupadas = async function (req, res) {
+  const idEmpresa = req.user?.empresa;
+  if (!req.user || !idEmpresa) {
+    return res.status(401).json({ message: 'No Access' });
+  }
+  try {
+    const opts = {
+      pagina: req.query.pagina,
+      porPagina: req.query.porPagina,
+      buscar: req.query.buscar,
+      fechaDesde: req.query.fechaDesde,
+      fechaHasta: req.query.fechaHasta,
+      tipoComprobante: req.query.tipoComprobante
+    };
+    const result = await withPool((pool) =>
+      ventasOrquestacion.listarComprobantesVentasAgrupadasPaginado(pool, idEmpresa, opts)
+    );
+    return res.json({
+      data: result.rows,
+      total: result.total,
+      pagina: result.pagina,
+      porPagina: result.porPagina
+    });
+  } catch (error) {
+    console.error('Error al listar comprobantes de ventas agrupadas:', error);
+    return res.status(500).json({ error: 'Error al listar comprobantes de ventas agrupadas' });
   }
 };
 
@@ -685,6 +720,7 @@ module.exports = {
   obtenerVentaPorId,
   obtenerVentas,
   obtenerVentasAgrupadas,
+  listarComprobantesVentasAgrupadas,
   obtenerVentasEmpresa,
   listarNotasCreditoDebito,
   obtenerDetalleVentaAgrupada,

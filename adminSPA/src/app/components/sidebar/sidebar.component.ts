@@ -133,9 +133,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   /** Renombra «Historial» → «Recepción» en submenús de ventas cuando el rubro es hotel. */
   private parchearSubmenuVentas(submenu: SubMenuItem[]): SubMenuItem[] {
-    if (!this.esRubroHotel()) return submenu;
+    const esGestora = this.estadoConfiguracion()?.esGestora === true;
+    const base = (esGestora || this.esRubroHotel())
+      ? submenu.filter((s) => s.ruta !== '/ventas/rapida')
+      : submenu;
+    if (!this.esRubroHotel()) return base;
     const label = this.etiquetaHistorialVentas();
-    return submenu.map((s) => {
+    return base.map((s) => {
       if (s.ruta === '/ventas' && (s.nombre === 'Historial' || s.nombre === 'Recepción')) {
         return { ...s, nombre: label };
       }
@@ -384,7 +388,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private buildSubmenuVentas(): SubMenuItem[] {
     const labelHistorial = this.etiquetaHistorialVentas();
     return [
-      { nombre: 'Venta rápida', ruta: '/ventas/rapida', permiso: 'VER_VENTAS', visible: true },
       { nombre: labelHistorial, ruta: '/ventas', permiso: 'VER_VENTAS', visible: true },
       {
         nombre: 'Reporte detallado',

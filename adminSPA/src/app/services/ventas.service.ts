@@ -67,6 +67,27 @@ export interface ComprobanteVentaAgrupada {
   empresaRuc?: string;
   fEmision: string;
   total: number;
+  eliminado?: boolean;
+}
+
+export interface VentaAgrupadaComprobanteListado {
+  idVentaAgrupada: string;
+  idVenta: number;
+  compVenta: string;
+  serie?: string;
+  numero?: string;
+  idComprobante?: number | null;
+  nombreComprobante?: string;
+  codigoComprobante?: string;
+  fEmision: string;
+  total: number;
+  idEstadoSunat?: number | null;
+  codigoEstadoSunat?: string | null;
+  empresaRazonSocial?: string;
+  empresaRuc?: string;
+  clienteRazonSocial?: string;
+  clienteRuc?: string;
+  eliminado?: boolean;
 }
 
 @Injectable({
@@ -88,9 +109,26 @@ export class VentasService {
     );
   }
 
-  /** Lista ventas agrupadas (total corporativo). */
-  listarVentasAgrupadas(): Observable<{ data: VentaAgrupadaListado[] }> {
-    return this._http.get<{ data: VentaAgrupadaListado[] }>(this.url + 'ventas/agrupadas', { withCredentials: true });
+  /** Lista ventas agrupadas (total corporativo). Filtros opcionales alineados con /ventas/listar. */
+  listarVentasAgrupadas(params?: {
+    buscar?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<{ data: VentaAgrupadaListado[] }> {
+    let q = new HttpParams();
+    if (params?.buscar != null && String(params.buscar).trim() !== '') {
+      q = q.set('buscar', String(params.buscar).trim());
+    }
+    if (params?.fechaDesde) {
+      q = q.set('fechaDesde', params.fechaDesde);
+    }
+    if (params?.fechaHasta) {
+      q = q.set('fechaHasta', params.fechaHasta);
+    }
+    return this._http.get<{ data: VentaAgrupadaListado[] }>(this.url + 'ventas/agrupadas', {
+      withCredentials: true,
+      params: q
+    });
   }
 
   /** Lista ventas por empresa (comprobantes). Filtro opcional por sucursal (query idSucursal). */
@@ -156,6 +194,30 @@ export class VentasService {
     return this._http.get<{ data: ComprobanteVentaAgrupada[] }>(
       this.url + 'ventas/agrupadas/' + idVentaAgrupada + '/comprobantes',
       { withCredentials: true }
+    );
+  }
+
+  /** Lista paginada de comprobantes pertenecientes a ventas agrupadas (solo gestora). */
+  listarComprobantesVentasAgrupadasPaginado(params: {
+    pagina?: number;
+    porPagina?: number;
+    buscar?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    tipoComprobante?: string;
+  }): Observable<{ data: VentaAgrupadaComprobanteListado[]; total: number; pagina?: number; porPagina?: number }> {
+    let q = new HttpParams();
+    if (params.pagina != null) q = q.set('pagina', String(params.pagina));
+    if (params.porPagina != null) q = q.set('porPagina', String(params.porPagina));
+    if (params.buscar != null && String(params.buscar).trim() !== '') q = q.set('buscar', String(params.buscar).trim());
+    if (params.fechaDesde) q = q.set('fechaDesde', params.fechaDesde);
+    if (params.fechaHasta) q = q.set('fechaHasta', params.fechaHasta);
+    if (params.tipoComprobante != null && String(params.tipoComprobante).trim() !== '') {
+      q = q.set('tipoComprobante', String(params.tipoComprobante).trim());
+    }
+    return this._http.get<{ data: VentaAgrupadaComprobanteListado[]; total: number; pagina?: number; porPagina?: number }>(
+      this.url + 'ventas/agrupadas/comprobantes',
+      { withCredentials: true, params: q }
     );
   }
 
@@ -467,6 +529,7 @@ export interface VentaAgrupadaListado {
   observaciones?: string;
   /** Usuario que registró el comprobante (trazabilidad). */
   usuarioRegistro?: string | null;
+  eliminado?: boolean;
 }
 
 export interface ComprobanteVAPdfData {
