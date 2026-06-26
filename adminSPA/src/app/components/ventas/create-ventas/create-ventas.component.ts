@@ -1535,6 +1535,9 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private validarAntesDeCobrar(validarCarrito = true): boolean {
+    if (this.esGestora) {
+      this.aplicarSucursalConCajaAbiertaPreferida();
+    }
     const abiertas = (this.cajas || [])
       .filter((c) => this.esCajaConAperturaActiva(c))
       .map((c) => (c.sucursal || c.nombre || '').trim())
