@@ -49,7 +49,7 @@ exports.obtenerResumenDashboardRepo = async (
     .input("fechaFinAnterior", sql.Date, fechaFinAnterior);
 
   // Ventas totales del período actual
-  const ventasActual = await req.query(`
+  const ventasActualPromise = req.query(`
     SELECT ISNULL(SUM(
       CASE
         WHEN UPPER(LTRIM(RTRIM(ISNULL(c.codigo, '')))) IN ('F7','B7','07') THEN -ABS(v.total)
@@ -65,7 +65,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Ventas totales del período anterior (para variación %)
-  const ventasAnterior = await pool
+  const ventasAnteriorPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaInicioAnterior", sql.Date, fechaInicioAnterior)
@@ -86,7 +86,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Clientes activos (total en la empresa, no solo del período)
-  const clientesResult = await pool
+  const clientesResultPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .query(`
@@ -96,7 +96,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Clientes que compraron en período anterior (para variación aproximada: nuevos vs anteriores)
-  const clientesAnterior = await pool
+  const clientesAnteriorPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaInicioAnterior", sql.Date, fechaInicioAnterior)
@@ -109,7 +109,7 @@ exports.obtenerResumenDashboardRepo = async (
       AND CONVERT(DATE, v.fEmision) <= @fechaFinAnterior
   `);
 
-  const clientesActual = await pool
+  const clientesActualPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaInicio", sql.Date, fechaInicio)
@@ -123,7 +123,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Productos más vendidos (período actual)
-  const productosMasVendidos = await pool
+  const productosMasVendidosPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaInicio", sql.Date, fechaInicio)
@@ -145,7 +145,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Ventas por hora del día actual (para vista "Por día" - leyenda Hora)
-  const ventasPorHora = await pool
+  const ventasPorHoraPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaReferencia", sql.Date, fechaRef)
@@ -161,7 +161,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Ventas del mes actual por día (para vista "Mes" - leyenda Por día)
-  const ventasMesPorDia = await pool
+  const ventasMesPorDiaPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaReferencia", sql.Date, fechaRef)
@@ -178,7 +178,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Ventas por mes (últimos 6 meses)
-  const ventas6Meses = await pool
+  const ventas6MesesPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaReferencia", sql.Date, fechaRef)
@@ -195,7 +195,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Ventas por mes (últimos 12 meses)
-  const ventasMensuales = await pool
+  const ventasMensualesPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("fechaReferencia", sql.Date, fechaRef)
@@ -212,7 +212,7 @@ exports.obtenerResumenDashboardRepo = async (
   `);
 
   // Alertas: stock bajo (umbral = alertaMinimo del producto, o stockMinimoGeneral si el producto no tiene)
-  const stockBajo = await pool
+  const stockBajoPromise = pool
     .request()
     .input("idEmpresa", sql.UniqueIdentifier, idEmpresa)
     .input("stockMinimoGeneral", sql.Decimal(18, 2), stockMinimoGeneral)
@@ -227,6 +227,32 @@ exports.obtenerResumenDashboardRepo = async (
     HAVING SUM(l.cantidadDisponible) < COALESCE(NULLIF(ISNULL(p.alertaMinimo, 0), 0), @stockMinimoGeneral)
        AND SUM(l.cantidadDisponible) >= 0
   `);
+
+  const [
+    ventasActual,
+    ventasAnterior,
+    clientesResult,
+    clientesAnterior,
+    clientesActual,
+    productosMasVendidos,
+    ventasPorHora,
+    ventasMesPorDia,
+    ventas6Meses,
+    ventasMensuales,
+    stockBajo
+  ] = await Promise.all([
+    ventasActualPromise,
+    ventasAnteriorPromise,
+    clientesResultPromise,
+    clientesAnteriorPromise,
+    clientesActualPromise,
+    productosMasVendidosPromise,
+    ventasPorHoraPromise,
+    ventasMesPorDiaPromise,
+    ventas6MesesPromise,
+    ventasMensualesPromise,
+    stockBajoPromise
+  ]);
 
   // Alertas: cuotas pendientes/vencidas (opcional: si no existe tabla CuotasCredito no se rompe el dashboard)
   let creditosPendientes = { recordset: [] };

@@ -74,15 +74,27 @@ exports.saasSuscripcionGate = async function saasSuscripcionGate(req, res, next)
   }
 
   try {
+    if (req.dbPool) {
+      const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(req.dbPool, idEmpresa);
+      if (permiteEscrituraSegunSuscripcion(sub)) {
+        return next();
+      }
+      return res.status(402).json({
+        code: 'SUBSCRIPTION_REQUIRED',
+        message:
+          'Su plan requiere completar el pago o renovar la suscripción para registrar operaciones. Puede navegar en modo lectura o ir a Planes.'
+      });
+    }
+
     await withPool(async (pool) => {
       const sub = await empresaSuscripcionRepository.obtenerPorEmpresa(pool, idEmpresa);
       if (permiteEscrituraSegunSuscripcion(sub)) {
         return next();
       }
       return res.status(402).json({
-      code: 'SUBSCRIPTION_REQUIRED',
-      message:
-        'Su plan requiere completar el pago o renovar la suscripción para registrar operaciones. Puede navegar en modo lectura o ir a Planes.'
+        code: 'SUBSCRIPTION_REQUIRED',
+        message:
+          'Su plan requiere completar el pago o renovar la suscripción para registrar operaciones. Puede navegar en modo lectura o ir a Planes.'
       });
     });
   } catch (error) {

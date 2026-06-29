@@ -422,48 +422,90 @@ export class DashboardAnalisisComponent implements OnInit {
     const filtrosApi = this.filtrosConsulta();
     const rango = this.obtenerRangoInforme();
 
-    forkJoin({
-      dashboard: this.analisisService.obtenerDashboardEjecutivo(filtrosApi).pipe(
-        map((r) => r.data),
-        catchError(() => of(null))
-      ),
-      balanceList: this.analisisService.obtenerBalanceGeneral(filtrosApi).pipe(
-        map((r) => (Array.isArray(r.data) ? r.data : r.data ? [r.data] : [])),
-        catchError(() => of([]))
-      ),
-      flujoCaja: this.analisisService.obtenerFlujoCaja(filtrosApi).pipe(
-        map((r) => r.data),
-        catchError(() => of(null))
-      ),
-      estadoResultadosList: this.analisisService
-        .obtenerEstadoResultados({
-          fechaDesde: rango.fechaInicio,
-          fechaHasta: rango.fechaFin,
-          agruparPor: 'MES'
-        })
-        .pipe(
+    const dashboard$ = this.dashboard
+      ? of(this.dashboard)
+      : this.analisisService.obtenerDashboardEjecutivo(filtrosApi).pipe(
+          map((r) => r.data),
+          catchError(() => of(null))
+        );
+
+    const balanceCache = this.balanceGeneralList.length
+      ? this.balanceGeneralList
+      : this.balanceGeneral
+        ? [this.balanceGeneral]
+        : [];
+    const balanceList$ = balanceCache.length
+      ? of(balanceCache)
+      : this.analisisService.obtenerBalanceGeneral(filtrosApi).pipe(
           map((r) => (Array.isArray(r.data) ? r.data : r.data ? [r.data] : [])),
           catchError(() => of([]))
-        ),
-      ratios: this.analisisService.obtenerRatiosFinancieros().pipe(
-        map((r) => r.data),
-        catchError(() => of(null))
-      ),
-      diagnostico: this.analisisService.obtenerDiagnosticoFinanciero().pipe(
-        map((r) => r.data),
-        catchError(() => of(null))
-      ),
-      gastos: this.analisisService.listarGastos(rango.fechaInicio, rango.fechaFin).pipe(
-        map((r) => (Array.isArray(r.data) ? r.data : [])),
-        catchError(() => of([]))
-      ),
-      flujoSerie:
-        filtrosApi.periodo === 'ANO_ACTUAL'
-          ? this.analisisService.obtenerFlujoCajaSerie(filtrosApi).pipe(
-              map((r) => r.data),
-              catchError(() => of(null))
-            )
-          : of(null)
+        );
+
+    const flujoCaja$ = this.flujoCaja
+      ? of(this.flujoCaja)
+      : this.analisisService.obtenerFlujoCaja(filtrosApi).pipe(
+          map((r) => r.data),
+          catchError(() => of(null))
+        );
+
+    const estadoCache = this.estadoResultadosList.length
+      ? this.estadoResultadosList
+      : this.estadoResultados
+        ? [this.estadoResultados]
+        : [];
+    const estadoResultadosList$ = estadoCache.length
+      ? of(estadoCache)
+      : this.analisisService
+          .obtenerEstadoResultados({
+            fechaDesde: rango.fechaInicio,
+            fechaHasta: rango.fechaFin,
+            agruparPor: 'MES'
+          })
+          .pipe(
+            map((r) => (Array.isArray(r.data) ? r.data : r.data ? [r.data] : [])),
+            catchError(() => of([]))
+          );
+
+    const ratios$ = this.ratiosFinancieros
+      ? of(this.ratiosFinancieros)
+      : this.analisisService.obtenerRatiosFinancieros().pipe(
+          map((r) => r.data),
+          catchError(() => of(null))
+        );
+
+    const diagnostico$ = this.diagnosticoFinanciero
+      ? of(this.diagnosticoFinanciero)
+      : this.analisisService.obtenerDiagnosticoFinanciero().pipe(
+          map((r) => r.data),
+          catchError(() => of(null))
+        );
+
+    const gastos$ = this.listGastos.length
+      ? of(this.listGastos)
+      : this.analisisService.listarGastos(rango.fechaInicio, rango.fechaFin).pipe(
+          map((r) => (Array.isArray(r.data) ? r.data : [])),
+          catchError(() => of([]))
+        );
+
+    const flujoSerie$ =
+      filtrosApi.periodo === 'ANO_ACTUAL'
+        ? (this.flujoCajaSerie
+            ? of(this.flujoCajaSerie)
+            : this.analisisService.obtenerFlujoCajaSerie(filtrosApi).pipe(
+                map((r) => r.data),
+                catchError(() => of(null))
+              ))
+        : of(null);
+
+    forkJoin({
+      dashboard: dashboard$,
+      balanceList: balanceList$,
+      flujoCaja: flujoCaja$,
+      estadoResultadosList: estadoResultadosList$,
+      ratios: ratios$,
+      diagnostico: diagnostico$,
+      gastos: gastos$,
+      flujoSerie: flujoSerie$
     }).subscribe({
       next: (pack) => {
         const nombreArchivo = `analisis-financiero-${rango.periodoLabel.replace(/\s/g, '_')}.pdf`;

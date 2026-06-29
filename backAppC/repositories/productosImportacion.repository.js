@@ -118,11 +118,87 @@ async function obtenerListasPrecioBaseImportacion(pool, idEmpresa) {
   return r.recordset || [];
 }
 
+async function obtenerPresentacionesCatalogo(pool) {
+  const r = await pool
+    .request()
+    .query(`
+      SELECT idPresentacion, codigo
+      FROM dbo.Presentacion
+    `);
+  return r.recordset || [];
+}
+
+async function obtenerCategoriasCatalogo(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idCategoria, nombre
+      FROM dbo.Categorias
+      WHERE idEmpresa = @idEmpresa
+    `);
+  return r.recordset || [];
+}
+
+async function obtenerMarcasCatalogo(pool, idEmpresa) {
+  const r = await pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .query(`
+      SELECT idMarca, nombre
+      FROM dbo.Marcas
+      WHERE idEmpresa = @idEmpresa
+    `);
+  return r.recordset || [];
+}
+
+function normalizarCodigoKey(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+async function obtenerCodigosExistentes(pool, idEmpresa, codigos) {
+  const normalizados = Array.from(
+    new Set((codigos || []).map((c) => normalizarCodigoKey(c)).filter(Boolean))
+  );
+  if (normalizados.length === 0) {
+    return new Set();
+  }
+
+  const existentes = new Set();
+  const chunkSize = 500;
+  for (let i = 0; i < normalizados.length; i += chunkSize) {
+    const chunk = normalizados.slice(i, i + chunkSize);
+    const req = pool.request().input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+    const inList = chunk
+      .map((codigo, idx) => {
+        const key = `codigo${i + idx}`;
+        req.input(key, sql.VarChar(50), codigo);
+        return `@${key}`;
+      })
+      .join(',');
+    const r = await req.query(`
+      SELECT RTRIM(LTRIM(Codigo)) AS codigo
+      FROM dbo.Productos
+      WHERE idEmpresa = @idEmpresa
+        AND UPPER(RTRIM(LTRIM(Codigo))) IN (${inList})
+    `);
+    for (const row of r.recordset || []) {
+      existentes.add(normalizarCodigoKey(row.codigo));
+    }
+  }
+
+  return existentes;
+}
+
 module.exports = {
   obtenerIdSucursalPrincipal,
   obtenerIdPresentacionPorCodigo,
   obtenerIdCategoriaPorAlias,
   obtenerIdMarcaPorAlias,
   existeCodigoProducto,
-  obtenerListasPrecioBaseImportacion
+  obtenerListasPrecioBaseImportacion,
+  obtenerPresentacionesCatalogo,
+  obtenerCategoriasCatalogo,
+  obtenerMarcasCatalogo,
+  obtenerCodigosExistentes
 };

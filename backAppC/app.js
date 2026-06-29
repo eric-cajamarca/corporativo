@@ -11,7 +11,9 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const auth = require('./middlewares/autenticate');
+const { dbPoolMiddleware } = require('./middlewares/dbPool.middleware');
 const { requestContextMiddleware } = require('./middlewares/requestContext.middleware');
+const { requestMetricsMiddleware } = require('./middlewares/requestMetrics.middleware');
 const { querySafeMiddleware } = require('./middlewares/tenant-query');
 const { saasSuscripcionGate } = require('./middlewares/saasSuscripcionGate');
 const publicSaasRoutes = require('./routes/publicSaas');
@@ -123,7 +125,12 @@ app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 
 app.use(cookieParser());
 app.use(requestContextMiddleware);
+app.use(requestMetricsMiddleware);
 const PORT = process.env.PORT || 3000;
+
+if (process.env.DB_PREWARM !== '0') {
+  connectDB();
+}
 
 // JSON / formularios (webhooks usan cuerpo crudo en /api/webhooks)
 app.use((req, res, next) => {
@@ -221,6 +228,7 @@ console.error('context:', JSON.stringify({ level: 'info', message: 'whatsapp_bot
 // Webhooks de pasarelas (sin JWT; firma HMAC / API Culqi). Antes de routers /api con auth global.
 app.use('/api/webhooks', pasarelaWebhookRawBody, verificarWebhookPasarela, webhooksRoutes);
 
+app.use('/api', dbPoolMiddleware);
 app.use('/api', auth.optionalAuth);
 app.use('/api', querySafeMiddleware); // Agrega req.querySafe
 app.use('/api', saasSuscripcionGate);

@@ -377,6 +377,10 @@ export class LoginEmpresaComponent implements OnInit {
     this.maxStepReached = 3;
   }
 
+  irPlanes(): void {
+    void this._router.navigate(['/planes']);
+  }
+
   // Método público para acceso desde template
   onRememberChange(event: any): void {
     if (!event.target.checked) {

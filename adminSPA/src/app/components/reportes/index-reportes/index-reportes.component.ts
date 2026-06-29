@@ -18,7 +18,7 @@ import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa as EmpresaPdf } from '../../../interfaces/pdf-interface';
 import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
-import { ReportesNegocioPdfService } from '../../../services/reportes-negocio-pdf.service';
+import { PackReportesNegocio, ReportesNegocioPdfService } from '../../../services/reportes-negocio-pdf.service';
 import {
   ReportesService,
   CompraProveedorItem,
@@ -69,6 +69,8 @@ export class IndexReportesComponent implements OnInit {
 
   generandoInformePdf = false;
   empresaPdf: EmpresaPdf | null = null;
+  private cachedPack: PackReportesNegocio | null = null;
+  private cachedPackKey: string | null = null;
 
   // Filtros de fecha
   fechaInicio: string = '';
@@ -201,6 +203,8 @@ export class IndexReportesComponent implements OnInit {
     if (this.reporteActual) {
       this.cargarDatosReporte(this.reporteActual.id);
     }
+    this.cachedPack = null;
+    this.cachedPackKey = null;
   }
 
   cargarReportesPrincipales(): void {
@@ -618,6 +622,8 @@ export class IndexReportesComponent implements OnInit {
     if (this.reporteActual) {
       this.cargarDatosReporte(this.reporteActual.id);
     }
+    this.cachedPack = null;
+    this.cachedPackKey = null;
   }
 
   /** Sincroniza fechas del filtro con el período rápido (alineado a análisis financiero). */
@@ -669,11 +675,45 @@ export class IndexReportesComponent implements OnInit {
     }
     this.generandoInformePdf = true;
     const periodoLabel = `${this.fechaInicio} — ${this.fechaFin}`;
+    const cacheKey = `${this.periodoSeleccionado}|${this.fechaInicio}|${this.fechaFin}`;
+
+    if (this.cachedPack && this.cachedPackKey === cacheKey) {
+      const nombreArchivo = `reportes-negocio-${this.fechaInicio}_${this.fechaFin}.pdf`;
+      const datos = this.reportesNegocioPdf.armarDatosPdf(
+        this.cachedPack,
+        this.empresaPdf,
+        periodoLabel,
+        this.periodoSeleccionado
+      );
+      this.pdfService.generarPdfReportesNegocio(datos, nombreArchivo).subscribe({
+        next: (blob) => {
+          this.generandoInformePdf = false;
+          this.pdfService.previsualizar(blob);
+          iziToast.success({
+            title: 'PDF generado',
+            message: 'Informe con todos los reportes (una sección por hoja).'
+          });
+        },
+        error: (err) => {
+          this.generandoInformePdf = false;
+          iziToast.error({
+            title: 'Error PDF',
+            message:
+              err?.error?.error ||
+              err?.message ||
+              'No se pudo generar el PDF (verifique pdf-backend).'
+          });
+        }
+      });
+      return;
+    }
 
     this.reportesNegocioPdf
       .cargarPack(this.periodoSeleccionado, this.fechaInicio, this.fechaFin)
       .subscribe({
         next: (pack) => {
+          this.cachedPack = pack;
+          this.cachedPackKey = cacheKey;
           const nombreArchivo = `reportes-negocio-${this.fechaInicio}_${this.fechaFin}.pdf`;
           const datos = this.reportesNegocioPdf.armarDatosPdf(
             pack,

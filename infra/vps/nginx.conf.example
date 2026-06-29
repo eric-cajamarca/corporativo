@@ -3,7 +3,7 @@
 # 2. Enlazar: sudo ln -sf /etc/nginx/sites-available/efaf /etc/nginx/sites-enabled/
 # 3. Ajustar server_name, root y rutas de certificado
 # 4. sudo nginx -t && sudo systemctl reload nginx
-# 5. SSL: sudo certbot --nginx -d tudominio.com -d www.tudominio.com
+# 5. SSL: sudo certbot --nginx -d businesssoft.net -d www.businesssoft.net
 #
 # Build Angular en el servidor:
 #   cd adminSPA && npm run build -- --configuration=production
@@ -13,7 +13,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name tudominio.com www.tudominio.com;
+    server_name businesssoft.net www.businesssoft.net;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -27,11 +27,11 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name tudominio.com www.tudominio.com;
+    server_name businesssoft.net www.businesssoft.net;
 
     # Certbot (tras certbot --nginx) o rutas manuales:
-    ssl_certificate     /etc/letsencrypt/live/tudominio.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/tudominio.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/businesssoft.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/businesssoft.net/privkey.pem;
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
@@ -80,6 +80,18 @@ server {
     # backAppC — sin barra final en proxy_pass para conservar /api/...
     location ^~ /api/ {
         proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # whatsapp-gateway (solo si necesitas exponerlo; requiere API key)
+    # RECOMENDADO: proteger por IP o dejarlo comentado si no hace falta.
+    location ^~ /api/whatsapp-gateway/ {
+        proxy_pass http://127.0.0.1:3010/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

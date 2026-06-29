@@ -4,10 +4,11 @@
 export const environment = {
   production: true,
   API_URL: '/api/',
+  APP_VERSION: '2.1.0',
   /** Mismo host que la SPA (Nginx hace proxy a pdf-backend). */
   PDF_API_BASE: '/api/reports',
   deploymentMode: 'enterprise' as 'saas' | 'enterprise',
-  FRONTEND_URL: '',
+  FRONTEND_URL: 'https://businesssoft.net',
   /** Mismo UUID que EMPRESA_PRINCIPAL_ID en el backend (obligatorio en prod si usa guard de plataforma). */
   empresaPrincipalId: ''
 };

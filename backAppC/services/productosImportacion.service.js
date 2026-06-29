@@ -262,6 +262,90 @@ function resolverListasPrecioImportacion(listas) {
   return out;
 }
 
+function normalizarClaveCatalogo(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizarCodigoKey(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function normalizarMarcaAlias(value) {
+  let norm = normalizarClaveCatalogo(value);
+  if (!norm || norm === 'SINMARCA' || norm === 'SIN MARCA' || norm === 'SM') {
+    norm = 'SM';
+  }
+  return norm;
+}
+
+function buildPresentacionesIndex(rows) {
+  const map = new Map();
+  for (const row of rows || []) {
+    const key = normalizarCodigoKey(row.codigo);
+    if (!key || map.has(key)) continue;
+    map.set(key, Number(row.idPresentacion));
+  }
+  return map;
+}
+
+function buildCategoriasIndex(rows) {
+  const byName = new Map();
+  let variosId = null;
+  for (const row of rows || []) {
+    const key = normalizarClaveCatalogo(row.nombre);
+    if (!key) continue;
+    if (!byName.has(key)) {
+      byName.set(key, Number(row.idCategoria));
+    }
+    if (!variosId && key.includes('VARIO')) {
+      variosId = Number(row.idCategoria);
+    }
+  }
+  return { byName, variosId };
+}
+
+function buildMarcasIndex(rows) {
+  const byName = new Map();
+  let smId = null;
+  for (const row of rows || []) {
+    const key = normalizarMarcaAlias(row.nombre);
+    if (!key) continue;
+    if (!byName.has(key)) {
+      byName.set(key, Number(row.idMarca));
+    }
+    if (!smId && (key === 'SM' || key.includes('SIN MARCA'))) {
+      smId = Number(row.idMarca);
+    }
+  }
+  return { byName, smId };
+}
+
+function resolverCategoriaId(index, aliasRaw) {
+  const alias = normalizarClaveCatalogo(aliasRaw);
+  const key = alias || 'VARIOS';
+  if (index.byName.has(key)) {
+    return index.byName.get(key);
+  }
+  if (key === 'VARIOS' && index.variosId != null) {
+    return index.variosId;
+  }
+  return null;
+}
+
+function resolverMarcaId(index, aliasRaw) {
+  const key = normalizarMarcaAlias(aliasRaw);
+  if (index.byName.has(key)) {
+    return index.byName.get(key);
+  }
+  if (key === 'SM' && index.smId != null) {
+    return index.smId;
+  }
+  return null;
+}
+
 async function generarNoImportadosBuffer(rowsNoImportados) {
   const headers = ['fila', 'codigo', 'descripcion', 'motivo'];
   const rows = (rowsNoImportados || []).map((r) => [
@@ -295,6 +379,16 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
   if (errores.length > 0) {
     return { filasResueltas: [], errores, idSucursal, listasPrecio };
   }
+  const [presentacionesRows, categoriasRows, marcasRows, codigosExistentes] = await Promise.all([
+    productosImportacionRepository.obtenerPresentacionesCatalogo(pool),
+    productosImportacionRepository.obtenerCategoriasCatalogo(pool, idEmpresa),
+    productosImportacionRepository.obtenerMarcasCatalogo(pool, idEmpresa),
+    productosImportacionRepository.obtenerCodigosExistentes(pool, idEmpresa, filasParseadas.map((f) => f.codigo))
+  ]);
+  const presentacionesIndex = buildPresentacionesIndex(presentacionesRows);
+  const categoriasIndex = buildCategoriasIndex(categoriasRows);
+  const marcasIndex = buildMarcasIndex(marcasRows);
+
   const vistosCodigo = new Map();
 
   const filasResueltas = [];
@@ -316,14 +410,15 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     if (Number.isNaN(cantidadInicialRaw)) msgs.push('cantidadInicial inválida');
     const cantidadInicial = Number.isNaN(cantidadInicialRaw) ? 0 : Math.max(0, cantidadInicialRaw);
 
-    const ck = f.codigo.toUpperCase();
+    const ck = normalizarCodigoKey(f.codigo);
     if (vistosCodigo.has(ck)) {
       msgs.push(`Código duplicado en el archivo (fila ${vistosCodigo.get(ck)})`);
     }
 
     let idPresentacion = null;
     if (f.presentacionCodigo && msgs.length === 0) {
-      idPresentacion = await productosImportacionRepository.obtenerIdPresentacionPorCodigo(pool, f.presentacionCodigo);
+      const presentacionKey = normalizarCodigoKey(f.presentacionCodigo);
+      idPresentacion = presentacionesIndex.get(presentacionKey) ?? null;
       if (idPresentacion == null) {
         msgs.push(`Presentación no encontrada: "${f.presentacionCodigo}"`);
       }
@@ -332,13 +427,13 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     let idCategoria = null;
     let idMarca = null;
     if (msgs.length === 0) {
-      idCategoria = await productosImportacionRepository.obtenerIdCategoriaPorAlias(pool, idEmpresa, f.categoriaAlias);
+      idCategoria = resolverCategoriaId(categoriasIndex, f.categoriaAlias);
       if (idCategoria == null) {
         msgs.push(
           `Categoría no encontrada para "${f.categoriaAlias || 'VARIOS'}". Cree una categoría "VARIOS" o indique el nombre exacto.`
         );
       }
-      idMarca = await productosImportacionRepository.obtenerIdMarcaPorAlias(pool, idEmpresa, f.marcaAlias);
+      idMarca = resolverMarcaId(marcasIndex, f.marcaAlias);
       if (idMarca == null) {
         msgs.push(
           `Marca no encontrada para "${f.marcaAlias || 'SM'}". Cree una marca "SM" o "Sin marca" o indique el nombre exacto.`
@@ -347,8 +442,7 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
     }
 
     if (msgs.length === 0 && f.codigo) {
-      const existe = await productosImportacionRepository.existeCodigoProducto(pool, idEmpresa, f.codigo);
-      if (existe) {
+      if (codigosExistentes.has(ck)) {
         msgs.push('El código ya existe en productos');
       }
     }
@@ -380,10 +474,9 @@ async function resolverYValidarFilas(pool, idEmpresa, filasParseadas) {
   return { filasResueltas, errores, idSucursal, listasPrecio };
 }
 
-async function validarArchivo(pool, user, buffer) {
+async function validarArchivoConFilas(pool, user, filas) {
   asegurarPuedeImportar(user);
   const idEmpresa = user.empresa;
-  const filas = await parseBufferAObjetos(buffer);
   const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
   return {
     totalLeidas: filas.length,
@@ -403,10 +496,14 @@ async function validarArchivo(pool, user, buffer) {
   };
 }
 
-async function ejecutarImportacion(pool, user, buffer) {
+async function validarArchivo(pool, user, buffer) {
+  const filas = await parseBufferAObjetos(buffer);
+  return validarArchivoConFilas(pool, user, filas);
+}
+
+async function ejecutarImportacionConFilas(pool, user, filas) {
   asegurarPuedeImportar(user);
   const idEmpresa = user.empresa;
-  const filas = await parseBufferAObjetos(buffer);
   const { filasResueltas, errores } = await resolverYValidarFilas(pool, idEmpresa, filas);
 
   if (filasResueltas.length === 0) {
@@ -556,11 +653,19 @@ async function ejecutarImportacion(pool, user, buffer) {
   };
 }
 
+async function ejecutarImportacion(pool, user, buffer) {
+  const filas = await parseBufferAObjetos(buffer);
+  return ejecutarImportacionConFilas(pool, user, filas);
+}
+
 module.exports = {
   asegurarPuedeImportar,
+  parseBufferAObjetos,
   generarPlantillaBuffer,
   validarArchivo,
+  validarArchivoConFilas,
   ejecutarImportacion,
+  ejecutarImportacionConFilas,
   MAX_FILAS,
   MAX_BYTES
 };

@@ -1,16 +1,23 @@
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
-const sql = require('mssql');
-const dbConfig = require('../dbconfig');
 const { getJwtSecret } = require('../config/jwt.config');
+const { getPool } = require('../utils/dbPool.util');
 const refreshTokenService = require('../services/refreshToken.service');
 
 async function validarSesionEnBd(req) {
+  if (req.sessionValidada) {
+    return req.sessionValida === true;
+  }
   try {
-    const pool = await sql.connect(dbConfig);
-    return refreshTokenService.validarSesionRequest(pool, req);
+    const pool = req.dbPool || await getPool();
+    const ok = await refreshTokenService.validarSesionRequest(pool, req);
+    req.sessionValidada = true;
+    req.sessionValida = ok === true;
+    return req.sessionValida === true;
   } catch (e) {
     console.error('auth validarSesionEnBd:', e.message);
+    req.sessionValidada = true;
+    req.sessionValida = false;
     return false;
   }
 }

@@ -13,6 +13,7 @@ import {
   share
 } from 'rxjs';
 import { global } from './global';
+import { ConnectionTimerService } from './connection-timer.service';
 
 interface UserData {
   /** Empresa del JWT (multiempresa). */
@@ -50,7 +51,8 @@ export class AuthService {
   public url: any;
   constructor(
     private http: HttpClient,
-    private router: Router
+    private router: Router,
+    private connectionTimer: ConnectionTimerService
   ) {
     this.url = global.url;
   }
@@ -201,15 +203,15 @@ export class AuthService {
     rol?: string;
   }) {
     if (!data) return;
-    this._userData.set(this.mapSessionUserData(data));
+    this.setUserData(this.mapSessionUserData(data));
   }
 
   private handleAuthResponse(response: any) {
     if (response?.active === true && response?.data) {
       const d = response.data;
-      this._userData.set(this.mapSessionUserData(d));
+      this.setUserData(this.mapSessionUserData(d));
     } else {
-      this._userData.set(null);
+      this.setUserData(null);
       if (!this.isPublicRoute()) {
         this.router.navigate(['/login-empresa']);
       }
@@ -217,7 +219,7 @@ export class AuthService {
   }
 
   private handleAuthError() {
-    this._userData.set(null);
+    this.setUserData(null);
     if (!this.isPublicRoute()) {
       this.router.navigate(['/login-empresa']);
     }
@@ -226,10 +228,24 @@ export class AuthService {
   forceLogout() {
     this.http.post(this.url + 'logout', {}, { withCredentials: true }).subscribe({
       complete: () => {
-        this._userData.set(null);
+        this.setUserData(null);
         this.router.navigate(['/login-empresa']);
         this.verifyToken().subscribe();
       }
     });
+  }
+
+  private setUserData(next: UserData | null): void {
+    const wasAuthenticated = !!this._userData();
+    const isAuthenticated = !!next;
+    this._userData.set(next);
+
+    if (!wasAuthenticated && isAuthenticated) {
+      this.connectionTimer.startSession();
+    }
+
+    if (wasAuthenticated && !isAuthenticated) {
+      this.connectionTimer.stopSession();
+    }
   }
 }

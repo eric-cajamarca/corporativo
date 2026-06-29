@@ -1,3 +1,20 @@
 
-<router-outlet></router-outlet>
+<div
+  class="app-shell"
+  [class.app-shell-auth]="isAuthenticated()"
+  [class.app-shell-collapsed]="isSidebarCollapsed()"
+>
+  <main class="app-content">
+    <router-outlet></router-outlet>
+  </main>
+  <footer class="app-footer" *ngIf="!shouldHideFooter()">
+    <span>Business Soft Company © Todos los derechos reservados</span>
+    <span class="app-footer-meta">
+      <span class="app-footer-timer" *ngIf="isAuthenticated()">
+        Tiempo BD: {{ connectedSeconds() }} s
+      </span>
+      <span class="app-footer-version">EFAFERP v{{ appVersion }}</span>
+    </span>
+  </footer>
+</div>
 

@@ -6,6 +6,7 @@ const {
   leerPermitirVentasNegativas,
   crearLectorConfiguracionEmpresa
 } = require('../utils/configBoolean.util');
+const { getCached } = require('../cache/redis.client');
 const { appendAgentDebugNdjson } = require('../utils/debugAgentLog.util');
 const { extraerDireccionClienteDesdeXmlUbl } = require('../utils/extraerDireccionClienteXmlUbl.util');
 const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
@@ -127,6 +128,77 @@ function normalizarEstadoImpuestoCatalogo(val) {
 
 /** Comprobante de venta NC/ND (catálogo interno B7/F7/B8/F8, no el tipo SUNAT 07/08). */
 const CODIGOS_VENTA_NOTA_CREDITO_DEBITO = new Set(["B7", "F7", "B8", "F8"]);
+
+const PDF_CATALOG_CACHE_TTL_SECONDS = Math.max(
+  0,
+  parseInt(process.env.PDF_CATALOG_CACHE_TTL_SECONDS, 10) || 300
+);
+
+async function obtenerImpuestosCatalogo(pool, idEmpresa) {
+  const ttl = PDF_CATALOG_CACHE_TTL_SECONDS;
+  const fetchFn = async () => {
+    const impuestosResult = await pool
+      .request()
+      .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+      .query(`
+        SELECT
+          idImpuesto,
+          descripcion,
+          ISNULL(codigoSunat, '') AS codigoSunat,
+          CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
+          pIncluyeIGV,
+          ISNULL(estado, 0) AS estado
+        FROM Impuestos
+        WHERE idEmpresa = @idEmpresa
+        ORDER BY descripcion
+      `);
+    return (impuestosResult.recordset || []).map((r) => ({
+      idImpuesto: r.idImpuesto,
+      descripcion: r.descripcion,
+      codigoSunat: String(r.codigoSunat || '').trim(),
+      porcentaje: r.porcentaje,
+      pIncluyeIGV: !!r.pIncluyeIGV,
+      estado: normalizarEstadoImpuestoCatalogo(r.estado)
+    }));
+  };
+
+  if (ttl > 0) {
+    return getCached(`pdf:impuestos:${idEmpresa}`, fetchFn, ttl);
+  }
+  return fetchFn();
+}
+
+async function obtenerConfigPdf(pool, idEmpresa) {
+  const ttl = PDF_CATALOG_CACHE_TTL_SECONDS;
+  const fetchFn = async () => {
+    let configPdf = [];
+    try {
+      const configRes = await pool
+        .request()
+        .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+        .query(`
+          SELECT clave, valor
+          FROM ConfiguracionEmpresa
+          WHERE idEmpresa = @idEmpresa
+            AND clave IN (
+              'PDF_CUENTAS_BANCARIAS',
+              'PDF_TEMA_COLOR_ACTIVO',
+              'PDF_COLOR_PRIMARIO',
+              'VENTAS_USAR_DESCUENTO_EN_TOTAL'
+            )
+        `);
+      configPdf = configRes.recordset || [];
+    } catch (_) {
+      configPdf = [];
+    }
+    return configPdf;
+  };
+
+  if (ttl > 0) {
+    return getCached(`pdf:config:${idEmpresa}`, fetchFn, ttl);
+  }
+  return fetchFn();
+}
 
 /**
  * Copia cliente desde la factura/boleta indicada en compRelacionado cuando la NC/ND no tiene receptor válido.
@@ -1253,51 +1325,10 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     }
   }
 
-  const impuestosResult = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
-    .query(`
-      SELECT
-        idImpuesto,
-        descripcion,
-        ISNULL(codigoSunat, '') AS codigoSunat,
-        CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
-        pIncluyeIGV,
-        ISNULL(estado, 0) AS estado
-      FROM Impuestos
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY descripcion
-    `);
-  const impuestos = (impuestosResult.recordset || []).map(r => ({
-    idImpuesto: r.idImpuesto,
-    descripcion: r.descripcion,
-    codigoSunat: String(r.codigoSunat || '').trim(),
-    porcentaje: r.porcentaje,
-    pIncluyeIGV: !!r.pIncluyeIGV,
-    estado: normalizarEstadoImpuestoCatalogo(r.estado)
-  }));
+  const impuestos = await obtenerImpuestosCatalogo(pool, idEmpresaVenta);
 
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
-  let configPdf = [];
-  try {
-    const configRes = await pool
-      .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaVenta)
-      .query(`
-        SELECT clave, valor
-        FROM ConfiguracionEmpresa
-        WHERE idEmpresa = @idEmpresa
-          AND clave IN (
-            'PDF_CUENTAS_BANCARIAS',
-            'PDF_TEMA_COLOR_ACTIVO',
-            'PDF_COLOR_PRIMARIO',
-            'VENTAS_USAR_DESCUENTO_EN_TOTAL'
-          )
-      `);
-    configPdf = configRes.recordset || [];
-  } catch (_) {
-    configPdf = [];
-  }
+  const configPdf = await obtenerConfigPdf(pool, idEmpresaVenta);
   const cfgMap = configPdf.reduce((acc, row) => {
     acc[String(row.clave || '').trim()] = row.valor != null ? String(row.valor).trim() : '';
     return acc;
@@ -3398,29 +3429,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       ORDER BY dva.idDetalleVA
     `);
 
-  const impuestosVaResult = await pool
-    .request()
-    .input('idEmpresa', sql.UniqueIdentifier, idEmpresaCobradora)
-    .query(`
-      SELECT
-        idImpuesto,
-        descripcion,
-        ISNULL(codigoSunat, '') AS codigoSunat,
-        CONVERT(DECIMAL(5,2), porcentaje) AS porcentaje,
-        pIncluyeIGV,
-        ISNULL(estado, 0) AS estado
-      FROM Impuestos
-      WHERE idEmpresa = @idEmpresa
-      ORDER BY descripcion
-    `);
-  const impuestosVa = (impuestosVaResult.recordset || []).map((r) => ({
-    idImpuesto: r.idImpuesto,
-    descripcion: r.descripcion,
-    codigoSunat: String(r.codigoSunat || '').trim(),
-    porcentaje: r.porcentaje,
-    pIncluyeIGV: !!r.pIncluyeIGV,
-    estado: normalizarEstadoImpuestoCatalogo(r.estado)
-  }));
+  const impuestosVa = await obtenerImpuestosCatalogo(pool, idEmpresaCobradora);
 
   const base = (baseUrl || '').replace(/\/$/, '');
   const logoFileName = emp && (emp.logoArchivo ?? emp.logo ?? '');
@@ -3428,22 +3437,15 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
     ? `${base}/logos/${logoFileName.trim()}`
     : `${base}/assets/img/01.jpg`;
 
-  let usarDescVa = true;
-  try {
-    const cfgVa = await pool
-      .request()
-      .input('idEmpresa', sql.UniqueIdentifier, idEmpresaCobradora)
-      .query(`
-        SELECT valor FROM ConfiguracionEmpresa
-        WHERE idEmpresa = @idEmpresa AND clave = 'VENTAS_USAR_DESCUENTO_EN_TOTAL'
-      `);
-    const rowV = cfgVa.recordset && cfgVa.recordset[0];
-    if (rowV && rowV.valor != null) {
-      usarDescVa = interpretarBooleanoConfig(rowV.valor, true);
-    }
-  } catch (_) {
-    usarDescVa = true;
-  }
+  const cfgVa = await obtenerConfigPdf(pool, idEmpresaCobradora);
+  const cfgVaMap = cfgVa.reduce((acc, row) => {
+    acc[String(row.clave || '').trim()] = row.valor != null ? String(row.valor).trim() : '';
+    return acc;
+  }, {});
+  const usarDescVa = interpretarBooleanoConfig(
+    cfgVaMap.VENTAS_USAR_DESCUENTO_EN_TOTAL || 'true',
+    true
+  );
   const descVaNum = cab.descuentos != null ? Number(cab.descuentos) : 0;
   const descuentosImpresionVa = usarDescVa ? descVaNum : 0;
 

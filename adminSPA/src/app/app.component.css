@@ -1,0 +1,59 @@
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  --sidebar-width: 260px;
+  --sidebar-width-collapsed: 70px;
+}
+
+.app-content {
+  flex: 1;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  font-size: 12px;
+  color: #64748b;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  gap: 12px;
+}
+
+.app-footer span {
+  letter-spacing: 0.3px;
+}
+
+.app-footer-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.app-footer-timer {
+  font-weight: 600;
+  color: #334155;
+}
+
+.app-footer-version {
+  font-weight: 600;
+  color: #475569;
+}
+
+.app-shell.app-shell-auth .app-footer {
+  padding-left: calc(20px + var(--sidebar-width));
+}
+
+.app-shell.app-shell-auth.app-shell-collapsed .app-footer {
+  padding-left: calc(20px + var(--sidebar-width-collapsed));
+}
+
+@media (max-width: 991.98px) {
+  .app-shell.app-shell-auth .app-footer,
+  .app-shell.app-shell-auth.app-shell-collapsed .app-footer {
+    padding-left: 20px;
+  }
+}

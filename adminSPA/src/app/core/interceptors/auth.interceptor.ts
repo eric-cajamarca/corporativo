@@ -8,12 +8,17 @@ import {
   HttpErrorResponse
 } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { catchError, finalize, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { ConnectionTimerService } from '../../services/connection-timer.service';
+import { environment } from '../../../environments/environment';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private connectionTimer: ConnectionTimerService
+  ) {}
 
   intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     const url = req.url;
@@ -25,6 +30,12 @@ export class AuthInterceptor implements HttpInterceptor {
       url.includes('logout') ||
       url.includes('recuperar-password') ||
       url.includes('restablecer-password');
+
+    const startedAt = Date.now();
+    const shouldTrack =
+      this.connectionTimer.isActive() &&
+      !skipRefresh &&
+      (url.includes(environment.API_URL) || url.includes(environment.PDF_API_BASE));
 
     return next.handle(req).pipe(
       catchError((error: HttpErrorResponse) => {
@@ -47,6 +58,11 @@ export class AuthInterceptor implements HttpInterceptor {
           }
         }
         return throwError(() => error);
+      }),
+      finalize(() => {
+        if (shouldTrack) {
+          this.connectionTimer.addDuration(Date.now() - startedAt);
+        }
       })
     );
   }

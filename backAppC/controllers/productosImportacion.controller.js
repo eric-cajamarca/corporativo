@@ -41,7 +41,10 @@ const validar = async (req, res) => {
     if (!buffer || buffer.length === 0) {
       return res.status(400).json({ message: 'Adjunte un archivo Excel (.xlsx)', data: undefined });
     }
-    const data = await withPool((pool) => productosImportacionService.validarArchivo(pool, req.user, buffer));
+    const filas = await productosImportacionService.parseBufferAObjetos(buffer);
+    const data = await withPool((pool) =>
+      productosImportacionService.validarArchivoConFilas(pool, req.user, filas)
+    );
     return res.status(200).json({ message: 'Validación completada', data });
   } catch (error) {
     if (error.message === 'NO_PERMISO_IMPORTACION') {
@@ -86,7 +89,10 @@ const ejecutar = async (req, res) => {
     if (!buffer || buffer.length === 0) {
       return res.status(400).json({ message: 'Adjunte un archivo Excel (.xlsx)', data: undefined });
     }
-    const data = await withPool((pool) => productosImportacionService.ejecutarImportacion(pool, req.user, buffer));
+    const filas = await productosImportacionService.parseBufferAObjetos(buffer);
+    const data = await withPool((pool) =>
+      productosImportacionService.ejecutarImportacionConFilas(pool, req.user, filas)
+    );
     return res.status(200).json({ message: 'Importación finalizada', data });
   } catch (error) {
     if (error.message === 'NO_PERMISO_IMPORTACION') {
