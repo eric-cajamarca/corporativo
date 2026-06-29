@@ -407,10 +407,10 @@ function construirNavegacionPorDominios(ctx) {
         { nombre: 'Sucursales', ruta: '/sucursal', permiso: 'GESTIONAR_SUCURSALES', visible: can('GESTIONAR_SUCURSALES') },
         { nombre: 'Colaboradores', ruta: '/colaborador', permiso: 'VER_USUARIOS', visible: can('VER_USUARIOS') },
         { nombre: 'Roles', ruta: '/rol', permiso: 'GESTIONAR_ROLES', visible: can('GESTIONAR_ROLES') },
-        { nombre: 'Log de auditoría', ruta: '/auditoria', permiso: 'VER_CONFIGURACION', visible: true },
-        { nombre: 'Integraciones / APIs', ruta: '/configuracion/integraciones', permiso: 'VER_CONFIGURACION', visible: true },
-        { nombre: 'Vincular WhatsApp', ruta: '/configuracion/whatsapp', permiso: 'VER_CONFIGURACION', visible: true },
-        { nombre: 'Bot WhatsApp', ruta: '/configuracion/whatsapp-bot', permiso: 'VER_CONFIGURACION', visible: true }
+        { nombre: 'Log de auditoría', ruta: '/auditoria', permiso: 'VER_CONFIGURACION', visible: true }
+       // { nombre: 'Integraciones / APIs', ruta: '/configuracion/integraciones', permiso: 'VER_CONFIGURACION', visible: true },
+       // { nombre: 'Vincular WhatsApp', ruta: '/configuracion/whatsapp', permiso: 'VER_CONFIGURACION', visible: true },
+       // { nombre: 'Bot WhatsApp', ruta: '/configuracion/whatsapp-bot', permiso: 'VER_CONFIGURACION', visible: true }
       ].filter((s) => s.visible)
     });
   }
