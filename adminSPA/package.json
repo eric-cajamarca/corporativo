@@ -18,14 +18,14 @@
   },
   "private": true,
   "dependencies": {
-    "@angular/common": "^20.3.16",
-    "@angular/compiler": "^20.3.16",
-    "@angular/core": "^20.3.16",
-    "@angular/forms": "^20.3.16",
-    "@angular/localize": "^20.3.16",
-    "@angular/platform-browser": "^20.3.16",
-    "@angular/platform-browser-dynamic": "^20.3.16",
-    "@angular/router": "^20.3.16",
+    "@angular/common": "^20.3.25",
+    "@angular/compiler": "^20.3.25",
+    "@angular/core": "^20.3.25",
+    "@angular/forms": "^20.3.25",
+    "@angular/localize": "^20.3.25",
+    "@angular/platform-browser": "^20.3.25",
+    "@angular/platform-browser-dynamic": "^20.3.25",
+    "@angular/router": "^20.3.25",
     "@ng-bootstrap/ng-bootstrap": "^19.0.0",
     "@popperjs/core": "^2.11.8",
     "bootstrap": "^5.3.5",
@@ -44,9 +44,9 @@
   },
   "devDependencies": {
     "@angular-builders/jest": "^20.0.0",
-    "@angular-devkit/build-angular": "^20.3.17",
-    "@angular/cli": "^20.3.17",
-    "@angular/compiler-cli": "^20.3.16",
+    "@angular-devkit/build-angular": "^20.3.25",
+    "@angular/cli": "^20.3.25",
+    "@angular/compiler-cli": "^20.3.25",
     "@playwright/test": "^1.51.0",
     "@types/file-saver": "^2.0.7",
     "@types/jest": "^29.5.0",
@@ -60,6 +60,11 @@
     "sockjs": {
       "uuid": "^11.1.1"
     },
-    "webpack-dev-server": "^5.2.4"
+    "webpack-dev-server": "^5.2.5",
+    "http-proxy-middleware": "^3.0.7",
+    "esbuild": "^0.28.1",
+    "vite": "^7.3.5",
+    "piscina": "^5.2.0",
+    "@babel/core": "^7.29.7"
   }
 }
