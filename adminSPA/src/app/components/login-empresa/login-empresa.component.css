@@ -179,7 +179,7 @@
 /* Campos del formulario */
 .form-fields {
   padding: 18px 30px 12px;
-  height: 200px;
+  height: 220px;
 }
 
 .form-group {
@@ -369,7 +369,8 @@
 .login-button {
   width: calc(100% - 80px);
   margin: 0 30px 12px;
-  padding: 12px 18px;
+  padding: 16px 18px;
+  min-height: 48px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;

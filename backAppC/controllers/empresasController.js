@@ -74,6 +74,7 @@ const { obtenerIpCliente } = require('../utils/clientIp.util');
 const { puedeAccesoListadoPlataformaEmpresas } = require('../utils/plataformaEmpresa.util');
 const empresaRepository = require('../repositories/empresa.repository');
 const usuarioRepository = require('../repositories/usuario.repository');
+const emailService = require('../services/email.service');
 const empresasAdministracionService = require('../services/empresasAdministracion.service');
 const usuarioAdminService = require('../services/usuarioAdmin.service');
 const empresaSuscripcionBootstrap = require('../services/empresaSuscripcionBootstrap.service');
@@ -107,6 +108,48 @@ async function enviarCodigoActivacionFactiliza(pool, telefono, codigo) {
     console.error('Error enviando código activación Factiliza WHATSAPP:', err.message);
     return { sent: false, error: err.message || 'Error al enviar por WhatsApp.' };
   }
+}
+
+async function enviarCodigoActivacionCorreo(correo, codigo) {
+  const destino = String(correo || '').trim();
+  if (!destino) {
+    return { sent: false, error: 'Correo destino vacío.' };
+  }
+  const subject = 'Código de activación de cuenta';
+  const text = `Tu código de verificación para activar tu empresa es: ${codigo}\n\nSi no solicitaste este código, ignora este mensaje.`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto;">
+      <h2 style="color: #333;">Código de activación</h2>
+      <p>Tu código de verificación para activar tu empresa es:</p>
+      <p style="font-size: 24px; font-weight: 700; letter-spacing: 2px; margin: 16px 0;">${codigo}</p>
+      <p style="color: #666; font-size: 14px;">Si no solicitaste este código, ignora este mensaje.</p>
+    </div>
+  `;
+  try {
+    await emailService.enviarNotificacionOperativa({
+      to: destino,
+      subject,
+      text,
+      html
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('Error enviando código por correo:', err?.message || err);
+    return { sent: false, error: err?.message || 'Error al enviar correo.' };
+  }
+}
+
+function construirMensajeActivacion(resultadoWhatsApp, resultadoEmail) {
+  if (resultadoWhatsApp.sent && resultadoEmail.sent) {
+    return 'Empresa creada. Se envió un código de verificación por WhatsApp y correo.';
+  }
+  if (resultadoWhatsApp.sent) {
+    return 'Empresa creada. Se envió un código de verificación por WhatsApp. No se pudo enviar por correo.';
+  }
+  if (resultadoEmail.sent) {
+    return 'Empresa creada. Se envió un código de verificación por correo. No se pudo enviar por WhatsApp.';
+  }
+  return 'Empresa creada. No se pudo enviar el código por WhatsApp ni correo; use "Reenviar código" más tarde.';
 }
 
 const createEmpresa = async function (req, res, next) {
@@ -181,16 +224,17 @@ const createEmpresa = async function (req, res, next) {
 
                 const verificacion = await empresaService.crearRegistroVerificacionEmpresa(pool, idEmpresa, celular);
                 const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, celular, verificacion.codigo);
+                const resultadoEmail = await enviarCodigoActivacionCorreo(correo, verificacion.codigo);
 
-                const mensaje = resultadoWhatsApp.sent
-                    ? 'Empresa creada. Se envió un código de verificación por WhatsApp para activar la cuenta.'
-                    : 'Empresa creada. ' + (resultadoWhatsApp.error || 'No se pudo enviar el código por WhatsApp; puede usar "Reenviar código" más tarde.');
+                const mensaje = construirMensajeActivacion(resultadoWhatsApp, resultadoEmail);
 
                 res.status(200).send({
                     data: idEmpresa,
                     sucursalPrincipal: resultadoInicializacion.sucursal?.idSucursal,
                     mensaje,
-                    codigoEnviado: resultadoWhatsApp.sent
+                    codigoEnviado: resultadoWhatsApp.sent || resultadoEmail.sent,
+                    codigoEnviadoWhatsApp: resultadoWhatsApp.sent,
+                    codigoEnviadoEmail: resultadoEmail.sent
                 });
             } catch (errorInicializacion) {
                 console.error('⚠️ Error inicializando datos maestros:', errorInicializacion);
@@ -308,11 +352,14 @@ const enviarCodigoActivacion = async function (req, res, next) {
                 console.error('enviarCodigoActivacion: no se generó código de verificación');
                 throw new Error('Error al generar código de verificación');
             }
-            const resultado = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
-            if (!resultado.sent) {
-                return res.status(503).json({ message: resultado.error || 'No se pudo enviar el código por WhatsApp' });
+            const resultadoWhatsApp = await enviarCodigoActivacionFactiliza(pool, telefono, codigoEnviar);
+            const resultadoEmail = await enviarCodigoActivacionCorreo(empresa.correo, codigoEnviar);
+            if (!resultadoWhatsApp.sent && !resultadoEmail.sent) {
+                return res.status(503).json({
+                  message: resultadoWhatsApp.error || resultadoEmail.error || 'No se pudo enviar el código por WhatsApp ni correo'
+                });
             }
-            res.status(200).json({ message: 'Código enviado por WhatsApp' });
+            res.status(200).json({ message: construirMensajeActivacion(resultadoWhatsApp, resultadoEmail) });
         });
     } catch (error) {
         console.error('Error en enviarCodigoActivacion:', error);

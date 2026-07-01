@@ -149,7 +149,7 @@ async function obtenerEmpresaCelularEstado(pool, idEmpresa) {
   const r = await pool
     .request()
     .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
-    .query('SELECT idEmpresa, celular, estado FROM Empresas WHERE idEmpresa = @idEmpresa');
+    .query('SELECT idEmpresa, celular, correo, estado FROM Empresas WHERE idEmpresa = @idEmpresa');
   return r.recordset[0] || null;
 }
 

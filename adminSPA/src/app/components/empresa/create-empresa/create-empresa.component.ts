@@ -527,7 +527,7 @@ export class CreateEmpresaComponent implements OnInit {
             color: '#FFF',
             class: 'text-success',
             position: 'topRight',
-            message: msg || 'Revisa tu WhatsApp: te enviamos un código para activar tu cuenta. Luego inicia sesión.'
+            message: msg || 'Revisa tu WhatsApp y tu correo: te enviamos un código para activar tu cuenta. Luego inicia sesión.'
           });
         } else {
           this.registrando.set(false);

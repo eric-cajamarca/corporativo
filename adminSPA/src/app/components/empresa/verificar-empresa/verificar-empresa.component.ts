@@ -66,7 +66,7 @@ export class VerificarEmpresaComponent implements OnInit {
     this.empresaService.enviarCodigoActivacion(id).subscribe({
       next: (res) => {
         this.reenviando.set(false);
-        iziToast.success({ title: 'Código enviado', message: res.message || 'Revisa tu WhatsApp.' });
+        iziToast.success({ title: 'Código enviado', message: res.message || 'Revisa tu WhatsApp y correo.' });
       },
       error: (err) => {
         this.reenviando.set(false);

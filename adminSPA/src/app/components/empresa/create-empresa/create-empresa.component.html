@@ -57,7 +57,7 @@
           <div class="success-details">
             <div class="detail-item">
               <i class="fas fa-comment-alt"></i>
-              <span>Revisa tu WhatsApp: te enviamos un código de 6 dígitos para activar tu cuenta.</span>
+              <span>Revisa tu WhatsApp y tu correo: te enviamos un código de 6 dígitos para activar tu cuenta.</span>
             </div>
             <div class="detail-item">
               <i class="fas fa-key"></i>
@@ -348,7 +348,7 @@
                   <div class="invalid-feedback">{{ getError('email') }}</div>
                 }
                 <small class="form-text text-muted">
-                  Este correo será usado para notificaciones y recuperación de contraseña.
+                  Este correo será usado para activación de empresa, notificaciones y recuperación de contraseña.
                 </small>
               </div>
 
@@ -362,13 +362,13 @@
                   id="celular"
                   class="form-control form-control-lg" 
                   formControlName="celular"
-                  placeholder="+51987654321 o 987654321"
+                  placeholder="51987654321"
                   [class.is-invalid]="hasError('celular')">
                 @if (hasError('celular')) {
                   <div class="invalid-feedback">{{ getError('celular') }}</div>
                 }
                 <small class="form-text text-muted">
-                  A este número se enviará el código de activación por WhatsApp.
+                  A este número se enviará notificaciones.
                 </small>
               </div>
 
@@ -510,6 +510,7 @@
               }
 
               <!-- DEBUG: Estado del formulario -->
+               <!--
               <div class="alert alert-info mb-3">
                 <strong>Estado del formulario:</strong>
                 <ul class="mb-0">
@@ -526,7 +527,7 @@
                   <li><strong>Errores del formulario:</strong> {{ empresaForm.errors | json }}</li>
                 </ul>
               </div>
-
+              -->
               <div class="form-actions d-flex gap-2">
                 <button 
                   type="button" 

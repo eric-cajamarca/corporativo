@@ -3,7 +3,7 @@
     <div class="verificar-header">
       <i class="fas fa-check-double fa-3x text-primary mb-3"></i>
       <h1>Activar tu cuenta</h1>
-      <p class="text-muted">Ingresa el código de 6 dígitos que te enviamos por WhatsApp.</p>
+      <p class="text-muted">Ingresa el código de 6 dígitos que te enviamos por WhatsApp y correo.</p>
     </div>
     <form (ngSubmit)="verificar()" class="verificar-form">
       <div class="mb-3">
@@ -29,7 +29,7 @@
       </button>
       <button type="button" class="btn btn-outline-primary w-100 mb-2" (click)="reenviarCodigo()" [disabled]="reenviando() || !idEmpresa()">
         @if (reenviando()) { <span class="spinner-border spinner-border-sm me-2"></span> }
-        Reenviar código por WhatsApp
+        Reenviar código por WhatsApp y correo
       </button>
       <button type="button" class="btn btn-outline-secondary w-100" (click)="irALogin()">Ir a Iniciar sesión</button>
     </form>
