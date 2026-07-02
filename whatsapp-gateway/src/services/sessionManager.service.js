@@ -7,7 +7,8 @@ const {
   default: makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
-  fetchLatestBaileysVersion
+  fetchLatestBaileysVersion,
+  Browsers
 } = require('@whiskeysockets/baileys');
 const config = require('../config');
 const {
@@ -38,6 +39,7 @@ function getTenantState(idEmpresa) {
       lidToJid: new Map(),
       phoneToLid: new Map(),
       nombreDispositivo: null,
+      pendingSaveCreds: null,
       suppressMessageIds: new Set(),
       processedMessageIds: new Set()
     });
@@ -412,16 +414,35 @@ async function connectTenant(idEmpresa, options = {}) {
       auth: state,
       logger,
       printQRInTerminal: false,
-      browser: buildBrowser(nombreDispositivo),
+      browser: Browsers.windows('Chrome'),
       syncFullHistory: false,
       markOnlineOnConnect: false
     });
     t.sock = sock;
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', () => {
+      t.pendingSaveCreds = saveCreds().catch((e) => {
+        console.error(`sessionManager saveCreds ${idEmpresa}:`, e.message);
+        throw e;
+      });
+    });
     bindInboundListener(idEmpresa, sock);
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr, isNewLogin } = update;
+
+      if (config.logLevel === 'debug') {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        console.error(
+          `sessionManager ${idEmpresa} connection.update:`,
+          JSON.stringify({
+            connection: connection || null,
+            hasQr: !!qr,
+            isNewLogin: !!isNewLogin,
+            statusCode: statusCode ?? null,
+            error: lastDisconnect?.error?.message || null
+          })
+        );
+      }
 
       if (qr) {
         t.status = 'qr_pendiente';
@@ -454,22 +475,36 @@ async function connectTenant(idEmpresa, options = {}) {
         const code = lastDisconnect?.error?.output?.statusCode;
         const loggedOut = code === DisconnectReason.loggedOut;
         const restartRequired = code === DisconnectReason.restartRequired;
+
+        if (!loggedOut) {
+          t.qr = null;
+          t.qrDataUrl = null;
+        }
+
+        if (t.pendingSaveCreds) {
+          try {
+            await t.pendingSaveCreds;
+          } catch (e) {
+            console.error(`sessionManager await saveCreds ${idEmpresa}:`, e.message);
+          }
+          t.pendingSaveCreds = null;
+        }
+
         t.lastError = lastDisconnect?.error?.message || `codigo ${code}`;
         t.status = loggedOut ? 'desconectado' : 'reconectando';
         await destroySocket(t);
         t.starting = false;
 
         if (loggedOut) {
-          t.qr = null;
-          t.qrDataUrl = null;
           t.telefonoVinculado = null;
           return;
         }
 
         if (restartRequired) {
-          setTimeout(() => connectTenant(idEmpresa, { forceNew: true }).catch((err) => {
+          console.error(`sessionManager ${idEmpresa}: restartRequired, reconectando con credenciales guardadas`);
+          setTimeout(() => connectTenant(idEmpresa).catch((err) => {
             console.error('sessionManager restartRequired:', err.message);
-          }), 2000);
+          }), 1500);
           return;
         }
 
@@ -516,16 +551,22 @@ async function startSession(idEmpresa, options = {}) {
 
 function getSessionStatus(idEmpresa) {
   const t = getTenantState(idEmpresa);
-  const lastError = t.qrDataUrl || t.status === 'conectado' ? null : t.lastError || null;
+  const ocultarQr = t.status === 'reconectando';
+  const qrDataUrl = ocultarQr ? null : t.qrDataUrl;
+  const lastError = qrDataUrl || t.status === 'conectado' ? null : t.lastError || null;
   const mensaje =
-    t.qrDataUrl || t.status === 'conectado' ? null : mensajeConexionAmigable(lastError);
+    qrDataUrl || t.status === 'conectado'
+      ? null
+      : t.status === 'reconectando'
+        ? 'Vinculacion en curso. Confirme en su celular si WhatsApp lo solicita.'
+        : mensajeConexionAmigable(lastError);
   return {
     idEmpresa,
     proveedor: 'baileys',
     estadoSesion: t.status,
     telefonoVinculado: t.telefonoVinculado,
-    qr: t.qr,
-    qrDataUrl: t.qrDataUrl,
+    qr: ocultarQr ? null : t.qr,
+    qrDataUrl,
     nombreDispositivo: t.nombreDispositivo || null,
     lastError,
     mensaje
