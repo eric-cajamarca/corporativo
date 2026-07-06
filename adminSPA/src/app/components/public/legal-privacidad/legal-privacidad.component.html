@@ -1,0 +1,222 @@
+<div class="legal-page">
+  <div class="container">
+    <h1>Política de privacidad</h1>
+    <p class="subtitle">Última actualización: 05/07/2026</p>
+
+    <section>
+      <h2>1. Responsable del tratamiento</h2>
+      <p>
+        <strong>BUSINESS SOFT COMPANY S.A.C.</strong> (en adelante, el <strong>Responsable</strong>) es titular y
+        operador de la plataforma EFAFERP (software SaaS de gestión empresarial).
+      </p>
+      <p>
+        El Responsable trata datos personales conforme a la Ley N.° 29733, Ley de Protección de Datos Personales,
+        su Reglamento (D.S. N.° 003-2013-JUS) y demás normativa aplicable en el Perú.
+        Los datos de identificación y contacto del Responsable (RUC, domicilio fiscal, correo y teléfono) están
+        publicados en nuestra <a routerLink="/publico">página principal</a>.
+      </p>
+    </section>
+
+    <section>
+      <h2>2. Ámbito de aplicación</h2>
+      <p>
+        Esta Política de Privacidad aplica al tratamiento de datos personales realizado a través del sitio web,
+        la plataforma en la nube, formularios de registro, contratación de planes, soporte técnico y demás
+        canales oficiales de BUSINESS SOFT COMPANY S.A.C.
+      </p>
+      <p>
+        Al utilizar el Sistema, usted acepta las prácticas descritas en este documento y en nuestros
+        <a routerLink="/politicas/terminos">Términos y Condiciones</a>.
+      </p>
+    </section>
+
+    <section>
+      <h2>3. Datos personales que recopilamos</h2>
+      <p>Podemos recopilar las siguientes categorías de datos, según el uso del servicio:</p>
+      <ul>
+        <li><strong>Datos de identificación:</strong> nombres, apellidos, documento de identidad, RUC, razón social.</li>
+        <li><strong>Datos de contacto:</strong> correo electrónico, teléfono, WhatsApp, dirección fiscal.</li>
+        <li><strong>Datos de cuenta:</strong> credenciales de acceso, rol, empresa asociada, historial de sesiones.</li>
+        <li><strong>Datos comerciales y operativos:</strong> ventas, compras, inventario, clientes, proveedores y comprobantes ingresados por la Empresa Cliente.</li>
+        <li><strong>Datos de facturación y pago:</strong> plan contratado, monto, moneda, número de orden de checkout, correo del pagador e identificador de transacción de la pasarela (p. ej. cargo Culqi). <strong>No almacenamos</strong> números completos de tarjeta, CVV, PIN ni credenciales bancarias: esos datos se ingresan únicamente en el formulario seguro de <strong>Culqi</strong> y son tratados por Culqi conforme a su propia política de privacidad.</li>
+        <li><strong>Datos técnicos:</strong> dirección IP, tipo de navegador, dispositivo, logs de acceso, cookies y eventos de uso del Sistema.</li>
+        <li><strong>Datos de soporte:</strong> consultas, tickets, grabaciones o capturas enviadas voluntariamente al equipo de soporte.</li>
+      </ul>
+      <p>
+        La Empresa Cliente es responsable de la legalidad de los datos de terceros (clientes finales, empleados,
+        proveedores) que ingrese en el Sistema.
+      </p>
+    </section>
+
+    <section>
+      <h2>4. Finalidades del tratamiento</h2>
+      <p>Tratamos los datos personales para las siguientes finalidades:</p>
+      <ul>
+        <li>Proveer, operar y mantener el servicio SaaS contratado.</li>
+        <li>Crear y administrar cuentas de usuario y empresas.</li>
+        <li>Procesar pagos, suscripciones, renovaciones y facturación.</li>
+        <li>Brindar soporte técnico, capacitación y atención al cliente.</li>
+        <li>Enviar comunicaciones operativas, alertas de seguridad y avisos del servicio.</li>
+        <li>Cumplir obligaciones legales, tributarias y requerimientos de autoridades competentes.</li>
+        <li>Prevenir fraude, abusos y garantizar la seguridad de la plataforma.</li>
+        <li>Mejorar el Sistema mediante análisis agregados y estadísticos (sin identificar personas cuando sea posible).</li>
+        <li>Enviar información comercial o promocional, solo con consentimiento previo o base legal aplicable.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Base legal del tratamiento</h2>
+      <p>El tratamiento se realiza sobre las siguientes bases, según corresponda:</p>
+      <ul>
+        <li><strong>Ejecución contractual:</strong> prestación del servicio SaaS contratado.</li>
+        <li><strong>Consentimiento:</strong> registro, comunicaciones comerciales u otras finalidades que lo requieran.</li>
+        <li><strong>Interés legítimo:</strong> seguridad, mejora del servicio y prevención de fraude.</li>
+        <li><strong>Obligación legal:</strong> conservación de registros exigidos por normativa peruana.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Cookies y tecnologías similares</h2>
+      <p>
+        Utilizamos cookies y tecnologías similares para mantener la sesión, recordar preferencias, medir el
+        rendimiento y reforzar la seguridad. Puede configurar su navegador para rechazar cookies; sin embargo,
+        algunas funciones del Sistema podrían dejar de estar disponibles.
+      </p>
+    </section>
+
+    <section>
+      <h2>7. Pagos en línea (Culqi)</h2>
+      <p>
+        Las suscripciones de pago del Sistema se procesan mediante la pasarela <strong>Culqi</strong>
+        (<a href="https://culqi.com" target="_blank" rel="noopener noreferrer">culqi.com</a>).
+        El flujo implementado en EFAFERP funciona así:
+      </p>
+      <ul>
+        <li>El Usuario ingresa los datos de tarjeta y entidad bancaria en el <strong>formulario seguro de Culqi Checkout</strong>, cargado desde los servidores de Culqi.</li>
+        <li>Culqi tokeniza la tarjeta y devuelve a la aplicación un <strong>token de un solo uso</strong> (<code>tkn_...</code>); el número de tarjeta (PAN), CVV y datos sensibles <strong>no transitan ni se almacenan</strong> en los servidores de BUSINESS SOFT COMPANY S.A.C.</li>
+        <li>Nuestro backend utiliza ese token únicamente para solicitar el cargo a la API de Culqi y, si el pago es exitoso, guarda el identificador del cargo (p. ej. <code>chr_...</code>), el número de orden, plan, monto y correo de contacto para conciliación y soporte.</li>
+        <li>Para prevención de fraude y autenticación 3D Secure puede utilizarse <strong>Culqi3DS</strong> (huella de dispositivo y validación del emisor); esos datos son gestionados por Culqi y sus socios de pago.</li>
+      </ul>
+      <p>
+        El tratamiento de datos de medios de pago por Culqi se rige por la política de privacidad y términos de Culqi.
+        BUSINESS SOFT COMPANY S.A.C. actúa como comercio integrador y no es responsable del almacenamiento de datos
+        sensibles de tarjeta, que permanecen bajo el estándar PCI-DSS de la pasarela.
+      </p>
+    </section>
+
+    <section>
+      <h2>8. Compartición y encargados del tratamiento</h2>
+      <p>
+        No vendemos ni alquilamos datos personales. Podemos compartir información únicamente en los siguientes casos:
+      </p>
+      <ul>
+        <li><strong>Proveedores de servicios:</strong> hosting en la nube, pasarela de pagos <strong>Culqi</strong> (procesamiento de cargos y datos de medios de pago), mensajería (WhatsApp/SMS), correo electrónico y herramientas de soporte, bajo contratos de confidencialidad.</li>
+        <li><strong>Integraciones autorizadas:</strong> SUNAT, servicios de facturación u otros conectados por la Empresa Cliente.</li>
+        <li><strong>Obligación legal:</strong> cuando sea requerido por autoridad competente o mandato judicial.</li>
+        <li><strong>Protección de derechos:</strong> para defender los derechos, propiedad o seguridad del Responsable, usuarios o terceros.</li>
+      </ul>
+      <p>
+        Algunos proveedores pueden encontrarse fuera del Perú. En esos casos, adoptamos medidas razonables para
+        garantizar un nivel adecuado de protección conforme a la normativa aplicable.
+      </p>
+    </section>
+
+    <section>
+      <h2>9. Plazo de conservación</h2>
+      <p>
+        Conservamos los datos personales mientras la cuenta esté activa y sea necesario para las finalidades descritas.
+        Tras la cancelación del servicio, los datos podrán conservarse por un plazo adicional para:
+      </p>
+      <ul>
+        <li>Respaldo y recuperación ante contingencias técnicas.</li>
+        <li>Cumplimiento de obligaciones legales, contables o tributarias.</li>
+        <li>Resolución de disputas o reclamos pendientes.</li>
+      </ul>
+      <p>
+        Transcurrido el plazo aplicable, los datos serán eliminados o anonimizados de forma segura, salvo que la ley
+        exija su conservación por más tiempo.
+      </p>
+    </section>
+
+    <section>
+      <h2>10. Seguridad de la información</h2>
+      <p>
+        Implementamos medidas técnicas, administrativas y organizativas razonables para proteger los datos personales,
+        incluyendo:
+      </p>
+      <ul>
+        <li>Cifrado de comunicaciones (HTTPS/TLS).</li>
+        <li>Control de accesos por roles y autenticación.</li>
+        <li>Registro de actividad y monitoreo de incidentes.</li>
+        <li>Copias de seguridad periódicas.</li>
+        <li>Restricción de acceso al personal autorizado bajo confidencialidad.</li>
+      </ul>
+      <p>
+        Ningún sistema es 100% invulnerable. En caso de incidente de seguridad que afecte datos personales,
+        notificaremos a las autoridades y titulares cuando corresponda conforme a la ley.
+      </p>
+    </section>
+
+    <section>
+      <h2>11. Derechos del titular (ARCO y revocación)</h2>
+      <p>
+        Conforme a la Ley N.° 29733, usted puede ejercer los siguientes derechos sobre sus datos personales:
+      </p>
+      <ul>
+        <li><strong>Acceso:</strong> conocer qué datos tratamos y para qué finalidad.</li>
+        <li><strong>Rectificación:</strong> corregir datos inexactos o incompletos.</li>
+        <li><strong>Cancelación / supresión:</strong> solicitar la eliminación cuando proceda legalmente.</li>
+        <li><strong>Oposición:</strong> oponerse a determinados tratamientos.</li>
+        <li><strong>Revocación del consentimiento:</strong> cuando el tratamiento se base en consentimiento.</li>
+        <li><strong>Portabilidad:</strong> solicitar entrega de datos en formato estructurado, cuando sea aplicable.</li>
+      </ul>
+      <p>
+        Para ejercer sus derechos, comuníquese con BUSINESS SOFT COMPANY S.A.C. a través de los canales
+        indicados en nuestra <a routerLink="/publico">página principal</a>, señalando su solicitud, identidad
+        y datos de contacto. Responderemos en un plazo razonable conforme a la normativa vigente.
+      </p>
+      <p>
+        También puede presentar un reclamo ante la Autoridad Nacional de Protección de Datos Personales del Perú
+        si considera que sus derechos no han sido atendidos adecuadamente.
+      </p>
+    </section>
+
+    <section>
+      <h2>12. Datos de menores de edad</h2>
+      <p>
+        El Sistema está dirigido a empresas y usuarios con capacidad legal para contratar. No recopilamos
+        intencionalmente datos de menores de 18 años. Si detectamos datos de menores sin autorización válida,
+        procederemos a eliminarlos.
+      </p>
+    </section>
+
+    <section>
+      <h2>13. Enlaces a terceros</h2>
+      <p>
+        El Sistema puede contener enlaces a sitios o servicios de terceros (redes sociales, pasarelas de pago,
+        documentación externa). El Responsable no controla las políticas de privacidad de esos sitios; le recomendamos
+        revisarlas antes de proporcionar información personal.
+      </p>
+    </section>
+
+    <section>
+      <h2>14. Cambios a esta política</h2>
+      <p>
+        Podemos actualizar esta Política de Privacidad para reflejar cambios legales, técnicos o en nuestros
+        servicios. Publicaremos la versión actualizada en esta página e indicaremos la fecha de última modificación.
+        El uso continuado del Sistema después de los cambios implica aceptación de la política revisada.
+      </p>
+    </section>
+
+    <section>
+      <h2>15. Contacto</h2>
+      <p>
+        Para consultas sobre privacidad o ejercicio de derechos, diríjase a
+        <strong>BUSINESS SOFT COMPANY S.A.C.</strong> mediante los canales publicados en la
+        <a routerLink="/publico">página principal</a> del sitio.
+      </p>
+    </section>
+
+    <a class="btn btn-outline-primary mt-3" routerLink="/publico">Volver al inicio</a>
+  </div>
+</div>

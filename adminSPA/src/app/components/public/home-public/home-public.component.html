@@ -1,0 +1,245 @@
+<div class="public-home">
+  <section class="hero">
+    <div class="container">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-6">
+          <!--<p class="eyebrow">EFAFERP · Empresa, Facturación, Administración y Finanzas</p>-->
+          <h1>Gestiona tu empresa con claridad, velocidad y control</h1>
+          <p class="lead">
+            <strong>EFAFERP</strong> nace del acrónimo <strong>EFAF</strong>: las cuatro áreas esenciales que
+            todo negocio debe dominar — <em>Empresa</em>, <em>Facturación</em>, <em>Administración</em> y
+            <em>Finanzas</em>. El nombre refleja exactamente lo que hace el sistema: unificar en una sola
+            plataforma la operación comercial, la emisión de comprobantes, la gestión administrativa y el
+            control financiero de tu empresa.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" routerLink="/planes">Ver planes</a>
+            <a class="btn btn-outline-light btn-lg" routerLink="/login-empresa">Iniciar sesión</a>
+          </div>
+          <div class="hero-meta">
+            <span><i class="fas fa-shield-alt"></i> Datos seguros</span>
+            <span><i class="fas fa-cloud"></i> Acceso desde cualquier lugar</span>
+            <span><i class="fas fa-headset"></i> Soporte dedicado</span>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="hero-card">
+            <h3>¿Qué incluye el sistema?</h3>
+            <ul>
+              <li><i class="fas fa-check-circle"></i> Facturación electrónica y ventas</li>
+              <li><i class="fas fa-check-circle"></i> Inventario y control de stock</li>
+              <li><i class="fas fa-check-circle"></i> Compras y proveedores</li>
+              <li><i class="fas fa-check-circle"></i> Caja, créditos y reportes</li>
+              <li><i class="fas fa-check-circle"></i> Multiempresa y multiusuario</li>
+            </ul>
+            <!--
+            <a class="btn btn-outline-primary w-100" routerLink="/crear-empresa">
+              Registrar empresa
+            </a>
+            -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-light">
+    <div class="container">
+      <div class="section-header">
+        <h2>¿Qué significa EFAF?</h2>
+        <p>
+          El nombre <strong>EFAFERP</strong> combina el acrónimo <strong>EFAF</strong> con ERP
+          (<em>Enterprise Resource Planning</em>): software de planificación de recursos empresariales.
+        </p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+          <div class="info-card">
+            <h4>Empresa</h4>
+            <p>Multiempresa, multiusuario, sucursales y configuración centralizada de tu organización.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="info-card">
+            <h4>Facturación</h4>
+            <p>Ventas, comprobantes electrónicos, clientes y cumplimiento tributario con SUNAT.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="info-card">
+            <h4>Administración</h4>
+            <p>Inventario, compras, proveedores, despachos y procesos operativos del día a día.</p>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="info-card">
+            <h4>Finanzas</h4>
+            <p>Caja, créditos, reportes, análisis y control del flujo económico de tu negocio.</p>
+          </div>
+        </div>
+      </div>
+      <p class="text-center text-muted mt-3 mb-0">
+        Desarrollado por <strong>BUSINESS SOFT COMPANY S.A.C.</strong> (RUC 20614636930).
+      </p>
+    </div>
+  </section>
+
+  <section class="section section-light">
+    <div class="container">
+      <div class="section-header">
+        <h2>Información de la empresa</h2>
+        <p>Somos un equipo peruano especializado en digitalización de procesos empresariales.</p>
+      </div>
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="info-card">
+            <h4>Misión</h4>
+            <p>Impulsar el crecimiento de las empresas con tecnología simple, confiable y escalable.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="info-card">
+            <h4>Visión</h4>
+            <p>Ser la plataforma SaaS preferida para la gestión integral de microempresas en Perú, impulsando su crecimiento y transformación digital.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="info-card">
+            <h4>Valores</h4>
+            <p>Transparencia, soporte cercano y evolución continua según la necesidad del cliente.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Planes disponibles</h2>
+        <p>El mismo sistema EFAFERP para todos; cada plan define los límites de escala de tu negocio.</p>
+      </div>
+
+      @if (cargandoPlanes()) {
+        <p class="text-center text-muted">Cargando planes…</p>
+      } @else if (errorPlanes()) {
+        <p class="text-center text-muted">{{ errorPlanes() }}</p>
+      } @else {
+        <div class="row g-4">
+          @for (plan of planes(); track plan.planCode) {
+            <div class="col-md-6 col-lg-4">
+              <div class="plan-card" [class.plan-card--featured]="esPlanDestacado(plan.planCode)">
+                @if (esPlanDestacado(plan.planCode)) {
+                  <span class="plan-badge">Recomendado</span>
+                }
+                <h4>{{ plan.nombre }}</h4>
+                <p class="plan-desc">{{ plan.descripcionCorta }}</p>
+                <ul class="plan-limites">
+                  @for (limite of resumirLimitesPlan(plan); track limite) {
+                    <li><i class="fas fa-check-circle"></i> {{ limite }}</li>
+                  }
+                </ul>
+                <p class="plan-precio">
+                  Desde <strong>S/ {{ plan.precioMensualPen | number : '1.0-0' }}</strong>/mes
+                  <span class="plan-precio-igv">+ IGV</span>
+                </p>
+                <a class="btn btn-outline-primary w-100" [routerLink]="['/suscribirse', plan.planCode]" [queryParams]="{ billing: 'monthly' }">
+                  Contratar
+                </a>
+                <a class="btn btn-link w-100 mt-1" routerLink="/planes">Ver comparativa</a>
+              </div>
+            </div>
+          }
+        </div>
+        <!--
+        <p class="text-center text-muted small mt-4 mb-0">
+          También disponible <a routerLink="/suscribirse/demo" [queryParams]="{ billing: 'none' }">demo 14 días</a>
+          y plan <strong>Enterprise</strong> bajo cotización.
+        </p>
+        -->
+      }
+    </div>
+  </section>
+
+  <section class="section section-light">
+    <div class="container">
+      <div class="section-header">
+        <h2>Referidos</h2>
+        <p>Historias reales de clientes que ya gestionan su negocio con nosotros.</p>
+      </div>
+      <div class="row g-4">
+        @for (ref of referidos; track ref.nombre) {
+          <div class="col-md-4">
+            <div class="testimonial-card">
+              <p class="testimonial-quote">“{{ ref.comentario }}”</p>
+              <p class="testimonial-name">{{ ref.nombre }}</p>
+              <span class="testimonial-business">{{ ref.negocio }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Videos de uso del sistema</h2>
+        <p>Explora las funcionalidades más importantes en pocos minutos.</p>
+      </div>
+      <div class="row g-4">
+        @for (video of videos; track video.titulo) {
+          <div class="col-md-6 col-lg-4">
+            <div class="video-card">
+              <div class="ratio ratio-16x9">
+                <iframe [src]="video.url" title="{{ video.titulo }}" allowfullscreen></iframe>
+              </div>
+              <p class="video-title">{{ video.titulo }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-light">
+    <div class="container">
+      <div class="section-header">
+        <h2>Contacto y redes</h2>
+        <p>Estamos listos para ayudarte en cada etapa de tu crecimiento.</p>
+      </div>
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-6">
+          <div class="contact-card">
+            <p><i class="fas fa-building"></i> BUSINESS SOFT COMPANY S.A.C. · RUC 20614636930</p>
+            <p><i class="fas fa-phone-alt"></i> +51 993 289 440</p>
+            <p><i class="fas fa-envelope"></i> businesssoftperu@gmail.com</p>
+            <p><i class="fas fa-map-marker-alt"></i> PJ. LOS OLIVOS NRO. S/N URB. LOS OLIVOS, CAJAMARCA - JAÉN - JAÉN, Perú</p>
+            <div class="social-links">
+              <a href="https://www.facebook.com/businesssoftperu/" target="_blank" rel="noopener">
+                <i class="bi bi-facebook"></i> Facebook
+              </a>
+              <a href="https://www.instagram.com" target="_blank" rel="noopener">
+                <i class="bi bi-instagram"></i> Instagram
+              </a>
+              <a href="https://www.linkedin.com" target="_blank" rel="noopener">
+                <i class="fab fa-linkedin"></i> LinkedIn
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="legal-card">
+            <h4>Políticas legales</h4>
+            <p>Revisa nuestros documentos obligatorios antes de contratar.</p>
+            <div class="legal-links">
+              <a routerLink="/politicas/terminos">Términos y condiciones</a>
+              <a routerLink="/politicas/privacidad">Política de privacidad</a>
+              <a routerLink="/politicas/devoluciones">Política de devoluciones</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

@@ -475,7 +475,7 @@ export class CreateEmpresaComponent implements OnInit {
         color: '#FFF',
         class: 'text-warning',
         position: 'topRight',
-        message: 'Debe aceptar los términos y condiciones'
+        message: 'Debe aceptar las políticas legales para continuar'
       });
       return;
     }

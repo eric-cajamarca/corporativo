@@ -1,9 +1,9 @@
 // auth.guard.ts
 import { Injectable } from '@angular/core';
 import { CanActivate, Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
-
-import { map } from 'rxjs/operators';
+import { map, of } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { isPublicUrl } from '../core/constants/public-routes';
 
 @Injectable({
   providedIn: 'root'
@@ -14,37 +14,37 @@ export class AuthGuard implements CanActivate {
     private router: Router
   ) {}
 
-  canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+  canActivate(_route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+    const url = state.url || '';
+
+    // #region agent log
+    fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.guard.ts:canActivate',message:'guard entry',data:{url,isPublic:isPublicUrl(url)},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+
+    if (isPublicUrl(url)) {
+      return of(true);
+    }
+
+    const isLoginRoute = url.includes('/login-empresa');
+
     return this.authService.verifyToken().pipe(
       map(isValid => {
-        const isLoginRoute = state.url.includes('/login-empresa');
-        const isPublicRoute =
-          state.url.includes('/crear-empresa') ||
-          state.url.includes('/verificar-empresa') ||
-          state.url.includes('/planes') ||
-          state.url.includes('/suscribirse') ||
-          state.url.includes('/recuperar-password');
-
-        
-        // Si es una ruta pública, siempre permitir
-        if (isPublicRoute) {
-          return true;
-        }
-
-        // Si el token es válido y está en la página de login, redirigir a home
         if (isValid && isLoginRoute) {
+          // #region agent log
+          fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.guard.ts:redirectHome',message:'redirect to home from login',data:{url,isValid},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
           this.router.navigate(['/home']);
           return false;
         }
 
-        // Si el token no es válido y no está en la página de login, redirigir a login
         if (!isValid && !isLoginRoute) {
-          console.error('Token no válido, redirigiendo a login');
+          // #region agent log
+          fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.guard.ts:redirectLogin',message:'redirect to login',data:{url,isValid},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
           this.router.navigate(['/login-empresa']);
           return false;
         }
 
-        // Permitir acceso en otros casos válidos
         return true;
       })
     );

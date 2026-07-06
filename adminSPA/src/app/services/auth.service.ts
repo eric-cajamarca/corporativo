@@ -10,10 +10,14 @@ import {
   of,
   switchMap,
   finalize,
-  share
+  share,
+  filter,
+  take
 } from 'rxjs';
+import { NavigationEnd } from '@angular/router';
 import { global } from './global';
 import { ConnectionTimerService } from './connection-timer.service';
+import { isPublicBrowserLocation, isPublicUrl } from '../core/constants/public-routes';
 
 interface UserData {
   /** Empresa del JWT (multiempresa). */
@@ -35,16 +39,6 @@ export class AuthService {
   /** Una sola petición refresh en vuelo (evita tormenta si expiran muchas llamadas a la vez). */
   private refreshInFlight$: Observable<boolean> | null = null;
 
-  // Rutas públicas que NO requieren autenticación (deben alinearse con app.routes y AuthGuard)
-  private readonly publicRoutes = [
-    '/login-empresa',
-    '/crear-empresa',
-    '/verificar-empresa',
-    '/planes',
-    '/suscribirse',
-    '/recuperar-password'
-  ];
-
   // Exponer datos reactivos
   userData = this._userData.asReadonly();
   isAuthenticated = computed(() => !!this._userData());
@@ -62,21 +56,28 @@ export class AuthService {
    * En el arranque `router.url` puede ser '' o '/' antes de la primera navegación; se usa también `location`.
    */
   private isPublicRoute(): boolean {
-    const routerUrl = (this.router.url || '').trim();
-    let pathFromWindow = '';
-    try {
-      if (typeof globalThis !== 'undefined' && globalThis.location?.pathname) {
-        pathFromWindow = `${globalThis.location.pathname}${globalThis.location.search || ''}`;
-      }
-    } catch {
-      /* ignore */
-    }
-    const candidates = [routerUrl, pathFromWindow].filter((u) => u.length > 0);
-    return candidates.some((currentUrl) => this.publicRoutes.some((route) => currentUrl.includes(route)));
+    const browserPublic = isPublicBrowserLocation();
+    const routerPublic = isPublicUrl(this.router.url);
+    const result = browserPublic || routerPublic;
+    // #region agent log
+    fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.service.ts:isPublicRoute',message:'public route check',data:{browserPublic,routerPublic,result,routerUrl:this.router.url,browserPath:globalThis.location?.pathname},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    return result;
   }
 
   initialize() {
-    this.verifyToken().subscribe();
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      take(1)
+    ).subscribe((event) => {
+      const isPublic = this.isPublicRoute();
+      // #region agent log
+      fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.service.ts:initialize',message:'first NavigationEnd',data:{url:event.url,urlAfterRedirects:event.urlAfterRedirects,isPublic,willVerifyToken:!isPublic},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+      if (!isPublic) {
+        this.verifyToken().subscribe();
+      }
+    });
     this.setupTokenVerification();
   }
 
@@ -157,6 +158,66 @@ export class AuthService {
   }
 
   /**
+   * Comprueba sesión sin redirigir a login (ruta raíz, landing pública).
+   */
+  peekSession(): Observable<boolean> {
+    return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
+      switchMap((response) => {
+        if (response?.active === true && response?.data) {
+          this.setUserData(this.mapSessionUserData(response.data));
+          return of(true);
+        }
+        return this.tryRefreshSession().pipe(
+          switchMap((ok) => {
+            if (!ok) {
+              this.setUserData(null);
+              return of(false);
+            }
+            return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
+              map((r2) => {
+                if (r2?.active === true && r2?.data) {
+                  this.setUserData(this.mapSessionUserData(r2.data));
+                  return true;
+                }
+                this.setUserData(null);
+                return false;
+              })
+            );
+          })
+        );
+      }),
+      catchError(() =>
+        this.tryRefreshSession().pipe(
+          switchMap((ok) => {
+            if (!ok) {
+              this.setUserData(null);
+              return of(false);
+            }
+            return this.http.get<any>(this.url + 'getEmpresa_login', { withCredentials: true }).pipe(
+              map((r2) => {
+                if (r2?.active === true && r2?.data) {
+                  this.setUserData(this.mapSessionUserData(r2.data));
+                  return true;
+                }
+                this.setUserData(null);
+                return false;
+              }),
+              catchError(() => {
+                this.setUserData(null);
+                return of(false);
+              })
+            );
+          }),
+          catchError(() => {
+            this.setUserData(null);
+            return of(false);
+          })
+        )
+      )
+    );
+  }
+
+  /**
    * Nombre visible en sidebar/topnav (nombres + apellidos, o razón social de respaldo).
    */
   private buildDisplayName(data: {
@@ -229,8 +290,9 @@ export class AuthService {
     this.http.post(this.url + 'logout', {}, { withCredentials: true }).subscribe({
       complete: () => {
         this.setUserData(null);
-        this.router.navigate(['/login-empresa']);
-        this.verifyToken().subscribe();
+        if (!this.isPublicRoute()) {
+          this.router.navigate(['/login-empresa']);
+        }
       }
     });
   }

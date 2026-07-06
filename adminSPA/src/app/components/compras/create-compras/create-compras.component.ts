@@ -138,6 +138,8 @@ export class CreateComprasComponent {
   public vuelto = 0;
   /** true = modal abierto desde "Registrar Compra" (mostrar botón Procesar compra). false = abierto desde "Forma de pago" (solo Guardar). */
   public modalPagoParaRegistrar = false;
+  /** Conserva si la operación es al crédito aunque el estado de pago se sincronice a Pendiente. */
+  private compraOperacionEsCredito = false;
   public categoria: any = [];
   public presentacion: any = [];
   public nuevoProducto: any = {
@@ -601,6 +603,7 @@ export class CreateComprasComponent {
     this._tablasSunatService.obtener_estado_pago().subscribe(
       (response) => {
         this.estadoPago = response.data;
+        this.actualizarCompraOperacionEsCredito();
         this.sincronizarEstadoPagoSiCreditoOperacion();
       },
       (error) => {
@@ -610,6 +613,7 @@ export class CreateComprasComponent {
     this._tablasSunatService.obtener_medios_pago().subscribe(
       (response) => {
         this.mediosPago = response.data;
+        this.actualizarCompraOperacionEsCredito();
         this.sincronizarEstadoPagoSiCreditoOperacion();
       },
       (error) => {
@@ -1251,7 +1255,7 @@ export class CreateComprasComponent {
     const idEstadoPagoOk = !!this.compras.idEstadoPago;
     const totalOk = !isNaN(Number(this.compras.total)) && Number(this.compras.total) > 0;
     const detalleOk = Array.isArray(this.detalleCompras) && this.detalleCompras.length > 0;
-    const esCredito = this.esCompraAlCredito();
+    const esCredito = this.esCompraAlCreditoParaSunat();
     let idMediosPagoOk = true;
     if (esCredito) {
       idMediosPagoOk = !!this.compras.idMediosPago;
@@ -2170,6 +2174,7 @@ export class CreateComprasComponent {
   }
 
   onCambioEstadoPagoCompras(): void {
+    this.actualizarCompraOperacionEsCredito();
     this.sincronizarEstadoPagoSiCreditoOperacion();
     if (this.comprobante) {
       this.syncSunatAuxiliaresDesdeFormulario();
@@ -2177,20 +2182,36 @@ export class CreateComprasComponent {
   }
 
   onCambioMedioPagoCompras(): void {
+    this.actualizarCompraOperacionEsCredito();
     this.sincronizarEstadoPagoSiCreditoOperacion();
     if (this.comprobante) {
       this.syncSunatAuxiliaresDesdeFormulario();
     }
   }
 
-  esMedioPagoCredito(): boolean {
-    const mp = this.mediosPago?.find((m: any) => String(m.idMediosPago) === String(this.compras.idMediosPago));
-    return /credito/i.test(String(mp?.descripcion ?? ''));
+  private normalizarTextoCondicion(texto: string): string {
+    return String(texto ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   }
 
-  /** Crédito operativo: estado de pago o medio de pago (misma lógica que el backend con idEstadoPago). */
+  private esDescripcionCredito(desc: string): boolean {
+    return this.normalizarTextoCondicion(desc).includes('credito');
+  }
+
+  private actualizarCompraOperacionEsCredito(): void {
+    this.compraOperacionEsCredito = this.esCompraAlCredito() || this.esMedioPagoCredito();
+  }
+
+  esMedioPagoCredito(): boolean {
+    const mp = this.mediosPago?.find((m: any) => String(m.idMediosPago) === String(this.compras.idMediosPago));
+    return this.esDescripcionCredito(String(mp?.descripcion ?? ''));
+  }
+
+  /** Crédito operativo: condición/medio de pago o estado de pago al crédito (no modal de formas de pago). */
   esCompraAlCreditoParaSunat(): boolean {
-    return this.esCompraAlCredito() || this.esMedioPagoCredito();
+    return this.compraOperacionEsCredito || this.esCompraAlCredito() || this.esMedioPagoCredito();
   }
 
   /** Moneda del CPE consultado (DocumentCurrencyCode); el tipo de cambio SUNAT sigue esta moneda. */
@@ -2347,8 +2368,7 @@ export class CreateComprasComponent {
     const id = this.compras.idEstadoPago;
     if (id == null || id === '') return false;
     const estado = this.estadoPago?.find((e: any) => String(e.idEstadoPago) === String(id));
-    const desc = (estado?.descripcion ?? '').toLowerCase();
-    return desc.includes('credito') || desc.includes('crédito');
+    return this.esDescripcionCredito(String(estado?.descripcion ?? ''));
   }
 
   private idEstadoPagoPendienteCatalogo(): string | number {
@@ -2384,6 +2404,9 @@ export class CreateComprasComponent {
 
   /** Abre el modal de forma de pago: selecciona Efectivo y monto = saldo. No modifica modalPagoParaRegistrar (lo define quien llama). */
   abrirModalFormaPago(): void {
+    if (this.esCompraAlCreditoParaSunat()) {
+      return;
+    }
     const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
     if (efectivo) {
       this.formaPagoSeleccionada = { ...efectivo };

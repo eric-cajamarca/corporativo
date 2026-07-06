@@ -111,12 +111,35 @@ import { PlanesPublicComponent } from './components/public/planes-public/planes-
 import { CheckoutSuscripcionComponent } from './components/public/checkout-suscripcion/checkout-suscripcion.component';
 import { MiSuscripcionComponent } from './components/cuenta/mi-suscripcion/mi-suscripcion.component';
 
+const loadHomePublic = () =>
+  import('./components/public/home-public/home-public.component').then((m) => m.HomePublicComponent);
+
 export const routes: Routes = [
     {
-        path: '',
-        redirectTo: 'home',
-         title: 'Inicio',
-        pathMatch: 'full'
+      path: 'publico',
+      loadComponent: loadHomePublic,
+      title: 'Página principal'
+    },
+    {
+      path: '',
+      pathMatch: 'full',
+      loadComponent: () =>
+        import('./components/public/root-redirect/root-redirect.component').then((m) => m.RootRedirectComponent)
+    },
+    {
+      path: 'politicas/terminos',
+      loadComponent: () => import('./components/public/legal-terminos/legal-terminos.component').then((m) => m.LegalTerminosComponent),
+      title: 'Términos y condiciones'
+    },
+    {
+      path: 'politicas/privacidad',
+      loadComponent: () => import('./components/public/legal-privacidad/legal-privacidad.component').then((m) => m.LegalPrivacidadComponent),
+      title: 'Política de privacidad'
+    },
+    {
+      path: 'politicas/devoluciones',
+      loadComponent: () => import('./components/public/legal-devoluciones/legal-devoluciones.component').then((m) => m.LegalDevolucionesComponent),
+      title: 'Política de devoluciones'
     },
     { path:'login-empresa', 
         loadComponent: () => import('./components/login-empresa/login-empresa.component').then((m) => m.LoginEmpresaComponent),

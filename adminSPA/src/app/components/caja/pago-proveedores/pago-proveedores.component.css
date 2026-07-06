@@ -7,6 +7,11 @@
   z-index: 1050;
 }
 
+/* Modal anidado de proveedor: encima del recibo de pago */
+:host .modal-proveedor-selector.modal.show {
+  z-index: 1060;
+}
+
 /* Layout: espacio para sidebar (260px) y topnav (64px) */
 :host {
   display: block;

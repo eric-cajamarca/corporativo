@@ -10,6 +10,7 @@ import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { TopnavComponent } from '../../topnav/topnav.component';
+import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
@@ -43,7 +44,7 @@ export interface ComprobantePagoRow {
 @Component({
   selector: 'app-pago-proveedores',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent, IndexProveedorComponent],
   templateUrl: './pago-proveedores.component.html',
   styleUrl: './pago-proveedores.component.css'
 })
@@ -65,6 +66,7 @@ export class PagoProveedoresComponent implements OnInit {
 
   mostrarForm = false;
   mostrarVer = false;
+  mostrarModalProveedor = false;
   itemVer: CompraProveedorItem | null = null;
 
   /** Proveedor seleccionado en el modal (id y datos) */
@@ -302,7 +304,25 @@ export class PagoProveedoresComponent implements OnInit {
       razonSocial: p.rSocial || p.razonSocial || p.nombre || '',
       direccion: p.direccion || ''
     };
+    this.proveedorBusqueda = this.proveedorSeleccionado.ruc;
     this.cargarComprobantesProveedor();
+  }
+
+  abrirModalProveedor(): void {
+    this.mostrarModalProveedor = true;
+  }
+
+  cerrarModalProveedor(): void {
+    this.mostrarModalProveedor = false;
+  }
+
+  onProveedorElegido(proveedor: Record<string, unknown>): void {
+    if (!proveedor?.['idProveedor']) {
+      iziToast.warning({ title: 'Aviso', message: 'No se pudo cargar el proveedor seleccionado.' });
+      return;
+    }
+    this.seleccionarProveedor(proveedor);
+    this.cerrarModalProveedor();
   }
 
   private cargarComprobantesProveedor(): void {

@@ -30,6 +30,9 @@ function evaluarAccesoPlan(router: Router, url: string, permisos: PermisosServic
 
   if (abs.startsWith('/configuracion/whatsapp-bot')) {
     if (!planPermiteWhatsAppBot(planRaw)) {
+      // #region agent log
+      fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'saas-plan-modulo.guard.ts:home',message:'saas guard redirect home',data:{url:abs,reason:'whatsapp-bot'},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
       return router.createUrlTree(['/home']);
     }
   } else if (abs.startsWith('/configuracion/whatsapp')) {

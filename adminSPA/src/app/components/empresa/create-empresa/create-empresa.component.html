@@ -480,12 +480,14 @@
                     formControlName="acceptTerms"
                     [class.is-invalid]="hasError('acceptTerms')">
                   <label for="acceptTerms" class="form-check-label">
-                    Acepto los <a href="#" target="_blank">términos y condiciones</a> y la 
-                    <a href="#" target="_blank">política de privacidad</a>
+                    Acepto los
+                    <a routerLink="/politicas/terminos" target="_blank" rel="noopener">términos y condiciones</a>,
+                    la <a routerLink="/politicas/privacidad" target="_blank" rel="noopener">política de privacidad</a>
+                    y la <a routerLink="/politicas/devoluciones" target="_blank" rel="noopener">política de devoluciones</a>.
                   </label>
                   @if (hasError('acceptTerms')) {
                     <div class="invalid-feedback d-block">
-                      Debe aceptar los términos y condiciones para continuar
+                      Debe aceptar las políticas legales para continuar
                     </div>
                   }
                 </div>

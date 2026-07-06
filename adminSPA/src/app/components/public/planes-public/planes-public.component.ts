@@ -9,6 +9,7 @@ import { SaasSubscriptionService } from '../../../services/saas-subscription.ser
 import { AuthService } from '../../../services/auth.service';
 import { DeploymentContextService } from '../../../services/deployment-context.service';
 import { PlanCatalogoItem } from '../../../models/saas-public.model';
+import { formatLimitePlan } from '../../../utils/saas-plan-resumen.util';
 
 type EdicionPlan = {
   descripcionCorta: string;
@@ -174,9 +175,7 @@ export class PlanesPublicComponent implements OnInit {
 
   /** Formato de límites numéricos (ej. 3 000). */
   formatLimite(val: number | undefined | null): string {
-    const n = Math.floor(Number(val));
-    if (!Number.isFinite(n) || n <= 0) return '—';
-    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+    return formatLimitePlan(val);
   }
 
   planTieneBot(p: PlanCatalogoItem): boolean {

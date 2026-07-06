@@ -20,14 +20,41 @@
       @if (checkout(); as c) {
         <div class="card shadow-sm auth-form-shell">
           <div class="card-body">
-            <h1 class="h4 mb-3">Pago de suscripción</h1>
+            <h1 class="h4 mb-3">{{ c.esDemo ? 'Activación de plan demo' : 'Pago de suscripción' }}</h1>
             <p class="text-muted small mb-2">Plan: <strong>{{ c.planCode }}</strong> · Ciclo: <strong>{{ c.billingCycle }}</strong></p>
-            <p class="mb-2">Monto: <strong>S/ {{ c.montoSoles | number : '1.2-2' }}</strong> <span class="text-muted small">+ IGV</span></p>
+            @if (c.esDemo) {
+              <p class="mb-2">Monto: <strong>Gratuito</strong> (14 días de prueba)</p>
+            } @else {
+              <p class="mb-2">Monto: <strong>S/ {{ c.montoSoles | number : '1.2-2' }}</strong> <span class="text-muted small">+ IGV</span></p>
+            }
             <p class="small text-break">Número de orden: <code>{{ c.orderNumber }}</code></p>
+
+            <div class="form-check mb-3 mt-3">
+              <input
+                type="checkbox"
+                id="acceptLegalCheckout"
+                class="form-check-input"
+                [(ngModel)]="aceptoPoliticas"
+                [class.is-invalid]="errorLegal()"
+                (change)="errorLegal.set(false)" />
+              <label for="acceptLegalCheckout" class="form-check-label small">
+                Acepto los
+                <a routerLink="/politicas/terminos" target="_blank" rel="noopener">términos y condiciones</a>,
+                la <a routerLink="/politicas/privacidad" target="_blank" rel="noopener">política de privacidad</a>
+                y la <a routerLink="/politicas/devoluciones" target="_blank" rel="noopener">política de devoluciones</a>.
+              </label>
+              @if (errorLegal()) {
+                <div class="invalid-feedback d-block">Debe aceptar las políticas legales para continuar.</div>
+              }
+            </div>
 
             @if (c.esDemo) {
               <p class="small text-muted">La demo no usa Culqi. Al confirmar, podrá registrar la empresa con este número de orden.</p>
-              <button type="button" class="btn btn-primary w-100 mt-2" [disabled]="procesando()" (click)="confirmarDemo()">
+              <button
+                type="button"
+                class="btn btn-primary w-100 mt-2"
+                [disabled]="procesando() || !aceptoPoliticas"
+                (click)="confirmarDemo()">
                 Activar demo
               </button>
             } @else {
@@ -42,7 +69,7 @@
               <button
                 type="button"
                 class="btn btn-primary w-100 mt-2"
-                [disabled]="procesando() || !c.culqiPublicKey"
+                [disabled]="procesando() || !c.culqiPublicKey || !aceptoPoliticas"
                 (click)="abrirCulqiCheckout()">
                 Pagar con tarjeta (Culqi Checkout)
               </button>

@@ -1,0 +1,263 @@
+.public-home {
+  background: #f5f7fb;
+  color: #1f2633;
+}
+
+.hero {
+  background: linear-gradient(135deg, #1f3b73 0%, #4f7cff 100%);
+  color: #fff;
+  padding: 80px 0;
+}
+
+.hero .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 12px;
+}
+
+.hero h1 {
+  font-size: 2.6rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.hero .lead {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.hero-meta i {
+  margin-right: 6px;
+}
+
+.hero-card {
+  background: #fff;
+  color: #1f2633;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 18px 40px rgba(31, 38, 51, 0.2);
+}
+
+.hero-card h3 {
+  font-size: 1.4rem;
+  margin-bottom: 16px;
+}
+
+.hero-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.hero-card li {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #334155;
+}
+
+.hero-card i {
+  color: #4f7cff;
+  margin-top: 2px;
+}
+
+.section {
+  padding: 70px 0;
+}
+
+.section-light {
+  background: #fff;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.section-header h2 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.section-header p {
+  color: #64748b;
+  margin-bottom: 0;
+}
+
+.info-card,
+.plan-card,
+.testimonial-card,
+.video-card,
+.contact-card,
+.legal-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  height: 100%;
+}
+
+.plan-card--featured {
+  border: 2px solid #4f7cff;
+  box-shadow: 0 16px 32px rgba(79, 124, 255, 0.2);
+}
+
+.plan-card h4 {
+  margin-bottom: 12px;
+}
+
+.plan-badge {
+  display: inline-block;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.plan-desc {
+  color: #64748b;
+  font-size: 0.92rem;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.plan-limites {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.plan-limites li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: #334155;
+  margin-bottom: 8px;
+  line-height: 1.45;
+}
+
+.plan-limites i {
+  color: #22c55e;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.plan-precio {
+  font-size: 0.95rem;
+  color: #1e293b;
+  margin-bottom: 14px;
+}
+
+.plan-precio-igv {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.plan-card .btn-link {
+  font-size: 0.88rem;
+  text-decoration: none;
+}
+
+.plan-card .btn-link:hover {
+  text-decoration: underline;
+}
+
+.testimonial-quote {
+  font-style: italic;
+  color: #1f2937;
+  margin-bottom: 16px;
+}
+
+.testimonial-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.testimonial-business {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.video-title {
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.contact-card p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.social-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.social-links a,
+.legal-links a {
+  color: #1f3b73;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.social-links a:hover,
+.legal-links a:hover {
+  text-decoration: underline;
+}
+
+.legal-card h4 {
+  margin-bottom: 10px;
+}
+
+.legal-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 991px) {
+  .hero {
+    padding: 60px 0;
+  }
+
+  .hero h1 {
+    font-size: 2.1rem;
+  }
+}
+
+@media (max-width: 575px) {
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-meta {
+    flex-direction: column;
+  }
+}

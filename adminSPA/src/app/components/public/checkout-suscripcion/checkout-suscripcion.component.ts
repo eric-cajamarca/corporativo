@@ -32,6 +32,9 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   errorMsg = signal<string | null>(null);
   procesando = signal(false);
   modoEnterprise = signal(false);
+  /** Aceptación explícita de políticas legales (demo y planes de pago). */
+  aceptoPoliticas = false;
+  errorLegal = signal(false);
   /** Huella de dispositivo (Culqi3DS) enviada en antifraud_details al crear el cargo. */
   deviceFingerPrintId = '';
   /** Evita cargar el script dos veces. */
@@ -91,6 +94,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   }
 
   confirmarDemo(): void {
+    if (!this.validarAceptacionLegal()) return;
     const c = this.checkout();
     if (!c?.orderNumber) return;
     this.procesando.set(true);
@@ -114,6 +118,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
    * El PAN no pasa por nuestro servidor; Culqi devuelve un token (`tkn_...`) en el callback global `culqi`.
    */
   async abrirCulqiCheckout(): Promise<void> {
+    if (!this.validarAceptacionLegal()) return;
     const c = this.checkout();
     if (!c || c.esDemo) return;
     const pk = (c.culqiPublicKey || '').trim();
@@ -448,6 +453,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   }
 
   irCrearEmpresa(): void {
+    if (!this.validarAceptacionLegal()) return;
     const c = this.checkout();
     const q = c?.orderNumber ? { checkout: c.orderNumber } : {};
     void this.router.navigate(['/crear-empresa'], { queryParams: q });
@@ -455,5 +461,16 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
 
   volverPlanes(): void {
     void this.router.navigate(['/planes']);
+  }
+
+  /** Obligatorio para demo (sin Culqi) y para planes de pago. */
+  private validarAceptacionLegal(): boolean {
+    if (this.aceptoPoliticas) {
+      this.errorLegal.set(false);
+      return true;
+    }
+    this.errorLegal.set(true);
+    this.errorMsg.set(null);
+    return false;
   }
 }
