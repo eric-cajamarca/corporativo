@@ -11,7 +11,6 @@ import {
 import { EmpresaService } from '../../../services/empresa.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ClienteService } from '../../../services/cliente.service';
-import { CatalogosService } from '../../../services/catalogos.service';
 import { VehiculosService, VehiculoRegistro } from '../../../services/vehiculos.service';
 import { PdfService } from '../../../services/pdf.service';
 import { htmlBloqueQrSunatGre, qrDataUrlParaPdfGuia } from '../../../utils/guia-representacion-impresa-qr.util';
@@ -205,7 +204,6 @@ export class GuiasTransportistaComponent implements OnInit {
   private empresaService = inject(EmpresaService);
   private factilizaService = inject(FactilizaService);
   private clienteService = inject(ClienteService);
-  private catalogosService = inject(CatalogosService);
   private vehiculosService = inject(VehiculosService);
   private consultaXmlService = inject(ConsultaXMLService);
   private proveedoresService = inject(ProveedoresService);
@@ -224,7 +222,7 @@ export class GuiasTransportistaComponent implements OnInit {
   /** Si la empresa no tiene habilitada la emisión de guías, se bloquea el uso. */
   autorizado = true;
 
-  /** Catálogo SUNAT motivo de traslado (HandlingCode): 01, 02, 04, 08, 09, 13 */
+  /** Ya no se usa en GRE transportista (tipo 31); se mantiene por compatibilidad de edición. */
   motivosTraslado: { codigoSunat: string; descripcion: string }[] = [];
   /** Vehículos registrados en la empresa (tabla Vehiculos) */
   vehiculosEmpresa: VehiculoRegistro[] = [];
@@ -233,6 +231,11 @@ export class GuiasTransportistaComponent implements OnInit {
   buscarSerie = '';
   buscarNumero = '';
   comprobanteOrigen: any = null;
+
+  /**
+   * Cómo se cargan los bienes (solo UI). GRE 31 no envía HandlingCode / motivo a SUNAT.
+   */
+  origenBienesTransporte: 'venta' | 'compra' | 'manual' = 'venta';
 
   /**
    * desde_comprobante: venta interna o compra SUNAT (flujo previo).
@@ -286,9 +289,9 @@ export class GuiasTransportistaComponent implements OnInit {
   /** Vehículo elegido del catálogo empresa (opcional; rellena placa) */
   idVehiculoEmpresa: string | null = null;
 
-  // Datos de traslado (campos obligatorios GRE)
+  // Datos de traslado (campos obligatorios GRE transportista — sin motivo de traslado)
   guia: any = {
-    motivoTraslado: '',           // codigoSunat: 01, 02, 04, 08, 09, 13
+    motivoTraslado: '',           // No aplica a GRE 31; se deja vacío
     descripcionMotivo: '',
     modalidadTransporte: '02',    // Fijo para payload; el XML transportista no usa modalidad SUNAT
     vehiculoM1L: false,
@@ -298,7 +301,7 @@ export class GuiasTransportistaComponent implements OnInit {
     unidadMedidaPeso: 'KGM',   // KGM = Kilogramo, TNE = Tonelada
     placaVehiculo: '',
     placaSecundaria: '',
-    // Conductor (obligatorio en privado)
+    // Conductor (obligatorio salvo M1/L)
     tipoDocConductor: '1',
     numeroDocConductor: '',
     nombreConductor: '',
@@ -339,14 +342,11 @@ export class GuiasTransportistaComponent implements OnInit {
         }
         forkJoin({
           dir: this.empresaService.getDireccionEmpresa_id().pipe(catchError(() => of({ data: [] }))),
-          mot: this.catalogosService.codigosSunatMotivoTraslado().pipe(catchError(() => of({ data: [] }))),
           veh: this.vehiculosService.listarVehiculos().pipe(catchError(() => of({ data: [] }))),
           cfg: this.facturacionService.obtenerConfiguracion().pipe(catchError(() => of({ data: null })))
         }).subscribe({
-          next: ({ dir, mot, veh, cfg }) => {
+          next: ({ dir, veh, cfg }) => {
             this.direccionesEmpresa = dir?.data || [];
-            const m = mot?.data || [];
-            this.motivosTraslado = m.length > 0 ? m : this.motivosTrasladoFallback();
             this.vehiculosEmpresa = veh?.data || [];
             const c = cfg?.data;
             if (c) {
@@ -371,7 +371,6 @@ export class GuiasTransportistaComponent implements OnInit {
           },
           error: () => {
             this.direccionesEmpresa = [];
-            this.motivosTraslado = this.motivosTrasladoFallback();
             this.vehiculosEmpresa = [];
             iziToast.error({
               title: 'Error',
@@ -389,14 +388,29 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   private motivosTrasladoFallback(): { codigoSunat: string; descripcion: string }[] {
-    return [
-      { codigoSunat: '01', descripcion: 'Venta' },
-      { codigoSunat: '02', descripcion: 'Compra' },
-      { codigoSunat: '04', descripcion: 'Traslado entre establecimientos' },
-      { codigoSunat: '08', descripcion: 'Importación' },
-      { codigoSunat: '09', descripcion: 'Exportación' },
-      { codigoSunat: '13', descripcion: 'Otros' }
-    ];
+    return [];
+  }
+
+  private sincronizarOrigenBienesDesdeMotivoLegacy(): void {
+    if (this.guia.motivoTraslado === '02') {
+      this.origenBienesTransporte = 'compra';
+    } else if (this.modoItemsTransportista === 'manual') {
+      this.origenBienesTransporte = 'manual';
+    } else {
+      this.origenBienesTransporte = 'venta';
+    }
+  }
+
+  onOrigenBienesTransporteChange(): void {
+    if (this.origenBienesTransporte === 'manual') {
+      this.setModoItemsTransportista('manual');
+    } else {
+      this.setModoItemsTransportista('desde_comprobante');
+    }
+    // Compatibilidad interna: compra = flujo direcciones proveedor (antes motivo 02)
+    this.guia.motivoTraslado = this.origenBienesTransporte === 'compra' ? '02' : '';
+    this.guia.descripcionMotivo = '';
+    this.onMotivoTrasladoGreChange();
   }
 
   private tryCargarEdicionDesdeQuery(): void {
@@ -463,6 +477,7 @@ export class GuiasTransportistaComponent implements OnInit {
     const d = g.datosGuia!;
     this.guia.motivoTraslado = String(d.motivoTraslado || '');
     this.guia.descripcionMotivo = d.descripcionMotivo || '';
+    this.sincronizarOrigenBienesDesdeMotivoLegacy();
     this.guia.modalidadTransporte = '02';
     this.guia.vehiculoM1L = Boolean(d.vehiculoM1L);
     this.guia.fechaInicioTraslado = (d.fechaEmision || g.fechaEmision || '').slice(0, 10);
@@ -634,9 +649,6 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   seccionesTransportistaVisibles(): boolean {
-    if (!this.guia.motivoTraslado) {
-      return false;
-    }
     if (this.guia.tipoComprobanteOrigen === '09') {
       return true;
     }
@@ -650,8 +662,14 @@ export class GuiasTransportistaComponent implements OnInit {
     this.modoItemsTransportista = modo;
     if (modo === 'manual') {
       this.comprobanteOrigen = null;
+      if (this.origenBienesTransporte !== 'compra') {
+        this.origenBienesTransporte = 'manual';
+      }
     } else {
       this.itemsManualesGre = [{ codigo: '', descripcion: '', cantidad: 1, unidad: 'NIU' }];
+      if (this.origenBienesTransporte === 'manual') {
+        this.origenBienesTransporte = 'venta';
+      }
     }
   }
 
@@ -741,10 +759,10 @@ export class GuiasTransportistaComponent implements OnInit {
     if (this.guia.tipoComprobanteOrigen === '09') {
       return;
     }
-    if (!this.esMotivoCompraGre()) {
+    if (!this.esOrigenCompraBienes()) {
       iziToast.warning({
-        title: 'Motivo',
-        message: 'La consulta SUNAT de compra solo aplica con motivo 02 — Compra.',
+        title: 'Origen de bienes',
+        message: 'La consulta SUNAT de compra solo aplica cuando el origen de bienes es «Desde compra».',
         position: 'topRight'
       });
       return;
@@ -831,6 +849,7 @@ export class GuiasTransportistaComponent implements OnInit {
         this.itemsManualesGre = [this.nuevaFilaItemManual()];
         this.comprobanteOrigen = comprobanteOrigen as any;
         this.guia.tipoComprobanteOrigen = String(comprobanteOrigen.tipoComprobante || '01').trim();
+        this.origenBienesTransporte = 'compra';
         this.guia.motivoTraslado = '02';
         this.enriquecerComprobanteCompraSunatYPrefill(this.comprobanteOrigen);
       },
@@ -951,34 +970,48 @@ export class GuiasTransportistaComponent implements OnInit {
     }
   }
 
+  /** Compra = carga de bienes desde compra (direcciones proveedor → origen). No es motivo SUNAT. */
+  esOrigenCompraBienes(): boolean {
+    return this.origenBienesTransporte === 'compra' || this.guia.motivoTraslado === '02';
+  }
+
+  /** @deprecated Alias interno: conservar llamadas existentes a esMotivoCompraGre. */
   esMotivoCompraGre(): boolean {
-    return this.guia.motivoTraslado === '02';
+    return this.esOrigenCompraBienes();
   }
 
   listaDireccionesOrigenGre(): any[] {
-    return this.esMotivoCompraGre() ? this.direccionesOrigenProveedorGre : this.direccionesEmpresa;
+    // Preferir direcciones del remitente/proveedor cuando ya se cargaron por Consultar RUC
+    if (this.usarOrigenDireccionesProveedor && this.direccionesOrigenProveedorGre.length > 0) {
+      return this.direccionesOrigenProveedorGre;
+    }
+    return this.esOrigenCompraBienes() ? this.direccionesOrigenProveedorGre : this.direccionesEmpresa;
   }
 
   listaDireccionesDestinoGre(): any[] {
-    return this.esMotivoCompraGre() ? this.direccionesEmpresa : this.direccionesDestinoLocal;
+    // Preferir direcciones del destinatario cargadas por Consultar RUC (salvo compra → almacén)
+    if (!this.esOrigenCompraBienes() && this.direccionesDestinoLocal.length > 0) {
+      return this.direccionesDestinoLocal;
+    }
+    return this.esOrigenCompraBienes() ? this.direccionesEmpresa : this.direccionesDestinoLocal;
   }
 
   onMotivoTrasladoGreChange(): void {
     const co = this.comprobanteOrigen;
-    if (co && this.guia.motivoTraslado) {
+    if (co && (this.guia.motivoTraslado || this.origenBienesTransporte)) {
       const coEsCompraSunat = !!co.origenDesdeCompraSunat;
-      if (this.esMotivoCompraGre() !== coEsCompraSunat) {
+      if (this.esOrigenCompraBienes() !== coEsCompraSunat) {
         this.comprobanteOrigen = null;
         this.buscarSerie = '';
         this.buscarNumero = '';
         iziToast.info({
           title: 'Comprobante',
-          message: 'El comprobante cargado no coincide con el motivo. Busque o consulte de nuevo según corresponda.',
+          message: 'El comprobante cargado no coincide con el origen de bienes. Busque o consulte de nuevo según corresponda.',
           position: 'topRight'
         });
       }
     }
-    if (this.esMotivoCompraGre()) {
+    if (this.esOrigenCompraBienes()) {
       this.direccionesDestinoLocal = [];
       this.direccionOrigenSeleccionada = null;
       if (this.usarOrigenDireccionesProveedor && this.direccionesOrigenProveedorGre.length > 0) {
@@ -1023,6 +1056,12 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   private rucParaAnexosOrigenGre(): string {
+    const rucRemitente = String(this.remitente.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    if (rucRemitente.length === 11) {
+      return rucRemitente;
+    }
     if (this.esMotivoCompraGre()) {
       const r = String(
         this.comprobanteOrigen?.rucEmpresa ||
@@ -1130,14 +1169,6 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   buscarComprobanteOrigen(): void {
-    if (!this.guia.motivoTraslado) {
-      iziToast.warning({
-        title: 'Motivo',
-        message: 'Seleccione primero el motivo de traslado.',
-        position: 'topRight'
-      });
-      return;
-    }
     if (!this.buscarSerie.trim() || !this.buscarNumero.trim()) {
       iziToast.warning({
         title: 'Datos incompletos',
@@ -1146,9 +1177,9 @@ export class GuiasTransportistaComponent implements OnInit {
       });
       return;
     }
-    if (this.guia.motivoTraslado === '02') {
+    if (this.esOrigenCompraBienes()) {
       iziToast.info({
-        title: 'Motivo compra',
+        title: 'Origen compra',
         message:
           'La búsqueda interna solo lista comprobantes de venta emitidos por su empresa. Para una compra use «Consultar en SUNAT (Factiliza)».',
         position: 'topRight'
@@ -1162,11 +1193,14 @@ export class GuiasTransportistaComponent implements OnInit {
       next: (res: any) => {
         if (res?.data) {
           this.modoItemsTransportista = 'desde_comprobante';
+          this.origenBienesTransporte = 'venta';
           this.itemsManualesGre = [this.nuevaFilaItemManual()];
           this.comprobanteOrigen = res.data;
           delete this.comprobanteOrigen.origenDesdeCompraSunat;
           this.limpiarOrigenProveedorGre();
           this.guia.tipoComprobanteOrigen = String(res.data.tipoComprobante || '01').trim();
+          this.guia.motivoTraslado = '';
+          this.guia.descripcionMotivo = '';
           this.cargarDireccionesDestinoLocal(res.data);
           this.prefillDestinatarioDesdeComprobante(res.data);
         } else {
@@ -1305,45 +1339,331 @@ export class GuiasTransportistaComponent implements OnInit {
     });
   }
 
-  /** Consulta RUC (Factiliza) y completa razón social del destinatario. */
+  /**
+   * Extrae razón social / nombre y dirección desde respuestas Factiliza (RUC/DNI).
+   */
+  private extraerRazonYDireccionConsultaExterna(res: unknown): {
+    razonSocial: string;
+    direccion: string;
+    ubigeo: string;
+  } {
+    const o = res && typeof res === 'object' ? (res as Record<string, unknown>) : null;
+    if (!o) {
+      return { razonSocial: '', direccion: '', ubigeo: '' };
+    }
+    const data =
+      o['data'] !== undefined && o['data'] !== null && typeof o['data'] === 'object' && !Array.isArray(o['data'])
+        ? (o['data'] as Record<string, unknown>)
+        : o;
+    const razonSocial = String(
+      data['razonSocial'] ??
+        data['nombre_o_razon_social'] ??
+        data['razon_social'] ??
+        data['nombre'] ??
+        o['razonSocial'] ??
+        ''
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
+    const direccion = String(
+      data['direccion_completa'] ??
+        data['direccionCompleta'] ??
+        data['direccion'] ??
+        data['domicilioFiscal'] ??
+        ''
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
+    const ubigeo = String(data['ubigeo'] ?? data['ubigeo_sunat'] ?? '')
+      .replace(/\D/g, '')
+      .slice(0, 6);
+    return { razonSocial, direccion, ubigeo };
+  }
+
+  private mapDireccionClienteGreRow(d: Record<string, unknown>): Record<string, unknown> {
+    return {
+      idDireccionClientes: d['idDireccionClientes'],
+      direccion: String(d['direccion'] || '').trim(),
+      ubigeo: String(d['ubigeo'] || '').replace(/\D/g, '').slice(0, 6),
+      referencia: String(d['referencia'] || '').trim() || 'Cliente',
+      codLocal: String(d['codLocal'] || '').trim(),
+      region: String(d['region'] || '').trim(),
+      provincia: String(d['provincia'] || '').trim(),
+      distrito: String(d['distrito'] || '').trim(),
+      principal: d['principal'] === true || d['principal'] === 1
+    };
+  }
+
+  private mapDireccionProveedorGreRowLocal(d: Record<string, unknown>): Record<string, unknown> {
+    return this.mapDireccionProveedorGreRow(d);
+  }
+
+  /** Carga direcciones del cliente en el selector de destino (punto de llegada SUNAT). */
+  private cargarDireccionesDestinoDesdeClienteId(idCliente: number, clienteRow?: Record<string, unknown>): void {
+    this.clienteService.obtener_direccionesCliente_idCliente(idCliente).subscribe({
+      next: (res: { data?: unknown[] }) => {
+        const listaRaw = Array.isArray(res?.data) ? res.data : [];
+        const lista = listaRaw
+          .filter((d) => String((d as Record<string, unknown>)?.['direccion'] || '').trim().length > 0)
+          .map((d) => this.mapDireccionClienteGreRow(d as Record<string, unknown>));
+        if (lista.length > 0) {
+          this.direccionesDestinoLocal = lista;
+          this.direccionDestinoSeleccionada = lista.find((x) => x['principal']) || lista[0];
+          return;
+        }
+        this.aplicarDireccionDestinoDesdeFila(clienteRow || {});
+      },
+      error: () => this.aplicarDireccionDestinoDesdeFila(clienteRow || {})
+    });
+  }
+
+  private aplicarDireccionDestinoDesdeFila(row: Record<string, unknown>): void {
+    const dir = String(row['direccion'] || '').trim();
+    if (!dir) {
+      return;
+    }
+    const destino = {
+      direccion: dir,
+      ubigeo: String(row['ubigeo'] || '').replace(/\D/g, '').slice(0, 6),
+      codLocal: String(row['codLocal'] || '').trim(),
+      region: String(row['region'] || '').trim(),
+      provincia: String(row['provincia'] || '').trim(),
+      distrito: String(row['distrito'] || '').trim(),
+      referencia: 'Destinatario'
+    };
+    this.direccionesDestinoLocal = [destino];
+    this.direccionDestinoSeleccionada = destino;
+  }
+
+  private aplicarDireccionDestinoConsultaExterna(direccion: string, ubigeo?: string): void {
+    const dir = String(direccion || '').trim();
+    if (!dir) {
+      return;
+    }
+    const destino = {
+      direccion: dir,
+      ubigeo: String(ubigeo || '').replace(/\D/g, '').slice(0, 6),
+      codLocal: '',
+      referencia: 'Consulta externa'
+    };
+    this.direccionesDestinoLocal = [destino, ...this.direccionesDestinoLocal.filter((x) => x.direccion !== dir)];
+    this.direccionDestinoSeleccionada = destino;
+  }
+
+  /** Carga direcciones del proveedor/cliente como origen (punto de partida SUNAT). */
+  private cargarDireccionesOrigenDesdeProveedorId(idProveedor: number, row?: Record<string, unknown>): void {
+    this.proveedoresService.obtener_direccionesProveedor_idProveedor(idProveedor).subscribe({
+      next: (res: { data?: unknown[] }) => {
+        const raw = Array.isArray(res?.data) ? res.data : [];
+        const lista = raw
+          .filter((d) => String((d as Record<string, unknown>)?.['direccion'] || '').trim().length > 0)
+          .map((d) => this.mapDireccionProveedorGreRowLocal(d as Record<string, unknown>));
+        if (lista.length > 0) {
+          this.direccionesOrigenProveedorGre = lista;
+          this.usarOrigenDireccionesProveedor = true;
+          this.direccionOrigenSeleccionada = lista.find((x) => x['principal']) || lista[0];
+          return;
+        }
+        this.aplicarDireccionOrigenDesdeFila(row || {});
+      },
+      error: () => this.aplicarDireccionOrigenDesdeFila(row || {})
+    });
+  }
+
+  private cargarDireccionesOrigenDesdeClienteId(idCliente: number, row?: Record<string, unknown>): void {
+    this.clienteService.obtener_direccionesCliente_idCliente(idCliente).subscribe({
+      next: (res: { data?: unknown[] }) => {
+        const listaRaw = Array.isArray(res?.data) ? res.data : [];
+        const lista = listaRaw
+          .filter((d) => String((d as Record<string, unknown>)?.['direccion'] || '').trim().length > 0)
+          .map((d) => this.mapDireccionClienteGreRow(d as Record<string, unknown>));
+        if (lista.length > 0) {
+          // Reutiliza lista de origen proveedor para no mezclar con almacenes empresa
+          this.direccionesOrigenProveedorGre = lista;
+          this.usarOrigenDireccionesProveedor = true;
+          this.direccionOrigenSeleccionada = lista.find((x) => x['principal']) || lista[0];
+          return;
+        }
+        this.aplicarDireccionOrigenDesdeFila(row || {});
+      },
+      error: () => this.aplicarDireccionOrigenDesdeFila(row || {})
+    });
+  }
+
+  private aplicarDireccionOrigenDesdeFila(row: Record<string, unknown>): void {
+    const dir = String(row['direccion'] || '').trim();
+    if (!dir) {
+      return;
+    }
+    const origen = {
+      direccion: dir,
+      ubigeo: String(row['ubigeo'] || '').replace(/\D/g, '').slice(0, 6),
+      codLocal: String(row['codLocal'] || '').trim(),
+      region: String(row['region'] || '').trim(),
+      provincia: String(row['provincia'] || '').trim(),
+      distrito: String(row['distrito'] || '').trim(),
+      referencia: 'Remitente',
+      principal: true
+    };
+    this.direccionesOrigenProveedorGre = [origen];
+    this.usarOrigenDireccionesProveedor = true;
+    this.direccionOrigenSeleccionada = origen;
+  }
+
+  private aplicarDireccionOrigenConsultaExterna(direccion: string, ubigeo?: string): void {
+    const dir = String(direccion || '').trim();
+    if (!dir) {
+      return;
+    }
+    const origen = {
+      direccion: dir,
+      ubigeo: String(ubigeo || '').replace(/\D/g, '').slice(0, 6),
+      codLocal: '',
+      referencia: 'Consulta externa',
+      principal: true
+    };
+    this.direccionesOrigenProveedorGre = [origen];
+    this.usarOrigenDireccionesProveedor = true;
+    this.direccionOrigenSeleccionada = origen;
+  }
+
+  /**
+   * Destinatario: BD clientes → Factiliza. Completa nombre (SUNAT) y dirección de destino (ubigeo).
+   */
   consultarRucDestinatario(): void {
-    const num = (this.destinatario.numeroDoc || '').toString().trim();
+    const num = String(this.destinatario.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    this.destinatario.numeroDoc = num;
     if (num.length !== 11) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese 11 dígitos del RUC.', position: 'topRight' });
       return;
     }
     this.destinatario.tipoDoc = '6';
     this.consultandoDestinatario = true;
+    this.clienteService.obtener_cliente_ruc(num).subscribe({
+      next: (response: { data?: Record<string, unknown>[] }) => {
+        const filas = Array.isArray(response?.data) ? response.data : [];
+        if (filas.length > 0) {
+          const row = filas[0];
+          this.destinatario.numeroDoc = String(row['ruc'] || num).replace(/\D/g, '').slice(0, 11);
+          this.destinatario.razonSocial = String(
+            row['rSocial'] ?? row['r_Social'] ?? row['razonSocial'] ?? row['RazonSocial'] ?? ''
+          ).trim();
+          const idCliente = Number(row['idCliente']);
+          if (Number.isFinite(idCliente) && idCliente > 0) {
+            this.cargarDireccionesDestinoDesdeClienteId(idCliente, row);
+          } else {
+            this.aplicarDireccionDestinoDesdeFila(row);
+          }
+          this.consultandoDestinatario = false;
+          iziToast.success({
+            title: 'Destinatario',
+            message: 'Encontrado en base de datos. Nombre y dirección de destino cargados.',
+            position: 'topRight'
+          });
+          return;
+        }
+        this.consultarRucDestinatarioFactiliza(num);
+      },
+      error: () => this.consultarRucDestinatarioFactiliza(num)
+    });
+  }
+
+  private consultarRucDestinatarioFactiliza(num: string): void {
+    this.consultandoDestinatario = true;
     this.factilizaService.getRuc(num).subscribe({
-      next: (res: any) => {
-        const razon = res?.data?.razonSocial || res?.razonSocial || res?.data?.nombre || '';
-        if (razon) this.destinatario.razonSocial = razon;
+      next: (res: unknown) => {
+        const { razonSocial, direccion, ubigeo } = this.extraerRazonYDireccionConsultaExterna(res);
+        if (razonSocial) {
+          this.destinatario.razonSocial = razonSocial;
+        }
+        if (direccion) {
+          this.aplicarDireccionDestinoConsultaExterna(direccion, ubigeo);
+        }
         this.consultandoDestinatario = false;
+        if (razonSocial) {
+          iziToast.success({
+            title: 'Destinatario',
+            message: direccion
+              ? 'Datos obtenidos de Factiliza (nombre y dirección).'
+              : 'Razón social obtenida de Factiliza. Complete la dirección de destino en el paso 2 si falta ubigeo.',
+            position: 'topRight'
+          });
+        } else {
+          iziToast.info({
+            title: 'Sin datos',
+            message: 'RUC consultado; no se obtuvo razón social. Verifique el número o ingrese el nombre manualmente.',
+            position: 'topRight'
+          });
+        }
       },
       error: () => {
-        iziToast.error({ title: 'Error', message: 'No se pudo consultar el RUC.', position: 'topRight' });
+        iziToast.error({ title: 'Error', message: 'No se pudo consultar el RUC del destinatario.', position: 'topRight' });
         this.consultandoDestinatario = false;
       }
     });
   }
 
-  /** Consulta DNI (Factiliza) y completa razón social del destinatario. */
   consultarDniDestinatario(): void {
-    const num = (this.destinatario.numeroDoc || '').toString().trim();
+    const num = String(this.destinatario.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 8);
+    this.destinatario.numeroDoc = num;
     if (num.length !== 8) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese 8 dígitos del DNI.', position: 'topRight' });
       return;
     }
     this.destinatario.tipoDoc = '1';
     this.consultandoDestinatario = true;
+    this.clienteService.obtener_cliente_ruc(num).subscribe({
+      next: (response: { data?: Record<string, unknown>[] }) => {
+        const filas = Array.isArray(response?.data) ? response.data : [];
+        if (filas.length > 0) {
+          const row = filas[0];
+          this.destinatario.numeroDoc = String(row['ruc'] || num).replace(/\D/g, '').slice(0, 8);
+          this.destinatario.razonSocial = String(
+            row['rSocial'] ?? row['r_Social'] ?? row['razonSocial'] ?? ''
+          ).trim();
+          const idCliente = Number(row['idCliente']);
+          if (Number.isFinite(idCliente) && idCliente > 0) {
+            this.cargarDireccionesDestinoDesdeClienteId(idCliente, row);
+          } else {
+            this.aplicarDireccionDestinoDesdeFila(row);
+          }
+          this.consultandoDestinatario = false;
+          iziToast.success({
+            title: 'Destinatario',
+            message: 'Encontrado en base de datos.',
+            position: 'topRight'
+          });
+          return;
+        }
+        this.consultarDniDestinatarioFactiliza(num);
+      },
+      error: () => this.consultarDniDestinatarioFactiliza(num)
+    });
+  }
+
+  private consultarDniDestinatarioFactiliza(num: string): void {
+    this.consultandoDestinatario = true;
     this.factilizaService.getDni(num).subscribe({
-      next: (res: any) => {
+      next: (res: unknown) => {
         const nombre = extraerNombreCompletoDesdeDni(res);
-        if (nombre) this.destinatario.razonSocial = nombre;
+        const { direccion, ubigeo } = this.extraerRazonYDireccionConsultaExterna(res);
+        if (nombre) {
+          this.destinatario.razonSocial = nombre;
+        }
+        if (direccion) {
+          this.aplicarDireccionDestinoConsultaExterna(direccion, ubigeo);
+        }
         this.consultandoDestinatario = false;
+        if (!nombre) {
+          iziToast.info({ title: 'Sin nombre', message: 'No se obtuvo el nombre del DNI.', position: 'topRight' });
+        }
       },
       error: () => {
-        iziToast.error({ title: 'Error', message: 'No se pudo consultar el DNI.', position: 'topRight' });
+        iziToast.error({ title: 'Error', message: 'No se pudo consultar el DNI del destinatario.', position: 'topRight' });
         this.consultandoDestinatario = false;
       }
     });
@@ -1359,19 +1679,107 @@ export class GuiasTransportistaComponent implements OnInit {
     }
   }
 
+  /**
+   * Remitente GRE 31: BD proveedores → BD clientes → Factiliza.
+   * Completa nombre (DespatchParty) y sugiere dirección de origen (punto de partida).
+   */
   consultarRucRemitente(): void {
-    const num = (this.remitente.numeroDoc || '').toString().trim();
+    const num = String(this.remitente.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
+    this.remitente.numeroDoc = num;
     if (num.length !== 11) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese 11 dígitos del RUC del remitente.', position: 'topRight' });
       return;
     }
     this.remitente.tipoDoc = '6';
     this.consultandoRemitente = true;
+    this.proveedoresService.obtener_proveedor_ruc(num).subscribe({
+      next: (response: { data?: Record<string, unknown>[] }) => {
+        const filas = Array.isArray(response?.data) ? response.data : [];
+        if (filas.length > 0) {
+          const row = filas[0];
+          this.remitente.numeroDoc = String(row['ruc'] || num).replace(/\D/g, '').slice(0, 11);
+          this.remitente.razonSocial = String(
+            row['rSocial'] ?? row['razonSocial'] ?? row['RazonSocial'] ?? ''
+          ).trim();
+          const idProveedor = Number(row['idProveedor']);
+          if (Number.isFinite(idProveedor) && idProveedor > 0) {
+            this.cargarDireccionesOrigenDesdeProveedorId(idProveedor, row);
+          } else {
+            this.aplicarDireccionOrigenDesdeFila(row);
+          }
+          this.consultandoRemitente = false;
+          iziToast.success({
+            title: 'Remitente',
+            message: 'Proveedor encontrado en base de datos. Nombre y origen cargados.',
+            position: 'topRight'
+          });
+          return;
+        }
+        this.buscarRemitenteEnClientesBd(num);
+      },
+      error: () => this.buscarRemitenteEnClientesBd(num)
+    });
+  }
+
+  private buscarRemitenteEnClientesBd(num: string): void {
+    this.clienteService.obtener_cliente_ruc(num).subscribe({
+      next: (response: { data?: Record<string, unknown>[] }) => {
+        const filas = Array.isArray(response?.data) ? response.data : [];
+        if (filas.length > 0) {
+          const row = filas[0];
+          this.remitente.numeroDoc = String(row['ruc'] || num).replace(/\D/g, '').slice(0, 11);
+          this.remitente.razonSocial = String(
+            row['rSocial'] ?? row['r_Social'] ?? row['razonSocial'] ?? ''
+          ).trim();
+          const idCliente = Number(row['idCliente']);
+          if (Number.isFinite(idCliente) && idCliente > 0) {
+            this.cargarDireccionesOrigenDesdeClienteId(idCliente, row);
+          } else {
+            this.aplicarDireccionOrigenDesdeFila(row);
+          }
+          this.consultandoRemitente = false;
+          iziToast.success({
+            title: 'Remitente',
+            message: 'Encontrado en clientes. Nombre y origen cargados.',
+            position: 'topRight'
+          });
+          return;
+        }
+        this.consultarRucRemitenteFactiliza(num);
+      },
+      error: () => this.consultarRucRemitenteFactiliza(num)
+    });
+  }
+
+  private consultarRucRemitenteFactiliza(num: string): void {
+    this.consultandoRemitente = true;
     this.factilizaService.getRuc(num).subscribe({
-      next: (res: any) => {
-        const razon = res?.data?.razonSocial || res?.razonSocial || res?.data?.nombre || '';
-        if (razon) this.remitente.razonSocial = razon;
+      next: (res: unknown) => {
+        const { razonSocial, direccion, ubigeo } = this.extraerRazonYDireccionConsultaExterna(res);
+        if (razonSocial) {
+          this.remitente.razonSocial = razonSocial;
+        }
+        if (direccion) {
+          this.aplicarDireccionOrigenConsultaExterna(direccion, ubigeo);
+        }
         this.consultandoRemitente = false;
+        if (razonSocial) {
+          iziToast.success({
+            title: 'Remitente',
+            message: direccion
+              ? 'Datos obtenidos de Factiliza (nombre y punto de partida sugerido).'
+              : 'Razón social obtenida de Factiliza. Complete/revise la dirección de origen en el paso 2.',
+            position: 'topRight'
+          });
+        } else {
+          iziToast.info({
+            title: 'Sin datos',
+            message: 'RUC consultado; no se obtuvo razón social. Ingrese el nombre manualmente.',
+            position: 'topRight'
+          });
+        }
       },
       error: () => {
         iziToast.error({ title: 'Error', message: 'No se pudo consultar el RUC del remitente.', position: 'topRight' });
@@ -1381,18 +1789,56 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   consultarDniRemitente(): void {
-    const num = (this.remitente.numeroDoc || '').toString().trim();
+    const num = String(this.remitente.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 8);
+    this.remitente.numeroDoc = num;
     if (num.length !== 8) {
       iziToast.warning({ title: 'Aviso', message: 'Ingrese 8 dígitos del DNI del remitente.', position: 'topRight' });
       return;
     }
     this.remitente.tipoDoc = '1';
     this.consultandoRemitente = true;
+    this.clienteService.obtener_cliente_ruc(num).subscribe({
+      next: (response: { data?: Record<string, unknown>[] }) => {
+        const filas = Array.isArray(response?.data) ? response.data : [];
+        if (filas.length > 0) {
+          const row = filas[0];
+          this.remitente.razonSocial = String(
+            row['rSocial'] ?? row['r_Social'] ?? row['razonSocial'] ?? ''
+          ).trim();
+          const idCliente = Number(row['idCliente']);
+          if (Number.isFinite(idCliente) && idCliente > 0) {
+            this.cargarDireccionesOrigenDesdeClienteId(idCliente, row);
+          } else {
+            this.aplicarDireccionOrigenDesdeFila(row);
+          }
+          this.consultandoRemitente = false;
+          iziToast.success({ title: 'Remitente', message: 'Encontrado en base de datos.', position: 'topRight' });
+          return;
+        }
+        this.consultarDniRemitenteFactiliza(num);
+      },
+      error: () => this.consultarDniRemitenteFactiliza(num)
+    });
+  }
+
+  private consultarDniRemitenteFactiliza(num: string): void {
+    this.consultandoRemitente = true;
     this.factilizaService.getDni(num).subscribe({
-      next: (res: any) => {
+      next: (res: unknown) => {
         const nombre = extraerNombreCompletoDesdeDni(res);
-        if (nombre) this.remitente.razonSocial = nombre;
+        const { direccion, ubigeo } = this.extraerRazonYDireccionConsultaExterna(res);
+        if (nombre) {
+          this.remitente.razonSocial = nombre;
+        }
+        if (direccion) {
+          this.aplicarDireccionOrigenConsultaExterna(direccion, ubigeo);
+        }
         this.consultandoRemitente = false;
+        if (!nombre) {
+          iziToast.info({ title: 'Sin nombre', message: 'No se obtuvo el nombre del DNI.', position: 'topRight' });
+        }
       },
       error: () => {
         iziToast.error({ title: 'Error', message: 'No se pudo consultar el DNI del remitente.', position: 'topRight' });
@@ -1406,9 +1852,8 @@ export class GuiasTransportistaComponent implements OnInit {
     if (!ruc) {
       iziToast.warning({
         title: 'Sin RUC',
-        message: this.esMotivoCompraGre()
-          ? 'Indique RUC proveedor, elija proveedor desde el catálogo o cargue el comprobante de compra.'
-          : 'No se pudo obtener el RUC de su empresa para anexos del almacén de origen.',
+        message:
+          'Indique el RUC del remitente (paso 4), el RUC del proveedor o cargue un comprobante con RUC emisor.',
         position: 'topRight'
       });
       return;
@@ -1435,27 +1880,25 @@ export class GuiasTransportistaComponent implements OnInit {
   }
 
   consultarAnexosDestinoPorRuc(): void {
+    const rucDestinatarioForm = String(this.destinatario.numeroDoc || '')
+      .replace(/\D/g, '')
+      .slice(0, 11);
     const rucClienteDesdeComprobante = String(
       this.comprobanteOrigen?.documento_cliente || this.comprobanteOrigen?.rucCliente || ''
     )
       .replace(/\D/g, '')
       .slice(0, 11);
-    const rucDestinatarioForm = String(this.destinatario.numeroDoc || '')
-      .replace(/\D/g, '')
-      .slice(0, 11);
-    const ruc = this.esMotivoCompraGre()
+    const ruc = this.esOrigenCompraBienes()
       ? this.rucMiEmpresaNormalizado()
-      : this.modoItemsTransportista === 'manual' || !this.comprobanteOrigen
+      : rucDestinatarioForm.length === 11
         ? rucDestinatarioForm
         : rucClienteDesdeComprobante;
     if (!ruc || String(ruc).length !== 11) {
       iziToast.warning({
         title: 'Sin RUC',
-        message: this.esMotivoCompraGre()
+        message: this.esOrigenCompraBienes()
           ? 'No hay RUC de su empresa para consultar anexos del almacén de destino.'
-          : this.modoItemsTransportista === 'manual' || !this.comprobanteOrigen
-            ? 'Ingrese el RUC o DNI del destinatario (sección 4) para consultar anexos SUNAT.'
-            : 'El comprobante no tiene RUC del cliente destinatario.',
+          : 'Ingrese el RUC del destinatario (paso 3) para consultar anexos SUNAT.',
         position: 'topRight'
       });
       return;
@@ -1542,10 +1985,6 @@ export class GuiasTransportistaComponent implements OnInit {
         message: 'Busque el comprobante de origen (factura o boleta) o use «Carga manual de ítems».',
         position: 'topRight'
       });
-      return;
-    }
-    if (!this.guia.motivoTraslado) {
-      iziToast.warning({ title: 'Campo requerido', message: 'Seleccione el motivo de traslado.', position: 'topRight' });
       return;
     }
     if (!this.guia.fechaInicioTraslado) {
@@ -1645,8 +2084,9 @@ export class GuiasTransportistaComponent implements OnInit {
 
     const payload: RegistrarGuiaPayload = {
       tipoGuia: 'TRANSPORTISTA',
-      motivoTraslado: this.guia.motivoTraslado,
-      descripcionMotivo: this.guia.descripcionMotivo || '',
+      // GRE 31 no usa motivo de traslado (HandlingCode); se omite en XML SUNAT.
+      motivoTraslado: '',
+      descripcionMotivo: '',
       fechaEmision: this.guia.fechaInicioTraslado,
       horaInicioTraslado: this.guia.horaInicioTraslado || '',
       cantidadPeso: this.guia.cantidadPeso ?? null,
@@ -1803,13 +2243,11 @@ export class GuiasTransportistaComponent implements OnInit {
     const tipoDoc = guia?.tipoDocumento === '31' ? 'GUÍA DE REMISIÓN TRANSPORTISTA' : 'GUÍA DE REMISIÓN REMITENTE';
     const codSunat = guia?.tipoDocumento === '31' ? '31' : '09';
     const fecha = (guia?.fechaEmision ?? '').slice(0, 10);
-    const motivoMap: Record<string, string> = {
-      '01': 'Venta', '02': 'Compra', '04': 'Traslado entre establecimientos',
-      '08': 'Importación', '09': 'Exportación', '13': 'Otros'
-    };
-    const motivo = motivoMap[d.motivoTraslado ?? ''] || d.motivoTraslado || '—';
-    const modalidad = d.modalidadTransporte === '01' ? 'Público' : 'Privado';
     const peso = d.cantidadPeso != null ? `${d.cantidadPeso} ${d.unidadMedidaPeso ?? 'KGM'}` : '—';
+    const docRel =
+      d.comprobanteOrigenSerie && d.comprobanteOrigenNumero
+        ? `${d.comprobanteOrigenSerie}-${d.comprobanteOrigenNumero}`
+        : '—';
 
     const es31 = guia?.tipoDocumento === '31';
     const mostrarFirmas = es31;
@@ -1838,6 +2276,20 @@ export class GuiasTransportistaComponent implements OnInit {
       : guia?.idEstadoSunat === 98 ? '<span style="color:#b91c1c;font-weight:700">ERROR</span>'
       : '<span style="color:#78716c;font-weight:700">PENDIENTE</span>';
 
+    const filaTrasladoExtra = es31
+      ? `<tr><td>Peso bruto</td><td>${peso}</td><td>Doc. relacionado</td><td>${docRel}</td></tr>
+  <tr><td>Pagador flete</td><td colspan="3">${d.indicadorPagadorFlete || 'Sin pagador de flete'}</td></tr>`
+      : (() => {
+          const motivoMap: Record<string, string> = {
+            '01': 'Venta', '02': 'Compra', '04': 'Traslado entre establecimientos',
+            '08': 'Importación', '09': 'Exportación', '13': 'Otros'
+          };
+          const motivo = motivoMap[d.motivoTraslado ?? ''] || d.motivoTraslado || '—';
+          const modalidad = d.modalidadTransporte === '01' ? 'Público' : 'Privado';
+          return `<tr><td>Motivo</td><td>${motivo}${d.descripcionMotivo ? ' — ' + d.descripcionMotivo : ''}</td><td>Modalidad</td><td>${modalidad}</td></tr>
+  <tr><td>Peso bruto</td><td>${peso}</td><td>Doc. origen</td><td>${docRel}</td></tr>`;
+        })();
+
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <style>${estilosGrePdfInline(formato)}</style></head><body>
 <div class="header">
@@ -1848,8 +2300,7 @@ export class GuiasTransportistaComponent implements OnInit {
 <div class="sec">DATOS DEL TRASLADO</div>
 <table class="info">
   <tr><td>Fecha</td><td>${fecha}</td><td>Hora</td><td>${d.horaInicioTraslado ?? '—'}</td></tr>
-  <tr><td>Motivo</td><td>${motivo}${d.descripcionMotivo ? ' — ' + d.descripcionMotivo : ''}</td><td>Modalidad</td><td>${modalidad}</td></tr>
-  <tr><td>Peso bruto</td><td>${peso}</td><td>Doc. origen</td><td>${d.comprobanteOrigenSerie && d.comprobanteOrigenNumero ? d.comprobanteOrigenSerie + '-' + d.comprobanteOrigenNumero : '—'}</td></tr>
+  ${filaTrasladoExtra}
 </table>
 <div class="sec">DESTINATARIO</div>
 <table class="info">

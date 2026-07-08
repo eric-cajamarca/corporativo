@@ -17,6 +17,8 @@ export interface BuscadorProductosVentaOpciones {
   onPrecargarCatalogo?: () => void;
   /** Resalta filas ya presentes en el detalle de venta (gris). */
   estaEnDetalle?: (row: ProductoSeleccionado) => boolean;
+  /** Config ventas: cantidad + ver precios en el buscador (la empresa del JWT). */
+  mostrarCantidadPreciosEnBuscador?: boolean;
 }
 
 export interface BuscadorProductosModalOpciones {

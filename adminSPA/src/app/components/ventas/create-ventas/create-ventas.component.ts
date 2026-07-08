@@ -199,6 +199,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Config > Ventas: mostrar modal PDF/WhatsApp al registrar venta (por defecto activo). */
   mostrarModalPdfTrasRegistrarVenta = true;
+  /** Config ventas: cantidad + ver precios en buscador de productos */
+  mostrarCantidadPreciosEnBuscador = false;
 
   /** Modal comprobante PDF tras registrar venta */
   postVentaIdVenta: number | null = null;
@@ -350,6 +352,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           String(c?.clave ?? c?.Clave ?? '')
             .trim()
             .toUpperCase();
+        const getVal = (clave: string, def: string) => {
+          const item = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === clave);
+          const raw =
+            item && (item as { valor?: string; Valor?: string }).valor !== undefined
+              ? (item as { valor?: string; Valor?: string }).valor
+              : (item as { valor?: string; Valor?: string })?.Valor;
+          return raw != null ? String(raw) : def;
+        };
         const itemDesc = lista.find((c: { clave?: string; Clave?: string }) => normClave(c) === 'VENTAS_USAR_DESCUENTO_EN_TOTAL');
         const vDesc =
           itemDesc && (itemDesc as { valor?: string; Valor?: string }).valor !== undefined
@@ -364,6 +374,10 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
             ? (itemPdfModal as { valor?: string; Valor?: string }).valor
             : (itemPdfModal as { valor?: string; Valor?: string })?.Valor;
         this.mostrarModalPdfTrasRegistrarVenta = interpretarBooleanoConfig(vPdfModal, true);
+        this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR', 'false'),
+          false
+        );
         const itemPermNeg = lista.find(
           (c: { clave?: string; Clave?: string }) => normClave(c) === 'INVENTARIO_PERMITIR_VENTAS_NEGATIVAS'
         );
@@ -432,6 +446,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         this.esEmpresaGestionada = !!(estado as { esEmpresaGestionada?: boolean })?.esEmpresaGestionada;
         if (this.esGestora) {
           this.cargarDescuentoPorEmpresaGestora();
+          // Evitar catálogo en memoria de una carga previa sin empresas gestionadas.
+          this._productoService.limpiarCacheListaProductos();
         }
         if (!this.esGestora) {
           this._productoService.limpiarCacheListaProductos();
@@ -1314,6 +1330,29 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   abrirBuscadorProductos(): void {
+    this.gestoresService.obtenerConfiguracion({ evitarCache: true }).subscribe({
+      next: (res) => {
+        const lista = Array.isArray(res?.data) ? res.data : [];
+        const normClave = (c: { clave?: string; Clave?: string }) =>
+          String(c?.clave ?? c?.Clave ?? '')
+            .trim()
+            .toUpperCase();
+        const item = lista.find(
+          (c: { clave?: string; Clave?: string }) =>
+            normClave(c) === 'VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR'
+        );
+        const raw =
+          item && (item as { valor?: string; Valor?: string }).valor !== undefined
+            ? (item as { valor?: string; Valor?: string }).valor
+            : (item as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(raw, false);
+        this.abrirBuscadorProductosModal();
+      },
+      error: () => this.abrirBuscadorProductosModal()
+    });
+  }
+
+  private abrirBuscadorProductosModal(): void {
     this.buscadorProductosModal.abrir({
       modo: 'venta',
       conservarUltimaBusqueda: true,
@@ -1325,7 +1364,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         buscarLocal: (term) => this.buscarEnCatalogoLocal(term),
         filtrarFila: (row) => this.productoPerteneceEmpresaOperativa(row),
         onPrecargarCatalogo: () => this.precargarCatalogoProductosEnSegundoPlano(),
-        estaEnDetalle: (p) => this.productoYaEnCarrito(p)
+        estaEnDetalle: (p) => this.productoYaEnCarrito(p),
+        mostrarCantidadPreciosEnBuscador: this.mostrarCantidadPreciosEnBuscador
       }
     }).then((prod) => {
       if (!prod) {
@@ -1487,22 +1527,36 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
     }
+    const cantAgregar = Math.max(
+      0.000001,
+      Number(producto?.cantidadSeleccionada) > 0 ? Number(producto.cantidadSeleccionada) : 1
+    );
+    const precioElegido =
+      producto?.pVentaSeleccionada != null && !Number.isNaN(Number(producto.pVentaSeleccionada))
+        ? Number(producto.pVentaSeleccionada)
+        : producto?.pVenta != null && !Number.isNaN(Number(producto.pVenta))
+          ? Number(producto.pVenta)
+          : undefined;
+
     const existe = this.carrito.find(p =>
       String(p.idProducto) === String(producto.idProducto) &&
       String(p.idSucursal || '') === String(producto.idSucursal || this.ventas.idSucursal || '') &&
       String(p.idEmpresa || '') === String(producto.idEmpresa || '')
     );
     if (existe) {
-      const cantNueva = (Number(existe.cantidad) || 0) + 1;
+      const cantNueva = (Number(existe.cantidad) || 0) + cantAgregar;
       const stockVal = this.validarStockAgregarAlCarrito(existe, cantNueva);
       if (!stockVal.valido) {
         iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
         return;
       }
       existe.cantidad = cantNueva;
+      if (precioElegido != null) {
+        existe.pVenta = precioElegido;
+      }
       this.enriquecerLineaCarritoDesdeCatalogo(existe);
     } else {
-      const stockVal = this.validarStockAgregarAlCarrito(producto, 1);
+      const stockVal = this.validarStockAgregarAlCarrito(producto, cantAgregar);
       if (!stockVal.valido) {
         iziToast.warning({ title: 'Stock', message: stockVal.mensaje || 'Stock insuficiente.', position: 'topRight' });
         return;
@@ -1510,13 +1564,14 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
       const descCat = (producto.descripcion ?? '').toString().trim();
       this.carrito.push({
         ...producto,
-        cantidad: 1,
+        cantidad: cantAgregar,
+        ...(precioElegido != null ? { pVenta: precioElegido } : {}),
         descripcionOriginal: descCat,
         permiteDescripcionEnVenta: !!(producto.permiteDescripcionEnVenta === true || producto.permiteDescripcionEnVenta === 1)
       });
       const agregado = this.carrito[this.carrito.length - 1];
       this.enriquecerLineaCarritoDesdeCatalogo(agregado);
-            }
+    }
     this.actualizaTotales();
   }
 

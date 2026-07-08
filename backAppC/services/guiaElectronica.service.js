@@ -1135,17 +1135,20 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
     throw new Error("RUC de empresa inválido para GRE: revise el campo ruc en Empresas (11 dígitos).");
   }
 
-  if (!datos.motivoTraslado) throw new Error("El motivo de traslado es requerido.");
+  const tipoGuia = guia.tipoRol === "TRANSPORTISTA" ? "TRANSPORTISTA" : "REMITENTE";
+  const tipoDoc = String(guia.tipoDocumento || "09").trim();
+  const serie = String(guia.serie || "").trim();
+  const numStr = String(guia.numero || "").trim();
+
+  // GRE remitente (09) exige motivo; GRE transportista (31) no lo usa (SIN HandlingCode en XML SUNAT).
+  if (tipoDoc !== "31" && !datos.motivoTraslado) {
+    throw new Error("El motivo de traslado es requerido.");
+  }
   const fechaYmd = normalizarFechaEmisionGreYmd(datos.fechaEmision);
   if (!fechaYmd) throw new Error("La fecha de inicio de traslado es requerida (formato YYYY-MM-DD).");
   if (!datos.dirOrigen) throw new Error("La dirección de origen es requerida.");
   if (!datos.dirDestino) throw new Error("La dirección de destino es requerida.");
   if (!datos.nomDestinatario) throw new Error("Los datos del destinatario son requeridos.");
-
-  const tipoGuia = guia.tipoRol === "TRANSPORTISTA" ? "TRANSPORTISTA" : "REMITENTE";
-  const tipoDoc = String(guia.tipoDocumento || "09").trim();
-  const serie = String(guia.serie || "").trim();
-  const numStr = String(guia.numero || "").trim();
 
   const datosGuiaJson = {
     tipoGuia,
@@ -1154,8 +1157,8 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
     numero: numStr,
     fechaEmision: fechaYmd,
     horaInicioTraslado: datos.horaInicioTraslado || "",
-    motivoTraslado: datos.motivoTraslado,
-    descripcionMotivo: datos.descripcionMotivo || "",
+    motivoTraslado: tipoDoc === "31" ? "" : datos.motivoTraslado,
+    descripcionMotivo: tipoDoc === "31" ? "" : (datos.descripcionMotivo || ""),
     modalidadTransporte: datos.modalidadTransporte,
     cantidadPeso: datos.cantidadPeso,
     unidadMedidaPeso: datos.unidadMedidaPeso || "KGM",
@@ -1212,7 +1215,7 @@ exports.actualizarGuiaService = async (pool, user, idGuiaElectronica, datos) => 
 
   const ok = await guiaRepo.actualizarGuiaDatosRepo(pool, idGuiaElectronica, idEmpresa, {
     fechaEmision: new Date(`${fechaYmd}T12:00:00`),
-    motivoTraslado: datos.motivoTraslado || null,
+    motivoTraslado: tipoDoc === "31" ? null : (datos.motivoTraslado || null),
     comprobanteOrigenSerie: datos.comprobanteOrigenSerie || null,
     comprobanteOrigenNumero: datos.comprobanteOrigenNumero || null,
     datosGuia: datosGuiaJson
@@ -1259,15 +1262,18 @@ exports.registrarGuiaService = async (pool, user, datos) => {
     throw new Error("RUC de empresa inválido para GRE: revise el campo ruc en Empresas (11 dígitos).");
   }
 
-  if (!datos.motivoTraslado) throw new Error("El motivo de traslado es requerido.");
+  const tipoGuia    = datos.tipoGuia === "TRANSPORTISTA" ? "TRANSPORTISTA" : "REMITENTE";
+  const tipoDoc     = tipoGuia === "TRANSPORTISTA" ? "31" : "09";
+  // GRE remitente (09) exige motivo; GRE transportista (31) no lo usa.
+  if (tipoDoc !== "31" && !datos.motivoTraslado) {
+    throw new Error("El motivo de traslado es requerido.");
+  }
   const fechaYmd = normalizarFechaEmisionGreYmd(datos.fechaEmision);
   if (!fechaYmd) throw new Error("La fecha de inicio de traslado es requerida (formato YYYY-MM-DD).");
   if (!datos.dirOrigen)       throw new Error("La dirección de origen es requerida.");
   if (!datos.dirDestino)      throw new Error("La dirección de destino es requerida.");
   if (!datos.nomDestinatario) throw new Error("Los datos del destinatario son requeridos.");
 
-  const tipoGuia    = datos.tipoGuia === "TRANSPORTISTA" ? "TRANSPORTISTA" : "REMITENTE";
-  const tipoDoc     = tipoGuia === "TRANSPORTISTA" ? "31" : "09";
   const serie       = tipoGuia === "TRANSPORTISTA" ? "V001" : "T001";
   const numero      = await guiaRepo.siguienteNumeroGuiaRepo(pool, idEmpresa, serie);
   const numStr      = String(numero).padStart(8, "0");
@@ -1277,8 +1283,8 @@ exports.registrarGuiaService = async (pool, user, datos) => {
     tipoGuia, tipoDocumento: tipoDoc, serie, numero: numStr,
     fechaEmision      : fechaYmd,
     horaInicioTraslado: datos.horaInicioTraslado || "",
-    motivoTraslado    : datos.motivoTraslado,
-    descripcionMotivo : datos.descripcionMotivo || "",
+    motivoTraslado    : tipoDoc === "31" ? "" : datos.motivoTraslado,
+    descripcionMotivo : tipoDoc === "31" ? "" : (datos.descripcionMotivo || ""),
     modalidadTransporte: datos.modalidadTransporte,
     cantidadPeso      : datos.cantidadPeso,
     unidadMedidaPeso  : datos.unidadMedidaPeso || "KGM",
@@ -1345,7 +1351,7 @@ exports.registrarGuiaService = async (pool, user, datos) => {
     comprobanteOrigenSerie  : datos.comprobanteOrigenSerie || null,
     comprobanteOrigenNumero : datos.comprobanteOrigenNumero
       ? String(datos.comprobanteOrigenNumero).padStart(8, "0") : null,
-    motivoTraslado  : datos.motivoTraslado || null,
+    motivoTraslado  : tipoDoc === "31" ? null : (datos.motivoTraslado || null),
     datosGuia       : datosGuiaJson
   });
 

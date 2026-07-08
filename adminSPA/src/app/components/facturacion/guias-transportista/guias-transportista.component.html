@@ -8,9 +8,12 @@
     <div class="row">
       <div class="col-12">
         <h1 class="h4 mb-3">
-          <i class="bi bi-truck me-2"></i> Guía de remisión transportista (SUNAT 31)
+          <i class="bi bi-truck me-2"></i> Guía de remisión transportista
         </h1>
-        <p class="text-muted small mb-3">Usted actúa como transportista. Indique el remitente de la mercadería, destinatario, direcciones con ubigeo y vehículo/conductor según SUNAT.</p>
+        <p class="text-muted small mb-3">
+          Usted actúa como transportista (GRE SUNAT tipo <strong>31</strong>). En esta guía no se informa motivo de traslado.
+          Indique el documento relacionado, remitente, destinatario, direcciones con ubigeo y vehículo/conductor.
+        </p>
       </div>
     </div>
 
@@ -41,45 +44,11 @@
     } @else {
     <div class="row">
       <div class="col-12">
-        <div class="card shadow-sm mb-3 border-primary border-opacity-25">
-          <div class="card-header bg-primary bg-opacity-10">
-            <h2 class="h6 mb-0 text-primary">
-              <i class="bi bi-flag me-2"></i> 1. Motivo de traslado (defina primero cómo cargará el documento relacionado)
-            </h2>
-          </div>
-          <div class="card-body">
-            <div class="row g-2 align-items-end">
-              <div class="col-md-4">
-                <label class="form-label">Motivo (catálogo SUNAT) <span class="text-danger">*</span></label>
-                <select class="form-select form-select-sm" [(ngModel)]="guia.motivoTraslado" (ngModelChange)="onMotivoTrasladoGreChange()" required>
-                  <option value="">Seleccione motivo…</option>
-                  @for (m of motivosTraslado; track m.codigoSunat) {
-                    <option [value]="m.codigoSunat">{{ m.codigoSunat }} — {{ m.descripcion }}</option>
-                  }
-                </select>
-              </div>
-              <div class="col-md-8">
-                <label class="form-label">Descripción del motivo</label>
-                <input type="text" class="form-control form-control-sm" [(ngModel)]="guia.descripcionMotivo" placeholder="Detalle opcional (SUNAT)">
-              </div>
-            </div>
-            <p class="small text-muted mb-0 mt-2">
-              <strong>01 Venta</strong> u otros (distintos de 02): podrá usar «Buscar comprobante» en ventas internas (si el documento relacionado no es guía 09).
-              <strong>02 Compra:</strong> se mostrará la consulta en SUNAT (Factiliza) con su clave SOL y el RUC del proveedor.
-            </p>
-          </div>
-        </div>
-
-        @if (!guia.motivoTraslado) {
-          <div class="alert alert-secondary mb-3">
-            <i class="bi bi-arrow-up-circle me-2"></i> Seleccione el <strong>motivo de traslado</strong> arriba para continuar con el documento relacionado y el resto del formulario.
-          </div>
-        }
-
-        <div class="card shadow-sm mb-3" *ngIf="guia.motivoTraslado">
+        <div class="card shadow-sm mb-3">
           <div class="card-header bg-light">
             <h2 class="h6 mb-0">
-              <i class="bi bi-search me-2"></i> 2. Documento relacionado al transporte (SUNAT cat. 61)
+              <i class="bi bi-search me-2"></i> 1. Documento relacionado al transporte (SUNAT cat. 61)
+              <span class="badge bg-light text-dark border ms-2 fw-normal">Guía transportista SUNAT 31</span>
             </h2>
           </div>
           <div class="card-body">
@@ -102,14 +71,23 @@
 
             @if (guia.tipoComprobanteOrigen !== '09') {
               <div class="row g-2 align-items-end mb-3">
-                <div class="col-12">
+                <div class="col-md-5">
+                  <label class="form-label">Origen de los bienes (solo para cargar ítems)</label>
+                  <select class="form-select form-select-sm" [(ngModel)]="origenBienesTransporte" (ngModelChange)="onOrigenBienesTransporteChange()">
+                    <option value="venta">Desde venta / comprobante interno</option>
+                    <option value="compra">Desde compra (consulta SUNAT)</option>
+                    <option value="manual">Carga manual de ítems</option>
+                  </select>
+                  <p class="small text-muted mb-0 mt-1">No se envía a SUNAT como motivo de traslado (GRE 31 no lo usa).</p>
+                </div>
+                <div class="col-md-7" *ngIf="origenBienesTransporte !== 'manual'">
                   <label class="form-label d-block mb-1">Detalle de bienes</label>
                   <div class="btn-group btn-group-sm" role="group" aria-label="Modo ítems GRE transportista">
                     <button type="button" class="btn"
                             [class.btn-primary]="modoItemsTransportista === 'desde_comprobante'"
                             [class.btn-outline-primary]="modoItemsTransportista !== 'desde_comprobante'"
                             (click)="setModoItemsTransportista('desde_comprobante')">
-                      Desde comprobante (venta interna / compra SUNAT)
+                      Desde comprobante
                     </button>
                     <button type="button" class="btn"
                             [class.btn-primary]="modoItemsTransportista === 'manual'"
@@ -119,7 +97,7 @@
                     </button>
                   </div>
                   <p class="small text-muted mb-0 mt-1">
-                    En modo manual puede dejar vacíos serie y número si no hay documento relacionado al transporte; si los informa, debe completar el RUC del emisor de ese documento.
+                    En modo manual puede dejar vacíos serie y número si no hay documento relacionado; si los informa, complete el RUC del emisor.
                   </p>
                 </div>
               </div>
@@ -134,7 +112,7 @@
                 <label class="form-label">{{ modoItemsTransportista === 'manual' && guia.tipoComprobanteOrigen !== '09' ? 'Número (opc.)' : 'Número' }}</label>
                 <input type="text" class="form-control form-control-sm" [(ngModel)]="buscarNumero" placeholder="00000478">
               </div>
-              <div class="col-3" *ngIf="guia.tipoComprobanteOrigen !== '09' && guia.motivoTraslado !== '02' && modoItemsTransportista === 'desde_comprobante'">
+              <div class="col-3" *ngIf="guia.tipoComprobanteOrigen !== '09' && origenBienesTransporte !== 'compra' && modoItemsTransportista === 'desde_comprobante'">
                 <button class="btn btn-sm btn-primary w-100" (click)="buscarComprobanteOrigen()">
                   <i class="bi bi-search me-1"></i> Buscar comprobante
                 </button>
@@ -147,13 +125,13 @@
                        placeholder="11 dígitos — obligatorio solo si informó serie y número" maxlength="11">
               </div>
             </div>
-            <p class="small text-muted mb-0 mt-2" *ngIf="guia.tipoComprobanteOrigen !== '09' && guia.motivoTraslado !== '02' && modoItemsTransportista === 'desde_comprobante'">
-              Búsqueda en su base de datos de <strong>ventas</strong> emitidas por su empresa (motivo distinto de compra).
+            <p class="small text-muted mb-0 mt-2" *ngIf="guia.tipoComprobanteOrigen !== '09' && origenBienesTransporte !== 'compra' && modoItemsTransportista === 'desde_comprobante'">
+              Búsqueda en su base de datos de <strong>ventas</strong> emitidas por su empresa.
             </p>
 
-            <div class="mt-3 pt-3 border-top" *ngIf="guia.tipoComprobanteOrigen !== '09' && guia.motivoTraslado === '02' && modoItemsTransportista === 'desde_comprobante'">
+            <div class="mt-3 pt-3 border-top" *ngIf="guia.tipoComprobanteOrigen !== '09' && origenBienesTransporte === 'compra' && modoItemsTransportista === 'desde_comprobante'">
               <div class="alert alert-info py-2 small mb-2">
-                <strong>Compra (02):</strong> credenciales SOL (se precargan desde Configuración → Facturación si existen). <strong>RUC proveedor</strong> = emisor del comprobante. Elija factura (01) o boleta (03) arriba; misma serie y número.
+                <strong>Compra:</strong> credenciales SOL (se precargan desde Configuración → Facturación si existen). <strong>RUC proveedor</strong> = emisor del comprobante. Elija factura (01) o boleta (03) arriba; misma serie y número.
               </div>
               <div class="row g-2 align-items-end">
                 <div class="col-6 col-lg-2">
@@ -226,9 +204,9 @@
                 <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarFilaItemManual()">
                   <i class="bi bi-plus-lg me-1"></i> Agregar línea
                 </button>
-                @if (guia.motivoTraslado === '02') {
+                @if (origenBienesTransporte === 'compra') {
                   <div class="alert alert-warning py-2 small mt-3 mb-0">
-                    <strong>Compra (02) en modo manual:</strong> no se usa la consulta SUNAT. Elija el proveedor para cargar direcciones de origen o indique RUC en remitente y use «Buscar anexos RUC» en el paso 3.
+                    <strong>Compra en modo manual:</strong> no se usa la consulta SUNAT. Elija el proveedor para cargar direcciones de origen o indique RUC en remitente y use «Buscar anexos RUC» en el paso 2.
                     <div class="mt-2">
                       <button type="button" class="btn btn-sm btn-outline-dark" (click)="abrirModalSeleccionProveedorGre()">
                         <i class="bi bi-search me-1"></i> Elegir proveedor del catálogo
@@ -295,15 +273,15 @@
         <div class="card shadow-sm mb-3" *ngIf="seccionesTransportistaVisibles()">
           <div class="card-header bg-light">
             <h2 class="h6 mb-0">
-              <i class="bi bi-geo-alt me-2"></i> 3. Direcciones de origen y destino
+              <i class="bi bi-geo-alt me-2"></i> 2. Direcciones de origen y destino
             </h2>
           </div>
           <div class="card-body">
             <div class="row">
               <div class="col-md-6 border-end">
-                <h3 class="h6">{{ esMotivoCompraGre() ? 'Origen (proveedor / remitente)' : 'Origen (mi almacén)' }}</h3>
+                <h3 class="h6">{{ esOrigenCompraBienes() ? 'Origen (proveedor / remitente)' : 'Origen (mi almacén)' }}</h3>
                 <div class="mb-2">
-                  <label class="form-label">{{ esMotivoCompraGre() ? 'Dirección del proveedor' : 'Dirección del almacén / establecimiento' }}</label>
+                  <label class="form-label">{{ esOrigenCompraBienes() ? 'Dirección del proveedor' : 'Dirección del almacén / establecimiento' }}</label>
                   <select class="form-select form-select-sm"
                           [(ngModel)]="direccionOrigenSeleccionada">
                     <option [ngValue]="null">Seleccione...</option>
@@ -313,7 +291,7 @@
                   </select>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="small text-muted">{{ esMotivoCompraGre() ? 'Anexos SUNAT del proveedor (origen)' : 'Anexos SUNAT de su empresa (origen)' }}</span>
+                  <span class="small text-muted">{{ esOrigenCompraBienes() ? 'Anexos SUNAT del proveedor (origen)' : 'Anexos SUNAT de su empresa (origen)' }}</span>
                   <button class="btn btn-sm btn-outline-secondary" (click)="consultarAnexosOrigenPorRuc()">
                     <i class="bi bi-building me-1"></i> Buscar anexos RUC
                   </button>
@@ -328,19 +306,19 @@
               </div>
 
               <div class="col-md-6">
-                <h3 class="h6">{{ esMotivoCompraGre() ? 'Destino (mi almacén)' : 'Destino (cliente)' }}</h3>
+                <h3 class="h6">{{ esOrigenCompraBienes() ? 'Destino (mi almacén)' : 'Destino (cliente)' }}</h3>
                 <div class="mb-2">
-                  <label class="form-label">{{ esMotivoCompraGre() ? 'Dirección del almacén / local de recepción' : 'Dirección del cliente' }}</label>
+                  <label class="form-label">{{ esOrigenCompraBienes() ? 'Dirección del almacén / local de recepción' : 'Dirección del cliente' }}</label>
                   <select class="form-select form-select-sm"
                           [(ngModel)]="direccionDestinoSeleccionada">
-                    <option [ngValue]="null">{{ esMotivoCompraGre() ? 'Seleccione establecimiento de la empresa…' : 'Seleccione o use anexos SUNAT…' }}</option>
+                    <option [ngValue]="null">{{ esOrigenCompraBienes() ? 'Seleccione establecimiento de la empresa…' : 'Seleccione o use anexos SUNAT…' }}</option>
                     <option *ngFor="let d of listaDireccionesDestinoGre()" [ngValue]="d">
-                      {{ d.direccion }} ({{ esMotivoCompraGre() ? (d.codLocal || '0000') : (d.referencia || d.codLocal || '-') }})
+                      {{ d.direccion }} ({{ esOrigenCompraBienes() ? (d.codLocal || '0000') : (d.referencia || d.codLocal || '-') }})
                     </option>
                   </select>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="small text-muted">{{ esMotivoCompraGre() ? 'Anexos SUNAT de su empresa (destino)' : 'Anexos SUNAT del RUC cliente' }}</span>
+                  <span class="small text-muted">{{ esOrigenCompraBienes() ? 'Anexos SUNAT de su empresa (destino)' : 'Anexos SUNAT del RUC cliente' }}</span>
                   <button class="btn btn-sm btn-outline-secondary" (click)="consultarAnexosDestinoPorRuc()">
                     <i class="bi bi-building me-1"></i> Buscar anexos RUC
                   </button>
@@ -361,7 +339,7 @@
         <div class="card shadow-sm mb-3" *ngIf="seccionesTransportistaVisibles()">
           <div class="card-header bg-light">
             <h2 class="h6 mb-0">
-              <i class="bi bi-person-check me-2"></i> 4. Destinatario (quien recibe la mercadería)
+              <i class="bi bi-person-check me-2"></i> 3. Destinatario (quien recibe la mercadería)
             </h2>
           </div>
           <div class="card-body">
@@ -382,7 +360,7 @@
               </div>
               <div class="col-md-2 d-flex align-items-end">
                 <button type="button" class="btn btn-sm btn-outline-primary w-100" (click)="destinatario.tipoDoc === '6' ? consultarRucDestinatario() : consultarDniDestinatario()"
-                        [disabled]="consultandoDestinatario">
+                        [disabled]="consultandoDestinatario" title="Busca en BD y Factiliza; carga nombre y dirección de destino">
                   {{ consultandoDestinatario ? '...' : 'Consultar' }}
                 </button>
               </div>
@@ -391,6 +369,9 @@
                 <input type="text" class="form-control form-control-sm" [(ngModel)]="destinatario.razonSocial" placeholder="Razón social o nombre completo">
               </div>
             </div>
+            <p class="small text-muted mb-0 mt-2">
+              SUNAT exige tipo doc., número y razón social del destinatario. Al consultar se busca primero en clientes y, si no existe, en Factiliza; si hay dirección, se carga en el paso 2 (destino).
+            </p>
           </div>
         </div>
 
@@ -398,7 +379,7 @@
         <div class="card shadow-sm mb-3" *ngIf="seccionesTransportistaVisibles()">
           <div class="card-header bg-light">
             <h2 class="h6 mb-0">
-              <i class="bi bi-box-seam me-2"></i> 5. Remitente de la mercadería (quien envía la carga)
+              <i class="bi bi-box-seam me-2"></i> 4. Remitente de la mercadería (quien envía la carga)
             </h2>
           </div>
           <div class="card-body">
@@ -419,7 +400,7 @@
               </div>
               <div class="col-md-2 d-flex align-items-end">
                 <button type="button" class="btn btn-sm btn-outline-primary w-100" (click)="remitente.tipoDoc === '6' ? consultarRucRemitente() : consultarDniRemitente()"
-                        [disabled]="consultandoRemitente">
+                        [disabled]="consultandoRemitente" title="Busca proveedor/cliente en BD y Factiliza; carga nombre y origen">
                   {{ consultandoRemitente ? '...' : 'Consultar' }}
                 </button>
               </div>
@@ -428,13 +409,16 @@
                 <input type="text" class="form-control form-control-sm" [(ngModel)]="remitente.razonSocial" placeholder="Remitente según SUNAT">
               </div>
             </div>
+            <p class="small text-muted mb-0 mt-2">
+              En GRE 31 SUNAT exige remitente (DespatchParty). Al consultar: proveedores → clientes → Factiliza. Si hay dirección, se sugiere como origen en el paso 2.
+            </p>
           </div>
         </div>
 
         <div class="card shadow-sm" *ngIf="seccionesTransportistaVisibles()">
           <div class="card-header bg-light">
             <h2 class="h6 mb-0">
-              <i class="bi bi-truck-front me-2"></i> 6. Datos de traslado (obligatorios SUNAT GRE transportista)
+              <i class="bi bi-truck-front me-2"></i> 5. Datos de traslado (obligatorios SUNAT GRE transportista)
             </h2>
           </div>
           <div class="card-body">
@@ -553,9 +537,11 @@
                 <i *ngIf="!generandoPdf" class="bi bi-file-earmark-pdf me-1"></i>
                 {{ generandoPdf ? 'Generando...' : 'Imprimir PDF' }}
               </button>
+              <!--
               <button class="btn btn-sm btn-success" (click)="enviarWhatsapp()">
                 <i class="bi bi-whatsapp me-1"></i> Enviar por WhatsApp
               </button>
+            -->
             </div>
           </div>
         </div>

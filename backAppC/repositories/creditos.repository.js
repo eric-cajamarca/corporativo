@@ -28,6 +28,7 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
         cc.idEmpresa,
         cc.idCredito,
         cc.idCliente,
+        ISNULL(c.rSocial, '') AS cliente,
         cc.fechaCredito,
         cc.montoTotal,
         cc.plazoDias,
@@ -45,11 +46,12 @@ exports.obtenerCreditosClienteRepo = async (pool, idEmpresas, idCliente) => {
         ISNULL(SUM(ISNULL(cu.saldoPendiente, 0)), 0) AS saldoPendiente,
         MIN(CASE WHEN cu.estado IN ('PENDIENTE', 'VENCIDO') THEN cu.fechaVencimiento END) AS proximaCuota
       FROM CreditosClientes cc
+      LEFT JOIN Clientes c ON cc.idCliente = c.idCliente
       LEFT JOIN Ventas v ON cc.idVenta = v.idVenta
       LEFT JOIN CuotasCredito cu ON cc.idCredito = cu.idCredito
       LEFT JOIN UsuarioWeb uw ON cc.idUsuarioCredito = uw.idUsuario
       WHERE ${inEmpresa}${condicionCliente}
-      GROUP BY cc.idEmpresa, cc.idCredito, cc.idCliente, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
+      GROUP BY cc.idEmpresa, cc.idCredito, cc.idCliente, c.rSocial, cc.fechaCredito, cc.montoTotal, cc.plazoDias,
                cc.tasaInteres, cc.estado, cc.observaciones, v.idVenta,
                v.serie, v.numero, uw.nombres, uw.apellidos
       ORDER BY cc.fechaCredito DESC
@@ -79,6 +81,7 @@ async function listarCreditosSimple(pool, idsEmpresa, idCliente) {
       idEmpresa,
       idCredito,
       idCliente,
+      CAST(NULL AS VARCHAR(250)) AS cliente,
       fechaCredito,
       montoTotal,
       plazoDias,

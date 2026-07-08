@@ -80,7 +80,7 @@
                     <i class="bi bi-printer"></i>
                   </button>
                 </td>
-                <td>{{ getClienteNombre(credito.idCliente) }}</td>
+                <td>{{ getClienteNombre(credito) }}</td>
                 <td *ngIf="empresasOperacion.length > 1">{{ nombreEmpresaCredito(credito.idEmpresa) }}</td>
                 <td>{{ credito.comprobante || (credito.idVenta ? 'Venta ' + credito.idVenta : '—') }}</td>
                 <td>{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
@@ -317,7 +317,7 @@
       <div class="modal-header bg-info text-white">
         <h5 class="modal-title">
           <i class="bi bi-list me-2"></i>
-          Cuotas - {{ creditoSeleccionado ? getClienteNombre(creditoSeleccionado.idCliente) : '' }}
+          Cuotas - {{ creditoSeleccionado ? getClienteNombre(creditoSeleccionado) : '' }}
         </h5>
         <button type="button" class="btn-close btn-close-white" (click)="cerrarModalVerCuotas()"></button>
       </div>

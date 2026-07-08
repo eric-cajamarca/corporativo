@@ -84,6 +84,20 @@
             </h2>
           </div>
           <div class="card-body">
+            <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Fuente del comprobante de origen">
+              <input type="radio" class="btn-check" name="fuenteComprobante" id="fuenteBuscar" autocomplete="off"
+                     [value]="'buscar'" [(ngModel)]="fuenteComprobante" (ngModelChange)="onFuenteComprobanteChange()">
+              <label class="btn btn-outline-primary" for="fuenteBuscar">
+                <i class="bi bi-search me-1"></i> Buscar comprobante existente
+              </label>
+              <input type="radio" class="btn-check" name="fuenteComprobante" id="fuenteManual" autocomplete="off"
+                     [value]="'manual'" [(ngModel)]="fuenteComprobante" (ngModelChange)="onFuenteComprobanteChange()">
+              <label class="btn btn-outline-primary" for="fuenteManual">
+                <i class="bi bi-pencil-square me-1"></i> Ingresar manualmente
+              </label>
+            </div>
+
+            @if (fuenteComprobante === 'buscar') {
             @if (guia.motivoTraslado !== '02') {
             <div class="row g-2 align-items-end">
               <div class="col-3">
@@ -152,7 +166,7 @@
             </div>
             }
 
-            <div class="mt-3" *ngIf="comprobanteOrigen">
+            <div class="mt-3" *ngIf="comprobanteOrigen && !comprobanteOrigen.esManual">
               <div class="alert alert-secondary py-2" [class.alert-warning]="comprobanteOrigen.idEstadoSunat !== 1">
                 <div><strong>Comprobante:</strong> {{ comprobanteOrigen.serie }}-{{ comprobanteOrigen.numero }}</div>
                 @if (comprobanteOrigen.origenDesdeCompraSunat) {
@@ -171,34 +185,123 @@
                   </div>
                 }
               </div>
-              @if (comprobanteOrigen.items && comprobanteOrigen.items.length > 0) {
+              @if (comprobanteOrigen.items) {
                 <div class="small mt-2">
-                  <strong>Detalle de productos:</strong>
-                  <table class="table table-sm table-bordered mt-1 mb-0">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Código</th>
-                        <th>Descripción</th>
-                        <th>Cant.</th>
-                        <th>Unidad</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (it of comprobanteOrigen.items; track it.idDetalle || it.idProducto || $index) {
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong>Detalle de productos (editable):</strong>
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarItemComprobante()">
+                      <i class="bi bi-plus-circle me-1"></i> Agregar ítem
+                    </button>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                      <thead class="table-light">
                         <tr>
-                          <td>{{ it.numeroLinea || ($index + 1) }}</td>
-                          <td>{{ it.codigo }}</td>
-                          <td>{{ it.descripcion }}</td>
-                          <td>{{ it.cantidad }}</td>
-                          <td>{{ it.unidad || 'NIU' }}</td>
+                          <th style="width:40px;">#</th>
+                          <th style="width:16%;">Código</th>
+                          <th>Descripción</th>
+                          <th style="width:12%;">Cant.</th>
+                          <th style="width:14%;">Unidad</th>
+                          <th style="width:48px;"></th>
                         </tr>
-                      }
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        @for (it of comprobanteOrigen.items; track it.idDetalle || it.idProducto || $index) {
+                          <tr>
+                            <td class="text-center">{{ it.numeroLinea || ($index + 1) }}</td>
+                            <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.codigo" placeholder="Cód."></td>
+                            <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.descripcion" placeholder="Descripción"></td>
+                            <td><input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad" min="0" step="0.01"></td>
+                            <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.unidad" placeholder="NIU" maxlength="3"></td>
+                            <td class="text-center">
+                              <button type="button" class="btn btn-sm btn-outline-danger" (click)="eliminarItemComprobante($index)" title="Quitar ítem">
+                                <i class="bi bi-trash"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="small text-muted mt-1 mb-0">Puede ajustar cantidades, descripciones o agregar líneas antes de guardar la guía.</p>
                 </div>
               }
             </div>
+            }
+
+            @if (fuenteComprobante === 'manual') {
+            <div class="alert alert-info py-2 small mb-3">
+              <strong>Ingreso manual:</strong> registre el comprobante de origen y sus ítems a mano. Se enviará a SUNAT como documento relacionado de la guía. Las direcciones y el destinatario también pueden capturarse manualmente en las secciones siguientes.
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-6 col-lg-2">
+                <label class="form-label">Tipo comprobante</label>
+                <select class="form-select form-select-sm" [(ngModel)]="comprobanteOrigen.tipoComprobante">
+                  @for (t of tiposComprobanteOrigen; track t.value) {
+                    <option [value]="t.value">{{ t.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-6 col-lg-2">
+                <label class="form-label">Serie</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="comprobanteOrigen.serie" placeholder="F001" maxlength="4">
+              </div>
+              <div class="col-6 col-lg-2">
+                <label class="form-label">Número</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="comprobanteOrigen.numero" placeholder="00012345">
+              </div>
+              <div class="col-6 col-lg-3">
+                <label class="form-label">RUC emisor (doc. relacionado)</label>
+                <input type="text" class="form-control form-control-sm" [(ngModel)]="comprobanteOrigen.rucEmisor" placeholder="11 dígitos" maxlength="11"
+                       (ngModelChange)="onRucEmisorComprobanteChange($event)">
+              </div>
+              <div class="col-6 col-lg-3">
+                <label class="form-label">Importe total (opcional)</label>
+                <input type="number" class="form-control form-control-sm" [(ngModel)]="comprobanteOrigen.total" min="0" step="0.01" placeholder="0.00">
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 mb-1">
+              <strong class="small">Ítems / bienes a trasladar <span class="text-danger">*</span></strong>
+              <button type="button" class="btn btn-sm btn-outline-primary" (click)="agregarItemComprobante()">
+                <i class="bi bi-plus-circle me-1"></i> Agregar ítem
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width:40px;">#</th>
+                    <th style="width:16%;">Código</th>
+                    <th>Descripción</th>
+                    <th style="width:12%;">Cantidad</th>
+                    <th style="width:14%;">Unidad</th>
+                    <th style="width:48px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (it of comprobanteOrigen.items; track $index) {
+                    <tr>
+                      <td class="text-center">{{ $index + 1 }}</td>
+                      <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.codigo" placeholder="Cód."></td>
+                      <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.descripcion" placeholder="Descripción del bien"></td>
+                      <td><input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad" min="0" step="0.01"></td>
+                      <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.unidad" placeholder="NIU" maxlength="3"></td>
+                      <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger" (click)="eliminarItemComprobante($index)" title="Quitar ítem">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <p class="small text-muted mt-2 mb-0">Unidad SUNAT (catálogo 03): p. ej. <strong>NIU</strong> (unidad), <strong>ZZ</strong> (servicio), <strong>KGM</strong> (kilogramo), <strong>BX</strong> (caja).</p>
+            @if (esMotivoCompraGre()) {
+              <p class="small text-muted mb-0">Con motivo <strong>Compra (02)</strong>, al completar los 11 dígitos del RUC emisor se busca el proveedor en su base de datos y se carga la dirección de origen en el paso 3.</p>
+            }
+            }
           </div>
         </div>
 
@@ -235,6 +338,27 @@
                     <hr class="my-1">
                   </div>
                 </div>
+                <button type="button" class="btn btn-sm btn-link p-0 mt-1" (click)="mostrarFormDirOrigen = !mostrarFormDirOrigen">
+                  <i class="bi" [class.bi-plus-circle]="!mostrarFormDirOrigen" [class.bi-dash-circle]="mostrarFormDirOrigen"></i>
+                  {{ mostrarFormDirOrigen ? 'Ocultar dirección manual' : 'Agregar dirección manual' }}
+                </button>
+                <div *ngIf="mostrarFormDirOrigen" class="border rounded p-2 mt-1 bg-light">
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <input type="text" class="form-control form-control-sm" [(ngModel)]="formDirOrigen.direccion" placeholder="Dirección completa">
+                    </div>
+                    <div class="col-6"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirOrigen.ubigeo" placeholder="Ubigeo (6 díg.)" maxlength="6"></div>
+                    <div class="col-6"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirOrigen.codLocal" placeholder="Cód. local (0000)"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirOrigen.region" placeholder="Departamento"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirOrigen.provincia" placeholder="Provincia"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirOrigen.distrito" placeholder="Distrito"></div>
+                    <div class="col-12 d-grid">
+                      <button type="button" class="btn btn-sm btn-primary" (click)="agregarDireccionOrigenManual()">
+                        <i class="bi bi-check-circle me-1"></i> Usar esta dirección de origen
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="col-md-6">
@@ -260,6 +384,27 @@
                     <strong>{{ a.codigo }}</strong> - {{ a.direccion }}<br>
                     <span class="text-muted">{{ a.ubigeo }}</span>
                     <hr class="my-1">
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-link p-0 mt-1" (click)="mostrarFormDirDestino = !mostrarFormDirDestino">
+                  <i class="bi" [class.bi-plus-circle]="!mostrarFormDirDestino" [class.bi-dash-circle]="mostrarFormDirDestino"></i>
+                  {{ mostrarFormDirDestino ? 'Ocultar dirección manual' : 'Agregar dirección manual' }}
+                </button>
+                <div *ngIf="mostrarFormDirDestino" class="border rounded p-2 mt-1 bg-light">
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <input type="text" class="form-control form-control-sm" [(ngModel)]="formDirDestino.direccion" placeholder="Dirección completa">
+                    </div>
+                    <div class="col-6"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirDestino.ubigeo" placeholder="Ubigeo (6 díg.)" maxlength="6"></div>
+                    <div class="col-6"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirDestino.codLocal" placeholder="Cód. local (0000)"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirDestino.region" placeholder="Departamento"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirDestino.provincia" placeholder="Provincia"></div>
+                    <div class="col-4"><input type="text" class="form-control form-control-sm" [(ngModel)]="formDirDestino.distrito" placeholder="Distrito"></div>
+                    <div class="col-12 d-grid">
+                      <button type="button" class="btn btn-sm btn-primary" (click)="agregarDireccionDestinoManual()">
+                        <i class="bi bi-check-circle me-1"></i> Usar esta dirección de destino
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -292,7 +437,7 @@
               </div>
               <div class="col-md-2 d-flex align-items-end">
                 <button type="button" class="btn btn-sm btn-outline-primary w-100" (click)="destinatario.tipoDoc === '6' ? consultarRucDestinatario() : consultarDniDestinatario()"
-                        [disabled]="consultandoDestinatario">
+                        [disabled]="consultandoDestinatario" title="Busca en su base de datos y carga la dirección de destino">
                   {{ consultandoDestinatario ? '...' : 'Consultar' }}
                 </button>
               </div>
@@ -301,6 +446,9 @@
                 <input type="text" class="form-control form-control-sm" [(ngModel)]="destinatario.razonSocial" placeholder="Razón social o nombre completo">
               </div>
             </div>
+            <p class="small text-muted mb-0 mt-2">
+              Al consultar RUC/DNI se busca primero en su base de clientes y se carga la dirección de destino en el paso 3. Si no existe, se consulta SUNAT (Factiliza).
+            </p>
           </div>
         </div>
 
@@ -437,9 +585,11 @@
                 <i *ngIf="!generandoPdf" class="bi bi-file-earmark-pdf me-1"></i>
                 {{ generandoPdf ? 'Generando...' : 'Imprimir PDF' }}
               </button>
+              <!--
               <button class="btn btn-sm btn-success" (click)="enviarWhatsapp()">
                 <i class="bi bi-whatsapp me-1"></i> Enviar por WhatsApp
               </button>
+            -->
             </div>
           </div>
         </div>

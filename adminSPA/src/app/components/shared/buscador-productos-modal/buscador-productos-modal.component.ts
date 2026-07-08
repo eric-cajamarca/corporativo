@@ -36,7 +36,21 @@ export interface ProductoSeleccionado {
   idSucursal?: string | number;
   aliasEmpresa?: string;
   razonSocialEmpresa?: string;
+  /** Mapas de listas de precio (venta). */
+  precios?: Record<string, PrecioListaBuscador>;
+  /** Cantidad elegida al confirmar desde el buscador (venta). */
+  cantidadSeleccionada?: number;
+  /** Precio unitario elegido (override de pVenta principal). */
+  pVentaSeleccionada?: number;
   [key: string]: unknown;
+}
+
+export interface PrecioListaBuscador {
+  precio: number;
+  idPrecio?: string | number;
+  nombreLista?: string;
+  principal?: boolean | number;
+  simboloMoneda?: string;
 }
 
 @Component({
@@ -68,6 +82,8 @@ export class BuscadorProductosModalComponent implements OnInit {
   productosConImagenes = false;
   /** Opción en Ventas: ver stock por ubicación en este modal */
   mostrarStockUbicacionesEnBuscador = false;
+  /** Opción en Ventas: cantidad + ver precios en el buscador (solo modo venta) */
+  mostrarCantidadPreciosEnBuscador = false;
   /** Desde estado configuración: empresa gestora → mostrar columna Ubic. aunque la config ventas esté en false */
   esEmpresaGestoraPorEstado = false;
   modalStockUbicacionesAbierto = false;
@@ -82,6 +98,11 @@ export class BuscadorProductosModalComponent implements OnInit {
   private idsSolicitadosImagen = new Set<string>();
   /** Catálogo en memoria para filtrar al escribir (modo venta). */
   private catalogoVentaLocal: ProductoSeleccionado[] = [];
+
+  /** Cantidad por fila (clave = trackByProducto). Solo modo venta. */
+  cantidadPorFila: Record<string, number> = {};
+  /** Fila con panel de precios abierto. */
+  keyPreciosExpandido: string | null = null;
 
   readonly imagenPorDefecto = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>');
 
@@ -110,7 +131,7 @@ export class BuscadorProductosModalComponent implements OnInit {
       },
       error: () => {}
     });
-    this.gestoresService.obtenerConfiguracion().subscribe({
+    this.gestoresService.obtenerConfiguracion({ evitarCache: true }).subscribe({
       next: (res) => {
         const lista = Array.isArray(res?.data) ? res.data : [];
         const normClave = (c: { clave?: string; Clave?: string }) =>
@@ -130,6 +151,15 @@ export class BuscadorProductosModalComponent implements OnInit {
             ? (itemUb as { valor?: string; Valor?: string }).valor
             : (itemUb as { valor?: string; Valor?: string })?.Valor;
         this.mostrarStockUbicacionesEnBuscador = interpretarBooleanoConfig(valUb, false);
+        const itemCantPrec = lista.find(
+          (c: { clave?: string; Clave?: string }) =>
+            normClave(c) === 'VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR'
+        );
+        const valCantPrec =
+          itemCantPrec && (itemCantPrec as { valor?: string; Valor?: string }).valor !== undefined
+            ? (itemCantPrec as { valor?: string; Valor?: string }).valor
+            : (itemCantPrec as { valor?: string; Valor?: string })?.Valor;
+        this.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(valCantPrec, false);
         this.cdr.detectChanges();
         if (this.productosConImagenes && this.productosFiltrados.length > 0) {
           this.productosFiltrados.forEach((p) => this.cargarPrimeraImagenSiNecesario(p));
@@ -139,6 +169,17 @@ export class BuscadorProductosModalComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  /** Cantidad y Ver precios solo en modo venta y si la config de la empresa lo habilita. */
+  mostrarCantidadYPreciosBuscador(): boolean {
+    if (this.modo !== 'venta') {
+      return false;
+    }
+    if (this.ventaOpciones?.mostrarCantidadPreciosEnBuscador !== undefined) {
+      return !!this.ventaOpciones.mostrarCantidadPreciosEnBuscador;
+    }
+    return this.mostrarCantidadPreciosEnBuscador;
   }
 
   private cargarCatalogo(opciones?: { evitarCache?: boolean }): void {
@@ -279,6 +320,105 @@ export class BuscadorProductosModalComponent implements OnInit {
 
   trackByProducto(_index: number, p: ProductoSeleccionado): string {
     return `${p.idProducto || ''}|${p.idSucursal || ''}|${p['idEmpresa'] || ''}`;
+  }
+
+  claveFila(p: ProductoSeleccionado): string {
+    return this.trackByProducto(0, p);
+  }
+
+  cantidadFila(p: ProductoSeleccionado): number {
+    const k = this.claveFila(p);
+    const n = Number(this.cantidadPorFila[k]);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  }
+
+  setCantidadFila(p: ProductoSeleccionado, value: number | string): void {
+    const k = this.claveFila(p);
+    let n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) {
+      n = 1;
+    }
+    this.cantidadPorFila[k] = Math.round(n * 1e6) / 1e6;
+  }
+
+  listasPrecioProducto(p: ProductoSeleccionado): PrecioListaBuscador[] {
+    const raw = p?.precios;
+    if (!raw || typeof raw !== 'object') {
+      const base = Number(p?.pVenta) || 0;
+      return base > 0
+        ? [{ precio: base, nombreLista: 'Precio venta', principal: true, simboloMoneda: 'S/' }]
+        : [];
+    }
+    const esPrecioNormal = (nombre: string | undefined): boolean => {
+      const n = String(nombre || '').trim().toLowerCase();
+      return n === 'precio normal' || n === 'normal';
+    };
+    return Object.values(raw)
+      .filter((x) => x && typeof x === 'object')
+      .map((x) => x as PrecioListaBuscador)
+      .sort((a, b) => {
+        const na = esPrecioNormal(a.nombreLista) ? 0 : 1;
+        const nb = esPrecioNormal(b.nombreLista) ? 0 : 1;
+        if (na !== nb) return na - nb;
+        const pa = a.principal === true || a.principal === 1 ? 0 : 1;
+        const pb = b.principal === true || b.principal === 1 ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return String(a.nombreLista || '').localeCompare(String(b.nombreLista || ''));
+      });
+  }
+
+  tieneVariosPrecios(p: ProductoSeleccionado): boolean {
+    return this.listasPrecioProducto(p).length > 1;
+  }
+
+  togglePanelPrecios(p: ProductoSeleccionado, event: Event): void {
+    event.stopPropagation();
+    const k = this.claveFila(p);
+    this.keyPreciosExpandido = this.keyPreciosExpandido === k ? null : k;
+  }
+
+  panelPreciosAbierto(p: ProductoSeleccionado): boolean {
+    return this.keyPreciosExpandido === this.claveFila(p);
+  }
+
+  /** Número de columnas visibles en la tabla desktop (para colspan del panel de precios). */
+  colspanPanelPrecios(): number {
+    let n = 8; // código…stock
+    if (this.productosConImagenes) n += 1;
+    if (this.muestraColumnaEmpresa()) n += 1;
+    if (this.mostrarCantidadYPreciosBuscador()) n += 2; // cant + precios
+    if (this.mostrarColumnaUbicacionesBuscador()) n += 1;
+    return n;
+  }
+
+  /** Clic en fila: agrega con cantidad del input y precio principal. */
+  seleccionarConCantidad(p: ProductoSeleccionado): void {
+    if (!this.mostrarCantidadYPreciosBuscador()) {
+      this.seleccionar(p);
+      return;
+    }
+    this.confirmarSeleccion(p, Number(p.pVenta) || 0);
+  }
+
+  /** Elige un precio de lista y confirma con la cantidad del input. */
+  elegirPrecioYAgregar(p: ProductoSeleccionado, precioLista: PrecioListaBuscador, event: Event): void {
+    event.stopPropagation();
+    this.confirmarSeleccion(p, Number(precioLista.precio) || 0);
+  }
+
+  private confirmarSeleccion(p: ProductoSeleccionado, pVentaElegido: number): void {
+    const cantidad = this.cantidadFila(p);
+    const out: ProductoSeleccionado = {
+      ...p,
+      pVenta: pVentaElegido,
+      cantidadSeleccionada: cantidad,
+      pVentaSeleccionada: pVentaElegido
+    };
+    this.activeModal.close(out);
+  }
+
+  seleccionar(p: ProductoSeleccionado): void {
+    this.activeModal.close(p);
   }
 
   recargarProductosDesdeServidor(): void {
@@ -474,10 +614,6 @@ export class BuscadorProductosModalComponent implements OnInit {
           this.cdr.detectChanges();
         }
       });
-  }
-
-  seleccionar(p: ProductoSeleccionado): void {
-    this.activeModal.close(p);
   }
 
   cerrar(): void {

@@ -217,8 +217,8 @@ export class IndexCreditosComponent implements OnInit {
     const n = (this.filtros.numero || '').trim();
     if (b) {
       list = list.filter(c => {
-        const nombre = this.getClienteNombre(c.idCliente).toLowerCase();
-        const doc = (c.idVenta || '').toLowerCase();
+        const nombre = this.getClienteNombre(c).toLowerCase();
+        const doc = String(c.comprobante || c.idVenta || '').toLowerCase();
         const id = (c.idCredito || '').toLowerCase();
         return nombre.includes(b) || doc.includes(b) || id.includes(b);
       });
@@ -305,7 +305,7 @@ export class IndexCreditosComponent implements OnInit {
   imprimir(credito: CreditoCliente) {
     const ventana = window.open('', '_blank');
     if (!ventana) return;
-    const nombre = this.getClienteNombre(credito.idCliente);
+    const nombre = this.getClienteNombre(credito);
     const pagado = this.getPagado(credito);
     const saldo = credito.saldoPendiente ?? 0;
     ventana.document.write(`
@@ -739,8 +739,15 @@ export class IndexCreditosComponent implements OnInit {
     this.cargarCreditos();
   }
 
-  getClienteNombre(idCliente: string | number): string {
-    const id = idCliente != null ? String(idCliente) : '';
+  getClienteNombre(creditoOId: CreditoCliente | string | number): string {
+    if (creditoOId != null && typeof creditoOId === 'object') {
+      const desdeApi = String(creditoOId.cliente || '').trim();
+      if (desdeApi) {
+        return desdeApi;
+      }
+      creditoOId = creditoOId.idCliente;
+    }
+    const id = creditoOId != null ? String(creditoOId) : '';
     const cliente = this.clientes.find(c => String(c.idCliente) === id);
     return cliente ? cliente.rSocial || `${cliente.nombre} ${cliente.apellido || ''}`.trim() : 'Cliente no encontrado';
   }

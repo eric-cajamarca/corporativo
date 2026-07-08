@@ -110,7 +110,9 @@ export class IndexConfiguracionComponent implements OnInit {
     /** Tras registrar venta en “Nueva venta”, mostrar modal para generar PDF / WhatsApp */
     mostrarModalPdfTrasRegistrarVenta: true,
     /** Stock por ubicación en buscador de productos y conteo físico por ubicación */
-    mostrarStockUbicacionesEnBuscador: false
+    mostrarStockUbicacionesEnBuscador: false,
+    /** En buscador de productos (modo venta): columnas cantidad y ver precios */
+    mostrarCantidadPreciosEnBuscador: false
   };
   public ventasGuardando = false;
 
@@ -599,6 +601,10 @@ export class IndexConfiguracionComponent implements OnInit {
           getVal('VENTAS_MOSTRAR_STOCK_UBICACIONES_EN_BUSCADOR', 'false'),
           false
         );
+        this.ventas.mostrarCantidadPreciosEnBuscador = interpretarBooleanoConfig(
+          getVal('VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR', 'false'),
+          false
+        );
       },
       error: () => {}
     });
@@ -629,6 +635,13 @@ export class IndexConfiguracionComponent implements OnInit {
         valor: this.ventas.mostrarStockUbicacionesEnBuscador ? 'true' : 'false',
         descripcion:
           'Mostrar en el modal de búsqueda de productos la opción de ver stock por ubicación; habilita conteo físico por ubicación al crear sesión',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        clave: 'VENTAS_MOSTRAR_CANTIDAD_PRECIOS_EN_BUSCADOR',
+        valor: this.ventas.mostrarCantidadPreciosEnBuscador ? 'true' : 'false',
+        descripcion:
+          'En el modal de búsqueda de productos (venta), mostrar cantidad a agregar y botón para elegir listas de precio',
         tipoDato: 'BOOLEAN'
       }
     ];

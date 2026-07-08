@@ -51,48 +51,99 @@
           <th>{{ etiquetaPrecio }}</th>
           <th>Sucursal</th>
           <th>Stock</th>
+          <th *ngIf="mostrarCantidadYPreciosBuscador()" class="text-center" style="min-width:5.5rem">Cant.</th>
+          <th *ngIf="mostrarCantidadYPreciosBuscador()" class="text-center text-nowrap" style="min-width:6.5rem">Precios</th>
           <th *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center text-nowrap" style="width:3rem" title="Stock por ubicación">Ubic.</th>
         </tr>
       </thead>
       <tbody>
-        <tr
-          *ngFor="let p of productosFiltrados; trackBy: trackByProducto"
-          role="button"
-          class="table-row-hover"
-          [class.efaf-buscador-row-en-detalle]="estaEnDetalleVenta(p)"
-          [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p) && !estaEnDetalleVenta(p)"
-          (click)="seleccionar(p)"
-        >
-          <td *ngIf="productosConImagenes" class="align-middle p-1" (click)="$event.stopPropagation()">
-            <div class="thumb-cell" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
-              <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
-            </div>
-          </td>
-          <td *ngIf="muestraColumnaEmpresa()">
-            <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
-          </td>
-          <td>{{ p.codigo }}</td>
-          <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
-          <td class="efaf-buscador-col-marca" [title]="marcaColumna(p)">{{ marcaColumna(p) }}</td>
-          <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
-          <td>{{ uMedidaColumna(p) }}</td>
-          <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
-          <td>{{ textoSucursal(p) }}</td>
-          <td>{{ p.stock }}</td>
-          <td *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center align-middle" (click)="$event.stopPropagation()">
-            <button
-              *ngIf="puedeVerStockUbicaciones(p)"
-              type="button"
-              class="btn btn-sm btn-outline-secondary py-0 px-2"
-              (click)="abrirStockUbicaciones(p, $event)"
-              title="Ver stock por ubicación"
-              aria-label="Ver stock por ubicación"
-            >
-              <i class="bi bi-eye"></i>
-            </button>
-            <span *ngIf="!puedeVerStockUbicaciones(p)" class="text-muted small">—</span>
-          </td>
-        </tr>
+        <ng-container *ngFor="let p of productosFiltrados; trackBy: trackByProducto">
+          <tr
+            role="button"
+            class="table-row-hover"
+            [class.efaf-buscador-row-en-detalle]="estaEnDetalleVenta(p)"
+            [class.efaf-buscador-row-sin-stock]="sinStockBusqueda(p) && !estaEnDetalleVenta(p)"
+            (click)="mostrarCantidadYPreciosBuscador() ? seleccionarConCantidad(p) : seleccionar(p)"
+          >
+            <td *ngIf="productosConImagenes" class="align-middle p-1" (click)="$event.stopPropagation()">
+              <div class="thumb-cell" (click)="verImagenes(p, $event)" [title]="tieneImagen(p) ? 'Ver galería' : 'Sin imágenes'">
+                <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
+              </div>
+            </td>
+            <td *ngIf="muestraColumnaEmpresa()">
+              <span class="badge bg-light text-dark">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</span>
+            </td>
+            <td>{{ p.codigo }}</td>
+            <td class="efaf-buscador-col-cat" [title]="p?.categoria">{{ p.categoria }}</td>
+            <td class="efaf-buscador-col-marca" [title]="marcaColumna(p)">{{ marcaColumna(p) }}</td>
+            <td class="efaf-buscador-col-desc">{{ p.descripcion }}</td>
+            <td>{{ uMedidaColumna(p) }}</td>
+            <td>S/ {{ p.pVenta | number:'1.2-2' }}</td>
+            <td>{{ textoSucursal(p) }}</td>
+            <td>{{ p.stock }}</td>
+            <td *ngIf="mostrarCantidadYPreciosBuscador()" class="text-center align-middle" (click)="$event.stopPropagation()">
+              <input
+                type="number"
+                class="form-control form-control-sm text-end buscador-cant-input"
+                min="0.000001"
+                step="any"
+                [ngModel]="cantidadFila(p)"
+                (ngModelChange)="setCantidadFila(p, $event)"
+                (click)="$event.stopPropagation()"
+                title="Cantidad a agregar"
+              />
+            </td>
+            <td *ngIf="mostrarCantidadYPreciosBuscador()" class="text-center align-middle" (click)="$event.stopPropagation()">
+              <button
+                type="button"
+                class="btn btn-sm"
+                [class.btn-primary]="panelPreciosAbierto(p)"
+                [class.btn-outline-primary]="!panelPreciosAbierto(p)"
+                (click)="togglePanelPrecios(p, $event)"
+                [title]="tieneVariosPrecios(p) ? 'Ver listas de precio' : 'Confirmar precio y cantidad'"
+              >
+                <i class="bi bi-tags"></i>
+                <!-- <span class="d-none d-xl-inline ms-1">Ver precios</span> -->
+              </button>
+            </td>
+            <td *ngIf="mostrarColumnaUbicacionesBuscador()" class="text-center align-middle" (click)="$event.stopPropagation()">
+              <button
+                *ngIf="puedeVerStockUbicaciones(p)"
+                type="button"
+                class="btn btn-sm btn-outline-secondary py-0 px-2"
+                (click)="abrirStockUbicaciones(p, $event)"
+                title="Ver stock por ubicación"
+                aria-label="Ver stock por ubicación"
+              >
+                <i class="bi bi-eye"></i>
+              </button>
+              <span *ngIf="!puedeVerStockUbicaciones(p)" class="text-muted small">—</span>
+            </td>
+          </tr>
+          <tr *ngIf="mostrarCantidadYPreciosBuscador() && panelPreciosAbierto(p)" class="buscador-precios-row">
+            <td [attr.colspan]="colspanPanelPrecios()" class="bg-light py-2">
+              <div class="px-2">
+                <div class="small text-muted mb-2">
+                  Elija un precio para agregar <strong>{{ cantidadFila(p) }}</strong> unidad(es) de
+                  <strong>{{ p.codigo }}</strong> al detalle.
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-success"
+                    *ngFor="let pr of listasPrecioProducto(p)"
+                    (click)="elegirPrecioYAgregar(p, pr, $event)"
+                  >
+                    <span class="fw-semibold">{{ pr.nombreLista || 'Lista' }}</span>
+                    <span class="ms-1">{{ pr.simboloMoneda || 'S/' }} {{ pr.precio | number:'1.2-2' }}</span>
+                    <span *ngIf="pr.principal === true || pr.principal === 1" class="badge bg-success ms-1">Principal</span>
+                  </button>
+                  <span *ngIf="listasPrecioProducto(p).length === 0" class="small text-muted">Sin listas de precio. Use el clic en la fila con el precio mostrado.</span>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
       </tbody>
     </table>
   </div>
@@ -110,13 +161,14 @@
             <img [src]="getThumbUrl(p)" [alt]="p.descripcion" class="thumb-img" (error)="onThumbError(p)" />
           </div>
         </div>
-        <div class="flex-grow-1 min-w-0" role="button" (click)="seleccionar(p)">
-          <div class="d-flex justify-content-between align-items-start gap-2">
+        <div class="flex-grow-1 min-w-0">
+          <div class="d-flex justify-content-between align-items-start gap-2" role="button"
+               (click)="mostrarCantidadYPreciosBuscador() ? seleccionarConCantidad(p) : seleccionar(p)">
             <span class="fw-semibold text-truncate">{{ p?.codigo }}</span>
             <span class="text-nowrap">S/ {{ p.pVenta | number:'1.2-2' }}</span>
           </div>
           <div class="small text-primary" *ngIf="muestraColumnaEmpresa()">{{ p?.aliasEmpresa || p?.razonSocialEmpresa || '—' }}</div>
-          <div class="small mt-1">{{ p?.descripcion }}</div>
+          <div class="small mt-1" role="button" (click)="mostrarCantidadYPreciosBuscador() ? seleccionarConCantidad(p) : seleccionar(p)">{{ p?.descripcion }}</div>
           <div class="small text-muted mt-1">{{ p?.categoria }} · {{ marcaColumna(p) }} · {{ uMedidaColumna(p) }}</div>
           <div class="small d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
             <span class="text-truncate me-1">{{ textoSucursal(p) }}</span>
@@ -129,6 +181,44 @@
             >
               Stock por ubicación
             </button>
+          </div>
+          <div class="d-flex align-items-center gap-2 mt-2" *ngIf="mostrarCantidadYPreciosBuscador()">
+            <label class="small mb-0 text-nowrap">Cant.</label>
+            <input
+              type="number"
+              class="form-control form-control-sm buscador-cant-input"
+              style="max-width:5.5rem"
+              min="0.000001"
+              step="any"
+              [ngModel]="cantidadFila(p)"
+              (ngModelChange)="setCantidadFila(p, $event)"
+            />
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="panelPreciosAbierto(p)"
+              [class.btn-outline-primary]="!panelPreciosAbierto(p)"
+              (click)="togglePanelPrecios(p, $event)"
+            >
+              <i class="bi bi-tags me-1"></i>Ver precios
+            </button>
+            <button type="button" class="btn btn-sm btn-success ms-auto" (click)="seleccionarConCantidad(p)">
+              Agregar
+            </button>
+          </div>
+          <div class="mt-2 pt-2 border-top" *ngIf="mostrarCantidadYPreciosBuscador() && panelPreciosAbierto(p)">
+            <div class="small text-muted mb-2">Elija un precio (cantidad: {{ cantidadFila(p) }}):</div>
+            <div class="d-grid gap-1">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-success text-start"
+                *ngFor="let pr of listasPrecioProducto(p)"
+                (click)="elegirPrecioYAgregar(p, pr, $event)"
+              >
+                {{ pr.nombreLista || 'Lista' }} —
+                {{ pr.simboloMoneda || 'S/' }} {{ pr.precio | number:'1.2-2' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
