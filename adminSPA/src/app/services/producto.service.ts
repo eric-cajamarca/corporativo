@@ -21,6 +21,11 @@ import {
   ImportacionProductosEjecutarData,
   StockUbicacionProductoFila
 } from '../models/producto.models';
+import {
+  HistorialCompraProductoItem,
+  HistorialProductoResponse,
+  HistorialVentaProductoItem
+} from '../models/producto-historial.model';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 
@@ -259,6 +264,41 @@ export class ProductoService {
       tap(() => {
         this.limpiarCacheListaProductos();
       })
+    );
+  }
+
+  /**
+   * Historial de ventas del producto (líneas vigentes).
+   */
+  obtenerHistorialVentasProducto(
+    idProducto: string,
+    opts?: { limite?: number; idCliente?: number | string; fechaDesde?: string }
+  ): Observable<HistorialProductoResponse<HistorialVentaProductoItem>> {
+    let params = new HttpParams();
+    if (opts?.limite != null) params = params.set('limite', String(opts.limite));
+    if (opts?.idCliente != null && opts.idCliente !== '') {
+      params = params.set('idCliente', String(opts.idCliente));
+    }
+    if (opts?.fechaDesde) params = params.set('fechaDesde', opts.fechaDesde);
+    return this._http.get<HistorialProductoResponse<HistorialVentaProductoItem>>(
+      `${this.url}productos/${encodeURIComponent(idProducto)}/historial-ventas`,
+      { withCredentials: true, params }
+    );
+  }
+
+  /**
+   * Historial de compras del producto. Solo Administrador (403 si no).
+   */
+  obtenerHistorialComprasProducto(
+    idProducto: string,
+    opts?: { limite?: number; fechaDesde?: string }
+  ): Observable<HistorialProductoResponse<HistorialCompraProductoItem>> {
+    let params = new HttpParams();
+    if (opts?.limite != null) params = params.set('limite', String(opts.limite));
+    if (opts?.fechaDesde) params = params.set('fechaDesde', opts.fechaDesde);
+    return this._http.get<HistorialProductoResponse<HistorialCompraProductoItem>>(
+      `${this.url}productos/${encodeURIComponent(idProducto)}/historial-compras`,
+      { withCredentials: true, params }
     );
   }
 

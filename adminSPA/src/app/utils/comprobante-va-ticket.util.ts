@@ -51,9 +51,14 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     })
     .join('');
 
-  const logo = d.empresa?.logo ? escapeHtmlVa(d.empresa.logo) : '';
+  const logoRaw = String(d.empresa?.logo || '').trim();
+  const logoEsPlaceholder =
+    !logoRaw ||
+    /\/assets\/img\/01\.jpg$/i.test(logoRaw) ||
+    /\/assets\/img\/01\.png$/i.test(logoRaw);
+  const logo = !logoEsPlaceholder ? escapeHtmlVa(logoRaw) : '';
   const logoBlock = logo
-    ? `<div class="logo-wrap"><img src="${logo}" alt="" class="logo-img" /></div>`
+    ? `<div class="logo-wrap"><img src="${logo}" alt="Logo gestora" class="logo-img" /></div>`
     : '';
 
   const sub = Number(d.venta.subtotal);
@@ -91,8 +96,8 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     color: #000000;
   }
   .center { text-align: center; }
-  .logo-wrap { margin-bottom: 6px; }
-  .logo-img { max-height: 44px; max-width: 100%; object-fit: contain; }
+  .logo-wrap { margin: 0 0 8px; padding: 0; }
+  .logo-img { max-height: 96px; max-width: 68mm; width: auto; height: auto; object-fit: contain; }
   .empresa { font-weight: 700; font-size: 10px; line-height: 1.25; color: #000; }
   .ruc { font-size: 10px; margin-top: 2px; color: #000; }
   .dir { font-size: 10px; color: #000; margin-top: 4px; line-height: 1.2; }
@@ -196,13 +201,14 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
     }
     .comp-num { font-size: 12px !important; }
     .total-final { font-size: 16px !important; }
+    .logo-img { max-height: 96px !important; max-width: 68mm !important; }
     .no-print { display: none !important; }
     @page { size: 80mm auto; margin: 2mm; }
   }
 </style>
 </head><body>
   <div class="ticket">
-    ${logoBlock}
+    ${logoBlock ? `<div class="center">${logoBlock}</div>` : ''}
     <div class="center empresa">${escapeHtmlVa(d.empresa?.nombre || 'Empresa')}</div>
     <div class="center ruc">RUC: ${escapeHtmlVa(d.empresa?.ruc || '')}</div>
     ${d.empresa?.direccion ? `<div class="center dir">${escapeHtmlVa(d.empresa.direccion)}</div>` : ''}
@@ -234,11 +240,89 @@ export function buildComprobanteVaTicketHtml(data: ComprobanteVAPdfData): string
 </body></html>`;
 }
 
-/** Abre ventana solo con ticket VA (no PDF ni otros formatos). */
-export function openComprobanteVaTicket(data: ComprobanteVAPdfData): boolean {
+/** Extrae el nombre de archivo del logo desde URL /logos o /api/obtener_logo. */
+function extractLogoFilename(logoUrl: string): string | null {
+  const s = String(logoUrl || '').trim();
+  if (!s || s.startsWith('data:')) return null;
+  if (/\/assets\/img\/01\.(jpg|png)$/i.test(s)) return null;
+  const m = s.match(/(?:\/logos\/|\/obtener_logo\/)([^/?#]+)$/i);
+  if (m?.[1]) return decodeURIComponent(m[1]);
+  if (/^[A-Za-z0-9._-]+\.(jpg|jpeg|png|gif|webp)$/i.test(s)) return s;
+  return null;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('No se pudo leer el logo'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Descarga el logo por rutas proxied (/api/obtener_logo o /logos) y lo embebe como data URI
+ * para que la ventana del ticket (about:blank) lo muestre e imprima sin depender de red.
+ */
+async function resolveLogoDataUrl(logoUrl: string | undefined | null): Promise<string> {
+  const s = String(logoUrl || '').trim();
+  if (!s) return '';
+  if (s.startsWith('data:')) return s;
+  if (/\/assets\/img\/01\.(jpg|png)$/i.test(s)) return '';
+
+  const filename = extractLogoFilename(s);
+  const candidates: string[] = [];
+  if (filename) {
+    candidates.push(`/api/obtener_logo/${encodeURIComponent(filename)}`);
+    candidates.push(`/logos/${encodeURIComponent(filename)}`);
+  }
+  if (/^https?:\/\//i.test(s)) candidates.push(s);
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      if (!blob || blob.size < 32) continue;
+      const dataUrl = await blobToDataUrl(blob);
+      if (dataUrl.startsWith('data:')) return dataUrl;
+    } catch {
+      /* probar siguiente candidato */
+    }
+  }
+  return '';
+}
+
+/** Abre ventana solo con ticket VA (no PDF ni otros formatos). Embebe el logo de la gestora. */
+export async function openComprobanteVaTicket(data: ComprobanteVAPdfData): Promise<boolean> {
+  // Abrir en el mismo tick del clic para no perder el gesto (popup blocker).
   const w = window.open('', '_blank');
   if (!w) return false;
-  w.document.write(buildComprobanteVaTicketHtml(data));
-  w.document.close();
+  try {
+    w.document.write(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Ticket VA</title></head>' +
+        '<body style="font-family:sans-serif;padding:16px;color:#333">Cargando ticket…</body></html>'
+    );
+    w.document.close();
+  } catch {
+    /* algunos navegadores restringen write inicial */
+  }
+
+  const logoData = await resolveLogoDataUrl(data?.empresa?.logo);
+  const payload: ComprobanteVAPdfData = {
+    ...data,
+    empresa: {
+      ...(data.empresa || { nombre: '' }),
+      logo: logoData || undefined
+    }
+  };
+  try {
+    w.document.open();
+    w.document.write(buildComprobanteVaTicketHtml(payload));
+    w.document.close();
+  } catch {
+    w.close();
+    return false;
+  }
   return true;
 }

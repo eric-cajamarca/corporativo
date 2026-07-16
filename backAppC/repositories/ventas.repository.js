@@ -3433,9 +3433,10 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
 
   const base = (baseUrl || '').replace(/\/$/, '');
   const logoFileName = emp && (emp.logoArchivo ?? emp.logo ?? '');
+  // Preferir /api/obtener_logo (proxied en Angular/Nginx) frente a /logos estático.
   const logoUrl = (typeof logoFileName === 'string' && logoFileName.trim())
-    ? `${base}/logos/${logoFileName.trim()}`
-    : `${base}/assets/img/01.jpg`;
+    ? `${base}/api/obtener_logo/${encodeURIComponent(logoFileName.trim())}`
+    : '';
 
   const cfgVa = await obtenerConfigPdf(pool, idEmpresaCobradora);
   const cfgVaMap = cfgVa.reduce((acc, row) => {
@@ -3478,7 +3479,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       correo: (emp.correo || '').trim(),
       logo: logoUrl,
       cantidadSucursales: cantidadSucursalesEmpresa
-    } : { nombre: '', ruc: '', direccion: '', telefono: '', logo: `${base}/assets/img/01.jpg`, cantidadSucursales: 0 },
+    } : { nombre: '', ruc: '', direccion: '', telefono: '', logo: '', cantidadSucursales: 0 },
     cliente: {
       rSocial: cab.clienteRazonSocial,
       razonSocial: cab.clienteRazonSocial,

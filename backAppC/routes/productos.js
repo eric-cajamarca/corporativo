@@ -27,8 +27,10 @@ api.get('/productos/buscar-venta', auth.auth, productosController.buscar_product
 api.get('/productos/compras', auth.auth, productosController.obtener_productos_compras);
 api.get('/productos/habitaciones', auth.auth, productosController.obtener_productos_habitacion);
 api.post('/productos/match-descripcion', auth.auth, productosController.match_productos_descripcion);
-// Stock por ubicación (antes de /productos/:id para rutas más específicas)
+// Stock e historial por producto (antes de /productos/:id para rutas más específicas)
 api.get('/productos/:id/stock-ubicaciones', auth.auth, productosController.obtener_stock_ubicaciones_producto);
+api.get('/productos/:idProducto/historial-ventas', auth.auth, productosController.obtener_historial_ventas_producto);
+api.get('/productos/:idProducto/historial-compras', auth.auth, productosController.obtener_historial_compras_producto);
 // Imágenes de producto (antes de /productos/:id para que no capture "imagenes" como id)
 api.get('/productos/:idProducto/imagenes', auth.auth, productosImagenController.listar);
 api.post('/productos/:idProducto/imagenes', auth.auth, multerConfig.uploadImagenesProducto, productosImagenController.subir);

@@ -4,6 +4,7 @@ const { assertEmpresaAutorizada } = require('../utils/empresaGestora.util');
 const ProductosServices = require('../services/productos.service');
 const ProductosRepository = require('../repositories/productos.repository');
 const productosMutacionesService = require('../services/productosMutaciones.service');
+const productoHistorialService = require('../services/productoHistorial.service');
 const { shouldSkipRedisCache } = require('../utils/cacheSkip.util');
 
 const obtener_productos_todos = async (req, res) => {
@@ -700,6 +701,68 @@ const obtener_stock_ubicaciones_producto = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/productos/:idProducto/historial-ventas
+ */
+const obtener_historial_ventas_producto = async (req, res) => {
+  try {
+    const resultado = await withPool(async (pool) =>
+      productoHistorialService.obtenerHistorialVentasProducto(
+        pool,
+        req.user,
+        req.params.idProducto,
+        req.query || {}
+      )
+    );
+    return res.status(200).json({ data: resultado.items || [] });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).json({ message: 'No autorizado', data: undefined });
+    }
+    if (error.message === 'NO_PERMISSIONS') {
+      return res.status(403).json({ message: 'No tiene permisos para realizar esta acción', data: undefined });
+    }
+    if (error.message === 'ID_PRODUCTO_INVALIDO') {
+      return res.status(400).json({ message: 'Identificador de producto inválido', data: undefined });
+    }
+    console.error('obtener_historial_ventas_producto:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener historial de ventas', data: undefined });
+  }
+};
+
+/**
+ * GET /api/productos/:idProducto/historial-compras
+ * Solo rol Administrador (403 si no).
+ */
+const obtener_historial_compras_producto = async (req, res) => {
+  try {
+    const resultado = await withPool(async (pool) =>
+      productoHistorialService.obtenerHistorialComprasProducto(
+        pool,
+        req.user,
+        req.params.idProducto,
+        req.query || {}
+      )
+    );
+    return res.status(200).json({ data: resultado.items || [] });
+  } catch (error) {
+    if (error.message === 'NO_ACCESS') {
+      return res.status(401).json({ message: 'No autorizado', data: undefined });
+    }
+    if (error.message === 'SOLO_ADMINISTRADOR' || error.message === 'NO_PERMISSIONS') {
+      return res.status(403).json({
+        message: 'Solo el administrador puede ver el historial de compras del producto',
+        data: undefined
+      });
+    }
+    if (error.message === 'ID_PRODUCTO_INVALIDO') {
+      return res.status(400).json({ message: 'Identificador de producto inválido', data: undefined });
+    }
+    console.error('obtener_historial_compras_producto:', error);
+    return res.status(500).json({ message: error.message || 'Error al obtener historial de compras', data: undefined });
+  }
+};
+
 module.exports = {
   obtener_productos_todos,
   buscar_productos_venta,
@@ -707,6 +770,8 @@ module.exports = {
   obtener_productos_habitacion,
   match_productos_descripcion,
   obtener_stock_ubicaciones_producto,
+  obtener_historial_ventas_producto,
+  obtener_historial_compras_producto,
   obtener_productos_id,
   crear_producto,
   gestionProductos_Compras,

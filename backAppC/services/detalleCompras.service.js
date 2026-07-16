@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const detalleComprasRepository = require('../repositories/detalleCompras.repository');
+const productosRepository = require('../repositories/productos.repository');
 const ubicacionesPrioridadRepository = require('../repositories/ubicacionesPrioridad.repository');
 const conteoFisicoRepository = require('../repositories/conteoFisico.repository');
 const productoInventarioMetaService = require('./productoInventarioMeta.service');
@@ -55,6 +56,16 @@ async function crearDetalleCompraCompleto(pool, user, body) {
       total: totalVal,
       idUsuario
     });
+
+    // Precios de venta lee Productos.cUnitario; sincronizar con el último costo de compra.
+    if (pUnitarioFormateado > 0) {
+      await productosRepository.actualizarCUnitarioDesdeCompra(
+        transaction,
+        idEmpresa,
+        idProducto,
+        pUnitarioFormateado
+      );
+    }
 
     let ingresaStock;
     if (idPresentacion != null && idPresentacion !== '') {

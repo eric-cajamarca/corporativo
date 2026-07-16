@@ -234,7 +234,7 @@ const obtenerComprobanteVAParaPdf = async (req, res) => {
     if (!idVentaAgrupada) {
       return res.status(400).json({ error: 'idVentaAgrupada es requerido.' });
     }
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = (process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
     const data = await withPool((pool) =>
       ventasOrquestacion.obtenerComprobanteVAParaPdf(pool, idEmpresa, idVentaAgrupada, baseUrl)
     );

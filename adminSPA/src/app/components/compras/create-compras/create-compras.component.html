@@ -285,7 +285,12 @@
                                                 <td class="col-sucursal-detalle">{{ textoSucursalDetalle(item) }}</td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm" role="group">
-                                                        <a style="cursor: pointer;" class="text-danger"
+                                                        <a style="cursor: pointer;" class="text-secondary"
+                                                            (click)="abrirModalHistorialProducto(item)"
+                                                            title="Historial del producto">
+                                                            <i class="bi bi-clock-history"></i>
+                                                        </a>
+                                                        <a style="cursor: pointer; margin-left: 8px;" class="text-danger"
                                                             (click)="quitar(idx, item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)))"
                                                             title="Eliminar">
                                                             <i class="bi bi-trash"></i>
@@ -339,6 +344,9 @@
                                                         </div>
                                                         <div class="compra-detalle-mobile-card__actions">
                                                             <div class="btn-group btn-group-sm" role="group">
+                                                                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="abrirModalHistorialProducto(item)" title="Historial del producto">
+                                                                    <i class="bi bi-clock-history"></i>
+                                                                </button>
                                                                 <button type="button" class="btn btn-outline-danger btn-sm" (click)="quitar(idx, item?.subtotal ?? ((item?.cantidad ?? 0) * (item?.cUnitario ?? item?.pUnitario ?? 0)))" title="Eliminar">
                                                                     <i class="bi bi-trash"></i>
                                                                 </button>
@@ -1010,14 +1018,14 @@
                             <div class="col-md-3 d-flex align-items-end gap-2">
                                 <button type="submit" class="btn btn-primary" [disabled]="consultaForm.invalid || loading">
                                     <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
-                                    {{ loading ? 'Consultando...' : 'Consultar SUNAT' }}
+                                    {{ loading ? 'Consultando...' : 'SUNAT' }}
                                 </button>
                                 <button type="button" class="btn btn-outline-danger" (click)="consultarYDescargarPdf()" [disabled]="consultaForm.invalid || loadingPdf" title="Descargar solo el PDF del comprobante (independiente de la consulta XML)">
                                     <span *ngIf="loadingPdf" class="spinner-border spinner-border-sm me-1"></span>
-                                    {{ loadingPdf ? 'Descargando...' : 'Descargar PDF' }}
+                                    {{ loadingPdf ? 'Descargando...' : 'PDF' }}
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary" (click)="consultarManual()">
-                                    Registro manual
+                                    Manual
                                 </button>
                             </div>
                         </div>

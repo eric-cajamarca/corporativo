@@ -38,6 +38,8 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
 import { CreateMarcaComponent } from '../../marcas/create-marca/create-marca.component';
 import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
+import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
+import { AuthService } from '../../../services/auth.service';
 import { aplicarProveedorEnCompra } from '../../../utils/proveedor-compra.util';
 
 declare var iziToast: any;
@@ -192,6 +194,7 @@ export class CreateComprasComponent {
     private buscadorProductosModal: BuscadorProductosModalService,
     private _router: Router,
     private modalService: NgbModal,
+    private auth: AuthService,
 
     // consultarxml
     private fb: FormBuilder,
@@ -878,6 +881,45 @@ export class CreateComprasComponent {
     this.compras.total = this.compras.total - subtotal;
     this.sumarDetalleCompras();
     this.sumarFooterFactura();
+  }
+
+  /** Solo Administrador ve pestaña de compras en historial del producto. */
+  esAdministradorHistorial(): boolean {
+    return String(this.auth.userData()?.rol ?? '').trim() === 'Administrador';
+  }
+
+  /**
+   * Mismo modal de historial que en Crear venta (ventas + compras si admin).
+   */
+  abrirModalHistorialProducto(item: {
+    idProducto?: string;
+    codigo?: string;
+    descripcion?: string;
+    cUnitario?: number;
+    pUnitario?: number;
+  }): void {
+    const idProducto = String(item?.idProducto || '').trim();
+    if (!idProducto) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'El producto de la línea no es válido',
+        position: 'topRight',
+      });
+      return;
+    }
+    const precioActual = Number(item?.cUnitario ?? item?.pUnitario) || 0;
+    const modalRef = this.modalService.open(HistorialProductoModalComponent, {
+      size: 'lg',
+      backdrop: 'static',
+      centered: true,
+    });
+    modalRef.componentInstance.idProducto = idProducto;
+    modalRef.componentInstance.codigo = item.codigo || '';
+    modalRef.componentInstance.descripcion = item.descripcion || '';
+    modalRef.componentInstance.puedeVerCompras = this.esAdministradorHistorial();
+    modalRef.componentInstance.idCliente = null;
+    modalRef.componentInstance.precioActual = precioActual;
+    modalRef.result.catch(() => {});
   }
 
   seleccionar(idx: number) {

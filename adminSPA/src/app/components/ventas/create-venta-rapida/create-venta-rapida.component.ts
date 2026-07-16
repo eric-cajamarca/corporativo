@@ -3677,13 +3677,15 @@ abrirModalPrecios(item: any) {
           iziToast.warning({ title: 'Aviso', message: 'No se pudieron cargar los datos del comprobante VA.', position: 'topRight' });
           return;
         }
-        if (!openComprobanteVaTicket(res.data)) {
-          iziToast.warning({
-            title: 'Aviso',
-            message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
-            position: 'topRight'
-          });
-        }
+        void openComprobanteVaTicket(res.data).then((ok) => {
+          if (!ok) {
+            iziToast.warning({
+              title: 'Aviso',
+              message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
+              position: 'topRight'
+            });
+          }
+        });
       },
       error: () => {
         iziToast.warning({ title: 'Aviso', message: 'No se pudo cargar el comprobante VA para impresión.', position: 'topRight' });

@@ -1,5 +1,6 @@
 {
   "/api/reports": {"target":"http://127.0.0.1:3002","secure":false,"changeOrigin":true,"logLevel":"silent"},
   "/api/**": {"target":"http://127.0.0.1:3000","secure":false,"changeOrigin":true,"logLevel":"silent"},
-  "/productos-img/**": {"target":"http://127.0.0.1:3000","secure":false,"changeOrigin":true}
+  "/productos-img/**": {"target":"http://127.0.0.1:3000","secure":false,"changeOrigin":true},
+  "/logos/**": {"target":"http://127.0.0.1:3000","secure":false,"changeOrigin":true}
 }

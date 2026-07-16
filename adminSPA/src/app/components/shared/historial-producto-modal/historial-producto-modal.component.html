@@ -1,0 +1,136 @@
+<div class="modal-header bg-primary text-white">
+  <div class="me-2 min-w-0">
+    <h5 class="modal-title mb-0">Historial del producto</h5>
+    <div class="small text-white-50 text-truncate" [title]="tituloProducto">{{ tituloProducto }}</div>
+  </div>
+  <button type="button" class="btn-close btn-close-white" aria-label="Cerrar" (click)="cancelar()"></button>
+</div>
+
+<div class="modal-body historial-producto-body">
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+      <button
+        type="button"
+        class="nav-link"
+        [class.active]="tab === 'ventas'"
+        (click)="seleccionarTab('ventas')"
+      >
+        Ventas
+      </button>
+    </li>
+    @if (puedeVerCompras) {
+      <li class="nav-item">
+        <button
+          type="button"
+          class="nav-link"
+          [class.active]="tab === 'compras'"
+          (click)="seleccionarTab('compras')"
+        >
+          Compras
+        </button>
+      </li>
+    }
+  </ul>
+
+  @if (tab === 'ventas') {
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      @if (idCliente) {
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-outline-secondary]="!soloEsteCliente"
+          [class.btn-secondary]="soloEsteCliente"
+          (click)="toggleSoloCliente()"
+          title="Filtrar por el cliente de la venta actual"
+        >
+          {{ soloEsteCliente ? 'Solo este cliente' : 'Todos los clientes' }}
+        </button>
+      }
+      <button type="button" class="btn btn-sm btn-outline-primary" (click)="cargarVentas()" [disabled]="loadingVentas">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+
+    @if (loadingVentas) {
+      <p class="text-muted mb-0">Cargando historial de ventas…</p>
+    } @else if (errorVentas) {
+      <div class="alert alert-danger py-2 mb-0">{{ errorVentas }}</div>
+    } @else if (ventas.length === 0) {
+      <p class="text-muted mb-0">No hay ventas registradas para este producto.</p>
+    } @else {
+      <div class="table-responsive historial-producto-table-wrap">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Comprobante</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th class="text-end">Cant.</th>
+              <th class="text-end">Precio</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of ventas; track f.idVenta + '-' + f.idDetalle) {
+              <tr [class.table-primary]="f.precio === precioActual">
+                <td class="text-nowrap">{{ f.comprobante || '—' }}</td>
+                <td class="text-nowrap">{{ formatearFecha(f.fecha) }}</td>
+                <td class="historial-producto-clip" [title]="f.cliente">{{ f.cliente || '—' }}</td>
+                <td class="text-end">{{ f.cantidad | number:'1.0-3' }}</td>
+                <td class="text-end">{{ f.precio | number:'1.2-2' }}</td>
+                <td class="text-end">{{ f.total | number:'1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+
+  @if (tab === 'compras' && puedeVerCompras) {
+    <div class="d-flex justify-content-end mb-2">
+      <button type="button" class="btn btn-sm btn-outline-primary" (click)="cargarCompras()" [disabled]="loadingCompras">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+
+    @if (loadingCompras) {
+      <p class="text-muted mb-0">Cargando historial de compras…</p>
+    } @else if (errorCompras) {
+      <div class="alert alert-danger py-2 mb-0">{{ errorCompras }}</div>
+    } @else if (compras.length === 0) {
+      <p class="text-muted mb-0">No hay compras registradas para este producto.</p>
+    } @else {
+      <div class="table-responsive historial-producto-table-wrap">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Comprobante</th>
+              <th>Fecha</th>
+              <th>Proveedor</th>
+              <th class="text-end">Cant.</th>
+              <th class="text-end">Precio</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of compras; track f.idCompra + '-' + f.idDetalleCompra) {
+              <tr>
+                <td class="text-nowrap">{{ f.comprobante || '—' }}</td>
+                <td class="text-nowrap">{{ formatearFecha(f.fecha) }}</td>
+                <td class="historial-producto-clip" [title]="f.proveedor">{{ f.proveedor || '—' }}</td>
+                <td class="text-end">{{ f.cantidad | number:'1.0-3' }}</td>
+                <td class="text-end">{{ f.precio | number:'1.2-4' }}</td>
+                <td class="text-end">{{ f.total | number:'1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="cancelar()">Cerrar</button>
+</div>

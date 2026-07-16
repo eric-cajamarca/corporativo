@@ -20,6 +20,7 @@ import { Documento } from '../../../interfaces/documento-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
 import { Presentacion } from '../../../interfaces/presentacion-interface';
 import { ModalPreciosComponent } from '../../modal-precios/modal-precios.component';
+import { HistorialProductoModalComponent } from '../../shared/historial-producto-modal/historial-producto-modal.component';
 import { ModalService } from '../../../services/modal.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ComprobantePdfData, VentasService } from '../../../services/ventas.service';
@@ -2020,6 +2021,48 @@ abrirModalPrecios(item: any) {
 
   }
 
+  /** Solo Administrador ve pestaña de compras en historial del producto. */
+  esAdministradorHistorial(): boolean {
+    return String(this.auth.userData()?.rol ?? '').trim() === 'Administrador';
+  }
+
+  /**
+   * Historial de ventas (y compras si admin) del producto de la línea.
+   */
+  abrirModalHistorialProducto(item: { idProducto?: string; codigo?: string; descripcion?: string; pVenta?: number }): void {
+    const idProducto = String(item?.idProducto || '').trim();
+    if (!idProducto) {
+      iziToast.warning({
+        title: 'Aviso',
+        message: 'El producto de la línea no es válido',
+        position: 'topRight'
+      });
+      return;
+    }
+    const idCliente =
+      this.cliente?.idCliente != null && this.cliente.idCliente !== '' && this.cliente.idCliente !== 0
+        ? this.cliente.idCliente
+        : null;
+
+    this.modalService
+      .open(
+        HistorialProductoModalComponent,
+        { size: 'lg', backdrop: 'static' },
+        {
+          idProducto,
+          codigo: item.codigo || '',
+          descripcion: item.descripcion || '',
+          puedeVerCompras: this.esAdministradorHistorial(),
+          idCliente,
+          precioActual: Number(item.pVenta) || 0
+        }
+      )
+      .subscribe({
+        next: () => {},
+        error: () => {}
+      });
+  }
+
   actualizaCantidad(item: any, el: any) {
     const raw = (el.target?.innerText ?? '')
       .replace(/[^\d.,\-]/g, '')
@@ -3547,13 +3590,15 @@ abrirModalPrecios(item: any) {
           iziToast.warning({ title: 'Aviso', message: 'No se pudieron cargar los datos del comprobante VA.', position: 'topRight' });
           return;
         }
-        if (!openComprobanteVaTicket(res.data)) {
-          iziToast.warning({
-            title: 'Aviso',
-            message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
-            position: 'topRight'
-          });
-        }
+        void openComprobanteVaTicket(res.data).then((ok) => {
+          if (!ok) {
+            iziToast.warning({
+              title: 'Aviso',
+              message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
+              position: 'topRight'
+            });
+          }
+        });
       },
       error: () => {
         iziToast.warning({ title: 'Aviso', message: 'No se pudo cargar el comprobante VA para impresión.', position: 'topRight' });

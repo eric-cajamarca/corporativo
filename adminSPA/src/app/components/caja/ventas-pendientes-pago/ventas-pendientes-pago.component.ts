@@ -219,13 +219,15 @@ export class VentasPendientesPagoComponent implements OnInit {
           }
           return;
         }
-        if (!openComprobanteVaTicket(res.data) && typeof iziToast !== 'undefined') {
-          iziToast.warning({
-            title: 'Aviso',
-            message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
-            position: 'topRight'
-          });
-        }
+        void openComprobanteVaTicket(res.data).then((ok) => {
+          if (!ok && typeof iziToast !== 'undefined') {
+            iziToast.warning({
+              title: 'Aviso',
+              message: 'Permita ventanas emergentes para ver e imprimir el ticket VA.',
+              position: 'topRight'
+            });
+          }
+        });
       },
       error: () => {
         this.imprimiendoVaId = null;

@@ -1141,6 +1141,20 @@ exports.actualizarProductoCompra = async (pool, detalle) => {
     );
 };
 
+/** Actualiza el costo de catálogo (último costo de compra) para que Precios de venta lo refleje. */
+exports.actualizarCUnitarioDesdeCompra = async (executor, idEmpresa, idProducto, cUnitario) => {
+  const req = typeof executor.request === 'function' ? executor.request() : executor;
+  return req
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('cUnitario', sql.Decimal(18, 6), cUnitario)
+    .query(`
+      UPDATE Productos
+      SET cUnitario = @cUnitario
+      WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa
+    `);
+};
+
 exports.insertarProductoCompraValores = async (transaction, detalle) => {
   return transaction
     .request()

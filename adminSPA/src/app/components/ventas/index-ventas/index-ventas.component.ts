@@ -441,9 +441,11 @@ export class IndexVentasComponent implements OnInit, OnDestroy {
           this.toastError('No se pudieron cargar los datos del comprobante VA.');
           return;
         }
-        if (!openComprobanteVaTicket(res.data)) {
-          this.toastWarning('Permita ventanas emergentes para ver e imprimir el ticket VA.');
-        }
+        void openComprobanteVaTicket(res.data).then((ok) => {
+          if (!ok) {
+            this.toastWarning('Permita ventanas emergentes para ver e imprimir el ticket VA.');
+          }
+        });
       },
       error: () => {
         this.imprimiendoVAId = null;
