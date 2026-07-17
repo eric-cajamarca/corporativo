@@ -64,7 +64,7 @@
             </button>
           </div>
           <div class="table-responsive">
-            <table class="table table-sm table-bordered">
+            <table class="table table-sm table-bordered table-update-venta-detalle-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Código</th>
@@ -77,16 +77,16 @@
               </thead>
               <tbody>
                 <tr *ngFor="let d of detalles; let i = index">
-                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.codigo" readonly></td>
-                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" [readonly]="!d.permiteDescripcionEnVenta"></td>
-                  <td>
+                  <td data-label="Código"><input type="text" class="form-control form-control-sm" [(ngModel)]="d.codigo" readonly></td>
+                  <td data-label="Descripción"><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" [readonly]="!d.permiteDescripcionEnVenta"></td>
+                  <td data-label="Cantidad">
                     <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.cantidad" (ngModelChange)="recalcularTotal()" step="0.001" min="0">
                   </td>
-                  <td>
+                  <td data-label="P. venta">
                     <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.pVenta" (ngModelChange)="recalcularTotal()" step="0.01" min="0">
                   </td>
-                  <td class="text-end align-middle">{{ formatearMoneda(d.total) }}</td>
-                  <td class="text-center align-middle">
+                  <td class="text-end align-middle" data-label="Total">{{ formatearMoneda(d.total) }}</td>
+                  <td class="text-center align-middle" data-label="Eliminar">
                     <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarDetalle(i)" title="Eliminar">
                       <i class="bi bi-trash"></i>
                     </button>
@@ -177,7 +177,7 @@
         </div>
 
         <div class="table-responsive">
-          <table class="table table-sm table-hover table-bordered">
+          <table class="table table-sm table-hover table-bordered table-update-venta-pago-responsive">
             <thead class="table-light">
               <tr>
                 <th class="text-center" style="width: 5%">#</th>
@@ -189,19 +189,19 @@
             </thead>
             <tbody>
               <tr *ngFor="let detalle of detallePago; let i = index">
-                <td class="text-center">{{ detalle.item }}</td>
-                <td>{{ detalle.descripcion }}</td>
-                <td class="text-end align-middle p-1">
+                <td class="text-center" data-label="#">{{ detalle.item }}</td>
+                <td data-label="Forma de pago">{{ detalle.descripcion }}</td>
+                <td class="text-end align-middle p-1" data-label="Monto">
                   <input type="number" class="form-control text-end modal-pago-monto-fila" [(ngModel)]="detalle.monto" (ngModelChange)="onMontoTablaDetallePagoChange()" (blur)="normalizarMontoDetallePago(detalle)" step="0.01" min="0" inputmode="decimal">
                 </td>
-                <td>{{ detalle.referencia }}</td>
-                <td class="text-center">
+                <td data-label="Referencia">{{ detalle.referencia }}</td>
+                <td class="text-center" data-label="Quitar">
                   <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarFilaDetallePago(i)" title="Eliminar">
                     <i class="bi bi-trash"></i>
                   </button>
                 </td>
               </tr>
-              <tr *ngIf="detallePago.length === 0">
+              <tr *ngIf="detallePago.length === 0" class="fila-vacia">
                 <td colspan="5" class="text-center text-muted py-3">
                   <i class="bi bi-inbox me-1"></i>No se han agregado formas de pago
                 </td>

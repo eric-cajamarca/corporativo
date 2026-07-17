@@ -61,7 +61,7 @@
         @if (listadoBusqueda.length > 0) {
           <div class="table-responsive mt-3">
             <p class="small text-muted mb-2">Seleccione un comprobante:</p>
-            <table class="table table-sm table-hover table-bordered">
+            <table class="table table-sm table-hover table-bordered table-notas-busqueda-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Tipo</th>
@@ -75,12 +75,12 @@
               <tbody>
                 @for (c of listadoBusqueda; track c.idComprobanteElectronico) {
                   <tr>
-                    <td>{{ c.tipoComprobante === '01' ? 'Factura' : 'Boleta' }}</td>
-                    <td>{{ c.serie }}-{{ c.numero }}</td>
-                    <td>{{ c.fechaEmision }}</td>
-                    <td>{{ c.clienteRuc }}</td>
-                    <td>{{ c.clienteRazonSocial }}</td>
-                    <td>
+                    <td data-label="Tipo">{{ c.tipoComprobante === '01' ? 'Factura' : 'Boleta' }}</td>
+                    <td data-label="Serie-Número">{{ c.serie }}-{{ c.numero }}</td>
+                    <td data-label="Fecha">{{ c.fechaEmision }}</td>
+                    <td data-label="RUC">{{ c.clienteRuc }}</td>
+                    <td data-label="Cliente">{{ c.clienteRazonSocial }}</td>
+                    <td data-label="Acciones">
                       <button type="button" class="btn btn-sm btn-primary" (click)="seleccionarComprobante(c)">Usar este</button>
                     </td>
                   </tr>
@@ -125,7 +125,7 @@
 
         <p class="small text-muted mb-2">Edite cantidades y precios si corresponde. Luego pulse "Crear nota".</p>
         <div class="table-responsive">
-          <table class="table table-sm table-bordered">
+          <table class="table table-sm table-bordered table-notas-items-responsive">
             <thead class="table-light">
               <tr>
                 <th>Producto</th>
@@ -138,24 +138,24 @@
             <tbody>
               @for (it of items; track it.idProducto + $index) {
                 <tr>
-                  <td>{{ it.descripcion || it.idProducto }}</td>
-                  <td>
+                  <td data-label="Producto">{{ it.descripcion || it.idProducto }}</td>
+                  <td data-label="Cantidad">
                     <input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad"
                            min="0" step="0.01" (ngModelChange)="recalcularItem(it)">
                   </td>
-                  <td>
+                  <td data-label="P. venta">
                     <input type="number" class="form-control form-control-sm" [(ngModel)]="it.pVenta"
                            min="0" step="0.01" (ngModelChange)="recalcularItem(it)">
                   </td>
-                  <td>{{ it.subtotal | number:'1.2-2' }}</td>
-                  <td>{{ it.total | number:'1.2-2' }}</td>
+                  <td data-label="Subtotal">{{ it.subtotal | number:'1.2-2' }}</td>
+                  <td data-label="Total">{{ it.total | number:'1.2-2' }}</td>
                 </tr>
               }
             </tbody>
             <tfoot>
-              <tr class="table-light">
+              <tr class="table-light fila-vacia">
                 <td colspan="4" class="text-end fw-bold">Total</td>
-                <td class="fw-bold">{{ totalGeneral | number:'1.2-2' }}</td>
+                <td class="fw-bold" data-label="Total">{{ totalGeneral | number:'1.2-2' }}</td>
               </tr>
             </tfoot>
           </table>
@@ -204,7 +204,7 @@
           <p class="text-muted small p-3 mb-0">No hay notas registradas con los filtros actuales.</p>
         } @else {
           <div class="table-responsive">
-            <table class="table table-hover table-bordered mb-0 notas-emitidas-table align-middle">
+            <table class="table table-hover table-bordered mb-0 notas-emitidas-table align-middle table-notas-credito-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Acciones</th>
@@ -218,24 +218,24 @@
               <tbody>
                 @for (row of notasEmitidas; track row.idVenta) {
                   <tr>
-                    <td class="text-center text-nowrap notas-td-acciones">
-                      <button type="button" class="btn btn-danger btn-sm mb-2" (click)="abrirModalPdfNota(row)"
+                    <td class="text-center text-nowrap notas-td-acciones" data-label="Acciones">
+                      <button type="button" class="btn btn-danger btn-sm notas-btn-accion" (click)="abrirModalPdfNota(row)"
                               [disabled]="pdfNotaCargandoId === row.idVenta" title="PDF / WhatsApp">
-                      <span class="ms-2">PDF</span>
+                        PDF
                       </button>
-                      <button type="button" class="btn btn-primary btn-sm mb-2"
+                      <button type="button" class="btn btn-primary btn-sm notas-btn-accion"
                               [disabled]="!notaTieneArchivosSunat(row)"
                               [class.text-muted]="!notaTieneArchivosSunat(row)"
                               (click)="abrirModalArchivoNota(row, 'xml')" title="Ver / Descargar XML">
-                         <span class="ms-2">XML</span>
+                        XML
                       </button>
-                      <button type="button" class="btn btn-secondary btn-sm mb-2"
+                      <button type="button" class="btn btn-secondary btn-sm notas-btn-accion"
                               [disabled]="!notaTieneArchivosSunat(row)"
                               (click)="abrirModalArchivoNota(row, 'cdr')" title="Ver / Descargar CDR">
-                        <span class="ms-2">CDR</span>
+                        CDR
                       </button>
                       @if (puedeEliminarNota(row)) {
-                        <button type="button" class="btn btn-secondary btn-sm p-1 text-secondary" (click)="confirmarEliminarNota(row)"
+                        <button type="button" class="btn btn-outline-secondary btn-sm notas-btn-accion" (click)="confirmarEliminarNota(row)"
                                 [disabled]="eliminandoIdVenta === row.idVenta" title="Eliminar (solo si no fue enviada/aceptada en SUNAT)">
                           @if (eliminandoIdVenta === row.idVenta) {
                             <span class="spinner-border spinner-border-sm" role="status"></span>
@@ -245,11 +245,11 @@
                         </button>
                       }
                     </td>
-                    <td class="small">{{ formatearFechaCorta(row.fEmision) }}</td>
-                    <td class="small fw-medium">{{ textoDocumento(row) }}</td>
-                    <td class="small text-truncate" style="max-width: 220px" [title]="row.clienteRazonSocial">{{ row.clienteRazonSocial || '—' }}</td>
-                    <td class="text-end small">{{ row.total | number:'1.2-2' }}</td>
-                    <td class="small fw-semibold text-uppercase">{{ estadoNotaEtiqueta(row.idEstadoSunat) }}</td>
+                    <td class="small" data-label="Fecha">{{ formatearFechaCorta(row.fEmision) }}</td>
+                    <td class="small fw-medium" data-label="Documento">{{ textoDocumento(row) }}</td>
+                    <td class="small text-truncate" style="max-width: 220px" [title]="row.clienteRazonSocial" data-label="Cliente">{{ row.clienteRazonSocial || '—' }}</td>
+                    <td class="text-end small" data-label="Total">{{ row.total | number:'1.2-2' }}</td>
+                    <td class="small fw-semibold text-uppercase" data-label="Estado">{{ estadoNotaEtiqueta(row.idEstadoSunat) }}</td>
                   </tr>
                 }
               </tbody>

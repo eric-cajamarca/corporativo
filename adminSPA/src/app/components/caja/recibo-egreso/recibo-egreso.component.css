@@ -36,3 +36,109 @@
   font-size: 1rem;
 }
 
+.btn-nueva-accion-movil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #198754;
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(25, 135, 84, 0.35);
+}
+
+.btn-nueva-accion-movil:active {
+  background: #157347;
+}
+
+/* Cards compactas en móvil; desktop sin cambios */
+@media (max-width: 991.98px) {
+  .table-recibo-egreso-responsive thead {
+    display: none;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.4rem;
+    width: auto !important;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Acciones"],
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Concepto"],
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Glosa"],
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Empresa"],
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Entregué a"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Concepto"] {
+    font-weight: 600;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Acciones"] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    order: 10;
+    padding-top: 0.35rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid #f1f3f5;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Acciones"]::before {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+
+  .table-recibo-egreso-responsive tbody tr:not(.recibo-fila-vacia) td[data-label="Acciones"] .btn {
+    margin-right: 0 !important;
+  }
+
+  .table-recibo-egreso-responsive tbody tr.recibo-fila-vacia {
+    display: block;
+  }
+
+  .table-recibo-egreso-responsive tbody tr.recibo-fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-recibo-egreso-responsive tbody tr.recibo-fila-vacia td::before {
+    display: none;
+  }
+}
+

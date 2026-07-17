@@ -175,7 +175,7 @@
         } @else {
           <div class="hotel-card">
             <div class="table-responsive">
-              <table class="table hotel-table">
+              <table class="table hotel-table table-hotel-reservas-responsive">
                 <thead>
                   <tr>
                     <th>Código</th>
@@ -191,18 +191,18 @@
                 <tbody>
                   @for (r of reservas; track r.idReserva) {
                     <tr>
-                      <td><span class="fw-medium">{{ r.codigo }}</span></td>
-                      <td>{{ r.nombreHuesped }}</td>
-                      <td><span class="hotel-room-tag">{{ r.habitacionDescripcion || r.habitacionCodigo }}</span></td>
-                      <td>{{ r.fechaEntrada }}</td>
-                      <td>{{ r.fechaSalida }}</td>
-                      <td>
+                      <td data-label="Código"><span class="fw-medium">{{ r.codigo }}</span></td>
+                      <td data-label="Huésped">{{ r.nombreHuesped }}</td>
+                      <td data-label="Habitación"><span class="hotel-room-tag">{{ r.habitacionDescripcion || r.habitacionCodigo }}</span></td>
+                      <td data-label="Entrada">{{ r.fechaEntrada }}</td>
+                      <td data-label="Salida">{{ r.fechaSalida }}</td>
+                      <td data-label="Estado">
                         <span class="hotel-badge" [ngClass]="estadoReservaClass(r.estado)">
                           {{ labelEstadoReserva(r.estado) }}
                         </span>
                       </td>
-                      <td class="text-end fw-semibold">{{ formatearMoneda(r.total) }}</td>
-                      <td class="text-end text-nowrap">
+                      <td class="text-end fw-semibold" data-label="Total">{{ formatearMoneda(r.total) }}</td>
+                      <td class="text-end text-nowrap" data-label="Acciones">
                         @if (reservaEsConfirmada(r)) {
                           <button type="button" class="btn btn-sm btn-success me-1" (click)="abrirModalCheckInDesdeReserva(r)">Check-in</button>
                           <button type="button" class="btn btn-sm btn-outline-primary me-1" (click)="abrirModalAnticipo(r)">Anticipo</button>
@@ -492,7 +492,7 @@
                 <p class="text-muted mb-0">No hay estancias registradas en este mes para esta habitación.</p>
               } @else {
                 <div class="table-responsive">
-                  <table class="table table-sm table-hover align-middle mb-0">
+                  <table class="table table-sm table-hover align-middle mb-0 table-hotel-historial-responsive">
                     <thead>
                       <tr>
                         <th>Huésped</th>
@@ -508,18 +508,18 @@
                     <tbody>
                       @for (est of historialData.estancias; track est.idEstancia) {
                         <tr>
-                          <td>{{ est.nombreHuesped }}</td>
-                          <td class="small">{{ formatearFechaHora(est.checkIn) }}</td>
-                          <td class="small">{{ formatearFechaHora(est.checkOutPrevisto) }}</td>
-                          <td class="small">{{ formatearFechaHora(est.checkOutReal) }}</td>
-                          <td>
+                          <td data-label="Huésped">{{ est.nombreHuesped }}</td>
+                          <td class="small" data-label="Check-in">{{ formatearFechaHora(est.checkIn) }}</td>
+                          <td class="small" data-label="Salida prevista">{{ formatearFechaHora(est.checkOutPrevisto) }}</td>
+                          <td class="small" data-label="Salida real">{{ formatearFechaHora(est.checkOutReal) }}</td>
+                          <td data-label="Estado">
                             <span class="badge" [class.bg-success]="est.estadoEstancia === 'activa'" [class.bg-secondary]="est.estadoEstancia === 'checkout'">
                               {{ est.estadoEstancia === 'activa' ? 'Activa' : 'Check-out' }}
                             </span>
                           </td>
-                          <td class="text-end">{{ formatearMoneda(est.totalHabitacion) }}</td>
-                          <td class="text-end">{{ formatearMoneda(est.totalConsumo) }}</td>
-                          <td class="text-end">
+                          <td class="text-end" data-label="Habitación">{{ formatearMoneda(est.totalHabitacion) }}</td>
+                          <td class="text-end" data-label="Consumo">{{ formatearMoneda(est.totalConsumo) }}</td>
+                          <td class="text-end" data-label="Acciones">
                             <button type="button" class="btn btn-outline-primary btn-sm" (click)="abrirDetalleHistorialEstancia(est)">Ver</button>
                           </td>
                         </tr>
@@ -570,7 +570,7 @@
               <p class="text-muted small mb-0">Sin consumos registrados.</p>
             } @else {
               <div class="table-responsive">
-                <table class="table table-sm mb-2">
+                <table class="table table-sm mb-2 table-hotel-historial-consumo-responsive">
                   <thead>
                     <tr>
                       <th>Producto</th>
@@ -583,11 +583,11 @@
                   <tbody>
                     @for (c of historialDetalle.consumos; track c.idConsumo) {
                       <tr>
-                        <td>{{ c.productoCodigo }} — {{ c.productoDescripcion }}</td>
-                        <td class="text-end">{{ c.cantidad }}</td>
-                        <td class="text-end">{{ formatearMoneda(c.pUnitario) }}</td>
-                        <td class="text-end">{{ formatearMoneda(c.cantidad * c.pUnitario) }}</td>
-                        <td><span class="badge bg-light text-dark">{{ c.estadoConsumo || 'pendiente' }}</span></td>
+                        <td data-label="Producto">{{ c.productoCodigo }} — {{ c.productoDescripcion }}</td>
+                        <td class="text-end" data-label="Cant.">{{ c.cantidad }}</td>
+                        <td class="text-end" data-label="P. unit.">{{ formatearMoneda(c.pUnitario) }}</td>
+                        <td class="text-end" data-label="Subtotal">{{ formatearMoneda(c.cantidad * c.pUnitario) }}</td>
+                        <td data-label="Estado"><span class="badge bg-light text-dark">{{ c.estadoConsumo || 'pendiente' }}</span></td>
                       </tr>
                     }
                   </tbody>
@@ -823,7 +823,7 @@
           }
           <h6 class="mb-2">Consumo</h6>
           <div class="table-responsive mb-3">
-            <table class="table table-sm hotel-table">
+            <table class="table table-sm hotel-table table-hotel-consumo-responsive">
               <thead>
                 <tr>
                   <th>Producto</th>
@@ -835,7 +835,7 @@
               </thead>
               <tbody>
                 @for (lin of getConsumoDeHabitacion(habitacionDetalleSeleccionada.idProducto); track lin.idConsumo) {
-                  <tr>
+                  <tr [class.fila-vacia]="editandoConsumo?.idConsumo === lin.idConsumo">
                     @if (editandoConsumo?.idConsumo === lin.idConsumo) {
                       <td colspan="5" class="bg-light p-2">
                         <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -846,11 +846,11 @@
                         </div>
                       </td>
                     } @else {
-                      <td>{{ lin.productoDescripcion }}</td>
-                      <td class="text-center">{{ lin.cantidad }}</td>
-                      <td class="text-end">{{ lin.pUnitario | number:'1.2-2' }}</td>
-                      <td class="text-end">{{ formatearMoneda(lin.cantidad * lin.pUnitario) }}</td>
-                      <td>
+                      <td data-label="Producto">{{ lin.productoDescripcion }}</td>
+                      <td class="text-center" data-label="Cant.">{{ lin.cantidad }}</td>
+                      <td class="text-end" data-label="P.unit">{{ lin.pUnitario | number:'1.2-2' }}</td>
+                      <td class="text-end" data-label="Subtotal">{{ formatearMoneda(lin.cantidad * lin.pUnitario) }}</td>
+                      <td data-label="Acciones">
                         <i class="bi bi-pencil text-primary" style="cursor:pointer;" (click)="iniciarEditarConsumo(lin)"></i>
                         <i class="bi bi-trash text-danger" style="cursor:pointer;" (click)="eliminarConsumoLinea(lin.idConsumo)"></i>
                         
@@ -1010,7 +1010,7 @@
             </div>
           </div>
           <div class="table-responsive" style="max-height: 300px;">
-            <table class="table table-hover align-middle">
+            <table class="table table-hover align-middle table-hotel-productos-responsive">
               <thead style="background-color: #20c997; color: white;">
                 <tr>
                   <th>Código</th>
@@ -1025,13 +1025,18 @@
               <tbody>
                 @for (p of productosFiltradosBusqueda; track p.idProducto) {
                   <tr role="button" class="table-row-hover" (click)="seleccionarProductoConsumo(p)">
-                    <td>{{ p.codigo }}</td>
-                    <td>{{ p.categoria }}</td>
-                    <td>{{ p.descripcion }}</td>
-                    <td>{{ uMedidaColumnaConsumo(p) }}</td>
-                    <td>S/ {{ (p.pVenta ?? 0) | number:'1.2-2' }}</td>
-                    <td>{{ p.sucursal }}</td>
-                    <td>{{ p.stock }}</td>
+                    <td data-label="Código">{{ p.codigo }}</td>
+                    <td data-label="Categoría">{{ p.categoria }}</td>
+                    <td data-label="Producto">{{ p.descripcion }}</td>
+                    <td data-label="U.Medida">{{ uMedidaColumnaConsumo(p) }}</td>
+                    <td data-label="Precio">S/ {{ (p.pVenta ?? 0) | number:'1.2-2' }}</td>
+                    <td data-label="Sucursal">{{ p.sucursal }}</td>
+                    <td data-label="Stock">{{ p.stock }}</td>
+                  </tr>
+                }
+                @if (productosFiltradosBusqueda.length === 0) {
+                  <tr class="fila-vacia">
+                    <td colspan="7" class="text-muted text-center">No hay productos para mostrar.</td>
                   </tr>
                 }
               </tbody>
@@ -1106,16 +1111,16 @@
             <input type="text" class="form-control" [(ngModel)]="formAnticipo.concepto" />
           </div>
           @if (anticiposReserva.length) {
-            <table class="table table-sm">
+            <table class="table table-sm table-hotel-anticipos-responsive">
               <thead><tr><th>Fecha</th><th>Concepto</th><th class="text-end">Monto</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 @for (a of anticiposReserva; track a.idAnticipo) {
                   <tr>
-                    <td>{{ a.fRegistro }}</td>
-                    <td>{{ a.concepto }}</td>
-                    <td class="text-end">{{ formatearMoneda(a.monto) }}</td>
-                    <td>{{ a.estado }}</td>
-                    <td>
+                    <td data-label="Fecha">{{ a.fRegistro }}</td>
+                    <td data-label="Concepto">{{ a.concepto }}</td>
+                    <td class="text-end" data-label="Monto">{{ formatearMoneda(a.monto) }}</td>
+                    <td data-label="Estado">{{ a.estado }}</td>
+                    <td data-label="Acciones">
                       @if (a.estado === 'pendiente') {
                         <button type="button" class="btn btn-link btn-sm text-danger p-0" (click)="anularAnticipoLista(a)">Anular</button>
                       }

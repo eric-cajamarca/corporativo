@@ -102,7 +102,7 @@
       </div>
 
       <div class="pv-table-scroll table-responsive">
-        <table class="table table-hover table-striped mb-0 pv-table">
+        <table class="table table-hover table-striped mb-0 pv-table table-productos-comprados-responsive">
           <thead>
             <tr>
               <th class="text-center" style="width: 2.5rem">#</th>
@@ -120,27 +120,27 @@
           </thead>
           <tbody>
             @if (cargando) {
-              <tr>
+              <tr class="fila-vacia">
                 <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">Cargando…</td>
               </tr>
             } @else if (!items.length) {
-              <tr>
+              <tr class="fila-vacia">
                 <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">Sin resultados</td>
               </tr>
             } @else {
               @for (r of items; track trackFila($index, r); let idx = $index) {
                 <tr>
-                  <td class="text-center">{{ idx + 1 }}</td>
-                  <td class="text-nowrap small">{{ r.fecha || '—' }}</td>
-                  <td class="pv-col-producto">{{ r.producto }}</td>
+                  <td class="text-center" data-label="#">{{ idx + 1 }}</td>
+                  <td class="text-nowrap small" data-label="Fecha">{{ r.fecha || '—' }}</td>
+                  <td class="pv-col-producto" data-label="Producto">{{ r.producto }}</td>
                   @if (mostrarColumnaEmpresa) {
-                    <td><small>{{ r.aliasEmpresa }}</small></td>
+                    <td data-label="Empresa"><small>{{ r.aliasEmpresa }}</small></td>
                   }
-                  <td class="pv-col-proveedor"><small>{{ r.proveedor || '—' }}</small></td>
-                  <td class="text-end">{{ r.cantidad | number: '1.2-3' }}</td>
-                  <td class="text-end">{{ r.precio | number: '1.2-2' }}</td>
-                  <td class="text-end fw-semibold">{{ r.importe | number: '1.2-2' }}</td>
-                  <td class="text-center">
+                  <td class="pv-col-proveedor" data-label="Proveedor"><small>{{ r.proveedor || '—' }}</small></td>
+                  <td class="text-end" data-label="Cantidad">{{ r.cantidad | number: '1.2-3' }}</td>
+                  <td class="text-end" data-label="Precio">{{ r.precio | number: '1.2-2' }}</td>
+                  <td class="text-end fw-semibold" data-label="Importe">{{ r.importe | number: '1.2-2' }}</td>
+                  <td class="text-center" data-label="Ver">
                     @if (r.idCompra != null) {
                       <a [routerLink]="['/compras', r.idCompra]" class="btn btn-link btn-sm p-0 text-primary" title="Ver compra">
                         <i class="bi bi-table"></i>
@@ -155,11 +155,11 @@
           </tbody>
           @if (!cargando && items.length) {
             <tfoot>
-              <tr class="pv-tfoot-row">
+              <tr class="pv-tfoot-row fila-vacia">
                 <td class="text-end fw-bold" [attr.colspan]="mostrarColumnaEmpresa ? 5 : 4">Totales</td>
-                <td class="text-end fw-bold">{{ totales.cantidad | number: '1.3-3' }}</td>
+                <td class="text-end fw-bold" data-label="Cantidad">{{ totales.cantidad | number: '1.3-3' }}</td>
                 <td class="text-end fw-bold"></td>
-                <td class="text-end fw-bold">{{ totales.importe | number: '1.2-2' }}</td>
+                <td class="text-end fw-bold" data-label="Importe">{{ totales.importe | number: '1.2-2' }}</td>
                 <td></td>
               </tr>
             </tfoot>

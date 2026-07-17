@@ -47,6 +47,106 @@
     margin-left: 0;
     width: 100%;
   }
+
+  .table-comunicacion-baja-comprobantes-responsive thead,
+  .table-comunicacion-baja-historial-responsive thead {
+    display: none;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia),
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td,
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.4rem;
+    width: auto !important;
+    max-width: none !important;
+    white-space: normal;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  /* Comprobantes: checkbox + tipo | documento | fecha | motivo ancho completo */
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td[data-label="Seleccionar"] {
+    align-items: center;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td[data-label="Seleccionar"]::before {
+    display: none;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td[data-label="Motivo"],
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) td[data-label="Descripción"],
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td[data-label="Serie-Núm."] {
+    font-weight: 600;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr:not(.fila-vacia) td[data-label="Motivo"] .form-select {
+    width: 100%;
+    max-width: none !important;
+  }
+
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    order: 10;
+    padding-top: 0.35rem;
+    margin-top: 0.1rem;
+    border-top: 1px solid #f1f3f5;
+  }
+
+  .table-comunicacion-baja-historial-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"]::before {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr.fila-vacia,
+  .table-comunicacion-baja-historial-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr.fila-vacia td,
+  .table-comunicacion-baja-historial-responsive tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-comunicacion-baja-comprobantes-responsive tbody tr.fila-vacia td::before,
+  .table-comunicacion-baja-historial-responsive tbody tr.fila-vacia td::before {
+    display: none;
+  }
 }
 
 /* Historial RA: compacto, encabezado alineado al primary del sistema */

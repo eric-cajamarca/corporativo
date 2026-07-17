@@ -56,7 +56,7 @@
           </p>
         } @else {
           <div class="table-responsive">
-            <table class="table table-sm table-hover table-bordered">
+            <table class="table table-sm table-hover table-bordered table-comunicacion-baja-comprobantes-responsive">
               <thead class="table-light">
                 <tr>
                   <th style="width:2.5rem"></th>
@@ -69,14 +69,14 @@
               <tbody>
                 @for (c of comprobantes; track c.idComprobanteElectronico) {
                   <tr>
-                    <td>
+                    <td data-label="Seleccionar">
                       <input type="checkbox" class="form-check-input" [checked]="estaSeleccionado(c.idComprobanteElectronico)"
                              (change)="toggleSeleccion(c.idComprobanteElectronico)">
                     </td>
-                    <td>{{ tipoDocLabel(c.tipoComprobante) }}</td>
-                    <td>{{ c.serie }}-{{ c.numero }}</td>
-                    <td>{{ c.fechaEmision }}</td>
-                    <td>
+                    <td data-label="Tipo">{{ tipoDocLabel(c.tipoComprobante) }}</td>
+                    <td data-label="Serie-Núm.">{{ c.serie }}-{{ c.numero }}</td>
+                    <td data-label="Fecha">{{ c.fechaEmision }}</td>
+                    <td data-label="Motivo">
                       @if (estaSeleccionado(c.idComprobanteElectronico)) {
                         <select class="form-select form-select-sm" style="max-width:220px"
                                 [ngModel]="motivoPorComprobante[c.idComprobanteElectronico]"
@@ -149,7 +149,7 @@
           </div>
         </div>
         <div class="table-responsive cb-historial-wrap">
-          <table class="table table-sm table-bordered mb-0 cb-historial-table">
+          <table class="table table-sm table-bordered mb-0 cb-historial-table table-comunicacion-baja-historial-responsive">
             <thead class="cb-historial-thead">
               <tr>
                 <th>Fecha</th>
@@ -165,12 +165,12 @@
                 <tr class="cb-historial-row" (click)="abrirModalDescripcion(item)" role="button" tabindex="0"
                     (keydown.enter)="abrirModalDescripcion(item)" (keydown.space)="$event.preventDefault(); abrirModalDescripcion(item)"
                     title="Clic para ver la descripción completa">
-                  <td>{{ item.fechaComunicacion }}</td>
-                  <td>{{ item.numeroCorrelativo }}</td>
-                  <td class="small">{{ item.ticketSunat || '—' }}</td>
-                  <td>{{ descripcionEstado(item) }}</td>
-                  <td class="small cb-desc-preview">{{ previewDescripcion(item.descripcionRespuesta) }}</td>
-                  <td (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+                  <td data-label="Fecha">{{ item.fechaComunicacion }}</td>
+                  <td data-label="Correlativo">{{ item.numeroCorrelativo }}</td>
+                  <td class="small" data-label="Ticket">{{ item.ticketSunat || '—' }}</td>
+                  <td data-label="Estado">{{ descripcionEstado(item) }}</td>
+                  <td class="small cb-desc-preview" data-label="Descripción">{{ previewDescripcion(item.descripcionRespuesta) }}</td>
+                  <td data-label="Acciones" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
                     <div class="d-flex flex-wrap gap-1 align-items-center">
                       <button type="button" class="btn btn-sm btn-outline-danger" title="Generar PDF resumen"
                               (click)="generarPdfResumenBaja(item)"

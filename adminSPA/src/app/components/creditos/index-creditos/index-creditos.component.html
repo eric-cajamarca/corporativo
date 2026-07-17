@@ -42,12 +42,25 @@
           </div>
         </div>
 
+        <!-- Móvil: el + vive en thead (oculto en cards); se muestra aquí -->
+        <div class="d-lg-none d-flex align-items-center gap-2 mb-2">
+          <button
+            type="button"
+            class="btn-nueva-accion-movil"
+            (click)="abrirModalNuevaCobranza()"
+            title="Nueva cobranza"
+            aria-label="Nueva cobranza"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
+          <span class="small text-muted">Nueva cobranza</span>
+        </div>
         <div class="table-responsive">
-          <table class="table table-hover table-sm">
+          <table class="table table-hover table-sm table-creditos-responsive">
             <thead class="table-light">
               <tr>
                 <th style="width: 200px;">
-                  <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirModalNuevaCobranza()" title="Nueva cobranza"></i>
+                  <i class="bi bi-plus-circle-fill text-success d-none d-lg-inline" style="font-size: 20px; cursor: pointer;" (click)="abrirModalNuevaCobranza()" title="Nueva cobranza"></i>
                   Acciones
                 </th>
                 <th>Cliente</th>
@@ -62,11 +75,11 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngIf="loading">
-                <td [attr.colspan]="empresasOperacion.length > 1 ? 10 : 9" class="text-center py-3">Cargando...</td>
+              <tr *ngIf="loading" class="creditos-fila-vacia">
+                <td [attr.colspan]="empresasOperacion.length > 1 ? 10 : 9" class="text-center py-3" data-label="">Cargando...</td>
               </tr>
               <tr *ngFor="let credito of creditosPendientes">
-                <td>
+                <td data-label="Acciones">
                   <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(credito)" title="Editar / Ver cuotas">
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -80,20 +93,20 @@
                     <i class="bi bi-printer"></i>
                   </button>
                 </td>
-                <td>{{ getClienteNombre(credito) }}</td>
-                <td *ngIf="empresasOperacion.length > 1">{{ nombreEmpresaCredito(credito.idEmpresa) }}</td>
-                <td>{{ credito.comprobante || (credito.idVenta ? 'Venta ' + credito.idVenta : '—') }}</td>
-                <td>{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
-                <td class="text-end">S/ {{ credito.montoTotal | number:'1.2-2' }}</td>
-                <td>{{ (credito.proximaCuota | date:'dd/MM/yyyy') || '—' }}</td>
-                <td>—</td>
-                <td class="text-end">S/ {{ (credito.saldoPendiente ?? 0) | number:'1.2-2' }}</td>
-                <td>
+                <td data-label="Cliente">{{ getClienteNombre(credito) }}</td>
+                <td *ngIf="empresasOperacion.length > 1" data-label="Empresa">{{ nombreEmpresaCredito(credito.idEmpresa) }}</td>
+                <td data-label="Documento">{{ credito.comprobante || (credito.idVenta ? 'Venta ' + credito.idVenta : '—') }}</td>
+                <td data-label="F.Venta">{{ credito.fechaCredito | date:'dd/MM/yyyy' }}</td>
+                <td class="text-end" data-label="Total">S/ {{ credito.montoTotal | number:'1.2-2' }}</td>
+                <td data-label="F.Venc.">{{ (credito.proximaCuota | date:'dd/MM/yyyy') || '—' }}</td>
+                <td data-label="N.C.">—</td>
+                <td class="text-end" data-label="Saldo">S/ {{ (credito.saldoPendiente ?? 0) | number:'1.2-2' }}</td>
+                <td data-label="Estado">
                   <span class="badge" [ngClass]="getEstadoBadgeClass(credito.estado)">{{ credito.estado }}</span>
                 </td>
               </tr>
-              <tr *ngIf="!loading && creditosPendientes.length === 0">
-                <td [attr.colspan]="empresasOperacion.length > 1 ? 10 : 9" class="text-center py-4 text-muted">No hay créditos pendientes.</td>
+              <tr *ngIf="!loading && creditosPendientes.length === 0" class="creditos-fila-vacia">
+                <td [attr.colspan]="empresasOperacion.length > 1 ? 10 : 9" class="text-center py-4 text-muted" data-label="">No hay créditos pendientes.</td>
               </tr>
             </tbody>
           </table>

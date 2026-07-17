@@ -107,18 +107,18 @@
                 <div class="card border-0 shadow-sm">
                   <div class="card-header bg-dark text-white py-1 small fw-bold">Bienes trasladados</div>
                   <div class="card-body p-0">
-                    <table class="table table-sm mb-0 small">
+                    <table class="table table-sm mb-0 small table-emision-guias-items-responsive">
                       <thead class="table-secondary">
                         <tr><th>#</th><th>Código</th><th>Descripción</th><th>Cant.</th><th>Unidad</th></tr>
                       </thead>
                       <tbody>
                         @for (it of guiaSeleccionada.datosGuia?.items ?? []; track $index) {
                           <tr>
-                            <td>{{ $index + 1 }}</td>
-                            <td>{{ it.codigo }}</td>
-                            <td>{{ it.descripcion }}</td>
-                            <td>{{ it.cantidad }}</td>
-                            <td>{{ it.unidad }}</td>
+                            <td data-label="#">{{ $index + 1 }}</td>
+                            <td data-label="Código">{{ it.codigo }}</td>
+                            <td data-label="Descripción">{{ it.descripcion }}</td>
+                            <td data-label="Cant.">{{ it.cantidad }}</td>
+                            <td data-label="Unidad">{{ it.unidad }}</td>
                           </tr>
                         }
                       </tbody>
@@ -150,7 +150,7 @@
               </div>
             } @else {
               <div class="table-responsive">
-                <table class="table table-sm table-hover mb-0">
+                <table class="table table-sm table-hover mb-0 table-emision-guias-responsive">
                   <thead class="table-dark">
                     <tr>
                       <th>Tipo</th>
@@ -165,13 +165,13 @@
                   <tbody>
                     @for (row of items; track row.idGuiaElectronica) {
                       <tr [class.table-active]="guiaSeleccionada?.idGuiaElectronica === row.idGuiaElectronica">
-                        <td class="small">{{ etiquetaTipoDocumento(row.tipoDocumento) }}</td>
-                        <td class="small">{{ row.tipoRol || '—' }}</td>
-                        <td><code class="small">{{ row.serie }}-{{ row.numero }}</code></td>
-                        <td class="small">{{ row.fechaEmision.slice(0,10) || '—' }}</td>
-                        <td><span [class]="claseEstado(row)">{{ etiquetaEstado(row) }}</span></td>
-                        <td class="small">{{ docOrigen(row) }}</td>
-                        <td class="text-end text-nowrap">
+                        <td class="small" data-label="Tipo">{{ etiquetaTipoDocumento(row.tipoDocumento) }}</td>
+                        <td class="small" data-label="Rol">{{ row.tipoRol || '—' }}</td>
+                        <td data-label="Serie-Núm."><code class="small">{{ row.serie }}-{{ row.numero }}</code></td>
+                        <td class="small" data-label="Fecha">{{ row.fechaEmision.slice(0,10) || '—' }}</td>
+                        <td data-label="Estado"><span [class]="claseEstado(row)">{{ etiquetaEstado(row) }}</span></td>
+                        <td class="small" data-label="Doc. origen">{{ docOrigen(row) }}</td>
+                        <td class="text-end text-nowrap" data-label="Acciones">
                           <!-- Editar: pendiente o error -->
                           <a
                             *ngIf="esEditable(row)"

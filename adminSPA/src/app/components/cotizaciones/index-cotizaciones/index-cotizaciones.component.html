@@ -55,7 +55,7 @@
           </div>
         </ng-container>
         <div class="table-responsive" *ngIf="!loading && cotizaciones.length > 0">
-          <table class="table table-hover table-striped mb-0">
+          <table class="table table-hover table-striped mb-0 table-cotizaciones-responsive">
             <thead class="table-dark">
               <tr>
                 <th>ID</th>
@@ -69,16 +69,17 @@
             </thead>
             <tbody>
               <tr *ngFor="let c of cotizaciones | slice: (page - 1) * pageSize : page * pageSize">
-                <td>{{ c.idCotizacion }}</td>
-                <td>{{ formatearFecha(c.fEmision) }}</td>
-                <td>{{ c.serieNumero || '—' }}</td>
-                <td>{{ c.clienteRuc || '—' }}</td>
-                <td>{{ c.clienteRazonSocial || '—' }}</td>
-                <td class="text-end fw-semibold">{{ formatearMoneda(c.total) }}</td>
-                <td>
+                <td data-label="ID">{{ c.idCotizacion }}</td>
+                <td data-label="Fecha">{{ formatearFecha(c.fEmision) }}</td>
+                <td data-label="Comprobante">{{ c.serieNumero || '—' }}</td>
+                <td data-label="RUC">{{ c.clienteRuc || '—' }}</td>
+                <td data-label="Cliente">{{ c.clienteRazonSocial || '—' }}</td>
+                <td class="text-end fw-semibold" data-label="Total">{{ formatearMoneda(c.total) }}</td>
+                <td data-label="Acciones">
+                  <!--
                   <button type="button" class="btn btn-sm btn-outline-primary me-1" title="Ver detalle" (click)="verDetalle(c)">
                     <i class="bi bi-eye"></i>
-                  </button>
+                  -->
                   <button type="button" class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="modal" data-bs-target="#pdfModalCotizacion" title="Imprimir PDF" (click)="abrirModalPdf(c)">
                     <i class="bi bi-file-pdf"></i>
                   </button>

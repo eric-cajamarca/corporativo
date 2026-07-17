@@ -39,8 +39,8 @@
         </div>
         <div *ngIf="loading" class="text-center py-4"><span class="spinner-border"></span></div>
         <div *ngIf="!loading && errorCarga" class="alert alert-danger mb-3">{{ errorCarga }}</div>
-        <div class="table-responsive" *ngIf="!loading && !errorCarga && items.length > 0">
-          <table class="table table-sm table-striped table-hover">
+        <div class="table-responsive table-auditoria-wrap" *ngIf="!loading && !errorCarga && items.length > 0">
+          <table class="table table-sm table-striped table-hover table-auditoria-responsive mb-0">
             <thead class="table-light">
               <tr>
                 <th>Fecha</th>
@@ -53,12 +53,12 @@
             </thead>
             <tbody>
               <tr *ngFor="let item of items">
-                <td>{{ formatearFecha(item.fechaAccion) }}</td>
-                <td>{{ item.usuarioNombre || '—' }}</td>
-                <td>{{ item.tablaAfectada || '—' }}</td>
-                <td>{{ item.accion || '—' }}</td>
-                <td>{{ item.referencia || item.idRegistroAfectado || '—' }}</td>
-                <td>{{ item.ipAddress || '—' }}</td>
+                <td class="text-nowrap" data-label="Fecha">{{ formatearFecha(item.fechaAccion) }}</td>
+                <td data-label="Usuario">{{ item.usuarioNombre || '—' }}</td>
+                <td data-label="Módulo">{{ item.tablaAfectada || '—' }}</td>
+                <td data-label="Acción">{{ item.accion || '—' }}</td>
+                <td data-label="Referencia">{{ item.referencia || item.idRegistroAfectado || '—' }}</td>
+                <td data-label="IP">{{ item.ipAddress || '—' }}</td>
               </tr>
             </tbody>
           </table>

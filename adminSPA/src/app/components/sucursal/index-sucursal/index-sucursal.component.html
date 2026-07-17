@@ -9,25 +9,41 @@
     <div class="container bg-white my-4 py-3 rounded shadow-sm">
       <div class="card border-0">
         <div class="card-header bg-transparent border-0 pb-0">
-          <div class="d-flex justify-content-between align-items-center flex-wrap">
-            <h4 class="mb-3 mb-md-0 fw-semibold">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 sucursales-header">
+            <h4 class="mb-0 fw-semibold">
               Mostrando todas las sucursales
             </h4>
             @if (puedeIrCrearNuevaSucursal()) {
-              <button class="btn btn-primary mb-2" type="button" [routerLink]="['/editar-empresa']" routerLinkActive="active">
+              <button class="btn btn-primary d-none d-lg-inline-block" type="button" [routerLink]="['/editar-empresa']" routerLinkActive="active">
                 Crear nueva sucursal
               </button>
+              <a
+                class="btn-nueva-accion-movil d-lg-none"
+                [routerLink]="['/editar-empresa']"
+                title="Crear nueva sucursal"
+                aria-label="Crear nueva sucursal"
+              >
+                <i class="bi bi-plus-lg"></i>
+              </a>
             } @else {
               <button
-                class="btn btn-primary mb-2"
+                class="btn btn-primary d-none d-lg-inline-block"
                 type="button"
                 disabled
                 title="Límite de sucursales o direcciones del plan alcanzado. Actualice el plan en Mi suscripción."
               >
                 Crear nueva sucursal
               </button>
+              <button
+                type="button"
+                class="btn-nueva-accion-movil d-lg-none"
+                disabled
+                title="Límite de sucursales o direcciones del plan alcanzado. Actualice el plan en Mi suscripción."
+                aria-label="Crear nueva sucursal (no disponible)"
+              >
+                <i class="bi bi-plus-lg"></i>
+              </button>
             }
-            
           </div>
         </div>
     
@@ -41,8 +57,8 @@
           </div>
     
           <!-- Tabla de sucursales -->
-          <div *ngIf="sucursales_const.length > 0" class="table-responsive" style="min-height:300px;">
-            <table class="table table-hover">
+          <div *ngIf="sucursales_const.length > 0" class="table-responsive table-sucursales-wrap" style="min-height:300px;">
+            <table class="table table-hover table-sucursales-responsive mb-0">
               <thead class="table-light">
                 <tr>
                   <th>Nombre</th>
@@ -56,21 +72,21 @@
               </thead>
               <tbody>
                 <tr *ngFor="let item of sucursales | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize">
-                  <td>{{ item.nombre }}</td>
-                  <td>{{ item.direccion }}</td>
-                  <td>{{ item.fregistro }}</td>
-                  <td>
+                  <td data-label="Nombre">{{ item.nombre }}</td>
+                  <td data-label="Dirección">{{ item.direccion }}</td>
+                  <td data-label="Registro">{{ item.fregistro || '—' }}</td>
+                  <td data-label="Estado">
                     <span class="badge" [ngClass]="item.estado ? 'bg-success' : 'bg-danger'">
                       {{ item.estado ? 'Activo' : 'Inactivo' }}
                     </span>
                   </td>
-                  <td>
-                    <span class="badge" [ngClass]="item.esPrincipal ? 'bg-success' : 'bg-danger'">
+                  <td data-label="Principal">
+                    <span class="badge" [ngClass]="item.esPrincipal ? 'bg-success' : 'bg-secondary'">
                       {{ item.esPrincipal ? 'Principal' : 'No principal' }}
                     </span>
                   </td>
-                  <td class="small">{{ etiquetaSeries(item) }}</td>
-                  <td class="text-end">
+                  <td class="small" data-label="Series">{{ etiquetaSeries(item) }}</td>
+                  <td class="text-end" data-label="Acción">
                     <!-- Dropdown de opciones con Bootstrap nativo -->
                     <div class="dropdown">
                       <button class="btn btn-sm btn-primary dropdown-toggle" type="button" 

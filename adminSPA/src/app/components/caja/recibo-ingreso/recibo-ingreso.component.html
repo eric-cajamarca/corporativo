@@ -57,12 +57,24 @@
           </span>
         </div>
       </div>
+      <div class="d-lg-none d-flex align-items-center gap-2 mb-2">
+        <button
+          type="button"
+          class="btn-nueva-accion-movil"
+          (click)="abrirNuevo()"
+          title="Nuevo recibo de ingreso"
+          aria-label="Nuevo recibo de ingreso"
+        >
+          <i class="bi bi-plus-lg"></i>
+        </button>
+        <span class="small text-muted">Nuevo recibo</span>
+      </div>
       <div class="table-responsive">
-        <table class="table table-hover table-sm">
+        <table class="table table-hover table-sm table-recibo-ingreso-responsive">
           <thead class="table-light">
             <tr>
               <th style="width: 120px;">
-                <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirNuevo()" title="Nuevo"></i>
+                <i class="bi bi-plus-circle-fill text-success d-none d-lg-inline" style="font-size: 20px; cursor: pointer;" (click)="abrirNuevo()" title="Nuevo"></i>
                 Acciones
               </th>
               <th>Fecha</th>
@@ -77,16 +89,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngIf="loading">
-              <td colspan="9" class="text-center py-3">Cargando...</td>
+            <tr *ngIf="loading" class="recibo-fila-vacia">
+              <td [attr.colspan]="colspanTablaRecibos" class="text-center py-3" data-label="">Cargando...</td>
             </tr>
             <tr *ngFor="let item of listPaginated" [class.movimiento-eliminado]="esEliminado(item)">
-              <td>
-                <!--
-                <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar"
-                        [disabled]="esEliminado(item)">
-                  <i class="bi bi-pencil"></i>
-                </button> -->
+              <td data-label="Acciones">
                 <button class="btn btn-sm btn-outline-danger me-1" (click)="eliminar(item)" title="Eliminar"
                         [disabled]="esEliminado(item)">
                   <i class="bi bi-trash"></i>
@@ -95,18 +102,18 @@
                   <i class="bi bi-printer"></i>
                 </button>
               </td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ formatFecha(item.fechaMovimiento) }}</td>
-              <td *ngIf="empresasOperacion.length > 1" [class.text-decoration-line-through]="esEliminado(item)">{{ item.empresaMovimiento || '—' }}</td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.documentoRelacionado || '-' }}</td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.concepto }}</td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.glosa || '------' }}</td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.recibidoDe || '-' }}</td>
-              <td class="text-end" [class.text-decoration-line-through]="esEliminado(item)">{{ formatCurrency(item.monto) }}</td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.medioPago ? (item.medioPago).slice(0, 3).toUpperCase() : '-' }}</td>
-              <td [class.text-decoration-line-through]="esEliminado(item)">{{ item.usuario || '-' }}</td>
+              <td data-label="Fecha" [class.text-decoration-line-through]="esEliminado(item)">{{ formatFecha(item.fechaMovimiento) }}</td>
+              <td *ngIf="empresasOperacion.length > 1" data-label="Empresa" [class.text-decoration-line-through]="esEliminado(item)">{{ item.empresaMovimiento || '—' }}</td>
+              <td data-label="Documento" [class.text-decoration-line-through]="esEliminado(item)">{{ item.documentoRelacionado || '-' }}</td>
+              <td data-label="Concepto" [class.text-decoration-line-through]="esEliminado(item)">{{ item.concepto }}</td>
+              <td data-label="Glosa" [class.text-decoration-line-through]="esEliminado(item)">{{ item.glosa || '------' }}</td>
+              <td data-label="Recibido de" [class.text-decoration-line-through]="esEliminado(item)">{{ item.recibidoDe || '-' }}</td>
+              <td class="text-end" data-label="Importe" [class.text-decoration-line-through]="esEliminado(item)">{{ formatCurrency(item.monto) }}</td>
+              <td data-label="C.Pago" [class.text-decoration-line-through]="esEliminado(item)">{{ item.medioPago ? (item.medioPago).slice(0, 3).toUpperCase() : '-' }}</td>
+              <td data-label="Usuario" [class.text-decoration-line-through]="esEliminado(item)">{{ item.usuario || '-' }}</td>
             </tr>
-            <tr *ngIf="!loading && list.length === 0">
-              <td [attr.colspan]="colspanTablaRecibos" class="text-center py-4 text-muted">No hay recibos de ingreso.</td>
+            <tr *ngIf="!loading && list.length === 0" class="recibo-fila-vacia">
+              <td [attr.colspan]="colspanTablaRecibos" class="text-center py-4 text-muted" data-label="">No hay recibos de ingreso.</td>
             </tr>
           </tbody>
         </table>

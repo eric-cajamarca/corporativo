@@ -63,7 +63,7 @@
                 <div *ngIf="errorMsgVa" class="alert alert-warning mt-2 mb-0 py-2 small" role="alert">{{ errorMsgVa }}</div>
 
                 <div *ngIf="resultadoVaLista?.length" class="table-responsive mt-3">
-                  <table class="table table-sm table-striped align-middle mb-0">
+                  <table class="table table-sm table-striped align-middle mb-0 table-index-despachos-va-responsive">
                     <thead>
                       <tr>
                         <th>VA</th>
@@ -75,11 +75,11 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let row of resultadoVaLista">
-                        <td><code class="small">{{ row.compVenta }}</code></td>
-                        <td>{{ row.clienteRazonSocial }} <span *ngIf="row.clienteRuc" class="text-muted">({{ row.clienteRuc }})</span></td>
-                        <td>{{ row.fEmision }}</td>
-                        <td class="text-end">{{ row.total | number:'1.2-2' }}</td>
-                        <td>
+                        <td data-label="VA"><code class="small">{{ row.compVenta }}</code></td>
+                        <td data-label="Cliente">{{ row.clienteRazonSocial }} <span *ngIf="row.clienteRuc" class="text-muted">({{ row.clienteRuc }})</span></td>
+                        <td data-label="Emisión">{{ row.fEmision }}</td>
+                        <td class="text-end" data-label="Total">{{ row.total | number:'1.2-2' }}</td>
+                        <td data-label="Acciones">
                           <button type="button" class="btn btn-sm btn-outline-primary" (click)="seleccionarVentaAgrupadaLista(row)">Abrir</button>
                         </td>
                       </tr>
@@ -215,7 +215,7 @@
                 <!-- Detalle de la venta (DetalleVenta): cantidad, entregada, pendiente, ubicaciones -->
                 <h6 class="mb-2">Detalle de la venta (pendiente por entregar)</h6>
                 <div class="table-responsive mb-3" *ngIf="resultado.detalleVenta?.length">
-                  <table class="table table-sm table-bordered">
+                  <table class="table table-sm table-bordered table-index-despachos-detalle-venta-responsive">
                     <thead class="table-light">
                       <tr>
                         <th>Código</th>
@@ -228,12 +228,12 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let dv of resultado.detalleVenta">
-                        <td>{{ dv.productoCodigo }}</td>
-                        <td>{{ descripcionProductoDespacho(dv.productoDescripcion, dv.productoMarca) }}</td>
-                        <td>{{ dv.cantidad }}</td>
-                        <td>{{ dv.cantEntregada }}</td>
-                        <td>{{ dv.cantPendiente }}</td>
-                        <td class="small fw-semibold text-dark">{{ dv.ubicaciones ? dv.ubicaciones : 'Sin ubicación' }}</td>
+                        <td data-label="Código">{{ dv.productoCodigo }}</td>
+                        <td data-label="Descripción">{{ descripcionProductoDespacho(dv.productoDescripcion, dv.productoMarca) }}</td>
+                        <td data-label="Cantidad">{{ dv.cantidad }}</td>
+                        <td data-label="Entregada">{{ dv.cantEntregada }}</td>
+                        <td data-label="Pendiente">{{ dv.cantPendiente }}</td>
+                        <td class="small fw-semibold text-dark" data-label="Ubicación (almacén)">{{ dv.ubicaciones ? dv.ubicaciones : 'Sin ubicación' }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -291,7 +291,7 @@
                           <p class="small text-muted mb-2" *ngIf="d.estado === 'PENDIENTE' || d.estado === 'EN_PROCESO'">
                             <i class="bi bi-info-circle me-1"></i>Indique la cantidad retirada del almacén por línea (máximo lo solicitado) y pulse <strong>Guardar cantidades</strong> para registrar todas las líneas pendientes a la vez.
                           </p>
-                          <table class="table table-sm table-striped">
+                          <table class="table table-sm table-striped table-index-despachos-lineas-responsive">
                             <thead>
                               <tr>
                                 <th>Código</th>
@@ -306,20 +306,20 @@
                             </thead>
                             <tbody>
                               <tr *ngFor="let lin of detallePorDespacho[d.idDespacho]">
-                                <td>{{ lin.productoCodigo }}</td>
-                                <td>{{ descripcionProductoDespacho(lin.productoDescripcion, lin.productoMarca) }}</td>
-                                <td>{{ lin.cantidadSolicitada }}</td>
-                                <td>{{ lin.cantidadDespachada }}</td>
-                                <td>{{ pendienteLinea(lin) }}</td>
-                                <td class="small">{{ lin.ubicacionOrigen || lin.ubicacionDestino || '—' }}</td>
-                                <td>
+                                <td data-label="Código">{{ lin.productoCodigo }}</td>
+                                <td data-label="Descripción">{{ descripcionProductoDespacho(lin.productoDescripcion, lin.productoMarca) }}</td>
+                                <td data-label="Solicitada">{{ lin.cantidadSolicitada }}</td>
+                                <td data-label="Despachada">{{ lin.cantidadDespachada }}</td>
+                                <td data-label="Pendiente">{{ pendienteLinea(lin) }}</td>
+                                <td class="small" data-label="Ubicación">{{ lin.ubicacionOrigen || lin.ubicacionDestino || '—' }}</td>
+                                <td data-label="Cant. a registrar">
                                   <input *ngIf="pendienteLinea(lin) > 0" type="number" class="form-control form-control-sm" style="width:5.5rem"
                                     [(ngModel)]="cantADespacharEdicion[lin.idDetalleDespacho]"
                                     [max]="lin.cantidadSolicitada" min="0" step="0.001"
                                     [title]="'Máximo: ' + lin.cantidadSolicitada">
                                   <span *ngIf="pendienteLinea(lin) <= 0" class="text-muted small">—</span>
                                 </td>
-                                <td><span class="badge" [ngClass]="lin.estado === 'DESPACHADO' ? 'bg-success' : 'bg-warning'">{{ lin.estado }}</span></td>
+                                <td data-label="Estado"><span class="badge" [ngClass]="lin.estado === 'DESPACHADO' ? 'bg-success' : 'bg-warning'">{{ lin.estado }}</span></td>
                               </tr>
                             </tbody>
                           </table>
@@ -346,7 +346,7 @@
                             Si hay envío vinculado a este despacho y devuelve <strong>toda</strong> la mercadería despachada, el envío pasará a <strong>AGENDADO</strong> y podrá eliminarse desde Envíos programados.
                           </p>
                           <div class="table-responsive" *ngIf="(detallePorDespacho[d.idDespacho]?.length || 0) > 0">
-                            <table class="table table-sm table-bordered">
+                            <table class="table table-sm table-bordered table-index-despachos-dev-form-responsive">
                               <thead class="table-light">
                                 <tr>
                                   <th>Producto</th>
@@ -357,14 +357,14 @@
                               </thead>
                               <tbody>
                                 <tr *ngFor="let lin of detallePorDespacho[d.idDespacho]">
-                                  <td>{{ descripcionProductoDespacho(lin.productoDescripcion, lin.productoMarca) }}</td>
-                                  <td class="text-end">{{ lin.cantidadDespachada }}</td>
-                                  <td style="width: 120px;">
+                                  <td data-label="Producto">{{ descripcionProductoDespacho(lin.productoDescripcion, lin.productoMarca) }}</td>
+                                  <td class="text-end" data-label="Despachada">{{ lin.cantidadDespachada }}</td>
+                                  <td style="width: 120px;" data-label="Devolver">
                                     <input type="number" class="form-control form-control-sm text-end"
                                       [(ngModel)]="devolucionCantidadPorDetalle[lin.idDetalleDespacho]"
                                       [max]="lin.cantidadDespachada" min="0" step="0.001">
                                   </td>
-                                  <td>
+                                  <td data-label="Notas">
                                     <input type="text" class="form-control form-control-sm"
                                       [(ngModel)]="devolucionNotasPorDetalle[lin.idDetalleDespacho]" placeholder="Motivo o detalle">
                                   </td>
@@ -390,7 +390,7 @@
                           <div *ngIf="!cargandoDevoluciones[d.idDespacho] && (!devolucionesPorDespacho[d.idDespacho] || devolucionesPorDespacho[d.idDespacho].length === 0)"
                                class="text-muted small">No hay devoluciones registradas.</div>
                           <div class="table-responsive" *ngIf="(devolucionesPorDespacho[d.idDespacho]?.length || 0) > 0">
-                            <table class="table table-sm">
+                            <table class="table table-sm table-index-despachos-devs-list-responsive">
                               <thead>
                                 <tr>
                                   <th>Fecha</th>
@@ -402,11 +402,11 @@
                               </thead>
                               <tbody>
                                 <tr *ngFor="let dv of devolucionesPorDespacho[d.idDespacho]">
-                                  <td>{{ dv.fechaDevolucion }}</td>
-                                  <td>{{ dv.usuarioNombre }}</td>
-                                  <td class="text-end">{{ dv.cantidadTotalDevuelta }}</td>
-                                  <td>{{ dv.observaciones }}</td>
-                                  <td class="text-end">
+                                  <td data-label="Fecha">{{ dv.fechaDevolucion }}</td>
+                                  <td data-label="Usuario">{{ dv.usuarioNombre }}</td>
+                                  <td class="text-end" data-label="Cantidad">{{ dv.cantidadTotalDevuelta }}</td>
+                                  <td data-label="Observaciones">{{ dv.observaciones }}</td>
+                                  <td class="text-end" data-label="Acciones">
                                     <button type="button" class="btn btn-outline-secondary btn-sm"
                                       (click)="verDetalleDevolucion(d.idDespacho, dv.idDevolucionDespacho)">
                                       Ver detalle
@@ -417,7 +417,7 @@
                             </table>
                           </div>
                           <div *ngIf="(detalleDevolucionPorDespacho[d.idDespacho]?.length || 0) > 0" class="table-responsive">
-                            <table class="table table-sm table-bordered">
+                            <table class="table table-sm table-bordered table-index-despachos-dev-detalle-responsive">
                               <thead>
                                 <tr>
                                   <th>Producto</th>
@@ -427,9 +427,9 @@
                               </thead>
                               <tbody>
                                 <tr *ngFor="let det of detalleDevolucionPorDespacho[d.idDespacho]">
-                                  <td>{{ descripcionProductoDespacho(det.productoDescripcion, det.productoMarca) }}</td>
-                                  <td class="text-end">{{ det.cantidadDevuelta }}</td>
-                                  <td>{{ det.notas }}</td>
+                                  <td data-label="Producto">{{ descripcionProductoDespacho(det.productoDescripcion, det.productoMarca) }}</td>
+                                  <td class="text-end" data-label="Cantidad">{{ det.cantidadDevuelta }}</td>
+                                  <td data-label="Notas">{{ det.notas }}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -508,7 +508,7 @@
           </div>
           <p class="small mb-2">Indique la cantidad a despachar por cada ítem (máx. pendiente).</p>
           <div class="table-responsive mb-3">
-            <table class="table table-sm table-bordered">
+            <table class="table table-sm table-bordered table-index-despachos-crear-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Código</th>
@@ -520,15 +520,18 @@
               </thead>
               <tbody>
                 <tr *ngFor="let dv of detalleConPendiente">
-                  <td class="small">{{ dv.productoCodigo }}</td>
-                  <td class="small">{{ descripcionProductoDespacho(dv.productoDescripcion, dv.productoMarca) }}</td>
-                  <td>{{ dv.cantPendiente }}</td>
-                  <td class="small fw-semibold">{{ dv.ubicaciones || '—' }}</td>
-                  <td>
+                  <td class="small" data-label="Código">{{ dv.productoCodigo }}</td>
+                  <td class="small" data-label="Descripción">{{ descripcionProductoDespacho(dv.productoDescripcion, dv.productoMarca) }}</td>
+                  <td data-label="Pendiente">{{ dv.cantPendiente }}</td>
+                  <td class="small fw-semibold" data-label="Ubicación">{{ dv.ubicaciones || '—' }}</td>
+                  <td data-label="Cant. a despachar">
                     <input type="number" class="form-control form-control-sm" style="width:4.5rem"
                       [(ngModel)]="cantADespacharPanel[dv.idDetalle]"
                       [max]="dv.cantPendiente" min="0" step="0.001" placeholder="0">
                   </td>
+                </tr>
+                <tr *ngIf="detalleConPendiente.length === 0" class="fila-vacia">
+                  <td colspan="5" class="text-muted text-center">No hay ítems con cantidad pendiente.</td>
                 </tr>
               </tbody>
             </table>

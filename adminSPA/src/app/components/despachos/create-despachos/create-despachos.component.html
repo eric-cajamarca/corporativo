@@ -60,7 +60,7 @@
                 <div *ngIf="errorDevolucion" class="alert alert-warning">{{ errorDevolucion }}</div>
 
                 <div class="table-responsive mb-3" *ngIf="detalleDespachoSeleccionado.length">
-                  <table class="table table-sm table-striped">
+                  <table class="table table-sm table-striped table-create-despachos-dev-form-responsive">
                     <thead>
                       <tr>
                         <th>Producto</th>
@@ -71,9 +71,9 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let d of detalleDespachoSeleccionado; let i = index">
-                        <td>{{ descripcionProductoDespacho(d.productoDescripcion, d.productoMarca) }}</td>
-                        <td class="text-end">{{ d.cantidadDespachada | number:'1.0-3' }}</td>
-                        <td class="text-end" style="width: 140px;">
+                        <td data-label="Producto">{{ descripcionProductoDespacho(d.productoDescripcion, d.productoMarca) }}</td>
+                        <td class="text-end" data-label="Despachado">{{ d.cantidadDespachada | number:'1.0-3' }}</td>
+                        <td class="text-end" style="width: 140px;" data-label="Devolver">
                           <input type="number"
                                  class="form-control form-control-sm text-end"
                                  [(ngModel)]="devolucionItems[i].cantidadDevuelta"
@@ -81,7 +81,7 @@
                                  [max]="d.cantidadDespachada"
                                  step="0.001">
                         </td>
-                        <td>
+                        <td data-label="Notas">
                           <input type="text"
                                  class="form-control form-control-sm"
                                  [(ngModel)]="devolucionItems[i].notas"
@@ -109,7 +109,7 @@
                   No hay devoluciones registradas.
                 </div>
                 <div class="table-responsive" *ngIf="devolucionesDespacho.length">
-                  <table class="table table-sm">
+                  <table class="table table-sm table-create-despachos-devs-list-responsive">
                     <thead>
                       <tr>
                         <th>Fecha</th>
@@ -121,11 +121,11 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let dv of devolucionesDespacho">
-                        <td>{{ dv.fechaDevolucion }}</td>
-                        <td>{{ dv.usuarioNombre }}</td>
-                        <td class="text-end">{{ dv.cantidadTotalDevuelta | number:'1.0-3' }}</td>
-                        <td>{{ dv.observaciones }}</td>
-                        <td class="text-end">
+                        <td data-label="Fecha">{{ dv.fechaDevolucion }}</td>
+                        <td data-label="Usuario">{{ dv.usuarioNombre }}</td>
+                        <td class="text-end" data-label="Cantidad">{{ dv.cantidadTotalDevuelta | number:'1.0-3' }}</td>
+                        <td data-label="Observaciones">{{ dv.observaciones }}</td>
+                        <td class="text-end" data-label="Acciones">
                           <button type="button" class="btn btn-outline-secondary btn-sm" (click)="verDetalleDevolucion(dv.idDevolucionDespacho)">
                             Ver detalle
                           </button>
@@ -136,7 +136,7 @@
                 </div>
 
                 <div *ngIf="detalleDevolucionSeleccionada.length" class="table-responsive">
-                  <table class="table table-sm table-bordered">
+                  <table class="table table-sm table-bordered table-create-despachos-dev-detalle-responsive">
                     <thead>
                       <tr>
                         <th>Producto</th>
@@ -146,9 +146,9 @@
                     </thead>
                     <tbody>
                       <tr *ngFor="let dd of detalleDevolucionSeleccionada">
-                        <td>{{ descripcionProductoDespacho(dd.productoDescripcion, dd.productoMarca) }}</td>
-                        <td class="text-end">{{ dd.cantidadDevuelta | number:'1.0-3' }}</td>
-                        <td>{{ dd.notas }}</td>
+                        <td data-label="Producto">{{ descripcionProductoDespacho(dd.productoDescripcion, dd.productoMarca) }}</td>
+                        <td class="text-end" data-label="Cantidad">{{ dd.cantidadDevuelta | number:'1.0-3' }}</td>
+                        <td data-label="Notas">{{ dd.notas }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -172,7 +172,7 @@
               </div>
               <h5 class="card-title">Detalle del comprobante</h5>
               <form #miFormulario="ngForm" (ngSubmit)="guardarDatos(miFormulario.value)">
-                <table class="table table-dark">
+                <table class="table table-dark table-create-despachos-detalle-responsive">
                   <thead class="table-dark">
                     <tr>
                       <th>Cantidad</th>
@@ -185,11 +185,11 @@
                   </thead>
                   <tbody class="table-active">
                     <tr *ngFor="let item of detalleVenta">
-                      <td style="width: 70px;">{{item.Cantidad}}</td>
-                      <td>{{item.Descripcion}}</td>
-                      <td style="width: 60px; text-align: center;">{{item.Presentacion}}</td>
-                      <td style="width: 60px; text-align: right;">{{item.PVenta | number:'1.2-2'}}</td>
-                      <td>
+                      <td style="width: 70px;" data-label="Cantidad">{{item.Cantidad}}</td>
+                      <td data-label="Descripción">{{item.Descripcion}}</td>
+                      <td style="width: 60px; text-align: center;" data-label="U.Medida">{{item.Presentacion}}</td>
+                      <td style="width: 60px; text-align: right;" data-label="PVenta">{{item.PVenta | number:'1.2-2'}}</td>
+                      <td data-label="CEntrega">
                         <ng-container *ngIf="item.Cantidad == item.CantEntregado">
                           <input type="text" name="cantidadIngresar{{item.Id}}" [(ngModel)]="item.CantEntregado"
                             style="width: 60px; text-align: center; color: blue; background: rgb(214, 158, 158);" required
@@ -200,12 +200,15 @@
                             style="width: 60px; text-align: center; color: blue;" required [max]="item.Cantidad">
                         </ng-container>
                       </td>
-                      <td [routerLink]="['/despachos']" routerLinkActive="active">
+                      <td data-label="Acciones" [routerLink]="['/despachos']" routerLinkActive="active">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                           class="bi bi-pencil" viewBox="0 0 16 16">
                           <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z" />
                         </svg>
                       </td>
+                    </tr>
+                    <tr *ngIf="detalleVenta.length === 0" class="fila-vacia">
+                      <td colspan="6" class="text-center text-muted">Sin detalle de comprobante.</td>
                     </tr>
                   </tbody>
                 </table>

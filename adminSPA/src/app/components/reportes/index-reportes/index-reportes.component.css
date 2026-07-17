@@ -346,9 +346,62 @@
   }
 }
 
+@media (max-width: 991.98px) {
+  .content-header {
+    overflow: visible;
+  }
+
+  .reportes-header-row {
+    width: 100%;
+  }
+
+  .reportes-header-actions {
+    width: 100%;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reportes-export-group {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .reportes-export-group > .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .reportes-periodo-dropdown {
+    width: 100%;
+    position: relative;
+    z-index: 20;
+  }
+
+  .reportes-periodo-dropdown .dropdown-menu {
+    position: absolute;
+    z-index: 1050;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (min-width: 992px) {
+  .reportes-header-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  /* En desktop: periodo a la izquierda de PDF/Excel */
+  .reportes-periodo-dropdown {
+    order: -1;
+  }
+}
+
 @media (max-width: 768px) {
   .content-header {
     padding: 1.5rem 1rem;
+    overflow: visible;
   }
 
   .filters-section {

@@ -174,7 +174,7 @@
                 <h3 class="h6">Bienes a transportar (manual)</h3>
                 <p class="small text-muted">Al menos una fila con descripción y cantidad &gt; 0. Unidad SUNAT (ej. NIU, KGM).</p>
                 <div class="table-responsive">
-                  <table class="table table-sm table-bordered align-middle mb-2">
+                  <table class="table table-sm table-bordered align-middle mb-2 table-guias-transportista-items-responsive">
                     <thead class="table-light">
                       <tr>
                         <th style="width:12%">Código</th>
@@ -187,11 +187,11 @@
                     <tbody>
                       @for (fila of itemsManualesGre; track $index) {
                         <tr>
-                          <td><input type="text" class="form-control form-control-sm" [(ngModel)]="fila.codigo" placeholder="—"></td>
-                          <td><input type="text" class="form-control form-control-sm" [(ngModel)]="fila.descripcion" placeholder="Descripción del bien"></td>
-                          <td><input type="number" class="form-control form-control-sm" [(ngModel)]="fila.cantidad" min="0" step="any" placeholder="0"></td>
-                          <td><input type="text" class="form-control form-control-sm" [(ngModel)]="fila.unidad" maxlength="6" placeholder="NIU"></td>
-                          <td class="text-nowrap">
+                          <td data-label="Código"><input type="text" class="form-control form-control-sm" [(ngModel)]="fila.codigo" placeholder="—"></td>
+                          <td data-label="Descripción"><input type="text" class="form-control form-control-sm" [(ngModel)]="fila.descripcion" placeholder="Descripción del bien"></td>
+                          <td data-label="Cant."><input type="number" class="form-control form-control-sm" [(ngModel)]="fila.cantidad" min="0" step="any" placeholder="0"></td>
+                          <td data-label="Und."><input type="text" class="form-control form-control-sm" [(ngModel)]="fila.unidad" maxlength="6" placeholder="NIU"></td>
+                          <td class="text-nowrap" data-label="Acciones">
                             <button type="button" class="btn btn-sm btn-outline-danger" (click)="eliminarFilaItemManual($index)" title="Quitar fila">
                               <i class="bi bi-trash"></i>
                             </button>
@@ -239,7 +239,7 @@
               @if (comprobanteOrigen.items && comprobanteOrigen.items.length > 0) {
                 <div class="small mt-2">
                   <strong>Detalle de productos:</strong>
-                  <table class="table table-sm table-bordered mt-1 mb-0">
+                  <table class="table table-sm table-bordered mt-1 mb-0 table-guias-transportista-items-responsive">
                     <thead>
                       <tr>
                         <th>#</th>
@@ -252,11 +252,11 @@
                     <tbody>
                       @for (it of comprobanteOrigen.items; track it.idDetalle || it.idProducto || $index) {
                         <tr>
-                          <td>{{ it.numeroLinea || ($index + 1) }}</td>
-                          <td>{{ it.codigo }}</td>
-                          <td>{{ it.descripcion }}</td>
-                          <td>{{ it.cantidad }}</td>
-                          <td>{{ it.unidad || 'NIU' }}</td>
+                          <td data-label="#">{{ it.numeroLinea || ($index + 1) }}</td>
+                          <td data-label="Código">{{ it.codigo }}</td>
+                          <td data-label="Descripción">{{ it.descripcion }}</td>
+                          <td data-label="Cant.">{{ it.cantidad }}</td>
+                          <td data-label="Unidad">{{ it.unidad || 'NIU' }}</td>
                         </tr>
                       }
                     </tbody>

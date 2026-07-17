@@ -912,3 +912,64 @@
 
 .historial-leyenda-dot.ocupado { background: #fecaca; }
 .historial-leyenda-dot.libre { background: #f1f5f9; border: 1px solid #cbd5e1; }
+
+/* Tablas operativas → cards (< lg); selectores compactos por budget CSS */
+@media (max-width: 991.98px) {
+  table[class*="table-hotel-"][class*="-responsive"] thead { display: none; }
+
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: none;
+  }
+
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr.fila-vacia { display: block; }
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+  table[class*="table-hotel-"][class*="-responsive"] tbody tr.fila-vacia td::before { display: none; }
+
+  .table-hotel-historial-consumo-responsive tfoot tr {
+    display: block;
+    margin-top: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #e7f1ff;
+    padding: 0.5rem 0;
+  }
+  .table-hotel-historial-consumo-responsive tfoot th {
+    display: block;
+    width: 100% !important;
+    text-align: left !important;
+    border: none;
+    padding: 0.35rem 1rem;
+  }
+}

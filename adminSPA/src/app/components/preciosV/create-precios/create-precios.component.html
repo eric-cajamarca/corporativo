@@ -112,7 +112,7 @@
             </div>
             
             <div class="table-responsive table-precios-wrap" *ngIf="productosFiltrados.length > 0">
-                <table class="table table-hover align-middle mb-0 table-precios-productos">
+                <table class="table table-hover align-middle mb-0 table-precios-productos table-precios-responsive">
                     <thead class="table-light">
                         <tr>
                             <th scope="col">SKU / código</th>
@@ -127,14 +127,14 @@
                     </thead>
                     <tbody>
                         <tr *ngFor="let producto of productosPaginated">
-                            <td class="sku-cell">{{producto.sku || producto.codigo}}</td>
-                            <td class="marca-cell">{{ producto.marca || '—' }}</td>
-                            <td class="sucursal-cell" *ngIf="mostrarColumnaSucursal">{{ producto.sucursal || '—' }}</td>
-                            <td class="descripcion-cell">
+                            <td class="sku-cell" data-label="SKU">{{producto.sku || producto.codigo}}</td>
+                            <td class="marca-cell" data-label="Marca">{{ producto.marca || '—' }}</td>
+                            <td class="sucursal-cell" *ngIf="mostrarColumnaSucursal" data-label="Sucursal">{{ producto.sucursal || '—' }}</td>
+                            <td class="descripcion-cell" data-label="Producto">
                                 <div class="producto-descripcion">{{producto.descripcion}}</div>
                                 <small class="text-muted producto-sub">{{producto.descripcionPres || 'Sin categoría'}}</small>
                             </td>
-                            <td class="text-end col-c-unit">
+                            <td class="text-end col-c-unit" data-label="C. Unit.">
                                 <div class="input-group input-group-sm justify-content-end">
                                  <!--   <span class="input-group-text bg-light">{{simboloMoneda}}</span>-->
                                     <input type="number"
@@ -151,10 +151,10 @@
                                     </button>
                                 </div>
                             </td>
-                            <td class="text-end">
+                            <td class="text-end" data-label="P. Actual">
                                 <span class="fw-semibold">{{simboloMoneda}} {{producto.precioActual || '0.00'}}</span>
                             </td>
-                            <td class="text-center col-n-precio">
+                            <td class="text-center col-n-precio" data-label="N. Precio">
                                 <div class="input-group input-group-sm justify-content-center">
                                     <input *ngIf="listaSeleccionadaId !== LISTA_TODAS"
                                            type="number"
@@ -185,7 +185,7 @@
                                     </span>
                                 </small>
                             </td>
-                            <td class="text-center small text-muted">
+                            <td class="text-center small text-muted" data-label="Última Act.">
                                 {{producto.fActualizacion ? (producto.fActualizacion | date:'dd/MM/yyyy HH:mm') : 'Nunca'}}
                             </td>
                         </tr>

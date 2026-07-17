@@ -30,12 +30,25 @@
         </div>
       </div>
       <div class="card-body">
+        <!-- Móvil: el + vive en thead (oculto en cards); se muestra aquí -->
+        <div class="d-lg-none d-flex align-items-center gap-2 mb-2">
+          <button
+            type="button"
+            class="btn-nueva-accion-movil"
+            (click)="abrirNuevo()"
+            title="Nuevo recibo de pago"
+            aria-label="Nuevo recibo de pago"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </button>
+          <span class="small text-muted">Nuevo pago</span>
+        </div>
         <div class="table-responsive">
-          <table class="table table-hover table-sm">
+          <table class="table table-hover table-sm table-pago-proveedores-responsive">
             <thead class="table-light">
               <tr>
                 <th style="width: 200px;">
-                  <i class="bi bi-plus-circle-fill text-success" style="font-size: 20px;" (click)="abrirNuevo()" title="Nuevo recibo de pago"></i>
+                  <i class="bi bi-plus-circle-fill text-success d-none d-lg-inline" style="font-size: 20px; cursor: pointer;" (click)="abrirNuevo()" title="Nuevo recibo de pago"></i>
                   Acciones
                 </th>
                 <th>Fecha</th>
@@ -49,11 +62,11 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngIf="loading">
-                <td [attr.colspan]="colspanTablaPagos" class="text-center py-3">Cargando...</td>
+              <tr *ngIf="loading" class="pago-proveedores-fila-vacia">
+                <td [attr.colspan]="colspanTablaPagos" class="text-center py-3" data-label="">Cargando...</td>
               </tr>
               <tr *ngFor="let item of listPaginated">
-                <td>
+                <td data-label="Acciones">
                   <button class="btn btn-sm btn-outline-primary me-1" (click)="editar(item)" title="Editar / Registrar pago">
                     <i class="bi bi-pencil"></i>
                   </button>
@@ -67,17 +80,17 @@
                     <i class="bi bi-printer"></i>
                   </button>
                 </td>
-                <td>{{ formatFecha(item.fecha) }}</td>
-                <td *ngIf="empresasOperacion.length > 1">{{ nombreEmpresaCompra(item.idEmpresa) }}</td>
-                <td>{{ item.documento }}</td>
-                <td>{{ item.proveedor }}</td>
-                <td class="text-end">{{ formatCurrency(item.deuda) }}</td>
-                <td class="text-end">{{ formatCurrency(item.pagado) }}</td>
-                <td class="text-end">{{ formatCurrency(item.saldo) }}</td>
-                <td>{{ item.medioPago || '-' }}</td>
+                <td data-label="Fecha">{{ formatFecha(item.fecha) }}</td>
+                <td *ngIf="empresasOperacion.length > 1" data-label="Empresa">{{ nombreEmpresaCompra(item.idEmpresa) }}</td>
+                <td data-label="Documento">{{ item.documento }}</td>
+                <td data-label="Proveedor">{{ item.proveedor }}</td>
+                <td class="text-end" data-label="Deuda">{{ formatCurrency(item.deuda) }}</td>
+                <td class="text-end" data-label="Pagado">{{ formatCurrency(item.pagado) }}</td>
+                <td class="text-end" data-label="Saldo">{{ formatCurrency(item.saldo) }}</td>
+                <td data-label="C.Pago">{{ item.medioPago || '-' }}</td>
               </tr>
-              <tr *ngIf="!loading && list.length === 0">
-                <td [attr.colspan]="colspanTablaPagos" class="text-center py-4 text-muted">No hay compras / cuentas por pagar.</td>
+              <tr *ngIf="!loading && list.length === 0" class="pago-proveedores-fila-vacia">
+                <td [attr.colspan]="colspanTablaPagos" class="text-center py-4 text-muted" data-label="">No hay compras / cuentas por pagar.</td>
               </tr>
             </tbody>
           </table>

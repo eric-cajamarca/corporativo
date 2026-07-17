@@ -2,6 +2,7 @@ const config = require('../config/auditoriaOperaciones.config');
 const auditoriaOperacionesRepository = require('../repositories/auditoriaOperaciones.repository');
 const { obtenerIpCliente } = require('../utils/clientIp.util');
 const { withPool } = require('../utils/dbPool.util');
+const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 
 exports.MODULOS = {
   VENTAS: 'VENTAS',
@@ -15,6 +16,38 @@ exports.contextoDesdeReq = (req) => ({
   ipCliente: obtenerIpCliente(req),
   userAgent: req?.headers?.['user-agent'] ? String(req.headers['user-agent']).slice(0, 500) : null
 });
+
+/**
+ * Fecha/hora de la operación (reloj del cliente o del documento), no GETDATE() del servidor.
+ * Prioridad: fecha explícita → body de la operación → header X-Fecha-Hora-Cliente → APP_TIMEZONE.
+ */
+function fechaOperacionDesdeReq(req, fechaExplicit) {
+  const body = req?.body || {};
+  const compra = body.compra && typeof body.compra === 'object' ? body.compra : null;
+  const venta = body.venta && typeof body.venta === 'object' ? body.venta : null;
+  const candidatos = [
+    fechaExplicit,
+    body.fechaHoraCliente,
+    body.fEmision,
+    body.fechaEmision,
+    body.fechaCompra,
+    body.fechaMovimiento,
+    body.fechaDespacho,
+    body.fechaApertura,
+    body.fechaCierre,
+    compra?.fEmision,
+    compra?.fechaEmision,
+    compra?.fechaCompra,
+    venta?.fEmision,
+    venta?.fechaEmision,
+    req?.headers?.['x-fecha-hora-cliente']
+  ];
+  for (const c of candidatos) {
+    const sql = resolveFechaHoraClienteSql(c, false);
+    if (sql) return sql;
+  }
+  return resolveFechaHoraClienteSql(null, true);
+}
 
 /**
  * Registra auditoría sin interrumpir la operación principal si falla.
@@ -43,6 +76,7 @@ exports.auditarVentasCreadas = (req, resultado) => {
   if (!ventas?.length || !req?.user?.empresa) return;
   const ctx = exports.contextoDesdeReq(req);
   const idUsuario = req.user.sub || req.user.idUsuario || null;
+  const fechaFallback = fechaOperacionDesdeReq(req);
   registrarEnBackground(async () => {
     await withPool(async (pool) => {
       for (const v of ventas) {
@@ -53,6 +87,7 @@ exports.auditarVentasCreadas = (req, resultado) => {
           accion: 'CREAR',
           idRegistro: v.idVenta != null ? String(v.idVenta) : null,
           referencia: v.compVenta || null,
+          fecha: resolveFechaHoraClienteSql(v.fEmision, false) || fechaFallback,
           ...ctx
         });
       }
@@ -60,9 +95,10 @@ exports.auditarVentasCreadas = (req, resultado) => {
   });
 };
 
-exports.auditarVenta = (req, accion, idVenta, referencia, detalle) => {
+exports.auditarVenta = (req, accion, idVenta, referencia, detalle, fechaExplicit) => {
   if (!req?.user?.empresa || idVenta == null) return;
   const ctx = exports.contextoDesdeReq(req);
+  const fecha = fechaOperacionDesdeReq(req, fechaExplicit);
   registrarEnBackground(async () => {
     await withPool((pool) =>
       exports.registrar(pool, {
@@ -73,15 +109,17 @@ exports.auditarVenta = (req, accion, idVenta, referencia, detalle) => {
         idRegistro: String(idVenta),
         referencia: referencia || null,
         detalle: detalle || null,
+        fecha,
         ...ctx
       })
     );
   });
 };
 
-exports.auditarCompra = (req, accion, idCompra, referencia) => {
+exports.auditarCompra = (req, accion, idCompra, referencia, fechaExplicit) => {
   if (!req?.user?.empresa || !idCompra) return;
   const ctx = exports.contextoDesdeReq(req);
+  const fecha = fechaOperacionDesdeReq(req, fechaExplicit);
   registrarEnBackground(async () => {
     await withPool((pool) =>
       exports.registrar(pool, {
@@ -91,15 +129,17 @@ exports.auditarCompra = (req, accion, idCompra, referencia) => {
         accion,
         idRegistro: String(idCompra),
         referencia: referencia || null,
+        fecha,
         ...ctx
       })
     );
   });
 };
 
-exports.auditarInventario = (req, accion, idMovimiento, referencia, detalle) => {
+exports.auditarInventario = (req, accion, idMovimiento, referencia, detalle, fechaExplicit) => {
   if (!req?.user?.empresa) return;
   const ctx = exports.contextoDesdeReq(req);
+  const fecha = fechaOperacionDesdeReq(req, fechaExplicit);
   registrarEnBackground(async () => {
     await withPool((pool) =>
       exports.registrar(pool, {
@@ -110,15 +150,17 @@ exports.auditarInventario = (req, accion, idMovimiento, referencia, detalle) => 
         idRegistro: idMovimiento != null ? String(idMovimiento) : null,
         referencia: referencia || null,
         detalle: detalle || null,
+        fecha,
         ...ctx
       })
     );
   });
 };
 
-exports.auditarCaja = (req, accion, idRegistro, referencia, detalle) => {
+exports.auditarCaja = (req, accion, idRegistro, referencia, detalle, fechaExplicit) => {
   if (!req?.user?.empresa) return;
   const ctx = exports.contextoDesdeReq(req);
+  const fecha = fechaOperacionDesdeReq(req, fechaExplicit);
   registrarEnBackground(async () => {
     await withPool((pool) =>
       exports.registrar(pool, {
@@ -129,15 +171,17 @@ exports.auditarCaja = (req, accion, idRegistro, referencia, detalle) => {
         idRegistro: idRegistro != null ? String(idRegistro) : null,
         referencia: referencia || null,
         detalle: detalle || null,
+        fecha,
         ...ctx
       })
     );
   });
 };
 
-exports.auditarDespacho = (req, idDespacho, idVenta, referencia) => {
+exports.auditarDespacho = (req, idDespacho, idVenta, referencia, fechaExplicit) => {
   if (!req?.user?.empresa) return;
   const ctx = exports.contextoDesdeReq(req);
+  const fecha = fechaOperacionDesdeReq(req, fechaExplicit);
   registrarEnBackground(async () => {
     await withPool((pool) =>
       exports.registrar(pool, {
@@ -147,6 +191,7 @@ exports.auditarDespacho = (req, idDespacho, idVenta, referencia) => {
         accion: 'CREAR',
         idRegistro: idDespacho != null ? String(idDespacho) : (idVenta != null ? String(idVenta) : null),
         referencia: referencia || (idVenta != null ? `Venta ${idVenta}` : null),
+        fecha,
         ...ctx
       })
     );

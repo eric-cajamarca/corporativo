@@ -38,6 +38,7 @@
   padding: 2rem;
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .content-title {
@@ -47,6 +48,53 @@
 
 .content-subtitle {
   color: #718096;
+}
+
+.config-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.config-header-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+  .content-header {
+    overflow: hidden;
+  }
+
+  .config-header-row {
+    width: 100%;
+  }
+
+  .config-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    justify-content: stretch;
+  }
+
+  .config-header-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.5rem;
+    font-size: 0.8rem;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .config-header-btn i {
+    flex-shrink: 0;
+  }
 }
 
 /* Config Container */
@@ -204,16 +252,27 @@
 
 @media (max-width: 768px) {
   .content-header {
-    padding: 1.5rem 1rem;
+    padding: 1.25rem 1rem;
+  }
+
+  .content-title {
+    font-size: 1.25rem;
   }
 
   .config-container {
     padding: 1rem;
   }
 
+  .config-container .nav-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .config-container .nav-tabs .nav-link {
     padding: 0.75rem 1rem;
     font-size: 0.9rem;
+    flex: 0 0 auto;
   }
 
   .card-body {

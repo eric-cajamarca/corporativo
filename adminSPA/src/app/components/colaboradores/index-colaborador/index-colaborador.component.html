@@ -7,30 +7,47 @@
 <!-- Contenido principal -->
 <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <div>
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
+      <div class="min-w-0">
         <h1 class="content-title mb-1">Colaboradores</h1>
         <p class="content-subtitle text-muted mb-0">Gestiona los usuarios del sistema</p>
       </div>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-primary" (click)="abrirModalGestion()">
+      <div class="colaboradores-header-actions">
+        <button class="btn btn-outline-primary colaboradores-header-btn" type="button" (click)="abrirModalGestion()">
           <i class="bi bi-shield-fill me-1"></i>
-          Roles y Permisos
+          <span>Roles y Permisos</span>
         </button>
         @if (puedeNuevoColaborador()) {
-          <button class="btn btn-primary" type="button" [routerLink]="['/colaborador/create']">
+          <button class="btn btn-primary d-none d-lg-inline-flex" type="button" [routerLink]="['/colaborador/create']">
             <i class="bi bi-person-plus me-1"></i>
             Nuevo Colaborador
           </button>
+          <a
+            class="btn-nueva-accion-movil d-lg-none"
+            [routerLink]="['/colaborador/create']"
+            title="Nuevo Colaborador"
+            aria-label="Nuevo Colaborador"
+          >
+            <i class="bi bi-plus-lg"></i>
+          </a>
         } @else {
           <button
-            class="btn btn-primary"
+            class="btn btn-primary d-none d-lg-inline-flex"
             type="button"
             disabled
             title="Límite de usuarios del plan alcanzado. Actualice el plan en Mi suscripción."
           >
             <i class="bi bi-person-plus me-1"></i>
             Nuevo Colaborador
+          </button>
+          <button
+            type="button"
+            class="btn-nueva-accion-movil d-lg-none"
+            disabled
+            title="Límite de usuarios del plan alcanzado. Actualice el plan en Mi suscripción."
+            aria-label="Nuevo Colaborador (no disponible)"
+          >
+            <i class="bi bi-plus-lg"></i>
           </button>
         }
       </div>
@@ -82,8 +99,8 @@
           }
         </div>
       } @else {
-        <div class="table-responsive">
-          <table class="table table-hover mb-0">
+        <div class="table-responsive table-colaboradores-wrap">
+          <table class="table table-hover mb-0 table-colaboradores-responsive">
             <thead>
               <tr>
                 <th>Colaborador</th>
@@ -96,7 +113,7 @@
             <tbody>
               @for (item of colaboradores | slice: (page-1) * pageSize : (page-1) * pageSize + pageSize; track item.idUsuario) {
                 <tr>
-                  <td>
+                  <td data-label="Colaborador">
                     <div class="d-flex align-items-center">
                       <div 
                         class="avatar-circle me-3" 
@@ -109,11 +126,11 @@
                       </div>
                     </div>
                   </td>
-                  <td>{{ item.email }}</td>
-                  <td>
+                  <td data-label="Correo">{{ item.email }}</td>
+                  <td data-label="Rol">
                     <span class="badge bg-primary">{{ item.rol }}</span>
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     @if (item.estado) {
                       <span class="badge bg-success">
                         <i class="bi bi-check-circle-fill me-1"></i>Activo
@@ -124,7 +141,7 @@
                       </span>
                     }
                   </td>
-                  <td class="text-end">
+                  <td class="text-end" data-label="Acciones">
                     <div class="btn-group">
                       <button 
                         type="button" 
@@ -208,7 +225,7 @@
         </div>
 
         <!-- Paginación -->
-        <div class="card-footer d-flex justify-content-between align-items-center">
+        <div class="card-footer d-flex flex-column flex-lg-row justify-content-between align-items-center gap-2">
           <small class="text-muted">
             Mostrando {{ (page-1) * pageSize + 1 }} - {{ Math.min(page * pageSize, colaboradores.length) }} de {{ colaboradores.length }}
           </small>

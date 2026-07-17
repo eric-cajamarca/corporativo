@@ -65,7 +65,7 @@
           </div>
         </div>
         <div class="table-responsive productos-tabla-wrap" style="height:500px;">
-          <table class="table table-striped table-hover table-sm mb-0 productos-tabla-compacta">
+          <table class="table table-striped table-hover table-sm mb-0 productos-tabla-compacta table-productos-responsive">
             <thead class="table-primary" style="position: sticky; top: 0; z-index: 100;">
               <tr>
                 <th>Codigo</th>
@@ -81,8 +81,8 @@
               </tr>
             </thead>
             <tbody class="font-size-base">
-              <tr *ngIf="productos.length === 0">
-                <td [attr.colspan]="mostrarColumnaSucursal ? 9 : 8" class="text-center text-muted py-4">
+              <tr *ngIf="productos.length === 0" class="productos-fila-vacia">
+                <td [attr.colspan]="mostrarColumnaSucursal ? 9 : 8" class="text-center text-muted py-4" data-label="">
                   <p class="mb-2">No se encontraron productos que coincidan con la búsqueda.</p>
                   <button type="button" class="btn btn-sm btn-outline-primary" (click)="limpiarFiltroBusqueda()">
                     Ver todos los productos
@@ -91,35 +91,35 @@
               </tr>
               <tr *ngFor="let item of productos"
                 [class.producto-fila-inactiva]="!productoEstaActivo(item)">
-                <td>
+                <td data-label="Código">
     
                   <span>
                     {{item.codigo}}
                   </span>
                 </td>
-                <td>
+                <td data-label="Marca">
                   <span>{{ item.marca || '—' }}</span>
                 </td>
-                <td *ngIf="mostrarColumnaSucursal">
+                <td *ngIf="mostrarColumnaSucursal" data-label="Sucursal">
                   <span>{{ item.sucursal || '—' }}</span>
                 </td>
-                <td>
+                <td data-label="Descripción">
                   <span>{{item.descripcion}}</span>
                 </td>
-                <td>
+                <td data-label="U.Med.">
                   <span>{{item.codigoPresentacion}} </span>
                 </td>
-                <td>
+                <td data-label="C.Unit.">
                   <span>{{item.cUnitario | number:'1.2-2'}}</span>
                 </td>
-                <td>
+                <td data-label="F.Prod.">
                   <span>{{ item.fProduccion || '—' }}</span>
                 </td>
-                <td style="width: 60px; text-align: right;">
+                <td data-label="F.Venc." style="width: 60px; text-align: right;">
                   <span>{{item.fVencimiento}}</span>
                 </td>
                
-                <td>
+                <td data-label="Acción">
     
     
                   <!-- Example single danger button -->

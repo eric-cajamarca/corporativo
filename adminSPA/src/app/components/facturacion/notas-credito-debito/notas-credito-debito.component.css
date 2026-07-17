@@ -60,6 +60,15 @@
   opacity: 0.85;
 }
 
+/* Desktop: PDF/XML/CDR apilados en la columna */
+.notas-td-acciones .notas-btn-accion {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0.35rem;
+}
+
 .notas-buscar-wrap {
   max-width: 320px;
   min-width: 200px;
@@ -90,5 +99,141 @@
   .main-content {
     margin-left: 0;
     width: 100%;
+  }
+
+  .table-notas-busqueda-responsive thead,
+  .table-notas-items-responsive thead,
+  .table-notas-credito-responsive thead {
+    display: none;
+  }
+
+  /* Búsqueda e ítems: cards compactas */
+  .table-notas-busqueda-responsive tbody tr:not(.fila-vacia),
+  .table-notas-items-responsive tbody tr:not(.fila-vacia) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-notas-busqueda-responsive tbody tr:not(.fila-vacia) td,
+  .table-notas-items-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.35rem;
+    width: auto !important;
+    max-width: none !important;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-notas-busqueda-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-notas-items-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .table-notas-busqueda-responsive tbody tr:not(.fila-vacia) td[data-label="Cliente"],
+  .table-notas-busqueda-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"],
+  .table-notas-items-responsive tbody tr:not(.fila-vacia) td[data-label="Producto"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Notas emitidas: cards compactas (lista principal) */
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.35rem;
+    width: auto !important;
+    max-width: none !important;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td[data-label="Cliente"],
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td[data-label="Cliente"] {
+    font-weight: 600;
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    order: 10;
+    padding-top: 0.4rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid #f1f3f5;
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"]::before {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+
+  .table-notas-credito-responsive tbody tr:not(.fila-vacia) td[data-label="Acciones"] .notas-btn-accion {
+    display: inline-block;
+    width: auto;
+    margin: 0;
+  }
+
+  .table-notas-items-responsive tfoot tr.fila-vacia {
+    display: block;
+    margin-bottom: 0.65rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #f8f9fa;
+  }
+
+  .table-notas-items-responsive tfoot tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-notas-items-responsive tfoot tr.fila-vacia td::before {
+    display: none;
   }
 }

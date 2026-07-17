@@ -1,7 +1,9 @@
 const sql = require('mssql');
+const { resolveFechaHoraClienteSql } = require('../utils/fechaHoraLocal.util');
 
 /**
  * Inserta un registro de auditoría operativa.
+ * `fecha` debe ser la de la operación (cliente / documento), no GETDATE() del servidor.
  */
 exports.insertar = async (pool, params) => {
   const {
@@ -13,8 +15,11 @@ exports.insertar = async (pool, params) => {
     referencia = null,
     detalle = null,
     ipCliente = null,
-    userAgent = null
+    userAgent = null,
+    fecha = null
   } = params;
+
+  const fechaSql = resolveFechaHoraClienteSql(fecha, true);
 
   await pool
     .request()
@@ -27,12 +32,14 @@ exports.insertar = async (pool, params) => {
     .input('detalle', sql.NVarChar(500), detalle != null ? String(detalle).slice(0, 500) : null)
     .input('ipCliente', sql.VarChar(45), ipCliente ? String(ipCliente).slice(0, 45) : null)
     .input('userAgent', sql.NVarChar(500), userAgent ? String(userAgent).slice(0, 500) : null)
+    .input('fecha', sql.VarChar(23), fechaSql)
     .query(`
       INSERT INTO AuditoriaOperaciones (
-        idEmpresa, idUsuario, modulo, accion, idRegistro, referencia, detalle, ipCliente, userAgent
+        idEmpresa, idUsuario, modulo, accion, idRegistro, referencia, detalle, ipCliente, userAgent, fecha
       )
       VALUES (
-        @idEmpresa, @idUsuario, @modulo, @accion, @idRegistro, @referencia, @detalle, @ipCliente, @userAgent
+        @idEmpresa, @idUsuario, @modulo, @accion, @idRegistro, @referencia, @detalle, @ipCliente, @userAgent,
+        CAST(@fecha AS DATETIME)
       )
     `);
 };

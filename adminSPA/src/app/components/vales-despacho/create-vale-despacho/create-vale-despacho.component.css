@@ -66,3 +66,56 @@
   padding: 1rem 1.25rem;
   border-top: 1px solid #e2e8f0;
 }
+
+/* Detalle vale → bloques tipo tarjeta (< lg) */
+@media (max-width: 991.98px) {
+  .table-create-vale-detalle-responsive thead {
+    display: none;
+  }
+
+  .table-create-vale-detalle-responsive tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-create-vale-detalle-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  .table-create-vale-detalle-responsive tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: none;
+  }
+
+  .table-create-vale-detalle-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .table-create-vale-detalle-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-create-vale-detalle-responsive tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-create-vale-detalle-responsive tbody tr.fila-vacia td::before {
+    display: none;
+  }
+}

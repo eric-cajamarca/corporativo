@@ -50,7 +50,7 @@
         <button type="button" class="btn btn-success btn-sm" (click)="abrirModalProducto()">Agregar producto</button>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover">
+        <table class="table table-sm table-hover table-create-vale-detalle-responsive">
           <thead>
             <tr>
               <th>Código</th>
@@ -65,13 +65,18 @@
           <tbody>
             @for (l of lineas; track $index) {
               <tr>
-                <td>{{ l.codigo }}</td>
-                <td>{{ l.descripcion }}</td>
-                <td>{{ l.codigoPresentacion || "-" }}</td>
-                <td><input type="number" class="form-control form-control-sm" style="width:90px" [(ngModel)]="l.cantidad" min="0.001" step="0.001" (ngModelChange)="actualizarTotal(l)" /></td>
-                <td><input type="number" class="form-control form-control-sm" style="width:100px" [(ngModel)]="l.pUnitario" min="0" step="0.01" (ngModelChange)="actualizarTotal(l)" /></td>
-                <td>{{ l.total | number:"1.2-2" }}</td>
-                <td><button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="quitarLinea($index)">Quitar</button></td>
+                <td data-label="Código">{{ l.codigo }}</td>
+                <td data-label="Producto">{{ l.descripcion }}</td>
+                <td data-label="Presentación">{{ l.codigoPresentacion || "-" }}</td>
+                <td data-label="Cantidad"><input type="number" class="form-control form-control-sm" style="width:90px" [(ngModel)]="l.cantidad" min="0.001" step="0.001" (ngModelChange)="actualizarTotal(l)" /></td>
+                <td data-label="P. unit."><input type="number" class="form-control form-control-sm" style="width:100px" [(ngModel)]="l.pUnitario" min="0" step="0.01" (ngModelChange)="actualizarTotal(l)" /></td>
+                <td data-label="Total">{{ l.total | number:"1.2-2" }}</td>
+                <td data-label="Acciones"><button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="quitarLinea($index)">Quitar</button></td>
+              </tr>
+            }
+            @if (lineas.length === 0) {
+              <tr class="fila-vacia">
+                <td colspan="7" class="text-muted text-center">Sin productos. Use «Agregar producto».</td>
               </tr>
             }
           </tbody>

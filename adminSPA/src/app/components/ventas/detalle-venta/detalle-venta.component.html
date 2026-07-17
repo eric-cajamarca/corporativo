@@ -42,7 +42,7 @@
           </div>
           <h6 class="mt-3">Detalle</h6>
           <div class="table-responsive">
-            <table class="table table-sm table-bordered">
+            <table class="table table-sm table-bordered table-detalle-venta-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Código</th>
@@ -56,13 +56,13 @@
               </thead>
               <tbody>
                 <tr *ngFor="let d of data.items">
-                  <td>{{ d.codigo || '—' }}</td>
-                  <td>{{ d.descripcion || '—' }}</td>
-                  <td class="text-end">{{ d.cantidad }}</td>
-                  <td class="text-end">{{ d.cantEntregada ?? 0 }}</td>
-                  <td class="text-end">{{ pendiente(d) }}</td>
-                  <td class="text-end">{{ formatearMoneda(d.pVenta) }}</td>
-                  <td class="text-end">{{ formatearMoneda(d.total) }}</td>
+                  <td data-label="Código">{{ d.codigo || '—' }}</td>
+                  <td data-label="Descripción">{{ d.descripcion || '—' }}</td>
+                  <td class="text-end" data-label="Cantidad">{{ d.cantidad }}</td>
+                  <td class="text-end" data-label="Entregado">{{ d.cantEntregada ?? 0 }}</td>
+                  <td class="text-end" data-label="Pendiente">{{ pendiente(d) }}</td>
+                  <td class="text-end" data-label="P. venta">{{ formatearMoneda(d.pVenta) }}</td>
+                  <td class="text-end" data-label="Total">{{ formatearMoneda(d.total) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -93,7 +93,7 @@
           </div>
           <p class="text-danger small mb-2" *ngIf="errorEntrega">{{ errorEntrega }}</p>
           <div class="table-responsive" *ngIf="entregas.length > 0">
-            <table class="table table-sm table-bordered">
+            <table class="table table-sm table-bordered table-detalle-venta-entregas-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Fecha</th>
@@ -105,11 +105,11 @@
               </thead>
               <tbody>
                 <tr *ngFor="let e of entregas">
-                  <td>{{ formatearFecha(e.fEntrega) }}</td>
-                  <td>{{ e.productoDescripcion || e.productoCodigo || '—' }}</td>
-                  <td class="text-end">{{ e.cantidad }}</td>
-                  <td>{{ e.usuarioNombre || '—' }}</td>
-                  <td>{{ e.notas || '—' }}</td>
+                  <td data-label="Fecha">{{ formatearFecha(e.fEntrega) }}</td>
+                  <td data-label="Producto">{{ e.productoDescripcion || e.productoCodigo || '—' }}</td>
+                  <td class="text-end" data-label="Cantidad">{{ e.cantidad }}</td>
+                  <td data-label="Usuario">{{ e.usuarioNombre || '—' }}</td>
+                  <td data-label="Notas">{{ e.notas || '—' }}</td>
                 </tr>
               </tbody>
             </table>

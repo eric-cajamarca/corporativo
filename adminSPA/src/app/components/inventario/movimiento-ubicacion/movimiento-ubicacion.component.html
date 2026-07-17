@@ -55,7 +55,7 @@
         <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div></div>
       } @else {
         <div class="table-responsive mov-ubic-table-wrap">
-          <table class="table table-sm table-hover align-middle mb-0">
+          <table class="table table-sm table-hover align-middle mb-0 table-movimiento-ubicacion-productos-responsive">
             <thead class="table-light">
               <tr>
                 <th>Código</th>
@@ -71,19 +71,19 @@
             <tbody>
               @for (p of productosResultado; track p.idProducto) {
                 <tr>
-                  <td class="text-nowrap">{{ p.codigoProducto }}</td>
-                  <td>{{ p.nombreProducto }}</td>
+                  <td class="text-nowrap" data-label="Código">{{ p.codigoProducto }}</td>
+                  <td data-label="Producto">{{ p.nombreProducto }}</td>
                   @if (esModoGestora) {
-                    <td class="small">{{ p.aliasEmpresa || '—' }}</td>
+                    <td class="small" data-label="Empresa">{{ p.aliasEmpresa || '—' }}</td>
                   }
-                  <td class="small">{{ marcaColumna(p) }}</td>
-                  <td class="text-end">{{ p.stockEnUbicaciones | number : '1.0-3' }}</td>
-                  <td class="text-end">
+                  <td class="small" data-label="Marca">{{ marcaColumna(p) }}</td>
+                  <td class="text-end" data-label="Stock ubic.">{{ p.stockEnUbicaciones | number : '1.0-3' }}</td>
+                  <td class="text-end" data-label="Acciones">
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirProducto(p)">Elegir</button>
                   </td>
                 </tr>
               } @empty {
-                <tr>
+                <tr class="fila-vacia">
                   <td [attr.colspan]="esModoGestora ? 6 : 5" class="text-center text-muted py-3">
                     Busque productos con stock en ubicaciones.
                   </td>
@@ -109,7 +109,7 @@
       <div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div></div>
     } @else {
       <div class="table-responsive mov-ubic-table-wrap">
-        <table class="table table-sm table-hover align-middle mb-0">
+        <table class="table table-sm table-hover align-middle mb-0 table-movimiento-ubicacion-lotes-responsive">
           <thead class="table-light">
             <tr>
               <th>Lote</th>
@@ -122,16 +122,16 @@
           <tbody>
             @for (l of lotesProducto; track l.idLote) {
               <tr>
-                <td>{{ l.numeroLote || (l.idLote | slice : 0 : 8) }}</td>
-                <td>{{ l.nombreSucursal }}</td>
-                <td class="text-end">{{ l.cantidadDisponible | number : '1.0-3' }}</td>
-                <td class="text-end">{{ l.stockEnUbicaciones | number : '1.0-3' }}</td>
-                <td class="text-end">
+                <td data-label="Lote">{{ l.numeroLote || (l.idLote | slice : 0 : 8) }}</td>
+                <td data-label="Sucursal">{{ l.nombreSucursal }}</td>
+                <td class="text-end" data-label="Disp. lote">{{ l.cantidadDisponible | number : '1.0-3' }}</td>
+                <td class="text-end" data-label="En ubic.">{{ l.stockEnUbicaciones | number : '1.0-3' }}</td>
+                <td class="text-end" data-label="Acciones">
                   <button type="button" class="btn btn-sm btn-outline-primary" (click)="elegirLote(l)">Elegir</button>
                 </td>
               </tr>
             } @empty {
-              <tr>
+              <tr class="fila-vacia">
                 <td colspan="5" class="text-center text-muted py-3">Sin lotes con stock en ubicaciones.</td>
               </tr>
             }

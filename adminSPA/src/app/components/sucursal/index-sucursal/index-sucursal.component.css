@@ -3,38 +3,158 @@
    sidebar oculto → contenido se extiende y sigue centrado
    ============================================= */
 
-   :host {
-    display: block;
-    min-height: 100vh;
-    background: #f5f7fa;
-  }
-  
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
   .main-content {
-    margin-left: 260px;
-    margin-top: 64px;
-    padding: 24px;
-    min-height: calc(100vh - 64px);
-    transition: margin-left 0.3s ease;
+    margin-left: 0;
+    padding: 16px;
   }
-  
-  .main-content.sidebar-collapsed {
-    margin-left: 70px;
+}
+
+.content-wrap {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.compras-card {
+  width: 100%;
+}
+
+.btn-nueva-accion-movil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #198754;
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(25, 135, 84, 0.35);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.btn-nueva-accion-movil:active {
+  background: #157347;
+  color: #fff;
+}
+
+.btn-nueva-accion-movil:disabled,
+.btn-nueva-accion-movil.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Tabla → cards compactas (< lg); desktop sin cambios */
+@media (max-width: 991.98px) {
+  .sucursales-header h4 {
+    font-size: 1.1rem;
   }
-  
-  @media (max-width: 991.98px) {
-    .main-content {
-      margin-left: 0;
-    }
+
+  .table-sucursales-wrap {
+    overflow: visible !important;
+    min-height: 0 !important;
   }
-  
-  .content-wrap {
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
+
+  .table-sucursales-responsive thead {
+    display: none;
   }
-  
-  .compras-card {
+
+  .table-sucursales-responsive tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-sucursales-responsive tbody tr td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.4rem;
+    width: auto !important;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-sucursales-responsive tbody tr td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  .table-sucursales-responsive tbody tr td[data-label="Nombre"],
+  .table-sucursales-responsive tbody tr td[data-label="Dirección"],
+  .table-sucursales-responsive tbody tr td[data-label="Series"],
+  .table-sucursales-responsive tbody tr td[data-label="Acción"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-sucursales-responsive tbody tr td[data-label="Nombre"] {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .table-sucursales-responsive tbody tr td[data-label="Dirección"] {
+    align-items: flex-start;
+    word-break: break-word;
+  }
+
+  .table-sucursales-responsive tbody tr td[data-label="Acción"] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    order: 10;
+    padding-top: 0.35rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid #f1f3f5;
+  }
+
+  .table-sucursales-responsive tbody tr td[data-label="Acción"]::before {
+    flex: 0 0 100%;
     width: 100%;
   }
 
+  .table-sucursales-responsive tbody tr td[data-label="Acción"] .dropdown {
+    width: auto;
+  }
 
+  .table-sucursales-responsive .badge {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.55rem;
+  }
+}

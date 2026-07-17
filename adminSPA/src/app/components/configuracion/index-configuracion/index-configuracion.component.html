@@ -8,40 +8,38 @@
 <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
     <!-- Header del contenido -->
     <div class="content-header">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3 config-header-row">
+        <div class="min-w-0">
           <h1 class="content-title mb-1">Configuración del Sistema</h1>
           <p class="content-subtitle text-muted mb-0">Administra la configuración general del sistema</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="config-header-actions">
           <!--
           <a routerLink="/configuracion/integraciones" class="btn btn-outline-primary">
             <i class="fas fa-plug me-1"></i>
             Integraciones / APIs de pago
           </a>
           -->
-          <a routerLink="/configuracion/sesiones" class="btn btn-outline-secondary">
+          <a routerLink="/configuracion/sesiones" class="btn btn-outline-secondary config-header-btn">
             <i class="fas fa-laptop-house me-1"></i>
-            Sesiones y dispositivos
+            <span>Sesiones y dispositivos</span>
           </a>
           @if (mostrarVincularWhatsApp()) {
-            <a routerLink="/configuracion/whatsapp" class="btn btn-outline-success">
+            <a routerLink="/configuracion/whatsapp" class="btn btn-outline-success config-header-btn">
               <i class="bi bi-whatsapp me-1"></i>
-              Vincular WhatsApp
+              <span>Vincular WhatsApp</span>
             </a>
           }
           @if (mostrarBotWhatsApp()) {
-            <a routerLink="/configuracion/whatsapp-bot" class="btn btn-outline-primary">
+            <a routerLink="/configuracion/whatsapp-bot" class="btn btn-outline-primary config-header-btn">
               <i class="bi bi-robot me-1"></i>
-              Bot WhatsApp
+              <span>Bot WhatsApp</span>
             </a>
           }
-          
-          <button class="btn btn-outline-danger" (click)="restaurarConfiguracion()">
+          <button type="button" class="btn btn-outline-danger config-header-btn" (click)="restaurarConfiguracion()">
             <i class="fas fa-undo me-1"></i>
-            Restaurar
+            <span>Restaurar</span>
           </button>
-          
         </div>
       </div>
     </div>

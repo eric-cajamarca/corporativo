@@ -156,6 +156,129 @@
     }
 }
 
+/* Tabla → cards compactas (< lg); desktop sin cambios */
+@media (max-width: 991.98px) {
+  .table-precios-wrap {
+    overflow-x: visible;
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .table-precios-responsive {
+    min-width: 0 !important;
+  }
+
+  .table-precios-responsive thead {
+    display: none;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.2rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.4rem;
+    width: auto !important;
+    max-width: 100% !important;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="Producto"],
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="Sucursal"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="Producto"] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    padding: 0.2rem 0;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="Producto"] .producto-descripcion {
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: normal;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="C. Unit."],
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="P. Actual"],
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="N. Precio"],
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="Última Act."] {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="N. Precio"] {
+    border-top: 1px solid #f1f3f5;
+    padding-top: 0.35rem;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td[data-label="Última Act."] {
+    border-top: 1px solid #f1f3f5;
+    padding-top: 0.35rem;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td .input-group {
+    width: auto;
+    max-width: 100%;
+    flex: 1 1 auto;
+    justify-content: flex-start !important;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td .input-group .form-control {
+    max-width: 7.5rem;
+    min-width: 4.5rem;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td.col-c-unit .input-group .form-control,
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) td.col-c-unit-input {
+    max-width: 5.5rem;
+  }
+
+  .table-precios-responsive tbody tr:not(.precios-fila-vacia) .descripcion-cell {
+    max-width: none;
+  }
+
+  .table-precios-responsive tbody tr.precios-fila-vacia {
+    display: block;
+  }
+
+  .table-precios-responsive tbody tr.precios-fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-precios-responsive tbody tr.precios-fila-vacia td::before {
+    display: none;
+  }
+}
+
 .table tbody tr:hover {
     background-color: rgba(13, 110, 253, 0.02);
 }

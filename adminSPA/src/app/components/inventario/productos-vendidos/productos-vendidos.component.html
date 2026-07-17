@@ -101,7 +101,7 @@
       </div>
 
       <div class="pv-table-scroll table-responsive">
-        <table class="table table-hover table-striped mb-0 pv-table">
+        <table class="table table-hover table-striped mb-0 pv-table table-productos-vendidos-responsive">
           <thead>
             <tr>
               <th class="text-center" style="width: 2.5rem">#</th>
@@ -119,27 +119,27 @@
           </thead>
           <tbody>
             @if (cargando) {
-              <tr>
+              <tr class="fila-vacia">
                 <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">Cargando…</td>
               </tr>
             } @else if (!items.length) {
-              <tr>
+              <tr class="fila-vacia">
                 <td [attr.colspan]="mostrarColumnaEmpresa ? 9 : 8" class="text-center py-4 text-muted">Sin resultados</td>
               </tr>
             } @else {
               @for (r of items; track trackFila($index, r); let idx = $index) {
                 <tr>
-                  <td class="text-center">{{ idx + 1 }}</td>
-                  <td class="text-nowrap small">{{ r.fecha || '—' }}</td>
-                  <td class="pv-col-producto">{{ r.producto }}</td>
+                  <td class="text-center" data-label="#">{{ idx + 1 }}</td>
+                  <td class="text-nowrap small" data-label="Fecha">{{ r.fecha || '—' }}</td>
+                  <td class="pv-col-producto" data-label="Producto">{{ r.producto }}</td>
                   @if (mostrarColumnaEmpresa) {
-                    <td><small>{{ r.aliasEmpresa }}</small></td>
+                    <td data-label="Empresa"><small>{{ r.aliasEmpresa }}</small></td>
                   }
-                  <td class="text-end">{{ r.cantidad | number: '1.2-3' }}</td>
-                  <td class="text-end">{{ r.costo | number: '1.2-2' }}</td>
-                  <td class="text-end">{{ r.venta | number: '1.2-2' }}</td>
-                  <td class="text-end fw-semibold">{{ r.utilidad | number: '1.2-2' }}</td>
-                  <td class="text-center">
+                  <td class="text-end" data-label="Cantidad">{{ r.cantidad | number: '1.2-3' }}</td>
+                  <td class="text-end" data-label="Costo">{{ r.costo | number: '1.2-2' }}</td>
+                  <td class="text-end" data-label="Venta">{{ r.venta | number: '1.2-2' }}</td>
+                  <td class="text-end fw-semibold" data-label="Utilidad">{{ r.utilidad | number: '1.2-2' }}</td>
+                  <td class="text-center" data-label="Ver">
                     @if (r.idVenta != null) {
                       <a [routerLink]="['/ventas/detalle', r.idVenta]" class="btn btn-link btn-sm p-0 text-primary" title="Ver venta">
                         <i class="bi bi-table"></i>
@@ -154,15 +154,15 @@
           </tbody>
           @if (!cargando && items.length) {
             <tfoot>
-              <tr class="pv-tfoot-row">
+              <tr class="pv-tfoot-row fila-vacia">
                 <td class="text-end fw-bold" [attr.colspan]="3">Total</td>
                 @if (mostrarColumnaEmpresa) {
                   <td></td>
                 }
-                <td class="text-end fw-bold">{{ totales.cantidad | number: '1.3-3' }}</td>
-                <td class="text-end fw-bold">{{ totales.costo | number: '1.2-2' }}</td>
-                <td class="text-end fw-bold">{{ totales.venta | number: '1.2-2' }}</td>
-                <td class="text-end fw-bold">{{ totales.utilidad | number: '1.2-2' }}</td>
+                <td class="text-end fw-bold" data-label="Cantidad">{{ totales.cantidad | number: '1.3-3' }}</td>
+                <td class="text-end fw-bold" data-label="Costo">{{ totales.costo | number: '1.2-2' }}</td>
+                <td class="text-end fw-bold" data-label="Venta">{{ totales.venta | number: '1.2-2' }}</td>
+                <td class="text-end fw-bold" data-label="Utilidad">{{ totales.utilidad | number: '1.2-2' }}</td>
                 <td></td>
               </tr>
             </tfoot>

@@ -2,32 +2,153 @@
    LAYOUT PRINCIPAL
    ============================================= */
 
-   :host {
-    display: block;
-    min-height: 100vh;
-    background: #f5f7fa;
-  }
-  
+:host {
+  display: block;
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.main-content {
+  margin-left: 260px;
+  margin-top: 64px;
+  padding: 24px;
+  min-height: calc(100vh - 64px);
+  transition: margin-left 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
+}
+
+@media (max-width: 991.98px) {
   .main-content {
-    margin-left: 260px;
-    margin-top: 64px;
-    padding: 24px;
-    min-height: calc(100vh - 64px);
-    transition: margin-left 0.3s ease;
+    margin-left: 0;
+    padding: 16px;
   }
-  
-  .main-content.sidebar-collapsed {
-    margin-left: 70px;
-  }
-  
-  @media (max-width: 991.98px) {
-    .main-content {
-      margin-left: 0;
-    }
-  }
-
-
+}
 
 .content-wrap {
   padding: 1rem 0;
+}
+
+/* Cards compactas en móvil; desktop sin cambios */
+@media (max-width: 991.98px) {
+  .table-auditoria-wrap {
+    overflow: visible !important;
+  }
+
+  .table-auditoria-responsive {
+    --bs-table-striped-bg: transparent;
+  }
+
+  .table-auditoria-responsive thead {
+    display: none;
+  }
+
+  .table-auditoria-responsive tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.5rem;
+    row-gap: 0.1rem;
+    margin-bottom: 0.4rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid #e9ecef;
+    border-radius: 0.4rem;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .table-auditoria-responsive tbody tr:nth-child(even) {
+    background: #f8f9fa;
+  }
+
+  .table-auditoria-responsive tbody tr td {
+    display: block;
+    width: auto !important;
+    padding: 0;
+    border: none;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    text-align: left !important;
+  }
+
+  .table-auditoria-responsive tbody tr td::before {
+    display: none;
+  }
+
+  /* Fila 1: fecha | módulo */
+  .table-auditoria-responsive tbody tr td[data-label="Fecha"] {
+    grid-column: 1;
+    grid-row: 1;
+    font-weight: 600;
+    color: #343a40;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .table-auditoria-responsive tbody tr td[data-label="Módulo"] {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #0d6efd;
+    background: #e7f1ff;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+  }
+
+  /* Fila 2: usuario · acción */
+  .table-auditoria-responsive tbody tr td[data-label="Usuario"] {
+    grid-column: 1;
+    grid-row: 2;
+    color: #495057;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .table-auditoria-responsive tbody tr td[data-label="Acción"] {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    font-weight: 600;
+    font-size: 0.7rem;
+    color: #198754;
+  }
+
+  /* Fila 3: referencia · IP */
+  .table-auditoria-responsive tbody tr td[data-label="Referencia"] {
+    grid-column: 1;
+    grid-row: 3;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .table-auditoria-responsive tbody tr td[data-label="Referencia"]::before {
+    display: inline;
+    content: "Ref ";
+    font-weight: 600;
+    color: #adb5bd;
+    font-size: 0.65rem;
+  }
+
+  .table-auditoria-responsive tbody tr td[data-label="IP"] {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+    color: #adb5bd;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .table-auditoria-responsive.table-hover > tbody > tr:hover > * {
+    --bs-table-bg-state: transparent;
+    background: transparent;
+  }
 }

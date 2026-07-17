@@ -70,3 +70,128 @@
   max-width: 9rem;
   margin-left: auto;
 }
+
+/* Tabla detalle → bloques tipo tarjeta (< lg), sin duplicar filas */
+@media (max-width: 991.98px) {
+  .table-update-venta-detalle-responsive thead {
+    display: none;
+  }
+
+  .table-update-venta-detalle-responsive tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-update-venta-detalle-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  .table-update-venta-detalle-responsive tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: none;
+  }
+
+  .table-update-venta-detalle-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .table-update-venta-detalle-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-update-venta-detalle-responsive tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-update-venta-detalle-responsive tbody tr.fila-vacia td::before {
+    display: none;
+  }
+
+  .table-update-venta-pago-responsive thead {
+    display: none;
+  }
+
+  .table-update-venta-pago-responsive tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-update-venta-pago-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  .table-update-venta-pago-responsive tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: none;
+  }
+
+  .table-update-venta-pago-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .table-update-venta-pago-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-update-venta-pago-responsive tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-update-venta-pago-responsive tbody tr.fila-vacia td::before {
+    display: none;
+  }
+
+  .table-update-venta-pago-responsive tfoot tr {
+    display: block;
+    margin-top: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #e7f1ff;
+    padding: 0.5rem 0;
+  }
+
+  .table-update-venta-pago-responsive tfoot td {
+    display: block;
+    width: 100% !important;
+    text-align: left !important;
+    border: none;
+    padding: 0.35rem 1rem;
+  }
+
+  #modalPagoEdicion .modal-pago-monto-fila {
+    margin-left: 0;
+    max-width: 100%;
+  }
+}

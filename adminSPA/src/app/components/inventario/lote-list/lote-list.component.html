@@ -64,7 +64,7 @@
   <!-- Tabla de lotes -->
   @if (!isLoading && !errorMessage) {
     <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-      <table class="table table-sm table-hover">
+      <table class="table table-sm table-hover table-lote-list-responsive">
         <thead class="table-light sticky-top">
           <tr>
             <th>ID Lote</th>
@@ -79,8 +79,8 @@
         </thead>
         <tbody>
           @if (lotesFiltrados.length === 0) {
-            <tr>
-              <td colspan="7" class="text-center py-4 text-muted">
+            <tr class="fila-vacia">
+              <td colspan="8" class="text-center py-4 text-muted">
                 <i class="bi bi-box-open fa-2x mb-2"></i>
                 <p class="mb-0">No se encontraron lotes</p>
               </td>
@@ -88,17 +88,17 @@
           } @else {
             @for (lote of lotesFiltrados; track lote.idLote) {
               <tr [class.table-secondary]="lote.activo === false">
-                <td>
+                <td data-label="ID Lote">
                   <code class="small">{{ lote.idLote | slice:0:8 }}...</code>
                   @if (lote.activo === false) {
                     <span class="badge bg-secondary ms-1">Inactivo</span>
                   }
                 </td>
-                <td>{{ lote.nombreProducto || 'N/D' }}</td>
-            <td>{{ lote.aliasEmpresa || 'N/D' }}</td>
-                <td>{{ lote.nombreSucursal || 'N/D' }}</td>
-                <td>S/ {{ lote.costoUnitario | number:'1.2-2' }}</td>
-                <td>
+                <td data-label="Producto">{{ lote.nombreProducto || 'N/D' }}</td>
+                <td data-label="Empresa">{{ lote.aliasEmpresa || 'N/D' }}</td>
+                <td data-label="Sucursal">{{ lote.nombreSucursal || 'N/D' }}</td>
+                <td data-label="Costo Unit.">S/ {{ lote.costoUnitario | number:'1.2-2' }}</td>
+                <td data-label="Disponible">
                   <span class="badge" [ngClass]="{
                     'bg-success': lote.cantidadDisponible > 50,
                     'bg-warning': lote.cantidadDisponible <= 50 && lote.cantidadDisponible > 10,
@@ -107,10 +107,10 @@
                     {{ lote.cantidadDisponible }}
                   </span>
                 </td>
-                <td>
+                <td data-label="Fecha Ingreso">
                   <small>{{ lote.fechaIngreso | date:'dd/MM/yyyy' }}</small>
                 </td>
-                <td class="text-end">
+                <td class="text-end" data-label="Acciones">
                   <div class="btn-group btn-group-sm">
                     <button 
                       class="btn btn-outline-primary" 

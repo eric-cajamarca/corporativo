@@ -91,3 +91,104 @@ h2{
   border: 0;
   border-left: 1px solid rgba(0, 0, 0, 0.125);
 }
+
+/* Tablas densas → bloques tipo tarjeta (< lg) */
+@media (max-width: 991.98px) {
+  .table-index-despachos-va-responsive thead,
+  .table-index-despachos-detalle-venta-responsive thead,
+  .table-index-despachos-lineas-responsive thead,
+  .table-index-despachos-dev-form-responsive thead,
+  .table-index-despachos-devs-list-responsive thead,
+  .table-index-despachos-dev-detalle-responsive thead,
+  .table-index-despachos-crear-responsive thead {
+    display: none;
+  }
+
+  .table-index-despachos-va-responsive tbody tr:not(.fila-vacia),
+  .table-index-despachos-detalle-venta-responsive tbody tr:not(.fila-vacia),
+  .table-index-despachos-lineas-responsive tbody tr:not(.fila-vacia),
+  .table-index-despachos-dev-form-responsive tbody tr:not(.fila-vacia),
+  .table-index-despachos-devs-list-responsive tbody tr:not(.fila-vacia),
+  .table-index-despachos-dev-detalle-responsive tbody tr:not(.fila-vacia),
+  .table-index-despachos-crear-responsive tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-index-despachos-va-responsive tbody tr:not(.fila-vacia) td,
+  .table-index-despachos-detalle-venta-responsive tbody tr:not(.fila-vacia) td,
+  .table-index-despachos-lineas-responsive tbody tr:not(.fila-vacia) td,
+  .table-index-despachos-dev-form-responsive tbody tr:not(.fila-vacia) td,
+  .table-index-despachos-devs-list-responsive tbody tr:not(.fila-vacia) td,
+  .table-index-despachos-dev-detalle-responsive tbody tr:not(.fila-vacia) td,
+  .table-index-despachos-crear-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  .table-index-despachos-va-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-index-despachos-detalle-venta-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-index-despachos-lineas-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-index-despachos-dev-form-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-index-despachos-devs-list-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-index-despachos-dev-detalle-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-index-despachos-crear-responsive tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: none;
+  }
+
+  .table-index-despachos-va-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-index-despachos-detalle-venta-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-index-despachos-lineas-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-index-despachos-dev-form-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-index-despachos-devs-list-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-index-despachos-dev-detalle-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-index-despachos-crear-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .table-index-despachos-va-responsive tbody tr.fila-vacia,
+  .table-index-despachos-detalle-venta-responsive tbody tr.fila-vacia,
+  .table-index-despachos-lineas-responsive tbody tr.fila-vacia,
+  .table-index-despachos-dev-form-responsive tbody tr.fila-vacia,
+  .table-index-despachos-devs-list-responsive tbody tr.fila-vacia,
+  .table-index-despachos-dev-detalle-responsive tbody tr.fila-vacia,
+  .table-index-despachos-crear-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-index-despachos-va-responsive tbody tr.fila-vacia td,
+  .table-index-despachos-detalle-venta-responsive tbody tr.fila-vacia td,
+  .table-index-despachos-lineas-responsive tbody tr.fila-vacia td,
+  .table-index-despachos-dev-form-responsive tbody tr.fila-vacia td,
+  .table-index-despachos-devs-list-responsive tbody tr.fila-vacia td,
+  .table-index-despachos-dev-detalle-responsive tbody tr.fila-vacia td,
+  .table-index-despachos-crear-responsive tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-index-despachos-va-responsive tbody tr.fila-vacia td::before,
+  .table-index-despachos-detalle-venta-responsive tbody tr.fila-vacia td::before,
+  .table-index-despachos-lineas-responsive tbody tr.fila-vacia td::before,
+  .table-index-despachos-dev-form-responsive tbody tr.fila-vacia td::before,
+  .table-index-despachos-devs-list-responsive tbody tr.fila-vacia td::before,
+  .table-index-despachos-dev-detalle-responsive tbody tr.fila-vacia td::before,
+  .table-index-despachos-crear-responsive tbody tr.fila-vacia td::before {
+    display: none;
+  }
+}

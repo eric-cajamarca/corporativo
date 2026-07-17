@@ -196,30 +196,38 @@
                   </div>
                   <div class="small text-muted mb-1">Producto</div>
                   <div [attr.contenteditable]="item.permiteDescripcionEnVenta ? true : null" class="editable create-ventas-cart-desc mb-2" [class.text-muted]="!item.permiteDescripcionEnVenta" (blur)="actualizaDescripcion(item, $event)">{{ item?.descripcion }}</div>
-                  <div class="small mb-2"><span class="text-muted">Marca</span> {{ marcaColumnaVentas(item) }}</div>
-                  <div class="row g-2 small">
+                  <div class="row g-2 small mb-2 create-ventas-cart-meta-row">
+                    <div class="col-6">
+                      <span class="text-muted">Marca</span>
+                      <div>{{ marcaColumnaVentas(item) }}</div>
+                    </div>
                     <div class="col-6">
                       <span class="text-muted">U.Medida</span>
                       <div>{{ item.codigoPresentacion }}</div>
                     </div>
-                    <div class="col-6">
-                      <span class="text-muted">Cantidad</span>
+                  </div>
+                  <div class="row g-2 small align-items-end create-ventas-cart-montos-row">
+                    <div class="col-3">
+                      <span class="text-muted d-block">Cant.</span>
                       <div contenteditable="true" class="editable d-inline-block min-w-0" (blur)="actualizaCantidad(item, $event)">{{ item?.cantidad }}</div>
                     </div>
-                    <div class="col-12">
-                      <span class="text-muted">P. unit.</span>
-                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="col-5">
+                      <span class="text-muted d-block">P. unit.</span>
+                      <div class="d-flex align-items-center gap-1 flex-nowrap">
                         <span contenteditable="true" class="editable" (blur)="actualizaPrecio(item, $event)">{{ item.pVenta | number:'1.2-2' }}</span>
-                        <button type="button" class="btn btn-sm btn-outline-primary create-ventas-touch-btn" (click)="abrirModalPrecios(item)" title="Otros precios">
+                        <button type="button" class="btn btn-sm btn-outline-primary create-ventas-touch-btn flex-shrink-0" (click)="abrirModalPrecios(item)" title="Otros precios">
                           <i class="bi bi-chevron-down"></i>
                         </button>
-                        <span class="ms-auto fw-semibold">S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</span>
                       </div>
                     </div>
-                    <div class="col-12" *ngIf="item.sucursal">
-                      <span class="text-muted">Sucursal</span>
-                      <div>{{ item.sucursal }}</div>
+                    <div class="col-4 text-end">
+                      <span class="text-muted d-block">Total</span>
+                      <div class="fw-semibold text-nowrap">S/ {{ (item.cantidad * item.pVenta) | number:'1.2-2' }}</div>
                     </div>
+                  </div>
+                  <div class="small mt-2" *ngIf="item.sucursal">
+                    <span class="text-muted">Sucursal</span>
+                    <div>{{ item.sucursal }}</div>
                   </div>
                 </div>
               </div>

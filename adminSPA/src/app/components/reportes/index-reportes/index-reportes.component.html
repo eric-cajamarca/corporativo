@@ -10,25 +10,13 @@
   <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
     <!-- Header del contenido -->
     <div class="content-header">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3 reportes-header-row">
+        <div class="min-w-0">
           <h1 class="content-title mb-1">Reportes y Análisis</h1>
           <p class="content-subtitle text-muted mb-0">Genera reportes detallados del negocio</p>
         </div>
-        <div class="d-flex gap-2">
-          <div class="dropdown">
-            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              <i class="bi bi-calendar3 me-1"></i>
-              {{periodoSeleccionado}}
-            </button>
-            <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Hoy'); $event.preventDefault()">Hoy</a></li>
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Esta Semana'); $event.preventDefault()">Esta Semana</a></li>
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Mes'); $event.preventDefault()">Este Mes</a></li>
-              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Año'); $event.preventDefault()">Este Año</a></li>
-            </ul>
-          </div>
-          <div class="btn-group">
+        <div class="d-flex flex-wrap gap-2 reportes-header-actions">
+          <div class="btn-group reportes-export-group" role="group">
             <button
               class="btn btn-outline-success"
               type="button"
@@ -38,12 +26,24 @@
               <span *ngIf="generandoInformePdf" class="spinner-border spinner-border-sm me-1" role="status"></span>
               <i class="bi bi-file-earmark-pdf me-1" *ngIf="!generandoInformePdf"></i>PDF
             </button>
-            <button class="btn btn-outline-success" (click)="exportarReporte('excel')">
+            <button class="btn btn-outline-success" type="button" (click)="exportarReporte('excel')">
               <i class="bi bi-file-earmark-excel me-1"></i>Excel
             </button>
-            <button class="btn btn-outline-secondary" (click)="imprimirReporte()">
+            <button class="btn btn-outline-secondary d-none d-md-inline-flex" type="button" (click)="imprimirReporte()">
               <i class="bi bi-printer me-1"></i>Imprimir
             </button>
+          </div>
+          <div class="dropdown reportes-periodo-dropdown dropup-mobile">
+            <button class="btn btn-outline-primary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" data-bs-display="static">
+              <i class="bi bi-calendar3 me-1"></i>
+              {{periodoSeleccionado}}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end w-100">
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Hoy'); $event.preventDefault()">Hoy</a></li>
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Esta Semana'); $event.preventDefault()">Esta Semana</a></li>
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Mes'); $event.preventDefault()">Este Mes</a></li>
+              <li><a class="dropdown-item" href="#" (click)="cambiarPeriodo('Este Año'); $event.preventDefault()">Este Año</a></li>
+            </ul>
           </div>
         </div>
       </div>

@@ -32,3 +32,64 @@
     margin-left: 0;
   }
 }
+
+/* Tablas → bloques tipo tarjeta (< lg), sin duplicar filas */
+@media (max-width: 991.98px) {
+  .table-detalle-venta-responsive thead,
+  .table-detalle-venta-entregas-responsive thead {
+    display: none;
+  }
+
+  .table-detalle-venta-responsive tbody tr:not(.fila-vacia),
+  .table-detalle-venta-entregas-responsive tbody tr:not(.fila-vacia) {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-detalle-venta-responsive tbody tr:not(.fila-vacia) td,
+  .table-detalle-venta-entregas-responsive tbody tr:not(.fila-vacia) td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 100% !important;
+    text-align: left !important;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f3f5;
+  }
+
+  .table-detalle-venta-responsive tbody tr:not(.fila-vacia) td:last-child,
+  .table-detalle-venta-entregas-responsive tbody tr:not(.fila-vacia) td:last-child {
+    border-bottom: none;
+  }
+
+  .table-detalle-venta-responsive tbody tr:not(.fila-vacia) td::before,
+  .table-detalle-venta-entregas-responsive tbody tr:not(.fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .table-detalle-venta-responsive tbody tr.fila-vacia,
+  .table-detalle-venta-entregas-responsive tbody tr.fila-vacia {
+    display: block;
+  }
+
+  .table-detalle-venta-responsive tbody tr.fila-vacia td,
+  .table-detalle-venta-entregas-responsive tbody tr.fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-detalle-venta-responsive tbody tr.fila-vacia td::before,
+  .table-detalle-venta-entregas-responsive tbody tr.fila-vacia td::before {
+    display: none;
+  }
+}

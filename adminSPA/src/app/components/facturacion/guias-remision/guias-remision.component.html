@@ -194,7 +194,7 @@
                     </button>
                   </div>
                   <div class="table-responsive">
-                    <table class="table table-sm table-bordered align-middle mb-0">
+                    <table class="table table-sm table-bordered align-middle mb-0 table-guias-remision-items-responsive">
                       <thead class="table-light">
                         <tr>
                           <th style="width:40px;">#</th>
@@ -208,12 +208,12 @@
                       <tbody>
                         @for (it of comprobanteOrigen.items; track it.idDetalle || it.idProducto || $index) {
                           <tr>
-                            <td class="text-center">{{ it.numeroLinea || ($index + 1) }}</td>
-                            <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.codigo" placeholder="Cód."></td>
-                            <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.descripcion" placeholder="Descripción"></td>
-                            <td><input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad" min="0" step="0.01"></td>
-                            <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.unidad" placeholder="NIU" maxlength="3"></td>
-                            <td class="text-center">
+                            <td class="text-center" data-label="#">{{ it.numeroLinea || ($index + 1) }}</td>
+                            <td data-label="Código"><input type="text" class="form-control form-control-sm" [(ngModel)]="it.codigo" placeholder="Cód."></td>
+                            <td data-label="Descripción"><input type="text" class="form-control form-control-sm" [(ngModel)]="it.descripcion" placeholder="Descripción"></td>
+                            <td data-label="Cant."><input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad" min="0" step="0.01"></td>
+                            <td data-label="Unidad"><input type="text" class="form-control form-control-sm" [(ngModel)]="it.unidad" placeholder="NIU" maxlength="3"></td>
+                            <td class="text-center" data-label="Acciones">
                               <button type="button" class="btn btn-sm btn-outline-danger" (click)="eliminarItemComprobante($index)" title="Quitar ítem">
                                 <i class="bi bi-trash"></i>
                               </button>
@@ -268,7 +268,7 @@
               </button>
             </div>
             <div class="table-responsive">
-              <table class="table table-sm table-bordered align-middle mb-0">
+              <table class="table table-sm table-bordered align-middle mb-0 table-guias-remision-items-responsive">
                 <thead class="table-light">
                   <tr>
                     <th style="width:40px;">#</th>
@@ -282,12 +282,12 @@
                 <tbody>
                   @for (it of comprobanteOrigen.items; track $index) {
                     <tr>
-                      <td class="text-center">{{ $index + 1 }}</td>
-                      <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.codigo" placeholder="Cód."></td>
-                      <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.descripcion" placeholder="Descripción del bien"></td>
-                      <td><input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad" min="0" step="0.01"></td>
-                      <td><input type="text" class="form-control form-control-sm" [(ngModel)]="it.unidad" placeholder="NIU" maxlength="3"></td>
-                      <td class="text-center">
+                      <td class="text-center" data-label="#">{{ $index + 1 }}</td>
+                      <td data-label="Código"><input type="text" class="form-control form-control-sm" [(ngModel)]="it.codigo" placeholder="Cód."></td>
+                      <td data-label="Descripción"><input type="text" class="form-control form-control-sm" [(ngModel)]="it.descripcion" placeholder="Descripción del bien"></td>
+                      <td data-label="Cantidad"><input type="number" class="form-control form-control-sm" [(ngModel)]="it.cantidad" min="0" step="0.01"></td>
+                      <td data-label="Unidad"><input type="text" class="form-control form-control-sm" [(ngModel)]="it.unidad" placeholder="NIU" maxlength="3"></td>
+                      <td class="text-center" data-label="Acciones">
                         <button type="button" class="btn btn-sm btn-outline-danger" (click)="eliminarItemComprobante($index)" title="Quitar ítem">
                           <i class="bi bi-trash"></i>
                         </button>

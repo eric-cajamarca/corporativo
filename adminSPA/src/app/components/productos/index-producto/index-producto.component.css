@@ -116,3 +116,94 @@
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
+
+/* Móvil: tabla → cards compactas (desktop sin cambios) */
+@media (max-width: 991.98px) {
+  .productos-tabla-wrap {
+    height: auto !important;
+    max-height: none;
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .table-productos-responsive thead {
+    display: none;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.15rem 0.5rem;
+    margin-bottom: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.4rem;
+    width: auto !important;
+    max-width: 100%;
+    text-align: left !important;
+    padding: 0.15rem 0;
+    border: none;
+    font-size: 0.875rem;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  /* Descripción y acción a ancho completo */
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Descripción"],
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Sucursal"],
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Acción"] {
+    grid-column: 1 / -1;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Descripción"] {
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.25rem 0;
+    font-weight: 600;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Acción"] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-top: 0.35rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid #f1f3f5;
+  }
+
+  .table-productos-responsive tbody tr:not(.productos-fila-vacia) td[data-label="Acción"]::before {
+    flex: 0 0 100%;
+    width: 100%;
+    margin-bottom: 0.1rem;
+  }
+
+  .table-productos-responsive tbody tr.productos-fila-vacia {
+    display: block;
+  }
+
+  .table-productos-responsive tbody tr.productos-fila-vacia td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-productos-responsive tbody tr.productos-fila-vacia td::before {
+    display: none;
+  }
+}

@@ -3,20 +3,20 @@
 
 <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
   <div class="content-header">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <div>
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2">
+      <div class="min-w-0">
         <h1 class="content-title mb-1">Reporte de Utilidades</h1>
         <p class="content-subtitle text-muted mb-0">Detalle por producto: precio de venta, costo y utilidad bruta</p>
       </div>
-      <div class="d-flex gap-2 flex-wrap">
-        <button type="button" class="btn btn-outline-danger" (click)="exportarPdf()" [disabled]="cargando || datos.length === 0">
-          <i class="fas fa-file-pdf me-1"></i>PDF
+      <div class="utilidades-header-actions">
+        <button type="button" class="btn btn-outline-danger utilidades-export-btn" (click)="exportarPdf()" [disabled]="cargando || datos.length === 0">
+          <i class="fas fa-file-pdf me-1"></i><span>PDF</span>
         </button>
-        <button type="button" class="btn btn-outline-success" (click)="exportarExcel()" [disabled]="cargando || datos.length === 0">
-          <i class="fas fa-file-excel me-1"></i>Excel
+        <button type="button" class="btn btn-outline-success utilidades-export-btn" (click)="exportarExcel()" [disabled]="cargando || datos.length === 0">
+          <i class="fas fa-file-excel me-1"></i><span>Excel</span>
         </button>
-        <button type="button" class="btn btn-outline-success" (click)="abrirModalWhatsapp()" [disabled]="cargando || datos.length === 0">
-          <i class="fab fa-whatsapp me-1"></i>Enviar PDF por WhatsApp
+        <button type="button" class="btn btn-outline-success utilidades-export-btn utilidades-wa-btn" (click)="abrirModalWhatsapp()" [disabled]="cargando || datos.length === 0">
+          <i class="fab fa-whatsapp me-1"></i><span class="d-none d-sm-inline">Enviar PDF por WhatsApp</span><span class="d-sm-none">WhatsApp</span>
         </button>
       </div>
     </div>
@@ -74,8 +74,8 @@
           </div>
         }
       </div>
-      <div class="table-responsive">
-        <table class="table table-hover table-utilidades">
+      <div class="table-responsive table-utilidades-wrap">
+        <table class="table table-hover table-utilidades table-utilidades-responsive mb-0">
           <thead>
             <tr>
               <th>Producto / Comprobante</th>
@@ -89,7 +89,7 @@
           <tbody>
             @for (fila of datosVisibles; track fila.idVenta + fila.nombreProducto + $index) {
               <tr [class.utilidad-fila-excluida]="esFilaExcluida(fila)">
-                <td>
+                <td data-label="Producto">
                   <div class="utilidad-producto-nombre" [class.text-decoration-line-through]="esFilaExcluida(fila)">
                     {{ fila.nombreProducto }}
                   </div>
@@ -97,20 +97,26 @@
                   @if (etiquetaEstadoFila(fila); as estado) {
                     <span class="badge utilidad-estado-badge mt-1">{{ estado }}</span>
                   }
+                  <div class="utilidad-meta-movil" [class.text-muted]="esFilaExcluida(fila)">
+                    <span>{{ fila.fechaVenta }}</span>
+                    <span>V {{ formatearMoneda(fila.precioVenta) }}</span>
+                    <span>C {{ formatearMoneda(fila.costo) }}</span>
+                  </div>
                 </td>
-                <td [class.text-muted]="esFilaExcluida(fila)">{{ fila.fechaVenta }}</td>
-                <td class="text-end" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                <td class="utilidad-col-desktop" data-label="Fecha" [class.text-muted]="esFilaExcluida(fila)">{{ fila.fechaVenta }}</td>
+                <td class="text-end utilidad-col-desktop" data-label="Venta" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
                   {{ formatearMoneda(fila.precioVenta) }}
                 </td>
-                <td class="text-end" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                <td class="text-end utilidad-col-desktop" data-label="Costo" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
                   {{ formatearMoneda(fila.costo) }}
                 </td>
-                <td class="text-end utilidad" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
+                <td class="text-end utilidad" data-label="Utilidad" [class.text-muted]="esFilaExcluida(fila)" [class.text-decoration-line-through]="esFilaExcluida(fila)">
                   {{ formatearMoneda(fila.utilidadBruta) }}
                 </td>
-                <td class="text-center">
-                  <button type="button" class="btn btn-sm btn-outline-primary" (click)="verDetalleComprobante(fila)" title="Ver detalle del comprobante">
-                    <i class="fas fa-file-invoice"></i> Ver detalle
+                <td class="text-center" data-label="Acción">
+                  <button type="button" class="btn btn-sm btn-outline-primary utilidad-btn-detalle" (click)="verDetalleComprobante(fila)" title="Ver detalle del comprobante">
+                    <i class="fas fa-file-invoice"></i>
+                    <span class="utilidad-btn-detalle-text"> Ver detalle</span>
                   </button>
                 </td>
               </tr>
@@ -118,10 +124,10 @@
           </tbody>
           <tfoot>
             <tr class="table-totals">
-              <th colspan="2" class="text-end">Total (solo comprobantes vigentes)</th>
-              <th class="text-end">{{ formatearMoneda(totalPrecioVenta) }}</th>
-              <th class="text-end">{{ formatearMoneda(totalCosto) }}</th>
-              <th class="text-end utilidad">{{ formatearMoneda(totalUtilidadBruta) }}</th>
+              <th colspan="2" class="text-end utilidad-total-label">Total (solo comprobantes vigentes)</th>
+              <th class="text-end" data-label="Venta">{{ formatearMoneda(totalPrecioVenta) }}</th>
+              <th class="text-end" data-label="Costo">{{ formatearMoneda(totalCosto) }}</th>
+              <th class="text-end utilidad" data-label="Utilidad">{{ formatearMoneda(totalUtilidadBruta) }}</th>
               <th></th>
             </tr>
           </tfoot>

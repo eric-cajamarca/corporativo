@@ -51,7 +51,7 @@
             </button>
           </div>
           <div class="table-responsive">
-            <table class="table table-sm table-bordered">
+            <table class="table table-sm table-bordered table-update-cotizacion-detalle-responsive">
               <thead class="table-light">
                 <tr>
                   <th>Código</th>
@@ -64,16 +64,16 @@
               </thead>
               <tbody>
                 <tr *ngFor="let d of detalles; let i = index">
-                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.codigo" readonly></td>
-                  <td><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" readonly></td>
-                  <td>
+                  <td data-label="Código"><input type="text" class="form-control form-control-sm" [(ngModel)]="d.codigo" readonly></td>
+                  <td data-label="Descripción"><input type="text" class="form-control form-control-sm" [(ngModel)]="d.descripcion" readonly></td>
+                  <td data-label="Cantidad">
                     <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.cantidad" (ngModelChange)="recalcularTotal()" step="0.001" min="0">
                   </td>
-                  <td>
+                  <td data-label="P. venta">
                     <input type="number" class="form-control form-control-sm text-end" [(ngModel)]="d.pVenta" (ngModelChange)="recalcularTotal()" step="0.01" min="0">
                   </td>
-                  <td class="text-end align-middle">{{ formatearMoneda(d.total) }}</td>
-                  <td class="text-center align-middle">
+                  <td class="text-end align-middle" data-label="Total">{{ formatearMoneda(d.total) }}</td>
+                  <td class="text-center align-middle" data-label="Eliminar">
                     <button type="button" class="btn btn-outline-danger btn-sm" (click)="eliminarDetalle(i)" title="Eliminar">
                       <i class="bi bi-trash"></i>
                     </button>
