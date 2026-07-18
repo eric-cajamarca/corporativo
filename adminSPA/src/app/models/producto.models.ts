@@ -27,6 +27,35 @@ export interface Producto {
   facturar?: string;
   /** Si true, en el POS se puede cambiar el texto del ítem en el comprobante sin tocar el catálogo. */
   permiteDescripcionEnVenta?: boolean;
+  /** Código producto SUNAT (UNSPSC 8 dígitos, Cat. 25 / anexos 25.1–25.3). */
+  codigoProductoSunat?: string | null;
+  /** null = sin decidir, true = sí aplica, false = no aplica. */
+  requiereCodigoSunat?: boolean | null;
+  revisadoSunat?: boolean;
+  anexoSunatSugerido?: string | null;
+  codigoSunatSugerido?: string | null;
+}
+
+export interface CatalogoProductoSunatItem {
+  codigo: string;
+  anexo: string;
+  descripcion: string;
+  partidaArancelaria?: string;
+  etiquetaAnexo?: string;
+  score?: number;
+}
+
+export interface ProductoCodigoSunatPendiente {
+  idProducto: string;
+  codigo: string;
+  descripcion: string;
+  categoria: string;
+  marca: string;
+  codigoProductoSunat?: string | null;
+  requiereCodigoSunat?: boolean | null;
+  revisadoSunat?: boolean;
+  anexoSunatSugerido?: string | null;
+  codigoSunatSugerido?: string | null;
 }
 
 export interface LoteInicialCreate {
@@ -55,6 +84,11 @@ export interface ProductoCreate {
   lote?: LoteInicialCreate | null;
   precioVenta?: number;
   permiteDescripcionEnVenta?: boolean;
+  codigoProductoSunat?: string | null;
+  requiereCodigoSunat?: boolean | null;
+  revisadoSunat?: boolean;
+  anexoSunatSugerido?: string | null;
+  codigoSunatSugerido?: string | null;
   /** Empresa gestora: crear el producto en esta empresa gestionada. */
   idEmpresaDestino?: string;
 }

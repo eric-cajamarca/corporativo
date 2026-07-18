@@ -25,6 +25,9 @@ const bajaSunatStockService = require("../services/bajaSunatStock.service");
 const { idUsuarioDesdePayloadUser } = require("../utils/idUsuarioSesion.util");
 const saasContadorComprobantesSunatService = require("../services/saasContadorComprobantesSunat.service");
 const { esFalloInfraestructuraSunat } = require("../utils/sunatEnvioReintentos.util");
+const {
+  validarItemsCodigoProductoSunatEmision
+} = require("../services/codigoProductoSunatEmision.service");
 
 /** Carpeta donde se guardan los XML firmados listos para enviar (para revisión/descarga). */
 const CARPETA_XML_FIRMADOS = path.join(process.cwd(), "xml_firmados_sunat");
@@ -1673,6 +1676,11 @@ exports.generarYFirmarXmlComprobanteRepo = async (pool, user, idComprobanteElect
   if (!comp) return { ok: false, mensaje: "Comprobante no encontrado" };
   const payload = await ventasRepository.obtenerComprobanteParaPdf(pool, comp.idVenta, [user.empresa]);
   if (!payload) return { ok: false, mensaje: "No se encontraron datos de la venta para generar el comprobante" };
+  try {
+    await validarItemsCodigoProductoSunatEmision(pool, payload.items || []);
+  } catch (errVal) {
+    return { ok: false, mensaje: errVal.message || "Código producto SUNAT inválido en ítems" };
+  }
   const configFirma = await exports.obtenerConfiguracionParaFirmaRepo(pool, user.empresa);
   const certBase64 = configFirma?.certificadoDigital;
   const claveCert = configFirma?.claveCertificado ? cifradoClaveCertificado.descifrar(configFirma.claveCertificado) : null;
@@ -1738,6 +1746,14 @@ exports.enviarComprobanteSunatRepo = async (pool, user, idComprobanteElectronico
     return {
       ok: false,
       mensaje: "No se encontraron datos de la venta para generar el comprobante"
+    };
+  }
+  try {
+    await validarItemsCodigoProductoSunatEmision(pool, payload.items || []);
+  } catch (errVal) {
+    return {
+      ok: false,
+      mensaje: errVal.message || "Código producto SUNAT inválido en ítems"
     };
   }
   const nombreArchivo = nombreArchivoComprobante({

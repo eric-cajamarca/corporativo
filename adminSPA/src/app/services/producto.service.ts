@@ -19,7 +19,9 @@ import {
   ProductoResponse,
   ImportacionProductosValidarData,
   ImportacionProductosEjecutarData,
-  StockUbicacionProductoFila
+  StockUbicacionProductoFila,
+  CatalogoProductoSunatItem,
+  ProductoCodigoSunatPendiente
 } from '../models/producto.models';
 import {
   HistorialCompraProductoItem,
@@ -220,6 +222,58 @@ export class ProductoService {
     const sid = encodeURIComponent(idSucursal);
     return this._http.get<{ data: StockUbicacionProductoFila[] }>(
       `${this.url}productos/${pid}/stock-ubicaciones?idSucursal=${sid}`,
+      { withCredentials: true }
+    );
+  }
+
+  listarCatalogoProductoSunat(params?: { anexo?: string; q?: string; limite?: number }): Observable<{ data: CatalogoProductoSunatItem[] }> {
+    let httpParams = new HttpParams();
+    if (params?.anexo) httpParams = httpParams.set('anexo', params.anexo);
+    if (params?.q) httpParams = httpParams.set('q', params.q);
+    if (params?.limite) httpParams = httpParams.set('limite', String(params.limite));
+    return this._http.get<{ data: CatalogoProductoSunatItem[] }>(`${this.url}catalogo-producto-sunat`, {
+      withCredentials: true,
+      params: httpParams
+    });
+  }
+
+  sugerirCodigoProductoSunat(descripcion: string, categoria?: string): Observable<{ data: CatalogoProductoSunatItem[] }> {
+    return this._http.post<{ data: CatalogoProductoSunatItem[] }>(
+      `${this.url}catalogo-producto-sunat/sugerir`,
+      { descripcion, categoria, limite: 8 },
+      { withCredentials: true }
+    );
+  }
+
+  listarProductosCodigoSunatPendientes(params?: {
+    filtro?: string;
+    anexo?: string;
+    idCategoria?: number | string;
+    idMarca?: number | string;
+    q?: string;
+    limite?: number;
+  }): Observable<{ data: ProductoCodigoSunatPendiente[] }> {
+    let httpParams = new HttpParams();
+    if (params?.filtro) httpParams = httpParams.set('filtro', params.filtro);
+    if (params?.anexo) httpParams = httpParams.set('anexo', params.anexo);
+    if (params?.idCategoria != null && params.idCategoria !== '') {
+      httpParams = httpParams.set('idCategoria', String(params.idCategoria));
+    }
+    if (params?.idMarca != null && params.idMarca !== '') {
+      httpParams = httpParams.set('idMarca', String(params.idMarca));
+    }
+    if (params?.q) httpParams = httpParams.set('q', params.q);
+    if (params?.limite) httpParams = httpParams.set('limite', String(params.limite));
+    return this._http.get<{ data: ProductoCodigoSunatPendiente[] }>(`${this.url}productos/codigo-sunat/pendientes`, {
+      withCredentials: true,
+      params: httpParams
+    });
+  }
+
+  sugerirCodigoSunatBatch(limite = 200): Observable<{ data: { revisados: number; actualizados: number } }> {
+    return this._http.post<{ data: { revisados: number; actualizados: number } }>(
+      `${this.url}productos/codigo-sunat/sugerir-batch`,
+      { limite },
       { withCredentials: true }
     );
   }

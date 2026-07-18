@@ -8,6 +8,10 @@
 const { escribirXmlFirma } = require("../utils/facturadorSunat.util");
 const { numeroALetras } = require("../utils/numeroALetras.util");
 const { getFechaHoyApp } = require("../utils/fechaDisplay.util");
+const {
+  codigoProductoSunatParaXml,
+  fragmentoCommodityClassificationXml
+} = require("./codigoProductoSunatEmision.service");
 
 const NS = {
   UBL: "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
@@ -314,6 +318,8 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
     const taxAmount = toNum(it.total) - lineExt;
     const desc = escXml(it.descripcion || "Item");
     const codProducto = escXml(it.codigo || String(idx));
+    const codSunat = codigoProductoSunatParaXml(it);
+    const commodityXml = fragmentoCommodityClassificationXml(codSunat);
     lineas.push(`
     <cac:InvoiceLine>
       <cbc:ID>${idx}</cbc:ID>
@@ -345,7 +351,7 @@ function generarXmlUblFacturaBoleta(payload, tipoComprobante, numeroComprobante)
         <cbc:Description>${desc}</cbc:Description>
         <cac:SellersItemIdentification>
           <cbc:ID>${codProducto}</cbc:ID>
-        </cac:SellersItemIdentification>
+        </cac:SellersItemIdentification>${commodityXml}
       </cac:Item>
       <cac:Price>
         <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(5)}</cbc:PriceAmount>
@@ -508,6 +514,7 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
     const lineExt = toNum(it.subtotal);
     const taxAmount = toNum(it.total) - lineExt;
     const desc = escXml(it.descripcion || "Item");
+    const commodityXmlNc = fragmentoCommodityClassificationXml(codigoProductoSunatParaXml(it));
     lineas.push(`
     <cac:CreditNoteLine>
       <cbc:ID>${idx}</cbc:ID>
@@ -541,7 +548,7 @@ function generarXmlUblCreditNote(payload, numeroComprobante) {
         <cbc:Description>${desc}</cbc:Description>
         <cac:SellersItemIdentification>
           <cbc:ID>${idx}</cbc:ID>
-        </cac:SellersItemIdentification>
+        </cac:SellersItemIdentification>${commodityXmlNc}
       </cac:Item>
       <cac:Price>
         <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(2)}</cbc:PriceAmount>
@@ -712,6 +719,7 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
     const lineExt = toNum(it.subtotal);
     const taxAmount = toNum(it.total) - lineExt;
     const desc = escXml(it.descripcion || "Item");
+    const commodityXmlNd = fragmentoCommodityClassificationXml(codigoProductoSunatParaXml(it));
     lineas.push(`
     <cac:DebitNoteLine>
       <cbc:ID>${idx}</cbc:ID>
@@ -745,7 +753,7 @@ function generarXmlUblDebitNote(payload, numeroComprobante) {
         <cbc:Description>${desc}</cbc:Description>
         <cac:SellersItemIdentification>
           <cbc:ID>${idx}</cbc:ID>
-        </cac:SellersItemIdentification>
+        </cac:SellersItemIdentification>${commodityXmlNd}
       </cac:Item>
       <cac:Price>
         <cbc:PriceAmount currencyID="PEN">${pUnit.toFixed(2)}</cbc:PriceAmount>

@@ -141,6 +141,14 @@ export const routes: Routes = [
       loadComponent: () => import('./components/public/legal-devoluciones/legal-devoluciones.component').then((m) => m.LegalDevolucionesComponent),
       title: 'Política de devoluciones'
     },
+    {
+      path: 'politicas/libro-reclamaciones',
+      loadComponent: () =>
+        import('./components/public/legal-libro-reclamaciones/legal-libro-reclamaciones.component').then(
+          (m) => m.LegalLibroReclamacionesComponent
+        ),
+      title: 'Libro de reclamaciones'
+    },
     { path:'login-empresa', 
         loadComponent: () => import('./components/login-empresa/login-empresa.component').then((m) => m.LoginEmpresaComponent),
         title: 'Login Empresa',
@@ -164,6 +172,15 @@ export const routes: Routes = [
         loadComponent: () => import('./components/empresa/index-empresa/index-empresa.component').then((m) => m.IndexEmpresaComponent),
         canActivate: [AuthGuard, superAdminPlataformaEmpresasGuard, empresaGestoraGuard, saasPlanModuloGuard],
         title: 'Empresas'
+     },
+     {
+        path: 'libro-reclamaciones',
+        loadComponent: () =>
+          import('./components/plataforma/index-libro-reclamaciones/index-libro-reclamaciones.component').then(
+            (m) => m.IndexLibroReclamacionesComponent
+          ),
+        canActivate: [AuthGuard, superAdminPlataformaEmpresasGuard, empresaGestoraGuard],
+        title: 'Libro de reclamaciones'
      },
      {
         path:'crear-empresa',
@@ -227,6 +244,15 @@ export const routes: Routes = [
       loadComponent: () => import('./components/productos/importar-productos-wizard/importar-productos-wizard.component').then((m) => m.ImportarProductosWizardComponent),
       canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard],
       title: 'Importar productos',
+     },
+     {
+      path: 'productos/codigos-sunat',
+      loadComponent: () =>
+        import('./components/productos/codigos-sunat-productos/codigos-sunat-productos.component').then(
+          (m) => m.CodigosSunatProductosComponent
+        ),
+      canActivate: [AuthGuard, empresaGestoraGuard, saasPlanModuloGuard, AdminGuard],
+      title: 'Códigos SUNAT productos',
      },
      {
       path: 'categorias',

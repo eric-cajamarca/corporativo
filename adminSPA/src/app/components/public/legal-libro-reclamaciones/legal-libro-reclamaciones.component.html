@@ -1,0 +1,237 @@
+<div class="legal-page">
+  <div class="container">
+    <div class="lr-badge-row">
+      <span class="lr-badge" aria-hidden="true">
+        <i class="bi bi-journal-text"></i>
+        Libro de reclamaciones
+      </span>
+    </div>
+
+    <h1>Libro de reclamaciones</h1>
+    <p class="subtitle">
+      Conforme a la Ley N.º 29571 y al DS N.º 011-2011-PCM. Plazo de respuesta: 15 días hábiles.
+    </p>
+
+    @if (proveedor(); as p) {
+      <section class="proveedor-card">
+        <h2>Identificación del proveedor</h2>
+        <p><strong>{{ p.razonSocial }}</strong></p>
+        <p>RUC: {{ p.ruc }}</p>
+        <p>{{ p.domicilio }}</p>
+        <p>{{ p.telefono }} · <a [href]="'mailto:' + p.email">{{ p.email }}</a></p>
+      </section>
+    }
+
+    <section>
+      <h2>Información importante</h2>
+      <ul>
+        <li>
+          <strong>Reclamo:</strong> disconformidad relacionada con productos o servicios adquiridos
+          (defectos, incumplimientos, etc.).
+        </li>
+        <li>
+          <strong>Queja:</strong> disconformidad no relacionada directamente con el producto o servicio
+          (atención al cliente, demoras en trámites, etc.).
+        </li>
+        <li>
+          La presentación de una hoja no impide acudir a otras vías (Indecopi u otras instancias).
+        </li>
+        <li>
+          Al registrar su hoja recibirá una constancia en su correo electrónico.
+        </li>
+      </ul>
+    </section>
+
+    @if (resultado(); as r) {
+      <section class="exito-card">
+        <h2>Hoja registrada correctamente</h2>
+        <p>Su código de constancia es:</p>
+        <p class="codigo-lr">{{ r.codigo }}</p>
+        <p>{{ r.mensaje }}</p>
+        <p class="mb-0">Revise su bandeja de entrada (y spam) para la constancia enviada por correo.</p>
+        <button type="button" class="btn btn-outline-primary mt-3" (click)="nuevaHoja()">
+          Registrar otra hoja
+        </button>
+      </section>
+    } @else {
+      <section>
+        <h2>Hoja de reclamación</h2>
+        <form [formGroup]="form" (ngSubmit)="enviar()" novalidate>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="tipo">Tipo <span class="req">*</span></label>
+              <select id="tipo" class="form-select" formControlName="tipo" [class.is-invalid]="hasError('tipo')">
+                <option value="RECLAMO">Reclamo</option>
+                <option value="QUEJA">Queja</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="bienTipo">Bien contratado <span class="req">*</span></label>
+              <select id="bienTipo" class="form-select" formControlName="bienTipo" [class.is-invalid]="hasError('bienTipo')">
+                <option value="SERVICIO">Servicio</option>
+                <option value="PRODUCTO">Producto</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="consumidorNombre">Nombre completo <span class="req">*</span></label>
+              <input
+                id="consumidorNombre"
+                type="text"
+                class="form-control"
+                formControlName="consumidorNombre"
+                [class.is-invalid]="hasError('consumidorNombre')"
+                autocomplete="name" />
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label" for="consumidorDocumentoTipo">Tipo doc. <span class="req">*</span></label>
+              <select id="consumidorDocumentoTipo" class="form-select" formControlName="consumidorDocumentoTipo">
+                <option value="DNI">DNI</option>
+                <option value="CE">Carné de extranjería</option>
+                <option value="PASAPORTE">Pasaporte</option>
+                <option value="RUC">RUC</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label" for="consumidorDocumentoNumero">N.º documento <span class="req">*</span></label>
+              <input
+                id="consumidorDocumentoNumero"
+                type="text"
+                class="form-control"
+                formControlName="consumidorDocumentoNumero"
+                [class.is-invalid]="hasError('consumidorDocumentoNumero')" />
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="consumidorDomicilio">Domicilio <span class="req">*</span></label>
+              <input
+                id="consumidorDomicilio"
+                type="text"
+                class="form-control"
+                formControlName="consumidorDomicilio"
+                [class.is-invalid]="hasError('consumidorDomicilio')"
+                autocomplete="street-address" />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="consumidorTelefono">Teléfono / celular</label>
+              <input id="consumidorTelefono" type="tel" class="form-control" formControlName="consumidorTelefono" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="consumidorEmail">Correo electrónico <span class="req">*</span></label>
+              <input
+                id="consumidorEmail"
+                type="email"
+                class="form-control"
+                formControlName="consumidorEmail"
+                [class.is-invalid]="hasError('consumidorEmail')"
+                autocomplete="email" />
+            </div>
+
+            <div class="col-12">
+              <div class="form-check">
+                <input id="esMenor" class="form-check-input" type="checkbox" formControlName="esMenor" />
+                <label class="form-check-label" for="esMenor">Soy menor de edad</label>
+              </div>
+            </div>
+
+            @if (form.controls.esMenor.value) {
+              <div class="col-12">
+                <label class="form-label" for="tutorNombre">Nombre del padre/madre o tutor <span class="req">*</span></label>
+                <input
+                  id="tutorNombre"
+                  type="text"
+                  class="form-control"
+                  formControlName="tutorNombre"
+                  [class.is-invalid]="hasError('tutorNombre')" />
+              </div>
+            }
+
+            <div class="col-md-8">
+              <label class="form-label" for="bienDescripcion">
+                Descripción del producto o servicio <span class="req">*</span>
+              </label>
+              <input
+                id="bienDescripcion"
+                type="text"
+                class="form-control"
+                formControlName="bienDescripcion"
+                [class.is-invalid]="hasError('bienDescripcion')"
+                placeholder="Ej.: Plan Profesional EFAFERP, suscripción mensual, orden CHK-..." />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="bienMonto">Monto reclamado (S/)</label>
+              <input id="bienMonto" type="number" min="0" step="0.01" class="form-control" formControlName="bienMonto" />
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="detalle">Detalle de la queja o reclamo <span class="req">*</span></label>
+              <textarea
+                id="detalle"
+                class="form-control"
+                rows="4"
+                formControlName="detalle"
+                [class.is-invalid]="hasError('detalle')"
+                placeholder="Describa los hechos con claridad..."></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="pedidoConsumidor">Pedido del consumidor</label>
+              <textarea
+                id="pedidoConsumidor"
+                class="form-control"
+                rows="2"
+                formControlName="pedidoConsumidor"
+                placeholder="Qué solución espera (reembolso, corrección, disculpas, etc.)"></textarea>
+            </div>
+
+            <!-- Honeypot anti-spam -->
+            <div class="hp-field" aria-hidden="true">
+              <label for="website">Website</label>
+              <input id="website" type="text" tabindex="-1" autocomplete="off" formControlName="website" />
+            </div>
+
+            <div class="col-12">
+              <div class="form-check">
+                <input
+                  id="aceptaVeracidad"
+                  class="form-check-input"
+                  type="checkbox"
+                  formControlName="aceptaVeracidad"
+                  [class.is-invalid]="hasError('aceptaVeracidad')" />
+                <label class="form-check-label" for="aceptaVeracidad">
+                  Declaro que la información consignada es veraz y autorizo el tratamiento de mis datos personales
+                  conforme a la
+                  <a routerLink="/politicas/privacidad" target="_blank" rel="noopener">política de privacidad</a>.
+                </label>
+              </div>
+            </div>
+          </div>
+
+          @if (errorMsg()) {
+            <div class="alert alert-danger mt-3 mb-0" role="alert">{{ errorMsg() }}</div>
+          }
+
+          <button type="submit" class="btn btn-primary mt-4" [disabled]="enviando()">
+            @if (enviando()) {
+              Registrando...
+            } @else {
+              Enviar hoja de reclamación
+            }
+          </button>
+        </form>
+      </section>
+    }
+
+    <p class="legal-note">
+      También puede revisar nuestros
+      <a routerLink="/politicas/terminos">términos</a>,
+      <a routerLink="/politicas/privacidad">privacidad</a> y
+      <a routerLink="/politicas/devoluciones">devoluciones</a>.
+    </p>
+
+    <a class="btn btn-outline-primary mt-2" routerLink="/publico">Volver al inicio</a>
+  </div>
+</div>

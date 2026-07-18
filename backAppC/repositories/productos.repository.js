@@ -869,6 +869,11 @@ exports.obtenerProductoPorIdRepo = async (pool, idProducto, idEmpresa) => {
           p.Codigo,
           p.descripcion,
           ISNULL(p.permiteDescripcionEnVenta, 0) AS permiteDescripcionEnVenta,
+          NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') AS codigoProductoSunat,
+          p.requiereCodigoSunat,
+          ISNULL(p.revisadoSunat, 0) AS revisadoSunat,
+          NULLIF(LTRIM(RTRIM(ISNULL(p.anexoSunatSugerido, ''))), '') AS anexoSunatSugerido,
+          NULLIF(LTRIM(RTRIM(ISNULL(p.codigoSunatSugerido, ''))), '') AS codigoSunatSugerido,
           p.idCategoria,
           p.idMarca,
           p.idPresentacion,
@@ -1104,8 +1109,31 @@ exports.insertarProducto = async (transaction, row) => {
     .input('estado', sql.Bit, row.estado)
     .input('tipoProducto', sql.Char(1), row.tipoProducto)
     .input('permiteDescripcionEnVenta', sql.Bit, row.permiteDescripcionEnVenta ? 1 : 0)
+    .input('codigoProductoSunat', sql.VarChar(8), row.codigoProductoSunat || null)
+    .input(
+      'requiereCodigoSunat',
+      sql.Bit,
+      row.requiereCodigoSunat === true || row.requiereCodigoSunat === 1
+        ? 1
+        : row.requiereCodigoSunat === false || row.requiereCodigoSunat === 0
+          ? 0
+          : null
+    )
+    .input('revisadoSunat', sql.Bit, row.revisadoSunat ? 1 : 0)
+    .input('anexoSunatSugerido', sql.VarChar(5), row.anexoSunatSugerido || null)
+    .input('codigoSunatSugerido', sql.VarChar(8), row.codigoSunatSugerido || null)
     .query(
-      'INSERT INTO Productos (idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion, cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas, facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta) VALUES (@idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion, @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas, @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta)'
+      `INSERT INTO Productos (
+        idProducto, idEmpresa, Codigo, idCategoria, descripcion, idMarca, idPresentacion,
+        cUnitario, fProduccion, fVencimiento, alertaMinimo, alertaMaximo, VecesVendidas,
+        facturar, idUsuario, FIngreso, estado, tipoProducto, permiteDescripcionEnVenta,
+        codigoProductoSunat, requiereCodigoSunat, revisadoSunat, anexoSunatSugerido, codigoSunatSugerido
+      ) VALUES (
+        @idProducto, @idEmpresa, @Codigo, @idCategoria, @descripcion, @idMarca, @idPresentacion,
+        @cUnitario, @fProduccion, @fVencimiento, @alertaMinimo, @alertaMaximo, @VecesVendidas,
+        @facturar, @idUsuario, @FIngreso, @estado, @tipoProducto, @permiteDescripcionEnVenta,
+        @codigoProductoSunat, @requiereCodigoSunat, @revisadoSunat, @anexoSunatSugerido, @codigoSunatSugerido
+      )`
     );
 };
 
@@ -1368,8 +1396,166 @@ exports.actualizarProductoFlexible = async (conn, detalle) => {
     request.input('permiteDescripcionEnVenta', sql.Bit, detalle.permiteDescripcionEnVenta);
     updateSql += ', permiteDescripcionEnVenta = @permiteDescripcionEnVenta';
   }
+  if (detalle.codigoProductoSunat !== undefined) {
+    request.input('codigoProductoSunat', sql.VarChar(8), detalle.codigoProductoSunat || null);
+    updateSql += ', codigoProductoSunat = @codigoProductoSunat';
+  }
+  if (detalle.requiereCodigoSunat !== undefined) {
+    request.input(
+      'requiereCodigoSunat',
+      sql.Bit,
+      detalle.requiereCodigoSunat === true || detalle.requiereCodigoSunat === 1
+        ? 1
+        : detalle.requiereCodigoSunat === false || detalle.requiereCodigoSunat === 0
+          ? 0
+          : null
+    );
+    updateSql += ', requiereCodigoSunat = @requiereCodigoSunat';
+  }
+  if (detalle.revisadoSunat !== undefined) {
+    request.input('revisadoSunat', sql.Bit, detalle.revisadoSunat ? 1 : 0);
+    updateSql += ', revisadoSunat = @revisadoSunat';
+  }
+  if (detalle.anexoSunatSugerido !== undefined) {
+    request.input('anexoSunatSugerido', sql.VarChar(5), detalle.anexoSunatSugerido || null);
+    updateSql += ', anexoSunatSugerido = @anexoSunatSugerido';
+  }
+  if (detalle.codigoSunatSugerido !== undefined) {
+    request.input('codigoSunatSugerido', sql.VarChar(8), detalle.codigoSunatSugerido || null);
+    updateSql += ', codigoSunatSugerido = @codigoSunatSugerido';
+  }
   updateSql += ' WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa';
   return request.query(updateSql);
+};
+
+/** Actualiza solo campos de cumplimiento código producto SUNAT. */
+exports.actualizarCamposCodigoSunat = async (pool, {
+  idProducto,
+  idEmpresa,
+  codigoProductoSunat,
+  requiereCodigoSunat,
+  revisadoSunat,
+  anexoSunatSugerido,
+  codigoSunatSugerido
+}) => {
+  const sets = [];
+  const req = pool
+    .request()
+    .input('idProducto', sql.UniqueIdentifier, idProducto)
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa);
+
+  if (codigoProductoSunat !== undefined) {
+    req.input('codigoProductoSunat', sql.VarChar(8), codigoProductoSunat || null);
+    sets.push('codigoProductoSunat = @codigoProductoSunat');
+  }
+  if (requiereCodigoSunat !== undefined) {
+    req.input(
+      'requiereCodigoSunat',
+      sql.Bit,
+      requiereCodigoSunat === true || requiereCodigoSunat === 1
+        ? 1
+        : requiereCodigoSunat === false || requiereCodigoSunat === 0
+          ? 0
+          : null
+    );
+    sets.push('requiereCodigoSunat = @requiereCodigoSunat');
+  }
+  if (revisadoSunat !== undefined) {
+    req.input('revisadoSunat', sql.Bit, revisadoSunat ? 1 : 0);
+    sets.push('revisadoSunat = @revisadoSunat');
+  }
+  if (anexoSunatSugerido !== undefined) {
+    req.input('anexoSunatSugerido', sql.VarChar(5), anexoSunatSugerido || null);
+    sets.push('anexoSunatSugerido = @anexoSunatSugerido');
+  }
+  if (codigoSunatSugerido !== undefined) {
+    req.input('codigoSunatSugerido', sql.VarChar(8), codigoSunatSugerido || null);
+    sets.push('codigoSunatSugerido = @codigoSunatSugerido');
+  }
+  if (!sets.length) return { rowsAffected: [0] };
+  return req.query(`
+    UPDATE Productos
+    SET ${sets.join(', ')}
+    WHERE idProducto = @idProducto AND idEmpresa = @idEmpresa
+  `);
+};
+
+/**
+ * Productos pendientes / filtro cumplimiento código SUNAT (por empresa).
+ */
+exports.listarProductosCodigoSunatPendientes = async (pool, idEmpresa, filtros = {}) => {
+  const lim = Math.min(Math.max(parseInt(filtros.limite, 10) || 100, 1), 500);
+  const req = pool
+    .request()
+    .input('idEmpresa', sql.UniqueIdentifier, idEmpresa)
+    .input('limite', sql.Int, lim);
+
+  let where = 'WHERE p.idEmpresa = @idEmpresa AND p.estado = 1';
+  const filtro = String(filtros.filtro || 'pendientes').trim().toLowerCase();
+
+  if (filtro === 'requiere_sin_codigo') {
+    where += ` AND p.requiereCodigoSunat = 1
+      AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') IS NULL`;
+  } else if (filtro === 'sugeridos') {
+    where += ` AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoSunatSugerido, ''))), '') IS NOT NULL
+      AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') IS NULL
+      AND (p.requiereCodigoSunat IS NULL OR p.requiereCodigoSunat = 1)`;
+  } else if (filtro === 'sin_revisar') {
+    where += ' AND ISNULL(p.revisadoSunat, 0) = 0';
+  } else if (filtro === 'no_aplica') {
+    where += ' AND p.requiereCodigoSunat = 0';
+  } else if (filtro === 'con_codigo') {
+    where += ` AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') IS NOT NULL`;
+  } else if (filtro === 'todos_sin_codigo') {
+    where += ` AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') IS NULL`;
+  } else {
+    // pendientes: requiere sin código OR sugerido sin código OR sin revisar con sugerencia
+    where += ` AND (
+      (p.requiereCodigoSunat = 1 AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') IS NULL)
+      OR (
+        NULLIF(LTRIM(RTRIM(ISNULL(p.codigoSunatSugerido, ''))), '') IS NOT NULL
+        AND NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') IS NULL
+        AND ISNULL(p.revisadoSunat, 0) = 0
+      )
+    )`;
+  }
+
+  if (filtros.anexo && ['25.1', '25.2', '25.3'].includes(String(filtros.anexo).trim())) {
+    req.input('anexo', sql.VarChar(5), String(filtros.anexo).trim());
+    where += ' AND p.anexoSunatSugerido = @anexo';
+  }
+  if (filtros.idCategoria != null && String(filtros.idCategoria).trim() !== '') {
+    req.input('idCategoria', sql.Int, parseInt(filtros.idCategoria, 10));
+    where += ' AND p.idCategoria = @idCategoria';
+  }
+  if (filtros.idMarca != null && String(filtros.idMarca).trim() !== '') {
+    req.input('idMarca', sql.Int, parseInt(filtros.idMarca, 10));
+    where += ' AND p.idMarca = @idMarca';
+  }
+  if (filtros.q && String(filtros.q).trim()) {
+    req.input('q', sql.VarChar(100), `%${String(filtros.q).trim()}%`);
+    where += ' AND (p.Codigo LIKE @q OR p.descripcion LIKE @q OR p.codigoProductoSunat LIKE @q)';
+  }
+
+  const r = await req.query(`
+    SELECT TOP (@limite)
+      p.idProducto,
+      p.Codigo AS codigo,
+      p.descripcion,
+      c.nombre AS categoria,
+      m.nombre AS marca,
+      NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') AS codigoProductoSunat,
+      p.requiereCodigoSunat,
+      ISNULL(p.revisadoSunat, 0) AS revisadoSunat,
+      NULLIF(LTRIM(RTRIM(ISNULL(p.anexoSunatSugerido, ''))), '') AS anexoSunatSugerido,
+      NULLIF(LTRIM(RTRIM(ISNULL(p.codigoSunatSugerido, ''))), '') AS codigoSunatSugerido
+    FROM Productos p
+    INNER JOIN Categorias c ON c.idCategoria = p.idCategoria
+    INNER JOIN Marcas m ON m.idMarca = p.idMarca
+    ${where}
+    ORDER BY p.descripcion
+  `);
+  return r.recordset || [];
 };
 
 /**

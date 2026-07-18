@@ -12,6 +12,7 @@ function esRutaPermitidaGestora(path: string): boolean {
   if (!path || path === 'home') return true;
   if (path === 'editar-empresa') return true;
   if (path === 'empresa') return true;
+  if (path === 'libro-reclamaciones') return true;
   if (path === 'analisis') return true;
   if (path.startsWith('ventas/rapida')) return false;
   if (path.startsWith('ventas')) return true;

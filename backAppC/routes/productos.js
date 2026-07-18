@@ -23,6 +23,8 @@ api.post(
 
 // Rutas CRUD productos (habitaciones antes de :id)
 api.get('/productos', auth.auth, productosController.obtener_productos_todos);
+api.get('/productos/codigo-sunat/pendientes', auth.auth, productosController.listar_productos_codigo_sunat);
+api.post('/productos/codigo-sunat/sugerir-batch', auth.auth, productosController.sugerir_productos_codigo_sunat_batch);
 api.get('/productos/buscar-venta', auth.auth, productosController.buscar_productos_venta);
 api.get('/productos/compras', auth.auth, productosController.obtener_productos_compras);
 api.get('/productos/habitaciones', auth.auth, productosController.obtener_productos_habitacion);

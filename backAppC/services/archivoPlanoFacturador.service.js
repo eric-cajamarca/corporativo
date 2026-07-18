@@ -8,6 +8,7 @@
  */
 
 const SEP = "|";
+const { codigoProductoSunatParaXml } = require("./codigoProductoSunatEmision.service");
 
 function toNum(v) {
   if (v == null || v === "") return 0;
@@ -179,12 +180,13 @@ function generarLineasDET(items, venta, tributoPrincipal) {
     const igvItem = igvPorItem[i];
     const desc = escPipe(d.descripcion) || "Item";
     const codProducto = d.codigo || String(i + 1);
+    const codSunat = codigoProductoSunatParaXml(d) || "-";
 
     const campos = [
       "NIU",                              // 1
       cant3(cantidad),                    // 2 cantidad 3 decimales
       codProducto,                        // 3
-      "-",                                // 4 código SUNAT
+      codSunat,                           // 4 código SUNAT
       desc,                               // 5
       valor5(pVenta),                     // 6 valor unitario 5 decimales
       monto2(igvItem),                    // 7 sumatoria tributos ítem

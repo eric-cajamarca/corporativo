@@ -1,0 +1,151 @@
+<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
+<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
+
+<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+  <div class="content-header">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h1 class="content-title mb-1">Libro de reclamaciones</h1>
+        <p class="content-subtitle text-muted mb-0">
+          Hojas registradas por consumidores (proveedor SaaS). Plazo legal: 15 días hábiles.
+        </p>
+      </div>
+      <a class="btn btn-outline-secondary" routerLink="/empresa">Volver a empresas</a>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-end">
+      <div>
+        <label class="form-label mb-1" for="filtroEstado">Estado</label>
+        <select id="filtroEstado" class="form-select" [(ngModel)]="filtroEstado" (change)="cargar()">
+          <option value="">Todos</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="EN_PROCESO">En proceso</option>
+          <option value="RESPONDIDO">Respondido</option>
+          <option value="CERRADO">Cerrado</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-outline-primary" (click)="cargar()">Actualizar</button>
+      <a class="btn btn-link" routerLink="/politicas/libro-reclamaciones" target="_blank" rel="noopener">
+        Ver formulario público
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      @if (loading()) {
+        <p class="text-muted mb-0">Cargando…</p>
+      } @else if (items().length === 0) {
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-journal-text fs-1 d-block mb-2"></i>
+          No hay hojas registradas con el filtro actual.
+        </div>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Consumidor</th>
+                <th>Bien / servicio</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of items(); track item.idReclamacion) {
+                <tr>
+                  <td class="fw-semibold">{{ item.codigo }}</td>
+                  <td>{{ item.fechaRegistro }}</td>
+                  <td>{{ item.tipo }}</td>
+                  <td>
+                    <div>{{ item.consumidorNombre }}</div>
+                    <small class="text-muted">{{ item.consumidorEmail }}</small>
+                  </td>
+                  <td>
+                    <div>{{ item.bienTipo }}</div>
+                    <small class="text-muted">{{ item.bienDescripcion }}</small>
+                  </td>
+                  <td>
+                    <span class="badge" [ngClass]="badgeClass(item.estado)">{{ item.estado }}</span>
+                  </td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary" (click)="abrirDetalle(item)">
+                      Ver / responder
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (seleccion(); as s) {
+    <div class="lr-modal-backdrop" (click)="cerrarDetalle()"></div>
+    <div class="lr-modal card shadow" role="dialog" aria-modal="true">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>{{ s.codigo }} — {{ s.tipo }}</strong>
+        <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarDetalle()"></button>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 small mb-3">
+          <div class="col-md-6"><strong>Consumidor:</strong> {{ s.consumidorNombre }}</div>
+          <div class="col-md-6">
+            <strong>Documento:</strong> {{ s.consumidorDocumentoTipo }} {{ s.consumidorDocumentoNumero }}
+          </div>
+          <div class="col-md-6"><strong>Email:</strong> {{ s.consumidorEmail }}</div>
+          <div class="col-md-6"><strong>Teléfono:</strong> {{ s.consumidorTelefono || '—' }}</div>
+          <div class="col-12"><strong>Domicilio:</strong> {{ s.consumidorDomicilio }}</div>
+          <div class="col-12">
+            <strong>Bien:</strong> {{ s.bienTipo }} — {{ s.bienDescripcion }}
+            @if (s.bienMonto != null) {
+              <span> (S/ {{ s.bienMonto }})</span>
+            }
+          </div>
+          <div class="col-12"><strong>Detalle:</strong> {{ s.detalle }}</div>
+          <div class="col-12"><strong>Pedido:</strong> {{ s.pedidoConsumidor || '—' }}</div>
+          <div class="col-md-6"><strong>Registro:</strong> {{ s.fechaRegistro }}</div>
+          <div class="col-md-6">
+            <strong>Estado:</strong>
+            <span class="badge" [ngClass]="badgeClass(s.estado)">{{ s.estado }}</span>
+          </div>
+        </div>
+
+        <label class="form-label" for="respuestaProveedor">Respuesta del proveedor</label>
+        <textarea
+          id="respuestaProveedor"
+          class="form-control mb-2"
+          rows="4"
+          [(ngModel)]="respuesta"
+          [disabled]="guardando()"></textarea>
+
+        <label class="form-label" for="estadoRespuesta">Estado tras responder</label>
+        <select id="estadoRespuesta" class="form-select mb-3" [(ngModel)]="estadoRespuesta" [disabled]="guardando()">
+          <option value="EN_PROCESO">En proceso</option>
+          <option value="RESPONDIDO">Respondido</option>
+          <option value="CERRADO">Cerrado</option>
+        </select>
+
+        <div class="d-flex gap-2 justify-content-end">
+          <button type="button" class="btn btn-outline-secondary" (click)="cerrarDetalle()" [disabled]="guardando()">
+            Cerrar
+          </button>
+          <button type="button" class="btn btn-primary" (click)="enviarRespuesta()" [disabled]="guardando()">
+            @if (guardando()) {
+              Guardando…
+            } @else {
+              Guardar y notificar
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</main>

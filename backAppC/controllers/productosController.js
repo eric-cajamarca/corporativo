@@ -5,7 +5,15 @@ const ProductosServices = require('../services/productos.service');
 const ProductosRepository = require('../repositories/productos.repository');
 const productosMutacionesService = require('../services/productosMutaciones.service');
 const productoHistorialService = require('../services/productoHistorial.service');
+const catalogoProductoSunatService = require('../services/catalogoProductoSunat.service');
+const productoSunatMatchService = require('../services/productoSunatMatch.service');
 const { shouldSkipRedisCache } = require('../utils/cacheSkip.util');
+
+function parseRequiereCodigoSunat(valor) {
+  if (valor === true || valor === 1 || valor === '1' || valor === 'true') return 1;
+  if (valor === false || valor === 0 || valor === '0' || valor === 'false') return 0;
+  return null;
+}
 
 const obtener_productos_todos = async (req, res) => {
   try {
@@ -269,6 +277,11 @@ const crear_producto = async (req, res) => {
     permiteDescripcionEnVenta,
     preciosPorLista,
     idEmpresaDestino,
+    codigoProductoSunat,
+    requiereCodigoSunat,
+    revisadoSunat,
+    anexoSunatSugerido,
+    codigoSunatSugerido,
   } = req.body;
 
   const idEmpresaJwt = req.user.empresa;
@@ -327,6 +340,11 @@ const crear_producto = async (req, res) => {
     tipoProducto: tipoProd,
     VecesVendidas: 0,
     permiteDescripcionEnVenta: permiteDescripcionEnVenta === true || permiteDescripcionEnVenta === 1 || permiteDescripcionEnVenta === 'true' ? 1 : 0,
+    codigoProductoSunat: null,
+    requiereCodigoSunat: parseRequiereCodigoSunat(requiereCodigoSunat),
+    revisadoSunat: revisadoSunat === true || revisadoSunat === 1 || revisadoSunat === 'true' ? 1 : 0,
+    anexoSunatSugerido: anexoSunatSugerido != null ? String(anexoSunatSugerido).trim() || null : null,
+    codigoSunatSugerido: codigoSunatSugerido != null ? String(codigoSunatSugerido).trim() || null : null,
   };
 
   const usarCorrelativo =
@@ -357,6 +375,20 @@ const crear_producto = async (req, res) => {
 
   try {
     const resultado = await withPool(async (pool) => {
+      datosProducto.codigoProductoSunat = await catalogoProductoSunatService.assertCodigoProductoSunat(pool, {
+        codigoProductoSunat,
+        requiereCodigoSunat: datosProducto.requiereCodigoSunat
+      });
+      if (!datosProducto.anexoSunatSugerido || !datosProducto.codigoSunatSugerido) {
+        const sugerencias = await productoSunatMatchService.sugerirCodigoProductoSunat(pool, {
+          descripcion: datosProducto.descripcion,
+          limite: 1
+        });
+        if (sugerencias[0]) {
+          if (!datosProducto.anexoSunatSugerido) datosProducto.anexoSunatSugerido = sugerencias[0].anexo;
+          if (!datosProducto.codigoSunatSugerido) datosProducto.codigoSunatSugerido = sugerencias[0].codigo;
+        }
+      }
       datosProducto.idUsuario = await productosMutacionesService.resolverIdUsuarioParaProducto(
         pool,
         idEmpresa,
@@ -408,7 +440,11 @@ const crear_producto = async (req, res) => {
         data: undefined
       });
     }
-    res.status(esConflictoCodigo ? 409 : 500).send({
+    const esSunat =
+      msg.includes('Código producto') ||
+      msg.includes('requiere Código') ||
+      msg.includes('listado de anexos');
+    res.status(esConflictoCodigo ? 409 : esSunat ? 400 : 500).send({
       message: msg || (esConflictoCodigo ? 'Código de producto duplicado.' : 'Error al crear los productos'),
       data: undefined,
     });
@@ -452,6 +488,11 @@ const actualizar_producto = async function (req, res) {
     estado,
     tipoProducto,
     permiteDescripcionEnVenta,
+    codigoProductoSunat,
+    requiereCodigoSunat,
+    revisadoSunat,
+    anexoSunatSugerido,
+    codigoSunatSugerido,
   } = req.body;
 
   const detalle = {
@@ -477,14 +518,39 @@ const actualizar_producto = async function (req, res) {
     idEmpresa: req.user.empresa,
   };
 
+  if (codigoProductoSunat !== undefined) detalle.codigoProductoSunat = codigoProductoSunat;
+  if (requiereCodigoSunat !== undefined) detalle.requiereCodigoSunat = parseRequiereCodigoSunat(requiereCodigoSunat);
+  if (revisadoSunat !== undefined) {
+    detalle.revisadoSunat = revisadoSunat === true || revisadoSunat === 1 || revisadoSunat === 'true' ? 1 : 0;
+  }
+  if (anexoSunatSugerido !== undefined) {
+    detalle.anexoSunatSugerido = anexoSunatSugerido != null ? String(anexoSunatSugerido).trim() || null : null;
+  }
+  if (codigoSunatSugerido !== undefined) {
+    detalle.codigoSunatSugerido = codigoSunatSugerido != null ? String(codigoSunatSugerido).trim() || null : null;
+  }
+
   try {
-    const productos = await withPool(async (pool) => productosMutacionesService.actualizarProducto(pool, detalle));
+    const productos = await withPool(async (pool) => {
+      if (codigoProductoSunat !== undefined || requiereCodigoSunat !== undefined) {
+        detalle.codigoProductoSunat = await catalogoProductoSunatService.assertCodigoProductoSunat(pool, {
+          codigoProductoSunat: detalle.codigoProductoSunat,
+          requiereCodigoSunat: detalle.requiereCodigoSunat
+        });
+      }
+      return productosMutacionesService.actualizarProducto(pool, detalle);
+    });
 
     res.status(200).send({ data: productos.rowsAffected });
   } catch (error) {
     console.error("actualizar productos error:", error);
-    res.status(500).send({
-      message: "Error al actualizar los productos",
+    const msg = error && error.message ? String(error.message) : '';
+    const esNegocio =
+      msg.includes('Código producto') ||
+      msg.includes('requiere Código') ||
+      msg.includes('listado de anexos');
+    res.status(esNegocio ? 400 : 500).send({
+      message: msg || 'Error al actualizar los productos',
       data: undefined,
     });
   }
@@ -763,6 +829,86 @@ const obtener_historial_compras_producto = async (req, res) => {
   }
 };
 
+const listar_productos_codigo_sunat = async function (req, res) {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).send({ message: 'Empresa no identificada', data: undefined });
+    }
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'superAdmin') {
+      return res.status(403).send({
+        message: 'Solo un administrador puede gestionar códigos SUNAT de productos',
+        data: undefined
+      });
+    }
+    const rows = await withPool((pool) =>
+      ProductosRepository.listarProductosCodigoSunatPendientes(pool, req.user.empresa, {
+        filtro: req.query.filtro,
+        anexo: req.query.anexo,
+        idCategoria: req.query.idCategoria,
+        idMarca: req.query.idMarca,
+        q: req.query.q,
+        limite: req.query.limite
+      })
+    );
+    const data = (rows || []).map((r) => ({
+      ...r,
+      requiereCodigoSunat:
+        r.requiereCodigoSunat === true || r.requiereCodigoSunat === 1
+          ? true
+          : r.requiereCodigoSunat === false || r.requiereCodigoSunat === 0
+            ? false
+            : null,
+      revisadoSunat: !!(r.revisadoSunat === true || r.revisadoSunat === 1)
+    }));
+    return res.status(200).send({ message: 'OK', data });
+  } catch (error) {
+    console.error('listar_productos_codigo_sunat:', error);
+    return res.status(500).send({ message: error.message || 'Error al listar', data: undefined });
+  }
+};
+
+const sugerir_productos_codigo_sunat_batch = async function (req, res) {
+  try {
+    if (!req.user || !req.user.empresa) {
+      return res.status(401).send({ message: 'Empresa no identificada', data: undefined });
+    }
+    if (req.user.rol !== 'Administrador' && req.user.rol !== 'superAdmin') {
+      return res.status(403).send({
+        message: 'Solo un administrador puede ejecutar la sugerencia masiva',
+        data: undefined
+      });
+    }
+    const limite = Math.min(parseInt(req.body?.limite, 10) || 200, 500);
+    const result = await withPool(async (pool) => {
+      const productos = await ProductosRepository.listarProductosCodigoSunatPendientes(pool, req.user.empresa, {
+        filtro: 'todos_sin_codigo',
+        limite
+      });
+      let actualizados = 0;
+      for (const p of productos) {
+        const sugerencias = await productoSunatMatchService.sugerirCodigoProductoSunat(pool, {
+          descripcion: p.descripcion,
+          categoria: p.categoria,
+          limite: 1
+        });
+        if (!sugerencias[0]) continue;
+        await ProductosRepository.actualizarCamposCodigoSunat(pool, {
+          idProducto: p.idProducto,
+          idEmpresa: req.user.empresa,
+          anexoSunatSugerido: sugerencias[0].anexo,
+          codigoSunatSugerido: sugerencias[0].codigo
+        });
+        actualizados += 1;
+      }
+      return { revisados: productos.length, actualizados };
+    });
+    return res.status(200).send({ message: 'OK', data: result });
+  } catch (error) {
+    console.error('sugerir_productos_codigo_sunat_batch:', error);
+    return res.status(500).send({ message: error.message || 'Error en sugerencia masiva', data: undefined });
+  }
+};
+
 module.exports = {
   obtener_productos_todos,
   buscar_productos_venta,
@@ -778,4 +924,6 @@ module.exports = {
   actualizar_producto,
   actualizar_estado_producto,
   eliminar_producto,
+  listar_productos_codigo_sunat,
+  sugerir_productos_codigo_sunat_batch,
 };

@@ -207,6 +207,7 @@ function construirNavegacionPorDominios(ctx) {
       visible: true,
       submenu: [
         { nombre: 'Lista de Productos', ruta: '/productos', permiso: 'VER_PRODUCTOS', visible: true },
+        { nombre: 'Códigos SUNAT', ruta: '/productos/codigos-sunat', permiso: 'EDITAR_PRODUCTOS', visible: can('EDITAR_PRODUCTOS') },
         { nombre: 'Categorías', ruta: '/categorias', permiso: 'VER_PRODUCTOS', visible: true },
         { nombre: 'Marcas', ruta: '/marcas', permiso: 'VER_PRODUCTOS', visible: true },
         { nombre: 'Precios', ruta: '/precios', permiso: 'GESTIONAR_PRECIOS', visible: can('GESTIONAR_PRECIOS') }

@@ -2,8 +2,10 @@ import { Component, OnDestroy, OnInit, Optional, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
+import { CatalogoProductoSunatItem } from '../../../models/producto.models';
 import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
 import { PresentacionService } from '../../../services/presentacion.service';
@@ -76,6 +78,8 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
   preciosPorListaModal: Array<{ idLista: number; nombre: string; precio: number }> = [];
   correlativo: { idCorrelativo?: string; numero?: number; [key: string]: unknown } = { numero: 0 };
   private codigoManual = '';
+  sugerenciasSunat: CatalogoProductoSunatItem[] = [];
+  private descSunatSub?: Subscription;
 
   // Estados
   guardando = signal<boolean>(false);
@@ -144,6 +148,7 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       clearTimeout(this.busquedaCopiarTimer);
       this.busquedaCopiarTimer = null;
     }
+    this.descSunatSub?.unsubscribe();
   }
 
   get esModoGestora(): boolean {
@@ -199,10 +204,65 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
       // Estado
       estado: [true],
       permiteDescripcionEnVenta: [false],
+      codigoProductoSunat: [''],
+      requiereCodigoSunat: [''],
+      revisadoSunat: [false],
+      anexoSunatSugerido: [''],
+      codigoSunatSugerido: [''],
 
       // Precio
       idListaPrecio: [null]
     });
+
+    this.descSunatSub = this.productoForm
+      .get('descripcion')!
+      .valueChanges.pipe(debounceTime(450), distinctUntilChanged())
+      .subscribe((desc: string) => this.buscarSugerenciasSunat(desc));
+  }
+
+  private buscarSugerenciasSunat(desc: string): void {
+    const d = String(desc || '').trim();
+    if (d.length < 3) {
+      this.sugerenciasSunat = [];
+      return;
+    }
+    const catId = this.productoForm.get('idCategoria')?.value;
+    const catNombre = this.categorias.find((c) => String(c.idCategoria) === String(catId))?.nombre || '';
+    this.productoService.sugerirCodigoProductoSunat(d, catNombre).subscribe({
+      next: (res) => {
+        this.sugerenciasSunat = Array.isArray(res?.data) ? res.data : [];
+        const top = this.sugerenciasSunat[0];
+        if (top && !this.productoForm.get('codigoProductoSunat')?.value) {
+          this.productoForm.patchValue(
+            {
+              anexoSunatSugerido: top.anexo,
+              codigoSunatSugerido: top.codigo
+            },
+            { emitEvent: false }
+          );
+        }
+      },
+      error: () => {
+        this.sugerenciasSunat = [];
+      }
+    });
+  }
+
+  aplicarSugerenciaSunat(item: CatalogoProductoSunatItem): void {
+    this.productoForm.patchValue({
+      codigoProductoSunat: item.codigo,
+      requiereCodigoSunat: '1',
+      revisadoSunat: true,
+      anexoSunatSugerido: item.anexo,
+      codigoSunatSugerido: item.codigo
+    });
+  }
+
+  etiquetaAnexoSunat(anexo?: string): string {
+    if (anexo === '25.1') return 'Regulado';
+    if (anexo === '25.2') return 'Detracción';
+    if (anexo === '25.3') return 'Percepción';
+    return anexo || '';
   }
 
   private cargarEmpresasGestionadas(): void {
@@ -484,6 +544,16 @@ export class CreateProductoComponent implements OnInit, OnDestroy {
           : null,
       preciosPorLista: Array.isArray(preciosPorLista) ? preciosPorLista : undefined,
       permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta,
+      codigoProductoSunat: v.codigoProductoSunat ? String(v.codigoProductoSunat).trim() : null,
+      requiereCodigoSunat:
+        v.requiereCodigoSunat === '1' || v.requiereCodigoSunat === true
+          ? true
+          : v.requiereCodigoSunat === '0' || v.requiereCodigoSunat === false
+            ? false
+            : null,
+      revisadoSunat: !!v.revisadoSunat,
+      anexoSunatSugerido: v.anexoSunatSugerido ? String(v.anexoSunatSugerido).trim() : null,
+      codigoSunatSugerido: v.codigoSunatSugerido ? String(v.codigoSunatSugerido).trim() : null,
       ...(this.esModoGestora && this.idEmpresaSeleccionada
         ? { idEmpresaDestino: this.idEmpresaSeleccionada }
         : {})

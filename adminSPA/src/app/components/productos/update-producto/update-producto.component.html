@@ -140,6 +140,65 @@
             <label class="form-check-label" for="permiteDescVentaEdit">Permitir cambiar la descripción al vender (ej. productos varios); no actualiza el catálogo.</label>
           </div>
         </div>
+        <div class="col-12">
+          <div class="border rounded p-3 bg-light">
+            <div class="fw-semibold mb-2">Código producto SUNAT</div>
+            @if (sugerenciasSunat.length) {
+              <div class="mb-2 small text-muted">Posibles coincidencias (elige una):</div>
+              <div class="table-responsive mb-3">
+                <table class="table table-sm table-bordered table-hover align-middle mb-0 bg-white">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Anexo</th>
+                      <th>Código</th>
+                      <th>Descripción</th>
+                      <th class="text-center">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (s of sugerenciasSunat; track s.codigo + s.anexo) {
+                      <tr [class.table-success]="productoForm.get('codigoProductoSunat')?.value === s.codigo">
+                        <td>{{ s.anexo }} · {{ etiquetaAnexoSunat(s.anexo) }}</td>
+                        <td><code>{{ s.codigo }}</code></td>
+                        <td>{{ s.descripcion }}</td>
+                        <td class="text-center">
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            [class.btn-success]="productoForm.get('codigoProductoSunat')?.value === s.codigo"
+                            [class.btn-outline-primary]="productoForm.get('codigoProductoSunat')?.value !== s.codigo"
+                            (click)="aplicarSugerenciaSunat(s)">
+                            {{ productoForm.get('codigoProductoSunat')?.value === s.codigo ? 'Elegida' : 'Elegir' }}
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label">Código SUNAT</label>
+                <input type="text" class="form-control" formControlName="codigoProductoSunat" maxlength="8" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">¿Aplica anexo?</label>
+                <select class="form-select" formControlName="requiereCodigoSunat">
+                  <option value="">Sin decidir</option>
+                  <option value="1">Sí aplica</option>
+                  <option value="0">No aplica</option>
+                </select>
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" formControlName="revisadoSunat" id="revisadoSunatEdit" />
+                  <label class="form-check-label" for="revisadoSunatEdit">Revisado</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </form>
   }

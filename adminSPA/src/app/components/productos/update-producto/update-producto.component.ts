@@ -1,12 +1,13 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoService } from '../../../services/producto.service';
 import { CategoriaService } from '../../../services/categoria.service';
 import { MarcaService } from '../../../services/marca.service';
 import { PresentacionService } from '../../../services/presentacion.service';
-import { Producto } from '../../../models/producto.models';
+import { CatalogoProductoSunatItem, Producto } from '../../../models/producto.models';
 
 declare var iziToast: any;
 
@@ -33,13 +34,15 @@ interface Presentacion {
   templateUrl: './update-producto.component.html',
   styleUrl: './update-producto.component.css'
 })
-export class UpdateProductoComponent implements OnInit {
+export class UpdateProductoComponent implements OnInit, OnDestroy {
   @Input() idProducto!: string;
 
   productoForm!: FormGroup;
   categorias: Categoria[] = [];
   marcas: Marca[] = [];
   presentaciones: Presentacion[] = [];
+  sugerenciasSunat: CatalogoProductoSunatItem[] = [];
+  private descSunatSub?: Subscription;
 
   cargando = true;
   guardando = false;
@@ -72,8 +75,56 @@ export class UpdateProductoComponent implements OnInit {
       alertaMinimo: [0, Validators.min(0)],
       alertaMaximo: [0, Validators.min(0)],
       estado: [true],
-      permiteDescripcionEnVenta: [false]
+      permiteDescripcionEnVenta: [false],
+      codigoProductoSunat: [''],
+      requiereCodigoSunat: [''],
+      revisadoSunat: [false],
+      anexoSunatSugerido: [''],
+      codigoSunatSugerido: ['']
     });
+    this.descSunatSub = this.productoForm
+      .get('descripcion')!
+      .valueChanges.pipe(debounceTime(450), distinctUntilChanged())
+      .subscribe((desc: string) => this.buscarSugerenciasSunat(desc));
+  }
+
+  ngOnDestroy(): void {
+    this.descSunatSub?.unsubscribe();
+  }
+
+  private buscarSugerenciasSunat(desc: string): void {
+    const d = String(desc || '').trim();
+    if (d.length < 3) {
+      this.sugerenciasSunat = [];
+      return;
+    }
+    const catId = this.productoForm.get('idCategoria')?.value;
+    const catNombre = this.categorias.find((c) => String(c.idCategoria) === String(catId))?.nombre || '';
+    this.productoService.sugerirCodigoProductoSunat(d, catNombre).subscribe({
+      next: (res) => {
+        this.sugerenciasSunat = Array.isArray(res?.data) ? res.data : [];
+      },
+      error: () => {
+        this.sugerenciasSunat = [];
+      }
+    });
+  }
+
+  aplicarSugerenciaSunat(item: CatalogoProductoSunatItem): void {
+    this.productoForm.patchValue({
+      codigoProductoSunat: item.codigo,
+      requiereCodigoSunat: '1',
+      revisadoSunat: true,
+      anexoSunatSugerido: item.anexo,
+      codigoSunatSugerido: item.codigo
+    });
+  }
+
+  etiquetaAnexoSunat(anexo?: string): string {
+    if (anexo === '25.1') return 'Regulado';
+    if (anexo === '25.2') return 'Detracción';
+    if (anexo === '25.3') return 'Percepción';
+    return anexo || '';
   }
 
   private cargarCatalogosYProducto(): void {
@@ -143,7 +194,13 @@ export class UpdateProductoComponent implements OnInit {
       alertaMinimo: p.alertaMinimo ?? 0,
       alertaMaximo: p.alertaMaximo ?? 0,
       estado: !!p.estado,
-      permiteDescripcionEnVenta: !!p.permiteDescripcionEnVenta
+      permiteDescripcionEnVenta: !!p.permiteDescripcionEnVenta,
+      codigoProductoSunat: p.codigoProductoSunat || '',
+      requiereCodigoSunat:
+        p.requiereCodigoSunat === true ? '1' : p.requiereCodigoSunat === false ? '0' : '',
+      revisadoSunat: !!p.revisadoSunat,
+      anexoSunatSugerido: p.anexoSunatSugerido || '',
+      codigoSunatSugerido: p.codigoSunatSugerido || ''
     });
   }
 
@@ -182,7 +239,17 @@ export class UpdateProductoComponent implements OnInit {
       alertaMaximo: Number(v.alertaMaximo),
       estado: !!v.estado,
       tipoProducto: v.tipoProducto || 'S',
-      permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta
+      permiteDescripcionEnVenta: !!v.permiteDescripcionEnVenta,
+      codigoProductoSunat: v.codigoProductoSunat ? String(v.codigoProductoSunat).trim() : null,
+      requiereCodigoSunat:
+        v.requiereCodigoSunat === '1' || v.requiereCodigoSunat === true
+          ? true
+          : v.requiereCodigoSunat === '0' || v.requiereCodigoSunat === false
+            ? false
+            : null,
+      revisadoSunat: !!v.revisadoSunat,
+      anexoSunatSugerido: v.anexoSunatSugerido ? String(v.anexoSunatSugerido).trim() : null,
+      codigoSunatSugerido: v.codigoSunatSugerido ? String(v.codigoSunatSugerido).trim() : null
     };
 
     this.productoService.actualizarProducto(this.idProducto, payload).subscribe({

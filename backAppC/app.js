@@ -17,6 +17,7 @@ const { requestMetricsMiddleware } = require('./middlewares/requestMetrics.middl
 const { querySafeMiddleware } = require('./middlewares/tenant-query');
 const { saasSuscripcionGate } = require('./middlewares/saasSuscripcionGate');
 const publicSaasRoutes = require('./routes/publicSaas');
+const libroReclamacionesRoutes = require('./routes/libroReclamaciones');
 // Importaci?n de rutas
 const detalleVentasRoutes = require('./routes/detalleventas');
 const adminRoutes = require('./routes/admin');
@@ -30,6 +31,7 @@ const clientesRoutes = require('./routes/clientes');
 const direccionClientesRoutes = require('./routes/direccionClientes');
 const documentosRoutes = require('./routes/documentos');
 const productosRoutes = require('./routes/productos');
+const catalogoProductoSunatRoutes = require('./routes/catalogoProductoSunat');
 const comprasRoutes = require('./routes/compras');
 const dcomprasRoutes = require('./routes/dcompras');
 const sucursalRoutes = require('./routes/sucursal');
@@ -234,6 +236,7 @@ app.use('/api', querySafeMiddleware); // Agrega req.querySafe
 app.use('/api', saasSuscripcionGate);
 // Rutas públicas SaaS (planes, checkout) y resto
 app.use('/api', publicSaasRoutes);
+app.use('/api', libroReclamacionesRoutes);
 app.use('/api/external', externalRoutes);
 app.use('/api/empresa', require('./routes/empresaPublic'));
 app.use('/api/activacion', require('./routes/activacionPublic')); // Solo activación por código WhatsApp
@@ -249,6 +252,7 @@ app.use('/api', clientesRoutes);
 app.use('/api', direccionClientesRoutes);
 app.use('/api', documentosRoutes);
 app.use('/api', productosRoutes);
+app.use('/api', catalogoProductoSunatRoutes);
 app.use('/api', comprasRoutes);
 app.use('/api', dcomprasRoutes);
 app.use('/api', sucursalRoutes);

@@ -1279,6 +1279,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
           ELSE p.descripcion
         END AS descripcion,
         p.codigo,
+        NULLIF(LTRIM(RTRIM(ISNULL(p.codigoProductoSunat, ''))), '') AS codigoProductoSunat,
+        p.requiereCodigoSunat,
         LTRIM(RTRIM(ISNULL(pr.descripcion, ''))) AS presentacion,
         LTRIM(RTRIM(ISNULL(pr.codigo, ''))) AS presentacionCodigo,
         LTRIM(RTRIM(ISNULL(m.nombre, ''))) AS marca
@@ -1672,6 +1674,8 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       idDetalle: d.idDetalle,
       idProducto: d.idProducto,
       codigo: d.codigo,
+      codigoProductoSunat: d.codigoProductoSunat != null ? String(d.codigoProductoSunat).trim() : null,
+      requiereCodigoSunat: d.requiereCodigoSunat === true || d.requiereCodigoSunat === 1 ? 1 : (d.requiereCodigoSunat === false || d.requiereCodigoSunat === 0 ? 0 : null),
       descripcion: d.descripcion,
       descripcionProducto: d.descripcionProducto != null ? String(d.descripcionProducto) : '',
       permiteDescripcionEnVenta: !!(d.permiteDescripcionEnVenta === true || d.permiteDescripcionEnVenta === 1),

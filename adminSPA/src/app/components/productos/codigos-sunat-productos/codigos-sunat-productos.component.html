@@ -1,0 +1,132 @@
+<div class="cs-page">
+  <div class="cs-head">
+    <div>
+      <h1>Códigos producto SUNAT</h1>
+      <p>Asigna códigos de anexos 25.1 (regulados), 25.2 (detracción) y 25.3 (percepción).</p>
+    </div>
+    <a routerLink="/productos" class="cs-link">Volver a productos</a>
+  </div>
+
+  @if (mensaje()) {
+    <div class="cs-ok">{{ mensaje() }}</div>
+  }
+  @if (error()) {
+    <div class="cs-err">{{ error() }}</div>
+  }
+
+  <div class="cs-filters">
+    <label>
+      Filtro
+      <select [(ngModel)]="filtro" (change)="cargar()">
+        <option value="pendientes">Pendientes</option>
+        <option value="sugeridos">Solo sugeridos</option>
+        <option value="requiere_sin_codigo">Requiere sin código</option>
+        <option value="sin_revisar">Sin revisar</option>
+        <option value="no_aplica">No aplica</option>
+        <option value="con_codigo">Con código</option>
+        <option value="todos_sin_codigo">Todos sin código</option>
+      </select>
+    </label>
+    <label>
+      Anexo
+      <select [(ngModel)]="anexo" (change)="cargar()">
+        <option value="">Todos</option>
+        <option value="25.1">25.1 Regulados</option>
+        <option value="25.2">25.2 Detracción</option>
+        <option value="25.3">25.3 Percepción</option>
+      </select>
+    </label>
+    <label class="cs-grow">
+      Buscar
+      <input type="text" [(ngModel)]="q" (keyup.enter)="cargar()" placeholder="Código o descripción" />
+    </label>
+    <button type="button" class="cs-btn" (click)="cargar()" [disabled]="cargando()">Buscar</button>
+    <button type="button" class="cs-btn cs-btn-alt" (click)="ejecutarSugerenciaBatch()" [disabled]="cargando()">
+      Sugerir masivo
+    </button>
+  </div>
+
+  @if (cargando()) {
+    <p>Cargando…</p>
+  } @else if (!productos.length) {
+    <p class="cs-empty">No hay productos para este filtro.</p>
+  } @else {
+    <div class="cs-table-wrap">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descripción</th>
+            <th>Categoría</th>
+            <th>Sugerido</th>
+            <th>Código SUNAT</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of productos; track p.idProducto) {
+            <tr>
+              <td>{{ p.codigo }}</td>
+              <td>{{ p.descripcion }}</td>
+              <td>{{ p.categoria }}</td>
+              <td>
+                @if (p.codigoSunatSugerido) {
+                  <span class="cs-chip">Posible {{ etiquetaAnexo(p.anexoSunatSugerido) }} · {{ p.codigoSunatSugerido }}</span>
+                } @else {
+                  —
+                }
+              </td>
+              <td>{{ p.codigoProductoSunat || '—' }}</td>
+              <td>
+                @if (p.requiereCodigoSunat === true) {
+                  Requiere
+                } @else if (p.requiereCodigoSunat === false) {
+                  No aplica
+                } @else {
+                  Sin decidir
+                }
+              </td>
+              <td class="cs-actions">
+                <button type="button" (click)="abrirAsignar(p)" [disabled]="guardandoId() === p.idProducto">Asignar</button>
+                @if (p.codigoSunatSugerido) {
+                  <button type="button" (click)="aplicarSugerido(p)" [disabled]="guardandoId() === p.idProducto">Usar sugerido</button>
+                }
+                <button type="button" (click)="marcarSiAplica(p)" [disabled]="guardandoId() === p.idProducto">Sí aplica</button>
+                <button type="button" class="cs-muted" (click)="marcarNoAplica(p)" [disabled]="guardandoId() === p.idProducto">No aplica</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
+
+@if (productoAsignando) {
+  <div class="cs-modal-backdrop" (click)="cerrarAsignar()">
+    <div class="cs-modal" (click)="$event.stopPropagation()">
+      <h2>Asignar código SUNAT</h2>
+      <p>{{ productoAsignando.descripcion }}</p>
+      <div class="cs-filters">
+        <label class="cs-grow">
+          Buscar en catálogo 25.1 / 25.2 / 25.3
+          <input type="text" [(ngModel)]="qCatalogo" (keyup.enter)="buscarCatalogo()" />
+        </label>
+        <button type="button" class="cs-btn" (click)="buscarCatalogo()">Buscar</button>
+      </div>
+      <ul class="cs-cat-list">
+        @for (c of catalogoBusqueda; track c.codigo + c.anexo) {
+          <li>
+            <button type="button" (click)="asignarCodigo(productoAsignando!, c)">
+              <strong>{{ c.codigo }}</strong>
+              <span>{{ c.etiquetaAnexo || etiquetaAnexo(c.anexo) }}</span>
+              <span>{{ c.descripcion }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+      <button type="button" class="cs-muted" (click)="cerrarAsignar()">Cerrar</button>
+    </div>
+  </div>
+}
