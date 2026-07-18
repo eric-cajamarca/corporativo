@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { esFragmentoCodigoUbicacion } = require('./direccionClientePdf.util');
+const {
+  esFragmentoCodigoUbicacion,
+  limpiarCodigosSunatAlFinal
+} = require('./direccionClientePdf.util');
 
 let mapas = null;
 
@@ -91,4 +94,56 @@ function resolverNombresUbigeo(datos = {}) {
   return { region, provincia, distrito };
 }
 
-module.exports = { resolverNombresUbigeo, cargarMapas };
+function normalizarTextoUbicacion(valor) {
+  return String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Dirección legible para PDF: calle (+ urbanización) y nombres de distrito, provincia y departamento.
+ * No incluye códigos ni ubigeos.
+ * @param {{
+ *   direccion?: string,
+ *   urbanizacion?: string,
+ *   region?: string,
+ *   provincia?: string,
+ *   distrito?: string,
+ *   ubigeo?: string
+ * }} datos
+ * @returns {string}
+ */
+function componerDireccionPdf(datos = {}) {
+  const partesCalle = [];
+  const calle = limpiarCodigosSunatAlFinal(String(datos.direccion ?? '').trim());
+  if (calle) partesCalle.push(calle);
+  const urb = String(datos.urbanizacion ?? '').trim();
+  if (urb && !esFragmentoCodigoUbicacion(urb)) {
+    const urbNorm = normalizarTextoUbicacion(urb);
+    if (!calle || !normalizarTextoUbicacion(calle).includes(urbNorm)) {
+      partesCalle.push(urb);
+    }
+  }
+  const base = partesCalle.join(', ');
+  const baseNorm = normalizarTextoUbicacion(base);
+
+  const nombres = resolverNombresUbigeo(datos);
+  // Orden habitual en comprobantes: Distrito, Provincia, Departamento (siempre en mayúsculas)
+  const ubicParts = [];
+  for (const n of [nombres.distrito, nombres.provincia, nombres.region]) {
+    if (!n) continue;
+    const nNorm = normalizarTextoUbicacion(n);
+    if (!nNorm) continue;
+    if (baseNorm && baseNorm.includes(nNorm)) continue;
+    if (ubicParts.some((p) => normalizarTextoUbicacion(p) === nNorm)) continue;
+    ubicParts.push(String(n).toLocaleUpperCase('es-PE'));
+  }
+
+  if (!base) return ubicParts.join(', ');
+  if (!ubicParts.length) return base;
+  return `${base}, ${ubicParts.join(', ')}`;
+}
+
+module.exports = { resolverNombresUbigeo, componerDireccionPdf, cargarMapas };

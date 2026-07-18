@@ -10,6 +10,7 @@ const { getCached } = require('../cache/redis.client');
 const { appendAgentDebugNdjson } = require('../utils/debugAgentLog.util');
 const { extraerDireccionClienteDesdeXmlUbl } = require('../utils/extraerDireccionClienteXmlUbl.util');
 const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
+const { componerDireccionPdf, resolverNombresUbigeo } = require('../utils/ubigeoNombres.util');
 const { ventasTieneColumnaIdDireccionClientes } = require('../utils/ventasColumnaDireccion.util');
 const {
   SQL_SELECT_USUARIO_VENTAS,
@@ -24,9 +25,61 @@ function documentoSoloDigitosPdf(valor) {
 }
 
 /**
- * PDF comprobante: solo calle (dc.direccion). distrito/provincia/region en BD suelen ser IDs/ubigeo, no nombres.
+ * PDF comprobante: calle (dc.direccion). región/provincia/distrito se resuelven a nombres al armar el payload.
  */
 const SQL_DC_LINEA_DIRECCION_READABLE = `LTRIM(RTRIM(ISNULL(dc.direccion, '')))`;
+
+const SQL_SELECT_DC_UBICACION_PDF = `
+  LTRIM(RTRIM(ISNULL(direccion, ''))) AS direccion,
+  LTRIM(RTRIM(ISNULL(urbanizacion, ''))) AS urbanizacion,
+  LTRIM(RTRIM(ISNULL(region, ''))) AS region,
+  LTRIM(RTRIM(ISNULL(provincia, ''))) AS provincia,
+  LTRIM(RTRIM(ISNULL(distrito, ''))) AS distrito,
+  LTRIM(RTRIM(ISNULL(ubigeo, ''))) AS ubigeo
+`;
+
+/**
+ * Fila de DireccionClientes con ubigeo para componer dirección PDF (nombres, no códigos).
+ */
+async function obtenerFilaDireccionClientePdf(pool, {
+  idDireccionClientes,
+  idCliente,
+  idsEmpresa
+}) {
+  const ids = (Array.isArray(idsEmpresa) ? idsEmpresa : [idsEmpresa]).filter(Boolean);
+  if (ids.length === 0) return null;
+
+  try {
+    if (idDireccionClientes != null && Number.isFinite(Number(idDireccionClientes))) {
+      const req = pool.request().input('idDir', sql.Int, Number(idDireccionClientes));
+      const inList = bindUniqueIdentifiersIn(req, ids, 'dirPdfEmp');
+      const r = await req.query(`
+        SELECT TOP 1 ${SQL_SELECT_DC_UBICACION_PDF}
+        FROM DireccionClientes
+        WHERE idDireccionClientes = @idDir AND idEmpresa IN (${inList})
+      `);
+      if (r.recordset && r.recordset[0]) return r.recordset[0];
+    }
+
+    if (idCliente != null && Number.isFinite(Number(idCliente))) {
+      const req = pool.request().input('idCliente', sql.Int, Number(idCliente));
+      const inList = bindUniqueIdentifiersIn(req, ids, 'dirPdfCli');
+      const r = await req.query(`
+        SELECT TOP 1 ${SQL_SELECT_DC_UBICACION_PDF}
+        FROM DireccionClientes
+        WHERE idCliente = @idCliente AND idEmpresa IN (${inList})
+          AND NULLIF(LTRIM(RTRIM(ISNULL(direccion, ''))), '') IS NOT NULL
+        ORDER BY
+          CASE WHEN ISNULL(principal, 0) = 1 THEN 0 ELSE 1 END,
+          idDireccionClientes ASC
+      `);
+      if (r.recordset && r.recordset[0]) return r.recordset[0];
+    }
+  } catch (err) {
+    console.error('obtenerFilaDireccionClientePdf:', err);
+  }
+  return null;
+}
 
 /**
  * Dirección en PDF de venta (solo `DireccionClientes`).
@@ -1531,16 +1584,42 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
     emp && (emp.codLocalSunat != null || emp.codlocalsunat != null)
       ? String(emp.codLocalSunat != null ? emp.codLocalSunat : emp.codlocalsunat).trim()
       : '0000';
+
+  const empUbigeoRaw = {
+    direccion: emp && emp.direccion != null ? String(emp.direccion).trim() : '',
+    urbanizacion: emp && emp.urbanizacion != null ? String(emp.urbanizacion).trim() : '',
+    region: emp && emp.region != null ? String(emp.region).trim() : '',
+    provincia: emp && emp.provincia != null ? String(emp.provincia).trim() : '',
+    distrito: emp && emp.distrito != null ? String(emp.distrito).trim() : '',
+    ubigeo: emp && emp.ubigeo != null ? String(emp.ubigeo).trim() : ''
+  };
+  const empNombresUbi = resolverNombresUbigeo(empUbigeoRaw);
+  const empresaDireccionPdf = componerDireccionPdf(empUbigeoRaw);
+
+  const filaDirClientePdf = await obtenerFilaDireccionClientePdf(pool, {
+    idDireccionClientes: cab.idDireccionClientesVenta,
+    idCliente: cab.idCliente,
+    idsEmpresa: idsPermitidos
+  });
+  const clienteDireccionPdf = componerDireccionPdf({
+    direccion: clienteDireccion || (filaDirClientePdf && filaDirClientePdf.direccion) || '',
+    urbanizacion: filaDirClientePdf ? filaDirClientePdf.urbanizacion : '',
+    region: filaDirClientePdf ? filaDirClientePdf.region : '',
+    provincia: filaDirClientePdf ? filaDirClientePdf.provincia : '',
+    distrito: filaDirClientePdf ? filaDirClientePdf.distrito : '',
+    ubigeo: filaDirClientePdf ? filaDirClientePdf.ubigeo : ''
+  });
+
   const empresaPayload = emp
     ? {
         nombre: emp.nombre,
         ruc: emp.ruc,
-        direccion: (emp.direccion != null && String(emp.direccion).trim()) ? String(emp.direccion).trim() : '',
-        ubigeo: (emp.ubigeo != null && String(emp.ubigeo).trim()) ? String(emp.ubigeo).trim() : '',
-        region: (emp.region != null && String(emp.region).trim()) ? String(emp.region).trim() : '',
-        provincia: (emp.provincia != null && String(emp.provincia).trim()) ? String(emp.provincia).trim() : '',
-        distrito: (emp.distrito != null && String(emp.distrito).trim()) ? String(emp.distrito).trim() : '',
-        urbanizacion: (emp.urbanizacion != null && String(emp.urbanizacion).trim()) ? String(emp.urbanizacion).trim() : '',
+        direccion: empresaDireccionPdf,
+        ubigeo: empUbigeoRaw.ubigeo,
+        region: empNombresUbi.region,
+        provincia: empNombresUbi.provincia,
+        distrito: empNombresUbi.distrito,
+        urbanizacion: empUbigeoRaw.urbanizacion,
         codLocalSunat: codLocalSunat || '0000',
         telefono: (emp.celular != null && String(emp.celular).trim()) ? String(emp.celular).trim() : '',
         rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
@@ -1667,7 +1746,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
       celular: (cab.clienteCelular != null && String(cab.clienteCelular).trim() !== '') ? String(cab.clienteCelular).trim() : '',
-      direccion: direccionClienteLegiblePdf(clienteDireccion),
+      direccion: clienteDireccionPdf,
       tipoDocSunat: tipoDocSunat
     },
     items: detalle.map(d => ({
@@ -3405,7 +3484,12 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
         ISNULL(e.rubro, '') AS rubro, ISNULL(e.celular, '') AS celular,
         ISNULL(e.correo, '') AS correo,
-        ISNULL(de.direccion, '') AS direccion
+        ISNULL(de.direccion, '') AS direccion,
+        ISNULL(de.ubigeo, '') AS ubigeo,
+        ISNULL(de.region, '') AS region,
+        ISNULL(de.provincia, '') AS provincia,
+        ISNULL(de.distrito, '') AS distrito,
+        ISNULL(de.urbanizacion, '') AS urbanizacion
       FROM Empresas e
       LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
       WHERE e.idEmpresa = @idEmpresa
@@ -3456,6 +3540,33 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
 
   const tipoDestLabels = { 'NV': 'Nota de Venta', '01': 'Factura', '03': 'Boleta' };
 
+  const empVaUbigeo = {
+    direccion: emp && emp.direccion != null ? String(emp.direccion).trim() : '',
+    urbanizacion: emp && emp.urbanizacion != null ? String(emp.urbanizacion).trim() : '',
+    region: emp && emp.region != null ? String(emp.region).trim() : '',
+    provincia: emp && emp.provincia != null ? String(emp.provincia).trim() : '',
+    distrito: emp && emp.distrito != null ? String(emp.distrito).trim() : '',
+    ubigeo: emp && emp.ubigeo != null ? String(emp.ubigeo).trim() : ''
+  };
+  const empresaDireccionVaPdf = componerDireccionPdf(empVaUbigeo);
+
+  const filaDirClienteVa = await obtenerFilaDireccionClientePdf(pool, {
+    idDireccionClientes: null,
+    idCliente: cab.idCliente,
+    idsEmpresa: idsArr
+  });
+  const clienteDireccionVaPdf = componerDireccionPdf({
+    direccion:
+      direccionClienteLegiblePdf((cab.clienteDireccion || '').trim()) ||
+      (filaDirClienteVa && filaDirClienteVa.direccion) ||
+      '',
+    urbanizacion: filaDirClienteVa ? filaDirClienteVa.urbanizacion : '',
+    region: filaDirClienteVa ? filaDirClienteVa.region : '',
+    provincia: filaDirClienteVa ? filaDirClienteVa.provincia : '',
+    distrito: filaDirClienteVa ? filaDirClienteVa.distrito : '',
+    ubigeo: filaDirClienteVa ? filaDirClienteVa.ubigeo : ''
+  });
+
   return {
     venta: {
       idVentaAgrupada: cab.idVentaAgrupada,
@@ -3477,7 +3588,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
     empresa: emp ? {
       nombre: emp.nombre,
       ruc: emp.ruc,
-      direccion: (emp.direccion || '').trim(),
+      direccion: empresaDireccionVaPdf,
       telefono: (emp.celular || '').trim(),
       rubro: (emp.rubro || '').trim(),
       correo: (emp.correo || '').trim(),
@@ -3489,7 +3600,7 @@ exports.obtenerComprobanteVAParaPdf = async (pool, idEmpresaCobradora, idVentaAg
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
       celular: (cab.clienteCelular || '').trim(),
-      direccion: direccionClienteLegiblePdf((cab.clienteDireccion || '').trim()),
+      direccion: clienteDireccionVaPdf,
       tipoDocSunat: (cab.clienteTipoDoc === '6' || (cab.clienteRuc && String(cab.clienteRuc).length === 11)) ? '6' : '1'
     },
     items: (itemsResult.recordset || []).map(d => ({

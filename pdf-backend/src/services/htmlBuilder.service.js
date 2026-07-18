@@ -16,7 +16,7 @@ class HtmlBuilderService {
       .replace(/'/g, '&#39;');
   }
 
-  /** PDF ventas: solo calle; sin ubigeo/códigos SUNAT al final. */
+  /** PDF ventas: limpia ubigeo/códigos SUNAT al final (la ubicación legible ya viene del backend). */
   _direccionClienteLegible(texto) {
     let s = String(texto ?? '').trim();
     if (!s) return '';

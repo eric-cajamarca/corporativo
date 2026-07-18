@@ -1,5 +1,7 @@
 // repositories/cotizaciones.repository.js
 const sql = require('mssql');
+const { componerDireccionPdf } = require('../utils/ubigeoNombres.util');
+const { direccionClienteLegiblePdf } = require('../utils/direccionClientePdf.util');
 
 /** Valida y retorna idSucursal para BD: si es UUID válido se usa; si no, null (el servicio debe proveer uno). */
 function toIdSucursalUniqueIdentifier(value) {
@@ -442,6 +444,11 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
         cl.rSocial AS clienteRazonSocial, cl.ruc AS clienteRuc, cl.idDocumento AS clienteTipoDoc,
         ISNULL(cl.celular, '') AS clienteCelular,
         (SELECT TOP 1 ISNULL(direccion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDireccion,
+        (SELECT TOP 1 ISNULL(urbanizacion, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteUrbanizacion,
+        (SELECT TOP 1 ISNULL(region, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteRegion,
+        (SELECT TOP 1 ISNULL(provincia, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteProvincia,
+        (SELECT TOP 1 ISNULL(distrito, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteDistrito,
+        (SELECT TOP 1 ISNULL(ubigeo, '') FROM DireccionClientes WHERE idCliente = cl.idCliente AND idEmpresa = cl.idEmpresa ORDER BY idDireccionClientes) AS clienteUbigeo,
         comp.nombre AS nombreComprobante, comp.codigo AS codigoComprobante
       FROM Cotizaciones c
       LEFT JOIN Comprobantes comp ON comp.idComprobante = c.idComprobante AND comp.idEmpresa = c.idEmpresa
@@ -457,7 +464,12 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
     .query(`
       SELECT e.razon_Social AS nombre, e.ruc, e.Logo AS logoArchivo,
         ISNULL(e.rubro, '') AS rubro, ISNULL(e.celular, '') AS celular, ISNULL(e.correo, '') AS correo,
-        ISNULL(de.direccion, '') AS direccion
+        ISNULL(de.direccion, '') AS direccion,
+        ISNULL(de.ubigeo, '') AS ubigeo,
+        ISNULL(de.region, '') AS region,
+        ISNULL(de.provincia, '') AS provincia,
+        ISNULL(de.distrito, '') AS distrito,
+        ISNULL(de.urbanizacion, '') AS urbanizacion
       FROM Empresas e
       LEFT JOIN DireccionEmpresa de ON e.idEmpresa = de.idEmpresa AND de.principal = 1
       WHERE e.idEmpresa = @idEmpresa
@@ -500,16 +512,39 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
 
   const emp = empresaResult.recordset && empresaResult.recordset[0] ? empresaResult.recordset[0] : null;
   let clienteDireccion = (cab.clienteDireccion != null && String(cab.clienteDireccion).trim() !== '') ? String(cab.clienteDireccion).trim() : '';
+  let clienteUrbanizacion = cab.clienteUrbanizacion != null ? String(cab.clienteUrbanizacion).trim() : '';
+  let clienteRegion = cab.clienteRegion != null ? String(cab.clienteRegion).trim() : '';
+  let clienteProvincia = cab.clienteProvincia != null ? String(cab.clienteProvincia).trim() : '';
+  let clienteDistrito = cab.clienteDistrito != null ? String(cab.clienteDistrito).trim() : '';
+  let clienteUbigeo = cab.clienteUbigeo != null ? String(cab.clienteUbigeo).trim() : '';
   const idEmpresaDirCliente =
     cab.clienteIdEmpresa != null ? cab.clienteIdEmpresa : idEmpresa;
-  if (!clienteDireccion && cab.idCliente != null && idEmpresaDirCliente != null) {
+  if ((!clienteDireccion || !clienteRegion) && cab.idCliente != null && idEmpresaDirCliente != null) {
     try {
       const dirResult = await pool.request()
         .input('idCliente', sql.Int, cab.idCliente)
         .input('idEmpresa', sql.UniqueIdentifier, idEmpresaDirCliente)
-        .query('SELECT TOP 1 ISNULL(direccion, \'\') AS direccion FROM DireccionClientes WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa ORDER BY idDireccionClientes');
+        .query(`
+          SELECT TOP 1
+            ISNULL(direccion, '') AS direccion,
+            ISNULL(urbanizacion, '') AS urbanizacion,
+            ISNULL(region, '') AS region,
+            ISNULL(provincia, '') AS provincia,
+            ISNULL(distrito, '') AS distrito,
+            ISNULL(ubigeo, '') AS ubigeo
+          FROM DireccionClientes
+          WHERE idCliente = @idCliente AND idEmpresa = @idEmpresa
+          ORDER BY idDireccionClientes
+        `);
       const dirRow = dirResult.recordset && dirResult.recordset[0];
-      if (dirRow && dirRow.direccion) clienteDireccion = String(dirRow.direccion).trim();
+      if (dirRow) {
+        if (!clienteDireccion && dirRow.direccion) clienteDireccion = String(dirRow.direccion).trim();
+        if (!clienteUrbanizacion && dirRow.urbanizacion) clienteUrbanizacion = String(dirRow.urbanizacion).trim();
+        if (!clienteRegion && dirRow.region) clienteRegion = String(dirRow.region).trim();
+        if (!clienteProvincia && dirRow.provincia) clienteProvincia = String(dirRow.provincia).trim();
+        if (!clienteDistrito && dirRow.distrito) clienteDistrito = String(dirRow.distrito).trim();
+        if (!clienteUbigeo && dirRow.ubigeo) clienteUbigeo = String(dirRow.ubigeo).trim();
+      }
     } catch (_) {}
   }
 
@@ -522,10 +557,27 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
   const tipoDocCliente = cab.clienteTipoDoc != null ? String(cab.clienteTipoDoc).trim() : '';
   const tipoDocSunat = (tipoDocCliente === '6' || (cab.clienteRuc && String(cab.clienteRuc).length === 11)) ? '6' : '1';
 
+  const empresaDireccionPdf = componerDireccionPdf({
+    direccion: emp && emp.direccion != null ? String(emp.direccion).trim() : '',
+    urbanizacion: emp && emp.urbanizacion != null ? String(emp.urbanizacion).trim() : '',
+    region: emp && emp.region != null ? String(emp.region).trim() : '',
+    provincia: emp && emp.provincia != null ? String(emp.provincia).trim() : '',
+    distrito: emp && emp.distrito != null ? String(emp.distrito).trim() : '',
+    ubigeo: emp && emp.ubigeo != null ? String(emp.ubigeo).trim() : ''
+  });
+  const clienteDireccionPdf = componerDireccionPdf({
+    direccion: direccionClienteLegiblePdf(clienteDireccion),
+    urbanizacion: clienteUrbanizacion,
+    region: clienteRegion,
+    provincia: clienteProvincia,
+    distrito: clienteDistrito,
+    ubigeo: clienteUbigeo
+  });
+
   const empresaPayload = emp ? {
     nombre: emp.nombre,
     ruc: emp.ruc,
-    direccion: (emp.direccion != null && String(emp.direccion).trim()) ? String(emp.direccion).trim() : '',
+    direccion: empresaDireccionPdf,
     telefono: (emp.celular != null && String(emp.celular).trim()) ? String(emp.celular).trim() : '',
     rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
     correo: (emp.correo != null && String(emp.correo).trim()) ? String(emp.correo).trim() : '',
@@ -566,7 +618,7 @@ exports.obtenerParaPdf = async (pool, idCotizacion, idEmpresa, baseUrl = 'http:/
       razonSocial: cab.clienteRazonSocial,
       ruc: cab.clienteRuc,
       celular: (cab.clienteCelular != null && String(cab.clienteCelular).trim() !== '') ? String(cab.clienteCelular).trim() : '',
-      direccion: clienteDireccion,
+      direccion: clienteDireccionPdf,
       tipoDocSunat: tipoDocSunat
     },
     items: detalle
