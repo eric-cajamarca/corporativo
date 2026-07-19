@@ -62,6 +62,18 @@ async function actualizarEstadoPago(pool, orderNumber, estado, idTransaccionPasa
     `);
 }
 
+async function actualizarEmailContacto(pool, orderNumber, emailContacto) {
+  await pool
+    .request()
+    .input('orderNumber', sql.VarChar(120), orderNumber)
+    .input('emailContacto', sql.VarChar(200), emailContacto || null)
+    .query(`
+      UPDATE SuscripcionCheckoutPendiente
+      SET emailContacto = @emailContacto
+      WHERE orderNumber = @orderNumber
+    `);
+}
+
 async function vincularEmpresaCliente(pool, orderNumber, idEmpresaCliente) {
   await pool
     .request()
@@ -178,6 +190,7 @@ module.exports = {
   insertar,
   obtenerPorOrderNumber,
   actualizarEstadoPago,
+  actualizarEmailContacto,
   vincularEmpresaCliente,
   listarPorEmpresaOCheckoutOrigen,
   listarConciliacionCulqi

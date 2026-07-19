@@ -8,8 +8,6 @@ import { ChoferesService } from '../../../services/choferes.service';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { CajaOperacionContextService } from '../../../services/caja-operacion-context.service';
 
@@ -37,7 +35,7 @@ export interface EnvioProgramado {
 
 @Component({
   selector: 'app-index-envios',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './index-envios.component.html',
   styleUrl: './index-envios.component.css'
 })

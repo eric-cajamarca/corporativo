@@ -2,8 +2,6 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { IndexVentasComponent } from '../index-ventas/index-ventas.component';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
@@ -40,8 +38,6 @@ export interface ProductoParaConsumo {
     CommonModule,
     RouterModule,
     FormsModule,
-    SidebarComponent,
-    TopnavComponent,
     IndexVentasComponent,
     IndexClientesComponent,
     CreateClientesComponent

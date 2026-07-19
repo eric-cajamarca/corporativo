@@ -3,13 +3,12 @@ import { RolService } from '../../../services/rol.service';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 
 
 @Component({
   selector: 'app-index-rol',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, NgbPagination],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-rol.component.html',
   styleUrl: './index-rol.component.css'
 })

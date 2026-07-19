@@ -2,8 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { WhatsappBotService } from '../../../services/whatsapp-bot.service';
 import {
@@ -17,7 +15,7 @@ import {
 @Component({
   selector: 'app-whatsapp-bot',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule],
   templateUrl: './whatsapp-bot.component.html',
   styleUrl: './whatsapp-bot.component.css'
 })

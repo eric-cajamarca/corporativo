@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="content-header">
       <h1 class="content-title">Emisión de notas</h1>
@@ -278,7 +275,7 @@
 
 
   </div>
-</main>
+</div>
 
 <!-- Modal PDF / WhatsApp para nota seleccionada -->
 <div class="modal fade" id="pdfNotaModal" tabindex="-1" aria-labelledby="pdfNotaModalLabel" aria-hidden="true">

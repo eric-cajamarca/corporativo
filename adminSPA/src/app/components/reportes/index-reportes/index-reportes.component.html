@@ -1,13 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-
-  <!-- Contenido principal -->
-  
-  <main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
     <!-- Header del contenido -->
     <div class="content-header">
       <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3 reportes-header-row">
@@ -248,4 +239,4 @@
         </div>
       </div>
     </div>
-  </main>
+  </div>

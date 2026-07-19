@@ -6,8 +6,6 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { GestoresService, EmpresaGestionada, GestorInfo, BusquedaEmpresaResult, ConfiguracionEmpresa } from '../../../services/gestores.service';
 import { EmpresaFactilizaService, EmpresasServiciosData } from '../../../services/empresa-factiliza.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 
 declare var iziToast: any;
@@ -16,7 +14,7 @@ declare var bootstrap: any;
 @Component({
   selector: 'app-index-empresa',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent, NgbPagination],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-empresa.component.html',
   styleUrl: './index-empresa.component.css'
 })
@@ -546,8 +544,7 @@ export class IndexEmpresaComponent implements OnInit {
       { clave: 'IGV_PORCENTAJE', valor: '18', descripcion: 'Porcentaje de IGV', tipoDato: 'NUMBER' },
       { clave: 'DIAS_CREDITO_DEFECTO', valor: '30', descripcion: 'Días de crédito por defecto', tipoDato: 'NUMBER' },
       { clave: 'MOSTRAR_STOCK_AGOTADO', valor: 'true', descripcion: 'Mostrar productos sin stock', tipoDato: 'BOOLEAN' },
-      { clave: 'ALERTA_STOCK_MINIMO', valor: '10', descripcion: 'Cantidad mínima para alerta de stock', tipoDato: 'NUMBER' },
-    ];
+      { clave: 'ALERTA_STOCK_MINIMO', valor: '10', descripcion: 'Cantidad mínima para alerta de stock', tipoDato: 'NUMBER' }];
 
     configuracionesDefecto.forEach(defecto => {
       if (!this.configuraciones.find(c => c.clave === defecto.clave)) {

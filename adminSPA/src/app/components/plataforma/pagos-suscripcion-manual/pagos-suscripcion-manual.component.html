@@ -1,0 +1,109 @@
+<div class="page-body">
+  <div class="content-header mb-3">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="content-title mb-1">Pagos manuales de suscripción</h1>
+        <p class="content-subtitle text-muted mb-0">
+          Valide vouchers recibidos por WhatsApp <strong>993289440</strong> (Yape, Plin o depósito BCP) y habilite el plan.
+        </p>
+      </div>
+      <a class="btn btn-outline-secondary" routerLink="/empresa">Volver a empresas</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-4">
+          <label class="form-label small mb-1" for="filtroEstado">Estado</label>
+          <select id="filtroEstado" class="form-select form-select-sm" [(ngModel)]="filtroEstado" name="filtroEstado">
+            <option value="PENDIENTE_VALIDACION">Pendiente de validación</option>
+            <option value="PENDIENTE">Pendiente (sin reportar)</option>
+            <option value="PAGADO">Pagado</option>
+            <option value="FALLIDO">Fallido</option>
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <button type="button" class="btn btn-primary btn-sm" (click)="cargar()" [disabled]="loading()">
+            Actualizar
+          </button>
+        </div>
+      </div>
+
+      @if (loading()) {
+        <p class="text-muted mb-0">Cargando…</p>
+      } @else if (items().length === 0) {
+        <p class="text-muted mb-0">No hay órdenes con el filtro seleccionado.</p>
+      } @else {
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Plan</th>
+                <th>Ciclo</th>
+                <th>Monto</th>
+                <th>Estado</th>
+                <th>Medio / ref.</th>
+                <th>Correo</th>
+                <th>Empresa</th>
+                <th>Creado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of items(); track row.orderNumber) {
+                <tr>
+                  <td><code class="small user-select-all">{{ row.orderNumber }}</code></td>
+                  <td>{{ row.planCode }}</td>
+                  <td>{{ etiquetaCiclo(row.billingCycle) }}</td>
+                  <td>S/ {{ row.monto | number : '1.2-2' }}</td>
+                  <td>
+                    <span
+                      class="badge"
+                      [class.text-bg-warning]="row.estado === 'PENDIENTE_VALIDACION' || row.estado === 'PENDIENTE'"
+                      [class.text-bg-success]="row.estado === 'PAGADO'"
+                      [class.text-bg-danger]="row.estado === 'FALLIDO'"
+                      [class.text-bg-secondary]="
+                        row.estado !== 'PENDIENTE_VALIDACION' &&
+                        row.estado !== 'PENDIENTE' &&
+                        row.estado !== 'PAGADO' &&
+                        row.estado !== 'FALLIDO'
+                      ">
+                      {{ row.estado }}
+                    </span>
+                  </td>
+                  <td class="small">{{ row.idTransaccionPasarela || '—' }}</td>
+                  <td class="small">{{ row.emailContacto || '—' }}</td>
+                  <td class="small">
+                    @if (row.razonSocialCliente) {
+                      {{ row.razonSocialCliente }}
+                      @if (row.rucCliente) {
+                        <span class="text-muted">({{ row.rucCliente }})</span>
+                      }
+                    } @else {
+                      <span class="text-muted">Sin vincular</span>
+                    }
+                  </td>
+                  <td class="small text-nowrap">{{ row.fCreacion }}</td>
+                  <td class="text-end">
+                    @if (row.estado === 'PENDIENTE_VALIDACION' || row.estado === 'PENDIENTE') {
+                      <button
+                        type="button"
+                        class="btn btn-success btn-sm"
+                        [disabled]="confirmando() === row.orderNumber"
+                        (click)="confirmar(row)">
+                        {{ confirmando() === row.orderNumber ? '…' : 'Marcar pagado' }}
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+</div>

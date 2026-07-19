@@ -48,7 +48,8 @@ exports.emitirSesion = async (pool, datosUsuario, res, req) => {
     userAgentCrear: userAgent ? String(userAgent).slice(0, 400) : null
   });
 
-  const accessToken = jwtHelper.createToken(datosUsuario);
+  // sid en el JWT: valida SesionRefreshToken sin depender solo de la cookie refreshToken
+  const accessToken = jwtHelper.createToken({ ...datosUsuario, idRefresh });
   const accessMs = jwtHelper.getAccessTokenMaxAgeMs();
 
   res.cookie('token', accessToken, cookieOpts(accessMs));

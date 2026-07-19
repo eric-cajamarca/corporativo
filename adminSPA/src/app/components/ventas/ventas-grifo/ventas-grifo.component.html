@@ -1,8 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav> 
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <header class="grifo-header">
     <div class="grifo-header-inner">
       <div class="grifo-header-brand">
@@ -118,7 +114,7 @@
       </div>
     </section>
   </div>
-</main>
+</div>
 
 <!-- Modal nuevo tanque -->
 @if (showModalNuevoTanque()) {

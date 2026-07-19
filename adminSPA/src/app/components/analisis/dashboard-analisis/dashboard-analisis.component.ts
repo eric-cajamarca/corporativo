@@ -18,8 +18,6 @@ import {
   FlujoCajaSerieMensual
 } from '../../../interfaces/analisis-interface';
 import { formatFechaLocal } from '../../../utils/fecha-local.util';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 
 @Component({

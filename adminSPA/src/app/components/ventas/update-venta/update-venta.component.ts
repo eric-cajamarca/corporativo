@@ -4,9 +4,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import {
   VentasService,
   ComprobantePdfData,
@@ -54,7 +52,7 @@ interface DetalleEdicion {
 @Component({
   selector: 'app-update-venta',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './update-venta.component.html',
   styleUrl: './update-venta.component.css'
 })

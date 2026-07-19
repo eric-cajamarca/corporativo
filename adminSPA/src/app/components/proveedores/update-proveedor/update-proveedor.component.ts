@@ -6,7 +6,6 @@ import { DocumentoService } from '../../../services/documento.service';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { FactilizaService } from '../../../services/factiliza.service';
 
 declare var iziToast: any;
@@ -14,7 +13,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-update-proveedor',
   standalone: true,
-  imports: [FormsModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, CommonModule],
   templateUrl: './update-proveedor.component.html',
   styleUrl: './update-proveedor.component.css'
 })

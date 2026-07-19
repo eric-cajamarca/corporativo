@@ -1,11 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
@@ -581,4 +574,4 @@
     <!-- <ngb-pagination *ngIf="productos.length >= 1" [(page)]="page" ...
     </ngb-pagination> -->
   </div>
-</main>
+</div>

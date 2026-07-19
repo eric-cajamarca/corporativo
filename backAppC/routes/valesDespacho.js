@@ -4,7 +4,7 @@ const auth = require('../middlewares/autenticate');
 const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const valesDespachoController = require('../controllers/valesDespachoController');
 
-api.use(auth.auth);
+api.use('/vales-despacho', auth.auth);
 
 api.get('/vales-despacho', valesDespachoController.listar);
 api.get('/vales-despacho/:id', valesDespachoController.obtenerPorId);

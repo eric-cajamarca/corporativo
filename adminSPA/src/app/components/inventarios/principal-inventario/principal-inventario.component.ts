@@ -3,8 +3,6 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { LotesService } from '../../../services/lotes.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
@@ -12,7 +10,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-principal-inventario',
   standalone: true,
-  imports: [CommonModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './principal-inventario.component.html',
   styleUrls: ['./principal-inventario.component.css']
 })

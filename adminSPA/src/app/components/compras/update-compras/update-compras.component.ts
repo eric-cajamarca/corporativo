@@ -11,8 +11,6 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { variosService } from '../../../services/varios.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -27,7 +25,7 @@ declare var bootstrap: any;
 @Component({
   selector: 'app-update-compras',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './update-compras.component.html',
   styleUrl: './update-compras.component.css'
 })

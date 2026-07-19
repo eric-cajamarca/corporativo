@@ -4,9 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { RolService } from '../../../services/rol.service';
 import { PermisosService } from '../../../services/permisos.service';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { CommonModule } from '@angular/common';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast:any;
@@ -15,7 +13,7 @@ declare var $:any;
 @Component({
   selector: 'app-create-colaborador',
   standalone: true,
-  imports: [FormsModule, RouterModule, TopnavComponent, CommonModule, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './create-colaborador.component.html',
   styleUrl: './create-colaborador.component.css'
 })

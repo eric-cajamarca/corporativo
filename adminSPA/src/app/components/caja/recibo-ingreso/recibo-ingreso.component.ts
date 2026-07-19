@@ -7,9 +7,7 @@ import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../serv
 import { CatalogosService } from '../../../services/catalogos.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
@@ -35,7 +33,7 @@ export interface ReciboIngresoItem {
 @Component({
   selector: 'app-recibo-ingreso',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './recibo-ingreso.component.html',
   styleUrl: './recibo-ingreso.component.css'
 })

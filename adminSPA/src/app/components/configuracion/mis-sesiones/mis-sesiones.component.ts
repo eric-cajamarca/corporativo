@@ -2,8 +2,6 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AdminService, SesionDispositivoItem } from '../../../services/admin.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
@@ -11,7 +9,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-mis-sesiones',
   standalone: true,
-  imports: [CommonModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './mis-sesiones.component.html',
   styleUrl: './mis-sesiones.component.css'
 })

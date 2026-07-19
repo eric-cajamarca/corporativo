@@ -2,10 +2,8 @@ import { Component, signal, TemplateRef } from '@angular/core';
 import { SucursalService } from '../../../services/sucursal.service';
 import { FormsModule } from '@angular/forms';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
 
@@ -13,7 +11,7 @@ declare var bootstrap: any;
 
 @Component({
   selector: 'app-index-sucursal',
-  imports: [FormsModule, NgbPagination, TopnavComponent, SidebarComponent, RouterModule, CommonModule],
+  imports: [FormsModule, NgbPagination, RouterModule, CommonModule],
   templateUrl: './index-sucursal.component.html',
   styleUrl: './index-sucursal.component.css'
 })

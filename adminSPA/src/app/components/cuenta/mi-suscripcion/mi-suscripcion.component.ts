@@ -2,8 +2,6 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { SaasSubscriptionService } from '../../../services/saas-subscription.service';
 import { LimitesUsoSuscripcion, MiEstadoSuscripcionResponse } from '../../../models/saas-subscription.model';
@@ -12,7 +10,7 @@ import { SuscripcionEmpresaRow } from '../../../models/saas-public.model';
 @Component({
   selector: 'app-mi-suscripcion',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './mi-suscripcion.component.html',
   styleUrl: './mi-suscripcion.component.css'
 })

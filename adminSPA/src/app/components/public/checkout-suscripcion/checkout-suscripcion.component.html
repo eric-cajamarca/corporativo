@@ -1,12 +1,14 @@
-<div class="checkout-page py-5 px-3">
-  <div class="container" style="max-width: 560px;">
-    <button type="button" class="btn btn-link px-0 mb-3" (click)="volverPlanes()">← Volver a planes</button>
+<div class="checkout-page py-4 py-md-5 px-3">
+  <div class="container checkout-wrap">
+    <button type="button" class="btn btn-link checkout-back px-0 mb-3" (click)="volverPlanes()">
+      ← Volver a planes
+    </button>
 
     @if (modoEnterprise()) {
       <div class="alert alert-secondary">Modo enterprise: el checkout público no está disponible.</div>
     } @else {
       @if (procesando() && !checkout()) {
-        <p class="text-muted">Preparando checkout…</p>
+        <p class="text-muted text-center py-5">Preparando checkout…</p>
       }
 
       @if (errorMsg()) {
@@ -18,69 +20,359 @@
       }
 
       @if (checkout(); as c) {
-        <div class="card shadow-sm auth-form-shell">
-          <div class="card-body">
-            <h1 class="h4 mb-3">{{ c.esDemo ? 'Activación de plan demo' : 'Pago de suscripción' }}</h1>
-            <p class="text-muted small mb-2">Plan: <strong>{{ c.planCode }}</strong> · Ciclo: <strong>{{ c.billingCycle }}</strong></p>
-            @if (c.esDemo) {
-              <p class="mb-2">Monto: <strong>Gratuito</strong> (14 días de prueba)</p>
-            } @else {
-              <p class="mb-2">Monto: <strong>S/ {{ c.montoSoles | number : '1.2-2' }}</strong> <span class="text-muted small">+ IGV</span></p>
-            }
-            <p class="small text-break">Número de orden: <code>{{ c.orderNumber }}</code></p>
-
-            <div class="form-check mb-3 mt-3">
-              <input
-                type="checkbox"
-                id="acceptLegalCheckout"
-                class="form-check-input"
-                [(ngModel)]="aceptoPoliticas"
-                [class.is-invalid]="errorLegal()"
-                (change)="errorLegal.set(false)" />
-              <label for="acceptLegalCheckout" class="form-check-label small">
-                Acepto los
-                <a routerLink="/politicas/terminos" target="_blank" rel="noopener">términos y condiciones</a>,
-                la <a routerLink="/politicas/privacidad" target="_blank" rel="noopener">política de privacidad</a>
-                y la <a routerLink="/politicas/devoluciones" target="_blank" rel="noopener">política de devoluciones</a>.
-                También puede acceder al
-                <a routerLink="/politicas/libro-reclamaciones" target="_blank" rel="noopener">libro de reclamaciones</a>.
-              </label>
-              @if (errorLegal()) {
-                <div class="invalid-feedback d-block">Debe aceptar las políticas legales para continuar.</div>
-              }
+        <div class="checkout-card">
+          <header class="checkout-hero">
+            <p class="checkout-hero-kicker mb-1">Suscripción Business Soft</p>
+            <h1 class="checkout-hero-title mb-2">
+              {{ c.esDemo ? 'Activación de plan demo' : 'Confirmar y pagar' }}
+            </h1>
+            <div class="checkout-summary">
+              <div class="checkout-summary-item">
+                <span class="label">Plan</span>
+                <strong>{{ c.planCode }}</strong>
+              </div>
+              <div class="checkout-summary-item">
+                <span class="label">Ciclo</span>
+                <strong>{{ etiquetaCiclo(c.billingCycle) }}</strong>
+              </div>
+              <div class="checkout-summary-item">
+                <span class="label">Monto</span>
+                @if (c.esDemo) {
+                  <strong>Gratis · 14 días</strong>
+                } @else {
+                  <strong>S/ {{ c.montoSoles | number : '1.2-2' }}</strong>
+                  <span class="hint">+ IGV / {{ billingCycle() === 'yearly' ? 'año' : 'mes' }}</span>
+                }
+              </div>
             </div>
+            <p class="checkout-order mb-0">
+              Orden <code>{{ c.orderNumber }}</code>
+            </p>
+          </header>
+
+          <div class="checkout-body">
+            @if (!c.esDemo && !pagoManualReportado()) {
+              <section class="checkout-section">
+                <h2 class="checkout-section-title">Facturación</h2>
+                <div class="ciclo-grid" role="radiogroup" aria-label="Ciclo de facturación">
+                  <label class="ciclo-option" [class.is-selected]="billingCycle() === 'monthly'">
+                    <input
+                      type="radio"
+                      name="billingCycleUi"
+                      [checked]="billingCycle() === 'monthly'"
+                      [disabled]="procesando()"
+                      (change)="cambiarCiclo('monthly')" />
+                    <span class="ciclo-check" aria-hidden="true"></span>
+                    <span class="ciclo-text">
+                      <strong>Mensual</strong>
+                      <small>Cobro cada mes</small>
+                    </span>
+                  </label>
+                  <label class="ciclo-option" [class.is-selected]="billingCycle() === 'yearly'">
+                    <input
+                      type="radio"
+                      name="billingCycleUi"
+                      [checked]="billingCycle() === 'yearly'"
+                      [disabled]="procesando()"
+                      (change)="cambiarCiclo('yearly')" />
+                    <span class="ciclo-check" aria-hidden="true"></span>
+                    <span class="ciclo-text">
+                      <strong>Anual</strong>
+                      <small>Un pago por año</small>
+                    </span>
+                  </label>
+                </div>
+                <p class="checkout-hint">Al cambiar el ciclo se genera un nuevo número de orden.</p>
+              </section>
+            }
+
+            <section class="checkout-section">
+              <div class="form-check legal-check">
+                <input
+                  type="checkbox"
+                  id="acceptLegalCheckout"
+                  class="form-check-input"
+                  [(ngModel)]="aceptoPoliticas"
+                  [class.is-invalid]="errorLegal()"
+                  (change)="errorLegal.set(false)" />
+                <label for="acceptLegalCheckout" class="form-check-label">
+                  Acepto los
+                  <a routerLink="/politicas/terminos" target="_blank" rel="noopener">términos</a>,
+                  la <a routerLink="/politicas/privacidad" target="_blank" rel="noopener">privacidad</a>
+                  y las <a routerLink="/politicas/devoluciones" target="_blank" rel="noopener">devoluciones</a>.
+                  También el
+                  <a routerLink="/politicas/libro-reclamaciones" target="_blank" rel="noopener">libro de reclamaciones</a>.
+                </label>
+              </div>
+              @if (errorLegal()) {
+                <div class="text-danger small mt-1">Debe aceptar las políticas legales para continuar.</div>
+              }
+            </section>
 
             @if (c.esDemo) {
-              <p class="small text-muted">La demo no usa Culqi. Al confirmar, podrá registrar la empresa con este número de orden.</p>
+              <p class="checkout-hint mb-3">La demo no usa pasarela. Al confirmar podrá registrar la empresa con esta orden.</p>
               <button
                 type="button"
-                class="btn btn-primary w-100 mt-2"
+                class="btn btn-checkout-primary w-100"
                 [disabled]="procesando() || !aceptoPoliticas"
                 (click)="confirmarDemo()">
                 Activar demo
               </button>
             } @else {
-              <label class="form-label mt-3">Correo del pagador</label>
-              <input type="email" class="form-control mb-2" [(ngModel)]="emailPago" placeholder="correo@empresa.com" />
+              <section class="checkout-section">
+                <label class="checkout-section-title d-block" for="emailPagoCulqi">
+                  Correo del pagador <span class="text-danger">*</span>
+                </label>
+                <input
+                  id="emailPagoCulqi"
+                  type="email"
+                  class="form-control checkout-input"
+                  [(ngModel)]="emailPago"
+                  name="emailPago"
+                  autocomplete="email"
+                  required
+                  placeholder="correo@empresa.com"
+                  [class.is-invalid]="errorEmail()"
+                  [readonly]="pagoManualReportado()"
+                  (input)="errorEmail.set(false)" />
+                @if (errorEmail()) {
+                  <div class="invalid-feedback d-block">Ingrese un correo válido.</div>
+                }
+              </section>
 
-              <p class="small text-muted mb-2">
-                Al continuar se abre el <strong>formulario seguro de Culqi</strong>. Allí ingresa los datos de la tarjeta;
-                Culqi devuelve un token a esta aplicación y el servidor registra el cargo (el número de tarjeta no pasa por nuestro backend).
-              </p>
+              <section class="checkout-section via-pago-section">
+                <h2 class="checkout-section-title">Método de pago</h2>
+                <fieldset class="medios-fieldset" [disabled]="pagoManualReportado()">
+                  <legend class="visually-hidden">Método de pago</legend>
+                  <div class="via-grid" role="radiogroup" aria-label="Método de pago">
+                    <!-- 1) Culqi primero -->
+                    <label
+                      class="via-card via-culqi"
+                      [class.is-selected]="viaPago === 'culqi'"
+                      [class.is-disabled]="!culqiDisponible()">
+                      <input
+                        type="radio"
+                        name="viaPago"
+                        value="culqi"
+                        [(ngModel)]="viaPago"
+                        [disabled]="!culqiDisponible() || pagoManualReportado()" />
+                      <span class="medio-box" aria-hidden="true">
+                        <span class="medio-tick"></span>
+                      </span>
+                      <span class="medio-body">
+                        <span class="medio-name">Culqi Checkout</span>
+                        <span class="medio-desc">
+                          @if (culqiDisponible()) {
+                            Pago con tarjeta (formulario seguro)
+                          } @else {
+                            En evaluación — no disponible por ahora
+                          }
+                        </span>
+                      </span>
+                    </label>
 
-              <button
-                type="button"
-                class="btn btn-primary w-100 mt-2"
-                [disabled]="procesando() || !c.culqiPublicKey || !aceptoPoliticas"
-                (click)="abrirCulqiCheckout()">
-                Pagar con tarjeta (Culqi Checkout)
-              </button>
-              @if (!c.culqiPublicKey) {
-                <p class="small text-warning mb-0 mt-2">Falta clave pública Culqi en la empresa principal.</p>
+                    <!-- 2) Otros medios -->
+                    <label class="via-card via-manual" [class.is-selected]="viaPago === 'manual'">
+                      <input
+                        type="radio"
+                        name="viaPago"
+                        value="manual"
+                        [(ngModel)]="viaPago"
+                        [disabled]="pagoManualReportado()" />
+                      <span class="medio-box" aria-hidden="true">
+                        <span class="medio-tick"></span>
+                      </span>
+                      <span class="medio-body">
+                        <span class="medio-name">Yape, Plin o depósito BCP</span>
+                        <span class="medio-desc">Transferencia + voucher por WhatsApp</span>
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
+              </section>
+
+              @if (viaPago === 'culqi' && !pagoManualReportado()) {
+                <section class="pago-culqi-panel">
+                  @if (culqiDisponible()) {
+                    <p class="pago-culqi-lead">
+                      Al continuar se abre el <strong>formulario seguro de Culqi</strong>.
+                      Allí ingresa los datos de la tarjeta; el número no pasa por nuestro servidor.
+                    </p>
+                    @if (!emailListo()) {
+                      <p class="pago-culqi-hint text-danger mb-2">
+                        Complete el <strong>correo del pagador</strong> arriba (Culqi lo exige).
+                      </p>
+                    }
+                    @if (!aceptoPoliticas) {
+                      <p class="pago-culqi-hint text-danger mb-2">
+                        Acepte los términos y políticas para continuar.
+                      </p>
+                    }
+                    <button
+                      type="button"
+                      class="btn btn-checkout-primary w-100"
+                      [disabled]="procesando() || !aceptoPoliticas"
+                      (click)="abrirCulqiCheckout()">
+                      Pagar con tarjeta (Culqi)
+                    </button>
+                  } @else {
+                    <p class="checkout-hint mb-0">
+                      Culqi aún no está disponible. Marque <strong>Yape, Plin o depósito BCP</strong> para pagar ahora.
+                    </p>
+                  }
+                </section>
+              }
+
+              @if (viaPago === 'manual') {
+                <section class="pago-manual">
+                  <div class="pago-manual-head">
+                    <span class="pago-manual-badge">Validación manual</span>
+                    <h2 class="pago-manual-title">Yape, Plin o depósito BCP</h2>
+                    <p class="pago-manual-lead">
+                      Elija el medio, pague y envíe el <strong>voucher</strong> al WhatsApp
+                      <strong class="wa-num">{{ c.pagoManual?.whatsappDisplay || '993289440' }}</strong>.
+                      El administrador habilitará el plan.
+                    </p>
+                  </div>
+
+                  <div class="wa-banner" role="note">
+                    <span class="wa-banner-icon" aria-hidden="true">
+                      <i class="bi bi-whatsapp"></i>
+                    </span>
+                    <div>
+                      <strong>WhatsApp 993289440</strong>
+                      <p class="mb-0">
+                        Envíe la captura o PDF del voucher con el número de orden. Allí se validará el pago.
+                      </p>
+                    </div>
+                  </div>
+
+                  @if (!pagoManualReportado()) {
+                    <fieldset class="medios-fieldset">
+                      <legend class="medios-legend">Seleccione el tipo de pago</legend>
+                      <div class="medios-grid" role="radiogroup" aria-label="Tipo de pago manual">
+                        <label class="medio-card medio-yape" [class.is-selected]="medioPagoManual === 'yape'">
+                          <input
+                            type="radio"
+                            name="medioPagoManual"
+                            value="yape"
+                            [(ngModel)]="medioPagoManual" />
+                          <span class="medio-box" aria-hidden="true">
+                            <span class="medio-tick"></span>
+                          </span>
+                          <span class="medio-body">
+                            <span class="medio-name">Yape</span>
+                            <span class="medio-desc">Al {{ c.pagoManual?.yapePlin || '993289440' }}</span>
+                          </span>
+                        </label>
+                    <!--
+                        <label class="medio-card medio-plin" [class.is-selected]="medioPagoManual === 'plin'">
+                          <input
+                            type="radio"
+                            name="medioPagoManual"
+                            value="plin"
+                            [(ngModel)]="medioPagoManual" />
+                          <span class="medio-box" aria-hidden="true">
+                            <span class="medio-tick"></span>
+                          </span>
+                          <span class="medio-body">
+                            <span class="medio-name">Plin</span>
+                            <span class="medio-desc">Al {{ c.pagoManual?.yapePlin || '993289440' }}</span>
+                          </span>
+                        </label>
+                        -->
+                        <label class="medio-card medio-bcp" [class.is-selected]="medioPagoManual === 'bcp'">
+                          <input
+                            type="radio"
+                            name="medioPagoManual"
+                            value="bcp"
+                            [(ngModel)]="medioPagoManual" />
+                          <span class="medio-box" aria-hidden="true">
+                            <span class="medio-tick"></span>
+                          </span>
+                          <span class="medio-body">
+                            <span class="medio-name">Depósito BCP</span>
+                            <span class="medio-desc">Transferencia a cuenta</span>
+                          </span>
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <div class="medio-detail">
+                      @if (medioPagoManual === 'yape' || medioPagoManual === 'plin') {
+                        <p class="mb-0">
+                          Pague con <strong>{{ medioPagoManual === 'yape' ? 'Yape' : 'Plin' }}</strong> al
+                          <strong>{{ c.pagoManual?.yapePlin || '993289440' }}</strong>
+                          por el monto de la orden y guarde el voucher.
+                        </p>
+                      } @else {
+                        <p class="mb-0">
+                          @if (c.pagoManual?.cuentas?.length) {
+                            <span class="d-block mb-1">Titular: <strong>{{ c.pagoManual?.bcp?.titular }}</strong></span>
+                            <ul class="mb-0 ps-3">
+                              @for (cta of c.pagoManual.cuentas; track cta.idCuentaBancaria) {
+                                <li class="mb-1">
+                                  <strong>{{ cta.banco }}</strong>
+                                  @if (cta.tipoCuenta) {
+                                    ({{ cta.tipoCuenta }})
+                                  }
+                                  · {{ cta.moneda }}
+                                  · <span class="user-select-all">{{ cta.cuenta }}</span>
+                                </li>
+                              }
+                            </ul>
+                          } @else if (c.pagoManual?.bcp?.cuenta) {
+                            @if (c.pagoManual?.bcp?.banco) {
+                              Banco: <strong>{{ c.pagoManual?.bcp?.banco }}</strong>.
+                            }
+                            @if (c.pagoManual?.bcp?.titular) {
+                              Titular: <strong>{{ c.pagoManual?.bcp?.titular }}</strong>.
+                            }
+                            Cuenta: <strong class="user-select-all">{{ c.pagoManual?.bcp?.cuenta }}</strong>.
+                          } @else {
+                            Aún no hay cuentas activas en <code>CuentasBancarias</code> para la empresa principal.
+                            Registre una cuenta (estado activo) o solicítela por WhatsApp con la orden
+                            <code>{{ c.orderNumber }}</code>.
+                          }
+                        </p>
+                      }
+                    </div>
+
+                    <label class="form-label small fw-semibold mt-3 mb-1" for="refPago">N° de operación (opcional)</label>
+                    <input
+                      id="refPago"
+                      type="text"
+                      class="form-control checkout-input mb-3"
+                      [(ngModel)]="referenciaPago"
+                      name="referenciaPago"
+                      maxlength="60"
+                      placeholder="Código de operación Yape, Plin o BCP" />
+
+                    <button
+                      type="button"
+                      class="btn btn-checkout-wa w-100"
+                      [disabled]="procesando() || !aceptoPoliticas || !emailListo()"
+                      (click)="reportarPagoManual()">
+                      <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>
+                      Ya pagué — registrar y abrir WhatsApp
+                    </button>
+                  } @else {
+                    <div class="pago-ok-panel">
+                      <p class="mb-2">
+                        Orden en <strong>pendiente de validación</strong>. Envíe el voucher al WhatsApp
+                        <strong>993289440</strong> con su número de orden.
+                      </p>
+                      <button type="button" class="btn btn-checkout-wa w-100" (click)="abrirWhatsAppVoucher()">
+                        <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>
+                        Enviar voucher por WhatsApp
+                      </button>
+                    </div>
+                  }
+                </section>
               }
             }
 
-            <button type="button" class="btn btn-outline-secondary w-100 mt-3" (click)="irCrearEmpresa()">
+            <button type="button" class="btn btn-link checkout-secondary-link w-100 mt-3" (click)="irCrearEmpresa()">
               Ir a crear empresa (con número de orden)
             </button>
           </div>

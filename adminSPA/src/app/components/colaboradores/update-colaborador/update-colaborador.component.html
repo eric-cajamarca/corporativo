@@ -1,10 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
     
     <div class="main-wrapper">
         <div class="card-form">
@@ -161,4 +155,4 @@
             </div>
         </div>
     </div>
-</main>
+</div>

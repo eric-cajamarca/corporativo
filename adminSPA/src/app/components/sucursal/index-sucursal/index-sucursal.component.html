@@ -1,10 +1,5 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
 <!-- Contenido principal: se desplaza según estado del sidebar -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="container bg-white my-4 py-3 rounded shadow-sm">
       <div class="card border-0">
@@ -194,4 +189,4 @@
       </div>
     </div>
   </div>
-</main>
+</div>

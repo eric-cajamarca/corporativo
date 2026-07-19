@@ -1,8 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoService } from '../../../services/producto.service';
 import { ExcelService } from '../../../services/excel.service';
@@ -19,7 +17,7 @@ type PasoWizard = 1 | 2 | 3 | 4;
 @Component({
   selector: 'app-importar-productos-wizard',
   standalone: true,
-  imports: [CommonModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './importar-productos-wizard.component.html',
   styleUrl: './importar-productos-wizard.component.css'
 })

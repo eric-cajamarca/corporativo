@@ -2,8 +2,6 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { HotelService, type ConfiguracionHotel } from '../../../services/hotel.service';
 
@@ -12,7 +10,7 @@ declare var iziToast: { success: (o: object) => void; error: (o: object) => void
 @Component({
   selector: 'app-hotel-configuracion',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './hotel-configuracion.component.html',
   styleUrl: './hotel-configuracion.component.css'
 })

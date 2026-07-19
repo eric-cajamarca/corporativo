@@ -2,8 +2,6 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { MovimientoInventarioFormBase } from './movimiento-inventario-form.base';
 import {
   CODIGOS_COMPROBANTE_SALIDA,
@@ -13,7 +11,7 @@ import {
 @Component({
   selector: 'app-salida-inventario',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterModule],
   templateUrl: './movimiento-inventario-split.component.html',
   styleUrl: './movimiento-inventario-split.component.css'
 })

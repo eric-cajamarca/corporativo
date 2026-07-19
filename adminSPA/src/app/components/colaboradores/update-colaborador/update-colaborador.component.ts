@@ -3,9 +3,7 @@ import { AdminService } from '../../../services/admin.service';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RolService } from '../../../services/rol.service';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { CommonModule } from '@angular/common';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast:any;
@@ -14,7 +12,7 @@ declare var iziToast:any;
 @Component({
   selector: 'app-update-colaborador',
   standalone: true,
-  imports: [FormsModule, RouterModule, TopnavComponent, CommonModule, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './update-colaborador.component.html',
   styleUrl: './update-colaborador.component.css'
 })

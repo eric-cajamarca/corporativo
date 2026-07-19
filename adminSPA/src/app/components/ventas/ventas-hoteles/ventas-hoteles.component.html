@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content hotel-main" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body hotel-main">
   <!-- Cabecera módulo hotelería -->
   <header class="hotel-header">
         <div class="hotel-header-inner">
@@ -1140,4 +1137,4 @@
       </div>
     </div>
   }
-</main>
+</div>

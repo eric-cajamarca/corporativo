@@ -3,8 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EnviosService } from '../../../services/envios.service';
 import { Envio } from '../../../interfaces/envios-interface';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare const iziToast: any;
@@ -14,7 +12,7 @@ type EstadoNombreEnvio = 'EN_PREPARACION' | 'EN_CAMINO' | 'ENTREGADO' | 'DEVUELT
 @Component({
   selector: 'app-mis-envios-chofer',
   standalone: true,
-  imports: [CommonModule, FormsModule,SidebarComponent,TopnavComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './mis-envios-chofer.component.html',
   styleUrl: './mis-envios-chofer.component.css'
 })

@@ -1,8 +1,4 @@
-<!-- Sidebar -->
- <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
 
   <div class="container-fluid">
     <div class="row">
@@ -622,4 +618,4 @@
     </div>
   </ng-template>
 
-</main>
+</div>

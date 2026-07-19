@@ -6,14 +6,12 @@ import { ClienteService } from '../../../services/cliente.service';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 declare var bootstrap: any;
 
 @Component({
   selector: 'app-update-clientes',
-  imports: [FormsModule,RouterModule,CommonModule,TopnavComponent],
+  imports: [FormsModule,RouterModule,CommonModule],
   templateUrl: './update-clientes.component.html',
   styleUrl: './update-clientes.component.css'
 })

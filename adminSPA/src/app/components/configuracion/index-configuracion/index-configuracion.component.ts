@@ -10,8 +10,6 @@ import { VentasService } from '../../../services/ventas.service';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Impuesto } from '../../../interfaces/impuesto.interface';
 import { GestoresService, ConfiguracionEmpresa } from '../../../services/gestores.service';
@@ -23,7 +21,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-index-configuracion',
-  imports: [FormsModule, CommonModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, CommonModule, RouterModule],
   templateUrl: './index-configuracion.component.html',
   styleUrl: './index-configuracion.component.css'
 })

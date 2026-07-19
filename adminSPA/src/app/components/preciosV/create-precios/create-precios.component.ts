@@ -7,8 +7,6 @@ import { PreciosService } from '../../../services/precios.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
 import { ProductoCreate } from '../../../models/producto.models';
@@ -48,7 +46,7 @@ export type PaginaItemPrecios = number | 'ellipsis';
 @Component({
   selector: 'app-create-precios',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
   templateUrl: './create-precios.component.html',
   styleUrls: ['./create-precios.component.css']
 

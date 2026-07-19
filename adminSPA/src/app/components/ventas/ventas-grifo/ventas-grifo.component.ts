@@ -2,8 +2,6 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { GrifoService, type TanqueGrifo, type ResumenGrifo, type ProductoCombustible } from '../../../services/grifo.service';
 import { SucursalService } from '../../../services/sucursal.service';
@@ -14,10 +12,7 @@ import { SucursalService } from '../../../services/sucursal.service';
   imports: [
     CommonModule,
     RouterModule,
-    FormsModule,
-    SidebarComponent,
-    TopnavComponent
-  ],
+    FormsModule],
   templateUrl: './ventas-grifo.component.html',
   styleUrl: './ventas-grifo.component.css'
 })

@@ -19,14 +19,12 @@ import {
   Validators,
 } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { ConsultaXMLService } from '../../../services/consulta-xml.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { saveAs } from 'file-saver';
 import { forkJoin, Observable, of, Subscription, throwError } from 'rxjs';
 import { catchError, finalize, mergeMap, switchMap, tap } from 'rxjs/operators';
 import { ProveedoresService } from '../../../services/proveedores.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
@@ -59,11 +57,8 @@ interface CuotaCompraSunatForm {
     FormsModule,
     RouterModule,
     CommonModule,
-    TopnavComponent,
-    SidebarComponent,
     ReactiveFormsModule,
-    IndexProveedorComponent,
-  ],
+    IndexProveedorComponent],
   templateUrl: './create-compras.component.html',
   styleUrl: './create-compras.component.css',
 })
@@ -2312,8 +2307,7 @@ export class CreateComprasComponent {
           numeroCuota: 1,
           fechaVencimiento: this.compras.fVencimiento,
           montoCuota: Number(this.compras.total) || 0,
-        },
-      ];
+        }];
     }
     const sum = cuotas.reduce((s, c) => s + (Number(c.montoCuota) || 0), 0);
     const tot = Number(this.compras.total) || 0;
@@ -2368,8 +2362,7 @@ export class CreateComprasComponent {
             numeroCuota: 1,
             fechaVencimiento: this.compras.fVencimiento,
             montoCuota: total,
-          },
-        ];
+          }];
       }
     }
 

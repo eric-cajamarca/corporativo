@@ -6,8 +6,6 @@ import { CajaService } from '../../../services/caja.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { Caja, MovimientoCaja, TipoMovimientoCaja } from '../../../interfaces/caja-interface';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
 
@@ -16,7 +14,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-index-caja',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './index-caja.component.html',
   styleUrl: './index-caja.component.css'
 })

@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content hotel-config-main" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="container py-3" style="max-width: 640px;">
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div>
@@ -64,4 +61,4 @@
       </div>
     }
   </div>
-</main>
+</div>

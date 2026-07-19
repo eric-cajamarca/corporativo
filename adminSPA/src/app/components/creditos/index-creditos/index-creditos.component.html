@@ -1,8 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="container-fluid">
     <div class="card shadow-sm">
       <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
@@ -114,7 +110,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <!-- Modal Nueva Cobranza de Crédito -->
 <div class="modal fade" [class.show]="mostrarModalNuevaCobranza" [style.display]="mostrarModalNuevaCobranza ? 'block' : 'none'"

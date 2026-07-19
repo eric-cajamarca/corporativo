@@ -9,6 +9,10 @@ import { DeploymentContextService } from '../../../services/deployment-context.s
 import { AuthService } from '../../../services/auth.service';
 import { CheckoutIniciado } from '../../../models/saas-public.model';
 
+type MedioPagoManual = 'yape' | 'plin' | 'bcp';
+/** Canal principal: Culqi (tarjeta) o transferencia / Yape / Plin. */
+type ViaPago = 'culqi' | 'manual';
+
 const CULQI_SCRIPT_SRC = 'https://checkout.culqi.com/js/v4';
 const CULQI_3DS_SCRIPT_SRC = 'https://3ds.culqi.com';
 /** Respaldo si el usuario pierde la URL (p. ej. corte de luz); se limpia al registrar empresa. */
@@ -35,6 +39,15 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   /** Aceptación explícita de políticas legales (demo y planes de pago). */
   aceptoPoliticas = false;
   errorLegal = signal(false);
+  /** Email inválido o vacío (requisito Culqi / pago manual). */
+  errorEmail = signal(false);
+  /** Culqi primero; el otro checkbox agrupa Yape / Plin / BCP. */
+  viaPago: ViaPago = 'culqi';
+  /** Medio elegido dentro del pago manual. */
+  medioPagoManual: MedioPagoManual = 'yape';
+  referenciaPago = '';
+  /** Tras reportar pago manual: mostrar instrucciones WhatsApp. */
+  pagoManualReportado = signal(false);
   /** Huella de dispositivo (Culqi3DS) enviada en antifraud_details al crear el cargo. */
   deviceFingerPrintId = '';
   /** Evita cargar el script dos veces. */
@@ -72,15 +85,24 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   iniciar(): void {
     this.procesando.set(true);
     this.errorMsg.set(null);
+    this.mensaje.set(null);
+    this.tokenCulqi = '';
     this.saasPublic
       .iniciarCheckout({
         planCode: this.planCode(),
         billingCycle: this.billingCycle(),
-        emailContacto: this.emailPago || undefined
+        emailContacto: (this.emailPago || '').trim() || undefined
       })
       .subscribe({
         next: (data) => {
           this.checkout.set(data);
+          this.billingCycle.set(
+            data.billingCycle === 'none' || data.billingCycle === 'yearly' || data.billingCycle === 'monthly'
+              ? data.billingCycle
+              : this.billingCycle()
+          );
+          // Culqi primero en la UI; si no hay clave, dejar seleccionado el pago manual.
+          this.viaPago = data.culqiPublicKey || data.culqiDisponible ? 'culqi' : 'manual';
           this.procesando.set(false);
           if (data.esDemo) {
             this.mensaje.set('Checkout demo listo. Confirme para obtener el número de orden y registrar su empresa.');
@@ -91,6 +113,113 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           this.errorMsg.set(err?.error?.message || 'No se pudo iniciar el pago.');
         }
       });
+  }
+
+  /** Cambia mensual/anual y recrea la orden (monto Culqi debe coincidir con el catálogo). */
+  cambiarCiclo(ciclo: 'monthly' | 'yearly'): void {
+    const c = this.checkout();
+    if (c?.esDemo || this.procesando() || this.pagoManualReportado()) return;
+    if (this.billingCycle() === ciclo) return;
+    this.billingCycle.set(ciclo);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { billing: ciclo },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
+    this.checkout.set(null);
+    this.pagoManualReportado.set(false);
+    this.iniciar();
+  }
+
+  reportarPagoManual(): void {
+    if (!this.validarAceptacionLegal()) return;
+    if (!this.validarEmailPago()) return;
+    const c = this.checkout();
+    if (!c || c.esDemo) return;
+    this.procesando.set(true);
+    this.errorMsg.set(null);
+    this.saasPublic
+      .reportarPagoManual({
+        orderNumber: c.orderNumber,
+        medioPago: this.medioPagoManual,
+        email: (this.emailPago || '').trim(),
+        referencia: (this.referenciaPago || '').trim() || undefined
+      })
+      .subscribe({
+        next: (data) => {
+          this.procesando.set(false);
+          this.pagoManualReportado.set(true);
+          if (data?.pagoManual && this.checkout()) {
+            this.checkout.set({ ...this.checkout()!, pagoManual: data.pagoManual });
+          }
+          this.mensaje.set(
+            'Orden registrada. Envíe el voucher al WhatsApp 993289440 para validar el pago y habilitar el plan.'
+          );
+          try {
+            window.localStorage.setItem(
+              LS_CHECKOUT_PENDIENTE,
+              JSON.stringify({ orderNumber: c.orderNumber, savedAt: Date.now() })
+            );
+          } catch {
+            /* ignore */
+          }
+          this.abrirWhatsAppVoucher();
+        },
+        error: (err) => {
+          this.procesando.set(false);
+          this.errorMsg.set(err?.error?.message || 'No se pudo registrar el pago manual.');
+        }
+      });
+  }
+
+  /** Abre WhatsApp con el texto del voucher / orden. */
+  abrirWhatsAppVoucher(): void {
+    const c = this.checkout();
+    if (!c) return;
+    const pm = c.pagoManual;
+    const wa = pm?.whatsappE164 || '51993289440';
+    const ciclo = this.etiquetaCiclo(c.billingCycle);
+    const medio =
+      this.medioPagoManual === 'yape' ? 'Yape' : this.medioPagoManual === 'plin' ? 'Plin' : 'Depósito BCP';
+    const texto = [
+      'Hola, envié el voucher de pago de suscripción Business Soft.',
+      `Orden: ${c.orderNumber}`,
+      `Plan: ${c.planCode}`,
+      `Ciclo: ${ciclo}`,
+      `Monto: S/ ${Number(c.montoSoles).toFixed(2)} + IGV`,
+      `Medio: ${medio}`,
+      `Correo: ${(this.emailPago || '').trim()}`,
+      this.referenciaPago.trim() ? `Referencia/N° operación: ${this.referenciaPago.trim()}` : null,
+      '',
+      'Adjunto el voucher para validación. Gracias.'
+    ]
+      .filter((x) => x !== null)
+      .join('\n');
+    const url = `https://wa.me/${wa}?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank', 'noopener');
+  }
+
+  culqiDisponible(): boolean {
+    const c = this.checkout();
+    return Boolean(c?.culqiPublicKey || c?.culqiDisponible);
+  }
+
+  etiquetaCiclo(ciclo: string | null | undefined): string {
+    if (ciclo === 'yearly' || ciclo === 'anual') return 'Anual';
+    if (ciclo === 'none') return 'Demo';
+    return 'Mensual';
+  }
+
+  /** Email con formato básico listo para Culqi (botón pagar). */
+  emailListo(): boolean {
+    return this.esEmailValido(this.emailPago);
+  }
+
+  private esEmailValido(valor: string): boolean {
+    const email = (valor || '').trim();
+    if (!email || email.length > 80) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
   confirmarDemo(): void {
@@ -119,6 +248,10 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
    */
   async abrirCulqiCheckout(): Promise<void> {
     if (!this.validarAceptacionLegal()) return;
+    if (!this.validarEmailPago()) {
+      this.enfocarCorreoPagador();
+      return;
+    }
     const c = this.checkout();
     if (!c || c.esDemo) return;
     const pk = (c.culqiPublicKey || '').trim();
@@ -129,10 +262,6 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       return;
     }
     const email = (this.emailPago || '').trim();
-    if (!email) {
-      this.errorMsg.set('Ingrese su correo electrónico antes de abrir el pago.');
-      return;
-    }
     this.errorMsg.set(null);
     try {
       await this.cargarScriptCulqi();
@@ -162,11 +291,12 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const cicloLabel = this.etiquetaCiclo(c.billingCycle);
     Culqi.publicKey = pk;
     Culqi.settings({
-      title: 'Suscripción',
+      title: 'Suscripción Business Soft',
       currency: 'PEN',
-      description: `Plan ${c.planCode} — ${c.orderNumber}`,
+      description: `Plan ${c.planCode} (${cicloLabel}) — ${c.orderNumber}`,
       amount: Math.max(0, Math.round(Number(c.montoCulqiCentimos) || 0))
     });
     Culqi.options({
@@ -266,8 +396,9 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       this.errorMsg.set('Complete el pago en el formulario de Culqi (token no recibido).');
       return;
     }
+    if (!this.validarEmailPago()) return;
     const pk = (c.culqiPublicKey || '').trim();
-    const email = (this.emailPago || 'cliente@empresa.com').trim();
+    const email = (this.emailPago || '').trim();
     const tokenId = this.tokenCulqi.trim();
     const amountCentimos = Math.max(0, Math.round(Number(c.montoCulqiCentimos) || 0));
 
@@ -472,5 +603,24 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     this.errorLegal.set(true);
     this.errorMsg.set(null);
     return false;
+  }
+
+  /** Culqi exige email válido en el cargo (sin placeholders). */
+  private validarEmailPago(): boolean {
+    if (this.esEmailValido(this.emailPago)) {
+      this.errorEmail.set(false);
+      return true;
+    }
+    this.errorEmail.set(true);
+    this.errorMsg.set('Ingrese un correo válido del pagador para continuar con Culqi.');
+    return false;
+  }
+
+  private enfocarCorreoPagador(): void {
+    queueMicrotask(() => {
+      const el = document.getElementById('emailPagoCulqi') as HTMLInputElement | null;
+      el?.focus();
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 }

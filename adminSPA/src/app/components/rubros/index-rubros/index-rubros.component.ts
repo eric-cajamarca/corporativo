@@ -2,15 +2,13 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { RubrosService, Rubro, ConfiguracionRubroItem } from '../../../services/rubros.service';
 
 @Component({
   selector: 'app-index-rubros',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './index-rubros.component.html',
   styleUrl: './index-rubros.component.css'
 })

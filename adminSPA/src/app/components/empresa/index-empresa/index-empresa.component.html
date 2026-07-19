@@ -1,11 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
@@ -15,6 +8,10 @@
         </p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-outline-success" [routerLink]="['/pagos-suscripcion']">
+          <i class="bi bi-whatsapp me-1"></i>
+          Pagos manuales
+        </button>
         <button class="btn btn-outline-warning" [routerLink]="['/libro-reclamaciones']">
           <i class="bi bi-journal-text me-1"></i>
           Libro de reclamaciones
@@ -274,7 +271,7 @@
       }
     </div>
   </div>
-</main>
+</div>
 
 <!-- Modal de Gestores y Configuración -->
 <div class="modal fade" id="modalGestores" tabindex="-1">

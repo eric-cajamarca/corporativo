@@ -10,24 +10,10 @@
     background: transparent;
   }
   
-  .main-content {
-    margin-left: 260px;
-    margin-top: 64px;
-    padding: 24px;
-    min-height: calc(100vh - 64px);
-    transition: margin-left 0.3s ease;
+  /* El margen lo pone AppShell; aquí solo centrado del formulario. */
+  .page-body--centered {
     display: flex;
     justify-content: center;
-  }
-  
-  .main-content.sidebar-collapsed {
-    margin-left: 70px;
-  }
-  
-  @media (max-width: 991.98px) {
-    .main-content {
-      margin-left: 0;
-    }
   }
   
   /* Contenedor más reducido y centrado */

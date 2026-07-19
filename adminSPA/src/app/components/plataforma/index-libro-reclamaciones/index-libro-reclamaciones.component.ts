@@ -2,8 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { LibroReclamacionesService } from '../../../services/libro-reclamaciones.service';
 import {
@@ -16,7 +14,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-index-libro-reclamaciones',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './index-libro-reclamaciones.component.html',
   styleUrl: './index-libro-reclamaciones.component.css'
 })

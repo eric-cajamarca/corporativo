@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
     <div class="content-wrap">
         <div class="container">
         <div class="card" style="margin-top: 20px;">
@@ -320,4 +317,4 @@
         </div>
         </div>
     </div>
-</main>
+</div>

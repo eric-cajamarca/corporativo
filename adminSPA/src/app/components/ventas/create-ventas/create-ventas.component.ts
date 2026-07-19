@@ -2,7 +2,6 @@ import { AfterViewInit, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewCh
 import { ProductoService } from '../../../services/producto.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CategoriaService } from '../../../services/categoria.service';
 import { SucursalService } from '../../../services/sucursal.service';
@@ -45,7 +44,6 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { AuthService } from '../../../services/auth.service';
 import { RubrosService } from '../../../services/rubros.service';
 import { CajaService } from '../../../services/caja.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FactilizaService } from '../../../services/factiliza.service';
 import { ImpuestoService } from '../../../services/impuesto.service';
@@ -95,7 +93,7 @@ interface DocumentoResponse {
 @Component({
   selector: 'app-create-ventas',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexClientesComponent, CreateClientesComponent, UpdateClientesComponent],
   templateUrl: './create-ventas.component.html',
   styleUrl: './create-ventas.component.css'
 })
@@ -1943,7 +1941,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   actualizaPrecio(item: any, el: any): void {
-    const raw = (el.target?.innerText ?? '').replace(/[^\d.,]/g, '').replace(',', '.').trim();
+    const raw = (el.target?.innerText ?? '').replace(/[^\d.]/g, '').replace(',', '.').trim();
     const nuevo = parseFloat(raw);
     if (!isNaN(nuevo) && nuevo >= 0) {
       item.pVenta = nuevo;

@@ -7,8 +7,6 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { MovimientoInventarioService } from '../../../services/movimiento-inventario.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoVendidoFila, ProductosVendidosTotales } from '../../../models/productos-vendidos.model';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
@@ -18,7 +16,7 @@ declare const iziToast: { success: (o: object) => void; error: (o: object) => vo
 @Component({
   selector: 'app-productos-vendidos',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './productos-vendidos.component.html',
   styleUrl: './productos-vendidos.component.css'
 })

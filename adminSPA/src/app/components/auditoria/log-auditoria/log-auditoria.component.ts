@@ -1,16 +1,14 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPaginationModule } from '@ng-bootstrap/ng-bootstrap';
 import { AuditoriaService, AuditoriaItem } from '../../../services/auditoria.service';
 
 @Component({
   selector: 'app-log-auditoria',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent, TopnavComponent, NgbPaginationModule],
+  imports: [CommonModule, FormsModule, NgbPaginationModule],
   templateUrl: './log-auditoria.component.html',
   styleUrl: './log-auditoria.component.css'
 })

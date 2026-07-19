@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="container-fluid">
       <div class="card shadow-sm">
@@ -195,7 +192,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <!-- Modal Formas de pago (Cobrar) -->
 <div class="modal fade" id="modalCobrarPendiente" tabindex="-1">

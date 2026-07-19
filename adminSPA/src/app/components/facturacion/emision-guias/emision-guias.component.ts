@@ -14,8 +14,6 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 
 declare const iziToast: any;
@@ -23,7 +21,7 @@ declare const iziToast: any;
 @Component({
   selector: 'app-emision-guias',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [CommonModule, RouterModule, NgbPagination],
   templateUrl: './emision-guias.component.html',
   styleUrl: './emision-guias.component.css'
 })

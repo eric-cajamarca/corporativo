@@ -10,8 +10,6 @@ import {
 } from '../../../services/movimiento-inventario.service';
 import { SucursalService } from '../../../services/sucursal.service';
 import { PdfService } from '../../../services/pdf.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 import {
@@ -25,7 +23,7 @@ declare const iziToast: { success: (o: object) => void; error: (o: object) => vo
 @Component({
   selector: 'app-lista-movimientos-inventario',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './lista-movimientos-inventario.component.html',
   styleUrl: './lista-movimientos-inventario.component.css'
 })

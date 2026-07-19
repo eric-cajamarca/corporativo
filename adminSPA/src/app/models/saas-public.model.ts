@@ -13,6 +13,31 @@ export interface PlanCatalogoItem {
   maxBotConversacionesSimultaneas?: number;
 }
 
+export interface PagoManualInfo {
+  whatsappDisplay: string;
+  whatsappE164: string;
+  yapePlin: string;
+  bcp: {
+    titular: string | null;
+    banco?: string | null;
+    cuenta: string | null;
+    cci: string | null;
+    tipoCuenta?: string | null;
+    moneda?: string | null;
+  };
+  /** Cuentas activas de la empresa principal (CuentasBancarias). */
+  cuentas?: Array<{
+    idCuentaBancaria: string;
+    banco: string | null;
+    cuenta: string | null;
+    tipoCuenta: string | null;
+    moneda: string;
+    titular: string | null;
+  }>;
+  medios: string[];
+  instruccionVoucher: string;
+}
+
 export interface CheckoutIniciado {
   orderNumber: string;
   montoSoles: number;
@@ -20,7 +45,19 @@ export interface CheckoutIniciado {
   planCode: string;
   billingCycle: string;
   culqiPublicKey: string | null;
+  culqiDisponible?: boolean;
   esDemo: boolean;
+  pagoManual?: PagoManualInfo | null;
+}
+
+export interface CheckoutPagoManualReportado {
+  orderNumber: string;
+  estado: string;
+  planCode: string;
+  billingCycle: string;
+  monto: number;
+  medioPago?: string;
+  pagoManual: PagoManualInfo;
 }
 
 export interface DeploymentConfig {

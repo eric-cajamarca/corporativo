@@ -7,8 +7,6 @@ import { EnviosService } from '../../../services/envios.service';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ChoferesService, ChoferInterno } from '../../../services/choferes.service';
 import { RegistrarChoferVehiculoModalComponent } from '../registrar-chofer-vehiculo-modal/registrar-chofer-vehiculo-modal.component';
@@ -113,7 +111,7 @@ const UUID_REGEX_VA =
 @Component({
   selector: 'app-index-despachos',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent, RegistrarChoferVehiculoModalComponent, RegistrarTransportistaModalComponent],
+  imports: [FormsModule, RouterModule, CommonModule, RegistrarChoferVehiculoModalComponent, RegistrarTransportistaModalComponent],
   templateUrl: './index-despachos.component.html',
   styleUrl: './index-despachos.component.css'
 })

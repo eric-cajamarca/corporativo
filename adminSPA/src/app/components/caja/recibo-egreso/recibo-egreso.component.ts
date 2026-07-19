@@ -8,9 +8,7 @@ import { CatalogosService } from '../../../services/catalogos.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
 import { AuthService } from '../../../services/auth.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
@@ -35,7 +33,7 @@ export interface ReciboEgresoItem {
 @Component({
   selector: 'app-recibo-egreso',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './recibo-egreso.component.html',
   styleUrl: './recibo-egreso.component.css'
 })

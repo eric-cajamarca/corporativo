@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="table-card card">
       <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
@@ -116,7 +113,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <div class="modal fade" id="pdfModalCotizacion" tabindex="-1" aria-labelledby="pdfModalCotizacionLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

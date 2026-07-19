@@ -1,8 +1,4 @@
-<app-sidebar *ngIf="!desdeVenta" (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<app-topnav *ngIf="!desdeVenta" [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-    <main [ngClass]="desdeVenta ? 'create-cliente-embed' : 'main-content'" [class.sidebar-collapsed]="!desdeVenta && sidebarState.sidebarCollapsed()">
+<div [ngClass]="desdeVenta ? 'create-cliente-embed' : 'page-body page-body--centered'">
         <div [ngClass]="desdeVenta ? 'create-cliente-form' : 'content-wrap'">
 
             <div class="container-fluid px-0">
@@ -431,4 +427,4 @@
             </div>
         </div>
     
-    </main>
+    </div>

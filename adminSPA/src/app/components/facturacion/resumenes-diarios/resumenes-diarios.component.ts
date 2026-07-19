@@ -3,8 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { formatFechaLocal, getFechaHoyLocal } from '../../../utils/fecha-local.util';
 
 declare var iziToast: any;
@@ -12,7 +10,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-resumenes-diarios',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './resumenes-diarios.component.html',
   styleUrl: './resumenes-diarios.component.css'
 })

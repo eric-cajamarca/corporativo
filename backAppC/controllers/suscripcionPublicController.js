@@ -79,12 +79,18 @@ const confirmarCulqi = async (req, res) => {
     }
     if (
       error.message === 'DATOS_INCOMPLETOS' ||
+      error.message === 'EMAIL_PAGO_INVALIDO' ||
       error.message === 'CHECKOUT_NO_ENCONTRADO' ||
       error.message === 'USAR_CONFIRMACION_DEMO' ||
       error.message === 'CULQI_SECRET_FALTANTE' ||
       error.message === 'MONTO_CHECKOUT_INCONSISTENTE'
     ) {
-      return res.status(400).json({ message: error.message });
+      return res.status(400).json({
+        message:
+          error.message === 'EMAIL_PAGO_INVALIDO'
+            ? 'Ingrese un correo válido del pagador (requerido por Culqi).'
+            : error.message
+      });
     }
     console.error('confirmarCulqi:', error);
     res.status(400).json({ message: error.message || 'Culqi rechazó el cargo' });
@@ -105,10 +111,47 @@ const estadoCheckout = async (req, res) => {
   }
 };
 
+const reportarPagoManual = async (req, res) => {
+  try {
+    const data = await withPool((pool) =>
+      suscripcionPublicService.reportarPagoManual(pool, req.body || {}, req.user)
+    );
+    res.status(200).json({
+      data,
+      message:
+        'Orden registrada como pendiente de validación. Envíe el voucher al WhatsApp indicado para que el administrador habilite el plan.'
+    });
+  } catch (error) {
+    if (error.message === 'MODO_NO_SAAS') {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    if (
+      error.message === 'DATOS_INCOMPLETOS' ||
+      error.message === 'MEDIO_PAGO_INVALIDO' ||
+      error.message === 'EMAIL_PAGO_INVALIDO' ||
+      error.message === 'CHECKOUT_NO_ENCONTRADO' ||
+      error.message === 'USAR_CONFIRMACION_DEMO' ||
+      error.message === 'CHECKOUT_NO_PERMITE_PAGO_MANUAL'
+    ) {
+      return res.status(400).json({
+        message:
+          error.message === 'EMAIL_PAGO_INVALIDO'
+            ? 'Ingrese un correo válido del pagador.'
+            : error.message === 'MEDIO_PAGO_INVALIDO'
+              ? 'Seleccione Yape, Plin o depósito BCP.'
+              : error.message
+      });
+    }
+    console.error('reportarPagoManual:', error);
+    res.status(500).json({ message: 'Error al registrar pago manual' });
+  }
+};
+
 module.exports = {
   listarPlanes,
   iniciarCheckout,
   confirmarDemo,
   confirmarCulqi,
+  reportarPagoManual,
   estadoCheckout
 };

@@ -2,9 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { CatalogosService } from '../../../services/catalogos.service';
 
@@ -18,7 +16,7 @@ export interface ClasificacionConceptoItem {
 @Component({
   selector: 'app-index-clasificacion-conceptos',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [CommonModule, FormsModule, RouterModule, NgbPagination],
   templateUrl: './index-clasificacion-conceptos.component.html',
   styleUrl: './index-clasificacion-conceptos.component.css'
 })

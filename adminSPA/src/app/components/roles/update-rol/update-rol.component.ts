@@ -2,13 +2,11 @@ import { Component } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RolService } from '../../../services/rol.service';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 
 @Component({
   selector: 'app-update-rol',
-  imports: [FormsModule, RouterModule, TopnavComponent],
+  imports: [FormsModule, RouterModule],
   templateUrl: './update-rol.component.html',
   styleUrl: './update-rol.component.css'
 })

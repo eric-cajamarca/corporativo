@@ -2,8 +2,6 @@ import { Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import {
   DashboardService,
@@ -53,7 +51,7 @@ type DatosReporteRow = Record<string, unknown>;
 @Component({
   selector: 'app-index-reportes',
   standalone: true,
-  imports: [FormsModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, CommonModule],
   templateUrl: './index-reportes.component.html',
   styleUrl: './index-reportes.component.css'
 })
@@ -135,8 +133,7 @@ export class IndexReportesComponent implements OnInit {
       descripcion: 'Rentabilidad por producto y categoría',
       icono: 'bi bi-percent',
       tipo: 'financiero',
-    },
-  ];
+    }];
 
   // Datos del reporte actual
   reporteActual: ReporteConfig | null = null;
@@ -404,8 +401,7 @@ export class IndexReportesComponent implements OnInit {
                 {
                   indicador: 'Eficiencia de cobro (%)',
                   valor: r.eficienciaCobro,
-                },
-              ];
+                }];
             } else {
               this.datosReporte = [];
             }
@@ -480,8 +476,7 @@ export class IndexReportesComponent implements OnInit {
               borderColor: '#3498db',
               backgroundColor: 'rgba(52, 152, 219, 0.1)',
               tension: 0.4,
-            },
-          ],
+            }],
         },
         options: {
           responsive: true,
@@ -513,8 +508,7 @@ export class IndexReportesComponent implements OnInit {
               backgroundColor: '#e74c3c',
               borderColor: '#c0392b',
               borderWidth: 1,
-            },
-          ],
+            }],
         },
         options: {
           responsive: true,
@@ -548,8 +542,7 @@ export class IndexReportesComponent implements OnInit {
             backgroundColor: '#e74c3c',
             borderColor: '#c0392b',
             borderWidth: 1,
-          },
-        ],
+          }],
       },
       options: {
         responsive: true,
@@ -587,10 +580,8 @@ export class IndexReportesComponent implements OnInit {
                 '#e74c3c',
                 '#27ae60',
                 '#f39c12',
-                '#9b59b6',
-              ],
-            },
-          ],
+                '#9b59b6'],
+            }],
         },
         options: {
           responsive: true,

@@ -209,6 +209,59 @@ const conciliacionCulqiCsv = async (req, res) => {
   }
 };
 
+const listarPagosManuales = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const filtros = {
+      fechaDesde: req.query?.fechaDesde || null,
+      fechaHasta: req.query?.fechaHasta || null,
+      estado: req.query?.estado || null
+    };
+    const data = await withPool((pool) =>
+      suscripcionConciliacionService.listarPagosManualesPendientes(pool, req.user, filtros)
+    );
+    return res.status(200).json({ data });
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
+      return res.status(403).json({ message: 'No autorizado para validar pagos de suscripción.' });
+    }
+    console.error('listarPagosManuales:', error);
+    return res.status(500).json({ message: 'Error al listar pagos manuales' });
+  }
+};
+
+const confirmarPagoManual = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const orderNumber = (req.body?.orderNumber || '').trim();
+    const data = await withPool((pool) =>
+      suscripcionConciliacionService.confirmarPagoManualAdmin(pool, req.user, orderNumber)
+    );
+    return res.status(200).json({
+      data,
+      message: 'Pago marcado como PAGADO. El plan queda habilitado si la orden está vinculada a una empresa.'
+    });
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
+      return res.status(403).json({ message: 'No autorizado para validar pagos de suscripción.' });
+    }
+    if (
+      error.message === 'DATOS_INCOMPLETOS' ||
+      error.message === 'CHECKOUT_NO_ENCONTRADO' ||
+      error.message === 'USAR_CONFIRMACION_DEMO' ||
+      error.message === 'CHECKOUT_NO_PERMITE_CONFIRMAR'
+    ) {
+      return res.status(400).json({ message: error.message });
+    }
+    console.error('confirmarPagoManual:', error);
+    return res.status(500).json({ message: 'Error al confirmar pago manual' });
+  }
+};
+
 module.exports = {
   crearPagoSuscripcion,
   vincularCheckout,
@@ -217,5 +270,7 @@ module.exports = {
   miEstado,
   solicitarUpgrade,
   conciliacionCulqi,
-  conciliacionCulqiCsv
+  conciliacionCulqiCsv,
+  listarPagosManuales,
+  confirmarPagoManual
 };

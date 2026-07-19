@@ -4,12 +4,9 @@ import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-
 @Component({
   selector: 'app-index-programacion',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './index-programacion.component.html',
   styleUrl: './index-programacion.component.css'
 })

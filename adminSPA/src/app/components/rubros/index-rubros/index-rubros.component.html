@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <h1 class="content-title">Configuración por rubro</h1>
     <p class="text-muted mb-0">Rubros del sistema y parámetros por rubro (independiente de empresa y cliente).</p>
@@ -75,4 +72,4 @@
       }
     </div>
   </div>
-</main>
+</div>

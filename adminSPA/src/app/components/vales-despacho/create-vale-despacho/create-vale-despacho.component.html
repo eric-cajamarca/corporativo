@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header d-flex justify-content-between align-items-center">
     <div>
       <h1 class="content-title">Nuevo vale de despacho</h1>
@@ -91,7 +88,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <!-- Modal información del cliente / elegir cliente -->
 @if (showModalCliente) {

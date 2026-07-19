@@ -4,8 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { FacturacionService } from '../../../services/facturacion.service';
 import { EmpresaService } from '../../../services/empresa.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare const iziToast: any;
@@ -13,7 +11,7 @@ declare const iziToast: any;
 @Component({
   selector: 'app-guias-configuracion',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './guias-configuracion.component.html',
   styleUrl: './guias-configuracion.component.css'
 })

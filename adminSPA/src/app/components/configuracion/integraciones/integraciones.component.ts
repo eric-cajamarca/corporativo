@@ -2,8 +2,6 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EmpresaService } from '../../../services/empresa.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { RouterModule } from '@angular/router';
 
@@ -25,13 +23,12 @@ interface IntegracionesFlags {
 const PROVEEDORES = [
   { id: 'twilio', nombre: 'Twilio (WhatsApp)', keys: ['accountSid', 'authToken', 'whatsappFrom'], flag: 'twilioHabilitado' },
   { id: 'izipay', nombre: 'Izipay (Pagos)', keys: ['merchantId', 'publicKey', 'secretKey', 'hmacSha256'], flag: 'izipayHabilitado' },
-  { id: 'culqi', nombre: 'Culqi (Pagos)', keys: ['publicKey', 'secretKey'], flag: 'culqiHabilitado' },
-] as const;
+  { id: 'culqi', nombre: 'Culqi (Pagos)', keys: ['publicKey', 'secretKey'], flag: 'culqiHabilitado' }] as const;
 
 @Component({
   selector: 'app-integraciones',
   standalone: true,
-  imports: [CommonModule, FormsModule, TopnavComponent, SidebarComponent, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './integraciones.component.html',
   styleUrl: './integraciones.component.css'
 })

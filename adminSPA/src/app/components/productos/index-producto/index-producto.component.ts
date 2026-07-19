@@ -6,8 +6,6 @@ import { SucursalService } from '../../../services/sucursal.service';
 import { ProductoService } from '../../../services/producto.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { ProductoCompuestoService } from '../../../services/producto-compuesto.service';
@@ -24,7 +22,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-index-producto',
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, SidebarComponent, NgbPagination],
+  imports: [FormsModule,RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-producto.component.html',
   styleUrl: './index-producto.component.css'
 })

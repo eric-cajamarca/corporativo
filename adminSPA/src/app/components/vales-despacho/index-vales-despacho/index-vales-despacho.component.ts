@@ -1,15 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ValesDespachoService, ValeDespachoListItem } from '../../../services/vales-despacho.service';
 
 @Component({
   selector: 'app-index-vales-despacho',
   standalone: true,
-  imports: [CommonModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './index-vales-despacho.component.html',
   styleUrl: './index-vales-despacho.component.css'
 })

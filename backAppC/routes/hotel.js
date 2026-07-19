@@ -4,8 +4,9 @@ const auth = require('../middlewares/autenticate');
 const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const hotelController = require('../controllers/hotelController');
 
-api.use(auth.auth);
-api.use(requireRubro('HOTEL'));
+// Solo rutas /hotel/* (no aplicar a todo /api: bloqueaba suscripcion/mi-estado en rubro GEN)
+api.use('/hotel', auth.auth);
+api.use('/hotel', requireRubro('HOTEL'));
 
 api.get('/hotel/configuracion', hotelController.obtenerConfiguracion);
 api.put('/hotel/configuracion', hotelController.guardarConfiguracion);

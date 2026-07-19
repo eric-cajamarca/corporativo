@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="content-header d-flex flex-wrap justify-content-between align-items-start gap-2">
       <div>
@@ -287,7 +284,7 @@
       </div>
     }
   </div>
-</main>
+</div>
 
 <ng-template #modalFormatoGrePdf let-modal>
   <div class="modal-header">

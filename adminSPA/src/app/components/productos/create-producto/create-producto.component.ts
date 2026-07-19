@@ -14,8 +14,6 @@ import { GestoresService } from '../../../services/gestores.service';
 import { ProductosImagenService, ImagenProducto } from '../../../services/productos-imagen.service';
 import { ComprasService } from '../../../services/compras.service';
 import { PreciosService } from '../../../services/precios.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoCreadoModalResult } from '../../../services/producto-crear-modal.service';
 import { CreateCategoriaComponent } from '../../categorias/create-categoria/create-categoria.component';
@@ -56,10 +54,7 @@ interface Sucursal {
     CommonModule,
     FormsModule,
     ReactiveFormsModule,
-    RouterModule,
-    TopnavComponent,
-    SidebarComponent,
-  ],
+    RouterModule],
   templateUrl: './create-producto.component.html',
   styleUrl: './create-producto.component.css'
 })

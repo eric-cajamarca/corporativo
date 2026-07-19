@@ -62,4 +62,45 @@ export class SaasSubscriptionService {
       })
       .pipe(map((r) => r.data));
   }
+
+  listarPagosManuales(filtros?: {
+    estado?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Observable<
+    Array<{
+      orderNumber: string;
+      planCode: string;
+      billingCycle: string;
+      monto: number;
+      moneda: string;
+      estado: string;
+      idTransaccionPasarela: string | null;
+      fCreacion: string;
+      fConfirmacion: string | null;
+      emailContacto: string | null;
+      idEmpresaCliente: string | null;
+      razonSocialCliente: string | null;
+      rucCliente: string | null;
+    }>
+  > {
+    const params: Record<string, string> = {};
+    if (filtros?.estado) params['estado'] = filtros.estado;
+    if (filtros?.fechaDesde) params['fechaDesde'] = filtros.fechaDesde;
+    if (filtros?.fechaHasta) params['fechaHasta'] = filtros.fechaHasta;
+    return this.http
+      .get<{ data: Array<Record<string, unknown>> }>(`${this.baseUrl}suscripcion/pagos-manuales`, {
+        params,
+        withCredentials: true
+      })
+      .pipe(map((r) => (r.data || []) as never));
+  }
+
+  confirmarPagoManual(orderNumber: string): Observable<unknown> {
+    return this.http.post(
+      `${this.baseUrl}suscripcion/pagos-manuales/confirmar`,
+      JSON.stringify({ orderNumber }),
+      { headers: this.headers, withCredentials: true }
+    );
+  }
 }

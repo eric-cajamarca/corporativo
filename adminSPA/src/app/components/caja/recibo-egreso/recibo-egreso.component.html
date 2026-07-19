@@ -1,8 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
 <div class="container-fluid">
   
   <div class="card shadow-sm">
@@ -137,7 +133,7 @@
     </div>
   </div>
 </div>
-</main>
+</div>
 
 <!-- Modales fuera de main para que cubran toda la pantalla (sidebar + topnav + contenido) -->
 <!-- Modal Crear / Editar -->

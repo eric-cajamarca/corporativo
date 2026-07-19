@@ -4,8 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { FacturacionService, ComprobanteParaBaja, ComunicacionBajaHistorialItem, MotivoBaja } from '../../../services/facturacion.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { EmpresaService } from '../../../services/empresa.service';
@@ -18,7 +16,7 @@ declare var bootstrap: any;
 @Component({
   selector: 'app-comunicacion-baja',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [CommonModule, FormsModule, NgbPagination],
   templateUrl: './comunicacion-baja.component.html',
   styleUrl: './comunicacion-baja.component.css'
 })

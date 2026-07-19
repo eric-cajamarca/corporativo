@@ -24,6 +24,7 @@ api.get('/public/planes', limiterSuave, suscripcionPublicController.listarPlanes
 api.post('/public/suscripcion/iniciar-checkout', limiterSuave, suscripcionPublicController.iniciarCheckout);
 api.post('/public/suscripcion/confirmar-demo', limiterSuave, suscripcionPublicController.confirmarDemo);
 api.post('/public/suscripcion/confirmar-culqi', limiterCulqi, suscripcionPublicController.confirmarCulqi);
+api.post('/public/suscripcion/reportar-pago-manual', limiterSuave, suscripcionPublicController.reportarPagoManual);
 api.get('/public/suscripcion/checkout/:orderNumber/estado', limiterSuave, suscripcionPublicController.estadoCheckout);
 
 module.exports = api;

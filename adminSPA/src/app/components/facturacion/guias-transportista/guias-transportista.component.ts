@@ -21,8 +21,6 @@ import {
   type GrePdfFormato
 } from '../../../utils/guia-pdf-html.util';
 import { NgbModal, NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -189,8 +187,6 @@ const PAGADORES_FLETE_GRE = [
     CommonModule,
     FormsModule,
     RouterModule,
-    SidebarComponent,
-    TopnavComponent,
     SeleccionarProveedorGreModalComponent
   ],
   templateUrl: './guias-transportista.component.html',

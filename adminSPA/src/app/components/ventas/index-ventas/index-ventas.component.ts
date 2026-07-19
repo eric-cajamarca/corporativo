@@ -5,8 +5,6 @@ import { RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { Subject } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { VentasService, VentaAgrupadaListado, VentaAgrupadaComprobanteListado, ComprobanteVentaAgrupada, VentaListado } from '../../../services/ventas.service';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
@@ -32,7 +30,7 @@ declare const iziToast: {
 @Component({
   selector: 'app-index-ventas',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-ventas.component.html',
   styleUrl: './index-ventas.component.css'
 })

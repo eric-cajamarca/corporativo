@@ -4,9 +4,7 @@ import { AdminService } from '../../../services/admin.service';
 import { variosService } from '../../../services/varios.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: any;
@@ -15,7 +13,7 @@ declare var boostrap: any;
 @Component({
   selector: 'app-index-marca',
   standalone: true,
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent,SidebarComponent, NgbPagination],
+  imports: [FormsModule,RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-marca.component.html',
   styleUrl: './index-marca.component.css'
 })

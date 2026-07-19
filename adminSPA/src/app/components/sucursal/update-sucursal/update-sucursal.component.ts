@@ -3,8 +3,6 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { SucursalService } from '../../../services/sucursal.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { FormatSentenceDirective } from '../../../format-sentence.directive';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
@@ -13,7 +11,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-update-sucursal',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent, FormatSentenceDirective],
+  imports: [FormsModule, RouterModule, CommonModule, FormatSentenceDirective],
   templateUrl: './update-sucursal.component.html',
   styleUrl: './update-sucursal.component.css'
 })

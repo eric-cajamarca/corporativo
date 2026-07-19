@@ -2,9 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { CatalogosService } from '../../../services/catalogos.service';
 
 declare var iziToast: any;
@@ -19,7 +17,7 @@ export interface TipoMovimientoCajaItem {
 @Component({
   selector: 'app-index-tipo-movimientos',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './index-tipo-movimientos.component.html',
   styleUrl: './index-tipo-movimientos.component.css'
 })

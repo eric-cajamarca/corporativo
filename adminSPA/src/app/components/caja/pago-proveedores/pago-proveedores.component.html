@@ -1,8 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="container-fluid">
     <div class="card shadow-sm">
       <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
@@ -114,7 +110,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <!-- Modal Recibo de Pago (fuera de main, z-index 1050) -->
 <div class="modal fade" [class.show]="mostrarForm" [style.display]="mostrarForm ? 'block' : 'none'" tabindex="-1">

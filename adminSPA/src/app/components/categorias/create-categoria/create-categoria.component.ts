@@ -4,14 +4,12 @@ import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 
 
 @Component({
   selector: 'app-create-categoria',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './create-categoria.component.html',
   styleUrl: './create-categoria.component.css'
 })

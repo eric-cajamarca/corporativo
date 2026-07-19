@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { CheckoutIniciado, PlanCatalogoItem } from '../models/saas-public.model';
+import { CheckoutIniciado, CheckoutPagoManualReportado, PlanCatalogoItem } from '../models/saas-public.model';
 
 @Injectable({ providedIn: 'root' })
 export class SaasPublicService {
@@ -58,6 +58,21 @@ export class SaasPublicService {
       headers: this.headers,
       withCredentials: true
     });
+  }
+
+  reportarPagoManual(payload: {
+    orderNumber: string;
+    medioPago: 'yape' | 'plin' | 'bcp';
+    email: string;
+    referencia?: string;
+  }): Observable<CheckoutPagoManualReportado> {
+    return this.http
+      .post<{ data: CheckoutPagoManualReportado }>(
+        `${this.baseUrl}public/suscripcion/reportar-pago-manual`,
+        JSON.stringify(payload),
+        { headers: this.headers, withCredentials: true }
+      )
+      .pipe(map((r) => r.data));
   }
 
   estadoCheckout(orderNumber: string): Observable<{ estado: string; planCode: string; billingCycle: string; monto: number }> {

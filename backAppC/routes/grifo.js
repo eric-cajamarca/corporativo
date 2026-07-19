@@ -4,8 +4,9 @@ const auth = require('../middlewares/autenticate');
 const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const grifoController = require('../controllers/grifoController');
 
-api.use(auth.auth);
-api.use(requireRubro('GRF'));
+// Solo rutas /grifo/* (no aplicar a todo /api)
+api.use('/grifo', auth.auth);
+api.use('/grifo', requireRubro('GRF'));
 
 api.get('/grifo/tanques', grifoController.listarTanques);
 api.put('/grifo/tanques/:id', grifoController.actualizarTanque);

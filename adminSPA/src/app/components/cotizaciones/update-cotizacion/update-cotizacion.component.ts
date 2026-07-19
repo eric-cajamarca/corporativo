@@ -2,9 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { CotizacionesService } from '../../../services/cotizaciones.service';
 import { BuscadorProductosModalService } from '../../../services/buscador-productos-modal.service';
 import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/buscador-productos-modal.component';
@@ -31,7 +29,7 @@ interface DetalleEdicion {
 @Component({
   selector: 'app-update-cotizacion',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './update-cotizacion.component.html',
   styleUrl: './update-cotizacion.component.css'
 })

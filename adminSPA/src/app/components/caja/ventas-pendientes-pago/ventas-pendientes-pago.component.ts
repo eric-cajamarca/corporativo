@@ -8,9 +8,7 @@ import { DocumentoService } from '../../../services/documento.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { FormaPago } from '../../../interfaces/formasPago-interface';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { EmpresaService } from '../../../services/empresa.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { openComprobanteVaTicket } from '../../../utils/comprobante-va-ticket.util';
@@ -22,7 +20,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-ventas-pendientes-pago',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './ventas-pendientes-pago.component.html',
   styleUrl: './ventas-pendientes-pago.component.css'
 })

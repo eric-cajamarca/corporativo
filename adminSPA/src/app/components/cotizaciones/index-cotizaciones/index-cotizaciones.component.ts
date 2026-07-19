@@ -3,8 +3,6 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { CotizacionesService, CotizacionListado } from '../../../services/cotizaciones.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -19,7 +17,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-index-cotizaciones',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-cotizaciones.component.html',
   styleUrl: './index-cotizaciones.component.css'
 })

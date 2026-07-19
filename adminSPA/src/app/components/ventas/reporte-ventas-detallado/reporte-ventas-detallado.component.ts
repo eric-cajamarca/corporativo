@@ -6,8 +6,6 @@ import { VentasService } from '../../../services/ventas.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { ExcelService } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { Empresa } from '../../../models/empresa.model';
 import {
@@ -25,7 +23,7 @@ declare const iziToast: {
 @Component({
   selector: 'app-reporte-ventas-detallado',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './reporte-ventas-detallado.component.html',
   styleUrl: './reporte-ventas-detallado.component.css',
 })
@@ -82,8 +80,7 @@ export class ReporteVentasDetalladoComponent implements OnInit {
         c.documento,
         c.fecha,
         c.estado,
-        ...(c.lineas || []).map((l) => `${l.codigo} ${l.producto}`),
-      ]
+        ...(c.lineas || []).map((l) => `${l.codigo} ${l.producto}`)]
         .join(' ')
         .toLowerCase();
       return hay.includes(q);

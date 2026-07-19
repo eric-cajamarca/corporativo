@@ -1,8 +1,6 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import {
   UtilidadesService,
@@ -18,7 +16,7 @@ type TipoPeriodo = 'dia' | 'mes' | 'anio' | 'rango';
 @Component({
   selector: 'app-index-utilidades',
   standalone: true,
-  imports: [FormsModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, CommonModule],
   templateUrl: './index-utilidades.component.html',
   styleUrl: './index-utilidades.component.css',
 })
@@ -299,8 +297,7 @@ export class IndexUtilidadesComponent implements OnInit {
       'Fecha venta',
       'Precio venta',
       'Costo',
-      'Utilidad bruta',
-    ];
+      'Utilidad bruta'];
     const filas = this.datos.map((r) => [
       r.nombreProducto,
       r.comprobante,
@@ -308,8 +305,7 @@ export class IndexUtilidadesComponent implements OnInit {
       r.fechaVenta,
       this.esFilaExcluida(r) ? 0 : Number(r.precioVenta),
       this.esFilaExcluida(r) ? 0 : Number(r.costo),
-      this.esFilaExcluida(r) ? 0 : Number(r.utilidadBruta),
-    ]);
+      this.esFilaExcluida(r) ? 0 : Number(r.utilidadBruta)]);
     return { columnas, filas };
   }
 

@@ -7,9 +7,7 @@ import { CajaOperacionContextService, EmpresaCajaOperacion } from '../../../serv
 import { ComprasService } from '../../../services/compras.service';
 import { ProveedoresService } from '../../../services/proveedores.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { IndexProveedorComponent } from '../../proveedores/index-proveedor/index-proveedor.component';
 import { fechaEmisionVentaParaApi } from '../../../utils/fecha-local.util';
 
@@ -44,7 +42,7 @@ export interface ComprobantePagoRow {
 @Component({
   selector: 'app-pago-proveedores',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent, IndexProveedorComponent],
+  imports: [CommonModule, FormsModule, RouterModule, IndexProveedorComponent],
   templateUrl: './pago-proveedores.component.html',
   styleUrl: './pago-proveedores.component.css'
 })

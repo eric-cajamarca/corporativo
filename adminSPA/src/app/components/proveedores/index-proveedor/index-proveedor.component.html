@@ -1,9 +1,4 @@
-<ng-container *ngIf="!modoSelector">
-  <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-  <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-</ng-container>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()" [class.p-0]="modoSelector">
+<div class="page-body" [class.ventas-embedded]="modoSelector">
   <div class="container" [class.container-fluid]="!modoSelector" [class.p-3]="modoSelector" style="background-color: white;">
     @if (modoSelector) {
       <p class="text-muted small mb-3">Haga clic en un proveedor para cargar sus datos en la compra.</p>
@@ -157,4 +152,4 @@
       </ngb-pagination>
     </div>
   </div>
-</main>
+</div>

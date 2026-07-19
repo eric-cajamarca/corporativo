@@ -20,5 +20,7 @@ api.get('/suscripcion/mi-estado', auth.auth, suscripcionController.miEstado);
 api.post('/suscripcion/solicitar-upgrade', auth.auth, suscripcionController.solicitarUpgrade);
 api.get('/suscripcion/conciliacion/culqi', auth.auth, suscripcionController.conciliacionCulqi);
 api.get('/suscripcion/conciliacion/culqi.csv', auth.auth, suscripcionController.conciliacionCulqiCsv);
+api.get('/suscripcion/pagos-manuales', auth.auth, suscripcionController.listarPagosManuales);
+api.post('/suscripcion/pagos-manuales/confirmar', auth.auth, suscripcionController.confirmarPagoManual);
 
 module.exports = api;

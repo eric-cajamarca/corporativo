@@ -2,8 +2,6 @@ import { Component, OnInit, signal, effect, OnDestroy } from '@angular/core';
 import { Router, NavigationEnd, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../topnav/topnav.component';
-import { SidebarComponent } from '../sidebar/sidebar.component';
 import { SidebarStateService } from '../../services/sidebar-state.service';
 import { AuthService } from '../../services/auth.service';
 import { PermisosService } from '../../services/permisos.service';
@@ -18,7 +16,7 @@ import { filter, Subscription } from 'rxjs';
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [FormsModule, CommonModule, RouterModule, TopnavComponent, SidebarComponent, OnboardingWizardComponent],
+  imports: [FormsModule, CommonModule, RouterModule, OnboardingWizardComponent],
   templateUrl: './inicio.component.html',
   styleUrl: './inicio.component.css'
 })

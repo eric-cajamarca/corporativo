@@ -80,23 +80,28 @@ async function obtenerMiEstado(pool, idEmpresa) {
       alertasPlan
     };
 
-    const metricas = await empresaSuscripcionUsoRepository.obtenerMetricasOnboarding(pool, idEmpresa);
-    const tieneConfigSunat = Number(metricas?.tieneConfigSunat || 0) > 0;
-    const fechaPrimerComprobante = metricas?.fechaPrimerComprobante
-      ? new Date(metricas.fechaPrimerComprobante)
-      : null;
-    const fechaInicioSuscripcion = suscripcion?.fechaInicio ? new Date(suscripcion.fechaInicio) : null;
-    const minsPrimerComp =
-      fechaPrimerComprobante && fechaInicioSuscripcion && !Number.isNaN(fechaPrimerComprobante.getTime())
-        ? Math.max(0, Math.round((fechaPrimerComprobante.getTime() - fechaInicioSuscripcion.getTime()) / 60000))
+    try {
+      const metricas = await empresaSuscripcionUsoRepository.obtenerMetricasOnboarding(pool, idEmpresa);
+      const tieneConfigSunat = Number(metricas?.tieneConfigSunat || 0) > 0;
+      const fechaPrimerComprobante = metricas?.fechaPrimerComprobante
+        ? new Date(metricas.fechaPrimerComprobante)
         : null;
-    onboarding = {
-      tieneConfigSunat,
-      fechaPrimerComprobante: fechaPrimerComprobante && !Number.isNaN(fechaPrimerComprobante.getTime())
-        ? fechaPrimerComprobante.toISOString()
-        : null,
-      minutosHastaPrimerComprobante: minsPrimerComp
-    };
+      const fechaInicioSuscripcion = suscripcion?.fechaInicio ? new Date(suscripcion.fechaInicio) : null;
+      const minsPrimerComp =
+        fechaPrimerComprobante && fechaInicioSuscripcion && !Number.isNaN(fechaPrimerComprobante.getTime())
+          ? Math.max(0, Math.round((fechaPrimerComprobante.getTime() - fechaInicioSuscripcion.getTime()) / 60000))
+          : null;
+      onboarding = {
+        tieneConfigSunat,
+        fechaPrimerComprobante: fechaPrimerComprobante && !Number.isNaN(fechaPrimerComprobante.getTime())
+          ? fechaPrimerComprobante.toISOString()
+          : null,
+        minutosHastaPrimerComprobante: minsPrimerComp
+      };
+    } catch (errOnb) {
+      console.error('contexto: obtenerMiEstado onboarding', errOnb);
+      onboarding = null;
+    }
   }
 
   let checkoutsOrden = [];

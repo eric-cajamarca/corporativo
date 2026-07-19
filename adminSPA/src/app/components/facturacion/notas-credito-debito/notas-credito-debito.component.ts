@@ -6,8 +6,6 @@ import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { FacturacionService, OrigenParaNota, ComprobanteOrigenItem } from '../../../services/facturacion.service';
 import { CatalogosService } from '../../../services/catalogos.service';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { VentasService, NotaCreditoDebitoListado } from '../../../services/ventas.service';
 import { PdfService } from '../../../services/pdf.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
@@ -30,7 +28,7 @@ interface ItemEditable {
 @Component({
   selector: 'app-notas-credito-debito',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [CommonModule, FormsModule, RouterLink, NgbPagination],
   templateUrl: './notas-credito-debito.component.html',
   styleUrl: './notas-credito-debito.component.css'
 })

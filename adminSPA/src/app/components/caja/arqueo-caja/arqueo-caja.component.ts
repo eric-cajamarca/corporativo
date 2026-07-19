@@ -9,10 +9,7 @@ import { DocumentoService } from '../../../services/documento.service';
 import { WhatsappService } from '../../../services/whatsapp.service';
 import { Caja } from '../../../interfaces/caja-interface';
 import { Empresa } from '../../../interfaces/pdf-interface';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 
 export interface FilaArqueoConcepto {
@@ -48,7 +45,7 @@ export interface ArqueoTotalesPorSucursalFila {
 @Component({
   selector: 'app-arqueo-caja',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './arqueo-caja.component.html',
   styleUrl: './arqueo-caja.component.css'
 })

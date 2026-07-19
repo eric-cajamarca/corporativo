@@ -4,13 +4,14 @@ const auth = require('../middlewares/autenticate');
 const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const consumoHabitacionController = require('../controllers/consumoHabitacionController');
 
-api.use(auth.auth);
-api.use(requireRubro('HOTEL'));
+// Solo rutas /consumo-habitacion/* (no aplicar a todo /api)
+api.use('/consumo-habitacion', auth.auth);
+api.use('/consumo-habitacion', requireRubro('HOTEL'));
 
 api.get('/consumo-habitacion', consumoHabitacionController.listar);
-api.post('/consumo-habitacion', requireRubro('HOTEL'), consumoHabitacionController.agregar);
-api.patch('/consumo-habitacion/:id', requireRubro('HOTEL'), consumoHabitacionController.actualizar);
-api.delete('/consumo-habitacion/habitacion/:idProductoHabitacion', requireRubro('HOTEL'), consumoHabitacionController.limpiarHabitacion);
-api.delete('/consumo-habitacion/:id', requireRubro('HOTEL'), consumoHabitacionController.eliminar);
+api.post('/consumo-habitacion', consumoHabitacionController.agregar);
+api.patch('/consumo-habitacion/:id', consumoHabitacionController.actualizar);
+api.delete('/consumo-habitacion/habitacion/:idProductoHabitacion', consumoHabitacionController.limpiarHabitacion);
+api.delete('/consumo-habitacion/:id', consumoHabitacionController.eliminar);
 
 module.exports = api;

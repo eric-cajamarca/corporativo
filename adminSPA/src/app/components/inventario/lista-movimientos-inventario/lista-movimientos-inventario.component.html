@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="content-header">
       <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center flex-wrap gap-2">
@@ -151,7 +148,7 @@
       }
     </div>
   </div>
-</main>
+</div>
 
 @if (modalAbierto && cabeceraModal) {
   <div class="modal-backdrop fade show mi-modal-backdrop" (click)="cerrarModal()"></div>

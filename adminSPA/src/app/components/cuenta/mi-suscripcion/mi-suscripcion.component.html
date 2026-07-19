@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <h1 class="content-title mb-1">Mi suscripción</h1>
     <p class="content-subtitle text-muted mb-0">Estado del plan, vigencia y uso frente a los límites del contrato.</p>
@@ -244,4 +241,4 @@
       </div>
     }
   }
-</main>
+</div>

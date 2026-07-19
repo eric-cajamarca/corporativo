@@ -1,11 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
       <div class="min-w-0">
@@ -243,7 +236,7 @@
       }
     </div>
   </div>
-</main>
+</div>
 
 <!-- Modal de Gestión de Roles y Permisos -->
 <div class="modal fade modal-lg" id="modalGestion" tabindex="-1">

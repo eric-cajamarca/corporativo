@@ -4,13 +4,11 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 
 @Component({
   selector: 'app-create-marca',
-  imports: [FormsModule, CommonModule, TopnavComponent],
+  imports: [FormsModule, CommonModule],
   templateUrl: './create-marca.component.html',
   styleUrl: './create-marca.component.css'
 })

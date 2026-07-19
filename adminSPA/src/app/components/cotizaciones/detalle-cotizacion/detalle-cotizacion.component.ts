@@ -1,9 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { FormsModule } from '@angular/forms';
 import { CotizacionesService, CotizacionDetalleResponse } from '../../../services/cotizaciones.service';
 import { PdfService } from '../../../services/pdf.service';
@@ -17,7 +15,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-detalle-cotizacion',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './detalle-cotizacion.component.html',
   styleUrl: './detalle-cotizacion.component.css'
 })

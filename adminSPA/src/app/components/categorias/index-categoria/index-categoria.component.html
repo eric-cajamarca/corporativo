@@ -1,9 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <div class="categorias-page-wrap">
       <div class="card categorias-list-card">
@@ -228,4 +223,4 @@
       </div>
     </div>
   </div>
-</main>
+</div>

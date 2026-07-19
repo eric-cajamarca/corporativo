@@ -2,9 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { CatalogosService } from '../../../services/catalogos.service';
 
@@ -13,7 +11,7 @@ declare var iziToast: any;
 @Component({
   selector: 'app-index-motivo-traslado',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, SidebarComponent, TopnavComponent, NgbPagination],
+  imports: [CommonModule, FormsModule, RouterModule, NgbPagination],
   templateUrl: './index-motivo-traslado.component.html',
   styleUrl: './index-motivo-traslado.component.css'
 })

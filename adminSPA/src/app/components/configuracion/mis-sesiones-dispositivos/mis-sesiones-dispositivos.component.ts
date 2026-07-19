@@ -3,8 +3,6 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AdminService, SesionDispositivoDto } from '../../../services/admin.service';
 import { AuthService } from '../../../services/auth.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 
 declare var iziToast: { error: (opts: object) => void; success: (opts: object) => void };
@@ -12,7 +10,7 @@ declare var iziToast: { error: (opts: object) => void; success: (opts: object) =
 @Component({
   selector: 'app-mis-sesiones-dispositivos',
   standalone: true,
-  imports: [CommonModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './mis-sesiones-dispositivos.component.html',
   styleUrl: './mis-sesiones-dispositivos.component.css'
 })

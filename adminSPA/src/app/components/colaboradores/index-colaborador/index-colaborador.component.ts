@@ -6,8 +6,6 @@ import { AdminService } from '../../../services/admin.service';
 import { RolService } from '../../../services/rol.service';
 import { PermisosService } from '../../../services/permisos.service';
 import { UsuarioSucursalService, SucursalConAsignacion } from '../../../services/usuario-sucursal.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { Permiso } from '../../../interfaces/permisos-interface';
@@ -49,7 +47,7 @@ interface SesionUsuario {
 @Component({
   selector: 'app-index-colaborador',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent, NgbPagination],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-colaborador.component.html',
   styleUrl: './index-colaborador.component.css'
 })

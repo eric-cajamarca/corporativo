@@ -572,6 +572,7 @@
   display: block;
 }
 
+.hotel-section-consumo .page-body.ventas-embedded,
 .hotel-section-consumo .main-content.ventas-embedded {
   padding: 0;
   margin: 0;

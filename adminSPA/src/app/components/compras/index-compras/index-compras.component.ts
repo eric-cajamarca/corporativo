@@ -11,14 +11,12 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Subject } from 'rxjs';
 import { debounceTime, takeUntil } from 'rxjs/operators';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { PdfService } from '../../../services/pdf.service';
 import { numeroALetras } from '../../../utils/numeroALetras';
 import { ExcelService } from '../../../services/excel.service';
 import { EmpresaService } from '../../../services/empresa.service';
 import { Empresa } from '../../../models/empresa.model';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { InventarioModalService } from '../../../services/inventario-modal.service';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
@@ -90,7 +88,7 @@ export interface DatosPdf {
 @Component({
   selector: 'app-index-compras',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, NgbPagination, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-compras.component.html',
   styleUrl: './index-compras.component.css'
 })

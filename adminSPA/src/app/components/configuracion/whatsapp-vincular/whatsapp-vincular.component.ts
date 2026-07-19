@@ -1,8 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { WhatsappSessionPanelComponent } from '../../shared/whatsapp-session-panel/whatsapp-session-panel.component';
 
@@ -12,8 +10,6 @@ import { WhatsappSessionPanelComponent } from '../../shared/whatsapp-session-pan
   imports: [
     CommonModule,
     RouterModule,
-    SidebarComponent,
-    TopnavComponent,
     WhatsappSessionPanelComponent
   ],
   templateUrl: './whatsapp-vincular.component.html',

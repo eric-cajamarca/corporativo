@@ -2,15 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { VentasService, ComprobantePdfData, EntregaItem } from '../../../services/ventas.service';
 
 @Component({
   selector: 'app-detalle-venta',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, TopnavComponent],
+  imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './detalle-venta.component.html',
   styleUrl: './detalle-venta.component.css'
 })

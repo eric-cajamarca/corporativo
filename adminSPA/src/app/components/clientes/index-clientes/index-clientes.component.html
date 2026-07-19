@@ -1,9 +1,4 @@
-<ng-container *ngIf="!modoSelector">
-  <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-  <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-</ng-container>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()" [class.p-0]="modoSelector">
+<div class="page-body" [class.ventas-embedded]="modoSelector">
   <div class="container" [class.container-fluid]="!modoSelector" style="background-color: white;">
   <div class="row">
     <div class="col-md-12">
@@ -185,4 +180,4 @@
         </ngb-pagination>
   </div>
 </div>
-</main>
+</div>

@@ -8,9 +8,7 @@ import { EmpresaService } from '../../../services/empresa.service';
 import { RubrosService, Rubro } from '../../../services/rubros.service';
 import { global } from '../../../services/global';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { AuthService } from '../../../services/auth.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { PermisosService } from '../../../services/permisos.service';
 
@@ -21,7 +19,7 @@ declare var bootstrap: any;
 @Component({
   selector: 'app-update-empresa',
   standalone: true,
-  imports: [FormsModule, RouterModule,CommonModule, TopnavComponent,SidebarComponent],
+  imports: [FormsModule, RouterModule,CommonModule],
   templateUrl: './update-empresa.component.html',
   styleUrl: './update-empresa.component.css'
 })
@@ -716,6 +714,7 @@ export class UpdateEmpresaComponent {
     }
 
   }
+
 
   // Método para seleccionar la dirección a eliminar
   seleccionarDireccionAEliminar(id: number) {

@@ -1,11 +1,4 @@
-<!-- Sidebar -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<!-- Contenido principal -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   
   <!-- Loading Overlay -->
   <div class="loading-overlay" *ngIf="cargandoDatos()">
@@ -351,4 +344,4 @@
       </div>
     </div>
   </div>
-</main>
+</div>

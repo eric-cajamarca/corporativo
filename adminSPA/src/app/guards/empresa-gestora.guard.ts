@@ -13,6 +13,7 @@ function esRutaPermitidaGestora(path: string): boolean {
   if (path === 'editar-empresa') return true;
   if (path === 'empresa') return true;
   if (path === 'libro-reclamaciones') return true;
+  if (path === 'pagos-suscripcion') return true;
   if (path === 'analisis') return true;
   if (path.startsWith('ventas/rapida')) return false;
   if (path.startsWith('ventas')) return true;
@@ -32,6 +33,7 @@ function esRutaPermitidaGestora(path: string): boolean {
   if (path.startsWith('rol')) return true;
   if (path.startsWith('sucursal')) return true;
   if (path === 'configuracion' || path.startsWith('configuracion/')) return true;
+  if (path === 'cuenta/suscripcion' || path.startsWith('cuenta/')) return true;
   return false;
 }
 
@@ -45,9 +47,6 @@ export const empresaGestoraGuard: CanActivateFn = (_route, state) => {
       const esGestora = res?.data?.esGestora === true;
       if (!esGestora) return true;
       if (esRutaPermitidaGestora(path)) return true;
-      // #region agent log
-      fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'empresa-gestora.guard.ts:home',message:'gestora guard redirect home',data:{path,url:state.url},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       return router.createUrlTree(['/home']);
     }),
     catchError(() => of(true))

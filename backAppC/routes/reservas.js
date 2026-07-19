@@ -4,8 +4,9 @@ const auth = require('../middlewares/autenticate');
 const { requireRubro } = require('../middlewares/rubroFeature.middleware');
 const reservasController = require('../controllers/reservasController');
 
-api.use(auth.auth);
-api.use(requireRubro('HOTEL'));
+// Solo rutas /reservas/* (no aplicar a todo /api)
+api.use('/reservas', auth.auth);
+api.use('/reservas', requireRubro('HOTEL'));
 
 api.get('/reservas', reservasController.listar);
 api.get('/reservas/siguiente-codigo', reservasController.siguienteCodigo);

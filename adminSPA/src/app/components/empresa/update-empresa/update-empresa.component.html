@@ -1,9 +1,6 @@
 <!-- <p>update-empresa works!</p>
 <img [src]="url + 'obtener_logo/' + empresas.logo" style="width: 50px; height: 50px;" onerror="this.src='assets/01.jpg'"> -->
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="container">
         <form id="kt_form" #registroForm="ngForm" (ngSubmit)="registrar(registroForm)">
@@ -131,6 +128,7 @@
                             En empresa no gestora con esta opción desactivada, la venta POS queda en una sola sucursal operativa del usuario (según asignación Usuario-Sucursal y caja abierta).
                         </small>
                     </div>
+
                 </div>
 
                 <div style="margin-bottom: 20px; text-align: left; margin-left: 20px;">
@@ -521,4 +519,4 @@
 
     </div>
   </div>
-</main>
+</div>

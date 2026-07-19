@@ -15,8 +15,6 @@ import { CventaService } from '../../../services/cventa.service';
 import { DventaService } from '../../../services/dventa.service';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { descripcionProductoConMarca } from '../../../utils/producto-presentacion.util';
 
@@ -24,7 +22,7 @@ declare var iziToast: any;
 
 @Component({
   selector: 'app-create-despachos',
-  imports: [FormsModule, RouterModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule],
   templateUrl: './create-despachos.component.html',
   styleUrl: './create-despachos.component.css'
 })

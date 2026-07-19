@@ -1,6 +1,4 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-header">
     <h1 class="content-title">Ventas – Restaurantes</h1>
     <p class="text-muted mb-0">Módulo adaptado para mesas y comandas.</p>
@@ -10,4 +8,4 @@
       Componente de ventas para restaurantes (mesas, comandas, consumo por mesa). En desarrollo.
     </div>
   </div>
-</main>
+</div>

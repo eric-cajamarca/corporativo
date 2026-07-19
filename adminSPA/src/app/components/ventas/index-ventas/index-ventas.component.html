@@ -1,8 +1,4 @@
-@if (!noShell) {
-  <app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-  <app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-}
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()" [class.ventas-embedded]="noShell">
+<div class="page-body" [class.ventas-embedded]="noShell">
   <div class="content-wrap ventas-container">
     <div class="table-card card">
       <div class="card-header bg-gradient-success text-white d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-2 py-2 px-3">
@@ -750,7 +746,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 @if (!esGestora) {
 <div class="modal fade" id="modalPostReporteContabilidad" tabindex="-1" aria-labelledby="modalPostReporteContabilidadLabel" aria-hidden="true">

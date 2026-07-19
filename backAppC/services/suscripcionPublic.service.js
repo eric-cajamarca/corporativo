@@ -1,11 +1,15 @@
 const { v4: uuidv4 } = require('uuid');
 const { isSaas } = require('../config/deployment.config');
+const { getPagoManualSuscripcionConfig } = require('../config/pagoManualSuscripcion.config');
 const suscripcionRepository = require('../repositories/suscripcion.repository');
 const suscripcionCheckoutRepository = require('../repositories/suscripcionCheckout.repository');
 const integracionesService = require('./integraciones.service');
 const saasPlanesService = require('./saasPlanes.service');
 const culqiChargeService = require('./culqiCharge.service');
 const empresaSuscripcionBootstrap = require('./empresaSuscripcionBootstrap.service');
+
+const MEDIOS_PAGO_MANUAL = new Set(['yape', 'plin', 'bcp']);
+const ESTADO_PENDIENTE_VALIDACION = 'PENDIENTE_VALIDACION';
 
 function construirOrderNumberCheckout() {
   return `CHK-${uuidv4()}`;
@@ -86,9 +90,13 @@ async function iniciarCheckout(pool, body, authUser) {
   const idEmpresaPrincipal = await suscripcionRepository.obtenerIdEmpresaPrincipal(pool);
   if (!idEmpresaPrincipal) throw new Error('NO_PRINCIPAL');
 
-  const credenciales = await integracionesService.obtenerCredencialesProveedor(pool, idEmpresaPrincipal, 'culqi');
-  const culqiPublicKey = credenciales.publicKey || credenciales.public_key || null;
-  if (!culqiPublicKey) throw new Error('CULQI_NO_CONFIGURADO');
+  let culqiPublicKey = null;
+  try {
+    const credenciales = await integracionesService.obtenerCredencialesProveedor(pool, idEmpresaPrincipal, 'culqi');
+    culqiPublicKey = credenciales.publicKey || credenciales.public_key || null;
+  } catch (error) {
+    console.error('iniciarCheckout: Culqi opcional no disponible:', error?.message || error);
+  }
 
   const orderNumber = construirOrderNumberCheckout();
   const idCheckout = uuidv4();
@@ -112,7 +120,67 @@ async function iniciarCheckout(pool, body, authUser) {
     planCode,
     billingCycle,
     culqiPublicKey,
-    esDemo: false
+    culqiDisponible: Boolean(culqiPublicKey),
+    esDemo: false,
+    pagoManual: await getPagoManualSuscripcionConfig(pool)
+  };
+}
+
+/**
+ * Cliente reporta que pagó por Yape/Plin/BCP y enviará (o envió) el voucher por WhatsApp.
+ * No marca PAGADO: queda en PENDIENTE_VALIDACION hasta confirmación del admin de plataforma.
+ */
+async function reportarPagoManual(pool, body, authUser) {
+  if (!isSaas()) throw new Error('MODO_NO_SAAS');
+  const orderNumber = (body?.orderNumber || '').trim();
+  const medio = (body?.medioPago || body?.medio || '').toString().trim().toLowerCase();
+  const email = (body?.email || body?.emailContacto || '').trim();
+  const referencia = (body?.referencia || '').toString().trim().substring(0, 60);
+
+  if (!orderNumber) throw new Error('DATOS_INCOMPLETOS');
+  if (!MEDIOS_PAGO_MANUAL.has(medio)) throw new Error('MEDIO_PAGO_INVALIDO');
+  if (!email || email.length > 80 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('EMAIL_PAGO_INVALIDO');
+  }
+
+  const row = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, orderNumber);
+  if (!row) throw new Error('CHECKOUT_NO_ENCONTRADO');
+  if (row.planCode === 'demo') throw new Error('USAR_CONFIRMACION_DEMO');
+  if (row.estado === 'PAGADO') {
+    await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, orderNumber, authUser);
+    return {
+      orderNumber,
+      estado: row.estado,
+      planCode: row.planCode,
+      billingCycle: row.billingCycle,
+      monto: row.monto,
+      pagoManual: await getPagoManualSuscripcionConfig(pool)
+    };
+  }
+  if (row.estado !== 'PENDIENTE' && row.estado !== ESTADO_PENDIENTE_VALIDACION) {
+    throw new Error('CHECKOUT_NO_PERMITE_PAGO_MANUAL');
+  }
+
+  const idTx = `MANUAL-${medio.toUpperCase()}${referencia ? `:${referencia}` : ''}`;
+  await suscripcionCheckoutRepository.actualizarEstadoPago(
+    pool,
+    orderNumber,
+    ESTADO_PENDIENTE_VALIDACION,
+    idTx.substring(0, 120)
+  );
+  if (email) {
+    await suscripcionCheckoutRepository.actualizarEmailContacto(pool, orderNumber, email);
+  }
+
+  const final = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, orderNumber);
+  return {
+    orderNumber: final.orderNumber,
+    estado: final.estado,
+    planCode: final.planCode,
+    billingCycle: final.billingCycle,
+    monto: final.monto,
+    medioPago: medio,
+    pagoManual: await getPagoManualSuscripcionConfig(pool)
   };
 }
 
@@ -132,6 +200,9 @@ async function confirmarCulqiCheckout(pool, body, authUser) {
   const tokenId = (body?.tokenId || '').trim();
   const email = (body?.email || '').trim();
   if (!orderNumber || !tokenId) throw new Error('DATOS_INCOMPLETOS');
+  if (!email || email.length > 80 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('EMAIL_PAGO_INVALIDO');
+  }
 
   const row = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, orderNumber);
   if (!row) throw new Error('CHECKOUT_NO_ENCONTRADO');
@@ -203,5 +274,7 @@ module.exports = {
   iniciarCheckout,
   confirmarDemoCheckout,
   confirmarCulqiCheckout,
-  estadoCheckout
+  reportarPagoManual,
+  estadoCheckout,
+  ESTADO_PENDIENTE_VALIDACION
 };

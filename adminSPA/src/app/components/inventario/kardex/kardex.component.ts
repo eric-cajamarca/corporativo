@@ -14,8 +14,6 @@ import { ProductoSeleccionado } from '../../shared/buscador-productos-modal/busc
 import { VentasService, ComprobantePdfData } from '../../../services/ventas.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { formatFechaLocal } from '../../../utils/fecha-local.util';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { forkJoin } from 'rxjs';
 
@@ -29,10 +27,7 @@ declare var bootstrap: any;
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    RouterModule,
-    TopnavComponent,
-    SidebarComponent
-  ],
+    RouterModule],
   templateUrl: './kardex.component.html',
   styleUrl: './kardex.component.css'
 })

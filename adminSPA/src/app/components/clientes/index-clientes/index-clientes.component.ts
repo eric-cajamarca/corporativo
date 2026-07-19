@@ -5,8 +5,6 @@ import { ClienteEditarModalService } from '../../../services/cliente-editar-moda
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { NgbPagination } from '@ng-bootstrap/ng-bootstrap';
 import { filtrarClientesCatalogo } from '../../../utils/cliente-busqueda.util';
@@ -18,7 +16,7 @@ type ModoBusquedaClientes = 'inicial' | 'redis' | 'sql';
 @Component({
   selector: 'app-index-clientes',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, NgbPagination, TopnavComponent, SidebarComponent],
+  imports: [FormsModule, RouterModule, CommonModule, NgbPagination],
   templateUrl: './index-clientes.component.html',
   styleUrl: './index-clientes.component.css'
 })

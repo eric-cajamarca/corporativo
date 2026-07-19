@@ -2,13 +2,11 @@ import { Component } from '@angular/core';
 import { RolService } from '../../../services/rol.service';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { TopnavComponent } from '../../topnav/topnav.component';
-
 declare var iziToast: any;
 
 @Component({
   selector: 'app-create-rol',
-  imports: [FormsModule, RouterModule, TopnavComponent],
+  imports: [FormsModule, RouterModule],
   templateUrl: './create-rol.component.html',
   styleUrl: './create-rol.component.css'
 })

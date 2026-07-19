@@ -11,8 +11,6 @@ import { CajaService } from '../../../services/caja.service';
 import { TablasSunatService } from '../../../services/tablas-sunat.service';
 import { CreditoCliente, CuotaCredito, ResumenCreditos } from '../../../interfaces/creditos-interface';
 import { Cliente } from '../../../interfaces/cliente-interface';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { fechaHoraVentaClienteAhora } from '../../../utils/fecha-local.util';
 import { IndexClientesComponent } from '../../clientes/index-clientes/index-clientes.component';
@@ -34,7 +32,7 @@ export interface DetalleCobranzaItem {
 @Component({
   selector: 'app-index-creditos',
   standalone: true,
-  imports: [FormsModule, RouterModule, CommonModule, SidebarComponent, TopnavComponent, IndexClientesComponent],
+  imports: [FormsModule, RouterModule, CommonModule, IndexClientesComponent],
   templateUrl: './index-creditos.component.html',
   styleUrl: './index-creditos.component.css'
 })

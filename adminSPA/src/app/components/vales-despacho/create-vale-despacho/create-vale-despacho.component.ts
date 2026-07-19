@@ -2,8 +2,6 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-import { TopnavComponent } from '../../topnav/topnav.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ValesDespachoService } from '../../../services/vales-despacho.service';
 import { ClienteService } from '../../../services/cliente.service';
@@ -42,7 +40,7 @@ interface LineaVale {
 @Component({
   selector: 'app-create-vale-despacho',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, SidebarComponent, TopnavComponent, IndexClientesComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IndexClientesComponent],
   templateUrl: './create-vale-despacho.component.html',
   styleUrl: './create-vale-despacho.component.css'
 })

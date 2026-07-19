@@ -1,7 +1,4 @@
-<app-sidebar (sidebarToggle)="onSidebarToggle($event)"></app-sidebar>
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="content-header">
       <h1 class="content-title">Comunicación de baja (RA)</h1>
@@ -277,7 +274,7 @@
       </div>
     </div>
   </div>
-</main>
+</div>
 
 <!-- Descripción SUNAT completa -->
 <div class="modal fade" id="modalDescripcionBaja" tabindex="-1" aria-labelledby="modalDescripcionBajaLabel" aria-hidden="true">

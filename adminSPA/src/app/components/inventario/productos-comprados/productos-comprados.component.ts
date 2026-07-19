@@ -8,8 +8,6 @@ import { MovimientoInventarioService } from '../../../services/movimiento-invent
 import { ComprobanteService } from '../../../services/comprobante.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { ProductoCompradoFila, ProductosCompradosTotales } from '../../../models/productos-comprados.model';
 import { getFechaHoyLocal } from '../../../utils/fecha-local.util';
@@ -25,7 +23,7 @@ interface ComprobanteCompraOpcion {
 @Component({
   selector: 'app-productos-comprados',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './productos-comprados.component.html',
   styleUrl: './productos-comprados.component.css'
 })

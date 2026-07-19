@@ -1,10 +1,5 @@
-<app-sidebar (sidebarToggle)="sidebarState.setCollapsed($event)"></app-sidebar>
-
-<!-- Topnav -->
-<app-topnav [sidebarCollapsed]="sidebarState.sidebarCollapsed()"></app-topnav>
-
 <!-- Contenido principal: se desplaza según estado del sidebar -->
-<main class="main-content" [class.sidebar-collapsed]="sidebarState.sidebarCollapsed()">
+<div class="page-body">
   <div class="content-wrap">
     <div class="container-fluid py-4">
     
@@ -348,7 +343,7 @@
         </div>
     </div>
   </div>  
-</main>
+</div>
 
 <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,.45);" *ngIf="mostrarModalPreciosTodas">
   <div class="modal-dialog modal-dialog-centered">

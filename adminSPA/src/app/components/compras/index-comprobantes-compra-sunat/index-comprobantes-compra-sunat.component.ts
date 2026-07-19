@@ -7,8 +7,6 @@ import { ConsultaXMLService } from '../../../services/consulta-xml.service';
 import { ExcelService } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
 import { EmpresaService } from '../../../services/empresa.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import type { ComprobanteCompraSunatListaItem } from '../../../models/comprobante-compra-sunat.model';
 import type { Empresa } from '../../../models/empresa.model';
@@ -18,7 +16,7 @@ declare const iziToast: { error: (o: { title: string; message: string; position?
 @Component({
   selector: 'app-index-comprobantes-compra-sunat',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './index-comprobantes-compra-sunat.component.html',
   styleUrl: './index-comprobantes-compra-sunat.component.css'
 })

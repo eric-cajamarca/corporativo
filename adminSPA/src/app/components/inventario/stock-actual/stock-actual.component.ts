@@ -8,8 +8,6 @@ import { MovimientoInventarioService } from '../../../services/movimiento-invent
 import { SucursalService } from '../../../services/sucursal.service';
 import { ExcelService, ExcelData } from '../../../services/excel.service';
 import { PdfService } from '../../../services/pdf.service';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
 import { SidebarStateService } from '../../../services/sidebar-state.service';
 import { StockActualItem } from '../../../models/stock-actual.model';
 import { Sucursal } from '../../../interfaces/sucursal-interface';
@@ -19,7 +17,7 @@ declare const iziToast: { success: (o: object) => void; error: (o: object) => vo
 @Component({
   selector: 'app-stock-actual',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, TopnavComponent, SidebarComponent],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './stock-actual.component.html',
   styleUrl: './stock-actual.component.css'
 })

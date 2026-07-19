@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges, inject, HostBinding } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges, HostBinding } from '@angular/core';
 import { AdminService } from '../../../services/admin.service';
 import { DocumentoService } from '../../../services/documento.service';
 import { ApiperuService } from '../../../services/apiperu.service';
@@ -7,22 +7,16 @@ import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import { TopnavComponent } from '../../topnav/topnav.component';
-import { SidebarStateService } from '../../../services/sidebar-state.service';
-import { SidebarComponent } from '../../sidebar/sidebar.component';
-
 declare var iziToast: any;
 declare var $: any;
 
 @Component({
   selector: 'app-create-clientes',
-  imports: [FormsModule,RouterModule, CommonModule, TopnavComponent, SidebarComponent],
+  imports: [FormsModule,RouterModule, CommonModule],
   templateUrl: './create-clientes.component.html',
   styleUrl: './create-clientes.component.css'
 })
 export class CreateClientesComponent implements OnInit, OnChanges {
-  public sidebarState = inject(SidebarStateService);
-
   @HostBinding('class.create-cliente-host-embed')
   get hostEmbedModal(): boolean {
     return this.desdeVenta;
@@ -771,9 +765,5 @@ private showError(message: string): void {
       // Realiza acciones cuando el checkbox está desmarcado
     }
     
-  }
-
-  onSidebarToggle(collapsed: boolean): void {
-    this.sidebarState.setCollapsed(collapsed);
   }
 }
