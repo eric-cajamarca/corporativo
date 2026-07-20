@@ -307,28 +307,34 @@
                         </p>
                       } @else {
                         <p class="mb-0">
-                          @if (c.pagoManual?.cuentas?.length) {
-                            <span class="d-block mb-1">Titular: <strong>{{ c.pagoManual?.bcp?.titular }}</strong></span>
-                            <ul class="mb-0 ps-3">
-                              @for (cta of c.pagoManual.cuentas; track cta.idCuentaBancaria) {
-                                <li class="mb-1">
-                                  <strong>{{ cta.banco }}</strong>
-                                  @if (cta.tipoCuenta) {
-                                    ({{ cta.tipoCuenta }})
-                                  }
-                                  · {{ cta.moneda }}
-                                  · <span class="user-select-all">{{ cta.cuenta }}</span>
-                                </li>
+                          @if (c.pagoManual; as pm) {
+                            @if (pm.cuentas && pm.cuentas.length > 0) {
+                              <span class="d-block mb-1">Titular: <strong>{{ pm.bcp.titular }}</strong></span>
+                              <ul class="mb-0 ps-3">
+                                @for (cta of pm.cuentas; track cta.idCuentaBancaria) {
+                                  <li class="mb-1">
+                                    <strong>{{ cta.banco }}</strong>
+                                    @if (cta.tipoCuenta) {
+                                      ({{ cta.tipoCuenta }})
+                                    }
+                                    · {{ cta.moneda }}
+                                    · <span class="user-select-all">{{ cta.cuenta }}</span>
+                                  </li>
+                                }
+                              </ul>
+                            } @else if (pm.bcp.cuenta) {
+                              @if (pm.bcp.banco) {
+                                Banco: <strong>{{ pm.bcp.banco }}</strong>.
                               }
-                            </ul>
-                          } @else if (c.pagoManual?.bcp?.cuenta) {
-                            @if (c.pagoManual?.bcp?.banco) {
-                              Banco: <strong>{{ c.pagoManual?.bcp?.banco }}</strong>.
+                              @if (pm.bcp.titular) {
+                                Titular: <strong>{{ pm.bcp.titular }}</strong>.
+                              }
+                              Cuenta: <strong class="user-select-all">{{ pm.bcp.cuenta }}</strong>.
+                            } @else {
+                              Aún no hay cuentas activas en <code>CuentasBancarias</code> para la empresa principal.
+                              Registre una cuenta (estado activo) o solicítela por WhatsApp con la orden
+                              <code>{{ c.orderNumber }}</code>.
                             }
-                            @if (c.pagoManual?.bcp?.titular) {
-                              Titular: <strong>{{ c.pagoManual?.bcp?.titular }}</strong>.
-                            }
-                            Cuenta: <strong class="user-select-all">{{ c.pagoManual?.bcp?.cuenta }}</strong>.
                           } @else {
                             Aún no hay cuentas activas en <code>CuentasBancarias</code> para la empresa principal.
                             Registre una cuenta (estado activo) o solicítela por WhatsApp con la orden
