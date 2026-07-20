@@ -37,6 +37,7 @@ export class PagosSuscripcionManualComponent implements OnInit {
   items = signal<PagoManualRow[]>([]);
   filtroEstado = 'PENDIENTE_VALIDACION';
   confirmando = signal<string | null>(null);
+  eliminando = signal<string | null>(null);
 
   constructor(private saas: SaasSubscriptionService) {}
 
@@ -100,9 +101,87 @@ export class PagosSuscripcionManualComponent implements OnInit {
     });
   }
 
+  puedeEliminar(row: PagoManualRow): boolean {
+    const e = (row?.estado || '').toUpperCase();
+    return e !== 'PAGADO';
+  }
+
+  eliminar(row: PagoManualRow): void {
+    if (!row?.orderNumber || !this.puedeEliminar(row)) return;
+    const sinEmpresa = !row.idEmpresaCliente;
+    const sinCorreo = !(row.emailContacto || '').trim();
+    const avisoExtra =
+      sinEmpresa || sinCorreo
+        ? '\n(Orden sin empresa vinculada y/o sin correo: típica de checkout abandonado.)'
+        : '';
+    if (
+      !window.confirm(
+        `¿Eliminar la solicitud ${row.orderNumber}?\nPlan ${row.planCode} · ${row.estado}${avisoExtra}\nEsta acción no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    this.eliminando.set(row.orderNumber);
+    this.saas.eliminarPagoManual(row.orderNumber).subscribe({
+      next: () => {
+        this.eliminando.set(null);
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Eliminada',
+            message: 'Solicitud de pago eliminada.',
+            position: 'topRight'
+          });
+        }
+        this.cargar();
+      },
+      error: (err) => {
+        this.eliminando.set(null);
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: this.mensajeErrorHttp(err, 'No se pudo eliminar la orden. Reinicie el backend si acaba de agregar esta función.'),
+            position: 'topRight'
+          });
+        }
+      }
+    });
+  }
+
   etiquetaCiclo(c: string): string {
     if (c === 'yearly' || c === 'anual') return 'Anual';
     if (c === 'none') return 'Demo';
     return 'Mensual';
+  }
+
+  badgeEstadoClass(estado: string): string {
+    const e = (estado || '').toUpperCase();
+    if (e === 'PAGADO') return 'text-bg-success';
+    if (e === 'FALLIDO') return 'text-bg-danger';
+    if (e === 'ANULADO') return 'text-bg-secondary';
+    if (e === 'PENDIENTE_VALIDACION' || e === 'PENDIENTE') return 'text-bg-warning';
+    return 'text-bg-secondary';
+  }
+
+  private mensajeErrorHttp(err: unknown, fallback: string): string {
+    const e = err as { status?: number; error?: unknown; message?: string };
+    const body = e?.error;
+    if (body && typeof body === 'object') {
+      const o = body as { detail?: string; message?: string };
+      if (o.detail) return String(o.detail);
+      if (o.message) return String(o.message);
+    }
+    if (typeof body === 'string' && body.trim() && !body.trim().startsWith('<')) {
+      return body.trim().slice(0, 200);
+    }
+    if (e?.status === 404) {
+      return 'Ruta no encontrada (404). Reinicie el servidor backend para cargar /pagos-manuales/eliminar.';
+    }
+    if (e?.status === 402) {
+      return 'Suscripción bloqueada para esta operación. Use la empresa principal de la plataforma.';
+    }
+    if (e?.status === 403) {
+      return 'No autorizado. Debe ser admin de la empresa principal.';
+    }
+    return fallback;
   }
 }

@@ -171,7 +171,10 @@
               <div class="mt-3 border-top pt-3">
                 <h3 class="h6 mb-2">Vincular pago con su cuenta</h3>
                 <p class="small text-muted mb-2">
-                  Tras pagar con Culqi, el plan se aplica aquí. Si venía de plan demo u otro plan activo, pegue el número de orden.
+                  Use este botón solo cuando la orden esté en estado <strong>PAGADO</strong>
+                  (pago Culqi confirmado o pago manual ya validado por la plataforma).
+                  Si el estado es <strong>PENDIENTE_VALIDACION</strong> (Yape / Plin / BCP),
+                  espere la confirmación del voucher; no se valida desde aquí.
                 </p>
                 <label class="form-label small" for="orderNum">Número de orden (CHK-…)</label>
                 <input id="orderNum" class="form-control form-control-sm mb-2" [(ngModel)]="orderNumber" />
@@ -179,7 +182,7 @@
                   Vincular pago
                 </button>
                 @if (vinculoMsg()) {
-                  <p class="small mt-2 mb-0" [class.text-success]="!vinculoMsg()?.includes('No se')" [class.text-danger]="vinculoMsg()?.includes('No se')">
+                  <p class="small mt-2 mb-0" [class.text-success]="vinculoOk()" [class.text-danger]="!vinculoOk()">
                     {{ vinculoMsg() }}
                   </p>
                 }
@@ -222,7 +225,17 @@
                           <td class="text-end text-nowrap">
                             {{ co.moneda }} {{ co.monto | number: '1.2-2' }}
                           </td>
-                          <td>{{ co.estado }}</td>
+                          <td>
+                            <span
+                              class="badge"
+                              [class.text-bg-success]="co.estado === 'PAGADO'"
+                              [class.text-bg-warning]="co.estado === 'PENDIENTE_VALIDACION' || co.estado === 'PENDIENTE'"
+                              [class.text-bg-secondary]="co.estado !== 'PAGADO' && co.estado !== 'PENDIENTE_VALIDACION' && co.estado !== 'PENDIENTE'"
+                            >{{ co.estado }}</span>
+                            @if (co.estado === 'PENDIENTE_VALIDACION') {
+                              <div class="text-muted small mt-1">Esperando validación del voucher (plataforma)</div>
+                            }
+                          </td>
                           <td class="text-nowrap">{{ co.fCreacion ?? '—' }}</td>
                           <td class="text-nowrap">{{ co.fConfirmacion ?? '—' }}</td>
                         </tr>

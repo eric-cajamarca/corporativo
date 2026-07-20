@@ -103,4 +103,12 @@ export class SaasSubscriptionService {
       { headers: this.headers, withCredentials: true }
     );
   }
+
+  eliminarPagoManual(orderNumber: string): Observable<unknown> {
+    return this.http.post(
+      `${this.baseUrl}suscripcion/pagos-manuales/eliminar`,
+      JSON.stringify({ orderNumber }),
+      { headers: this.headers, withCredentials: true }
+    );
+  }
 }

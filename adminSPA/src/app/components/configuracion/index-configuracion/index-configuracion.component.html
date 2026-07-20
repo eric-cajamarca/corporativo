@@ -570,20 +570,87 @@
             </div>
           </div>
           <div class="card mt-3">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <h5 class="card-title mb-0">Cuentas bancarias</h5>
+              <button
+                type="button"
+                class="btn btn-sm btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#modalCuentaBancariaForm"
+                (click)="abrirModalCrearCuentaBancaria()">
+                <i class="fas fa-plus me-1"></i>Nueva cuenta
+              </button>
+            </div>
+            <div class="card-body">
+              @if (cuentasBancariasCargando) {
+                <div class="text-muted py-2">
+                  <span class="spinner-border spinner-border-sm me-2"></span>Cargando cuentas…
+                </div>
+              } @else if (cuentasBancarias.length === 0) {
+                <p class="text-muted mb-0">No hay cuentas bancarias registradas.</p>
+              } @else {
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Banco</th>
+                        <th>Nº cuenta</th>
+                        <th>Tipo</th>
+                        <th>Moneda</th>
+                        <th>Apertura</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (c of cuentasBancarias; track c.idCuentaBancaria) {
+                        <tr>
+                          <td>{{ c.nombreBanco }}</td>
+                          <td><code>{{ c.numeroCuenta }}</code></td>
+                          <td>{{ c.tipoCuenta }}</td>
+                          <td>{{ c.moneda }}</td>
+                          <td>{{ c.fechaApertura || '—' }}</td>
+                          <td>
+                            @if (cuentaBancariaActiva(c)) {
+                              <span class="badge text-bg-success">Activa</span>
+                            } @else {
+                              <span class="badge text-bg-secondary">Inactiva</span>
+                            }
+                          </td>
+                          <td class="text-end text-nowrap">
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline-primary me-1"
+                              title="Editar"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalCuentaBancariaForm"
+                              (click)="abrirModalEditarCuentaBancaria(c)">
+                              <i class="bi bi-pencil-square"></i>
+                            </button>
+                            @if (cuentaBancariaActiva(c)) {
+                              <button
+                                type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                title="Desactivar"
+                                (click)="eliminarCuentaBancaria(c)">
+                                <i class="bi bi-x-circle"></i>
+                              </button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="card mt-3">
             <div class="card-header">
               <h5 class="card-title mb-0">PDF de comprobantes (Boleta/Factura/Nota de venta)</h5>
             </div>
             <div class="card-body">
               <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label">Cuentas bancarias (una por línea)</label>
-                  <textarea
-                    class="form-control"
-                    rows="4"
-                    [(ngModel)]="pdfComprobante.cuentasBancarias"
-                    name="pdfCuentasBancarias"
-                    placeholder="Ej: BANCO BCP - CTA: 001-1234567-89&#10;CCI: 00200100012345678901"></textarea>
-                </div>
                 <div class="col-md-6 d-flex align-items-center">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="pdfUsarTemaColor" [(ngModel)]="pdfComprobante.usarTemaColor" name="pdfUsarTemaColor">
@@ -890,6 +957,73 @@
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
               <button type="button" class="btn btn-primary" (click)="guardarImpuesto()" [disabled]="impuestoGuardando">
                 @if (impuestoGuardando) {
+                  <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Cuenta bancaria -->
+      <div class="modal fade" #modalCuentaBancariaForm id="modalCuentaBancariaForm" tabindex="-1" aria-labelledby="modalCuentaBancariaFormLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalCuentaBancariaFormLabel">
+                {{ cuentaBancariaEditando != null ? 'Editar cuenta bancaria' : 'Nueva cuenta bancaria' }}
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <form>
+                <div class="mb-3">
+                  <label for="cbNombreBanco" class="form-label">Banco *</label>
+                  <input type="text" class="form-control" id="cbNombreBanco" [(ngModel)]="cuentaBancariaForm.nombreBanco" name="cbNombreBanco" placeholder="Ej: BCP, Interbank" maxlength="100">
+                </div>
+                <div class="mb-3">
+                  <label for="cbNumeroCuenta" class="form-label">Número de cuenta *</label>
+                  <input type="text" class="form-control" id="cbNumeroCuenta" [(ngModel)]="cuentaBancariaForm.numeroCuenta" name="cbNumeroCuenta" placeholder="Ej: 191-2345678-0-12" maxlength="30">
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label for="cbTipoCuenta" class="form-label">Tipo</label>
+                    <select class="form-select" id="cbTipoCuenta" [(ngModel)]="cuentaBancariaForm.tipoCuenta" name="cbTipoCuenta">
+                      @for (t of tiposCuentaBancaria; track t) {
+                        <option [value]="t">{{ t }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="cbMoneda" class="form-label">Moneda</label>
+                    <select class="form-select" id="cbMoneda" [(ngModel)]="cuentaBancariaForm.moneda" name="cbMoneda">
+                      @for (m of monedasCuentaBancaria; track m) {
+                        <option [value]="m">{{ m }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+                @if (cuentaBancariaEditando == null) {
+                  <div class="mb-3">
+                    <label for="cbFechaApertura" class="form-label">Fecha de apertura</label>
+                    <input type="date" class="form-control" id="cbFechaApertura" [(ngModel)]="cuentaBancariaForm.fechaApertura" name="cbFechaApertura">
+                  </div>
+                }
+                <div class="mb-3">
+                  <label for="cbIdCuentaContable" class="form-label">Cuenta contable (opcional)</label>
+                  <input type="text" class="form-control" id="cbIdCuentaContable" [(ngModel)]="cuentaBancariaForm.idCuentaContable" name="cbIdCuentaContable" maxlength="20" placeholder="Código contable">
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="cbEstado" [(ngModel)]="cuentaBancariaForm.estado" name="cbEstado">
+                  <label class="form-check-label" for="cbEstado">Activa</label>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-primary" (click)="guardarCuentaBancaria()" [disabled]="cuentaBancariaGuardando">
+                @if (cuentaBancariaGuardando) {
                   <span class="spinner-border spinner-border-sm me-1"></span>
                 }
                 Guardar

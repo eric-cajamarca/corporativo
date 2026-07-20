@@ -16,6 +16,8 @@ import { GestoresService, ConfiguracionEmpresa } from '../../../services/gestore
 import { interpretarBooleanoConfig } from '../../../utils/config-valor-booleano.util';
 import { PermisosService } from '../../../services/permisos.service';
 import { planPermiteWhatsAppBot, planPermiteWhatsAppVinculado } from '../../../config/saas-plan-reglas.util';
+import { CuentasBancariasService } from '../../../services/cuentas-bancarias.service';
+import { CuentaBancaria } from '../../../models/cuenta-bancaria.model';
 
 declare var iziToast: any;
 
@@ -28,6 +30,7 @@ declare var iziToast: any;
 export class IndexConfiguracionComponent implements OnInit {
   @ViewChild('modalImpuestoForm') modalImpuestoRef?: ElementRef<HTMLDivElement>;
   @ViewChild('modalComprobantes') modalComprobantesRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('modalCuentaBancariaForm') modalCuentaBancariaRef?: ElementRef<HTMLDivElement>;
 
   // Configuración general (se llena con la empresa del usuario logueado)
   public configuracion = {
@@ -90,7 +93,6 @@ export class IndexConfiguracionComponent implements OnInit {
   };
   public inventarioGuardando = false;
   public pdfComprobante = {
-    cuentasBancarias: '',
     usarTemaColor: true,
     colorPrimario: '#0B5FA5'
   };
@@ -113,6 +115,23 @@ export class IndexConfiguracionComponent implements OnInit {
     mostrarCantidadPreciosEnBuscador: false
   };
   public ventasGuardando = false;
+
+  /** CRUD CuentasBancarias (empresa del token JWT) */
+  cuentasBancarias: CuentaBancaria[] = [];
+  cuentasBancariasCargando = false;
+  cuentaBancariaEditando: CuentaBancaria | null = null;
+  cuentaBancariaGuardando = false;
+  cuentaBancariaForm = {
+    nombreBanco: '',
+    numeroCuenta: '',
+    tipoCuenta: 'AHORROS',
+    moneda: 'PEN',
+    estado: true,
+    fechaApertura: '',
+    idCuentaContable: ''
+  };
+  readonly tiposCuentaBancaria = ['AHORROS', 'CORRIENTE', 'CTS', 'OTRO'];
+  readonly monedasCuentaBancaria = ['PEN', 'USD'];
 
   // Configuración de sistema
   public sistema = {
@@ -180,6 +199,7 @@ export class IndexConfiguracionComponent implements OnInit {
     private _facturacionService: FacturacionService,
     private _ventasService: VentasService,
     private _gestoresService: GestoresService,
+    private _cuentasBancariasService: CuentasBancariasService,
     private _router: Router,
     public sidebarState: SidebarStateService,
     private permisos: PermisosService
@@ -261,7 +281,6 @@ export class IndexConfiguracionComponent implements OnInit {
       next: (res) => {
         const lista = res?.data ?? [];
         const getVal = (clave: string, def: string) => (lista.find((c: { clave: string; valor: string }) => c.clave === clave)?.valor ?? def);
-        this.pdfComprobante.cuentasBancarias = getVal('PDF_CUENTAS_BANCARIAS', '');
         this.pdfComprobante.usarTemaColor = String(getVal('PDF_TEMA_COLOR_ACTIVO', 'true')).toLowerCase() !== 'false';
         const color = String(getVal('PDF_COLOR_PRIMARIO', '#0B5FA5')).trim();
         this.pdfComprobante.colorPrimario = color || '#0B5FA5';
@@ -275,12 +294,6 @@ export class IndexConfiguracionComponent implements OnInit {
     const color = (this.pdfComprobante.colorPrimario || '').trim();
     const colorFinal = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#0B5FA5';
     const configs: Array<{ clave: string; valor: string; descripcion: string; tipoDato: string }> = [
-      {
-        clave: 'PDF_CUENTAS_BANCARIAS',
-        valor: String(this.pdfComprobante.cuentasBancarias || '').trim(),
-        descripcion: 'Cuentas bancarias mostradas en PDF de comprobantes de venta (una por línea).',
-        tipoDato: 'STRING'
-      },
       {
         clave: 'PDF_TEMA_COLOR_ACTIVO',
         valor: this.pdfComprobante.usarTemaColor ? 'true' : 'false',
@@ -580,6 +593,7 @@ export class IndexConfiguracionComponent implements OnInit {
   }
 
   cargarConfiguracionVentas(): void {
+    this.cargarCuentasBancarias();
     this._gestoresService.obtenerConfiguracion().subscribe({
       next: (res) => {
         const lista = res?.data ?? [];
@@ -606,6 +620,171 @@ export class IndexConfiguracionComponent implements OnInit {
       },
       error: () => {}
     });
+  }
+
+  cargarCuentasBancarias(): void {
+    this.cuentasBancariasCargando = true;
+    this._cuentasBancariasService.listar().subscribe({
+      next: (data) => {
+        this.cuentasBancariasCargando = false;
+        this.cuentasBancarias = Array.isArray(data?.items) ? data.items : [];
+      },
+      error: () => {
+        this.cuentasBancariasCargando = false;
+        this.cuentasBancarias = [];
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: 'No se pudieron cargar las cuentas bancarias.',
+            position: 'topRight'
+          });
+        }
+      }
+    });
+  }
+
+  abrirModalCrearCuentaBancaria(): void {
+    this.cuentaBancariaEditando = null;
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    this.cuentaBancariaForm = {
+      nombreBanco: '',
+      numeroCuenta: '',
+      tipoCuenta: 'AHORROS',
+      moneda: 'PEN',
+      estado: true,
+      fechaApertura: `${yyyy}-${mm}-${dd}`,
+      idCuentaContable: ''
+    };
+  }
+
+  abrirModalEditarCuentaBancaria(cuenta: CuentaBancaria): void {
+    this.cuentaBancariaEditando = cuenta;
+    this.cuentaBancariaForm = {
+      nombreBanco: cuenta.nombreBanco || '',
+      numeroCuenta: cuenta.numeroCuenta || '',
+      tipoCuenta: (cuenta.tipoCuenta || 'AHORROS').toUpperCase(),
+      moneda: (cuenta.moneda || 'PEN').toUpperCase(),
+      estado: cuenta.estado === true || cuenta.estado === 1,
+      fechaApertura: (cuenta.fechaApertura || '').substring(0, 10),
+      idCuentaContable: cuenta.idCuentaContable || ''
+    };
+  }
+
+  private mensajeErrorCuentaBancaria(code: string | undefined): string {
+    switch (code) {
+      case 'BANCO_REQUERIDO':
+        return 'Ingrese el nombre del banco.';
+      case 'NUMERO_CUENTA_REQUERIDO':
+        return 'Ingrese el número de cuenta.';
+      case 'TIPO_CUENTA_REQUERIDO':
+        return 'Seleccione el tipo de cuenta.';
+      case 'MONEDA_INVALIDA':
+        return 'Moneda inválida (use PEN o USD).';
+      case 'FECHA_APERTURA_INVALIDA':
+        return 'Fecha de apertura inválida.';
+      default:
+        return 'No se pudo guardar la cuenta bancaria.';
+    }
+  }
+
+  guardarCuentaBancaria(): void {
+    const nombreBanco = (this.cuentaBancariaForm.nombreBanco || '').trim();
+    const numeroCuenta = (this.cuentaBancariaForm.numeroCuenta || '').trim();
+    if (!nombreBanco || !numeroCuenta) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.warning({
+          title: 'Validación',
+          message: 'Banco y número de cuenta son obligatorios.',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
+
+    this.cuentaBancariaGuardando = true;
+    const payload = {
+      nombreBanco,
+      numeroCuenta,
+      tipoCuenta: (this.cuentaBancariaForm.tipoCuenta || 'AHORROS').trim().toUpperCase(),
+      moneda: (this.cuentaBancariaForm.moneda || 'PEN').trim().toUpperCase(),
+      estado: !!this.cuentaBancariaForm.estado,
+      fechaApertura: this.cuentaBancariaForm.fechaApertura || undefined,
+      idCuentaContable: (this.cuentaBancariaForm.idCuentaContable || '').trim() || null
+    };
+
+    const req$ =
+      this.cuentaBancariaEditando != null
+        ? this._cuentasBancariasService.actualizar(this.cuentaBancariaEditando.idCuentaBancaria, payload)
+        : this._cuentasBancariasService.crear(payload);
+
+    req$.subscribe({
+      next: () => {
+        const fueEdicion = this.cuentaBancariaEditando != null;
+        this.cuentaBancariaGuardando = false;
+        this.cuentaBancariaEditando = null;
+        this.cerrarModalCuentaBancaria();
+        this.cargarCuentasBancarias();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Guardado',
+            message: fueEdicion ? 'Cuenta bancaria actualizada.' : 'Cuenta bancaria creada.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: (err) => {
+        this.cuentaBancariaGuardando = false;
+        const code = err?.error?.message as string | undefined;
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: this.mensajeErrorCuentaBancaria(code),
+            position: 'topRight'
+          });
+        }
+      }
+    });
+  }
+
+  eliminarCuentaBancaria(cuenta: CuentaBancaria): void {
+    if (!cuenta?.idCuentaBancaria) return;
+    const ok = confirm(`¿Desactivar la cuenta ${cuenta.nombreBanco} - ${cuenta.numeroCuenta}?`);
+    if (!ok) return;
+    this._cuentasBancariasService.eliminar(cuenta.idCuentaBancaria).subscribe({
+      next: () => {
+        this.cargarCuentasBancarias();
+        if (typeof iziToast !== 'undefined') {
+          iziToast.success({
+            title: 'Desactivada',
+            message: 'La cuenta bancaria fue desactivada.',
+            position: 'topRight'
+          });
+        }
+      },
+      error: () => {
+        if (typeof iziToast !== 'undefined') {
+          iziToast.error({
+            title: 'Error',
+            message: 'No se pudo desactivar la cuenta bancaria.',
+            position: 'topRight'
+          });
+        }
+      }
+    });
+  }
+
+  cuentaBancariaActiva(cuenta: CuentaBancaria): boolean {
+    return cuenta?.estado === true || cuenta?.estado === 1;
+  }
+
+  private cerrarModalCuentaBancaria(): void {
+    const el = this.modalCuentaBancariaRef?.nativeElement;
+    if (el && typeof (window as any).bootstrap !== 'undefined') {
+      (window as any).bootstrap.Modal.getInstance(el)?.hide();
+    }
   }
 
   guardarConfiguracionVentas(): void {

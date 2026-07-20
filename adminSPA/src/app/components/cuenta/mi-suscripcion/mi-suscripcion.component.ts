@@ -20,6 +20,8 @@ export class MiSuscripcionComponent implements OnInit {
   cargando = signal(true);
   errorMsg = signal<string | null>(null);
   vinculoMsg = signal<string | null>(null);
+  /** true = mensaje de éxito (estilo verde). */
+  vinculoOk = signal(false);
   orderNumber = '';
   vinculando = signal(false);
   /** Evita doble auto-vinculación al recargar tras éxito. */
@@ -134,22 +136,38 @@ export class MiSuscripcionComponent implements OnInit {
   vincular(): void {
     const on = this.orderNumber.trim();
     if (!on) {
+      this.vinculoOk.set(false);
       this.vinculoMsg.set('Ingrese el número de orden (CHK-…).');
       return;
     }
     this.vinculando.set(true);
     this.vinculoMsg.set(null);
+    this.vinculoOk.set(false);
     this.saas.vincularCheckout(on).subscribe({
       next: () => {
         this.vinculando.set(false);
         this.orderNumber = '';
+        this.vinculoOk.set(true);
         this.vinculoMsg.set('Suscripción vinculada correctamente.');
         void this.router.navigate(['/cuenta', 'suscripcion'], { replaceUrl: true });
         this.cargar(false);
       },
-      error: () => {
+      error: (err) => {
         this.vinculando.set(false);
-        this.vinculoMsg.set('No se pudo vincular. Verifique el número de orden o que el pago esté confirmado.');
+        this.vinculoOk.set(false);
+        const code = err?.error?.message as string | undefined;
+        const detail = (err?.error?.detail as string | undefined) || '';
+        if (code === 'CHECKOUT_NO_PAGADO' && detail) {
+          this.vinculoMsg.set(detail);
+        } else if (code === 'CHECKOUT_YA_VINCULADO') {
+          this.vinculoMsg.set(detail || 'Esa orden ya está vinculada a otra empresa.');
+        } else if (code === 'CHECKOUT_NO_ENCONTRADO') {
+          this.vinculoMsg.set(detail || 'No se encontró esa orden de pago.');
+        } else {
+          this.vinculoMsg.set(
+            'No se pudo vincular. Si pagó con Yape/Plin/BCP y el estado es PENDIENTE_VALIDACION, la plataforma debe confirmar el voucher primero.'
+          );
+        }
       }
     });
   }

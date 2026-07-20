@@ -22,5 +22,6 @@ api.get('/suscripcion/conciliacion/culqi', auth.auth, suscripcionController.conc
 api.get('/suscripcion/conciliacion/culqi.csv', auth.auth, suscripcionController.conciliacionCulqiCsv);
 api.get('/suscripcion/pagos-manuales', auth.auth, suscripcionController.listarPagosManuales);
 api.post('/suscripcion/pagos-manuales/confirmar', auth.auth, suscripcionController.confirmarPagoManual);
+api.post('/suscripcion/pagos-manuales/eliminar', auth.auth, suscripcionController.eliminarPagoManual);
 
 module.exports = api;

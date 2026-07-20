@@ -293,6 +293,8 @@ app.use('/api/gestores', gestoresRoutes);
 app.use('/api/usuario-sucursal', usuarioSucursalRoutes);
 app.use('/api/cotizaciones', cotizacionesRoutes);
 app.use('/api/catalogos', catalogosRoutes);
+app.use('/api', require('./routes/cuentasBancarias'));
+app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api', rubrosRoutes);
 app.use('/api', require('./routes/valesDespacho'));
 app.use('/api/auditoria', auditoriaRoutes);

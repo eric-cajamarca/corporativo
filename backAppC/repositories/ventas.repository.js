@@ -17,6 +17,7 @@ const {
   SQL_JOIN_USUARIO_VENTAS
 } = require('../utils/documentoTrazabilidad.util');
 const gestoresRepository = require('./gestores.repository');
+const cuentasBancariasRepository = require('./cuentasBancarias.repository');
 
 /** Normaliza RUC/DNI a solo dígitos para cruzar con Clientes. No registrar el valor en logs. */
 function documentoSoloDigitosPdf(valor) {
@@ -234,7 +235,6 @@ async function obtenerConfigPdf(pool, idEmpresa) {
           FROM ConfiguracionEmpresa
           WHERE idEmpresa = @idEmpresa
             AND clave IN (
-              'PDF_CUENTAS_BANCARIAS',
               'PDF_TEMA_COLOR_ACTIVO',
               'PDF_COLOR_PRIMARIO',
               'VENTAS_USAR_DESCUENTO_EN_TOTAL'
@@ -1596,6 +1596,14 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
   const empNombresUbi = resolverNombresUbigeo(empUbigeoRaw);
   const empresaDireccionPdf = componerDireccionPdf(empUbigeoRaw);
 
+  let cuentasBancariasPdf = '';
+  try {
+    cuentasBancariasPdf = await cuentasBancariasRepository.listarActivasTextoPdf(pool, idEmpresaVenta);
+  } catch (errCuentasPdf) {
+    console.error('obtenerComprobanteParaPdf cuentas bancarias:', errCuentasPdf);
+    cuentasBancariasPdf = '';
+  }
+
   const filaDirClientePdf = await obtenerFilaDireccionClientePdf(pool, {
     idDireccionClientes: cab.idDireccionClientesVenta,
     idCliente: cab.idCliente,
@@ -1625,7 +1633,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         rubro: (emp.rubro != null && String(emp.rubro).trim()) ? String(emp.rubro).trim() : '',
         correo: (emp.correo != null && String(emp.correo).trim()) ? String(emp.correo).trim() : '',
         logo: logoUrl,
-        cuentasBancarias: cfgMap.PDF_CUENTAS_BANCARIAS || '',
+        cuentasBancarias: cuentasBancariasPdf,
         pdfUsarColor: String(cfgMap.PDF_TEMA_COLOR_ACTIVO || 'true').toLowerCase() !== 'false',
         pdfColorPrimario: cfgMap.PDF_COLOR_PRIMARIO || '#0B5FA5'
       }
@@ -1643,7 +1651,7 @@ exports.obtenerComprobanteParaPdf = async (pool, idVenta, idsEmpresa, baseUrl = 
         rubro: '',
         correo: '',
         logo: `${base}/assets/img/01.jpg`,
-        cuentasBancarias: cfgMap.PDF_CUENTAS_BANCARIAS || '',
+        cuentasBancarias: cuentasBancariasPdf,
         pdfUsarColor: String(cfgMap.PDF_TEMA_COLOR_ACTIVO || 'true').toLowerCase() !== 'false',
         pdfColorPrimario: cfgMap.PDF_COLOR_PRIMARIO || '#0B5FA5'
       };

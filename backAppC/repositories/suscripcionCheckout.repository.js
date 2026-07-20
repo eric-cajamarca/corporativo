@@ -161,6 +161,9 @@ async function listarConciliacionCulqi(pool, filtros = {}) {
   if (estado) {
     where += ' AND c.estado = @estado';
     req.input('estado', sql.VarChar(20), String(estado).trim().toUpperCase());
+  } else {
+    // "Todos": ocultar anuladas (limpieza de cola)
+    where += " AND c.estado <> 'ANULADO'";
   }
 
   const r = await req.query(`
@@ -186,6 +189,47 @@ async function listarConciliacionCulqi(pool, filtros = {}) {
   return r.recordset || [];
 }
 
+/**
+ * Anula (limpia) una solicitud no pagada. Preferible a DELETE duro por si hay referencias.
+ * No toca PAGADO.
+ */
+async function anularPorOrderNumber(pool, orderNumber) {
+  const on = (orderNumber || '').toString().trim();
+  if (!on) return 0;
+  const r = await pool
+    .request()
+    .input('orderNumber', sql.VarChar(120), on)
+    .query(`
+      UPDATE dbo.SuscripcionCheckoutPendiente
+      SET estado = 'ANULADO',
+          fConfirmacion = ISNULL(fConfirmacion, GETDATE())
+      WHERE orderNumber = @orderNumber
+        AND UPPER(LTRIM(RTRIM(estado))) <> 'PAGADO'
+        AND LOWER(LTRIM(RTRIM(planCode))) <> 'demo'
+    `);
+  const n = Array.isArray(r.rowsAffected) ? Number(r.rowsAffected[0] || 0) : Number(r.rowsAffected || 0);
+  return n;
+}
+
+/**
+ * Elimina físicamente si no está pagada (respaldo / limpieza definitiva).
+ */
+async function eliminarPorOrderNumber(pool, orderNumber) {
+  const on = (orderNumber || '').toString().trim();
+  if (!on) return 0;
+  const r = await pool
+    .request()
+    .input('orderNumber', sql.VarChar(120), on)
+    .query(`
+      DELETE FROM dbo.SuscripcionCheckoutPendiente
+      WHERE orderNumber = @orderNumber
+        AND UPPER(LTRIM(RTRIM(estado))) <> 'PAGADO'
+        AND LOWER(LTRIM(RTRIM(planCode))) <> 'demo'
+    `);
+  const n = Array.isArray(r.rowsAffected) ? Number(r.rowsAffected[0] || 0) : Number(r.rowsAffected || 0);
+  return n;
+}
+
 module.exports = {
   insertar,
   obtenerPorOrderNumber,
@@ -193,5 +237,7 @@ module.exports = {
   actualizarEmailContacto,
   vincularEmpresaCliente,
   listarPorEmpresaOCheckoutOrigen,
-  listarConciliacionCulqi
+  listarConciliacionCulqi,
+  anularPorOrderNumber,
+  eliminarPorOrderNumber
 };

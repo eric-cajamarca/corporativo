@@ -50,10 +50,23 @@ const vincularCheckout = async (req, res) => {
     res.status(200).json({ data, message: 'Suscripción activada' });
   } catch (error) {
     if (error.message === 'CHECKOUT_NO_ENCONTRADO') {
-      return res.status(404).json({ message: error.message });
+      return res.status(404).json({
+        message: 'CHECKOUT_NO_ENCONTRADO',
+        detail: 'No se encontró esa orden de pago.'
+      });
     }
-    if (error.message === 'CHECKOUT_NO_PAGADO' || error.message === 'CHECKOUT_YA_VINCULADO') {
-      return res.status(400).json({ message: error.message });
+    if (error.message === 'CHECKOUT_NO_PAGADO') {
+      return res.status(400).json({
+        message: 'CHECKOUT_NO_PAGADO',
+        detail:
+          'El pago aún no está confirmado. Si pagó con Culqi, espere la confirmación. Si pagó con Yape, Plin o BCP, un administrador de la plataforma debe validar el voucher (estado PENDIENTE_VALIDACION). Cuando pase a PAGADO, el plan se habilita automáticamente si la orden ya está asociada a su empresa.'
+      });
+    }
+    if (error.message === 'CHECKOUT_YA_VINCULADO') {
+      return res.status(400).json({
+        message: 'CHECKOUT_YA_VINCULADO',
+        detail: 'Esa orden ya está vinculada a otra empresa.'
+      });
     }
     console.error('vincularCheckout:', error);
     res.status(500).json({ message: 'Error al vincular pago' });
@@ -262,6 +275,49 @@ const confirmarPagoManual = async (req, res) => {
   }
 };
 
+const eliminarPagoManual = async (req, res) => {
+  try {
+    if (!isSaas()) {
+      return res.status(404).json({ message: 'No disponible en modo enterprise' });
+    }
+    const orderNumber = (req.body?.orderNumber || req.params?.orderNumber || '').trim();
+    const data = await withPool((pool) =>
+      suscripcionConciliacionService.eliminarSolicitudPagoManualAdmin(pool, req.user, orderNumber)
+    );
+    return res.status(200).json({ data, message: 'Solicitud de pago eliminada' });
+  } catch (error) {
+    if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
+      return res.status(403).json({
+        message: 'NO_AUTORIZADO_CONCILIACION',
+        detail: 'No autorizado para eliminar pagos de suscripción (solo admin de la empresa principal).'
+      });
+    }
+    if (error.message === 'NO_ELIMINAR_PAGADO') {
+      return res.status(400).json({
+        message: 'NO_ELIMINAR_PAGADO',
+        detail: 'No se pueden eliminar órdenes ya marcadas como PAGADO (historial de cobro).'
+      });
+    }
+    if (error.message === 'NO_ELIMINAR_DEMO') {
+      return res.status(400).json({ message: 'NO_ELIMINAR_DEMO', detail: 'No se eliminan checkouts demo desde este panel.' });
+    }
+    if (error.message === 'DATOS_INCOMPLETOS' || error.message === 'CHECKOUT_NO_ENCONTRADO') {
+      return res.status(400).json({
+        message: error.message,
+        detail:
+          error.message === 'CHECKOUT_NO_ENCONTRADO'
+            ? 'No se encontró la orden o ya no se puede eliminar.'
+            : 'Falta el número de orden.'
+      });
+    }
+    console.error('eliminarPagoManual:', error);
+    return res.status(500).json({
+      message: 'ERROR_ELIMINAR',
+      detail: error?.message ? String(error.message).slice(0, 180) : 'Error al eliminar la solicitud de pago'
+    });
+  }
+};
+
 module.exports = {
   crearPagoSuscripcion,
   vincularCheckout,
@@ -272,5 +328,6 @@ module.exports = {
   conciliacionCulqi,
   conciliacionCulqiCsv,
   listarPagosManuales,
-  confirmarPagoManual
+  confirmarPagoManual,
+  eliminarPagoManual
 };

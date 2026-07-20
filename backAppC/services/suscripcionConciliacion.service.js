@@ -63,6 +63,41 @@ async function confirmarPagoManualAdmin(pool, user, orderNumber) {
   return suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
 }
 
+/**
+ * Admin elimina/anula solicitud abandonada o fallida.
+ * No elimina órdenes PAGADO. Primero intenta DELETE; si falla, marca ANULADO.
+ */
+async function eliminarSolicitudPagoManualAdmin(pool, user, orderNumber) {
+  const autorizado = await suscripcionCatalogoAdminService.puedeEditarCatalogoPlanes(pool, user);
+  if (!autorizado) throw new Error('NO_AUTORIZADO_CONCILIACION');
+
+  const on = (orderNumber || '').trim();
+  if (!on) throw new Error('DATOS_INCOMPLETOS');
+
+  const row = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
+  if (!row) throw new Error('CHECKOUT_NO_ENCONTRADO');
+  if (String(row.planCode || '').toLowerCase() === 'demo') throw new Error('NO_ELIMINAR_DEMO');
+  if (String(row.estado || '').toUpperCase() === 'PAGADO') {
+    throw new Error('NO_ELIMINAR_PAGADO');
+  }
+  if (String(row.estado || '').toUpperCase() === 'ANULADO') {
+    return { orderNumber: on, eliminado: true, modo: 'ya_anulada' };
+  }
+
+  try {
+    const deleted = await suscripcionCheckoutRepository.eliminarPorOrderNumber(pool, on);
+    if (deleted > 0) {
+      return { orderNumber: on, eliminado: true, modo: 'borrado' };
+    }
+  } catch (errDel) {
+    console.error('eliminarSolicitudPagoManualAdmin DELETE:', errDel?.message || errDel);
+  }
+
+  const anuladas = await suscripcionCheckoutRepository.anularPorOrderNumber(pool, on);
+  if (!anuladas) throw new Error('CHECKOUT_NO_ENCONTRADO');
+  return { orderNumber: on, eliminado: true, modo: 'anulado' };
+}
+
 function convertirCsv(rows) {
   const headers = [
     'orderNumber',
@@ -92,6 +127,7 @@ module.exports = {
   listarConciliacion,
   listarPagosManualesPendientes,
   confirmarPagoManualAdmin,
+  eliminarSolicitudPagoManualAdmin,
   convertirCsv
 };
 

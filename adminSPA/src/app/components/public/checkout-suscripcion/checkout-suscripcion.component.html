@@ -109,6 +109,47 @@
               }
             </section>
 
+            <aside class="checkout-transparencia" aria-labelledby="transparenciaTitulo">
+              <div class="checkout-transparencia-head">
+                <span class="checkout-transparencia-icon" aria-hidden="true">
+                  <i class="bi bi-shield-check"></i>
+                </span>
+                <div>
+                  <h2 id="transparenciaTitulo" class="checkout-transparencia-title">
+                    Transparencia: comprobante y entrega
+                  </h2>
+                  <p class="checkout-transparencia-lead mb-0">
+                    Información clara sobre facturación y envío del PDF, antes de pagar.
+                  </p>
+                </div>
+              </div>
+              <ul class="checkout-transparencia-list">
+                <li>
+                  <strong>Facturación con sus datos de registro.</strong>
+                  El comprobante electrónico se emitirá con la razón social, RUC y domicilio
+                  que registre (o ya tenga) en la cuenta de su empresa.
+                </li>
+                <li>
+                  <strong>PDF al celular de la cuenta.</strong>
+                  Enviaremos el PDF del comprobante al número de WhatsApp/celular que registre
+                  en su cuenta. Mantenga ese dato actualizado.
+                </li>
+                <li>
+                  <strong>Pago con Culqi (tarjeta).</strong>
+                  Si elige Culqi, el cargo lo procesa Culqi en un formulario seguro;
+                  los datos de la tarjeta no pasan por nuestros servidores.
+                </li>
+              </ul>
+              <p class="checkout-transparencia-foot mb-0">
+                Al continuar, confirma que conoce estas condiciones de facturación y entrega del comprobante.
+                Políticas de
+                <a routerLink="/politicas/devoluciones" target="_blank" rel="noopener">devoluciones</a>
+                y
+                <a routerLink="/politicas/privacidad" target="_blank" rel="noopener">privacidad</a>
+                disponibles.
+              </p>
+            </aside>
+
             @if (c.esDemo) {
               <p class="checkout-hint mb-3">La demo no usa pasarela. Al confirmar podrá registrar la empresa con esta orden.</p>
               <button
@@ -195,8 +236,10 @@
                 <section class="pago-culqi-panel">
                   @if (culqiDisponible()) {
                     <p class="pago-culqi-lead">
-                      Al continuar se abre el <strong>formulario seguro de Culqi</strong>.
-                      Allí ingresa los datos de la tarjeta; el número no pasa por nuestro servidor.
+                      Al continuar se abre el <strong>formulario seguro de Culqi</strong>
+                      (procesamiento certificado). El número de tarjeta no pasa por nuestro servidor.
+                      Tras el pago, el comprobante se emitirá con los <strong>datos de registro de su empresa</strong>
+                      y el PDF se enviará al <strong>celular registrado en la cuenta</strong>.
                     </p>
                     @if (!emailListo()) {
                       <p class="pago-culqi-hint text-danger mb-2">
