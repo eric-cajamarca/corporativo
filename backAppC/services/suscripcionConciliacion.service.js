@@ -46,8 +46,11 @@ async function confirmarPagoManualAdmin(pool, user, orderNumber) {
   if (!row) throw new Error('CHECKOUT_NO_ENCONTRADO');
   if (row.planCode === 'demo') throw new Error('USAR_CONFIRMACION_DEMO');
   if (row.estado === 'PAGADO') {
-    await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, on, user);
-    return row;
+    const resultado = await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, on, user);
+    if (resultado && resultado.aplicado === false && resultado.motivo === 'SIN_EMPRESA') {
+      throw new Error('CHECKOUT_SIN_EMPRESA');
+    }
+    return suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
   }
   if (row.estado !== ESTADO_PENDIENTE_VALIDACION && row.estado !== 'PENDIENTE') {
     throw new Error('CHECKOUT_NO_PERMITE_CONFIRMAR');
@@ -59,7 +62,11 @@ async function confirmarPagoManualAdmin(pool, user, orderNumber) {
     : 'MANUAL-ADMIN-OK';
 
   await suscripcionCheckoutRepository.actualizarEstadoPago(pool, on, 'PAGADO', idTx);
-  await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, on, user);
+  const resultado = await empresaSuscripcionBootstrap.intentarAplicarPagoCheckoutAEmpresa(pool, on, user);
+  if (resultado && resultado.aplicado === false && resultado.motivo === 'SIN_EMPRESA') {
+    // Queda PAGADO; el admin puede vincular después o el cliente crear empresa
+    console.error('contexto: confirmarPagoManualAdmin PAGADO pero sin empresa vinculada', on);
+  }
   return suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, on);
 }
 

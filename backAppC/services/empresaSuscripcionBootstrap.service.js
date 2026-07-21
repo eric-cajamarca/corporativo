@@ -139,27 +139,41 @@ function idEmpresaDesdeJwt(authUser) {
 
 /**
  * Tras marcar un checkout CHK-* como PAGADO: actualiza EmpresaSuscripcion sin intervención del cliente.
- * Usa idEmpresaCliente del checkout (sesión al iniciar o webhook) o, si coincide, la empresa del JWT.
+ * Prioriza siempre idEmpresaCliente del checkout (empresa que pagó / vinculó).
+ * El JWT solo se usa si el checkout aún no tiene empresa (p. ej. el propio cliente acaba de pagar con Culqi).
+ * Importante: cuando confirma el admin de la empresa principal, idAuth ≠ idCliente y NO debe bloquear.
  */
 async function intentarAplicarPagoCheckoutAEmpresa(pool, orderNumber, authUser) {
   const chk = await suscripcionCheckoutRepository.obtenerPorOrderNumber(pool, orderNumber);
   if (!chk || String(chk.estado || '').toUpperCase() !== 'PAGADO') {
-    return;
+    return { aplicado: false, motivo: 'NO_PAGADO' };
   }
+
   const idChk = chk.idEmpresaCliente ? String(chk.idEmpresaCliente).trim() : null;
   const idAuth = idEmpresaDesdeJwt(authUser);
-  if (idChk && idAuth && idChk.toLowerCase() !== String(idAuth).toLowerCase()) {
-    console.error('contexto: intentarAplicarPagoCheckoutAEmpresa empresa checkout distinta a sesión, omitido');
-    return;
-  }
+
+  // Empresa del checkout primero (cliente). Nunca usar la empresa del admin si el checkout ya tiene cliente.
   const idEmpresa = idChk || idAuth || null;
   if (!idEmpresa) {
-    return;
+    console.error(
+      'contexto: intentarAplicarPagoCheckoutAEmpresa sin empresa destino (ordene sin vincular y sin sesión cliente)'
+    );
+    return { aplicado: false, motivo: 'SIN_EMPRESA' };
   }
+
+  if (idChk && idAuth && idChk.toLowerCase() !== String(idAuth).toLowerCase()) {
+    // Esperable al confirmar desde panel de plataforma: admin ≠ cliente. Aplicar al cliente.
+    console.error(
+      'contexto: intentarAplicarPagoCheckoutAEmpresa aplicando plan a empresa del checkout (admin distinto)'
+    );
+  }
+
   try {
-    await vincularCheckoutPagado(pool, idEmpresa, orderNumber);
+    const sub = await vincularCheckoutPagado(pool, idEmpresa, orderNumber);
+    return { aplicado: true, idEmpresa, planCode: sub?.planCode || chk.planCode, estado: sub?.estado };
   } catch (err) {
     console.error('contexto: intentarAplicarPagoCheckoutAEmpresa', err.message || err);
+    return { aplicado: false, motivo: err.message || 'ERROR' };
   }
 }
 

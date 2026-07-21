@@ -75,6 +75,33 @@ export class PagosSuscripcionManualComponent implements OnInit {
     ) {
       return;
     }
+    this.ejecutarConfirmar(row, 'Pago marcado como PAGADO. Plan habilitado si corresponde.');
+  }
+
+  /** Reaplica plan a empresa vinculada (órdenes ya PAGADO que quedaron en demo por bug previo). */
+  aplicarPlan(row: PagoManualRow): void {
+    if (!row?.orderNumber || row.estado !== 'PAGADO') return;
+    if (!row.idEmpresaCliente) {
+      if (typeof iziToast !== 'undefined') {
+        iziToast.error({
+          title: 'Sin empresa',
+          message: 'Esta orden no tiene empresa vinculada.',
+          position: 'topRight'
+        });
+      }
+      return;
+    }
+    if (
+      !window.confirm(
+        `¿Aplicar plan ${row.planCode} a la empresa vinculada?\nOrden ${row.orderNumber}`
+      )
+    ) {
+      return;
+    }
+    this.ejecutarConfirmar(row, 'Plan aplicado a la empresa. Pida al cliente recargar Mi suscripción.');
+  }
+
+  private ejecutarConfirmar(row: PagoManualRow, okMsg: string): void {
     this.confirmando.set(row.orderNumber);
     this.saas.confirmarPagoManual(row.orderNumber).subscribe({
       next: () => {
@@ -82,7 +109,7 @@ export class PagosSuscripcionManualComponent implements OnInit {
         if (typeof iziToast !== 'undefined') {
           iziToast.success({
             title: 'OK',
-            message: 'Pago marcado como PAGADO. Plan habilitado si corresponde.',
+            message: okMsg,
             position: 'topRight'
           });
         }
@@ -93,7 +120,7 @@ export class PagosSuscripcionManualComponent implements OnInit {
         if (typeof iziToast !== 'undefined') {
           iziToast.error({
             title: 'Error',
-            message: err?.error?.message || 'No se pudo confirmar el pago',
+            message: this.mensajeErrorHttp(err, 'No se pudo confirmar / aplicar el plan'),
             position: 'topRight'
           });
         }

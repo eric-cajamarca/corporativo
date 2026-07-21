@@ -41,7 +41,7 @@
                   <strong>Gratis · 14 días</strong>
                 } @else {
                   <strong>S/ {{ c.montoSoles | number : '1.2-2' }}</strong>
-                  <span class="hint">+ IGV / {{ billingCycle() === 'yearly' ? 'año' : 'mes' }}</span>
+                  <span class="hint">/ {{ billingCycle() === 'yearly' ? 'año' : 'mes' }}</span>
                 }
               </div>
             </div>
@@ -411,19 +411,31 @@
                         Orden en <strong>pendiente de validación</strong>. Envíe el voucher al WhatsApp
                         <strong>993289440</strong> con su número de orden.
                       </p>
-                      <button type="button" class="btn btn-checkout-wa w-100" (click)="abrirWhatsAppVoucher()">
+                      <button type="button" class="btn btn-checkout-wa w-100 mb-2" (click)="abrirWhatsAppVoucher()">
                         <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>
-                        Enviar voucher por WhatsApp
+                        Reabrir WhatsApp (voucher)
                       </button>
+                      <button type="button" class="btn btn-checkout-primary w-100" (click)="continuarTrasPagoManual()">
+                        Continuar
+                      </button>
+                      <p class="checkout-hint mt-2 mb-0">
+                        Con sesión: Mi suscripción. Sin sesión: crear empresa (con el número de orden).
+                      </p>
                     </div>
                   }
                 </section>
               }
             }
 
-            <button type="button" class="btn btn-link checkout-secondary-link w-100 mt-3" (click)="irCrearEmpresa()">
-              Ir a crear empresa (con número de orden)
-            </button>
+            @if (!pagoManualReportado()) {
+              <button type="button" class="btn btn-link checkout-secondary-link w-100 mt-3" (click)="irCrearEmpresa()">
+                Ir a crear empresa (con número de orden)
+              </button>
+            } @else {
+              <button type="button" class="btn btn-link checkout-secondary-link w-100 mt-3" (click)="continuarTrasPagoManual()">
+                Continuar al siguiente paso
+              </button>
+            }
           </div>
         </div>
       }

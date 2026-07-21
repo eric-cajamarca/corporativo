@@ -104,6 +104,16 @@
                           {{ confirmando() === row.orderNumber ? '…' : 'Marcar pagado' }}
                         </button>
                       }
+                      @if (row.estado === 'PAGADO' && row.idEmpresaCliente) {
+                        <button
+                          type="button"
+                          class="btn btn-outline-primary btn-sm"
+                          [disabled]="confirmando() === row.orderNumber || eliminando() === row.orderNumber"
+                          (click)="aplicarPlan(row)"
+                          title="Reaplicar plan a la empresa vinculada">
+                          {{ confirmando() === row.orderNumber ? '…' : 'Aplicar plan' }}
+                        </button>
+                      }
                       @if (puedeEliminar(row)) {
                         <button
                           type="button"
@@ -174,6 +184,15 @@
                     [disabled]="confirmando() === row.orderNumber || eliminando() === row.orderNumber"
                     (click)="confirmar(row)">
                     {{ confirmando() === row.orderNumber ? '…' : 'Marcar pagado' }}
+                  </button>
+                }
+                @if (row.estado === 'PAGADO' && row.idEmpresaCliente) {
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    [disabled]="confirmando() === row.orderNumber || eliminando() === row.orderNumber"
+                    (click)="aplicarPlan(row)">
+                    {{ confirmando() === row.orderNumber ? '…' : 'Aplicar plan' }}
                   </button>
                 }
                 @if (puedeEliminar(row)) {

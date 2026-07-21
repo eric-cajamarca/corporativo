@@ -154,7 +154,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
             this.checkout.set({ ...this.checkout()!, pagoManual: data.pagoManual });
           }
           this.mensaje.set(
-            'Orden registrada. Envíe el voucher al WhatsApp 993289440 para validar el pago y habilitar el plan.'
+            'Orden registrada. Abriremos WhatsApp para el voucher y lo llevaremos al siguiente paso.'
           );
           try {
             window.localStorage.setItem(
@@ -164,7 +164,11 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
           } catch {
             /* ignore */
           }
+          // Voucher primero; luego mismo destino que Culqi (sesión → Mi suscripción / sin sesión → crear empresa).
           this.abrirWhatsAppVoucher();
+          window.setTimeout(() => {
+            void this.redirigirPostCheckoutPagado();
+          }, 450);
         },
         error: (err) => {
           this.procesando.set(false);
@@ -187,7 +191,7 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
       `Orden: ${c.orderNumber}`,
       `Plan: ${c.planCode}`,
       `Ciclo: ${ciclo}`,
-      `Monto: S/ ${Number(c.montoSoles).toFixed(2)} + IGV`,
+      `Monto: S/ ${Number(c.montoSoles).toFixed(2)}`,
       `Medio: ${medio}`,
       `Correo: ${(this.emailPago || '').trim()}`,
       this.referenciaPago.trim() ? `Referencia/N° operación: ${this.referenciaPago.trim()}` : null,
@@ -477,8 +481,8 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Tras Culqi o demo confirmados en servidor: sesión iniciada → vincular en cuenta; si no → crear empresa.
-   * El número de orden queda en BD; además guardamos respaldo en localStorage por si pierde la URL.
+   * Tras Culqi, demo o pago manual reportado: sesión → Mi suscripción; si no → crear empresa.
+   * El número de orden queda en BD y en query (?checkout=); localStorage como respaldo.
    */
   private async redirigirPostCheckoutPagado(): Promise<void> {
     const order = (this.checkout()?.orderNumber || '').trim();
@@ -514,6 +518,11 @@ export class CheckoutSuscripcionComponent implements OnInit, OnDestroy {
     } else {
       await this.router.navigate(['/crear-empresa'], { queryParams: { checkout: order } });
     }
+  }
+
+  /** Continuar manualmente tras reportar pago (si el usuario se quedó en la pantalla). */
+  continuarTrasPagoManual(): void {
+    void this.redirigirPostCheckoutPagado();
   }
 
   private construirReturnUrl3ds(): string {

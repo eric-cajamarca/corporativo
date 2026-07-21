@@ -141,7 +141,6 @@
                 </ul>
                 <p class="plan-precio">
                   Desde <strong>S/ {{ plan.precioMensualPen | number : '1.0-0' }}</strong>/mes
-                  <span class="plan-precio-igv">+ IGV</span>
                 </p>
                 <a class="btn btn-outline-primary w-100" [routerLink]="['/suscribirse', plan.planCode]" [queryParams]="{ billing: 'monthly' }">
                   Contratar

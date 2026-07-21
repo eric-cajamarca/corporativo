@@ -962,6 +962,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
     this._comprobanteService.obtenerComprobantesVenta(this.ventas.idSucursal).subscribe({
       next: (response) => {
         this.comprobantes = response.data || [];
+        this.aplicarDefaultsNuevaVenta();
       },
       error: () => {}
     });
@@ -995,10 +996,8 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
   this._documentosService.getFormasPago().subscribe({
     next: (response) => {
       this.formasPago = response.data || [];
-      const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
-      if (efectivo) {
-        this.formaPagoSeleccionada = { ...efectivo };
-      }
+      this.seleccionarFormaPagoEfectivoPorDefecto();
+      setTimeout(() => this.aplicarDefaultsNuevaVenta(), 100);
     },
     error: (err) => {
       console.error('Error:', err);
@@ -1052,6 +1051,7 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
           const contado = this.mediosPago.find((m: any) => (m.codigo || '').toString().trim() === '009');
           this.ventas.idMediosPago = contado ? String(contado.idMediosPago) : String(this.mediosPago[0].idMediosPago);
         }
+        this.aplicarDefaultsNuevaVenta();
       },
       (error) => {
         console.error('Error al cargar medios de pago:', error);
@@ -1075,7 +1075,60 @@ export class CreateVentasComponent implements OnInit, AfterViewInit, OnDestroy {
 
   }
 
+  /**
+   * Igual que venta rápida: boleta (03), contado, fecha hoy y cliente varios (DNI 00000000).
+   */
+  aplicarDefaultsNuevaVenta(): void {
+    if (!this.ventas.idComprobante && this.comprobantes?.length) {
+      const boleta = this.comprobantes.find(
+        (c: { codigo?: string }) => String(c.codigo ?? '').trim() === '03'
+      );
+      const elegido = boleta ?? this.comprobantes[0];
+      if (elegido?.idComprobante != null) {
+        this.ventas.idComprobante = elegido.idComprobante;
+        this.cargarDatosComprobantePorId(elegido.idComprobante);
+      }
+    }
+    if (this.ventas.idEstadoPago == null || this.ventas.idEstadoPago === '') {
+      this.ventas.idEstadoPago = this.configDefaults.idEstadoPagoPorDefecto ?? 2;
+    }
+    const medioContado = (this.mediosPago || []).find(
+      (m: { descripcion?: string; codigo?: string }) => {
+        const d = String(m.descripcion ?? '').toUpperCase();
+        const cod = String(m.codigo ?? '').trim();
+        return d.includes('CONTADO') || cod === '001' || cod === '1' || cod === '009';
+      }
+    );
+    if (medioContado?.idMediosPago != null && !this.ventas.idMediosPago) {
+      this.ventas.idMediosPago = medioContado.idMediosPago;
+    }
+    if (!this.cliente?.ruc && !this.cliente?.idCliente) {
+      this.aplicarClienteVariosPorDefecto();
+    }
+    if (!this.ventas.fEmision) {
+      this.ventas.fEmision = getFechaHoyLocal();
+    }
+  }
 
+  /** Cliente genérico (DNI 00000000) si existe en BD; si no, datos mínimos para registrar la venta. */
+  private aplicarClienteVariosPorDefecto(): void {
+    if (this.tieneClienteParaVenta()) {
+      return;
+    }
+    if (!this.ventas.idDocumento) {
+      this.ventas.idDocumento = this.ID_DOC_DNI;
+    }
+    this.cliente.ruc = '00000000';
+    this.cliente.rSocial = 'CLIENTE VARIOS';
+    this._clienteService.obtener_cliente_ruc('00000000').subscribe({
+      next: (response) => {
+        if (response?.data?.length) {
+          this.aplicarClienteDesdeBd(response.data[0]);
+        }
+      },
+      error: () => {}
+    });
+  }
 
   private cargarPermitirVentaMultiSucursal(): void {
     this.empresaService.refreshEmpresaFromApi().subscribe({
@@ -2576,9 +2629,7 @@ abrirModalPrecios(item: any) {
     if (idEstadoPago === 1 && this.cabeceraEsCreditoFinanciacion()) return;
     const total = Math.round((Number(this.ventas.total) || 0) * 100) / 100;
     if (total <= 0) return;
-    const efectivo = this.formasPago.find(
-      (f: FormaPago) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
-    );
+    const efectivo = this.buscarFormaPagoEfectivo();
     if (!efectivo?.idFormaPago) return;
     const idForma = Number(efectivo.idFormaPago);
     this.detallePago.push({
@@ -2590,17 +2641,33 @@ abrirModalPrecios(item: any) {
     });
   }
 
+  /** Localiza la forma EFECTIVO en el catálogo (tolerante a mayúsculas / espacios). */
+  private buscarFormaPagoEfectivo(): FormaPago | undefined {
+    return (this.formasPago || []).find((f: FormaPago) =>
+      (f.descripcion || '').trim().toUpperCase().includes('EFECTIVO')
+    );
+  }
+
+  /** Deja el combo del modal en Efectivo (mismo tipo de id que las opciones del select). */
+  seleccionarFormaPagoEfectivoPorDefecto(): void {
+    const efectivo = this.buscarFormaPagoEfectivo();
+    if (!efectivo) return;
+    const id = efectivo.idFormaPago;
+    const idOpcion = this.formasPago.find((f) => Number(f.idFormaPago) === Number(id))?.idFormaPago ?? id;
+    this.formaPagoSeleccionada = { ...efectivo, idFormaPago: idOpcion as number };
+    this.detailForm.formaPago = efectivo.descripcion || 'Efectivo';
+  }
+
+  /** Compara ids de forma de pago (number/string) para el select del modal. */
+  compareFormaPagoId = (a: unknown, b: unknown): boolean =>
+    a != null && b != null && !Number.isNaN(Number(a)) && Number(a) === Number(b);
+
   /** Al abrir el modal Forma de pago: selecciona Efectivo, fila por defecto con el total (si aplica) y sincroniza resumen. */
   abrirModalPago(): void {
     if (!this.validarAntesDeCobrar()) {
       return;
     }
-    const efectivo = this.formasPago.find(
-      (f: FormaPago) => (f.descripcion || '').trim().toUpperCase() === 'EFECTIVO'
-    );
-    if (efectivo) {
-      this.formaPagoSeleccionada = { ...efectivo };
-    }
+    this.seleccionarFormaPagoEfectivoPorDefecto();
     this.aplicarDetallePagoEfectivoPorDefectoSiVacio();
     this.actualizarMontoSaldo();
     const total = Number(this.ventas.total) || 0;
@@ -3736,13 +3803,17 @@ abrirModalPrecios(item: any) {
     this.direccionCliente = undefined;
 
     // Reset forma de pago seleccionada a efectivo si existe
-    const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase() === 'EFECTIVO');
-    if (efectivo) {
-      this.formaPagoSeleccionada = { ...efectivo };
+    this.seleccionarFormaPagoEfectivoPorDefecto();
+    if (!this.formaPagoSeleccionada?.idFormaPago) {
+      const efectivo = this.formasPago.find((f: FormaPago) => (f.descripcion || '').toUpperCase().includes('EFECTIVO'));
+      if (efectivo) {
+        this.formaPagoSeleccionada = { ...efectivo };
+      }
     }
 
     this.actualizaTotales();
     this._productoService.limpiarCacheListaProductos();
+    setTimeout(() => this.aplicarDefaultsNuevaVenta(), 150);
   }
 }
 

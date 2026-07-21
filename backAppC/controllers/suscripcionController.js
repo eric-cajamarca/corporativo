@@ -256,11 +256,18 @@ const confirmarPagoManual = async (req, res) => {
     );
     return res.status(200).json({
       data,
-      message: 'Pago marcado como PAGADO. El plan queda habilitado si la orden está vinculada a una empresa.'
+      message: 'Pago confirmado. Plan aplicado a la empresa vinculada a la orden (si existe).'
     });
   } catch (error) {
     if (error.message === 'NO_AUTORIZADO_CONCILIACION') {
       return res.status(403).json({ message: 'No autorizado para validar pagos de suscripción.' });
+    }
+    if (error.message === 'CHECKOUT_SIN_EMPRESA') {
+      return res.status(400).json({
+        message: 'CHECKOUT_SIN_EMPRESA',
+        detail:
+          'El pago está PAGADO pero la orden no tiene empresa vinculada. El cliente debe iniciar sesión o crear empresa con ese número de orden.'
+      });
     }
     if (
       error.message === 'DATOS_INCOMPLETOS' ||

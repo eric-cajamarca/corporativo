@@ -169,6 +169,52 @@ export class IndexEmpresaComponent implements OnInit {
     this.page = newPage;
   }
 
+  /** Página actual del listado (tabla desktop y cards móvil). */
+  empresasPagina(): any[] {
+    const start = (this.page - 1) * this.pageSize;
+    return this.empresas.slice(start, start + this.pageSize);
+  }
+
+  etiquetaEstSunat(est: string | null | undefined): string {
+    switch (est) {
+      case 'ACTIVO':
+        return 'Activo';
+      case 'BAJA DE OFICIO':
+        return 'Baja de oficio';
+      case 'BAJA PROVISIONAL':
+        return 'Baja provisional';
+      case 'BAJA DEFINITIVA':
+        return 'Baja definitiva';
+      case 'SUSPENSION TEMPORAL':
+        return 'Suspensión temporal';
+      default:
+        return 'Sin estado';
+    }
+  }
+
+  claseBadgeEstSunat(est: string | null | undefined): string {
+    switch (est) {
+      case 'ACTIVO':
+        return 'text-bg-success';
+      case 'BAJA DEFINITIVA':
+        return 'text-bg-danger';
+      case 'BAJA DE OFICIO':
+      case 'BAJA PROVISIONAL':
+      case 'SUSPENSION TEMPORAL':
+        return 'text-bg-warning';
+      default:
+        return 'text-bg-secondary';
+    }
+  }
+
+  etiquetaCicloSuscripcion(ciclo: string | null | undefined): string {
+    const c = (ciclo || '').toLowerCase();
+    if (c === 'monthly' || c === 'mensual') return 'Mensual';
+    if (c === 'yearly' || c === 'anual') return 'Anual';
+    if (!c || c === 'none') return '—';
+    return ciclo || '—';
+  }
+
   // =============================================
   // GESTORES DE EMPRESAS
   // =============================================
