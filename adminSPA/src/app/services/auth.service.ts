@@ -58,22 +58,15 @@ export class AuthService {
   private isPublicRoute(): boolean {
     const browserPublic = isPublicBrowserLocation();
     const routerPublic = isPublicUrl(this.router.url);
-    const result = browserPublic || routerPublic;
-    // #region agent log
-    fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.service.ts:isPublicRoute',message:'public route check',data:{browserPublic,routerPublic,result,routerUrl:this.router.url,browserPath:globalThis.location?.pathname},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
-    return result;
+    return browserPublic || routerPublic;
   }
 
   initialize() {
     this.router.events.pipe(
       filter((event): event is NavigationEnd => event instanceof NavigationEnd),
       take(1)
-    ).subscribe((event) => {
+    ).subscribe(() => {
       const isPublic = this.isPublicRoute();
-      // #region agent log
-      fetch('http://127.0.0.1:7846/ingest/a2bad43c-6b04-4aa9-9882-ff32cc25e5d5',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'acf3ea'},body:JSON.stringify({sessionId:'acf3ea',location:'auth.service.ts:initialize',message:'first NavigationEnd',data:{url:event.url,urlAfterRedirects:event.urlAfterRedirects,isPublic,willVerifyToken:!isPublic},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
       if (!isPublic) {
         this.verifyToken().subscribe();
       }
